@@ -48,3 +48,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.11"
 strict = true
 packages = ["hexagent"]
+
+[[tool.mypy.overrides]]
+module = ["CoolProp", "CoolProp.*"]
+ignore_missing_imports = true
