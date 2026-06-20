@@ -1,6 +1,6 @@
 # TASK-000 — Project bootstrap
 
-**Status:** IN_PROGRESS  
+**Status:** DONE  
 **Milestone:** M0  
 **Priority:** P0  
 **Depends on:** None
@@ -25,12 +25,12 @@ Create a reviewable repository foundation that enforces deterministic engineerin
 
 ## Acceptance criteria
 
-- [ ] Repository installs on Python 3.11 and 3.12.
-- [ ] Ruff, mypy, pytest and dependency audit pass.
-- [ ] README links to specifications, backlog and task cards.
-- [ ] No temporary, licensed, confidential or generated files are committed.
-- [ ] Demonstration calculations are explicitly marked preliminary.
-- [ ] Bootstrap PR is reviewable and mergeable.
+- [x] Repository installs on Python 3.11 and 3.12.
+- [x] Ruff, mypy, pytest and dependency audit pass.
+- [x] README links to specifications, backlog and task cards.
+- [x] No temporary, licensed, confidential or generated files are committed.
+- [x] Demonstration calculations are explicitly marked preliminary.
+- [x] Bootstrap PR is merged into `main`.
 
 ## Test plan
 
@@ -38,4 +38,4 @@ Run `ruff check .`, `mypy`, `pytest --cov=hexagent` and `pip-audit` in CI.
 
 ## Deliverables
 
-Repository scaffold and Draft PR #1.
+Repository scaffold, executable task system and merged PR #1.
