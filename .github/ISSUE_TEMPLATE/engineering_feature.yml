@@ -1,0 +1,35 @@
+name: Engineering feature
+description: Add a model, correlation, solver or workflow
+title: "[FEATURE] "
+labels: ["engineering", "needs-triage"]
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+    validations:
+      required: true
+  - type: textarea
+    id: basis
+    attributes:
+      label: Engineering basis and sources
+    validations:
+      required: true
+  - type: textarea
+    id: envelope
+    attributes:
+      label: Applicability envelope
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Test and validation cases
+    validations:
+      required: true

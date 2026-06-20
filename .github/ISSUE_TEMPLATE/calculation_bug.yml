@@ -1,0 +1,29 @@
+name: Calculation defect
+description: Report an incorrect, unstable or non-reproducible calculation
+title: "[CALC BUG] "
+labels: ["bug", "engineering"]
+body:
+  - type: textarea
+    id: case
+    attributes:
+      label: Minimal reproducible case
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result and reference
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Software version or commit
+    validations:
+      required: true

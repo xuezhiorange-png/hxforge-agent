@@ -1,0 +1,92 @@
+{
+  "name": "water-to-water-demo",
+  "hot_stream": {
+    "fluid": {
+      "backend": "CoolProp",
+      "name": "Water",
+      "phase_hint": "liquid"
+    },
+    "mass_flow": {
+      "value": 2.0,
+      "unit": "kg/s"
+    },
+    "inlet_temperature": {
+      "value": 90.0,
+      "unit": "degC"
+    },
+    "outlet_temperature": {
+      "value": 60.0,
+      "unit": "degC"
+    },
+    "inlet_pressure": {
+      "value": 4.0,
+      "unit": "bar"
+    },
+    "allowable_pressure_drop": {
+      "value": 50.0,
+      "unit": "kPa"
+    },
+    "fouling_resistance": {
+      "value": 0.0002,
+      "unit": "m^2*K/W"
+    }
+  },
+  "cold_stream": {
+    "fluid": {
+      "backend": "CoolProp",
+      "name": "Water",
+      "phase_hint": "liquid"
+    },
+    "mass_flow": {
+      "value": 2.0,
+      "unit": "kg/s"
+    },
+    "inlet_temperature": {
+      "value": 20.0,
+      "unit": "degC"
+    },
+    "outlet_temperature": {
+      "value": 50.0,
+      "unit": "degC"
+    },
+    "inlet_pressure": {
+      "value": 3.0,
+      "unit": "bar"
+    },
+    "allowable_pressure_drop": {
+      "value": 50.0,
+      "unit": "kPa"
+    },
+    "fouling_resistance": {
+      "value": 0.0002,
+      "unit": "m^2*K/W"
+    }
+  },
+  "constraints": {
+    "design_pressure_hot": {
+      "value": 10.0,
+      "unit": "bar"
+    },
+    "design_pressure_cold": {
+      "value": 10.0,
+      "unit": "bar"
+    },
+    "design_temperature_hot": {
+      "value": 120.0,
+      "unit": "degC"
+    },
+    "design_temperature_cold": {
+      "value": 80.0,
+      "unit": "degC"
+    },
+    "corrosion_allowance": {
+      "value": 1.0,
+      "unit": "mm"
+    },
+    "required_area_margin_fraction": 0.1
+  },
+  "target_duty": {
+    "value": 250.0,
+    "unit": "kW"
+  }
+}
