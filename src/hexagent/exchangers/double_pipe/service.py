@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from hexagent.correlations.thermal import counterflow_lmtd
 from hexagent.core.units import to_si
+from hexagent.correlations.thermal import counterflow_lmtd
 from hexagent.domain.models import (
     CalculationResult,
     DesignCase,

@@ -29,6 +29,9 @@ uvicorn hexagent.api.main:app --reload
 
 - `docs/MASTER_DEVELOPMENT_SPEC.md`
 - `docs/ARCHITECTURE.md`
+- `docs/TASK_BACKLOG.md`
+- `docs/tasks/README.md`
+- `docs/DEVELOPMENT_WORKFLOW.md`
 - `AGENTS.md`
 
 ## Repository policy

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
 
-class PhaseHint(str, Enum):
+class PhaseHint(StrEnum):
     AUTO = "auto"
     LIQUID = "liquid"
     GAS = "gas"
@@ -58,7 +58,7 @@ class DesignCase(BaseModel):
     target_duty: Quantity | None = None
 
     @model_validator(mode="after")
-    def check_thermal_specification(self) -> "DesignCase":
+    def check_thermal_specification(self) -> DesignCase:
         known_outlets = sum(
             x is not None
             for x in (self.hot_stream.outlet_temperature, self.cold_stream.outlet_temperature)
