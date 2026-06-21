@@ -1,29 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Protocol
 
 from hexagent.domain.models import CalculationResult, DesignCase
-
-
-@dataclass(frozen=True)
-class FluidState:
-    temperature_k: float
-    pressure_pa: float
-    density_kg_m3: float
-    cp_j_kg_k: float
-    viscosity_pa_s: float
-    conductivity_w_m_k: float
-    enthalpy_j_kg: float
-    phase: str
-
-
-class PropertyProvider(Protocol):
-    name: str
-    version: str
-
-    def state_tp(self, fluid_name: str, temperature_k: float, pressure_pa: float) -> FluidState:
-        ...
+from hexagent.properties.base import FluidState, PropertyProvider
 
 
 class ExchangerService(Protocol):
@@ -34,3 +14,6 @@ class ExchangerService(Protocol):
 
     def rate(self, case: DesignCase, geometry: dict[str, float]) -> CalculationResult:
         ...
+
+
+__all__ = ["ExchangerService", "FluidState", "PropertyProvider"]
