@@ -7,6 +7,7 @@ import pytest
 from hexagent.correlations.errors import (
     CorrelationDuplicateError,
     CorrelationNotFoundError,
+    CorrelationVersionNotFoundError,
 )
 from hexagent.correlations.models import (
     ApplicabilityEnvelope,
@@ -40,8 +41,9 @@ def _make_definition(
     flow_regimes: frozenset[FlowRegime] | None = None,
     bounds: tuple[NumericBound, ...] | None = None,
     implementation_status: CorrelationImplementationStatus = (
-        CorrelationImplementationStatus.implemented
+        CorrelationImplementationStatus.metadata_only
     ),
+    implementation_ref: str | None = None,
     tags: frozenset[str] = frozenset(),
 ) -> CorrelationDefinition:
     gt = geometry or frozenset({GeometryType.circular_tube})
@@ -54,6 +56,21 @@ def _make_definition(
             maximum=100000.0,
         ),
     )
+    # Item 3: required_inputs must include all bounded variables
+    ri = frozenset({b.variable for b in bnds})
+
+    # Item 7: implementation_ref required for implemented/validated
+    imp_ref = implementation_ref
+    if (
+        implementation_status
+        in (
+            CorrelationImplementationStatus.implemented,
+            CorrelationImplementationStatus.validated,
+        )
+        and not imp_ref
+    ):
+        imp_ref = f"impl-{correlation_id}-{version}"
+
     return CorrelationDefinition(
         key=CorrelationKey(correlation_id=correlation_id, version=version),
         name=f"Fixture {correlation_id} v{version}",
@@ -66,14 +83,16 @@ def _make_definition(
             phase_regimes=pr,
             flow_regimes=fr,
             bounds=bnds,
+            required_inputs=ri,
         ),
         source=BibliographicSource(
             source_id="src-001",
-            title="Fixture Paper",
-            publication="Fixture Journal",
+            title="Fictional Paper",
+            publication="Fictional Journal",
             year=2020,
         ),
         implementation_status=implementation_status,
+        implementation_ref=imp_ref,
         tags=tags,
     )
 
@@ -99,8 +118,6 @@ class TestInMemoryCorrelationRegistry:
         defn = _make_definition()
         reg.register(defn)
         result = reg.get(defn.key)
-        # Modify internal state - should not affect registry
-        # (frozen model prevents this, but test deep copy semantics)
         assert result.key == defn.key
 
     def test_duplicate_key_rejected(self) -> None:
@@ -120,6 +137,14 @@ class TestInMemoryCorrelationRegistry:
         reg = InMemoryCorrelationRegistry()
         key = CorrelationKey(correlation_id="nonexistent", version="1.0.0")
         with pytest.raises(CorrelationNotFoundError):
+            reg.get(key)
+
+    def test_get_version_not_found(self) -> None:
+        """Item 7: When ID exists but version doesn't, raise CorrelationVersionNotFoundError."""
+        reg = InMemoryCorrelationRegistry()
+        reg.register(_make_definition(version="1.0.0"))
+        key = CorrelationKey(correlation_id="fixture.htc.tube", version="2.0.0")
+        with pytest.raises(CorrelationVersionNotFoundError):
             reg.get(key)
 
     def test_get_latest(self) -> None:
@@ -289,6 +314,60 @@ class TestInMemoryCorrelationRegistry:
         results = reg.search(purpose=CorrelationPurpose.friction_factor)
         assert len(results) == 0
 
+    def test_search_excludes_deprecated_by_default(self) -> None:
+        """Item 7: Default search excludes deprecated."""
+        reg = InMemoryCorrelationRegistry()
+        reg.register(
+            _make_definition(
+                correlation_id="fixture.a",
+                implementation_status=CorrelationImplementationStatus.implemented,
+            )
+        )
+        reg.register(
+            _make_definition(
+                correlation_id="fixture.b",
+                implementation_status=CorrelationImplementationStatus.deprecated,
+            )
+        )
+        results = reg.search()
+        assert len(results) == 1
+        assert results[0].key.correlation_id == "fixture.a"
+
+    def test_search_excludes_withdrawn_by_default(self) -> None:
+        """Item 7: Default search excludes withdrawn."""
+        reg = InMemoryCorrelationRegistry()
+        reg.register(
+            _make_definition(
+                correlation_id="fixture.a",
+                implementation_status=CorrelationImplementationStatus.implemented,
+            )
+        )
+        reg.register(
+            _make_definition(
+                correlation_id="fixture.b",
+                implementation_status=CorrelationImplementationStatus.withdrawn,
+            )
+        )
+        results = reg.search()
+        assert len(results) == 1
+
+    def test_search_includes_deprecated_when_opted_in(self) -> None:
+        reg = InMemoryCorrelationRegistry()
+        reg.register(
+            _make_definition(
+                correlation_id="fixture.a",
+                implementation_status=CorrelationImplementationStatus.implemented,
+            )
+        )
+        reg.register(
+            _make_definition(
+                correlation_id="fixture.b",
+                implementation_status=CorrelationImplementationStatus.deprecated,
+            )
+        )
+        results = reg.search(include_deprecated=True)
+        assert len(results) == 2
+
     def test_assess(self) -> None:
         reg = InMemoryCorrelationRegistry()
         defn = _make_definition()
@@ -307,7 +386,6 @@ class TestInMemoryCorrelationRegistry:
         reg = InMemoryCorrelationRegistry()
         defn = _make_definition()
         reg.register(defn)
-        # If we could mutate the definition (frozen prevents this), the registry copy is safe
         stored = reg.get(defn.key)
         assert stored.key.version == "1.0.0"
 
@@ -320,3 +398,22 @@ class TestInMemoryCorrelationRegistry:
         results = reg.search()
         ids = [r.key.correlation_id for r in results]
         assert ids == ["a.fixture", "a.fixture", "z.fixture"]
+
+    def test_version_sorting_prerelease_order(self) -> None:
+        """Item 2: SemVer prerelease ordering."""
+        reg = InMemoryCorrelationRegistry()
+        reg.register(_make_definition(version="1.0.0-alpha"))
+        reg.register(_make_definition(version="1.0.0-alpha.1"))
+        reg.register(_make_definition(version="1.0.0-alpha.10"))
+        reg.register(_make_definition(version="1.0.0-alpha.2"))
+        reg.register(_make_definition(version="1.0.0-beta"))
+        reg.register(_make_definition(version="1.0.0"))
+        versions = reg.list_versions("fixture.htc.tube")
+        assert [v.key.version for v in versions] == [
+            "1.0.0-alpha",
+            "1.0.0-alpha.1",
+            "1.0.0-alpha.2",
+            "1.0.0-alpha.10",
+            "1.0.0-beta",
+            "1.0.0",
+        ]

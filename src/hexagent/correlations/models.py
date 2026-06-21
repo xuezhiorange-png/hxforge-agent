@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 import re
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -147,8 +147,10 @@ class VariableApplicabilityStatus(StrEnum):
 # ---------------------------------------------------------------------------
 
 _VALID_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
-_SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+")
+# Item 2: Fully-anchored SemVer regex — rejects trailing junk and build metadata
+_SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$")
 _DOI_RE = re.compile(r"^10\.\d{4,9}/[^\s]+$")
+_HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 def _is_valid_id(value: str) -> bool:
@@ -164,6 +166,46 @@ def _validate_no_nan_inf(value: float, field_name: str) -> None:
         raise ValueError(f"{field_name} must not be NaN")
     if math.isinf(value):
         raise ValueError(f"{field_name} must not be Inf")
+
+
+def _validate_hash_format(value: str, field_name: str) -> None:
+    """Validate that value matches sha256:<64-hex> format."""
+    if not _HASH_RE.match(value):
+        raise ValueError(f"{field_name} must match sha256:<64 lowercase hex>, got {value!r}")
+
+
+def _normalize_semver_prerelease(prerelease: str) -> tuple[int | str, ...]:
+    """Parse a SemVer prerelease string into a tuple of dot-separated identifiers.
+
+    Numeric identifiers are stored as ints for numeric comparison,
+    alphanumeric identifiers as strings for lexical comparison.
+    """
+    if not prerelease:
+        return ()
+    parts: list[int | str] = []
+    for part in prerelease.split("."):
+        try:
+            parts.append(int(part))
+        except ValueError:
+            parts.append(part)
+    return tuple(parts)
+
+
+def parse_semver(version: str) -> tuple[int, int, int, tuple[int | str, ...]]:
+    """Parse a SemVer string into (major, minor, patch, prerelease_tuple).
+
+    Prerelease identifiers are compared by SemVer precedence:
+    - Numeric identifiers compared numerically
+    - Alphanumeric identifiers compared lexically
+    - Numeric < alphanumeric
+    - Fewer identifiers < more identifiers (when prefix matches)
+    """
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", version)
+    if not match:
+        raise ValueError(f"Invalid SemVer string: {version!r}")
+    major, minor, patch = int(match.group(1)), int(match.group(2)), int(match.group(3))
+    prerelease = _normalize_semver_prerelease(match.group(4) or "")
+    return (major, minor, patch, prerelease)
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +236,7 @@ class CorrelationKey(BaseModel):
         if not v:
             raise ValueError("version must not be empty")
         if not _is_valid_version(v):
-            raise ValueError(f"version must have at least major.minor.patch, got {v!r}")
+            raise ValueError(f"version must be valid SemVer, got {v!r}")
         return v
 
 
@@ -219,10 +261,12 @@ class NumericBound(BaseModel):
             val: float | None = getattr(self, fname)
             if val is not None:
                 _validate_no_nan_inf(val, fname)
-        # tolerance >= 0
+        # tolerance >= 0 and <= 1.0
         _validate_no_nan_inf(self.tolerance_fraction, "tolerance_fraction")
         if self.tolerance_fraction < 0:
             raise ValueError(f"tolerance_fraction must be >= 0, got {self.tolerance_fraction}")
+        if self.tolerance_fraction > 1.0:
+            raise ValueError(f"tolerance_fraction must be <= 1.0, got {self.tolerance_fraction}")
         # min < max when both set
         if self.minimum is not None and self.maximum is not None and self.minimum >= self.maximum:
             raise ValueError(f"minimum ({self.minimum}) must be < maximum ({self.maximum})")
@@ -245,6 +289,16 @@ class NumericBound(BaseModel):
                 f"recommended_maximum ({self.recommended_maximum}) "
                 f"must be <= maximum ({self.maximum})"
             )
+        # Item 3: recommended_minimum <= recommended_maximum
+        if (
+            self.recommended_minimum is not None
+            and self.recommended_maximum is not None
+            and self.recommended_minimum > self.recommended_maximum
+        ):
+            raise ValueError(
+                f"recommended_minimum ({self.recommended_minimum}) "
+                f"must be <= recommended_maximum ({self.recommended_maximum})"
+            )
         return self
 
 
@@ -260,6 +314,29 @@ class ApplicabilityEnvelope(BaseModel):
     required_inputs: frozenset[ApplicabilityVariable] = frozenset()
     excluded_conditions: tuple[str, ...] = ()
     notes: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_envelope(self) -> ApplicabilityEnvelope:
+        # Item 3: Reject duplicate NumericBound.variable entries
+        seen_vars: set[ApplicabilityVariable] = set()
+        for bound in self.bounds:
+            if bound.variable in seen_vars:
+                raise ValueError(f"Duplicate NumericBound.variable entry: {bound.variable!r}")
+            seen_vars.add(bound.variable)
+
+        # Item 3: Every bounded variable must appear in required_inputs
+        for bound in self.bounds:
+            if bound.variable not in self.required_inputs:
+                raise ValueError(
+                    f"Variable {bound.variable!r} has bounds but is not in required_inputs"
+                )
+
+        # Item 3: Sort bounds by variable name for canonical ordering
+        if self.bounds != tuple(sorted(self.bounds, key=lambda b: b.variable.value)):
+            sorted_bounds = tuple(sorted(self.bounds, key=lambda b: b.variable.value))
+            object.__setattr__(self, "bounds", sorted_bounds)
+
+        return self
 
 
 class BibliographicSource(BaseModel):
@@ -366,6 +443,51 @@ class CorrelationDefinition(BaseModel):
     tags: frozenset[str] = frozenset()
     definition_hash: str = ""
 
+    @model_validator(mode="after")
+    def _validate_definition(self) -> CorrelationDefinition:
+        # Item 3: geometry must equal envelope.geometry_types
+        if self.geometry != self.envelope.geometry_types:
+            raise ValueError("CorrelationDefinition.geometry must equal envelope.geometry_types")
+        # Item 3: phase_regimes must equal envelope.phase_regimes
+        if self.phase_regimes != self.envelope.phase_regimes:
+            raise ValueError(
+                "CorrelationDefinition.phase_regimes must equal envelope.phase_regimes"
+            )
+        # Item 7: implementation_ref required for implemented/validated
+        if (
+            self.implementation_status
+            in (
+                CorrelationImplementationStatus.implemented,
+                CorrelationImplementationStatus.validated,
+            )
+            and not self.implementation_ref
+        ):
+            raise ValueError(
+                f"implementation_ref is required for {self.implementation_status.value} status"
+            )
+        # Item 7: source.verification_status >= primary_source_checked for validated
+        if self.implementation_status == CorrelationImplementationStatus.validated:
+            min_status = SourceVerificationStatus.primary_source_checked
+            status_order = [
+                SourceVerificationStatus.unverified,
+                SourceVerificationStatus.secondary_source,
+                SourceVerificationStatus.primary_source_checked,
+                SourceVerificationStatus.independently_verified,
+            ]
+            if status_order.index(self.source.verification_status) < status_order.index(min_status):
+                raise ValueError(
+                    f"Validated definition requires source.verification_status >= "
+                    f"primary_source_checked, got {self.source.verification_status.value}"
+                )
+        # Item 7: Reject self-supersession
+        if (
+            self.supersedes is not None
+            and self.supersedes.correlation_id == self.key.correlation_id
+            and self.supersedes.version == self.key.version
+        ):
+            raise ValueError("Correlation cannot supersede itself (same key)")
+        return self
+
 
 class CorrelationApplicabilityInput(BaseModel):
     """Input values for an applicability assessment."""
@@ -375,8 +497,39 @@ class CorrelationApplicabilityInput(BaseModel):
     geometry: GeometryType
     phase_regime: PhaseRegime
     flow_regime: FlowRegime
-    values: dict[ApplicabilityVariable, float] = Field(default_factory=dict)
+    values: tuple[tuple[ApplicabilityVariable, float], ...] = ()
     allow_extrapolation: bool = False
+
+    @field_validator("values", mode="before")
+    @classmethod
+    def _normalize_values(cls, v: Any) -> tuple[tuple[ApplicabilityVariable, float], ...]:
+        """Accept dict, list-of-pairs, or tuple-of-pairs.
+
+        Normalize to sorted deduplicated tuple. Reject NaN/Inf.
+        """
+        pairs: list[tuple[ApplicabilityVariable, float]] = []
+        if isinstance(v, dict):
+            raw = list(v.items())
+        elif isinstance(v, (list, tuple)):
+            raw = list(v)
+        else:
+            raise ValueError(f"values must be dict or list-of-pairs, got {type(v).__name__}")
+
+        seen: set[ApplicabilityVariable] = set()
+        for item in raw:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                raise ValueError(f"Each value pair must be (variable, float), got {item!r}")
+            var, val = item
+            if isinstance(var, str):
+                var = ApplicabilityVariable(var)
+            if not isinstance(val, (int, float)):
+                raise ValueError(f"Value must be numeric, got {val!r}")
+            _validate_no_nan_inf(float(val), f"value for {var}")
+            if var in seen:
+                raise ValueError(f"Duplicate variable in values: {var!r}")
+            seen.add(var)
+            pairs.append((var, float(val)))
+        return tuple(sorted(pairs, key=lambda p: p[0].value))
 
 
 class VariableAssessment(BaseModel):
@@ -407,6 +560,79 @@ class ApplicabilityAssessment(BaseModel):
     allows_evaluation: bool = False
     assessment_hash: str = ""
 
+    @field_validator("assessment_hash")
+    @classmethod
+    def _validate_assessment_hash(cls, v: str) -> str:
+        if v:
+            _validate_hash_format(v, "assessment_hash")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_assessment(self) -> ApplicabilityAssessment:
+        # Item 5: if status is applicable → no blockers
+        if self.status == ApplicabilityStatus.applicable and self.blockers:
+            raise ValueError("applicable status must not have blockers")
+        # Item 5: if status has blockers → allows_evaluation must be False
+        if self.blockers and self.allows_evaluation:
+            raise ValueError("Status with blockers must have allows_evaluation=False")
+        return self
+
+
+def compute_definition_hash(defn: CorrelationDefinition) -> str:
+    """Compute the canonical definition hash excluding the definition_hash field itself."""
+    from hexagent.core.canonical import sha256_digest
+
+    dump = defn.model_dump()
+    dump.pop("definition_hash", None)
+    return sha256_digest(dump)
+
+
+def compute_assessment_hash(
+    *,
+    definition_hash: str,
+    correlation_key: CorrelationKey,
+    status: ApplicabilityStatus,
+    variable_results: tuple[VariableAssessment, ...],
+    warnings: tuple[EngineeringMessage, ...],
+    blockers: tuple[EngineeringMessage, ...],
+    policy: OutOfRangePolicy,
+    allow_extrapolation: bool,
+) -> str:
+    """Compute a canonical assessment hash that is order-independent."""
+    from hexagent.core.canonical import sha256_digest
+
+    # Sort variable results by variable name for canonical ordering
+    sorted_vrs = tuple(sorted(variable_results, key=lambda vr: vr.variable.value))
+    # Sort warning/blocker codes for canonical ordering
+    warning_codes = sorted([(w.code.value, w.severity.value) for w in warnings])
+    blocker_codes = sorted([(b.code.value, b.severity.value) for b in blockers])
+
+    payload = {
+        "definition_hash": definition_hash,
+        "correlation_key": {
+            "correlation_id": correlation_key.correlation_id,
+            "version": correlation_key.version,
+        },
+        "status": status.value,
+        "variable_results": [
+            {
+                "variable": vr.variable.value,
+                "supplied_value": vr.supplied_value,
+                "status": vr.status.value,
+            }
+            for vr in sorted_vrs
+        ],
+        "warning_codes": warning_codes,
+        "blocker_codes": blocker_codes,
+        "policy": {
+            "absolute_violation": policy.absolute_violation.value,
+            "recommended_violation": policy.recommended_violation.value,
+            "missing_input": policy.missing_input.value,
+        },
+        "allow_extrapolation": allow_extrapolation,
+    }
+    return sha256_digest(payload)
+
 
 __all__ = [
     "ApplicabilityAssessment",
@@ -429,4 +655,7 @@ __all__ = [
     "UncertaintySpec",
     "VariableApplicabilityStatus",
     "VariableAssessment",
+    "compute_assessment_hash",
+    "compute_definition_hash",
+    "parse_semver",
 ]

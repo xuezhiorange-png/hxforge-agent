@@ -6,7 +6,6 @@ from hexagent.correlations.applicability import assess_applicability
 from hexagent.correlations.errors import (
     CorrelationDuplicateError,
     CorrelationError,
-    CorrelationErrorCode,
     CorrelationHashMismatchError,
     CorrelationNotFoundError,
     CorrelationVersionNotFoundError,
@@ -32,6 +31,9 @@ from hexagent.correlations.models import (
     UncertaintySpec,
     VariableApplicabilityStatus,
     VariableAssessment,
+    compute_assessment_hash,
+    compute_definition_hash,
+    parse_semver,
 )
 from hexagent.correlations.registry import (
     CorrelationRegistry,
@@ -49,7 +51,6 @@ __all__ = [
     "CorrelationDefinition",
     "CorrelationDuplicateError",
     "CorrelationError",
-    "CorrelationErrorCode",
     "CorrelationHashMismatchError",
     "CorrelationImplementationStatus",
     "CorrelationKey",
@@ -70,4 +71,7 @@ __all__ = [
     "VariableApplicabilityStatus",
     "VariableAssessment",
     "assess_applicability",
+    "compute_assessment_hash",
+    "compute_definition_hash",
+    "parse_semver",
 ]

@@ -29,7 +29,9 @@ from hexagent.correlations.models import (
     UncertaintySpec,
     VariableApplicabilityStatus,
     VariableAssessment,
+    parse_semver,
 )
+from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity, ErrorCode
 
 # ---------------------------------------------------------------------------
 # Enum tests
@@ -123,6 +125,123 @@ class TestVariableApplicabilityStatus:
 
 
 # ---------------------------------------------------------------------------
+# SemVer tests (Item 2)
+# ---------------------------------------------------------------------------
+
+
+class TestSemVer:
+    def test_valid_stable(self) -> None:
+        major, minor, patch, pre = parse_semver("1.0.0")
+        assert (major, minor, patch) == (1, 0, 0)
+        assert pre == ()
+
+    def test_valid_prerelease(self) -> None:
+        major, minor, patch, pre = parse_semver("1.0.0-alpha")
+        assert (major, minor, patch) == (1, 0, 0)
+        assert pre == ("alpha",)
+
+    def test_valid_prerelease_numeric(self) -> None:
+        major, minor, patch, pre = parse_semver("1.0.0-alpha.1")
+        assert pre == ("alpha", 1)
+
+    def test_malformed_no_patch(self) -> None:
+        with pytest.raises(ValueError, match="Invalid SemVer"):
+            parse_semver("1.0")
+
+    def test_malformed_trailing_junk(self) -> None:
+        with pytest.raises(ValueError, match="Invalid SemVer"):
+            parse_semver("1.0.0junk")
+
+    def test_build_metadata_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Invalid SemVer"):
+            parse_semver("1.0.0+build.123")
+
+    def test_build_metadata_plus_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Invalid SemVer"):
+            parse_semver("1.0.0+build")
+
+    def test_prerelease_precedence_numeric(self) -> None:
+        """Numeric identifiers compared numerically: alpha.2 < alpha.10."""
+        _, _, _, pre2 = parse_semver("1.0.0-alpha.2")
+        _, _, _, pre10 = parse_semver("1.0.0-alpha.10")
+        assert pre2 < pre10
+
+    def test_prerelease_precedence_lexical(self) -> None:
+        """Alphanumeric identifiers compared lexically: alpha < beta."""
+        _, _, _, pre_alpha = parse_semver("1.0.0-alpha")
+        _, _, _, pre_beta = parse_semver("1.0.0-beta")
+        assert pre_alpha < pre_beta
+
+    def test_stable_after_prerelease(self) -> None:
+        """Stable sorts after prerelease of same version number."""
+        from hexagent.correlations.models import CorrelationDefinition
+
+        pre_defn = CorrelationDefinition(
+            key=CorrelationKey(correlation_id="test", version="1.0.0-alpha"),
+            name="Pre",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.generic}),
+            phase_regimes=frozenset({PhaseRegime.generic}),
+            envelope=ApplicabilityEnvelope(),
+            source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
+        )
+        stable_defn = CorrelationDefinition(
+            key=CorrelationKey(correlation_id="test", version="1.0.0"),
+            name="Stable",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.generic}),
+            phase_regimes=frozenset({PhaseRegime.generic}),
+            envelope=ApplicabilityEnvelope(),
+            source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
+        )
+        from hexagent.correlations.registry import _version_sort_key
+
+        assert _version_sort_key(pre_defn) < _version_sort_key(stable_defn)
+
+    def test_version_sorting_order(self) -> None:
+        """1.0.0-alpha < 1.0.0-alpha.1 < 1.0.0-alpha.2 < 1.0.0-alpha.10 < 1.0.0-beta < 1.0.0"""
+        from hexagent.correlations.models import CorrelationDefinition
+        from hexagent.correlations.registry import _version_sort_key
+
+        versions = [
+            "1.0.0-beta",
+            "1.0.0",
+            "1.0.0-alpha",
+            "1.0.0-alpha.10",
+            "1.0.0-alpha.1",
+            "1.0.0-alpha.2",
+        ]
+        defns = []
+        for v in versions:
+            defns.append(
+                CorrelationDefinition(
+                    key=CorrelationKey(correlation_id="test", version=v),
+                    name=v,
+                    purpose=CorrelationPurpose.heat_transfer_coefficient,
+                    description="Test",
+                    geometry=frozenset({GeometryType.generic}),
+                    phase_regimes=frozenset({PhaseRegime.generic}),
+                    envelope=ApplicabilityEnvelope(),
+                    source=BibliographicSource(
+                        source_id="s", title="T", publication="P", year=2020
+                    ),
+                )
+            )
+        sorted_defns = sorted(defns, key=_version_sort_key)
+        sorted_versions = [d.key.version for d in sorted_defns]
+        assert sorted_versions == [
+            "1.0.0-alpha",
+            "1.0.0-alpha.1",
+            "1.0.0-alpha.2",
+            "1.0.0-alpha.10",
+            "1.0.0-beta",
+            "1.0.0",
+        ]
+
+
+# ---------------------------------------------------------------------------
 # CorrelationKey tests
 # ---------------------------------------------------------------------------
 
@@ -132,6 +251,10 @@ class TestCorrelationKey:
         key = CorrelationKey(correlation_id="fixture.htc.tube", version="1.0.0")
         assert key.correlation_id == "fixture.htc.tube"
         assert key.version == "1.0.0"
+
+    def test_valid_prerelease_version(self) -> None:
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0-alpha.1")
+        assert key.version == "1.0.0-alpha.1"
 
     def test_valid_id_with_hyphens(self) -> None:
         key = CorrelationKey(correlation_id="fixture-htc", version="2.1.3")
@@ -160,6 +283,16 @@ class TestCorrelationKey:
     def test_invalid_version_empty(self) -> None:
         with pytest.raises(ValidationError, match="version"):
             CorrelationKey(correlation_id="fixture.htc", version="")
+
+    def test_invalid_version_trailing_junk(self) -> None:
+        """Item 2: Trailing junk is rejected."""
+        with pytest.raises(ValidationError, match="version"):
+            CorrelationKey(correlation_id="fixture.htc", version="1.0.0junk")
+
+    def test_invalid_version_build_metadata(self) -> None:
+        """Item 2: Build metadata is rejected."""
+        with pytest.raises(ValidationError, match="version"):
+            CorrelationKey(correlation_id="fixture.htc", version="1.0.0+build")
 
     def test_frozen(self) -> None:
         key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
@@ -224,6 +357,28 @@ class TestNumericBound:
                 recommended_maximum=200000.0,
             )
 
+    def test_recommended_min_lte_max(self) -> None:
+        """Item 3: recommended_minimum <= recommended_maximum."""
+        with pytest.raises(
+            ValidationError,
+            match="recommended_minimum.*must be <= recommended_maximum",
+        ):
+            NumericBound(
+                variable=ApplicabilityVariable.reynolds,
+                minimum=100.0,
+                maximum=100000.0,
+                recommended_minimum=50000.0,
+                recommended_maximum=10000.0,
+            )
+
+    def test_tolerance_fraction_upper_bound(self) -> None:
+        """Item 3: tolerance_fraction <= 1.0."""
+        with pytest.raises(ValidationError, match="tolerance_fraction.*must be <= 1.0"):
+            NumericBound(
+                variable=ApplicabilityVariable.reynolds,
+                tolerance_fraction=1.5,
+            )
+
     def test_nan_rejected(self) -> None:
         with pytest.raises(ValidationError, match="NaN"):
             NumericBound(
@@ -259,7 +414,7 @@ class TestNumericBound:
 
 
 # ---------------------------------------------------------------------------
-# BibliographicSource tests
+# BibliographicSource tests (Item 9: fictional names)
 # ---------------------------------------------------------------------------
 
 
@@ -267,8 +422,8 @@ class TestBibliographicSource:
     def test_valid_source(self) -> None:
         src = BibliographicSource(
             source_id="src-001",
-            title="Dittus-Boelter",
-            publication="AIChE Journal",
+            title="Example Corp Internal Report 2024",
+            publication="Fictional Engineering Journal",
             year=1930,
         )
         assert src.source_id == "src-001"
@@ -333,14 +488,14 @@ class TestBibliographicSource:
 
 
 # ---------------------------------------------------------------------------
-# UncertaintySpec tests
+# UncertaintySpec tests (Item 9: fictional basis)
 # ---------------------------------------------------------------------------
 
 
 class TestUncertaintySpec:
     def test_valid_spec(self) -> None:
-        spec = UncertaintySpec(basis="Dittus-Boelter original data")
-        assert spec.basis == "Dittus-Boelter original data"
+        spec = UncertaintySpec(basis="Fictional uncertainty analysis")
+        assert spec.basis == "Fictional uncertainty analysis"
         assert spec.relative_uncertainty_fraction is None
 
     def test_relative_uncertainty_negative_rejected(self) -> None:
@@ -398,6 +553,82 @@ class TestOutOfRangePolicy:
 
 
 # ---------------------------------------------------------------------------
+# ApplicabilityEnvelope tests (Item 3)
+# ---------------------------------------------------------------------------
+
+
+class TestApplicabilityEnvelope:
+    def test_duplicate_bounds_rejected(self) -> None:
+        """Item 3: Reject duplicate NumericBound.variable entries."""
+        with pytest.raises(ValidationError, match="Duplicate NumericBound"):
+            ApplicabilityEnvelope(
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=100.0,
+                        maximum=10000.0,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=200.0,
+                        maximum=20000.0,
+                    ),
+                ),
+                required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            )
+
+    def test_bound_without_required_rejected(self) -> None:
+        """Item 3: Bounded variable must be in required_inputs."""
+        with pytest.raises(ValidationError, match="has bounds but is not in required_inputs"):
+            ApplicabilityEnvelope(
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=100.0,
+                        maximum=10000.0,
+                    ),
+                ),
+                required_inputs=frozenset(),
+            )
+
+    def test_bounds_sorted_canonical(self) -> None:
+        """Item 3: Bounds are sorted by variable name."""
+        env = ApplicabilityEnvelope(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.prandtl,
+                    minimum=0.5,
+                    maximum=100.0,
+                ),
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=100.0,
+                    maximum=10000.0,
+                ),
+            ),
+            required_inputs=frozenset(
+                {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+            ),
+        )
+        assert env.bounds[0].variable == ApplicabilityVariable.prandtl
+        assert env.bounds[1].variable == ApplicabilityVariable.reynolds
+
+    def test_generic_geometry_wildcard(self) -> None:
+        """Item 3: generic geometry is valid."""
+        env = ApplicabilityEnvelope(
+            geometry_types=frozenset({GeometryType.generic}),
+        )
+        assert GeometryType.generic in env.geometry_types
+
+    def test_generic_phase_wildcard(self) -> None:
+        """Item 3: generic phase is valid."""
+        env = ApplicabilityEnvelope(
+            phase_regimes=frozenset({PhaseRegime.generic}),
+        )
+        assert PhaseRegime.generic in env.phase_regimes
+
+
+# ---------------------------------------------------------------------------
 # CorrelationDefinition tests
 # ---------------------------------------------------------------------------
 
@@ -431,8 +662,8 @@ class TestCorrelationDefinition:
             ),
             source=BibliographicSource(
                 source_id="src-fixture-001",
-                title="Fixture Heat Transfer Correlation",
-                publication="Fixture Journal",
+                title="Fictional Heat Transfer Correlation",
+                publication="Fictional Journal",
                 year=2020,
             ),
         )
@@ -485,6 +716,92 @@ class TestCorrelationDefinition:
                 ),
             )
 
+    def test_geometry_must_match_envelope(self) -> None:
+        """Item 3: Definition geometry must equal envelope geometry."""
+        with pytest.raises(ValidationError, match="geometry must equal"):
+            CorrelationDefinition(
+                key=CorrelationKey(correlation_id="fixture", version="1.0.0"),
+                name="Test",
+                purpose=CorrelationPurpose.heat_transfer_coefficient,
+                description="Test",
+                geometry=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.generic}),
+                envelope=ApplicabilityEnvelope(
+                    geometry_types=frozenset({GeometryType.annulus}),
+                    phase_regimes=frozenset({PhaseRegime.generic}),
+                ),
+                source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
+            )
+
+    def test_phase_regimes_must_match_envelope(self) -> None:
+        """Item 3: Definition phase_regimes must equal envelope phase_regimes."""
+        with pytest.raises(ValidationError, match="phase_regimes must equal"):
+            CorrelationDefinition(
+                key=CorrelationKey(correlation_id="fixture", version="1.0.0"),
+                name="Test",
+                purpose=CorrelationPurpose.heat_transfer_coefficient,
+                description="Test",
+                geometry=frozenset({GeometryType.generic}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                envelope=ApplicabilityEnvelope(
+                    geometry_types=frozenset({GeometryType.generic}),
+                    phase_regimes=frozenset({PhaseRegime.boiling}),
+                ),
+                source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
+            )
+
+    def test_implementation_ref_required_for_implemented(self) -> None:
+        """Item 7: implementation_ref required for implemented/validated."""
+        with pytest.raises(ValidationError, match="implementation_ref is required"):
+            CorrelationDefinition(
+                key=CorrelationKey(correlation_id="fixture", version="1.0.0"),
+                name="Test",
+                purpose=CorrelationPurpose.heat_transfer_coefficient,
+                description="Test",
+                geometry=frozenset({GeometryType.generic}),
+                phase_regimes=frozenset({PhaseRegime.generic}),
+                envelope=ApplicabilityEnvelope(),
+                source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
+                implementation_status=CorrelationImplementationStatus.implemented,
+            )
+
+    def test_self_supersession_rejected(self) -> None:
+        """Item 7: Self-supersession is rejected."""
+        with pytest.raises(ValidationError, match="cannot supersede itself"):
+            CorrelationDefinition(
+                key=CorrelationKey(correlation_id="fixture", version="1.0.0"),
+                name="Test",
+                purpose=CorrelationPurpose.heat_transfer_coefficient,
+                description="Test",
+                geometry=frozenset({GeometryType.generic}),
+                phase_regimes=frozenset({PhaseRegime.generic}),
+                envelope=ApplicabilityEnvelope(),
+                source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
+                supersedes=CorrelationKey(correlation_id="fixture", version="1.0.0"),
+            )
+
+    def test_validated_requires_source_verification(self) -> None:
+        """Item 7: Validated requires source.verification_status >= primary_source_checked."""
+        with pytest.raises(ValidationError, match="primary_source_checked"):
+            CorrelationDefinition(
+                key=CorrelationKey(correlation_id="fixture", version="1.0.0"),
+                name="Test",
+                purpose=CorrelationPurpose.heat_transfer_coefficient,
+                description="Test",
+                geometry=frozenset({GeometryType.generic}),
+                phase_regimes=frozenset({PhaseRegime.generic}),
+                envelope=ApplicabilityEnvelope(),
+                source=BibliographicSource(
+                    source_id="s",
+                    title="T",
+                    publication="P",
+                    year=2020,
+                    verification_status=SourceVerificationStatus.secondary_source,
+                ),
+                implementation_status=CorrelationImplementationStatus.validated,
+                implementation_ref="impl-ref",
+            )
+
 
 # ---------------------------------------------------------------------------
 # CorrelationApplicabilityInput tests
@@ -501,6 +818,61 @@ class TestCorrelationApplicabilityInput:
         )
         assert inp.geometry == GeometryType.circular_tube
         assert inp.allow_extrapolation is False
+
+    def test_values_as_tuple_of_pairs(self) -> None:
+        """Item 5: Values can be provided as tuple of pairs."""
+        inp = CorrelationApplicabilityInput(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+            flow_regime=FlowRegime.turbulent,
+            values=((ApplicabilityVariable.reynolds, 25000.0),),
+        )
+        assert len(inp.values) == 1
+        assert inp.values[0] == (ApplicabilityVariable.reynolds, 25000.0)
+
+    def test_values_sorted_deduplicated(self) -> None:
+        """Item 5: Values are sorted and deduplicated."""
+        inp = CorrelationApplicabilityInput(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+            flow_regime=FlowRegime.turbulent,
+            values={ApplicabilityVariable.prandtl: 5.0, ApplicabilityVariable.reynolds: 25000.0},
+        )
+        assert inp.values[0][0] == ApplicabilityVariable.prandtl
+        assert inp.values[1][0] == ApplicabilityVariable.reynolds
+
+    def test_nan_rejected(self) -> None:
+        """Item 5: NaN values are rejected."""
+        with pytest.raises(ValidationError, match="NaN"):
+            CorrelationApplicabilityInput(
+                geometry=GeometryType.circular_tube,
+                phase_regime=PhaseRegime.single_phase_liquid,
+                flow_regime=FlowRegime.turbulent,
+                values={ApplicabilityVariable.reynolds: float("nan")},
+            )
+
+    def test_inf_rejected(self) -> None:
+        """Item 5: Inf values are rejected."""
+        with pytest.raises(ValidationError, match="Inf"):
+            CorrelationApplicabilityInput(
+                geometry=GeometryType.circular_tube,
+                phase_regime=PhaseRegime.single_phase_liquid,
+                flow_regime=FlowRegime.turbulent,
+                values={ApplicabilityVariable.reynolds: float("inf")},
+            )
+
+    def test_duplicate_variable_rejected(self) -> None:
+        """Item 5: Duplicate variables are rejected."""
+        with pytest.raises(ValidationError, match="Duplicate variable"):
+            CorrelationApplicabilityInput(
+                geometry=GeometryType.circular_tube,
+                phase_regime=PhaseRegime.single_phase_liquid,
+                flow_regime=FlowRegime.turbulent,
+                values=[
+                    (ApplicabilityVariable.reynolds, 25000.0),
+                    (ApplicabilityVariable.reynolds, 30000.0),
+                ],
+            )
 
     def test_frozen(self) -> None:
         inp = CorrelationApplicabilityInput(
@@ -528,6 +900,22 @@ class TestApplicabilityAssessment:
         assert assessment.status == ApplicabilityStatus.applicable
         assert assessment.allows_evaluation is True
         assert assessment.schema_version == "1.0"
+
+    def test_applicable_with_blockers_rejected(self) -> None:
+        """Item 5: applicable status must not have blockers."""
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
+        blocker = EngineeringMessage(
+            code=ErrorCode.CORRELATION_ABSOLUTE_RANGE_EXCEEDED,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="test blocker",
+        )
+        with pytest.raises(ValidationError, match="applicable status must not have blockers"):
+            ApplicabilityAssessment(
+                correlation_key=key,
+                status=ApplicabilityStatus.applicable,
+                blockers=(blocker,),
+                allows_evaluation=True,
+            )
 
     def test_frozen(self) -> None:
         key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")

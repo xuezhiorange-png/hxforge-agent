@@ -60,13 +60,15 @@ def _fixture_htc_v1() -> CorrelationDefinition:
                     recommended_maximum=70.0,
                 ),
             ),
-            required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            required_inputs=frozenset(
+                {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+            ),
         ),
         source=BibliographicSource(
             source_id="src-fixture-htc-001",
-            authors=("Fixture Author A", "Fixture Author B"),
+            authors=("Example Corp Author A", "Example Corp Author B"),
             title="Fictional Heat Transfer in Tubes",
-            publication="Fixture Journal of Thermal Engineering",
+            publication="Fictional Journal of Thermal Engineering",
             year=2020,
             doi="10.1000/fixture.001",
             verification_status=SourceVerificationStatus.independently_verified,
@@ -77,14 +79,13 @@ def _fixture_htc_v1() -> CorrelationDefinition:
             confidence_level_fraction=0.95,
             basis="Fixture uncertainty analysis",
         ),
-        implementation_status=CorrelationImplementationStatus.validated,
+        implementation_status=CorrelationImplementationStatus.metadata_only,
         tags=frozenset({"validated", "production", "fixture"}),
     )
 
 
 def _fixture_htc_v2() -> CorrelationDefinition:
     """Fixture: HTC correlation v2.0.0 (supersedes v1)."""
-    v1 = _fixture_htc_v1()
     return CorrelationDefinition(
         key=CorrelationKey(correlation_id="fixture.htc.tube", version="2.0.0"),
         name="Fixture HTC Tube v2",
@@ -112,19 +113,22 @@ def _fixture_htc_v2() -> CorrelationDefinition:
                     recommended_maximum=100.0,
                 ),
             ),
-            required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            required_inputs=frozenset(
+                {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+            ),
         ),
         source=BibliographicSource(
             source_id="src-fixture-htc-002",
-            authors=("Fixture Author C",),
+            authors=("Example Corp Author C",),
             title="Fictional Heat Transfer in Tubes — Extended Range",
-            publication="Fixture Journal of Thermal Engineering",
+            publication="Fictional Journal of Thermal Engineering",
             year=2024,
             doi="10.1000/fixture.002",
             verification_status=SourceVerificationStatus.primary_source_checked,
         ),
         implementation_status=CorrelationImplementationStatus.implemented,
-        supersedes=v1.key,
+        implementation_ref="impl-fixture-htc-v2",
+        supersedes=CorrelationKey(correlation_id="fixture.htc.tube", version="1.0.0"),
         tags=frozenset({"implemented", "fixture"}),
     )
 
@@ -164,11 +168,12 @@ def _fixture_ff() -> CorrelationDefinition:
         source=BibliographicSource(
             source_id="src-fixture-ff-001",
             title="Fictional Friction in Smooth Tubes",
-            publication="Fixture Fluid Mechanics Letters",
+            publication="Fictional Fluid Mechanics Letters",
             year=2019,
             verification_status=SourceVerificationStatus.secondary_source,
         ),
         implementation_status=CorrelationImplementationStatus.implemented,
+        implementation_ref="impl-fixture-ff-v1",
         tags=frozenset({"implemented", "fixture"}),
     )
 
@@ -232,15 +237,15 @@ class TestRegistryWorkflow:
         assert assessment.status == ApplicabilityStatus.applicable
         assert assessment.allows_evaluation is True
 
-        # Create usage record
+        # Create usage record with computed definition_hash
         record = CorrelationUsageRecord(
             correlation_key=defn.key,
-            definition_hash=defn.definition_hash,
-            source_id="integration-test-run",
+            definition_hash=defn.definition_hash or "sha256:" + "0" * 64,
+            source_id=defn.source.source_id,
             applicability_status=assessment.status,
             input_values=(
-                ("prandtl", 5.0),
-                ("reynolds", 25000.0),
+                (ApplicabilityVariable.prandtl, 5.0),
+                (ApplicabilityVariable.reynolds, 25000.0),
             ),
             assessment_hash=assessment.assessment_hash,
             extrapolation_used=False,
@@ -306,38 +311,50 @@ class TestRegistryWorkflow:
         )
 
         assessment = reg.assess(defn.key, inputs)
-        assert assessment.status == ApplicabilityStatus.explicit_extrapolation
-        assert assessment.allows_evaluation is True
+        # Default policy is block for absolute_violation
+        assert assessment.status == ApplicabilityStatus.absolute_range_exceeded
+        assert assessment.allows_evaluation is False
 
     def test_deprecated_correlation_workflow(self) -> None:
         """Deprecated correlations excluded from get_latest."""
         reg = InMemoryCorrelationRegistry()
         reg.register(_fixture_htc_v1())
-        reg.register(_fixture_htc_v2())
-        # Deprecate v2
-        deprecated_v2 = _fixture_htc_v2()
-        # We need to create a new one with deprecated status
+        # Create a deprecated version
         deprecated_v2 = CorrelationDefinition(
-            key=deprecated_v2.key,
-            name=deprecated_v2.name,
-            purpose=deprecated_v2.purpose,
-            description=deprecated_v2.description,
-            geometry=deprecated_v2.geometry,
-            phase_regimes=deprecated_v2.phase_regimes,
-            envelope=deprecated_v2.envelope,
-            source=deprecated_v2.source,
+            key=CorrelationKey(correlation_id="fixture.htc.tube", version="2.0.0"),
+            name="Fixture HTC Tube v2",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Fictional tube-side HTC v2",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                flow_regimes=frozenset({FlowRegime.turbulent}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=2000.0,
+                        maximum=500000.0,
+                    ),
+                ),
+                required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            ),
+            source=BibliographicSource(
+                source_id="src-fixture-htc-002",
+                title="Fictional HTC v2",
+                publication="Fictional Journal",
+                year=2024,
+            ),
             implementation_status=CorrelationImplementationStatus.deprecated,
-            tags=deprecated_v2.tags,
+            tags=frozenset({"deprecated", "fixture"}),
         )
-        # Register fresh (need new instance since v2 already registered)
-        reg2 = InMemoryCorrelationRegistry()
-        reg2.register(_fixture_htc_v1())
-        reg2.register(deprecated_v2)
+        reg.register(deprecated_v2)
 
-        latest = reg2.get_latest("fixture.htc.tube")
+        latest = reg.get_latest("fixture.htc.tube")
         assert latest.key.version == "1.0.0"
 
-        latest_with_deprecated = reg2.get_latest("fixture.htc.tube", include_deprecated=True)
+        latest_with_deprecated = reg.get_latest("fixture.htc.tube", include_deprecated=True)
         assert latest_with_deprecated.key.version == "2.0.0"
 
     def test_provenance_graph_integration(self) -> None:
@@ -356,10 +373,10 @@ class TestRegistryWorkflow:
         assessment = reg.assess(defn.key, inputs)
         record = CorrelationUsageRecord(
             correlation_key=defn.key,
-            definition_hash=defn.definition_hash,
-            source_id="integration-test-run",
+            definition_hash=defn.definition_hash or "sha256:" + "0" * 64,
+            source_id=defn.source.source_id,
             applicability_status=assessment.status,
-            input_values=(("reynolds", 25000.0),),
+            input_values=((ApplicabilityVariable.reynolds, 25000.0),),
             assessment_hash=assessment.assessment_hash,
             extrapolation_used=False,
         )
@@ -387,7 +404,37 @@ class TestRegistryWorkflow:
         assert len(ffs) == 1
 
         # By implementation status
-        validated = reg.search(implementation_status=CorrelationImplementationStatus.validated)
-        assert len(validated) == 1
+        metadata_only = reg.search(
+            implementation_status=CorrelationImplementationStatus.metadata_only
+        )
+        assert len(metadata_only) == 1
         implemented = reg.search(implementation_status=CorrelationImplementationStatus.implemented)
         assert len(implemented) == 2
+
+    def test_deterministic_provenance_node(self) -> None:
+        """Item 8: Same usage record → same provenance node_id."""
+        reg = InMemoryCorrelationRegistry()
+        defn = _fixture_htc_v1()
+        reg.register(defn)
+
+        inputs = CorrelationApplicabilityInput(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+            flow_regime=FlowRegime.turbulent,
+            values={ApplicabilityVariable.reynolds: 25000.0},
+        )
+        assessment = reg.assess(defn.key, inputs)
+
+        record = CorrelationUsageRecord(
+            correlation_key=defn.key,
+            definition_hash=defn.definition_hash or "sha256:" + "0" * 64,
+            source_id=defn.source.source_id,
+            applicability_status=assessment.status,
+            input_values=((ApplicabilityVariable.reynolds, 25000.0),),
+            assessment_hash=assessment.assessment_hash,
+            extrapolation_used=False,
+        )
+
+        node1 = record.to_provenance_node()
+        node2 = record.to_provenance_node()
+        assert node1.node_id == node2.node_id  # Deterministic, not random

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import re
 from typing import Protocol
 
 from hexagent.correlations.applicability import assess_applicability
@@ -11,6 +10,7 @@ from hexagent.correlations.errors import (
     CorrelationDuplicateError,
     CorrelationHashMismatchError,
     CorrelationNotFoundError,
+    CorrelationVersionNotFoundError,
 )
 from hexagent.correlations.models import (
     ApplicabilityAssessment,
@@ -21,31 +21,30 @@ from hexagent.correlations.models import (
     CorrelationPurpose,
     GeometryType,
     PhaseRegime,
+    compute_definition_hash,
+    parse_semver,
 )
 
+SortKey = tuple[int, int, int, int, tuple[int | str, ...]]
 
-def _parse_version(version: str) -> tuple[int, int, int, str]:
-    """Parse semver string into (major, minor, patch, prerelease).
 
-    Prerelease strings are sorted after the stable release of the same
-    version number (e.g. 1.0.0-alpha < 1.0.0).
+def _version_sort_key(defn: CorrelationDefinition) -> SortKey:
+    """Item 2: Sort key with SemVer prerelease precedence.
+
+    Prerelease versions sort BEFORE stable of the same version number:
+    1.0.0-alpha < 1.0.0-alpha.1 < 1.0.0-alpha.2 < 1.0.0-alpha.10 < 1.0.0-beta < 1.0.0
+
+    SemVer prerelease precedence:
+    - Numeric identifiers compared numerically
+    - Alphanumeric identifiers compared lexically
+    - Numeric < alphanumeric
+    - Fewer identifiers < more identifiers (when prefix matches)
     """
-    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", version)
-    if not match:
-        raise ValueError(f"Invalid version string: {version!r}")
-    major, minor, patch = int(match.group(1)), int(match.group(2)), int(match.group(3))
-    prerelease = match.group(4) or ""
-    return (major, minor, patch, prerelease)
-
-
-def _version_sort_key(defn: CorrelationDefinition) -> tuple[int, int, int, int, str]:
-    """Sort key: stable versions first, then prerelease, sorted numerically."""
-    major, minor, patch, prerelease = _parse_version(defn.key.version)
-    # Prerelease versions sort after stable of same number:
-    # (1,0,0,"") < (1,0,0,"alpha") is False, so we use a trick:
-    # stable: (major, minor, patch, 0, "")
-    # pre:    (major, minor, patch, 1, prerelease)
-    pre_flag = 1 if prerelease else 0
+    major, minor, patch, prerelease = parse_semver(defn.key.version)
+    # Prerelease versions sort BEFORE stable:
+    # stable: (major, minor, patch, 1, ())
+    # pre:    (major, minor, patch, 0, prerelease_tuple)
+    pre_flag = 0 if prerelease else 1
     return (major, minor, patch, pre_flag, prerelease)
 
 
@@ -89,7 +88,8 @@ class InMemoryCorrelationRegistry:
     - Deep copies on get/register to prevent external mutation.
     - Duplicate keys are rejected.
     - Same ID with multiple versions is allowed.
-    - Version sorting: numeric major.minor.patch, prerelease after stable.
+    - Version sorting: SemVer precedence with numeric prerelease comparison.
+    - Default search excludes deprecated and withdrawn definitions.
     """
 
     def __init__(self) -> None:
@@ -100,23 +100,22 @@ class InMemoryCorrelationRegistry:
 
         Raises CorrelationDuplicateError if the key already exists.
         Raises CorrelationHashMismatchError if the definition_hash doesn't match.
+        Item 6: Always recomputes and verifies definition_hash on register.
         """
         key = definition.key
 
-        # Validate definition_hash
+        # Item 6: Always recompute and verify definition_hash
+        computed_hash = compute_definition_hash(definition)
         if definition.definition_hash:
-            from hexagent.core.canonical import sha256_digest
-
-            # Build canonical payload excluding definition_hash
-            dump = definition.model_dump()
-            dump.pop("definition_hash", None)
-            computed_hash = sha256_digest(dump)
             if computed_hash != definition.definition_hash:
                 raise CorrelationHashMismatchError(
                     key.correlation_id,
                     expected=definition.definition_hash,
                     actual=computed_hash,
                 )
+        else:
+            # If no hash provided, set it to the computed one
+            definition = definition.model_copy(update={"definition_hash": computed_hash})
 
         if key in self._store:
             raise CorrelationDuplicateError(
@@ -128,11 +127,15 @@ class InMemoryCorrelationRegistry:
 
     def get(self, key: CorrelationKey) -> CorrelationDefinition:
         """Get a specific correlation by key.
-
         Returns a deep copy.
-        Raises CorrelationNotFoundError if not found.
+        Raises CorrelationVersionNotFoundError if ID exists but version doesn't.
+        Raises CorrelationNotFoundError if ID not found.
         """
         if key not in self._store:
+            # Check if the ID exists but the version doesn't
+            id_exists = any(k.correlation_id == key.correlation_id for k in self._store)
+            if id_exists:
+                raise CorrelationVersionNotFoundError(key.correlation_id, key.version)
             raise CorrelationNotFoundError(key.correlation_id, key.version)
         return copy.deepcopy(self._store[key])
 
@@ -144,10 +147,9 @@ class InMemoryCorrelationRegistry:
         include_deprecated: bool = False,
     ) -> CorrelationDefinition:
         """Get the latest version of a correlation by ID.
-
         Latest = highest stable version. Prerelease only used if no
         stable version exists and include_prerelease is True.
-        Excludes withdrawn correlations.
+        Excludes withdrawn definitions. Default excludes deprecated.
         """
         candidates = [
             defn for defn in self._store.values() if defn.key.correlation_id == correlation_id
@@ -155,7 +157,7 @@ class InMemoryCorrelationRegistry:
         if not candidates:
             raise CorrelationNotFoundError(correlation_id)
 
-        # Exclude withdrawn
+        # Exclude withdrawn (always)
         candidates = [
             d
             for d in candidates
@@ -174,8 +176,8 @@ class InMemoryCorrelationRegistry:
             raise CorrelationNotFoundError(correlation_id)
 
         # Separate stable and prerelease
-        stable = [d for d in candidates if not _parse_version(d.key.version)[3]]
-        prerelease = [d for d in candidates if _parse_version(d.key.version)[3]]
+        stable = [d for d in candidates if not parse_semver(d.key.version)[3]]
+        prerelease = [d for d in candidates if parse_semver(d.key.version)[3]]
 
         if stable:
             latest = max(stable, key=_version_sort_key)
@@ -205,13 +207,22 @@ class InMemoryCorrelationRegistry:
         phase: PhaseRegime | None = None,
         implementation_status: CorrelationImplementationStatus | None = None,
         tags: frozenset[str] = frozenset(),
+        include_deprecated: bool = False,
+        include_withdrawn: bool = False,
     ) -> tuple[CorrelationDefinition, ...]:
         """Search correlations with optional filters.
 
+        Item 7: Default search excludes deprecated and withdrawn.
         Returns matches sorted by correlation_id then version.
         """
         results: list[CorrelationDefinition] = []
         for defn in self._store.values():
+            # Item 7: Exclude deprecated/withdrawn by default
+            status = defn.implementation_status
+            if not include_deprecated and status == CorrelationImplementationStatus.deprecated:
+                continue
+            if not include_withdrawn and status == CorrelationImplementationStatus.withdrawn:
+                continue
             if purpose is not None and defn.purpose != purpose:
                 continue
             if geometry is not None and geometry not in defn.geometry:

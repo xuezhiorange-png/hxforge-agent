@@ -39,7 +39,10 @@ def _make_definition(
     pr = phase_regimes or frozenset({PhaseRegime.single_phase_liquid})
     fr = flow_regimes or frozenset({FlowRegime.turbulent})
     bnds = bounds or ()
-    ri = required_inputs or frozenset()
+    # Item 3: required_inputs must include all bounded variables
+    ri = required_inputs if required_inputs is not None else frozenset()
+    if bnds and not ri:
+        ri = frozenset({b.variable for b in bnds})
     return CorrelationDefinition(
         key=CorrelationKey(correlation_id="fixture.htc.tube", version="1.0.0"),
         name="Fixture HTC Tube",
@@ -56,8 +59,8 @@ def _make_definition(
         ),
         source=BibliographicSource(
             source_id="src-001",
-            title="Fixture Paper",
-            publication="Fixture Journal",
+            title="Fictional Paper",
+            publication="Fictional Journal",
             year=2020,
         ),
         out_of_range_policy=out_of_range_policy or OutOfRangePolicy(),
@@ -173,6 +176,8 @@ class TestAssessApplicability:
         )
         result = assess_applicability(defn, inputs)
         assert result.status == ApplicabilityStatus.recommended_range_exceeded
+        # Item 4: recommended_violation=warn → allows_evaluation=True
+        assert result.allows_evaluation is True
         assert len(result.warnings) >= 1
 
     def test_absolute_range_exceeded(self) -> None:
@@ -196,7 +201,29 @@ class TestAssessApplicability:
         assert result.allows_evaluation is False
 
     def test_extrapolation_allowed(self) -> None:
-        """Absolute exceeded + allow_extrapolation → explicit_extrapolation."""
+        """Absolute exceeded + allow_extrapolation + allow_explicit_opt_in policy."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 150000.0},
+            allow_extrapolation=True,
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.explicit_extrapolation
+        assert result.allows_evaluation is True
+
+    def test_extrapolation_blocked_by_default_policy(self) -> None:
+        """Item 4: allow_extrapolation=True with absolute_violation=block → blocked."""
         defn = _make_definition(
             bounds=(
                 NumericBound(
@@ -211,8 +238,8 @@ class TestAssessApplicability:
             allow_extrapolation=True,
         )
         result = assess_applicability(defn, inputs)
-        assert result.status == ApplicabilityStatus.explicit_extrapolation
-        assert result.allows_evaluation is True
+        assert result.status == ApplicabilityStatus.absolute_range_exceeded
+        assert result.allows_evaluation is False
 
     def test_below_absolute_range(self) -> None:
         """Value below absolute minimum → absolute_range_exceeded."""
@@ -269,32 +296,15 @@ class TestAssessApplicability:
         )
         result = assess_applicability(defn, inputs)
         assert result.status == ApplicabilityStatus.absolute_range_exceeded
-        # Warn policy means warnings not blockers
+        # Warn policy → warnings not blockers, allows_evaluation=True
         assert len(result.warnings) >= 1
+        assert result.allows_evaluation is True
 
     def test_no_bounds_returns_applicable(self) -> None:
         """No bounds defined → applicable (nothing to check)."""
         defn = _make_definition()
         inputs = _make_input()
         result = assess_applicability(defn, inputs)
-        assert result.status == ApplicabilityStatus.applicable
-
-    def test_optional_variable_not_supplied(self) -> None:
-        """Non-required variable not supplied → still applicable (no bounds check)."""
-        defn = _make_definition(
-            bounds=(
-                NumericBound(
-                    variable=ApplicabilityVariable.reynolds,
-                    minimum=3000.0,
-                    maximum=100000.0,
-                ),
-            ),
-        )
-        inputs = _make_input(values={})  # reynolds not required but has bounds
-        result = assess_applicability(defn, inputs)
-        # Not required, so missing_input doesn't apply;
-        # variable result is "missing" but overall status is applicable
-        # because missing non-required variables don't block evaluation
         assert result.status == ApplicabilityStatus.applicable
 
     def test_assessment_hash_deterministic(self) -> None:
@@ -333,6 +343,9 @@ class TestAssessApplicability:
                     recommended_minimum=1.0,
                     recommended_maximum=100.0,
                 ),
+            ),
+            required_inputs=frozenset(
+                {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
             ),
         )
         inputs = _make_input(
@@ -382,3 +395,245 @@ class TestAssessApplicability:
         )
         result = assess_applicability(defn, inputs)
         assert result.status == ApplicabilityStatus.applicable
+
+    def test_tolerance_fraction_within_bound(self) -> None:
+        """Item 4: Value within tolerance_fraction of bound is treated as in range."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                    tolerance_fraction=0.1,  # 10% tolerance
+                ),
+            ),
+        )
+        # Value is 10% below minimum (3000 * 0.9 = 2700), should be within tolerance
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 2700.0},
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.applicable
+
+    def test_tolerance_fraction_outside_bound(self) -> None:
+        """Item 4: Value outside tolerance_fraction of bound is still out of range."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                    tolerance_fraction=0.1,  # 10% tolerance
+                ),
+            ),
+        )
+        # Value is 20% below minimum (3000 * 0.8 = 2400), outside 10% tolerance
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 2400.0},
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.absolute_range_exceeded
+
+    def test_generic_geometry_matches_any(self) -> None:
+        """Item 3: generic geometry matches ANY geometry."""
+        defn = _make_definition(
+            geometry_types=frozenset({GeometryType.generic}),
+            phase_regimes=frozenset({PhaseRegime.generic}),
+        )
+        inputs = _make_input(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.applicable
+
+    def test_generic_phase_matches_any(self) -> None:
+        """Item 3: generic phase matches ANY phase."""
+        defn = _make_definition(
+            phase_regimes=frozenset({PhaseRegime.generic}),
+        )
+        inputs = _make_input(phase_regime=PhaseRegime.boiling)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.applicable
+
+    # -------------------------------------------------------------------------
+    # Item 4: Complete policy × violation decision-table tests
+    # -------------------------------------------------------------------------
+
+    def test_policy_decision_table_recommended_warn(self) -> None:
+        """recommended_violation=warn → allows_evaluation=True."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                    recommended_minimum=10000.0,
+                    recommended_maximum=50000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                recommended_violation=OutOfRangeAction.warn,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 75000.0},
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.recommended_range_exceeded
+        assert result.allows_evaluation is True
+
+    def test_policy_decision_table_absolute_block(self) -> None:
+        """absolute_violation=block → allows_evaluation=False."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.block,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 150000.0},
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.absolute_range_exceeded
+        assert result.allows_evaluation is False
+
+    def test_policy_decision_table_absolute_block_with_extrapolation(self) -> None:
+        """Item 4: absolute_violation=block blocks even with allow_extrapolation."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.block,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 150000.0},
+            allow_extrapolation=True,
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.absolute_range_exceeded
+        assert result.allows_evaluation is False
+
+    def test_policy_decision_table_absolute_allow_opt_in(self) -> None:
+        """absolute_violation=allow_explicit_opt_in + extrapolation → allows."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 150000.0},
+            allow_extrapolation=True,
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.explicit_extrapolation
+        assert result.allows_evaluation is True
+
+    def test_policy_decision_table_absolute_allow_opt_in_no_extrapolation(self) -> None:
+        """absolute_violation=allow_explicit_opt_in + no extrapolation → blocks."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 150000.0},
+            allow_extrapolation=False,
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.absolute_range_exceeded
+        assert result.allows_evaluation is False
+
+    def test_policy_decision_table_absolute_warn(self) -> None:
+        """absolute_violation=warn → allows_evaluation=True."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.warn,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 150000.0},
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.absolute_range_exceeded
+        assert result.allows_evaluation is True
+
+    def test_policy_decision_table_absolute_fallback(self) -> None:
+        """absolute_violation=fallback_required → allows_evaluation=False."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.fallback_required,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 150000.0},
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.absolute_range_exceeded
+        assert result.allows_evaluation is False
+
+    def test_policy_decision_table_missing_input_block(self) -> None:
+        """missing_input=block → allows_evaluation=False."""
+        defn = _make_definition(
+            required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            out_of_range_policy=OutOfRangePolicy(
+                missing_input=OutOfRangeAction.block,
+            ),
+        )
+        inputs = _make_input(values={})
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.missing_input
+        assert result.allows_evaluation is False
+
+    def test_policy_decision_table_missing_input_warn(self) -> None:
+        """Item 4: missing_input=warn → allows_evaluation=True."""
+        defn = _make_definition(
+            required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            out_of_range_policy=OutOfRangePolicy(
+                missing_input=OutOfRangeAction.warn,
+            ),
+        )
+        inputs = _make_input(values={})
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.missing_input
+        assert result.allows_evaluation is True

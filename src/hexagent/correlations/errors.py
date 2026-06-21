@@ -2,28 +2,9 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
 from typing import Any
 
-
-class CorrelationErrorCode(StrEnum):
-    """Stable error-code constants for correlation operations."""
-
-    NOT_FOUND = "correlation_not_found"
-    VERSION_NOT_FOUND = "correlation_version_not_found"
-    DUPLICATE = "correlation_duplicate"
-    DEPRECATED = "correlation_deprecated"
-    WITHDRAWN = "correlation_withdrawn"
-    GEOMETRY_INCOMPATIBLE = "correlation_geometry_incompatible"
-    PHASE_INCOMPATIBLE = "correlation_phase_incompatible"
-    FLOW_REGIME_INCOMPATIBLE = "correlation_flow_regime_incompatible"
-    INPUT_MISSING = "correlation_input_missing"
-    RECOMMENDED_RANGE_EXCEEDED = "correlation_recommended_range_exceeded"
-    ABSOLUTE_RANGE_EXCEEDED = "correlation_absolute_range_exceeded"
-    EXTRAPOLATION_USED = "correlation_extrapolation_used"
-    SOURCE_UNVERIFIED = "correlation_source_unverified"
-    HASH_MISMATCH = "correlation_hash_mismatch"
-    DEFINITION_INVALID = "correlation_definition_invalid"
+from hexagent.domain.messages import ErrorCode
 
 
 class CorrelationError(ValueError):
@@ -31,7 +12,7 @@ class CorrelationError(ValueError):
 
     def __init__(
         self,
-        code: CorrelationErrorCode,
+        code: ErrorCode,
         message: str,
         *,
         context: dict[str, Any] | None = None,
@@ -56,19 +37,8 @@ class CorrelationNotFoundError(CorrelationError):
         if version:
             msg += f" v{version}"
         super().__init__(
-            code=CorrelationErrorCode.NOT_FOUND,
+            code=ErrorCode.CORRELATION_NOT_FOUND,
             message=msg,
-            context={"correlation_id": correlation_id, "version": version},
-        )
-
-
-class CorrelationDuplicateError(CorrelationError):
-    """Raised when registering a correlation with an already-registered key."""
-
-    def __init__(self, correlation_id: str, version: str) -> None:
-        super().__init__(
-            code=CorrelationErrorCode.DUPLICATE,
-            message=f"Duplicate correlation: {correlation_id} v{version}",
             context={"correlation_id": correlation_id, "version": version},
         )
 
@@ -78,8 +48,19 @@ class CorrelationVersionNotFoundError(CorrelationError):
 
     def __init__(self, correlation_id: str, version: str) -> None:
         super().__init__(
-            code=CorrelationErrorCode.VERSION_NOT_FOUND,
+            code=ErrorCode.CORRELATION_VERSION_NOT_FOUND,
             message=f"Version not found: {correlation_id} v{version}",
+            context={"correlation_id": correlation_id, "version": version},
+        )
+
+
+class CorrelationDuplicateError(CorrelationError):
+    """Raised when registering a correlation with an already-registered key."""
+
+    def __init__(self, correlation_id: str, version: str) -> None:
+        super().__init__(
+            code=ErrorCode.CORRELATION_DUPLICATE,
+            message=f"Duplicate correlation: {correlation_id} v{version}",
             context={"correlation_id": correlation_id, "version": version},
         )
 
@@ -89,7 +70,7 @@ class CorrelationHashMismatchError(CorrelationError):
 
     def __init__(self, correlation_id: str, expected: str, actual: str) -> None:
         super().__init__(
-            code=CorrelationErrorCode.HASH_MISMATCH,
+            code=ErrorCode.HASH_MISMATCH,
             message=f"Hash mismatch for {correlation_id}: expected {expected}, got {actual}",
             context={
                 "correlation_id": correlation_id,
@@ -102,7 +83,6 @@ class CorrelationHashMismatchError(CorrelationError):
 __all__ = [
     "CorrelationDuplicateError",
     "CorrelationError",
-    "CorrelationErrorCode",
     "CorrelationHashMismatchError",
     "CorrelationNotFoundError",
     "CorrelationVersionNotFoundError",

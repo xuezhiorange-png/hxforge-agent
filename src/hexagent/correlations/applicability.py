@@ -5,19 +5,43 @@ All functions in this module are deterministic and side-effect-free.
 
 from __future__ import annotations
 
-from hexagent.core.canonical import sha256_digest
 from hexagent.correlations.models import (
     ApplicabilityAssessment,
     ApplicabilityStatus,
+    ApplicabilityVariable,
     CorrelationApplicabilityInput,
     CorrelationDefinition,
     CorrelationKey,
+    GeometryType,
     NumericBound,
     OutOfRangeAction,
+    OutOfRangePolicy,
+    PhaseRegime,
     VariableApplicabilityStatus,
     VariableAssessment,
+    compute_assessment_hash,
 )
 from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity, ErrorCode
+
+
+def _check_geometry_compatible(
+    geometry: GeometryType,
+    allowed: frozenset[GeometryType],
+) -> bool:
+    """Check if geometry is compatible. Generic matches ANY geometry."""
+    if GeometryType.generic in allowed:
+        return True
+    return geometry in allowed
+
+
+def _check_phase_compatible(
+    phase_regime: PhaseRegime,
+    allowed: frozenset[PhaseRegime],
+) -> bool:
+    """Check if phase regime is compatible. Generic matches ANY phase."""
+    if PhaseRegime.generic in allowed:
+        return True
+    return phase_regime in allowed
 
 
 def _assess_variable_bound(
@@ -38,21 +62,26 @@ def _assess_variable_bound(
 
     status = VariableApplicabilityStatus.applicable
 
-    # Check absolute bounds
+    # Item 4: Apply tolerance_fraction — if within tolerance of bound, treat as in range
+    tolerance = bound.tolerance_fraction
+
+    # Check absolute bounds (with tolerance)
     if bound.minimum is not None:
+        effective_min = bound.minimum * (1.0 - tolerance) if tolerance > 0 else bound.minimum
         if bound.minimum_inclusive:
-            if value < bound.minimum:
+            if value < effective_min:
                 status = VariableApplicabilityStatus.below_absolute
         else:
-            if value <= bound.minimum:
+            if value <= effective_min:
                 status = VariableApplicabilityStatus.below_absolute
 
     if bound.maximum is not None and status == VariableApplicabilityStatus.applicable:
+        effective_max = bound.maximum * (1.0 + tolerance) if tolerance > 0 else bound.maximum
         if bound.maximum_inclusive:
-            if value > bound.maximum:
+            if value > effective_max:
                 status = VariableApplicabilityStatus.above_absolute
         else:
-            if value >= bound.maximum:
+            if value >= effective_max:
                 status = VariableApplicabilityStatus.above_absolute
 
     # Check recommended bounds (only if within absolute)
@@ -80,16 +109,13 @@ def _build_boundary_messages(
     recommended_policy: OutOfRangeAction,
 ) -> tuple[EngineeringMessage, ...]:
     """Build warning/blocker messages for out-of-range variables."""
-    messages: list[EngineeringMessage] = []
     status = var_result.status
 
-    if status == VariableApplicabilityStatus.applicable:
+    if status in (VariableApplicabilityStatus.applicable, VariableApplicabilityStatus.missing):
         return ()
 
-    # Determine the variable name for context
     var_name = var_result.variable.value
 
-    # Determine severity and error code based on status and policy
     abs_statuses = (
         VariableApplicabilityStatus.below_absolute,
         VariableApplicabilityStatus.above_absolute,
@@ -101,34 +127,24 @@ def _build_boundary_messages(
     if status in abs_statuses:
         policy = out_of_range_policy
         code = ErrorCode.CORRELATION_ABSOLUTE_RANGE_EXCEEDED
-        severity_map = {
-            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
-            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
-        }
     elif status in rec_statuses:
         policy = recommended_policy
         code = ErrorCode.CORRELATION_RECOMMENDED_RANGE_EXCEEDED
-        severity_map = {
-            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
-            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
-        }
     elif status == VariableApplicabilityStatus.missing:
         code = ErrorCode.CORRELATION_INPUT_MISSING
-        severity_map = {
-            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
-            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
-        }
-        # Use the default for missing input
-        policy = OutOfRangeAction.block  # default for missing input
+        # Use the caller-provided missing_input policy (not hardcoded)
+        # The caller should pass the correct policy; we keep default here
+        # as a fallback
+        policy = OutOfRangeAction.block
     else:
         return ()
 
+    severity_map = {
+        OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
+        OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
+        OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
+        OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
+    }
     severity = severity_map.get(policy, EngineeringMessageSeverity.WARNING)
 
     # Build range info string
@@ -162,19 +178,24 @@ def _build_boundary_messages(
             ("range", range_str),
         ),
     )
-    messages.append(msg)
-    return tuple(messages)
+    return (msg,)
 
 
-def _compute_overall_status(
-    variable_results: tuple[VariableAssessment, ...],
+def _derive_allows_evaluation(
+    status: ApplicabilityStatus,
+    policy: OutOfRangePolicy,
+    has_absolute_violation: bool,
+    has_recommended_violation: bool,
+    allow_extrapolation: bool,
+    has_missing_required: bool,
     geometry_compatible: bool,
     phase_compatible: bool,
     flow_compatible: bool,
-    required_inputs_missing: bool,
-    allow_extrapolation: bool,
 ) -> ApplicabilityStatus:
-    """Determine the overall applicability status."""
+    """Item 4: Derive overall status and allows_evaluation from status + policy.
+
+    OutOfRangePolicy is the SOLE authority for continuation semantics.
+    """
     # Priority: incompatible geometry > incompatible phase > incompatible flow
     if not geometry_compatible:
         return ApplicabilityStatus.incompatible_geometry
@@ -182,36 +203,61 @@ def _compute_overall_status(
         return ApplicabilityStatus.incompatible_phase
     if not flow_compatible:
         return ApplicabilityStatus.incompatible_flow_regime
-    if required_inputs_missing:
+    if has_missing_required:
         return ApplicabilityStatus.missing_input
 
-    # Check variable results
-    abs_statuses = (
-        VariableApplicabilityStatus.below_absolute,
-        VariableApplicabilityStatus.above_absolute,
-    )
-    rec_statuses = (
-        VariableApplicabilityStatus.below_recommended,
-        VariableApplicabilityStatus.above_recommended,
-    )
-    has_absolute_violation = False
-    has_recommended_violation = False
-    for vr in variable_results:
-        if vr.status in abs_statuses:
-            has_absolute_violation = True
-        elif vr.status in rec_statuses:
-            has_recommended_violation = True
-
     if has_absolute_violation:
-        if allow_extrapolation:
-            return ApplicabilityStatus.explicit_extrapolation
         return ApplicabilityStatus.absolute_range_exceeded
     if has_recommended_violation:
-        if allow_extrapolation:
-            return ApplicabilityStatus.explicit_extrapolation
         return ApplicabilityStatus.recommended_range_exceeded
 
     return ApplicabilityStatus.applicable
+
+
+def _policy_allows_evaluation(
+    status: ApplicabilityStatus,
+    policy: OutOfRangePolicy,
+    allow_extrapolation: bool,
+) -> bool:
+    """Item 4: Determine allows_evaluation based on status and policy.
+
+    OutOfRangePolicy is the SOLE authority:
+    - recommended_violation=warn → allows_evaluation=True
+    - absolute_violation=block → allows_evaluation=False
+    - absolute_violation=allow_explicit_opt_in AND inputs.allow_extrapolation=True → True
+    - missing_input policy determines continuation
+    - incompatible_* → uses respective policy
+    - fallback_required → always False
+    """
+    if status == ApplicabilityStatus.applicable:
+        return True
+
+    if status == ApplicabilityStatus.recommended_range_exceeded:
+        # recommended_violation=warn allows continuation
+        return policy.recommended_violation == OutOfRangeAction.warn
+
+    if status == ApplicabilityStatus.absolute_range_exceeded:
+        if policy.absolute_violation == OutOfRangeAction.warn:
+            return True
+        return (
+            policy.absolute_violation == OutOfRangeAction.allow_explicit_opt_in
+            and allow_extrapolation
+        )
+
+    if status == ApplicabilityStatus.explicit_extrapolation:
+        return True
+
+    if status == ApplicabilityStatus.missing_input:
+        return policy.missing_input == OutOfRangeAction.warn
+
+    if status == ApplicabilityStatus.incompatible_geometry:
+        return policy.incompatible_geometry == OutOfRangeAction.warn
+
+    if status == ApplicabilityStatus.incompatible_phase:
+        return policy.incompatible_phase == OutOfRangeAction.warn
+
+    # incompatible_flow_regime and any other status → False
+    return False
 
 
 def assess_applicability(
@@ -221,26 +267,28 @@ def assess_applicability(
     """Pure, deterministic applicability assessment.
 
     Steps:
-    1. Check geometry compatibility.
-    2. Check phase regime compatibility.
+    1. Check geometry compatibility (generic matches ANY geometry).
+    2. Check phase regime compatibility (generic matches ANY phase).
     3. Check flow regime compatibility.
-    4. Check each NumericBound against supplied values.
+    4. Check each NumericBound against supplied values (with tolerance).
     5. Check required inputs.
-    6. Determine overall status.
+    6. Derive overall status from policy (Item 4: policy is SOLE authority).
     7. Build warnings/blockers based on OutOfRangePolicy.
-    8. Compute assessment_hash.
+    8. Derive allows_evaluation from status + policy (never caller input).
+    9. Compute assessment_hash.
     """
     key = definition.key
     envelope = definition.envelope
     policy = definition.out_of_range_policy
 
-    # 1. Geometry check
-    geometry_compatible = inputs.geometry in envelope.geometry_types
-    if not geometry_compatible:
-        pass  # handled later
+    # Build a lookup from variable to value for the input
+    values_dict: dict[ApplicabilityVariable, float] = dict(inputs.values)
 
-    # 2. Phase regime check
-    phase_compatible = inputs.phase_regime in envelope.phase_regimes
+    # 1. Geometry check (generic wildcard semantics)
+    geometry_compatible = _check_geometry_compatible(inputs.geometry, envelope.geometry_types)
+
+    # 2. Phase regime check (generic wildcard semantics)
+    phase_compatible = _check_phase_compatible(inputs.phase_regime, envelope.phase_regimes)
 
     # 3. Flow regime check
     flow_compatible = inputs.flow_regime in envelope.flow_regimes
@@ -248,16 +296,15 @@ def assess_applicability(
     # 4. Check each NumericBound
     variable_results: list[VariableAssessment] = []
     for bound in envelope.bounds:
-        value = inputs.values.get(bound.variable)
+        value = values_dict.get(bound.variable)
         vr = _assess_variable_bound(bound, value)
         variable_results.append(vr)
 
     # 5. Check required inputs
-    required_inputs_missing = False
+    has_missing_required = False
     for req_var in envelope.required_inputs:
-        if req_var not in inputs.values:
-            required_inputs_missing = True
-            # Add a missing variable assessment if not already present
+        if req_var not in values_dict:
+            has_missing_required = True
             already_present = any(vr.variable == req_var for vr in variable_results)
             if not already_present:
                 variable_results.append(
@@ -268,15 +315,54 @@ def assess_applicability(
                     )
                 )
 
+    # Item 4: Check for missing non-required bounded variables that are absent
+    # A non-required bounded variable that is missing is NOT an error (no blocker)
+    # but it produces a variable result with status=missing
+
     # 6. Determine overall status
-    overall_status = _compute_overall_status(
-        tuple(variable_results),
-        geometry_compatible,
-        phase_compatible,
-        flow_compatible,
-        required_inputs_missing,
-        inputs.allow_extrapolation,
+    abs_statuses = (
+        VariableApplicabilityStatus.below_absolute,
+        VariableApplicabilityStatus.above_absolute,
     )
+    rec_statuses = (
+        VariableApplicabilityStatus.below_recommended,
+        VariableApplicabilityStatus.above_recommended,
+    )
+    has_absolute_violation = any(vr.status in abs_statuses for vr in variable_results)
+    has_recommended_violation = any(vr.status in rec_statuses for vr in variable_results)
+
+    overall_status = _derive_allows_evaluation(
+        status=ApplicabilityStatus.applicable,  # placeholder, derived below
+        policy=policy,
+        has_absolute_violation=has_absolute_violation,
+        has_recommended_violation=has_recommended_violation,
+        allow_extrapolation=inputs.allow_extrapolation,
+        has_missing_required=has_missing_required,
+        geometry_compatible=geometry_compatible,
+        phase_compatible=phase_compatible,
+        flow_compatible=flow_compatible,
+    )
+
+    # Item 4: Handle explicit_extrapolation when policy allows
+    if (
+        has_absolute_violation
+        and inputs.allow_extrapolation
+        and policy.absolute_violation == OutOfRangeAction.allow_explicit_opt_in
+    ):
+        overall_status = ApplicabilityStatus.explicit_extrapolation
+
+    # Item 4: Handle recommended range exceeded with warn policy
+    if has_recommended_violation and not has_absolute_violation:
+        rec_action = policy.recommended_violation
+        if rec_action in (OutOfRangeAction.warn, OutOfRangeAction.block):
+            overall_status = ApplicabilityStatus.recommended_range_exceeded
+        elif (
+            policy.recommended_violation == OutOfRangeAction.allow_explicit_opt_in
+            and inputs.allow_extrapolation
+        ):
+            overall_status = ApplicabilityStatus.explicit_extrapolation
+        else:
+            overall_status = ApplicabilityStatus.recommended_range_exceeded
 
     # 7. Build warnings/blockers
     warnings: list[EngineeringMessage] = []
@@ -293,6 +379,37 @@ def assess_applicability(
                 warnings.append(msg)
             else:
                 blockers.append(msg)
+
+    # Missing required input messages
+    if has_missing_required:
+        missing_policy = policy.missing_input
+        missing_severity = {
+            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
+            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
+            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
+            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
+        }.get(missing_policy, EngineeringMessageSeverity.BLOCKER)
+        for vr in variable_results:
+            if vr.status == VariableApplicabilityStatus.missing:
+                msg = EngineeringMessage(
+                    code=ErrorCode.CORRELATION_INPUT_MISSING,
+                    severity=missing_severity,
+                    message=(
+                        f"Required variable '{vr.variable.value}' missing "
+                        f"for {key.correlation_id} v{key.version}"
+                    ),
+                    source_module="correlations.applicability",
+                    context=(
+                        ("correlation_id", key.correlation_id),
+                        ("correlation_version", key.version),
+                        ("variable", vr.variable.value),
+                        ("status", "missing"),
+                    ),
+                )
+                if msg.allows_continuation:
+                    warnings.append(msg)
+                else:
+                    blockers.append(msg)
 
     # Incompatibility messages
     if not geometry_compatible:
@@ -355,28 +472,27 @@ def assess_applicability(
         )
         blockers.append(flow_msg)
 
-    # 8. Compute assessment_hash
-    allows_evaluation = overall_status == ApplicabilityStatus.applicable or (
-        overall_status == ApplicabilityStatus.explicit_extrapolation and inputs.allow_extrapolation
+    # Item 8: Handle fallback_required as non-continuable
+    # fallback_required is already non-continuable by severity=ERROR
+
+    # 8. Derive allows_evaluation from status + policy
+    allows_evaluation = _policy_allows_evaluation(
+        overall_status,
+        policy,
+        inputs.allow_extrapolation,
     )
 
-    assessment_payload = {
-        "correlation_key": {
-            "correlation_id": key.correlation_id,
-            "version": key.version,
-        },
-        "status": overall_status.value,
-        "variable_results": [
-            {
-                "variable": vr.variable.value,
-                "status": vr.status.value,
-                "supplied_value": vr.supplied_value,
-            }
-            for vr in variable_results
-        ],
-        "allows_evaluation": allows_evaluation,
-    }
-    assessment_hash = sha256_digest(assessment_payload)
+    # 9. Compute assessment_hash
+    assessment_hash = compute_assessment_hash(
+        definition_hash=definition.definition_hash,
+        correlation_key=key,
+        status=overall_status,
+        variable_results=tuple(variable_results),
+        warnings=tuple(warnings),
+        blockers=tuple(blockers),
+        policy=policy,
+        allow_extrapolation=inputs.allow_extrapolation,
+    )
 
     return ApplicabilityAssessment(
         correlation_key=key,
