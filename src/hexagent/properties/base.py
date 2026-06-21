@@ -82,7 +82,7 @@ class FluidIdentifier:
 
     @classmethod
     def from_value(cls, value: FluidIdentifier | str) -> FluidIdentifier:
-        if isinstance(value, cls):
+        if isinstance(value, FluidIdentifier):
             return value
         return cls(name=value)
 
