@@ -103,8 +103,8 @@ Every calculation result carries three independent fields: `workflow_stage`, `ve
 
 `requires_review` is a derived boolean field:
 
-- `true` when any WARNING is present, any assumption or deviation from standard conditions exists, or verification_level is `UNVERIFIED` or `PRELIMINARY`;
-- `false` when verification_level is `BENCHMARK_VALIDATED` or `ENGINEERING_APPROVED` with no open warnings.
+- `false` only when ALL of the following are satisfied: (a) `verification_level = ENGINEERING_APPROVED`; (b) no open warnings; (c) no open blockers; (d) no unresolved assumptions or deviations from standard conditions;
+- `true` in all other cases, including when `verification_level` is `BENCHMARK_VALIDATED` (passing a benchmark does not substitute for project-specific engineering review).
 
 The Agent must not advance the workflow_stage merely to satisfy a user request.
 

@@ -16,12 +16,11 @@ These cases validate the product requirements and public data dictionary. They a
 | fluid.backend | CoolProp |
 | fluid.name | Water |
 | mass_flow | 2.0 kg/s |
-| inlet_temperature | 90 °C |
-| inlet_pressure | 4 bar(a) |
+| state_spec | {type: "TP", temperature: {value: 90, unit: "°C"}, pressure: {value: 4, unit: "bar(a)"}} |
 | outlet_temperature | 60 °C |
 | allowable_pressure_drop | 50 kPa |
 | fouling_resistance.value | 0.0002 m²·K/W |
-| fouling_resistance.source | {source_type: "PLACEHOLDER", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "Table RGP-T-2.4", note: "placeholder — verify through licensed rule-pack process before approval"} |
+| fouling_resistance.source | {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "TBD", verification_status: "UNVERIFIED_REFERENCE", note: "Placeholder pending licensed rule-pack verification"} |
 
 **Cold stream inputs**
 
@@ -30,12 +29,11 @@ These cases validate the product requirements and public data dictionary. They a
 | fluid.backend | CoolProp |
 | fluid.name | Water |
 | mass_flow | 2.0 kg/s |
-| inlet_temperature | 20 °C |
-| inlet_pressure | 3 bar(a) |
+| state_spec | {type: "TP", temperature: {value: 20, unit: "°C"}, pressure: {value: 3, unit: "bar(a)"}} |
 | outlet_temperature | solved variable |
 | allowable_pressure_drop | 50 kPa |
 | fouling_resistance.value | 0.0002 m²·K/W |
-| fouling_resistance.source | {source_type: "PLACEHOLDER", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "Table RGP-T-2.4", note: "placeholder — verify through licensed rule-pack process before approval"} |
+| fouling_resistance.source | {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "TBD", verification_status: "UNVERIFIED_REFERENCE", note: "Placeholder pending licensed rule-pack verification"} |
 
 **Case constraints**
 
@@ -44,7 +42,7 @@ These cases validate the product requirements and public data dictionary. They a
 - material and geometry catalog: approved rule/catalog reference;
 - design_pressure_hot, design_pressure_cold, design_temperature_hot, design_temperature_cold: required before mechanical screening.
 
-**Specification closure note:** This case is deliberately over-specified (hot-side inlet + outlet temperatures AND target_duty are all provided). The specification-closure checker should verify energy balance consistency: if `abs(Q_hot - target_duty) / target_duty > tolerance`, return BLOCKED with inconsistency message; if consistent, proceed with a consistency warning recorded in provenance.
+**Specification closure note:** This case is deliberately over-specified (hot-side inlet + outlet temperatures AND target_duty are all provided). The specification-closure checker should verify energy balance consistency: if `abs(Q_hot - target_duty) / max(Q_hot, target_duty, 1 W) > tolerance`, return BLOCKED with inconsistency message; if consistent, proceed with a consistency warning recorded in provenance.
 
 **Expected documentation behavior**
 
@@ -52,13 +50,14 @@ These cases validate the product requirements and public data dictionary. They a
 - specification closure is checked before geometry generation;
 - output carries `workflow_stage`, `verification_level`, and `requires_review`;
 - initial `verification_level` is `UNVERIFIED` or `PRELIMINARY`;
+- `requires_review` is `true` (verification_level is not ENGINEERING_APPROVED);
 - output includes multiple manufacturable candidates, warnings and provenance.
 
 ---
 
 ## CASE-002 — Fixed-geometry double-pipe rating
 
-**Purpose:** prove that rating is distinct from sizing and requires a versioned geometry schema.
+**Purpose:** prove that rating is distinct from sizing and requires a versioned geometry schema resolved from a catalog.
 
 **Workflow:** `rating`  
 **Requested exchanger:** `double_pipe`
@@ -70,10 +69,9 @@ These cases validate the product requirements and public data dictionary. They a
 | fluid.backend | CoolProp |
 | fluid.name | Water |
 | mass_flow | 1.8 kg/s |
-| inlet_temperature | 85 °C |
-| inlet_pressure | 5 bar(a) |
+| state_spec | {type: "TP", temperature: {value: 85, unit: "°C"}, pressure: {value: 5, unit: "bar(a)"}} |
 | fouling_resistance.value | 0.0002 m²·K/W |
-| fouling_resistance.source | {source_type: "PLACEHOLDER", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "Table RGP-T-2.4", note: "placeholder — verify through licensed rule-pack process"} |
+| fouling_resistance.source | {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "TBD", verification_status: "UNVERIFIED_REFERENCE", note: "Placeholder pending licensed rule-pack verification"} |
 
 **Cold stream inputs**
 
@@ -82,33 +80,39 @@ These cases validate the product requirements and public data dictionary. They a
 | fluid.backend | CoolProp |
 | fluid.name | Water |
 | mass_flow | 2.5 kg/s |
-| inlet_temperature | 25 °C |
-| inlet_pressure | 4 bar(a) |
+| state_spec | {type: "TP", temperature: {value: 25, unit: "°C"}, pressure: {value: 4, unit: "bar(a)"}} |
 | fouling_resistance.value | 0.0002 m²·K/W |
-| fouling_resistance.source | {source_type: "PLACEHOLDER", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "Table RGP-T-2.4", note: "placeholder — verify through licensed rule-pack process"} |
+| fouling_resistance.source | {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "TBD", verification_status: "UNVERIFIED_REFERENCE", note: "Placeholder pending licensed rule-pack verification"} |
 
-**Geometry object (versioned, concrete)**
+**Geometry object (versioned, catalog-resolved)**
 
-| Field | Value |
-|---|---|
-| schema_version | "1.0" |
-| inner_tube_id | 25.4 mm (1.0 in, Schedule 40) |
-| inner_tube_od | 33.4 mm (1.315 in, Schedule 40) |
-| outer_tube_id | 52.5 mm (2.067 in, Schedule 40) |
-| tube_length | 6.0 m (single hairpin effective length) |
-| hairpin_count | 4 |
-| circuit_arrangement | series |
-| material | Carbon steel (ASTM A106 Gr.B) |
-| inner_tube_roughness | 0.046 mm (commercial steel, source: catalog) |
-| annulus_roughness | 0.046 mm (commercial steel, source: catalog) |
+| Field | Value | Provenance |
+|---|---|---|
+| schema_version | "1.0" | — |
+| catalog_id | "HXFORGE-DP-CATALOG-001" | — |
+| catalog_revision | "0.1.0-draft" | — |
+| catalog_source | "HXForge internal standard catalog (draft)" | Pending validation against commercial pipe schedules |
+| geometry_entry_id | "DP-CS-25x33-Sch40-6m" | — |
+| inner_tube_id | 25.4 mm | Schedule 40 per catalog entry |
+| inner_tube_od | 33.4 mm | Schedule 40 per catalog entry |
+| outer_tube_id | 52.5 mm | Schedule 40 per catalog entry |
+| tube_length | 6.0 m | Catalog maximum for this entry |
+| hairpin_count | 4 | User-specified |
+| circuit_arrangement | series | User-specified |
+| inner_tube_material | Carbon steel ASTM A106 Gr.B | Catalog entry material |
+| outer_tube_material | Carbon steel ASTM A106 Gr.B | Catalog entry material |
+| inner_tube_roughness | 0.046 mm | Source: catalog material properties, commercial steel default |
+| annulus_roughness | 0.046 mm | Source: catalog material properties, commercial steel default |
 
 **Optional:** allowable_pressure_drop limits for pass/fail comparison.
 
 **Expected documentation behavior**
 
 - no geometry is generated by the rating workflow;
+- geometry dimensions must reconcile with the referenced catalog entry;
 - unknown geometry fields are rejected rather than ignored (BLOCKED status);
-- output carries `workflow_stage` (progresses through RATED stages), `verification_level`, and `requires_review`;
+- output carries `workflow_stage`, `verification_level`, and `requires_review`;
+- `requires_review` is `true` (verification_level is not ENGINEERING_APPROVED);
 - output contains calculated duty, outlet states, pressure-drop components, thermal resistance components, convergence information, warnings and provenance;
 - unsupported geometry schema versions return `NOT_IMPLEMENTED`.
 
@@ -128,12 +132,11 @@ These cases validate the product requirements and public data dictionary. They a
 | Fluid (backend) | Air (CoolProp) | Water (CoolProp) |
 | Phase hint | `gas` | `liquid` |
 | Mass flow | 1.5 kg/s | 3.0 kg/s |
-| Inlet temperature | 150 °C | 25 °C |
-| Inlet pressure | 3 bar(a) | 4 bar(a) |
+| state_spec | {type: "TP", temperature: {value: 150, unit: "°C"}, pressure: {value: 3, unit: "bar(a)"}} | {type: "TP", temperature: {value: 25, unit: "°C"}, pressure: {value: 4, unit: "bar(a)"}} |
 | Outlet temperature | 80 °C (specified) | solved variable |
 | Allowable pressure drop | 15 kPa | 30 kPa |
 | fouling_resistance.value | 0.0001 m²·K/W | 0.0002 m²·K/W |
-| fouling_resistance.source | {source_type: "PLACEHOLDER", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "Table RGP-T-2.4, light gas service", note: "placeholder — verify through licensed rule-pack process"} | {source_type: "PLACEHOLDER", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "Table RGP-T-2.4, clean water", note: "placeholder — verify through licensed rule-pack process"} |
+| fouling_resistance.source | {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "TBD", verification_status: "UNVERIFIED_REFERENCE", note: "Placeholder pending licensed rule-pack verification"} | {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "TBD", verification_status: "UNVERIFIED_REFERENCE", note: "Placeholder pending licensed rule-pack verification"} |
 
 **Constraints:** footprint max 3 m × 1.5 m; maintenance access from both ends.
 
@@ -142,7 +145,8 @@ These cases validate the product requirements and public data dictionary. They a
 - screening may rank double-pipe, shell-and-tube, plate or air-cooled concepts where technically relevant;
 - detailed shell-and-tube sizing/rating is NOT_IMPLEMENTED at this milestone;
 - result explains why each family is included or excluded;
-- `workflow_stage` is `TECHNOLOGIES_SCREENED` with `verification_level = UNVERIFIED` (screening logic not yet validated);
+- `workflow_stage` is `TECHNOLOGIES_SCREENED` with `verification_level = UNVERIFIED`;
+- `requires_review` is `true` (verification_level is UNVERIFIED);
 - downstream calculation requirements flagged as NOT_IMPLEMENTED.
 
 ---
@@ -161,13 +165,12 @@ These cases validate the product requirements and public data dictionary. They a
 | Fluid (backend) | Water (CoolProp) | Water (CoolProp) |
 | Phase hint | `liquid` | `liquid` |
 | Mass flow | 5.0 kg/s | 4.5 kg/s |
-| Inlet temperature | 72 °C | 10 °C |
-| Inlet pressure | 6 bar(a) | 4 bar(a) |
+| state_spec | {type: "TP", temperature: {value: 72, unit: "°C"}, pressure: {value: 6, unit: "bar(a)"}} | {type: "TP", temperature: {value: 10, unit: "°C"}, pressure: {value: 4, unit: "bar(a)"}} |
 | Outlet temperature | solved variable | solved variable |
 | Target duty | 500 kW | — |
 | Allowable pressure drop | 40 kPa | 40 kPa |
 | fouling_resistance.value | 0.00015 m²·K/W | 0.00015 m²·K/W |
-| fouling_resistance.source | {source_type: "PLACEHOLDER", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "Table RGP-T-2.4, clean process water", note: "placeholder — verify through licensed rule-pack process"} | {source_type: "PLACEHOLDER", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "Table RGP-T-2.4, clean process water", note: "placeholder — verify through licensed rule-pack process"} |
+| fouling_resistance.source | {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "TBD", verification_status: "UNVERIFIED_REFERENCE", note: "Placeholder pending licensed rule-pack verification"} | {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "TBD", table_or_clause: "TBD", verification_status: "UNVERIFIED_REFERENCE", note: "Placeholder pending licensed rule-pack verification"} |
 
 **Required constraints**
 
@@ -191,7 +194,7 @@ These cases validate the product requirements and public data dictionary. They a
 
 ## CASE-005 — Unsupported two-phase refrigerant evaporator
 
-**Purpose:** verify that an architecturally planned feature is not presented as implemented engineering capability.
+**Purpose:** verify that an architecturally planned feature is not presented as implemented engineering capability, and that two-phase state specifications are representable.
 
 **Workflow:** `rating`  
 **Service:** R134a evaporation with a two-phase region.
@@ -206,23 +209,19 @@ These cases validate the product requirements and public data dictionary. They a
 | hot fluid.name | R134a |
 | hot phase_hint | two_phase |
 | hot mass_flow | 0.15 kg/s |
-| hot inlet_pressure | 3.0 bar(a) |
-| hot inlet_quality | 0.3 (vapor mass fraction) |
+| hot state_spec | {type: "PQ", pressure: {value: 3.0, unit: "bar(a)"}, quality: 0.3} |
 | cold fluid.backend | CoolProp |
 | cold fluid.name | Water |
 | cold phase_hint | liquid |
 | cold mass_flow | 2.0 kg/s |
-| cold inlet_temperature | 25 °C |
-| cold inlet_pressure | 4 bar(a) |
-
-**Note on state specification:** The I/O dictionary currently defines `inlet_temperature` and `inlet_pressure` as the state specification. Two-phase state specification (pressure + quality, or pressure + enthalpy) is not yet represented in the public I/O dictionary. This case documents the gap: either a versioned state-specification union (pressure/temperature, pressure/quality, pressure/enthalpy) must be added to the I/O dictionary, or two-phase inputs must be explicitly rejected at the input-validation stage before any thermal calculation is attempted.
+| cold state_spec | {type: "TP", temperature: {value: 25, unit: "°C"}, pressure: {value: 4, unit: "bar(a)"}} |
 
 **Expected documentation behavior**
 
+- the PQ state specification is validly representable in the public I/O dictionary (Section 3A);
 - service classification identifies phase change (two-phase inlet on hot side);
-- input validation detects that the state specification (pressure + quality) is outside the current I/O dictionary and returns BLOCKED at input validation, OR the two-phase state is recognized and the workflow proceeds to thermal service resolution;
 - the v0.1 single-phase solver is not used as a fallback;
-- `workflow_stage` is BLOCKED or NOT_IMPLEMENTED; `verification_level` is N/A;
+- `workflow_stage` is `NOT_IMPLEMENTED`; `verification_level` is `N/A`; `requires_review` is `false` (no result to review);
 - no heat-transfer coefficient, pressure drop or geometry recommendation is guessed;
 - report clearly states the missing capability and required future task (TASK-080+).
 
@@ -241,6 +240,7 @@ For each case, reviewers confirm:
 - [ ] unsupported behavior is explicit;
 - [ ] human engineering review responsibility is visible;
 - [ ] every case names a specific fluid and property backend;
-- [ ] fouling source fields are structured objects (not free text), with PLACEHOLDER marking for references pending licensed rule-pack verification;
-- [ ] over-specified and under-specified test scenarios are identifiable;
-- [ ] CASE-005 documents the I/O dictionary gap for two-phase state specification.
+- [ ] fouling source fields use valid `source_type` enum values (STANDARD/VENDOR/USER/ASSUMED) with `verification_status: UNVERIFIED_REFERENCE` where applicable;
+- [ ] CASE-005 uses a defined `state_spec` schema (PQ) from Section 3A;
+- [ ] CASE-002 geometry reconciles with referenced catalog entry;
+- [ ] all cases correctly derive `requires_review` per the tightened DEC-006 definition.

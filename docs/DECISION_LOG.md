@@ -132,12 +132,14 @@ Status values: `PROPOSED`, `APPROVED`, `REJECTED`, `SUPERSEDED`.
 
 **`requires_review`** — whether a human engineering review is needed before the result can be used for decisions:
 
-| Value | Derivation |
+| Value | Conditions (ALL must be met for `false`) |
 |---|---|
-| `true` | Any WARNING is present, or any assumption/deviation from standard conditions exists, or verification_level is UNVERIFIED or PRELIMINARY |
-| `false` | verification_level is BENCHMARK_VALIDATED or ENGINEERING_APPROVED with no open warnings |
+| `true` | Any WARNING is present, OR any assumption/deviation from standard conditions exists, OR any BLOCKER is open, OR verification_level is UNVERIFIED or PRELIMINARY or BENCHMARK_VALIDATED |
+| `false` | AND only when: (a) verification_level is `ENGINEERING_APPROVED`; (b) no open warnings; (c) no open blockers; (d) no unresolved assumptions or deviations from standard conditions |
 
-`requires_review` is a derived boolean, not a user-set field. It is computed from warnings, assumptions, and verification_level.
+`BENCHMARK_VALIDATED` results still require project-specific engineering review — passing a benchmark does not substitute for domain-specific approval. Only `ENGINEERING_APPROVED` clears the review gate, and only when all four conditions above are satisfied.
+
+`requires_review` is a derived boolean, not a user-set field.
 
 **Rationale / consequence:** Separates three orthogonal concerns: where the workflow is (stage), how mature the evidence is (verification_level), and whether human action is needed (requires_review). Prevents conflating workflow completion with engineering confidence, and prevents requiring review for trivially verified results.
 
@@ -287,7 +289,7 @@ Convergence criterion: `abs(delta_x) <= absolute_tolerance + relative_tolerance 
 Default values are solver-specific and must be declared per solver, not globally assigned. Example for an outlet-temperature solver:
 - `absolute_tolerance`: 0.005 K
 - `relative_tolerance`: 1e-6
-- `scaling_quantity`: |T_in| + 273.15 (absolute inlet temperature as scale)
+- `scaling_quantity`: max(|T_in_K|, |T_out_K|, 1 K) (absolute inlet/outlet temperatures already in kelvin as scale)
 
 Example for a U-value iteration:
 - `absolute_tolerance`: 0.01 W/m²·K
@@ -383,7 +385,13 @@ The `fouling_resistance.source` field is a structured object, not a free-text st
 | `reference_id` | string | Document identifier (e.g., "TEMA-RGP-T-2.4", "API 660 Table H") |
 | `edition` | string | Edition or year of the reference |
 | `table_or_clause` | string | Specific table, figure or clause within the reference |
+| `verification_status` | enum: `VERIFIED`, `UNVERIFIED_REFERENCE` | Whether the reference has been verified through the licensed rule-pack process |
 | `note` | string | Free-text clarification or assumption statement |
+
+When `verification_status` is `UNVERIFIED_REFERENCE`:
+- the reference data is treated as preliminary and not yet confirmed through the licensed rule-pack process;
+- a `WARNING` must be returned indicating the reference is pending verification;
+- the `note` field should explain what verification is pending.
 
 When fouling resistance is zero:
 - `source_type` must be `USER` or `ASSUMED`;

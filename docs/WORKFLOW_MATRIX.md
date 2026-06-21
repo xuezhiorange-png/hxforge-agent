@@ -111,6 +111,6 @@ Verification level describes the engineering evidence behind the result, indepen
 
 ### 7.3 Review requirement
 
-`requires_review` is a derived boolean: `true` when any WARNING is present or verification_level is UNVERIFIED/PRELIMINARY; `false` when BENCHMARK_VALIDATED or ENGINEERING_APPROVED with no open warnings.
+`requires_review` is a derived boolean: `false` only when (a) `verification_level = ENGINEERING_APPROVED`; (b) no open warnings; (c) no open blockers; (d) no unresolved assumptions. `true` in all other cases, including `BENCHMARK_VALIDATED`.
 
 The Agent must not advance the workflow_stage merely to satisfy a user request.

@@ -33,10 +33,40 @@
 | `outlet_temperature` | outlet absolute temperature | quantity | temperature | conditional |
 | `allowable_pressure_drop` | maximum permitted loss | quantity | pressure difference | required for constrained sizing |
 | `fouling_resistance.value` | fouling thermal resistance | quantity | area·temperature/power | required or explicitly zero with source |
-| `fouling_resistance.source` | structured fouling source object (see DEC-017) | object | — | required; fields: source_type, reference_id, edition, table_or_clause, note |
+| `fouling_resistance.source` | structured fouling source object (see DEC-017) | object | — | required; fields: source_type, reference_id, edition, table_or_clause, verification_status, note |
 | `velocity_limit_max` | maximum allowable flow velocity | quantity | length/time | optional |
 | `velocity_limit_min` | minimum required flow velocity | quantity | length/time | optional |
 | `phase_hint` | auto, liquid, gas or two-phase | enum | — | optional |
+
+## 3A. State specification union
+
+Stream thermodynamic state can be specified using one of three mutually exclusive schemas. Exactly one `state_spec` block must be provided per stream.
+
+### TP: Temperature + Pressure (single-phase default)
+
+| Field | Type | Unit dimension | Requirement |
+|---|---|---|---|
+| `state_spec.type` | literal: `"TP"` | — | required |
+| `state_spec.temperature` | quantity | temperature | required |
+| `state_spec.pressure` | quantity | pressure | required |
+
+### PH: Pressure + Enthalpy (general two-phase capable)
+
+| Field | Type | Unit dimension | Requirement |
+|---|---|---|---|
+| `state_spec.type` | literal: `"PH"` | — | required |
+| `state_spec.pressure` | quantity | pressure | required |
+| `state_spec.enthalpy` | quantity: specific enthalpy | energy/mass | required |
+
+### PQ: Pressure + Quality (two-phase with known vapor fraction)
+
+| Field | Type | Unit dimension | Requirement |
+|---|---|---|---|
+| `state_spec.type` | literal: `"PQ"` | — | required |
+| `state_spec.pressure` | quantity | pressure | required |
+| `state_spec.quality` | number (0.0 = saturated liquid, 1.0 = saturated vapor) | dimensionless | required, range [0, 1] |
+
+When `state_spec` is not provided, the stream defaults to TP using `inlet_temperature` and `inlet_pressure` for backward compatibility. PH and PQ specifications are accepted at the input-validation stage but may result in `NOT_IMPLEMENTED` when the downstream solver does not support the corresponding state path.
 
 ## 4. Design constraints
 
@@ -80,7 +110,7 @@ Unknown fields in the geometry object must cause a BLOCKED status, not be silent
 | `run_id` | calculation-run identifier | UUID | — |
 | `workflow_stage` | execution state (see DEC-006 §7.1) | enum | one of: DRAFT, INPUT_VALIDATED, THERMAL_SERVICE_RESOLVED, TECHNOLOGIES_SCREENED, CANDIDATES_GENERATED, CANDIDATES_RATED, ENGINEERING_CHECKED, COSTED, VERIFICATION_COMPLETED, REPORT_READY, BLOCKED, NOT_IMPLEMENTED, NON_CONVERGED |
 | `verification_level` | evidence maturity (see DEC-006 §7.2) | enum | one of: UNVERIFIED, PRELIMINARY, BENCHMARK_VALIDATED, ENGINEERING_APPROVED, N/A |
-| `requires_review` | derived: human review needed before use | boolean | true when warnings exist or verification_level is UNVERIFIED/PRELIMINARY |
+| `requires_review` | derived: human review needed before use | boolean | false only when verification_level=ENGINEERING_APPROVED + no warnings/blockers/unresolved assumptions; true otherwise |
 | `duty` | calculated or specified heat transfer | quantity | power |
 | `energy_balance_error` | normalized hot/cold residual | number | fraction |
 | `outlet_states` | solved stream outlets | object | unit-bearing |
@@ -90,7 +120,8 @@ Unknown fields in the geometry object must cause a BLOCKED status, not be silent
 | `warnings` | non-fatal engineering conditions | list | structured |
 | `blockers` | fatal conditions | list | structured |
 | `provenance` | formula/property/version trace | list/object | structured |
-| `result_hash` | deterministic hash of canonical inputs + outputs (see §8) | string | — | always |
+| `calculation_hash` | deterministic hash of calculation identity (see §8.1) | string | — | always |
+| `audit_record_hash` | hash of immutable review/audit record including approval state (see §8.2) | string | — | always when review is recorded |
 | `software_version` | HXForge version used | string | — | always |
 | `property_backend_version` | property provider version | string | — | always when properties used |
 
@@ -111,27 +142,42 @@ Every calculation run must record:
 - Warnings and blockers with severity codes
 - Software version and Git commit hash
 
-### 8.1 Result hash (deterministic)
+### 8.1 Calculation hash (deterministic, immutable)
 
-`result_hash` is a SHA-256 hash of a canonical JSON payload. The payload includes **only** deterministic, reproducible fields:
+`calculation_hash` is a SHA-256 hash of a canonical JSON payload representing the deterministic calculation identity. It is independent of any human review or approval action.
 
 **Included in hash payload:**
+- Input schema version
+- Case/input revision identifier
 - All resolved input values (after unit normalization to SI)
 - `workflow_stage` (final value)
-- `verification_level` (final value)
 - Deterministic calculation outputs (duty, outlet states, pressure drops, geometry)
+- Geometry/catalog revision
 - Formula/property backend names and versions
 - Software version and Git commit hash
 - `energy_balance_error`
+- Structured warning/blocker codes and their deterministic context (not message text)
 
 **Excluded from hash payload:**
-- `result_hash` itself (self-reference)
+- `calculation_hash` itself (self-reference)
+- `audit_record_hash`
 - `run_id` (random UUID)
 - Timestamps, display formatting, locale-dependent text
-- `requires_review` (derived from warnings, which are included)
+- `verification_level`, `requires_review`, approval state, reviewer identity
 - Warning/blocker message text (codes are included)
 
-**Numeric canonicalization:**
+### 8.2 Audit record hash (review protection)
+
+`audit_record_hash` optionally protects the immutable review/audit record, including:
+- `verification_level` (at time of audit)
+- Reviewer identity
+- Review timestamps
+- Approval state and signatures
+- `calculation_hash` (the calculation being reviewed)
+
+This hash detects tampering with the review trail without affecting the calculation identity.
+
+**Numeric canonicalization** (applies to both hashes):
 - All floats are serialized with full precision (Python `repr` or equivalent)
 - Units are normalized to SI before hashing
 - Object keys are sorted alphabetically
