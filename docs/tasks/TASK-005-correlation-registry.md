@@ -7,21 +7,21 @@
 - GitHub Issue: #10
 - Branch: `codex/task-005-correlation-registry`
 - PR: #11 (Draft)
-- Head SHA: `408293e`
+- Head SHA: `94cb09d`
 
 ## Scope
 
 ### In Scope
 
-- Correlation identity and versioning (CorrelationKey, semver)
+- Correlation identity and versioning (CorrelationKey, SemVer)
 - Bibliographic source model with verification status
 - Applicability envelope (geometry, phase, flow, numeric bounds)
 - Pure-function applicability assessment
-- Out-of-range policy (conservative defaults)
+- OutOfRangePolicy as sole authority for continuation
 - Registry Protocol + InMemoryCorrelationRegistry
-- CorrelationUsageRecord with provenance integration
+- CorrelationUsageRecord with deterministic provenance
 - 13 new ErrorCode constants
-- Documentation (CORRELATION_REGISTRY.md)
+- Documentation
 
 ### Out of Scope
 
@@ -32,13 +32,26 @@
 
 ## Test Count
 
-568 total (457 existing + 111 new)
+626 total (457 existing + 169 new)
 
 ## Engineering Decisions
 
 - ID format: lowercase dot-separated namespace
-- Version rules: semantic versioning (major.minor.patch)
+- Version rules: SemVer with numeric prerelease precedence
 - Default out-of-range: block on absolute, warn on recommended
 - Source verification: 4-level enum
 - Hash format: SHA-256 of canonical JSON
-- Latest-version selection: highest stable, exclude withdrawn/deprecated by default
+- Latest-version selection: highest stable, exclude withdrawn/deprecated
+- Tolerance fraction: applied to bounds, ≤1.0
+
+## Review-01 Status
+
+- Item 1: mypy ✅
+- Item 2: SemVer ✅
+- Item 3: Envelope ✅
+- Item 4: Policy ✅
+- Item 5: Input immutability ✅
+- Item 6: Hash contracts ✅
+- Item 7: Error consolidation ✅
+- Item 8: Usage record ✅
+- Item 9: Fixtures ✅
