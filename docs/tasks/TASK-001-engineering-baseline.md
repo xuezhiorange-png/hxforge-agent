@@ -101,16 +101,16 @@ Deliver:
 
 ## Acceptance criteria
 
-- [ ] Every v0.1 workflow has a complete minimum input set.
-- [ ] No public engineering term has multiple meanings.
-- [ ] Required, optional and conditional fields are explicit.
-- [ ] Absolute pressure and pressure difference are distinct.
-- [ ] Absolute temperature and temperature difference are distinct.
-- [ ] No numerical engineering default is hidden or implied.
-- [ ] Supported and unsupported capability boundaries are explicit.
-- [ ] Result states and human-review requirements are defined.
-- [ ] Five baseline cases require no undocumented fields.
-- [ ] No output language can be confused with certified pressure-vessel design.
+- [x] Every v0.1 workflow has a complete minimum input set.
+- [x] No public engineering term has multiple meanings.
+- [x] Required, optional and conditional fields are explicit.
+- [x] Absolute pressure and pressure difference are distinct.
+- [x] Absolute temperature and temperature difference are distinct.
+- [x] No numerical engineering default is hidden or implied.
+- [x] Supported and unsupported capability boundaries are explicit.
+- [x] Result states and human-review requirements are defined.
+- [x] Five baseline cases require no undocumented fields.
+- [x] No output language can be confused with certified pressure-vessel design.
 - [ ] Engineering owner approves or rejects each proposed decision in `DECISION_LOG.md`.
 
 ## Review gates

@@ -41,8 +41,15 @@ This document defines the minimum information required for each workflow, the ca
 | One outlet temperature supplied with valid inlet states and flows | solver may calculate duty and the other outlet when the service is supported |
 | Target duty supplied with valid inlet states and flows | solver may calculate outlet states when the service is supported |
 | Unknown or unsupported geometry fields in rating | reject the request; do not ignore fields |
+| Area margin applied in sizing | design area = required area × (1 + margin); see DEC-015 |
+| Area margin in rating | reported as informational; does not modify the calculation |
 | Missing engineering value that has no approved default | `BLOCKED`; never guess |
 | Requested capability exists in architecture but has no validated implementation | `NOT_IMPLEMENTED` |
+| Mass flow rate is zero or negative | `BLOCKED` with validation error |
+| Operating temperature exceeds design temperature | `WARNING` with explicit note; does not block thermal calculation but blocks mechanical conclusions |
+| Property backend cannot identify or evaluate the requested fluid | `BLOCKED` with property error |
+| Ambiguous phase state (e.g., near-saturation with auto phase hint) | `BLOCKED` unless validated phase-determination logic is available; otherwise require explicit `phase_hint` |
+| Target duty and both outlet temperatures all provided (over-specified) | verify energy-balance consistency; proceed with `WARNING` if consistent, `BLOCKED` if inconsistent |
 
 ## 5. v0.1 capability matrix
 

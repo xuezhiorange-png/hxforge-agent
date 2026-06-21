@@ -31,10 +31,12 @@ These cases validate the product requirements and public data dictionary. They a
 
 **Case constraints**
 
-- target duty: approximately 250 kW as an input specification;
+- target_duty: 250 kW (input specification, value to be verified against hot-side energy balance);
 - area margin: explicitly selected;
 - material and geometry catalog: approved rule/catalog reference;
 - design pressure and design temperature: required before mechanical screening.
+
+**Specification closure note:** This case is deliberately over-specified (hot-side inlet + outlet temperatures AND target_duty are all provided). The specification-closure checker should verify energy balance consistency and return a BLOCKED status if the values are inconsistent, or proceed with a consistency warning if they agree within tolerance.
 
 **Expected documentation behavior**
 
@@ -74,7 +76,7 @@ These cases validate the product requirements and public data dictionary. They a
 
 **Service summary**
 
-- hot side: compressed air or another supported single-phase gas;
+- hot side: Air (or Nitrogen if a single-phase gas with validated CoolProp properties is required);
 - cold side: water;
 - both inlet states and mass flows provided;
 - target duty or one outlet temperature provided;
@@ -97,7 +99,7 @@ These cases validate the product requirements and public data dictionary. They a
 
 **Required constraints**
 
-- two supported single-phase liquid streams;
+- two supported single-phase liquid streams (e.g., Water and Water+Propylene Glycol solution, or two Water streams);
 - thermal specification and pressure-drop limits;
 - hygienic or cleanability requirement;
 - CIP compatibility requirement;
@@ -111,6 +113,8 @@ These cases validate the product requirements and public data dictionary. They a
 - a generic plate model is not claimed to be equivalent to a proprietary vendor plate;
 - missing licensed plate geometry prevents detailed rating but does not prevent high-level screening;
 - output states the evidence and uncertainty behind the recommendation.
+
+**Sanitation constraint note:** The screening engine must evaluate CIP access, gasket material compatibility with cleaning agents, surface finish requirements, and drain-ability alongside thermal criteria.
 
 ## CASE-005 — Unsupported two-phase refrigerant evaporator
 
@@ -146,3 +150,5 @@ For each case, reviewers confirm:
 - [ ] expected output fields and result status are defined;
 - [ ] unsupported behavior is explicit;
 - [ ] human engineering review responsibility is visible.
+- [ ] every case has explicitly named fluids and property backend
+- [ ] over-specified and under-specified test scenarios are identifiable
