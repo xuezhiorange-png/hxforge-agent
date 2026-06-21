@@ -97,9 +97,7 @@ class PQStateSpec(StrictBaseModel):
     schema_version: Literal["1.0"] = "1.0"
 
 
-StateSpec = Annotated[
-    TPStateSpec | PHStateSpec | PQStateSpec, Discriminator("type")
-]
+StateSpec = Annotated[TPStateSpec | PHStateSpec | PQStateSpec, Discriminator("type")]
 
 
 class FoulingSource(StrictBaseModel):
@@ -137,13 +135,11 @@ class StreamSpec(StrictBaseModel):
         has_legacy_pres = self.inlet_pressure is not None
         if has_state and (has_legacy_temp or has_legacy_pres):
             raise ValueError(
-                "Cannot provide both state_spec and legacy "
-                "inlet_temperature/inlet_pressure."
+                "Cannot provide both state_spec and legacy inlet_temperature/inlet_pressure."
             )
         if not has_state and not (has_legacy_temp and has_legacy_pres):
             raise ValueError(
-                "Must provide either state_spec or both "
-                "inlet_temperature and inlet_pressure."
+                "Must provide either state_spec or both inlet_temperature and inlet_pressure."
             )
         return self
 
@@ -197,9 +193,7 @@ class DesignCase(StrictBaseModel):
             for x in (self.hot_stream.outlet_temperature, self.cold_stream.outlet_temperature)
         )
         if self.target_duty is None and known_outlets == 0:
-            raise ValueError(
-                "Provide target_duty or at least one stream outlet temperature."
-            )
+            raise ValueError("Provide target_duty or at least one stream outlet temperature.")
         return self
 
 

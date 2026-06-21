@@ -22,3 +22,5 @@ simulation_artifacts/
 *.step
 *.stp
 .local/
+.config/
+backend/

@@ -179,9 +179,7 @@ class FluidIdentifier:
         ``composition_basis`` is validated (v0.1: ``mole_fraction`` only).
         """
         # Accept actual FluidSpec object
-        if hasattr(spec_or_provider, "backend") and hasattr(
-            spec_or_provider, "name"
-        ):
+        if hasattr(spec_or_provider, "backend") and hasattr(spec_or_provider, "name"):
             provider_id = spec_or_provider.backend
             fluid_name = spec_or_provider.name
             comp = getattr(spec_or_provider, "composition", None)
@@ -220,8 +218,7 @@ class FluidIdentifier:
         if composition_basis != "mole_fraction":
             raise PropertyServiceError(
                 PropertyErrorCode.INVALID_FLUID,
-                f"Composition basis {composition_basis!r} "
-                "is not supported in v0.1.",
+                f"Composition basis {composition_basis!r} is not supported in v0.1.",
                 context={"composition_basis": composition_basis},
             )
         if composition:
@@ -245,8 +242,7 @@ class FluidIdentifier:
     def coolprop_fluid(self) -> str:
         if self.components:
             mixture = "&".join(
-                f"{component}[{fraction:.16g}]"
-                for component, fraction in self.canonical_components
+                f"{component}[{fraction:.16g}]" for component, fraction in self.canonical_components
             )
             return f"{self.equation_of_state_backend}::{mixture}"
         return f"{self.equation_of_state_backend}::{self.name}"
@@ -552,9 +548,7 @@ class FluidState:
             query_type=PropertyQueryType(prov_dict["query_type"]),
             inputs=tuple(prov_dict["inputs"].items()),
             cache_policy_version=prov_dict["cache_policy_version"],
-            reference_state_policy=ReferenceStatePolicy(
-                prov_dict["reference_state_policy"]
-            ),
+            reference_state_policy=ReferenceStatePolicy(prov_dict["reference_state_policy"]),
             configuration_fingerprint=prov_dict["configuration_fingerprint"],
         )
         return cls(
@@ -609,9 +603,7 @@ class SaturationState:
             query_type=PropertyQueryType(prov_dict["query_type"]),
             inputs=tuple(prov_dict["inputs"].items()),
             cache_policy_version=prov_dict["cache_policy_version"],
-            reference_state_policy=ReferenceStatePolicy(
-                prov_dict["reference_state_policy"]
-            ),
+            reference_state_policy=ReferenceStatePolicy(prov_dict["reference_state_policy"]),
             configuration_fingerprint=prov_dict["configuration_fingerprint"],
         )
         liquid = FluidState.from_json(model.liquid.model_dump_json())

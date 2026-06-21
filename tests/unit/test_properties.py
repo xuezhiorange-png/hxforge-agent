@@ -82,10 +82,7 @@ class TestConfigurationGuard:
             # Next query should detect the change and raise
             with pytest.raises(PropertyServiceError) as exc_info:
                 provider.state_tp("R134a", 300.0, 2_000_000.0)
-            assert (
-                exc_info.value.code
-                is PropertyErrorCode.CONFIGURATION_CHANGED
-            )
+            assert exc_info.value.code is PropertyErrorCode.CONFIGURATION_CHANGED
             # Cache should be cleared
             assert provider.cache_info().size == 0
         finally:
@@ -124,26 +121,23 @@ class TestValidationLevels:
         ],
     )
     def test_all_tier_one_are_supported_tier_1(
-        self, fluid: str, temperature_k: float, pressure_pa: float,
+        self,
+        fluid: str,
+        temperature_k: float,
+        pressure_pa: float,
     ) -> None:
         """Item 2: all Tier-1 fluids get SUPPORTED_TIER_1, not
         BENCHMARK_VALIDATED (fixtures are same-backend regressions)."""
         state = CoolPropProvider().state_tp(fluid, temperature_k, pressure_pa)
         _assert_single_phase_state(state)
-        assert (
-            state.provenance.validation_level
-            is FluidValidationLevel.SUPPORTED_TIER_1
-        )
+        assert state.provenance.validation_level is FluidValidationLevel.SUPPORTED_TIER_1
         assert state.provenance.query_type is PropertyQueryType.TP
         assert state.provenance.backend_name == "CoolProp"
 
     def test_ammonia_alias_resolves_to_r717(self) -> None:
         state = CoolPropProvider().state_tp("Ammonia", 300.0, 2_000_000.0)
         assert state.provenance.fluid_identifier == "HEOS::R717"
-        assert (
-            state.provenance.validation_level
-            is FluidValidationLevel.SUPPORTED_TIER_1
-        )
+        assert state.provenance.validation_level is FluidValidationLevel.SUPPORTED_TIER_1
 
     def test_validation_matrix_is_backend_regression(self) -> None:
         """Item 2: matrix entries are labelled backend_regression."""
@@ -167,23 +161,22 @@ class TestTPPHConsistency:
         ],
     )
     def test_tp_ph_cross_consistency(
-        self, fluid: str, temperature_k: float, pressure_pa: float,
+        self,
+        fluid: str,
+        temperature_k: float,
+        pressure_pa: float,
     ) -> None:
         provider = CoolPropProvider()
         state_tp = provider.state_tp(fluid, temperature_k, pressure_pa)
         state_ph = provider.state_ph(
-            fluid, pressure_pa, state_tp.enthalpy_j_kg,
+            fluid,
+            pressure_pa,
+            state_tp.enthalpy_j_kg,
             reference_state=ReferenceStatePolicy.DEF,
         )
-        assert state_ph.temperature_k == pytest.approx(
-            state_tp.temperature_k, rel=1e-8
-        )
-        assert state_ph.pressure_pa == pytest.approx(
-            state_tp.pressure_pa, rel=1e-12
-        )
-        assert state_ph.density_kg_m3 == pytest.approx(
-            state_tp.density_kg_m3, rel=1e-7
-        )
+        assert state_ph.temperature_k == pytest.approx(state_tp.temperature_k, rel=1e-8)
+        assert state_ph.pressure_pa == pytest.approx(state_tp.pressure_pa, rel=1e-12)
+        assert state_ph.density_kg_m3 == pytest.approx(state_tp.density_kg_m3, rel=1e-7)
         assert state_ph.provenance.query_type is PropertyQueryType.PH
 
 
@@ -221,19 +214,21 @@ class TestBoundaryRejection:
         sat = provider.saturation_at_pressure("R134a", 500_000.0)
         with pytest.raises(PropertyServiceError) as exc_info:
             provider.state_tp(
-                "R134a", sat.liquid.temperature_k, 500_000.0,
+                "R134a",
+                sat.liquid.temperature_k,
+                500_000.0,
             )
         assert exc_info.value.code is PropertyErrorCode.NEAR_SATURATION
 
     def test_ph_inside_two_phase_is_rejected(self) -> None:
         provider = CoolPropProvider()
         sat = provider.saturation_at_pressure("R134a", 500_000.0)
-        midpoint = (
-            sat.liquid.enthalpy_j_kg + sat.vapor.enthalpy_j_kg
-        ) / 2.0
+        midpoint = (sat.liquid.enthalpy_j_kg + sat.vapor.enthalpy_j_kg) / 2.0
         with pytest.raises(PropertyServiceError) as exc_info:
             provider.state_ph(
-                "R134a", 500_000.0, midpoint,
+                "R134a",
+                500_000.0,
+                midpoint,
                 reference_state=ReferenceStatePolicy.DEF,
             )
         assert exc_info.value.code is PropertyErrorCode.TWO_PHASE_STATE
@@ -249,7 +244,9 @@ class TestPHReferenceState:
         provider = CoolPropProvider()
         tp = provider.state_tp("Water", 330.0, 300_000.0)
         ph = provider.state_ph(
-            "Water", 300_000.0, tp.enthalpy_j_kg,
+            "Water",
+            300_000.0,
+            tp.enthalpy_j_kg,
             reference_state=ReferenceStatePolicy.DEF,
         )
         assert ph.temperature_k == pytest.approx(330.0, rel=1e-8)
@@ -259,32 +256,29 @@ class TestPHReferenceState:
         tp = provider.state_tp("Water", 330.0, 300_000.0)
         original = provider.reference_state_policy
         try:
-            object.__setattr__(
-                provider, "reference_state_policy", "NOT_DEF"
-            )
+            object.__setattr__(provider, "reference_state_policy", "NOT_DEF")
             with pytest.raises(PropertyServiceError) as exc_info:
                 provider.state_ph(
-                    "Water", 300_000.0, tp.enthalpy_j_kg,
+                    "Water",
+                    300_000.0,
+                    tp.enthalpy_j_kg,
                     reference_state=ReferenceStatePolicy.DEF,
                 )
             assert exc_info.value.code is PropertyErrorCode.INVALID_INPUT
             assert "reference-state" in str(exc_info.value).lower()
         finally:
-            object.__setattr__(
-                provider, "reference_state_policy", original
-            )
+            object.__setattr__(provider, "reference_state_policy", original)
 
     def test_ph_reference_state_in_provenance(self) -> None:
         provider = CoolPropProvider()
         tp = provider.state_tp("Water", 330.0, 300_000.0)
         ph = provider.state_ph(
-            "Water", 300_000.0, tp.enthalpy_j_kg,
+            "Water",
+            300_000.0,
+            tp.enthalpy_j_kg,
             reference_state=ReferenceStatePolicy.DEF,
         )
-        assert (
-            ph.provenance.reference_state_policy
-            is ReferenceStatePolicy.DEF
-        )
+        assert ph.provenance.reference_state_policy is ReferenceStatePolicy.DEF
 
 
 # ======================================================================
@@ -307,14 +301,16 @@ class TestFluidSpecAdapter:
     def test_adapter_rejects_unsupported_composition_basis(self) -> None:
         with pytest.raises(PropertyServiceError) as exc_info:
             FluidIdentifier.from_fluid_spec(
-                "CoolProp", "Water",
+                "CoolProp",
+                "Water",
                 composition_basis="mass_fraction",
             )
         assert exc_info.value.code is PropertyErrorCode.INVALID_FLUID
 
     def test_adapter_with_composition(self) -> None:
         ident = FluidIdentifier.from_fluid_spec(
-            "CoolProp", "R410A",
+            "CoolProp",
+            "R410A",
             composition={"R32": 0.5, "R125": 0.5},
         )
         assert ident.name == "R410A"
@@ -357,9 +353,7 @@ class TestSerialization:
 
         assert restored.query_type is sat.query_type
         assert restored.input_value == pytest.approx(sat.input_value)
-        assert restored.liquid.temperature_k == pytest.approx(
-            sat.liquid.temperature_k
-        )
+        assert restored.liquid.temperature_k == pytest.approx(sat.liquid.temperature_k)
 
     def test_provenance_model_strict(self) -> None:
         """Provenance model has extra=forbid and Literal version."""
@@ -398,18 +392,16 @@ class TestSerialization:
                 "backend_version": "7.6.1",
                 "backend_git_revision": "abc",
                 "fluid_identifier": "HEOS::Water",
-                "validation_level":"supported_tier_1",
-                "query_type":"TP",
+                "validation_level": "supported_tier_1",
+                "query_type": "TP",
                 "inputs": {"temperature_k": 300.0},
                 "cache_policy_version": "1.0",
-                "reference_state_policy":"DEF",
+                "reference_state_policy": "DEF",
                 "configuration_fingerprint": "abc",
             },
         )
         with pytest.raises((ValueError, TypeError)):
-            state_model.model_validate(
-                {**state_model.model_dump(), "extra": "bad"}
-            )
+            state_model.model_validate({**state_model.model_dump(), "extra": "bad"})
 
     def test_error_code_stable_strings(self) -> None:
         """Item 8: all error codes are stable property_ prefixed strings."""
@@ -442,7 +434,9 @@ class TestMixtureCapability:
         ident = FluidIdentifier.from_components({"R32": 0.5, "R125": 0.5})
         with pytest.raises(PropertyServiceError) as exc_info:
             CoolPropProvider(allow_unvalidated_fluids=True).state_tp(
-                ident, 300.0, 2_000_000.0,
+                ident,
+                300.0,
+                2_000_000.0,
             )
         assert exc_info.value.code is PropertyErrorCode.UNSUPPORTED_QUERY
         assert "mixture" in str(exc_info.value).lower()
@@ -451,7 +445,9 @@ class TestMixtureCapability:
         ident = FluidIdentifier.from_components({"R32": 0.5, "R125": 0.5})
         with pytest.raises(PropertyServiceError) as exc_info:
             CoolPropProvider(allow_unvalidated_fluids=True).state_ph(
-                ident, 2_000_000.0, 200_000.0,
+                ident,
+                2_000_000.0,
+                200_000.0,
                 reference_state=ReferenceStatePolicy.DEF,
             )
         assert exc_info.value.code is PropertyErrorCode.UNSUPPORTED_QUERY
@@ -460,7 +456,8 @@ class TestMixtureCapability:
         ident = FluidIdentifier.from_components({"R32": 0.5, "R125": 0.5})
         with pytest.raises(PropertyServiceError) as exc_info:
             CoolPropProvider(allow_unvalidated_fluids=True).saturation_at_pressure(
-                ident, 2_000_000.0,
+                ident,
+                2_000_000.0,
             )
         assert exc_info.value.code is PropertyErrorCode.UNSUPPORTED_QUERY
 
@@ -486,23 +483,20 @@ class TestErrorClassification:
         provider = CoolPropProvider(allow_unvalidated_fluids=True)
         with pytest.raises(PropertyServiceError) as exc_info:
             provider.state_ph(
-                "Water", 101_325.0, -1_000_000.0,
+                "Water",
+                101_325.0,
+                -1_000_000.0,
                 reference_state=ReferenceStatePolicy.DEF,
             )
         # Must be deterministic: exactly STATE_OUT_OF_RANGE
-        assert (
-            exc_info.value.code is PropertyErrorCode.STATE_OUT_OF_RANGE
-        )
+        assert exc_info.value.code is PropertyErrorCode.STATE_OUT_OF_RANGE
 
     def test_above_critical_saturation_unavailable(self) -> None:
         """Item 7: saturation above critical returns SATURATION_UNAVAILABLE."""
         provider = CoolPropProvider()
         with pytest.raises(PropertyServiceError) as exc_info:
             provider.saturation_at_temperature("Water", 700.0)
-        assert (
-            exc_info.value.code
-            is PropertyErrorCode.SATURATION_UNAVAILABLE
-        )
+        assert exc_info.value.code is PropertyErrorCode.SATURATION_UNAVAILABLE
 
     def test_unsupported_backend_error(self) -> None:
         ident = FluidIdentifier(name="Water", equation_of_state_backend="REFPROP")
@@ -577,10 +571,7 @@ class TestDEFBaselineGuard:
             CP.set_reference_state("R717", "IIR")
             with pytest.raises(PropertyServiceError) as exc_info:
                 provider.state_tp("R717", 300.0, 2_000_000.0)
-            assert (
-                exc_info.value.code
-                is PropertyErrorCode.CONFIGURATION_CHANGED
-            )
+            assert exc_info.value.code is PropertyErrorCode.CONFIGURATION_CHANGED
             assert "DEF baseline" in str(exc_info.value)
         finally:
             CP.set_reference_state("R717", "DEF")
@@ -658,27 +649,28 @@ class TestCanonicalJSON:
         provider = CoolPropProvider()
         state = provider.state_tp("Water", 300.0, 101_325.0)
         restored = FluidState.from_json(state.to_json())
-        assert (
-            restored.provenance.validation_level
-            is FluidValidationLevel.SUPPORTED_TIER_1
-        )
+        assert restored.provenance.validation_level is FluidValidationLevel.SUPPORTED_TIER_1
         assert restored.provenance.query_type is PropertyQueryType.TP
-        assert (
-            restored.provenance.reference_state_policy
-            is ReferenceStatePolicy.DEF
-        )
+        assert restored.provenance.reference_state_policy is ReferenceStatePolicy.DEF
 
     def test_fluid_state_model_rejects_extra_fields(self) -> None:
         """Item 5: FluidStateModel has extra=forbid."""
         state = FluidState(
-            temperature_k=300.0, pressure_pa=101325.0,
-            density_kg_m3=996.5, cp_j_kg_k=4178.0,
-            viscosity_pa_s=0.001, conductivity_w_m_k=0.6,
-            enthalpy_j_kg=100000.0, entropy_j_kg_k=300.0,
-            phase=PhaseRegion.LIQUID, quality=None,
+            temperature_k=300.0,
+            pressure_pa=101325.0,
+            density_kg_m3=996.5,
+            cp_j_kg_k=4178.0,
+            viscosity_pa_s=0.001,
+            conductivity_w_m_k=0.6,
+            enthalpy_j_kg=100000.0,
+            entropy_j_kg_k=300.0,
+            phase=PhaseRegion.LIQUID,
+            quality=None,
             provenance=PropertyProvenance(
-                backend_name="CoolProp", backend_version="7.6.1",
-                backend_git_revision="abc", fluid_identifier="HEOS::Water",
+                backend_name="CoolProp",
+                backend_version="7.6.1",
+                backend_git_revision="abc",
+                fluid_identifier="HEOS::Water",
                 validation_level=FluidValidationLevel.SUPPORTED_TIER_1,
                 query_type=PropertyQueryType.TP,
                 inputs=(("temperature_k", 300.0),),
@@ -716,10 +708,7 @@ class TestAtomicLock:
             CP.set_reference_state("R134a", "IIR")
             with pytest.raises(PropertyServiceError) as exc_info:
                 provider.state_tp("R134a", 300.0, 2_000_000.0)
-            assert (
-                exc_info.value.code
-                is PropertyErrorCode.CONFIGURATION_CHANGED
-            )
+            assert exc_info.value.code is PropertyErrorCode.CONFIGURATION_CHANGED
         finally:
             CP.set_reference_state("R134a", "DEF")
 
@@ -798,9 +787,7 @@ class TestPHStateSpecReferenceState:
         spec = PHStateSpec(
             type="PH",
             pressure=AbsolutePressure(value=300_000.0, unit="Pa"),
-            enthalpy=SpecificEnthalpy(
-                value=tp.enthalpy_j_kg, unit="J/kg"
-            ),
+            enthalpy=SpecificEnthalpy(value=tp.enthalpy_j_kg, unit="J/kg"),
             reference_state=ReferenceStatePolicy.DEF,
         )
         args = spec.to_provider_args()
@@ -880,10 +867,9 @@ class TestStrictSerializationV2:
         assert model.result_schema_version == "1.0"
         # Literal["1.0"] rejects other values
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
-            model.model_validate(
-                {**model.model_dump(), "result_schema_version": "2.0"}
-            )
+            model.model_validate({**model.model_dump(), "result_schema_version": "2.0"})
 
     def test_enum_phase_in_model(self) -> None:
         """Item 4: phase field is PhaseRegion enum, not plain string."""
@@ -921,18 +907,18 @@ class TestStrictSerializationV2:
         from hexagent.properties.errors import PropertyServiceErrorModel
 
         with pytest.raises((ValueError, TypeError)):
-            PropertyServiceErrorModel.model_validate({
-                "code": "property_invalid_input",
-                "message": "test",
-                "extra_field": "bad",
-            })
+            PropertyServiceErrorModel.model_validate(
+                {
+                    "code": "property_invalid_input",
+                    "message": "test",
+                    "extra_field": "bad",
+                }
+            )
 
     def test_error_model_has_literal_version(self) -> None:
         """Item 4: error model includes schema_version."""
 
-        err = PropertyServiceError(
-            PropertyErrorCode.INVALID_INPUT, "test"
-        )
+        err = PropertyServiceError(PropertyErrorCode.INVALID_INPUT, "test")
         model = err.to_model()
         assert model.schema_version == "1.0"
 
@@ -966,10 +952,7 @@ class TestErrorClassificationV2:
         provider = CoolPropProvider()
         with pytest.raises(PropertyServiceError) as exc_info:
             provider.saturation_at_pressure("Water", 25_000_000.0)
-        assert (
-            exc_info.value.code
-            is PropertyErrorCode.SATURATION_UNAVAILABLE
-        )
+        assert exc_info.value.code is PropertyErrorCode.SATURATION_UNAVAILABLE
         assert "critical" in str(exc_info.value).lower()
 
     def test_above_critical_temperature_returns_saturation_unavailable(
@@ -979,10 +962,7 @@ class TestErrorClassificationV2:
         provider = CoolPropProvider()
         with pytest.raises(PropertyServiceError) as exc_info:
             provider.saturation_at_temperature("Water", 700.0)
-        assert (
-            exc_info.value.code
-            is PropertyErrorCode.SATURATION_UNAVAILABLE
-        )
+        assert exc_info.value.code is PropertyErrorCode.SATURATION_UNAVAILABLE
 
     def test_below_triple_returns_state_out_of_range(self) -> None:
         """Item 5: below-triple-point temperature via explicit TP pre-check."""
@@ -1034,10 +1014,8 @@ class TestErrorClassificationV2:
             exc = ValueError(msg)
             code = provider._classify_backend_error(exc, fluid, qt)
             assert code is PropertyErrorCode.BACKEND_FAILURE, (
-                f"Message {msg!r} produced {code}, "
-                f"expected BACKEND_FAILURE"
+                f"Message {msg!r} produced {code}, expected BACKEND_FAILURE"
             )
-
 
 
 # ======================================================================
@@ -1090,27 +1068,23 @@ class TestErrorModelLiteral:
 
         from hexagent.properties.errors import PropertyServiceErrorModel
 
-        model = PropertyServiceErrorModel(
-            code=PropertyErrorCode.INVALID_INPUT, message="test"
-        )
+        model = PropertyServiceErrorModel(code=PropertyErrorCode.INVALID_INPUT, message="test")
         assert model.schema_version == "1.0"
         with pytest.raises(ValidationError):
-            PropertyServiceErrorModel.model_validate({
-                "code": "property_invalid_input",
-                "message": "test",
-                "schema_version": "2.0",
-            })
+            PropertyServiceErrorModel.model_validate(
+                {
+                    "code": "property_invalid_input",
+                    "message": "test",
+                    "schema_version": "2.0",
+                }
+            )
 
     def test_context_uses_default_factory(self) -> None:
         """Item 2: context default is not shared mutable state."""
         from hexagent.properties.errors import PropertyServiceErrorModel
 
-        m1 = PropertyServiceErrorModel(
-            code=PropertyErrorCode.INVALID_INPUT, message="a"
-        )
-        m2 = PropertyServiceErrorModel(
-            code=PropertyErrorCode.INVALID_INPUT, message="b"
-        )
+        m1 = PropertyServiceErrorModel(code=PropertyErrorCode.INVALID_INPUT, message="a")
+        m2 = PropertyServiceErrorModel(code=PropertyErrorCode.INVALID_INPUT, message="b")
         assert m1.context is not m2.context
 
     def test_error_canonical_json_round_trip(self) -> None:
@@ -1129,8 +1103,6 @@ class TestErrorModelLiteral:
         """Item 2: error JSON includes schema_version 1.0."""
         import json
 
-        err = PropertyServiceError(
-            PropertyErrorCode.BACKEND_FAILURE, "test"
-        )
+        err = PropertyServiceError(PropertyErrorCode.BACKEND_FAILURE, "test")
         parsed = json.loads(err.to_json())
         assert parsed["schema_version"] == "1.0"
