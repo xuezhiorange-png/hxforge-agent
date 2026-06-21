@@ -1,11 +1,12 @@
 # TASK-003 — Fluid property service
 
-**Status:** IN_PROGRESS  
+**Status:** DONE  
 **Milestone:** M1  
 **Priority:** P0  
 **Depends on:** TASK-001, TASK-002  
 **GitHub Issue:** #6  
-**Branch:** `codex/task-003-property-service`
+**Branch:** `codex/task-003-property-service`  
+**Final approval:** `docs/reviews/TASK-003-final-approval.md`
 
 ## Objective
 
@@ -19,7 +20,7 @@ Provide a deterministic, injectable fluid-property service with CoolProp as the 
 - Property range, backend and convergence errors.
 - Backend version and git-revision provenance.
 - Explicit cache-key design without hidden mutable engineering state.
-- Tier-1 validation for Water, Air, R134a and R717.
+- Tier-1 support for Water, Air, R134a and R717.
 
 ## Expected files
 
@@ -35,18 +36,27 @@ Provide a deterministic, injectable fluid-property service with CoolProp as the 
 - [x] Provider protocol and typed property results are defined.
 - [x] TP and PH query paths are implemented.
 - [x] Saturation queries by pressure and temperature are implemented.
-- [x] Water, Air, R134a and R717 validation cases are covered by tests.
+- [x] Water, Air, R134a and R717 support and regression cases are covered by tests.
 - [x] Invalid fluid and invalid state errors are structured.
 - [x] Two-phase and near-saturation states are explicitly rejected from single-phase queries.
 - [x] Results record backend name, version, git revision and state provenance.
 - [x] Deterministic cache keys and cache inspection are implemented.
 - [x] Tests require no network access.
-- [x] Round-1 review: 8 items addressed (reference state, validation matrix, PH ref-state, backend naming, serialization, PH tolerance, mixture boundary, error regressions).
-- [x] Round-2 review: 8 items addressed (runtime config guard, validation level correction, mandatory PH ref-state, FluidSpec adapter, strict serialization, mixture NOT_IMPLEMENTED, deterministic errors, documentation).
-- [ ] GitHub CI passes on Python 3.11 and 3.12.
-- [ ] Engineering review is complete.
+- [x] Round 1 engineering review resolved.
+- [x] Round 2 engineering review resolved.
+- [x] Round 3 engineering review resolved.
+- [x] Round 4 engineering review resolved.
+- [x] GitHub CI passes on Python 3.11 and 3.12.
+- [x] Engineering review is complete.
 
-## Test plan
+## Verification
+
+- Reviewed code head: `44e7516e98a153623c6e28bc430ecd54439ec9f0`.
+- CI run: `27905712482` — success.
+- Gates: Ruff, mypy, pytest and pip-audit on Python 3.11 and 3.12.
+- Test suite: 191 passed.
+
+## Test plan covered
 
 - nominal liquid and gas TP states;
 - TP-to-PH cross consistency;
@@ -55,12 +65,13 @@ Provide a deterministic, injectable fluid-property service with CoolProp as the 
 - invalid fluids and invalid numeric inputs;
 - Tier-1 versus unvalidated-fluid policy;
 - cache determinism and mixture identity;
-- PH reference-state mismatch rejection;
-- JSON round-trip serialization (FluidState, SaturationState);
+- required PH reference-state identity and mismatch rejection;
+- strict JSON round trips for FluidState, SaturationState and PropertyServiceError;
 - PH saturation tolerance reference-state invariance;
-- mixture capability boundary (representation vs calculation);
-- error-boundary regressions (out-of-range, above-critical, unsupported backend, malformed composition, empty name, stable error codes, failed-query cache).
+- mixture capability boundary: representable, calculation unsupported in v0.1;
+- error-boundary regressions and message-independent backend-failure classification;
+- validation provenance for backend-regression, support-allowlist and unvalidated opt-in cases.
 
 ## Scope boundary
 
-Do not add heat-balance equations, exchanger correlations, geometry selection, costing or mechanical design in this task.
+This task does not add heat-balance equations, exchanger correlations, geometry selection, costing, mechanical design or downstream two-phase exchanger solvers.
