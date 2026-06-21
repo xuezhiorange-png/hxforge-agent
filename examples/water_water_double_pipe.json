@@ -67,7 +67,10 @@
         "unit": "bar(a)"
       }
     },
-    "outlet_temperature": null,
+    "outlet_temperature": {
+      "value": 50.0,
+      "unit": "degC"
+    },
     "allowable_pressure_drop": {
       "value": 50.0,
       "unit": "kPa"
