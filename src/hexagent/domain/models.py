@@ -18,19 +18,12 @@ from hexagent.domain.quantities import (
     SpecificEnthalpy,
 )
 
-# ---------------------------------------------------------------------------
-# ITEM 4: Strict public input base model
-# ---------------------------------------------------------------------------
 
 class StrictBaseModel(BaseModel):
     """Base model that rejects any unknown fields at construction time."""
 
     model_config = ConfigDict(extra="forbid")
 
-
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
 
 class PhaseHint(StrEnum):
     AUTO = "auto"
@@ -51,10 +44,6 @@ class VerificationStatus(StrEnum):
     UNVERIFIED_REFERENCE = "UNVERIFIED_REFERENCE"
 
 
-# ---------------------------------------------------------------------------
-# ITEM 4: FluidSpec → StrictBaseModel
-# ---------------------------------------------------------------------------
-
 class FluidSpec(StrictBaseModel):
     backend: str
     name: str
@@ -62,12 +51,8 @@ class FluidSpec(StrictBaseModel):
     phase_hint: PhaseHint = PhaseHint.AUTO
 
 
-# ---------------------------------------------------------------------------
-# ITEM 1: State-spec discriminated union
-# ---------------------------------------------------------------------------
-
 class TPStateSpec(StrictBaseModel):
-    """Temperature–pressure state specification."""
+    """Temperature-pressure state specification."""
 
     type: Literal["TP"]
     temperature: AbsoluteTemperature
@@ -76,7 +61,7 @@ class TPStateSpec(StrictBaseModel):
 
 
 class PHStateSpec(StrictBaseModel):
-    """Pressure–enthalpy state specification."""
+    """Pressure-enthalpy state specification."""
 
     type: Literal["PH"]
     pressure: AbsolutePressure
@@ -85,7 +70,7 @@ class PHStateSpec(StrictBaseModel):
 
 
 class PQStateSpec(StrictBaseModel):
-    """Pressure–quality state specification."""
+    """Pressure-quality state specification."""
 
     type: Literal["PQ"]
     pressure: AbsolutePressure
@@ -97,10 +82,6 @@ StateSpec = Annotated[
     TPStateSpec | PHStateSpec | PQStateSpec, Discriminator("type")
 ]
 
-
-# ---------------------------------------------------------------------------
-# ITEM 2: Structured fouling resistance
-# ---------------------------------------------------------------------------
 
 class FoulingSource(StrictBaseModel):
     """Traceable origin of a fouling-resistance value."""
@@ -120,22 +101,15 @@ class FoulingResistanceSpec(StrictBaseModel):
     source: FoulingSource
 
 
-# ---------------------------------------------------------------------------
-# StreamSpec (modified with state_spec + fouling_resistance)
-# ---------------------------------------------------------------------------
-
 class StreamSpec(StrictBaseModel):
     fluid: FluidSpec
     mass_flow: MassFlow
-    # Legacy fields kept Optional for backward compatibility
     inlet_temperature: AbsoluteTemperature | None = None
     inlet_pressure: AbsolutePressure | None = None
-    # New structured state specification
     state_spec: StateSpec | None = None
     outlet_temperature: AbsoluteTemperature | None = None
     allowable_pressure_drop: PressureDifference | None = None
-    # Structured fouling resistance with provenance (required)
-    fouling_resistance: FoulingResistanceSpec | None = None
+    fouling_resistance: FoulingResistanceSpec
 
     @model_validator(mode="after")
     def _check_state_specification(self) -> StreamSpec:
@@ -152,12 +126,6 @@ class StreamSpec(StrictBaseModel):
                 "Must provide either state_spec or both "
                 "inlet_temperature and inlet_pressure."
             )
-        return self
-
-    @model_validator(mode="after")
-    def _check_fouling_specification(self) -> StreamSpec:
-        if self.fouling_resistance is None:
-            raise ValueError("fouling_resistance is required.")
         return self
 
     @property
@@ -185,10 +153,6 @@ class StreamSpec(StrictBaseModel):
             return self.state_spec.type
         return None
 
-
-# ---------------------------------------------------------------------------
-# Design constraints and design case
-# ---------------------------------------------------------------------------
 
 class DesignConstraints(StrictBaseModel):
     design_pressure_hot: AbsolutePressure
@@ -219,10 +183,6 @@ class DesignCase(StrictBaseModel):
             )
         return self
 
-
-# ---------------------------------------------------------------------------
-# Result / provenance models (remain plain BaseModel — not public input)
-# ---------------------------------------------------------------------------
 
 class WarningMessage(BaseModel):
     code: str
