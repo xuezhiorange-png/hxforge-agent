@@ -8,7 +8,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY`, `BLOCKED`, `PLANNED`.
 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| TASK-000 | Repository, CI and engineering scaffold | DONE | — |
+| TASK-000 | Repository, CI and engineering scaffold | IN_PROGRESS | — |
 | TASK-001 | Freeze v0.1 scope, terminology and engineering assumptions | READY | TASK-000 |
 
 ## M1 — Deterministic calculation foundation
@@ -69,6 +69,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 
 ## Next execution sequence
 
-1. Execute TASK-001 through TASK-006 in order.
-2. Execute TASK-007 through TASK-010 to deliver the first complete exchanger workflow.
-3. Complete TASK-011 through TASK-019 before starting shell-and-tube development.
+1. Finish TASK-000 and merge the bootstrap PR.
+2. Execute TASK-001 through TASK-006 in order.
+3. Execute TASK-007 through TASK-010 to deliver the first complete exchanger workflow.
+4. Complete TASK-011 through TASK-019 before starting shell-and-tube development.
