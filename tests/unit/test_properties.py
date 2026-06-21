@@ -828,12 +828,19 @@ class TestValidationProvenance:
         assert state.provenance.validation_basis == "backend_regression"
         assert state.provenance.validation_dataset_revision is not None
 
-    def test_non_matching_query_has_no_dataset(self) -> None:
-        """Item 3: non-fixture query has None dataset fields."""
+    def test_non_matching_query_has_support_allowlist(self) -> None:
+        """Item 3: non-fixture Tier-1 query has support_allowlist basis."""
         provider = CoolPropProvider()
         state = provider.state_tp("Water", 350.0, 500_000.0)
         assert state.provenance.validation_dataset_id is None
-        assert state.provenance.validation_basis is None
+        assert state.provenance.validation_basis == "support_allowlist"
+
+    def test_unvalidated_opt_in_basis(self) -> None:
+        """Item 3: explicitly allowed unvalidated fluid has unvalidated_opt_in."""
+        provider = CoolPropProvider(allow_unvalidated_fluids=True)
+        state = provider.state_tp("CO2", 300.0, 5_000_000.0)
+        assert state.provenance.validation_basis == "unvalidated_opt_in"
+        assert state.provenance.validation_dataset_id is None
 
     def test_r134a_saturation_fixture_match(self) -> None:
         """Item 3: R134a saturation fixture is matched."""
@@ -978,16 +985,13 @@ class TestErrorClassificationV2:
         )
 
     def test_below_triple_returns_state_out_of_range(self) -> None:
-        """Item 5: below-triple-point enthalpy returns STATE_OUT_OF_RANGE."""
-        provider = CoolPropProvider(allow_unvalidated_fluids=True)
+        """Item 5: below-triple-point temperature via explicit TP pre-check."""
+        provider = CoolPropProvider()
         with pytest.raises(PropertyServiceError) as exc_info:
-            provider.state_ph(
-                "Water", 101_325.0, -1_000_000.0,
-                reference_state=ReferenceStatePolicy.DEF,
-            )
-        assert (
-            exc_info.value.code is PropertyErrorCode.STATE_OUT_OF_RANGE
-        )
+            provider.state_tp("Water", 200.0, 101_325.0)
+        assert exc_info.value.code is PropertyErrorCode.STATE_OUT_OF_RANGE
+        assert "triple point" in str(exc_info.value).lower()
+        assert "triple_point_temperature_k" in exc_info.value.context
 
     def test_pre_check_has_critical_context(self) -> None:
         """Item 5: pre-check error includes critical point in context."""
@@ -1008,14 +1012,125 @@ class TestErrorClassificationV2:
         assert provider.cache_info().size == 1
         assert provider.cache_info().hits == 0
 
-    def test_different_messages_same_code(self) -> None:
-        """Item 5: different CoolProp messages produce the same public code."""
-        # Both below-triple and out-of-range should give STATE_OUT_OF_RANGE
-        provider = CoolPropProvider(allow_unvalidated_fluids=True)
-        with pytest.raises(PropertyServiceError) as exc1:
-            provider.state_ph(
-                "Water", 101_325.0, -1_000_000.0,
-                reference_state=ReferenceStatePolicy.DEF,
+    def test_unexpected_backend_returns_backend_failure(self) -> None:
+        """Item 5: _classify_backend_error always returns BACKEND_FAILURE.
+
+        Since message-token classification was removed, any CoolProp
+        exception that reaches _classify_backend_error is an unexpected
+        fault — regardless of its message text.  Tests with monkeypatched
+        different exception messages.
+        """
+        provider = CoolPropProvider()
+        fluid = FluidIdentifier(name="Water")
+        qt = PropertyQueryType.TP
+
+        for msg in (
+            "something went wrong",
+            "out of range error",
+            "triple point exceeded",
+            "critical temperature reached",
+            "unexpected internal error",
+        ):
+            exc = ValueError(msg)
+            code = provider._classify_backend_error(exc, fluid, qt)
+            assert code is PropertyErrorCode.BACKEND_FAILURE, (
+                f"Message {msg!r} produced {code}, "
+                f"expected BACKEND_FAILURE"
             )
-        # Different error message, same code
-        assert exc1.value.code is PropertyErrorCode.STATE_OUT_OF_RANGE
+
+
+
+# ======================================================================
+# Item 1 (Review-04): PHStateSpec missing reference_state is rejected
+# ======================================================================
+
+
+class TestPHStateSpecRequired:
+    def test_omitting_reference_state_is_rejected(self) -> None:
+        """Item 1: PHStateSpec without reference_state fails validation."""
+        from hexagent.domain.models import PHStateSpec
+        from hexagent.domain.quantities import AbsolutePressure, SpecificEnthalpy
+
+        with pytest.raises((ValueError, TypeError)):
+            PHStateSpec(
+                type="PH",
+                pressure=AbsolutePressure(value=101_325.0, unit="Pa"),
+                enthalpy=SpecificEnthalpy(value=100_000.0, unit="J/kg"),
+                # reference_state intentionally omitted
+            )
+
+    def test_schema_json_requires_reference_state(self) -> None:
+        """Item 1: JSON schema marks reference_state as required."""
+        from hexagent.domain.models import PHStateSpec
+
+        schema = PHStateSpec.model_json_schema()
+        assert "reference_state" in schema.get("required", [])
+
+    def test_json_without_reference_state_is_rejected(self) -> None:
+        """Item 1: deserializing JSON without reference_state fails."""
+        from hexagent.domain.models import PHStateSpec
+
+        incomplete = (
+            '{"type":"PH","pressure":{"value":101325,"unit":"Pa"},'
+            '"enthalpy":{"value":100000,"unit":"J/kg"}}'
+        )
+        with pytest.raises((ValueError, TypeError)):
+            PHStateSpec.model_validate_json(incomplete)
+
+
+# ======================================================================
+# Item 2 (Review-04): Error model Literal version + canonical JSON
+# ======================================================================
+
+
+class TestErrorModelLiteral:
+    def test_schema_version_is_literal(self) -> None:
+        """Item 2: schema_version rejects non-Literal values."""
+        from pydantic import ValidationError
+
+        from hexagent.properties.errors import PropertyServiceErrorModel
+
+        model = PropertyServiceErrorModel(
+            code=PropertyErrorCode.INVALID_INPUT, message="test"
+        )
+        assert model.schema_version == "1.0"
+        with pytest.raises(ValidationError):
+            PropertyServiceErrorModel.model_validate({
+                "code": "property_invalid_input",
+                "message": "test",
+                "schema_version": "2.0",
+            })
+
+    def test_context_uses_default_factory(self) -> None:
+        """Item 2: context default is not shared mutable state."""
+        from hexagent.properties.errors import PropertyServiceErrorModel
+
+        m1 = PropertyServiceErrorModel(
+            code=PropertyErrorCode.INVALID_INPUT, message="a"
+        )
+        m2 = PropertyServiceErrorModel(
+            code=PropertyErrorCode.INVALID_INPUT, message="b"
+        )
+        assert m1.context is not m2.context
+
+    def test_error_canonical_json_round_trip(self) -> None:
+        """Item 2: error → JSON → error → JSON produces identical output."""
+        err = PropertyServiceError(
+            PropertyErrorCode.STATE_OUT_OF_RANGE,
+            "test boundary",
+            context={"fluid": "HEOS::Water", "temperature_k": 200.0},
+        )
+        json1 = err.to_json()
+        restored = PropertyServiceError.from_json(json1)
+        json2 = restored.to_json()
+        assert json1 == json2
+
+    def test_error_json_has_literal_version(self) -> None:
+        """Item 2: error JSON includes schema_version 1.0."""
+        import json
+
+        err = PropertyServiceError(
+            PropertyErrorCode.BACKEND_FAILURE, "test"
+        )
+        parsed = json.loads(err.to_json())
+        assert parsed["schema_version"] == "1.0"

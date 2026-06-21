@@ -101,19 +101,6 @@ def _validation_level_for(canonical_name: str) -> FluidValidationLevel:
 
 
 # ---------------------------------------------------------------------------
-# Known error classification (Item 7)
-# ---------------------------------------------------------------------------
-
-_COOLPROP_OUT_OF_RANGE_TOKENS = (
-    "out of range",
-    "triple",
-    "below the minimum",
-    "above the maximum",
-    "unable to solve",
-)
-
-
-# ---------------------------------------------------------------------------
 # Provider
 # ---------------------------------------------------------------------------
 
@@ -462,6 +449,8 @@ class CoolPropProvider:
         self, fluid: FluidIdentifier, validation: FluidValidationLevel,
         temperature_k: float, pressure_pa: float, fingerprint: str,
     ) -> FluidState:
+        # Item 5: explicit TP boundary pre-check
+        self._pre_check_tp_limits(fluid, temperature_k, pressure_pa)
         self._check_tp_near_saturation(fluid, temperature_k, pressure_pa)
         phase = self._phase(
             fluid, "T", temperature_k, "P", pressure_pa,
@@ -941,6 +930,37 @@ class CoolPropProvider:
         "R717": (405.40, 11_333_000.0),
     }
 
+    # Known triple-point temperatures (K) for TP pre-checks
+    _TRIPLE_POINT_TEMPS: dict[str, float] = {
+        "Water": 273.16,
+        "R134a": 169.85,
+        "R717": 195.41,
+    }
+
+    def _pre_check_tp_limits(
+        self, fluid: FluidIdentifier,
+        temperature_k: float, pressure_pa: float,
+    ) -> None:
+        """Explicit boundary check for TP queries.
+
+        Classifies below-triple-point states as STATE_OUT_OF_RANGE
+        *before* calling CoolProp, so the public error code is
+        independent of backend message wording.
+        """
+        canonical = fluid.name
+        if canonical in self._TRIPLE_POINT_TEMPS:
+            t_min = self._TRIPLE_POINT_TEMPS[canonical]
+            if temperature_k < t_min:
+                raise PropertyServiceError(
+                    PropertyErrorCode.STATE_OUT_OF_RANGE,
+                    "Temperature is below the triple point.",
+                    context={
+                        "fluid": fluid.cache_identity,
+                        "temperature_k": temperature_k,
+                        "triple_point_temperature_k": t_min,
+                    },
+                )
+
     def _pre_check_saturation_boundaries(
         self, fluid: FluidIdentifier,
         input_name: str, input_value: float,
@@ -982,22 +1002,12 @@ class CoolPropProvider:
     ) -> PropertyErrorCode:
         """Classify a CoolProp backend exception.
 
-        Item 5: uses explicit boundary checks first.  Message-token
-        matching is only a fallback for unexpected error wording.
-        ``BACKEND_FAILURE`` is reserved for truly unexpected faults.
+        Item 5 (Review-04): message-token classification is removed.
+        All known boundary cases are handled by explicit pre-checks
+        (``_pre_check_saturation_boundaries``, ``_pre_check_tp_limits``).
+        Any CoolProp exception that reaches this method is classified
+        as ``BACKEND_FAILURE`` — an unexpected backend fault.
         """
-        backend_message = str(exc)
-        lowered = backend_message.casefold()
-
-        # Primary: explicit keyword classification
-        if any(
-            token in lowered for token in _COOLPROP_OUT_OF_RANGE_TOKENS
-        ):
-            return PropertyErrorCode.STATE_OUT_OF_RANGE
-        if "critical" in lowered:
-            return PropertyErrorCode.SATURATION_UNAVAILABLE
-
-        # Fallback: no match → truly unexpected backend fault
         return PropertyErrorCode.BACKEND_FAILURE
 
     # ------------------------------------------------------------------
@@ -1057,10 +1067,24 @@ class CoolPropProvider:
         inputs: tuple[tuple[str, float], ...],
         fingerprint: str,
     ) -> PropertyProvenance:
-        # Item 3: populate dataset fields when a fixture matches
-        dataset_id, dataset_revision, validation_basis = (
+        # Item 3: populate dataset fields and validation basis
+        dataset_id, dataset_revision, fixture_basis = (
             self._match_validation_fixture(fluid, query_type, inputs)
         )
+        if fixture_basis is not None:
+            # Fixture match: backend_regression with dataset info
+            validation_basis = fixture_basis
+        elif validation is FluidValidationLevel.SUPPORTED_TIER_1:
+            # Ordinary Tier-1 state, no fixture match
+            validation_basis = "support_allowlist"
+        elif (
+            validation is FluidValidationLevel.UNVALIDATED
+            and self.allow_unvalidated_fluids
+        ):
+            # Explicitly allowed unvalidated pure fluid
+            validation_basis = "unvalidated_opt_in"
+        else:
+            validation_basis = None
         return PropertyProvenance(
             backend_name=self.name,
             backend_version=self.version,

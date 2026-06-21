@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PropertyErrorCode(StrEnum):
@@ -26,14 +27,16 @@ class PropertyServiceErrorModel(BaseModel):
 
     ``extra="forbid"`` ensures no unknown fields leak through.
     ``code`` uses the stable ``PropertyErrorCode`` enum, not free text.
+    ``schema_version`` is a ``Literal["1.0"]`` — any other value is
+    rejected at validation time.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    schema_version: str = "1.0"
+    schema_version: Literal["1.0"] = "1.0"
     code: PropertyErrorCode
     message: str
-    context: dict[str, object] = {}
+    context: dict[str, object] = Field(default_factory=dict)
 
 
 class PropertyServiceError(ValueError):

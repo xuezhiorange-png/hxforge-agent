@@ -72,7 +72,7 @@ class PHStateSpec(StrictBaseModel):
     type: Literal["PH"]
     pressure: AbsolutePressure
     enthalpy: SpecificEnthalpy
-    reference_state: ReferenceStatePolicy = ReferenceStatePolicy.DEF
+    reference_state: ReferenceStatePolicy
     schema_version: Literal["1.0"] = "1.0"
 
     def to_provider_args(self) -> dict[str, object]:
