@@ -31,11 +31,45 @@ class DoublePipeService:
                 ],
             )
 
-        th_in = to_si(case.hot_stream.inlet_temperature, "kelvin")
+        # Reject non-TP state specs (PH, PQ) — this solver only handles TP
+        for label, stream in [("hot", case.hot_stream), ("cold", case.cold_stream)]:
+            st = stream.state_spec_type
+            if st is not None and st != "TP":
+                return CalculationResult(
+                    status="NOT_IMPLEMENTED",
+                    outputs={},
+                    warnings=[
+                        WarningMessage(
+                            code="DP-004",
+                            severity="error",
+                            message=(
+                                f"Double-pipe solver only supports TP state"
+                                f" spec, got {st} for {label} stream."
+                            ),
+                        )
+                    ],
+                )
+
+        th_in_k = case.hot_stream.inlet_temperature_k
+        tc_in_k = case.cold_stream.inlet_temperature_k
+        if th_in_k is None or tc_in_k is None:
+            return CalculationResult(
+                status="NOT_IMPLEMENTED",
+                outputs={},
+                warnings=[
+                    WarningMessage(
+                        code="DP-003",
+                        severity="error",
+                        message=(
+                            "Inlet temperatures could not be resolved"
+                            " from state specs or legacy fields."
+                        ),
+                    )
+                ],
+            )
         th_out = to_si(hot_out, "kelvin")
-        tc_in = to_si(case.cold_stream.inlet_temperature, "kelvin")
         tc_out = to_si(cold_out, "kelvin")
-        lmtd = counterflow_lmtd(th_in, th_out, tc_in, tc_out)
+        lmtd = counterflow_lmtd(th_in_k, th_out, tc_in_k, tc_out)
 
         if case.target_duty is None:
             return CalculationResult(
@@ -84,9 +118,9 @@ class DoublePipeService:
                     formula_version="1.0.0",
                     source_reference="standard heat-transfer relation",
                     inputs={
-                        "hot_in_k": th_in,
+                        "hot_in_k": th_in_k,
                         "hot_out_k": th_out,
-                        "cold_in_k": tc_in,
+                        "cold_in_k": tc_in_k,
                         "cold_out_k": tc_out,
                     },
                     outputs={"lmtd_k": lmtd},

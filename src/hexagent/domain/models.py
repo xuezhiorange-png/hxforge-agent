@@ -1,10 +1,28 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, model_validator
+
+from hexagent.domain.quantities import (
+    AbsolutePressure,
+    AbsoluteTemperature,
+    FoulingResistance,
+    Length,
+    MassFlow,
+    Power,
+    PressureDifference,
+    Quantity,
+    SpecificEnthalpy,
+)
+
+
+class StrictBaseModel(BaseModel):
+    """Base model that rejects any unknown fields at construction time."""
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class PhaseHint(StrEnum):
@@ -14,48 +32,144 @@ class PhaseHint(StrEnum):
     TWO_PHASE = "two_phase"
 
 
-class Quantity(BaseModel):
-    value: float
-    unit: str
+class FoulingSourceType(StrEnum):
+    STANDARD = "STANDARD"
+    VENDOR = "VENDOR"
+    USER = "USER"
+    ASSUMED = "ASSUMED"
 
 
-class FluidSpec(BaseModel):
-    backend: str = "CoolProp"
+class VerificationStatus(StrEnum):
+    VERIFIED = "VERIFIED"
+    UNVERIFIED_REFERENCE = "UNVERIFIED_REFERENCE"
+
+
+class FluidSpec(StrictBaseModel):
+    backend: str
     name: str
     composition: dict[str, float] | None = None
     phase_hint: PhaseHint = PhaseHint.AUTO
 
 
-class StreamSpec(BaseModel):
+class TPStateSpec(StrictBaseModel):
+    """Temperature-pressure state specification."""
+
+    type: Literal["TP"]
+    temperature: AbsoluteTemperature
+    pressure: AbsolutePressure
+    schema_version: Literal["1.0"] = "1.0"
+
+
+class PHStateSpec(StrictBaseModel):
+    """Pressure-enthalpy state specification."""
+
+    type: Literal["PH"]
+    pressure: AbsolutePressure
+    enthalpy: SpecificEnthalpy
+    schema_version: Literal["1.0"] = "1.0"
+
+
+class PQStateSpec(StrictBaseModel):
+    """Pressure-quality state specification."""
+
+    type: Literal["PQ"]
+    pressure: AbsolutePressure
+    quality: float = Field(ge=0, le=1)
+    schema_version: Literal["1.0"] = "1.0"
+
+
+StateSpec = Annotated[
+    TPStateSpec | PHStateSpec | PQStateSpec, Discriminator("type")
+]
+
+
+class FoulingSource(StrictBaseModel):
+    """Traceable origin of a fouling-resistance value."""
+
+    source_type: FoulingSourceType
+    reference_id: str
+    edition: str
+    table_or_clause: str
+    verification_status: VerificationStatus
+    note: str
+
+
+class FoulingResistanceSpec(StrictBaseModel):
+    """Structured fouling resistance with provenance."""
+
+    value: FoulingResistance
+    source: FoulingSource
+
+
+class StreamSpec(StrictBaseModel):
     fluid: FluidSpec
-    mass_flow: Quantity
-    inlet_temperature: Quantity
-    inlet_pressure: Quantity
-    outlet_temperature: Quantity | None = None
-    allowable_pressure_drop: Quantity | None = None
-    fouling_resistance: Quantity = Field(
-        default_factory=lambda: Quantity(value=0.0, unit="m^2*K/W")
-    )
+    mass_flow: MassFlow
+    inlet_temperature: AbsoluteTemperature | None = None
+    inlet_pressure: AbsolutePressure | None = None
+    state_spec: StateSpec | None = None
+    outlet_temperature: AbsoluteTemperature | None = None
+    allowable_pressure_drop: PressureDifference | None = None
+    fouling_resistance: FoulingResistanceSpec
+
+    @model_validator(mode="after")
+    def _check_state_specification(self) -> StreamSpec:
+        has_state = self.state_spec is not None
+        has_legacy_temp = self.inlet_temperature is not None
+        has_legacy_pres = self.inlet_pressure is not None
+        if has_state and (has_legacy_temp or has_legacy_pres):
+            raise ValueError(
+                "Cannot provide both state_spec and legacy "
+                "inlet_temperature/inlet_pressure."
+            )
+        if not has_state and not (has_legacy_temp and has_legacy_pres):
+            raise ValueError(
+                "Must provide either state_spec or both "
+                "inlet_temperature and inlet_pressure."
+            )
+        return self
+
+    @property
+    def inlet_temperature_k(self) -> float | None:
+        """Return inlet temperature in kelvin from either TP state_spec or legacy field."""
+        if self.state_spec is not None and isinstance(self.state_spec, TPStateSpec):
+            return self.state_spec.temperature.si_value
+        if self.inlet_temperature is not None:
+            return self.inlet_temperature.si_value
+        return None
+
+    @property
+    def inlet_pressure_pa(self) -> float | None:
+        """Return inlet pressure in pascal from either TP state_spec or legacy field."""
+        if self.state_spec is not None and isinstance(self.state_spec, TPStateSpec):
+            return self.state_spec.pressure.si_value
+        if self.inlet_pressure is not None:
+            return self.inlet_pressure.si_value
+        return None
+
+    @property
+    def state_spec_type(self) -> str | None:
+        """Return the state spec type ('TP', 'PH', 'PQ') or None if legacy."""
+        if self.state_spec is not None:
+            return self.state_spec.type
+        return None
 
 
-class DesignConstraints(BaseModel):
-    design_pressure_hot: Quantity
-    design_pressure_cold: Quantity
-    design_temperature_hot: Quantity
-    design_temperature_cold: Quantity
-    corrosion_allowance: Quantity = Field(
-        default_factory=lambda: Quantity(value=0.0, unit="mm")
-    )
-    required_area_margin_fraction: float = Field(default=0.10, ge=0.0, le=1.0)
+class DesignConstraints(StrictBaseModel):
+    design_pressure_hot: AbsolutePressure
+    design_pressure_cold: AbsolutePressure
+    design_temperature_hot: AbsoluteTemperature
+    design_temperature_cold: AbsoluteTemperature
+    corrosion_allowance: Length | None = None
+    required_area_margin_fraction: float = Field(ge=0.0, le=1.0)
 
 
-class DesignCase(BaseModel):
+class DesignCase(StrictBaseModel):
     id: UUID = Field(default_factory=uuid4)
     name: str
     hot_stream: StreamSpec
     cold_stream: StreamSpec
     constraints: DesignConstraints
-    target_duty: Quantity | None = None
+    target_duty: Power | None = None
 
     @model_validator(mode="after")
     def check_thermal_specification(self) -> DesignCase:
@@ -92,3 +206,32 @@ class CalculationResult(BaseModel):
     outputs: dict[str, Any]
     warnings: list[WarningMessage] = Field(default_factory=list)
     provenance: list[ProvenanceRecord] = Field(default_factory=list)
+
+
+__all__ = [
+    "AbsolutePressure",
+    "AbsoluteTemperature",
+    "CalculationResult",
+    "DesignCase",
+    "DesignConstraints",
+    "FluidSpec",
+    "FoulingResistance",
+    "FoulingResistanceSpec",
+    "FoulingSource",
+    "FoulingSourceType",
+    "Length",
+    "MassFlow",
+    "PhaseHint",
+    "PHStateSpec",
+    "Power",
+    "PQStateSpec",
+    "PressureDifference",
+    "ProvenanceRecord",
+    "Quantity",
+    "StateSpec",
+    "StreamSpec",
+    "StrictBaseModel",
+    "TPStateSpec",
+    "VerificationStatus",
+    "WarningMessage",
+]

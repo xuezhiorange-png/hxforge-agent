@@ -10,25 +10,39 @@
       "value": 2.0,
       "unit": "kg/s"
     },
-    "inlet_temperature": {
-      "value": 90.0,
-      "unit": "degC"
+    "state_spec": {
+      "schema_version": "1.0",
+      "type": "TP",
+      "temperature": {
+        "value": 90.0,
+        "unit": "degC"
+      },
+      "pressure": {
+        "value": 4.0,
+        "unit": "bar(a)"
+      }
     },
     "outlet_temperature": {
       "value": 60.0,
       "unit": "degC"
-    },
-    "inlet_pressure": {
-      "value": 4.0,
-      "unit": "bar"
     },
     "allowable_pressure_drop": {
       "value": 50.0,
       "unit": "kPa"
     },
     "fouling_resistance": {
-      "value": 0.0002,
-      "unit": "m^2*K/W"
+      "value": {
+        "value": 0.0002,
+        "unit": "m^2*K/W"
+      },
+      "source": {
+        "source_type": "STANDARD",
+        "reference_id": "TEMA-RGP-T-2.4",
+        "edition": "TBD",
+        "table_or_clause": "TBD",
+        "verification_status": "UNVERIFIED_REFERENCE",
+        "note": "Placeholder pending licensed rule-pack verification"
+      }
     }
   },
   "cold_stream": {
@@ -41,35 +55,49 @@
       "value": 2.0,
       "unit": "kg/s"
     },
-    "inlet_temperature": {
-      "value": 20.0,
-      "unit": "degC"
+    "state_spec": {
+      "schema_version": "1.0",
+      "type": "TP",
+      "temperature": {
+        "value": 20.0,
+        "unit": "degC"
+      },
+      "pressure": {
+        "value": 3.0,
+        "unit": "bar(a)"
+      }
     },
     "outlet_temperature": {
       "value": 50.0,
       "unit": "degC"
-    },
-    "inlet_pressure": {
-      "value": 3.0,
-      "unit": "bar"
     },
     "allowable_pressure_drop": {
       "value": 50.0,
       "unit": "kPa"
     },
     "fouling_resistance": {
-      "value": 0.0002,
-      "unit": "m^2*K/W"
+      "value": {
+        "value": 0.0002,
+        "unit": "m^2*K/W"
+      },
+      "source": {
+        "source_type": "STANDARD",
+        "reference_id": "TEMA-RGP-T-2.4",
+        "edition": "TBD",
+        "table_or_clause": "TBD",
+        "verification_status": "UNVERIFIED_REFERENCE",
+        "note": "Placeholder pending licensed rule-pack verification"
+      }
     }
   },
   "constraints": {
     "design_pressure_hot": {
       "value": 10.0,
-      "unit": "bar"
+      "unit": "bar(a)"
     },
     "design_pressure_cold": {
       "value": 10.0,
-      "unit": "bar"
+      "unit": "bar(a)"
     },
     "design_temperature_hot": {
       "value": 120.0,
