@@ -30,7 +30,7 @@
       "value": 50.0,
       "unit": "kPa"
     },
-    "fouling_resistance_spec": {
+    "fouling_resistance": {
       "value": {
         "value": 0.0002,
         "unit": "m^2*K/W"
@@ -72,7 +72,7 @@
       "value": 50.0,
       "unit": "kPa"
     },
-    "fouling_resistance_spec": {
+    "fouling_resistance": {
       "value": {
         "value": 0.0002,
         "unit": "m^2*K/W"

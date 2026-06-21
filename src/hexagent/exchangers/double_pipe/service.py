@@ -31,24 +31,44 @@ class DoublePipeService:
                 ],
             )
 
-        hot_in = case.hot_stream.inlet_temperature
-        cold_in = case.cold_stream.inlet_temperature
-        th_in_k = to_si(hot_in, "kelvin") if hot_in is not None else None
-        th_out = to_si(hot_out, "kelvin")
-        tc_in_k = to_si(cold_in, "kelvin") if cold_in is not None else None
-        tc_out = to_si(cold_out, "kelvin")
+        # Reject non-TP state specs (PH, PQ) — this solver only handles TP
+        for label, stream in [("hot", case.hot_stream), ("cold", case.cold_stream)]:
+            st = stream.state_spec_type
+            if st is not None and st != "TP":
+                return CalculationResult(
+                    status="NOT_IMPLEMENTED",
+                    outputs={},
+                    warnings=[
+                        WarningMessage(
+                            code="DP-004",
+                            severity="error",
+                            message=(
+                                f"Double-pipe solver only supports TP state"
+                                f" spec, got {st} for {label} stream."
+                            ),
+                        )
+                    ],
+                )
+
+        th_in_k = case.hot_stream.inlet_temperature_k
+        tc_in_k = case.cold_stream.inlet_temperature_k
         if th_in_k is None or tc_in_k is None:
             return CalculationResult(
-                status="BLOCKED",
+                status="NOT_IMPLEMENTED",
                 outputs={},
                 warnings=[
                     WarningMessage(
                         code="DP-003",
                         severity="error",
-                        message="Legacy inlet_temperature fields required for this solver.",
+                        message=(
+                            "Inlet temperatures could not be resolved"
+                            " from state specs or legacy fields."
+                        ),
                     )
                 ],
             )
+        th_out = to_si(hot_out, "kelvin")
+        tc_out = to_si(cold_out, "kelvin")
         lmtd = counterflow_lmtd(th_in_k, th_out, tc_in_k, tc_out)
 
         if case.target_duty is None:

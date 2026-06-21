@@ -148,20 +148,40 @@ def test_public_domain_models_reject_wrong_quantity_dimension() -> None:
     payload = {
         "name": "invalid-unit-case",
         "hot_stream": {
-            "fluid": {"name": "Water"},
+            "fluid": {"backend": "CoolProp", "name": "Water"},
             "mass_flow": {"value": 1.0, "unit": "kW"},
             "inlet_temperature": {"value": 80.0, "unit": "degC"},
             "outlet_temperature": {"value": 60.0, "unit": "degC"},
             "inlet_pressure": {"value": 3.0, "unit": "bar(a)"},
-            "fouling_resistance": {"value": 0.0002, "unit": "m^2*K/W"},
+            "fouling_resistance": {
+                "value": {"value": 0.0002, "unit": "m^2*K/W"},
+                "source": {
+                    "source_type": "STANDARD",
+                    "reference_id": "TEMA-RGP-T-2.4",
+                    "edition": "TBD",
+                    "table_or_clause": "TBD",
+                    "verification_status": "UNVERIFIED_REFERENCE",
+                    "note": "test",
+                },
+            },
         },
         "cold_stream": {
-            "fluid": {"name": "Water"},
+            "fluid": {"backend": "CoolProp", "name": "Water"},
             "mass_flow": {"value": 1.0, "unit": "kg/s"},
             "inlet_temperature": {"value": 20.0, "unit": "degC"},
             "outlet_temperature": {"value": 40.0, "unit": "degC"},
             "inlet_pressure": {"value": 3.0, "unit": "bar(a)"},
-            "fouling_resistance": {"value": 0.0002, "unit": "m^2*K/W"},
+            "fouling_resistance": {
+                "value": {"value": 0.0002, "unit": "m^2*K/W"},
+                "source": {
+                    "source_type": "STANDARD",
+                    "reference_id": "TEMA-RGP-T-2.4",
+                    "edition": "TBD",
+                    "table_or_clause": "TBD",
+                    "verification_status": "UNVERIFIED_REFERENCE",
+                    "note": "test",
+                },
+            },
         },
         "constraints": {
             "design_pressure_hot": {"value": 10.0, "unit": "bar(a)"},

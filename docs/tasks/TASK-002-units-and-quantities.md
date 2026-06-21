@@ -64,15 +64,16 @@ Implement strict public quantity parsing and SI normalization under approved DEC
 - [x] Hard physical invariants enforced (T>0K, P>0Pa, area>=0, mass_flow>0).
 - [x] Strict public input base model (extra='forbid' on all public models).
 - [x] Unit constraints exposed in JSON/OpenAPI schema metadata.
-- [x] Integration and compatibility regression tests added (10 new tests).
+- [x] Integration and compatibility regression tests added (21 integration tests total).
+- [x] Round-1 review findings resolved.
+- [x] Round-2 review findings resolved (canonical fouling, state helpers, schema_version, backend required).
 - [ ] GitHub CI, including pip-audit, passes.
-- [ ] Engineering review round-1 findings resolved.
 
 ## Validation completed locally
 
 - Ruff: passed.
 - mypy: passed (26 source files, zero errors).
-- pytest: 96 passed (86 original + 10 new integration/regression tests).
+- pytest: 106 passed (85 unit + 21 integration/regression tests).
 - Unit-module coverage: above 90%.
 - pip-audit: passed.
 - pip-audit: deferred to GitHub CI because the local runtime could not resolve pypi.org.

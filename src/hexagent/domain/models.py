@@ -56,7 +56,7 @@ class VerificationStatus(StrEnum):
 # ---------------------------------------------------------------------------
 
 class FluidSpec(StrictBaseModel):
-    backend: str = "CoolProp"
+    backend: str
     name: str
     composition: dict[str, float] | None = None
     phase_hint: PhaseHint = PhaseHint.AUTO
@@ -72,7 +72,7 @@ class TPStateSpec(StrictBaseModel):
     type: Literal["TP"]
     temperature: AbsoluteTemperature
     pressure: AbsolutePressure
-    schema_version: str = "1.0"
+    schema_version: Literal["1.0"] = "1.0"
 
 
 class PHStateSpec(StrictBaseModel):
@@ -81,7 +81,7 @@ class PHStateSpec(StrictBaseModel):
     type: Literal["PH"]
     pressure: AbsolutePressure
     enthalpy: SpecificEnthalpy
-    schema_version: str = "1.0"
+    schema_version: Literal["1.0"] = "1.0"
 
 
 class PQStateSpec(StrictBaseModel):
@@ -90,7 +90,7 @@ class PQStateSpec(StrictBaseModel):
     type: Literal["PQ"]
     pressure: AbsolutePressure
     quality: float = Field(ge=0, le=1)
-    schema_version: str = "1.0"
+    schema_version: Literal["1.0"] = "1.0"
 
 
 StateSpec = Annotated[
@@ -121,7 +121,7 @@ class FoulingResistanceSpec(StrictBaseModel):
 
 
 # ---------------------------------------------------------------------------
-# StreamSpec (modified with state_spec + fouling_resistance_spec)
+# StreamSpec (modified with state_spec + fouling_resistance)
 # ---------------------------------------------------------------------------
 
 class StreamSpec(StrictBaseModel):
@@ -134,10 +134,8 @@ class StreamSpec(StrictBaseModel):
     state_spec: StateSpec | None = None
     outlet_temperature: AbsoluteTemperature | None = None
     allowable_pressure_drop: PressureDifference | None = None
-    # Legacy fouling field kept Optional for backward compatibility
-    fouling_resistance: FoulingResistance | None = None
-    # New structured fouling specification
-    fouling_resistance_spec: FoulingResistanceSpec | None = None
+    # Structured fouling resistance with provenance (required)
+    fouling_resistance: FoulingResistanceSpec | None = None
 
     @model_validator(mode="after")
     def _check_state_specification(self) -> StreamSpec:
@@ -158,19 +156,34 @@ class StreamSpec(StrictBaseModel):
 
     @model_validator(mode="after")
     def _check_fouling_specification(self) -> StreamSpec:
-        has_spec = self.fouling_resistance_spec is not None
-        has_legacy = self.fouling_resistance is not None
-        if has_spec and has_legacy:
-            raise ValueError(
-                "Cannot provide both fouling_resistance_spec and "
-                "legacy fouling_resistance."
-            )
-        if not has_spec and not has_legacy:
-            raise ValueError(
-                "Must provide either fouling_resistance_spec or "
-                "fouling_resistance."
-            )
+        if self.fouling_resistance is None:
+            raise ValueError("fouling_resistance is required.")
         return self
+
+    @property
+    def inlet_temperature_k(self) -> float | None:
+        """Return inlet temperature in kelvin from either TP state_spec or legacy field."""
+        if self.state_spec is not None and isinstance(self.state_spec, TPStateSpec):
+            return self.state_spec.temperature.si_value
+        if self.inlet_temperature is not None:
+            return self.inlet_temperature.si_value
+        return None
+
+    @property
+    def inlet_pressure_pa(self) -> float | None:
+        """Return inlet pressure in pascal from either TP state_spec or legacy field."""
+        if self.state_spec is not None and isinstance(self.state_spec, TPStateSpec):
+            return self.state_spec.pressure.si_value
+        if self.inlet_pressure is not None:
+            return self.inlet_pressure.si_value
+        return None
+
+    @property
+    def state_spec_type(self) -> str | None:
+        """Return the state spec type ('TP', 'PH', 'PQ') or None if legacy."""
+        if self.state_spec is not None:
+            return self.state_spec.type
+        return None
 
 
 # ---------------------------------------------------------------------------
