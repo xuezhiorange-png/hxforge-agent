@@ -32,7 +32,8 @@
 | `inlet_pressure` | inlet absolute pressure | quantity | pressure | required |
 | `outlet_temperature` | outlet absolute temperature | quantity | temperature | conditional |
 | `allowable_pressure_drop` | maximum permitted loss | quantity | pressure difference | required for constrained sizing |
-| `fouling_resistance` | fouling thermal resistance | quantity | area·temperature/power | required or explicitly zero with source |
+| `fouling_resistance.value` | fouling thermal resistance | quantity | area·temperature/power | required or explicitly zero with source |
+| `fouling_resistance.source` | structured fouling source object (see DEC-017) | object | — | required; fields: source_type, reference_id, edition, table_or_clause, note |
 | `roughness` | absolute surface roughness of wetted wall | quantity | length | optional, required for accurate friction calculations; if absent, material catalog default with explicit source |
 | `velocity_limit_max` | maximum allowable flow velocity | quantity | length/time | optional |
 | `velocity_limit_min` | minimum required flow velocity | quantity | length/time | optional |
@@ -76,7 +77,8 @@ Unknown fields in the geometry object must cause a BLOCKED status, not be silent
 | Field | Meaning | Type | Unit/status |
 |---|---|---|---|
 | `run_id` | calculation-run identifier | UUID | — |
-| `status` | calculation state | enum | — |
+| `status` | execution state (see DEC-006 §7.1) | enum | one of: DRAFT, INPUT_VALIDATED, THERMAL_SERVICE_RESOLVED, TECHNOLOGIES_SCREENED, CANDIDATES_GENERATED, CANDIDATES_RATED, ENGINEERING_CHECKED, COSTED, VERIFIED, REPORT_READY, BLOCKED, NOT_IMPLEMENTED, NON_CONVERGED |
+| `verification_level` | result maturity (see DEC-006 §7.2) | enum | one of: PRELIMINARY, REVIEW_REQUIRED, VERIFIED, N/A |
 | `duty` | calculated or specified heat transfer | quantity | power |
 | `energy_balance_error` | normalized hot/cold residual | number | fraction |
 | `outlet_states` | solved stream outlets | object | unit-bearing |
@@ -89,7 +91,6 @@ Unknown fields in the geometry object must cause a BLOCKED status, not be silent
 | `result_hash` | deterministic hash of inputs + outputs + versions | string | — | always |
 | `software_version` | HXForge version used | string | — | always |
 | `property_backend_version` | property provider version | string | — | always when properties used |
-| `confidence` | preliminary, review-required, blocked, not-implemented, or verified — aligns with DEC-006 result states | enum | — |
 
 ## 7. Default policy
 

@@ -27,3 +27,9 @@
 ## ADR-005: Licensed standards are external rule packs
 
 **Decision:** Copyrighted standards, proprietary catalogs and commercial property databases are not committed to the repository. The application loads licensed rule packs at runtime.
+
+## ADR-006: Geometry catalog file format
+
+**Decision:** The double-pipe and other exchanger geometry catalogs are maintained as versioned YAML files under `src/hexagent/catalogs/`.
+
+**Reason:** YAML provides human-readable, diff-friendly, schema-validatable catalog entries with embedded comments for source references. JSON was considered but lacks comment support. The engineering constraints governing catalog content (manufacturability, sourcing, transport limits) are defined in DEC-013; this ADR only covers the software implementation format.

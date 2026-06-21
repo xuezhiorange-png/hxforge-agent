@@ -17,7 +17,7 @@ These cases validate the product requirements and public data dictionary. They a
 - inlet pressure: 4 bar(a);
 - outlet temperature: 60 °C;
 - allowable pressure drop: 50 kPa;
-- fouling resistance: explicitly provided with source.
+- fouling resistance: 0.0002 m²·K/W, source: {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "2019", table_or_clause: "Table RGP-T-2.4", note: "clean fresh water, untreated"}.
 
 **Cold stream inputs**
 
@@ -27,7 +27,7 @@ These cases validate the product requirements and public data dictionary. They a
 - inlet pressure: 3 bar(a);
 - outlet temperature: solved variable;
 - allowable pressure drop: 50 kPa;
-- fouling resistance: explicitly provided with source.
+- fouling resistance: 0.0002 m²·K/W, source: {source_type: "STANDARD", reference_id: "TEMA-RGP-T-2.4", edition: "2019", table_or_clause: "Table RGP-T-2.4", note: "clean fresh water, untreated"}.
 
 **Case constraints**
 
@@ -44,6 +44,7 @@ These cases validate the product requirements and public data dictionary. They a
 - specification closure is checked before geometry generation;
 - output includes multiple manufacturable candidates, warnings and provenance;
 - status remains `PRELIMINARY` or `REVIEW_REQUIRED` until verification rules pass.
+- output carries both `status` (execution state) and `verification_level` (result maturity).
 
 ## CASE-002 — Fixed-geometry double-pipe rating
 
@@ -74,38 +75,58 @@ These cases validate the product requirements and public data dictionary. They a
 **Workflow:** `screening`  
 **Requested exchanger:** `auto`
 
-**Service summary**
+**Fixed fluids and conditions**
 
-- hot side: Air (or Nitrogen if a single-phase gas with validated CoolProp properties is required);
-- cold side: water;
-- both inlet states and mass flows provided;
-- target duty or one outlet temperature provided;
-- allowable pressure drop, footprint and maintenance constraints provided;
-- shell-and-tube is one candidate family, not an automatic recommendation.
+| Parameter | Hot side | Cold side |
+|---|---|---|
+| Fluid | Air (CoolProp backend) | Water (CoolProp backend) |
+| Phase hint | `gas` | `liquid` |
+| Mass flow | 1.5 kg/s | 3.0 kg/s |
+| Inlet temperature | 150 °C | 25 °C |
+| Inlet pressure | 3 bar(a) | 4 bar(a) |
+| Outlet temperature | 80 °C (specified) | solved variable |
+| Allowable pressure drop | 15 kPa | 30 kPa |
+| Fouling resistance | 0.0001 m²·K/W (source: TEMA-RGP-T-2.4, light gas service) | 0.0002 m²·K/W (source: TEMA-RGP-T-2.4, clean water) |
+
+**Constraints:** footprint max 3 m × 1.5 m; maintenance access from both ends.
 
 **Expected documentation behavior**
 
 - screening may rank double-pipe, shell-and-tube, plate or air-cooled concepts where technically relevant;
 - detailed shell-and-tube sizing/rating is not fabricated when the module is unavailable;
 - result explains why a family is included or excluded;
-- status is `PRELIMINARY` and unimplemented downstream calculations are clearly identified.
+- status is `TECHNOLOGIES_SCREENED` with verification_level `PRELIMINARY` and unimplemented downstream calculations are clearly identified as `NOT_IMPLEMENTED`.
 
 ## CASE-004 — Plate-exchanger screening with sanitation constraints
 
 **Purpose:** ensure that non-thermal requirements influence technology selection.
 
 **Workflow:** `screening`  
-**Requested exchanger:** `auto` or `plate`
+**Requested exchanger:** `plate`
+
+**Fixed fluids and conditions**
+
+| Parameter | Hot side | Cold side |
+|---|---|---|
+| Fluid | Water (CoolProp backend) | Water + 30% Propylene Glycol (CoolProp backend) |
+| Phase hint | `liquid` | `liquid` |
+| Mass flow | 5.0 kg/s | 4.5 kg/s |
+| Inlet temperature | 72 °C | 10 °C |
+| Inlet pressure | 6 bar(a) | 4 bar(a) |
+| Outlet temperature | solved variable | solved variable |
+| Target duty | 500 kW | — |
+| Allowable pressure drop | 40 kPa | 40 kPa |
+| Fouling resistance | 0.00015 m²·K/W (source: TEMA-RGP-T-2.4, clean process water) | 0.0003 m²·K/W (source: user-specified, glycol service) |
 
 **Required constraints**
 
-- two supported single-phase liquid streams (e.g., Water and Water+Propylene Glycol solution, or two Water streams);
-- thermal specification and pressure-drop limits;
-- hygienic or cleanability requirement;
-- CIP compatibility requirement;
-- allowed wetted material such as an approved stainless-steel grade;
-- gasket restrictions or preference for brazed/semi-welded construction;
-- maintenance access and footprint limits.
+- hygienic design requirement (3-A Sanitary or EHEDG reference);
+- CIP compatibility (hot caustic and acid wash cycles);
+- wetted material restricted to AISI 316L stainless steel;
+- gasket material: EPDM (compatible with CIP agents);
+- preferred construction: gasketed plate (brazed not permitted due to CIP requirement);
+- maintenance access: plates must be removable for inspection;
+- footprint limit: 2 m × 1 m.
 
 **Expected documentation behavior**
 
@@ -134,7 +155,7 @@ These cases validate the product requirements and public data dictionary. They a
 
 - service classification identifies phase change;
 - the v0.1 single-phase solver is not used as a fallback;
-- result returns `NOT_IMPLEMENTED` unless a validated two-phase module is present;
+- result returns status `NOT_IMPLEMENTED` with verification_level `N/A` unless a validated two-phase module is present;
 - no heat-transfer coefficient, pressure drop or geometry recommendation is guessed;
 - report clearly states the missing capability and required future task.
 
@@ -147,8 +168,9 @@ For each case, reviewers confirm:
 - [ ] absolute temperature and temperature difference are distinguished;
 - [ ] required, conditional and optional fields are identifiable;
 - [ ] no undocumented engineering default is necessary;
-- [ ] expected output fields and result status are defined;
+- [ ] expected output fields include both `status` and `verification_level`;
 - [ ] unsupported behavior is explicit;
-- [ ] human engineering review responsibility is visible.
-- [ ] every case has explicitly named fluids and property backend
-- [ ] over-specified and under-specified test scenarios are identifiable
+- [ ] human engineering review responsibility is visible;
+- [ ] every case names a specific fluid and property backend;
+- [ ] over-specified and under-specified test scenarios are identifiable;
+- [ ] fouling source fields are structured (not free text).

@@ -4,27 +4,190 @@ This log records product and engineering decisions that affect schemas, defaults
 
 Status values: `PROPOSED`, `APPROVED`, `REJECTED`, `SUPERSEDED`.
 
-| ID | Decision | Status | Owner | Rationale / consequence |
-|---|---|---|---|---|
-| DEC-001 | The first complete calculation vertical slice is single-phase double-pipe / hairpin service. | PROPOSED | Engineering owner | Limits early validation scope and proves the full input-to-report workflow before adding more exchanger families. |
-| DEC-002 | Shell-and-tube and plate exchangers may appear in v0.1 screening before their detailed sizing/rating solvers are complete. | PROPOSED | Engineering owner | Allows technology comparison without falsely claiming validated detailed calculations. |
-| DEC-003 | Condensation, evaporation and other two-phase services return `NOT_IMPLEMENTED` until approved correlations and validation cases are merged. | PROPOSED | Engineering owner | Prevents unvalidated refrigerant calculations from being presented as engineering results. |
-| DEC-004 | Public engineering inputs never use hidden numerical defaults. Values such as fouling resistance, area margin, roughness, material, cost basis and corrosion allowance must be provided or explicitly selected from an approved rule set. | PROPOSED | Engineering owner | Makes assumptions visible and traceable. |
-| DEC-005 | The deterministic calculation core uses SI units; API and reports may convert to user-selected display units. Absolute temperature and temperature difference are separate dimensions. | PROPOSED | Engineering owner | Avoids unit ambiguity and offset-temperature errors. |
-| DEC-006 | Result states include `VALIDATED_INPUT`, `PRELIMINARY`, `REVIEW_REQUIRED`, `BLOCKED`, `NOT_IMPLEMENTED` and `VERIFIED`. | PROPOSED | Engineering + product owner | Separates successful computation from engineering approval and implementation availability. |
-| DEC-007 | HXForge never claims certified ASME, TEMA, API or statutory compliance from preliminary calculations. | PROPOSED | Engineering owner | Code compliance requires licensed rules, complete inputs, qualified review and applicable legal processes. |
-| DEC-008 | Every numerical output must include calculation provenance and structured warnings. | PROPOSED | Engineering + software owner | Supports reproducibility, review and regression control. |
-| DEC-009 | Candidate generation is limited to approved, manufacturable catalog geometry; continuous optimization cannot invent arbitrary procurement dimensions. | PROPOSED | Engineering owner | Keeps optimized designs buildable and comparable. |
-| DEC-010 | A blocking input, safety, property or applicability error prevents candidate recommendation and report-ready status. | PROPOSED | Engineering owner | Prevents the Agent from forcing a result through an invalid workflow. |
-| DEC-011 | CoolProp is the first and default property backend for v0.1. Alternative backends (REFPROP, custom databases) are architecture-ready but not implemented in v0.1. | PROPOSED | Engineering owner | Limits property validation scope to one well-documented open-source backend while proving the injectable-provider interface. |
-| DEC-012 | For single-phase correlations, the transition Reynolds-number zone (typically 2300 < Re < 10000 for internal flow) must use an explicit, documented policy: interpolation with WARNING, or rejection. Blind interpolation without provenance is prohibited. | PROPOSED | Engineering owner | Prevents silent extrapolation into unvalidated flow regimes. The specific policy (interpolate vs reject) must be chosen and documented before TASK-007. |
-| DEC-013 | The double-pipe geometry catalog is maintained as a versioned YAML file. Each entry specifies standard pipe OD, wall thickness, schedule, and maximum hairpin length. Continuous optimization may only select from catalog entries. | PROPOSED | Engineering owner | Ensures manufactured dimensions are procurable. |
-| DEC-014 | Iterative solvers must declare a maximum iteration count and a convergence tolerance before execution. Default tolerance: energy balance residual < 0.1%. Default max iterations: 100. Both are configurable and traceable. | PROPOSED | Engineering owner | Prevents infinite loops and silent non-convergence. |
-| DEC-015 | In sizing workflows, the area margin is applied to the generated candidate geometry (design area = required area × (1 + margin)). In rating workflows, the margin is reported as informational only and does not modify the calculation. | PROPOSED | Engineering owner | Makes the role of area margin explicit and consistent across workflows. |
-| DEC-016 | The v0.1 supported fluid list is: Water, Air, R134a, R404A (or R507A), R717, and Propylene Glycol water solution (if backend support is confirmed). Fluids outside this list are supported architecturally but return NOT_IMPLEMENTED until validated. | PROPOSED | Engineering owner | Defines the property-validation scope for the first release. |
-| DEC-017 | The fouling_resistance source field is a free-text reference string (e.g., 'TEMA Table RGP-T-2.4 clean service' or 'user-specified'). When fouling resistance is zero, the source must still state 'explicitly zero — no fouling assumed' to confirm deliberate choice. | PROPOSED | Engineering owner | Makes zero-fouling assumptions visible and traceable. |
+**Authoritative source:** Each decision's full text lives in the detailed section below. The index table provides a concise summary only.
 
-### DEC-011 — CoolProp is the first and default property backend for v0.1
+## Decision index
+
+| ID | One-line summary | Status | Owner |
+|---|---|---|---|
+| DEC-001 | First vertical slice is single-phase double-pipe / hairpin | PROPOSED | Engineering owner |
+| DEC-002 | Shell-and-tube and plate may appear in v0.1 screening | PROPOSED | Engineering owner |
+| DEC-003 | Two-phase services return `NOT_IMPLEMENTED` until validated | PROPOSED | Engineering owner |
+| DEC-004 | No hidden numerical engineering defaults | PROPOSED | Engineering owner |
+| DEC-005 | SI internal kernel; absolute temperature ≠ temperature difference | PROPOSED | Engineering owner |
+| DEC-006 | Result states split into `status` and `verification_level` | PROPOSED | Engineering + product owner |
+| DEC-007 | HXForge never claims certified compliance from preliminary calcs | PROPOSED | Engineering owner |
+| DEC-008 | Every numerical output includes provenance and structured warnings | PROPOSED | Engineering + software owner |
+| DEC-009 | Candidate generation limited to approved manufacturable catalog | PROPOSED | Engineering owner |
+| DEC-010 | Blocking error prevents recommendation and report-ready status | PROPOSED | Engineering owner |
+| DEC-011 | CoolProp is the first and default property backend for v0.1 | PROPOSED | Engineering owner |
+| DEC-012 | Each correlation declares its own applicability envelope; reject-by-default outside envelope | PROPOSED | Engineering owner |
+| DEC-013 | Candidate structures must come from versioned, sourced catalog; continuous opt must not invent procurement dimensions | PROPOSED | Engineering owner |
+| DEC-014 | Four-tier convergence: heat-balance tolerance, solver residual, state-variable change, max iterations | PROPOSED | Engineering owner |
+| DEC-015 | Sizing uses discrete structure selection; rating reports margins without modifying structure | PROPOSED | Engineering owner |
+| DEC-016 | Three-tier fluid validation: mandatory, extended, independent-incompressible | PROPOSED | Engineering owner |
+| DEC-017 | Fouling source is a structured object; zero fouling requires explicit choice and Warning | PROPOSED | Engineering owner |
+
+## Detailed decisions
+
+### DEC-001 — First vertical slice: single-phase double-pipe / hairpin
+
+**Status:** PROPOSED
+**Owner:** Engineering owner
+
+**Decision:** The first complete calculation vertical slice is single-phase double-pipe / hairpin service.
+
+**Rationale / consequence:** Limits early validation scope and proves the full input-to-report workflow before adding more exchanger families.
+
+**Affected modules:** TASK-007 through TASK-010
+
+---
+
+### DEC-002 — Screening may include unimplemented families
+
+**Status:** PROPOSED
+**Owner:** Engineering owner
+
+**Decision:** Shell-and-tube and plate exchangers may appear in v0.1 screening before their detailed sizing/rating solvers are complete.
+
+**Rationale / consequence:** Allows technology comparison without falsely claiming validated detailed calculations.
+
+**Affected modules:** Screening workflow, WORKFLOW_MATRIX
+
+---
+
+### DEC-003 — Two-phase services return NOT_IMPLEMENTED
+
+**Status:** PROPOSED
+**Owner:** Engineering owner
+
+**Decision:** Condensation, evaporation and other two-phase services return `NOT_IMPLEMENTED` until approved correlations and validation cases are merged.
+
+**Rationale / consequence:** Prevents unvalidated refrigerant calculations from being presented as engineering results.
+
+**Affected modules:** Thermal service classifier, property provider
+
+---
+
+### DEC-004 — No hidden numerical engineering defaults
+
+**Status:** PROPOSED
+**Owner:** Engineering owner
+
+**Decision:** Public engineering inputs never use hidden numerical defaults. Values such as fouling resistance, area margin, roughness, material, cost basis and corrosion allowance must be provided or explicitly selected from an approved rule set.
+
+**Rationale / consequence:** Makes assumptions visible and traceable.
+
+**Affected modules:** All input schemas, I/O dictionary
+
+---
+
+### DEC-005 — SI internal kernel with dimension separation
+
+**Status:** PROPOSED
+**Owner:** Engineering owner
+
+**Decision:** The deterministic calculation core uses SI units; API and reports may convert to user-selected display units. Absolute temperature and temperature difference are separate dimensions.
+
+**Rationale / consequence:** Avoids unit ambiguity and offset-temperature errors.
+
+**Affected modules:** TASK-002 (units), all solvers
+
+---
+
+### DEC-006 — Result states split into status and verification_level
+
+**Status:** PROPOSED
+**Owner:** Engineering + product owner
+
+**Decision:** Every calculation result carries two independent state fields:
+
+**`status`** — the execution state of the workflow:
+
+| Value | Meaning |
+|---|---|
+| `DRAFT` | Case created, not yet validated |
+| `INPUT_VALIDATED` | Inputs pass schema and engineering validation |
+| `THERMAL_SERVICE_RESOLVED` | Phase, service type identified |
+| `TECHNOLOGIES_SCREENED` | Candidate families ranked |
+| `CANDIDATES_GENERATED` | Geometry candidates produced |
+| `CANDIDATES_RATED` | Candidates thermally/hydraulically rated |
+| `ENGINEERING_CHECKED` | Mechanical, material, risk checks done |
+| `COSTED` | Cost estimates attached |
+| `VERIFIED` | Benchmark/regression verified |
+| `REPORT_READY` | Report packaged |
+| `BLOCKED` | Terminal: input, safety, applicability, property or specification failure |
+| `NOT_IMPLEMENTED` | Terminal: capability not yet available |
+| `NON_CONVERGED` | Terminal: iterative solver failed to converge |
+
+**`verification_level`** — the maturity of the engineering result:
+
+| Value | Meaning |
+|---|---|
+| `PRELIMINARY` | Calculation completed; requires engineering review |
+| `REVIEW_REQUIRED` | Result exists but assumptions or warnings need approval |
+| `VERIFIED` | Passes approved benchmark and review rules |
+| `N/A` | Not applicable (status is BLOCKED, NOT_IMPLEMENTED, or NON_CONVERGED) |
+
+**Rationale / consequence:** Separates execution outcome from engineering maturity. Prevents conflating workflow termination (BLOCKED) with result confidence (PRELIMINARY).
+
+**Affected modules:** All result schemas, API responses, report generation
+
+---
+
+### DEC-007 — No certified compliance claims
+
+**Status:** PROPOSED
+**Owner:** Engineering owner
+
+**Decision:** HXForge never claims certified ASME, TEMA, API or statutory compliance from preliminary calculations.
+
+**Rationale / consequence:** Code compliance requires licensed rules, complete inputs, qualified review and applicable legal processes.
+
+**Affected modules:** Report templates, API responses
+
+---
+
+### DEC-008 — Mandatory provenance and warnings
+
+**Status:** PROPOSED
+**Owner:** Engineering + software owner
+
+**Decision:** Every numerical output must include calculation provenance and structured warnings.
+
+**Rationale / consequence:** Supports reproducibility, review and regression control.
+
+**Affected modules:** TASK-005 (provenance), all result schemas
+
+---
+
+### DEC-009 — Catalog-limited candidate generation
+
+**Status:** PROPOSED
+**Owner:** Engineering owner
+
+**Decision:** Candidate generation is limited to approved, manufacturable catalog geometry; continuous optimization cannot invent arbitrary procurement dimensions.
+
+**Rationale / consequence:** Keeps optimized designs buildable and comparable.
+
+**Affected modules:** TASK-009 (sizing), geometry catalog
+
+---
+
+### DEC-010 — Blocking error prevents recommendation
+
+**Status:** PROPOSED
+**Owner:** Engineering owner
+
+**Decision:** A blocking input, safety, property or applicability error prevents candidate recommendation and report-ready status.
+
+**Rationale / consequence:** Prevents the Agent from forcing a result through an invalid workflow.
+
+**Affected modules:** All workflows, state machine
+
+---
+
+### DEC-011 — CoolProp as default property backend
 
 **Status:** PROPOSED
 **Owner:** Engineering owner
@@ -33,71 +196,172 @@ Status values: `PROPOSED`, `APPROVED`, `REJECTED`, `SUPERSEDED`.
 
 **Rationale / consequence:** Limits property validation scope to one well-documented open-source backend while proving the injectable-provider interface.
 
+**Affected modules:** TASK-003 (property service), FluidSpec schema
+
 ---
 
-### DEC-012 — Transition Reynolds-number zone policy for single-phase correlations
+### DEC-012 — Per-correlation applicability envelope with reject-by-default
 
 **Status:** PROPOSED
 **Owner:** Engineering owner
 
-**Decision:** For single-phase correlations, the transition Reynolds-number zone (typically 2300 < Re < 10000 for internal flow) must use an explicit, documented policy: interpolation with WARNING, or rejection. Blind interpolation without provenance is prohibited.
+**Decision:**
 
-**Rationale / consequence:** Prevents silent extrapolation into unvalidated flow regimes. The specific policy (interpolate vs reject) must be chosen and documented before TASK-007.
+1. Each registered correlation must independently declare its own applicability envelope (Reynolds range, Prandtl range, geometry limits, roughness limits, fluid type, phase).
+2. When input falls outside a correlation's declared envelope, the default behavior is **reject** — the correlation must not be used.
+3. Interpolation across regime boundaries (e.g., laminar-to-turbulent transition) is permitted **only** when an approved composite model exists that has been validated for the transition zone.
+4. All interpolation must produce a `WARNING` with the interpolation method recorded in provenance.
+5. No blanket transition-zone policy (such as a system-wide Re range) overrides individual correlation envelopes.
+
+**Rationale / consequence:** Ensures each correlation's适用范围 is self-contained and auditable. Prevents system-wide defaults from masking per-formula inappropriateness.
+
+**Affected modules:** TASK-004 (correlation registry), TASK-007 (double-pipe correlations), applicability engine
 
 ---
 
-### DEC-013 — Double-pipe geometry catalog as versioned YAML
+### DEC-013 — Manufacturable catalog constraint
 
 **Status:** PROPOSED
 **Owner:** Engineering owner
 
-**Decision:** The double-pipe geometry catalog is maintained as a versioned YAML file. Each entry specifies standard pipe OD, wall thickness, schedule, and maximum hairpin length. Continuous optimization may only select from catalog entries.
+**Decision:**
 
-**Rationale / consequence:** Ensures manufactured dimensions are procurable.
+1. Candidate structures in sizing must come from a versioned, sourced, manufacturable geometry catalog.
+2. Every catalog entry must carry a source reference, version, and revision date.
+3. Continuous optimization may only select combinations of catalog-listed discrete parameters.
+4. Optimization must not generate non-standard procurement dimensions.
+5. Maximum hairpin effective length is constrained by **four independent factors**:
+   - **Manufacturer capability:** standard production lengths available from approved suppliers;
+   - **Transport:** maximum transportable length per road, rail or sea freight;
+   - **Installation:** crane reach, site access and field assembly limits;
+   - **Maintenance:** tube-pull distance, bundle removal access and clearances.
+   These four factors must be checked independently; a hairpin that passes one constraint may fail another.
+
+**Note:** The geometry catalog file format (YAML, JSON, etc.) is a software implementation decision and is recorded in the Architecture Decision Record, not here.
+
+**Rationale / consequence:** Separates engineering constraints from software format choices. Prevents overly narrow geometric assumptions that exclude valid designs.
+
+**Affected modules:** TASK-009 (sizing), TASK-016 (geometry catalog), TASK-017 (mechanical checks)
 
 ---
 
-### DEC-014 — Iterative solver iteration and tolerance defaults
+### DEC-014 — Four-tier convergence framework
 
 **Status:** PROPOSED
 **Owner:** Engineering owner
 
-**Decision:** Iterative solvers must declare a maximum iteration count and a convergence tolerance before execution. Default tolerance: energy balance residual < 0.1%. Default max iterations: 100. Both are configurable and traceable.
+**Decision:**
 
-**Rationale / consequence:** Prevents infinite loops and silent non-convergence.
+Iterative solvers must declare and track four independent convergence parameters:
+
+| Parameter | Definition | Default threshold | Scope |
+|---|---|---|---|
+| **Heat-balance acceptance error** | Normalized energy imbalance between hot and cold sides: `abs(Q_hot - Q_cold) / max(Q_hot, Q_cold)` | < 0.1% | Energy balance solver |
+| **Solver residual tolerance** | Change in the primary solved variable between iterations (e.g., outlet temperature) | < 0.01 K | All iterative solvers |
+| **State-variable change tolerance** | Change in secondary derived quantities (e.g., U-value, NTU) between iterations | < 0.1% of previous value | Sizing/rating loops |
+| **Maximum iteration count** | Hard stop on total iterations | 100 | All iterative solvers |
+
+All four parameters are configurable and traceable in provenance.
+
+When the maximum iteration count is reached without meeting tolerances, the run must terminate with status `NON_CONVERGED` and a `BLOCKED` blocker explaining which tolerance was not met. The solver must not return a partial result as if it converged.
+
+**Rationale / consequence:** Prevents infinite loops, silent non-convergence, and premature acceptance of loosely converged results.
+
+**Affected modules:** TASK-006 (heat balance), TASK-008 (rating), TASK-009 (sizing)
 
 ---
 
-### DEC-015 — Area margin behavior in sizing vs rating workflows
+### DEC-015 — Discrete structure selection for sizing, reporting-only for rating
 
 **Status:** PROPOSED
 **Owner:** Engineering owner
 
-**Decision:** In sizing workflows, the area margin is applied to the generated candidate geometry (design area = required area × (1 + margin)). In rating workflows, the margin is reported as informational only and does not modify the calculation.
+**Decision:**
 
-**Rationale / consequence:** Makes the role of area margin explicit and consistent across workflows.
+**Sizing:**
+- Sizing selects discrete, catalog-listed structures.
+- A candidate is accepted when: `actual_area >= required_area × (1 + required_margin)`.
+- `required_area` is calculated from the thermal duty and predicted U-value for that specific geometry.
+- `required_margin` is the user-specified `area_margin_fraction`.
+- Rejected candidates (insufficient area) are discarded; accepted candidates are reported with their actual area and margin.
+
+**Rating:**
+- Rating does not modify the supplied structure.
+- Rating reports four distinct area-related quantities:
+  - `actual_area` — the geometric heat-transfer area of the supplied structure;
+  - `required_area` — the area needed to achieve the calculated duty;
+  - `area_margin` — `actual_area / required_area - 1` (dimensionless);
+  - `duty_margin` — the excess duty capacity at the current geometry and conditions.
+- None of these modify the geometry; they are informational outputs only.
+
+**Rationale / consequence:** Makes the role of area margin explicit and consistent across workflows. Prevents ambiguity about whether margin changes geometry or just reporting.
+
+**Affected modules:** TASK-008 (rating), TASK-009 (sizing), output schemas
 
 ---
 
-### DEC-016 — v0.1 supported fluid list
+### DEC-016 — Three-tier fluid validation scope
 
 **Status:** PROPOSED
 **Owner:** Engineering owner
 
-**Decision:** The v0.1 supported fluid list is: Water, Air, R134a, R404A (or R507A), R717, and Propylene Glycol water solution (if backend support is confirmed). Fluids outside this list are supported architecturally but return NOT_IMPLEMENTED until validated.
+**Decision:**
 
-**Rationale / consequence:** Defines the property-validation scope for the first release.
+The v0.1 fluid validation scope is divided into three tiers:
+
+**Tier 1 — Mandatory validation (must pass before TASK-002 completes):**
+- Water (pure, single-phase)
+- Air (single-phase, ideal-gas-like behavior)
+- R134a (single-phase only; two-phase returns NOT_IMPLEMENTED)
+- R717 (single-phase only; two-phase returns NOT_IMPLEMENTED)
+
+**Tier 2 — Extended validation (must pass before v0.1 release):**
+- R404A (single-phase only)
+- R507A (single-phase only)
+
+**Tier 3 — Independent incompressible-fluid task (separate task, not blocking v0.1 thermal core):**
+- Propylene Glycol (MPG) water solutions at multiple concentrations
+- Propylene Glycol (MPG2) water solutions
+- Aqueous Propylene Glycol (APG) water solutions
+- Other glycol-water mixtures as needed
+
+Fluids not in any tier are supported architecturally (the PropertyProvider interface accepts them) but return `NOT_IMPLEMENTED` until validated with approved test cases.
+
+R404A and R507A are listed independently; the phrase "R404A or R507A" must not be used as a single entry.
+
+**Rationale / consequence:** Defines explicit validation scope per fluid. Separates mandatory thermal-core fluids from refrigerant and glycol extensions.
+
+**Affected modules:** TASK-003 (property service), golden test suite
 
 ---
 
-### DEC-017 — Fouling resistance source field traceability
+### DEC-017 — Structured fouling source object
 
 **Status:** PROPOSED
 **Owner:** Engineering owner
 
-**Decision:** The fouling_resistance source field is a free-text reference string (e.g., 'TEMA Table RGP-T-2.4 clean service' or 'user-specified'). When fouling resistance is zero, the source must still state 'explicitly zero — no fouling assumed' to confirm deliberate choice.
+**Decision:**
 
-**Rationale / consequence:** Makes zero-fouling assumptions visible and traceable.
+The `fouling_resistance.source` field is a structured object, not a free-text string. Required fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `source_type` | enum: `STANDARD`, `VENDOR`, `USER`, `ASSUMED` | Origin of the fouling value |
+| `reference_id` | string | Document identifier (e.g., "TEMA-RGP-T-2.4", "API 660 Table H") |
+| `edition` | string | Edition or year of the reference |
+| `table_or_clause` | string | Specific table, figure or clause within the reference |
+| `note` | string | Free-text clarification or assumption statement |
+
+When fouling resistance is zero:
+- `source_type` must be `USER` or `ASSUMED`;
+- `note` must state "explicitly zero — no fouling assumed";
+- a `WARNING` must be returned to confirm the deliberate choice.
+
+**Rationale / consequence:** Makes fouling assumptions traceable to a specific source. Prevents ambiguity about whether zero fouling is a deliberate engineering choice or a missing input.
+
+**Affected modules:** All stream input schemas, TASK-008 (rating), TASK-009 (sizing), report templates
+
+---
 
 ## Approval checklist
 
@@ -113,13 +377,9 @@ Before changing a row to `APPROVED`, record:
 
 ```text
 ID: DEC-XXX
-Decision:
 Status: PROPOSED
 Owner:
-Context:
-Options considered:
-Decision rationale:
-Affected modules and task IDs:
-Evidence / references:
-Approval record:
+Decision:
+Rationale / consequence:
+Affected modules:
 ```

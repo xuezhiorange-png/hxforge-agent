@@ -14,15 +14,26 @@ It is an engineering decision-support tool. It does not replace licensed standar
 - technical managers reviewing alternatives;
 - software or AI tools executing approved engineering tasks.
 
-## 3. v0.1 supported equipment families
+## 3. v0.1 equipment coverage
 
-- double-pipe / hairpin;
-- shell-and-tube preliminary single-phase workflows;
-- plate heat exchanger technology screening and later single-phase workflows;
-- air cooler architecture boundary;
-- microchannel architecture boundary.
+Equipment types are classified into three coverage levels:
 
-Only capabilities explicitly marked implemented may return engineering results.
+### Architecture coverage (no calculation code in v0.1)
+- Air cooler
+- Microchannel
+
+These families appear in the domain model and screening taxonomy but return `NOT_IMPLEMENTED` for any sizing, rating or optimization workflow.
+
+### Implemented calculation capability (partial)
+- Shell-and-tube — screening only; sizing and rating deferred to later milestones
+- Plate heat exchanger — screening only; sizing and rating deferred to later milestones
+
+These families participate in technology screening but do not produce validated thermal or hydraulic results.
+
+### Validated calculation capability (target for first vertical slice)
+- Double-pipe / hairpin — single-phase liquid-liquid and gas-liquid sizing, rating, optimization and reporting
+
+Only capabilities explicitly marked as validated may return engineering results that carry `verification_level = PRELIMINARY` or above.
 
 ## 4. v0.1 supported workflows
 
@@ -58,12 +69,36 @@ The first complete vertical slice is single-phase double-pipe service. It should
 
 ## 7. Result states
 
-- `VALIDATED_INPUT`: input is complete and internally consistent.
-- `PRELIMINARY`: calculation completed but requires engineering review.
-- `REVIEW_REQUIRED`: result exists but one or more material assumptions or warnings require approval.
-- `BLOCKED`: a safety, applicability, property or specification problem prevents calculation.
-- `NOT_IMPLEMENTED`: the requested workflow is outside the implemented capability.
-- `VERIFIED`: reserved for results that pass approved benchmark and review rules.
+Every calculation result carries two independent fields: `status` and `verification_level`.
+
+### 7.1 Status (execution state)
+
+| Status | Meaning |
+|---|---|
+| `DRAFT` | Case created, not yet validated |
+| `INPUT_VALIDATED` | Inputs pass schema and engineering validation |
+| `THERMAL_SERVICE_RESOLVED` | Phase and service type identified |
+| `TECHNOLOGIES_SCREENED` | Candidate families ranked |
+| `CANDIDATES_GENERATED` | Geometry candidates produced |
+| `CANDIDATES_RATED` | Candidates thermally and hydraulically rated |
+| `ENGINEERING_CHECKED` | Mechanical, material and risk checks done |
+| `COSTED` | Cost estimates attached |
+| `VERIFIED` | Benchmark and regression verified |
+| `REPORT_READY` | Report packaged |
+| `BLOCKED` | Terminal: input, safety, applicability, property or specification failure |
+| `NOT_IMPLEMENTED` | Terminal: capability not yet available |
+| `NON_CONVERGED` | Terminal: iterative solver failed to converge |
+
+### 7.2 Verification level (result maturity)
+
+| Verification level | Meaning |
+|---|---|
+| `PRELIMINARY` | Calculation completed; requires engineering review |
+| `REVIEW_REQUIRED` | Result exists but assumptions or warnings need approval |
+| `VERIFIED` | Passes approved benchmark and review rules |
+| `N/A` | Not applicable (status is BLOCKED, NOT_IMPLEMENTED, or NON_CONVERGED) |
+
+The Agent must not advance the status merely to satisfy a user request.
 
 ## 8. User-facing outputs
 
