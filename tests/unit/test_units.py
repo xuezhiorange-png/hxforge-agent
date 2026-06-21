@@ -3,7 +3,8 @@ from __future__ import annotations
 import math
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from hexagent.core.units import (
