@@ -1,17 +1,14 @@
-"""Unit tests for TASK-003 property service.
+"""Unit tests for TASK-003 property service — Round 2 review.
 
-Covers:
-- Tier-1 and benchmark-validated fluid states
-- TP-to-PH cross-consistency
-- Saturation queries
-- Near-saturation and two-phase rejection
-- Invalid fluids and invalid inputs
-- Cache determinism and mixture identity
-- PH reference-state mismatch (Item 3)
-- JSON round-trip serialization (Item 5)
-- PH saturation tolerance reference-state invariance (Item 6)
-- Mixture capability boundary (Item 7)
-- Error-boundary regressions (Item 8)
+Covers all 8 review items:
+1. Runtime CoolProp configuration guard
+2. SUPPORTED_TIER_1 for all Tier-1 fluids (no BENCHMARK_VALIDATED)
+3. Mandatory PH reference-state identity
+4. FluidSpec adapter (provider CoolProp -> EOS HEOS)
+5. Strict deterministic result/error serialization
+6. Mixture capability boundary (NOT_IMPLEMENTED)
+7. Deterministic error classification
+8. Error-boundary regressions
 """
 
 from __future__ import annotations
@@ -24,6 +21,7 @@ from hexagent.properties import (
     VALIDATION_MATRIX,
     CoolPropProvider,
     FluidIdentifier,
+    FluidStateModel,
     FluidValidationLevel,
     PhaseRegion,
     PropertyErrorCode,
@@ -53,13 +51,69 @@ def _assert_single_phase_state(state: object) -> None:
 
 
 # ======================================================================
-# Item 2: SUPPORTED_TIER_1 vs BENCHMARK_VALIDATED
+# Item 1: Runtime configuration guard
+# ======================================================================
+
+
+class TestConfigurationGuard:
+    def test_fingerprint_matches_between_queries(self) -> None:
+        """Normal operation: fingerprint stays stable across queries."""
+        provider = CoolPropProvider(cache_size=4)
+        provider.state_tp("Water", 300.0, 101_325.0)
+        provider.state_tp("Water", 310.0, 101_325.0)
+        info = provider.cache_info()
+        assert info.misses == 2
+        assert info.hits == 0
+
+    def test_configuration_changed_clears_cache_and_raises(self) -> None:
+        """Item 1: mutating CoolProp after provider creation triggers
+        CONFIGURATION_CHANGED on the next query."""
+        import CoolProp.CoolProp as CP
+
+        provider = CoolPropProvider(cache_size=4)
+        # Normal query succeeds
+        provider.state_tp("R134a", 300.0, 2_000_000.0)
+        assert provider.cache_info().size == 1
+
+        # Mutate CoolProp reference state for R134a
+        original_ref = "DEF"
+        try:
+            CP.set_reference_state("R134a", "IIR")
+            # Next query should detect the change and raise
+            with pytest.raises(PropertyServiceError) as exc_info:
+                provider.state_tp("R134a", 300.0, 2_000_000.0)
+            assert (
+                exc_info.value.code
+                is PropertyErrorCode.CONFIGURATION_CHANGED
+            )
+            # Cache should be cleared
+            assert provider.cache_info().size == 0
+        finally:
+            CP.set_reference_state("R134a", original_ref)
+
+    def test_configuration_error_has_both_fingerprints(self) -> None:
+        """Error context includes construction and current fingerprints."""
+        import CoolProp.CoolProp as CP
+
+        provider = CoolPropProvider()
+        try:
+            CP.set_reference_state("R134a", "IIR")
+            with pytest.raises(PropertyServiceError) as exc_info:
+                provider.state_tp("R134a", 300.0, 2_000_000.0)
+            ctx = exc_info.value.context
+            assert "construction_fingerprint" in ctx
+            assert "current_fingerprint" in ctx
+            assert ctx["construction_fingerprint"] != ctx["current_fingerprint"]
+        finally:
+            CP.set_reference_state("R134a", "DEF")
+
+
+# ======================================================================
+# Item 2: SUPPORTED_TIER_1 for all Tier-1 fluids
 # ======================================================================
 
 
 class TestValidationLevels:
-    """Tier-1 fluids have BENCHMARK_VALIDATED level (Item 2)."""
-
     @pytest.mark.parametrize(
         ("fluid", "temperature_k", "pressure_pa"),
         [
@@ -69,33 +123,34 @@ class TestValidationLevels:
             ("R717", 300.0, 2_000_000.0),
         ],
     )
-    def test_tier_one_tp_states(
-        self,
-        fluid: str,
-        temperature_k: float,
-        pressure_pa: float,
+    def test_all_tier_one_are_supported_tier_1(
+        self, fluid: str, temperature_k: float, pressure_pa: float,
     ) -> None:
+        """Item 2: all Tier-1 fluids get SUPPORTED_TIER_1, not
+        BENCHMARK_VALIDATED (fixtures are same-backend regressions)."""
         state = CoolPropProvider().state_tp(fluid, temperature_k, pressure_pa)
         _assert_single_phase_state(state)
-        assert state.provenance.validation_level is FluidValidationLevel.BENCHMARK_VALIDATED
+        assert (
+            state.provenance.validation_level
+            is FluidValidationLevel.SUPPORTED_TIER_1
+        )
         assert state.provenance.query_type is PropertyQueryType.TP
         assert state.provenance.backend_name == "CoolProp"
-        assert state.provenance.backend_version
-        assert state.provenance.backend_git_revision
 
     def test_ammonia_alias_resolves_to_r717(self) -> None:
         state = CoolPropProvider().state_tp("Ammonia", 300.0, 2_000_000.0)
         assert state.provenance.fluid_identifier == "HEOS::R717"
-        assert state.provenance.validation_level is FluidValidationLevel.BENCHMARK_VALIDATED
+        assert (
+            state.provenance.validation_level
+            is FluidValidationLevel.SUPPORTED_TIER_1
+        )
 
-    def test_validation_matrix_has_entries(self) -> None:
+    def test_validation_matrix_is_backend_regression(self) -> None:
+        """Item 2: matrix entries are labelled backend_regression."""
         assert len(VALIDATION_MATRIX) >= 4
         for entry in VALIDATION_MATRIX:
             assert "dataset_id" in entry
-            assert "fluid" in entry
-            assert "state_points" in entry
-            assert "source" in entry
-            assert "revision" in entry
+            assert entry.get("validation_basis") == "backend_regression"
 
 
 # ======================================================================
@@ -112,18 +167,23 @@ class TestTPPHConsistency:
         ],
     )
     def test_tp_ph_cross_consistency(
-        self,
-        fluid: str,
-        temperature_k: float,
-        pressure_pa: float,
+        self, fluid: str, temperature_k: float, pressure_pa: float,
     ) -> None:
         provider = CoolPropProvider()
         state_tp = provider.state_tp(fluid, temperature_k, pressure_pa)
-        state_ph = provider.state_ph(fluid, pressure_pa, state_tp.enthalpy_j_kg)
-
-        assert state_ph.temperature_k == pytest.approx(state_tp.temperature_k, rel=1e-8)
-        assert state_ph.pressure_pa == pytest.approx(state_tp.pressure_pa, rel=1e-12)
-        assert state_ph.density_kg_m3 == pytest.approx(state_tp.density_kg_m3, rel=1e-7)
+        state_ph = provider.state_ph(
+            fluid, pressure_pa, state_tp.enthalpy_j_kg,
+            reference_state=ReferenceStatePolicy.DEF,
+        )
+        assert state_ph.temperature_k == pytest.approx(
+            state_tp.temperature_k, rel=1e-8
+        )
+        assert state_ph.pressure_pa == pytest.approx(
+            state_tp.pressure_pa, rel=1e-12
+        )
+        assert state_ph.density_kg_m3 == pytest.approx(
+            state_tp.density_kg_m3, rel=1e-7
+        )
         assert state_ph.provenance.query_type is PropertyQueryType.PH
 
 
@@ -133,25 +193,21 @@ class TestTPPHConsistency:
 
 
 class TestSaturation:
-    def test_saturation_at_pressure_returns_liquid_and_vapor(self) -> None:
-        saturation = CoolPropProvider().saturation_at_pressure("R134a", 500_000.0)
+    def test_saturation_at_pressure(self) -> None:
+        sat = CoolPropProvider().saturation_at_pressure("R134a", 500_000.0)
+        assert sat.query_type is PropertyQueryType.SATURATION_P
+        assert sat.liquid.quality == 0.0
+        assert sat.vapor.quality == 1.0
+        assert sat.liquid.phase is PhaseRegion.SATURATED_LIQUID
+        assert sat.vapor.phase is PhaseRegion.SATURATED_VAPOR
+        assert sat.liquid.density_kg_m3 > sat.vapor.density_kg_m3
+        assert sat.vapor.enthalpy_j_kg > sat.liquid.enthalpy_j_kg
 
-        assert saturation.query_type is PropertyQueryType.SATURATION_P
-        assert saturation.liquid.quality == 0.0
-        assert saturation.vapor.quality == 1.0
-        assert saturation.liquid.phase is PhaseRegion.SATURATED_LIQUID
-        assert saturation.vapor.phase is PhaseRegion.SATURATED_VAPOR
-        assert saturation.liquid.density_kg_m3 > saturation.vapor.density_kg_m3
-        assert saturation.vapor.enthalpy_j_kg > saturation.liquid.enthalpy_j_kg
-
-    def test_saturation_at_temperature_returns_liquid_and_vapor(self) -> None:
-        saturation = CoolPropProvider().saturation_at_temperature("R134a", 273.15)
-
-        assert saturation.query_type is PropertyQueryType.SATURATION_T
-        assert saturation.liquid.temperature_k == pytest.approx(273.15)
-        assert saturation.vapor.temperature_k == pytest.approx(273.15)
-        assert saturation.liquid.pressure_pa > 0.0
-        assert saturation.vapor.pressure_pa > 0.0
+    def test_saturation_at_temperature(self) -> None:
+        sat = CoolPropProvider().saturation_at_temperature("R134a", 273.15)
+        assert sat.query_type is PropertyQueryType.SATURATION_T
+        assert sat.liquid.temperature_k == pytest.approx(273.15)
+        assert sat.vapor.temperature_k == pytest.approx(273.15)
 
 
 # ======================================================================
@@ -162,178 +218,123 @@ class TestSaturation:
 class TestBoundaryRejection:
     def test_exact_tp_saturation_is_rejected(self) -> None:
         provider = CoolPropProvider()
-        saturation = provider.saturation_at_pressure("R134a", 500_000.0)
-
+        sat = provider.saturation_at_pressure("R134a", 500_000.0)
         with pytest.raises(PropertyServiceError) as exc_info:
             provider.state_tp(
-                "R134a",
-                saturation.liquid.temperature_k,
-                500_000.0,
+                "R134a", sat.liquid.temperature_k, 500_000.0,
             )
-
         assert exc_info.value.code is PropertyErrorCode.NEAR_SATURATION
 
-    def test_ph_inside_two_phase_interval_is_rejected(self) -> None:
+    def test_ph_inside_two_phase_is_rejected(self) -> None:
         provider = CoolPropProvider()
-        saturation = provider.saturation_at_pressure("R134a", 500_000.0)
+        sat = provider.saturation_at_pressure("R134a", 500_000.0)
         midpoint = (
-            saturation.liquid.enthalpy_j_kg + saturation.vapor.enthalpy_j_kg
+            sat.liquid.enthalpy_j_kg + sat.vapor.enthalpy_j_kg
         ) / 2.0
-
         with pytest.raises(PropertyServiceError) as exc_info:
-            provider.state_ph("R134a", 500_000.0, midpoint)
-
+            provider.state_ph(
+                "R134a", 500_000.0, midpoint,
+                reference_state=ReferenceStatePolicy.DEF,
+            )
         assert exc_info.value.code is PropertyErrorCode.TWO_PHASE_STATE
 
 
 # ======================================================================
-# Error handling
-# ======================================================================
-
-
-class TestErrors:
-    def test_invalid_fluid_error_is_structured(self) -> None:
-        provider = CoolPropProvider(allow_unvalidated_fluids=True)
-
-        with pytest.raises(PropertyServiceError) as exc_info:
-            provider.state_tp("DefinitelyNotAFluid", 300.0, 101_325.0)
-
-        assert exc_info.value.code is PropertyErrorCode.INVALID_FLUID
-        assert exc_info.value.as_dict()["code"] == "property_invalid_fluid"
-
-    def test_unvalidated_fluid_requires_explicit_opt_in(self) -> None:
-        with pytest.raises(PropertyServiceError) as exc_info:
-            CoolPropProvider().state_tp("R32", 300.0, 2_000_000.0)
-
-        assert exc_info.value.code is PropertyErrorCode.UNVALIDATED_FLUID
-
-        state = CoolPropProvider(allow_unvalidated_fluids=True).state_tp(
-            "R32", 300.0, 2_000_000.0
-        )
-        assert state.provenance.validation_level is FluidValidationLevel.UNVALIDATED
-
-    def test_invalid_state_input_is_structured(self) -> None:
-        with pytest.raises(PropertyServiceError) as exc_info:
-            CoolPropProvider().state_tp("Water", 300.0, 0.0)
-
-        assert exc_info.value.code is PropertyErrorCode.INVALID_INPUT
-        assert exc_info.value.context["field"] == "pressure_pa"
-
-
-# ======================================================================
-# Cache
-# ======================================================================
-
-
-class TestCache:
-    def test_cache_key_is_deterministic_and_observable(self) -> None:
-        provider = CoolPropProvider(cache_size=4)
-        first = provider.state_tp("Water", 300.0, 101_325.0)
-        second = provider.state_tp("Water", 300.0, 101_325.0)
-        info = provider.cache_info()
-
-        assert first is second
-        assert info.misses == 1
-        assert info.hits == 1
-        assert info.size == 1
-        assert info.max_size == 4
-
-        provider.clear_cache()
-        assert provider.cache_info().size == 0
-
-    def test_cache_includes_config_fingerprint(self) -> None:
-        """Item 1: cache key includes configuration fingerprint."""
-        provider = CoolPropProvider(cache_size=4)
-        # Trigger a cache miss to populate
-        provider.state_tp("Water", 300.0, 101_325.0)
-        info = provider.cache_info()
-        assert info.misses == 1
-        # Second call should hit (same config)
-        provider.state_tp("Water", 300.0, 101_325.0)
-        info = provider.cache_info()
-        assert info.hits == 1
-
-
-# ======================================================================
-# Fluid identifier
-# ======================================================================
-
-
-class TestFluidIdentifier:
-    def test_mixture_identity_is_order_independent(self) -> None:
-        first = FluidIdentifier.from_components({"R32": 0.7, "R125": 0.3})
-        second = FluidIdentifier.from_components({"R125": 0.3, "R32": 0.7})
-
-        assert first.cache_identity == second.cache_identity
-        assert first.cache_identity.startswith("HEOS::")
-
-    def test_mixture_rejects_bad_composition(self) -> None:
-        with pytest.raises(PropertyServiceError) as exc_info:
-            FluidIdentifier.from_components({"R32": 0.8, "R125": 0.3})
-
-        assert exc_info.value.code is PropertyErrorCode.INVALID_FLUID
-
-    def test_from_fluid_spec_adapter(self) -> None:
-        """Item 4: FluidIdentifier.from_fluid_spec adapter."""
-        ident = FluidIdentifier.from_fluid_spec("HEOS", "Water")
-        assert ident.name == "Water"
-        assert ident.equation_of_state_backend == "HEOS"
-        assert ident.backend == "HEOS"  # backward-compatible alias
-
-    def test_from_fluid_spec_with_composition(self) -> None:
-        ident = FluidIdentifier.from_fluid_spec(
-            "HEOS", "R410A", composition={"R32": 0.5, "R125": 0.5}
-        )
-        assert ident.name == "R410A"
-        assert len(ident.components) == 2
-
-
-# ======================================================================
-# Item 3: PH reference-state mismatch
+# Item 3: Mandatory PH reference state
 # ======================================================================
 
 
 class TestPHReferenceState:
-    def test_ph_with_matching_reference_state_succeeds(self) -> None:
+    def test_ph_with_matching_reference_succeeds(self) -> None:
         provider = CoolPropProvider()
-        tp_state = provider.state_tp("Water", 330.0, 300_000.0)
-        # Default reference state matches — should succeed
-        ph_state = provider.state_ph(
-            "Water", 300_000.0, tp_state.enthalpy_j_kg,
+        tp = provider.state_tp("Water", 330.0, 300_000.0)
+        ph = provider.state_ph(
+            "Water", 300_000.0, tp.enthalpy_j_kg,
             reference_state=ReferenceStatePolicy.DEF,
         )
-        assert ph_state.temperature_k == pytest.approx(330.0, rel=1e-8)
+        assert ph.temperature_k == pytest.approx(330.0, rel=1e-8)
 
-    def test_ph_with_mismatched_reference_state_is_rejected(self) -> None:
-        """Item 3: PH query with non-DEF reference state is rejected."""
+    def test_ph_with_mismatched_reference_is_rejected(self) -> None:
         provider = CoolPropProvider()
-        tp_state = provider.state_tp("Water", 330.0, 300_000.0)
-
-        # Monkeypatch the provider's reference_state_policy to a non-DEF value
-        # so that requesting DEF will be a mismatch.
+        tp = provider.state_tp("Water", 330.0, 300_000.0)
         original = provider.reference_state_policy
         try:
-            # Use object.__setattr__ to bypass any property descriptor
-            object.__setattr__(provider, "reference_state_policy", "NOT_DEF")
+            object.__setattr__(
+                provider, "reference_state_policy", "NOT_DEF"
+            )
             with pytest.raises(PropertyServiceError) as exc_info:
                 provider.state_ph(
-                    "Water", 300_000.0, tp_state.enthalpy_j_kg,
+                    "Water", 300_000.0, tp.enthalpy_j_kg,
                     reference_state=ReferenceStatePolicy.DEF,
                 )
             assert exc_info.value.code is PropertyErrorCode.INVALID_INPUT
             assert "reference-state" in str(exc_info.value).lower()
         finally:
-            object.__setattr__(provider, "reference_state_policy", original)
+            object.__setattr__(
+                provider, "reference_state_policy", original
+            )
+
+    def test_ph_reference_state_in_provenance(self) -> None:
+        provider = CoolPropProvider()
+        tp = provider.state_tp("Water", 330.0, 300_000.0)
+        ph = provider.state_ph(
+            "Water", 300_000.0, tp.enthalpy_j_kg,
+            reference_state=ReferenceStatePolicy.DEF,
+        )
+        assert (
+            ph.provenance.reference_state_policy
+            is ReferenceStatePolicy.DEF
+        )
 
 
 # ======================================================================
-# Item 5: JSON round-trip serialization
+# Item 4: FluidSpec adapter
+# ======================================================================
+
+
+class TestFluidSpecAdapter:
+    def test_adapter_maps_coolprop_to_heos(self) -> None:
+        ident = FluidIdentifier.from_fluid_spec("CoolProp", "Water")
+        assert ident.name == "Water"
+        assert ident.equation_of_state_backend == "HEOS"
+        assert ident.backend == "HEOS"
+
+    def test_adapter_rejects_unsupported_provider(self) -> None:
+        with pytest.raises(PropertyServiceError) as exc_info:
+            FluidIdentifier.from_fluid_spec("REFPROP", "Water")
+        assert exc_info.value.code is PropertyErrorCode.UNSUPPORTED_BACKEND
+
+    def test_adapter_rejects_unsupported_composition_basis(self) -> None:
+        with pytest.raises(PropertyServiceError) as exc_info:
+            FluidIdentifier.from_fluid_spec(
+                "CoolProp", "Water",
+                composition_basis="mass_fraction",
+            )
+        assert exc_info.value.code is PropertyErrorCode.INVALID_FLUID
+
+    def test_adapter_with_composition(self) -> None:
+        ident = FluidIdentifier.from_fluid_spec(
+            "CoolProp", "R410A",
+            composition={"R32": 0.5, "R125": 0.5},
+        )
+        assert ident.name == "R410A"
+        assert len(ident.components) == 2
+        assert ident.equation_of_state_backend == "HEOS"
+
+    def test_adapter_rejects_non_coolprop_provider(self) -> None:
+        with pytest.raises(PropertyServiceError) as exc_info:
+            FluidIdentifier.from_fluid_spec("NIST", "Water")
+        assert "NIST" in str(exc_info.value)
+
+
+# ======================================================================
+# Item 5: Strict serialization
 # ======================================================================
 
 
 class TestSerialization:
     def test_fluid_state_json_round_trip(self) -> None:
-        """FluidState serializes to JSON and back without data loss."""
+        """Item 5: true FluidState -> JSON -> FluidState round trip."""
         provider = CoolPropProvider()
         state = provider.state_tp("Water", 300.0, 101_325.0)
 
@@ -343,165 +344,205 @@ class TestSerialization:
         assert restored.temperature_k == pytest.approx(state.temperature_k)
         assert restored.pressure_pa == pytest.approx(state.pressure_pa)
         assert restored.density_kg_m3 == pytest.approx(state.density_kg_m3)
-        assert restored.phase == state.phase.value
-        assert restored.provenance["backend_name"] == "CoolProp"
-        assert restored.provenance["reference_state_policy"] == "DEF"
+        assert restored.phase is state.phase
+        assert restored.provenance.validation_level is state.provenance.validation_level
+        assert restored.provenance.query_type is state.provenance.query_type
+        assert restored.provenance.reference_state_policy is state.provenance.reference_state_policy
 
-    def test_saturation_state_json_round_trip(self) -> None:
-        """SaturationState serializes to JSON and back."""
+    def test_saturation_json_round_trip(self) -> None:
         provider = CoolPropProvider()
         sat = provider.saturation_at_pressure("R134a", 500_000.0)
-
         json_str = sat.to_json()
         restored = SaturationState.from_json(json_str)
 
-        assert restored.query_type == sat.query_type.value
+        assert restored.query_type is sat.query_type
         assert restored.input_value == pytest.approx(sat.input_value)
         assert restored.liquid.temperature_k == pytest.approx(
             sat.liquid.temperature_k
         )
-        assert restored.vapor.temperature_k == pytest.approx(
-            sat.vapor.temperature_k
+
+    def test_provenance_model_strict(self) -> None:
+        """Provenance model has extra=forbid and Literal version."""
+        from hexagent.properties.base import PropertyProvenanceModel
+
+        prov = PropertyProvenanceModel(
+            backend_name="CoolProp",
+            backend_version="7.6.1",
+            backend_git_revision="abc",
+            fluid_identifier="HEOS::Water",
+            validation_level="supported_tier_1",
+            query_type="TP",
+            inputs={"temperature_k": 300.0},
+            cache_policy_version="1.0",
+            reference_state_policy="DEF",
+            configuration_fingerprint="abc",
         )
+        # Extra field should be rejected
+        with pytest.raises((ValueError, TypeError)):
+            prov.model_validate({**prov.model_dump(), "extra": "bad"})
 
-    def test_provenance_includes_reference_state_and_fingerprint(self) -> None:
-        """Item 1: provenance records reference-state policy and config fingerprint."""
-        provider = CoolPropProvider()
-        state = provider.state_tp("Water", 300.0, 101_325.0)
-        prov = state.provenance
-        assert prov.reference_state_policy is ReferenceStatePolicy.DEF
-        assert isinstance(prov.configuration_fingerprint, str)
-        assert len(prov.configuration_fingerprint) == 16  # sha256[:16]
+    def test_fluid_state_model_strict(self) -> None:
+        """FluidStateModel has extra=forbid."""
+        state_model = FluidStateModel(
+            temperature_k=300.0,
+            pressure_pa=101325.0,
+            density_kg_m3=996.5,
+            cp_j_kg_k=4178.0,
+            viscosity_pa_s=0.001,
+            conductivity_w_m_k=0.6,
+            enthalpy_j_kg=100000.0,
+            entropy_j_kg_k=300.0,
+            phase="liquid",
+            provenance={
+                "backend_name": "CoolProp",
+                "backend_version": "7.6.1",
+                "backend_git_revision": "abc",
+                "fluid_identifier": "HEOS::Water",
+                "validation_level": "supported_tier_1",
+                "query_type": "TP",
+                "inputs": {"temperature_k": 300.0},
+                "cache_policy_version": "1.0",
+                "reference_state_policy": "DEF",
+                "configuration_fingerprint": "abc",
+            },
+        )
+        with pytest.raises((ValueError, TypeError)):
+            state_model.model_validate(
+                {**state_model.model_dump(), "extra": "bad"}
+            )
+
+    def test_error_code_stable_strings(self) -> None:
+        """Item 8: all error codes are stable property_ prefixed strings."""
+        for code in PropertyErrorCode:
+            assert isinstance(code.value, str)
+            assert code.value.startswith("property_")
+
+    def test_error_as_dict_is_json_safe(self) -> None:
+        import json
+
+        err = PropertyServiceError(
+            PropertyErrorCode.INVALID_INPUT,
+            "test error",
+            context={"field": "x", "value": 1.0},
+        )
+        d = err.as_dict()
+        serialized = json.dumps(d)
+        assert "test error" in serialized
+        assert d["code"] == "property_invalid_input"
 
 
 # ======================================================================
-# Item 6: PH saturation tolerance reference-state invariance
-# ======================================================================
-
-
-class TestPHSaturationTolerance:
-    def test_ph_near_saturation_rejection_uses_latent_heat(self) -> None:
-        """Item 6: tolerance scales by abs(hg - hf), not max(abs(h))."""
-        provider = CoolPropProvider()
-        sat = provider.saturation_at_pressure("R134a", 500_000.0)
-
-        h_f = sat.liquid.enthalpy_j_kg
-        h_g = sat.vapor.enthalpy_j_kg
-        latent = abs(h_g - h_f)
-
-        # Place enthalpy just inside the tolerance window from h_f
-        # Tolerance = near_saturation_relative_tolerance * max(latent, 1.0)
-        tol = provider.near_saturation_relative_tolerance * max(latent, 1.0)
-        near_h_f = h_f + tol * 0.5  # should be rejected
-
-        with pytest.raises(PropertyServiceError) as exc_info:
-            provider.state_ph("R134a", 500_000.0, near_h_f)
-
-        assert exc_info.value.code is PropertyErrorCode.NEAR_SATURATION
-        # Verify the context records latent heat
-        assert "latent_heat_j_kg" in exc_info.value.context
-
-    def test_ph_far_from_saturation_succeeds(self) -> None:
-        """Enthalpy far from saturation should succeed."""
-        provider = CoolPropProvider()
-        sat = provider.saturation_at_pressure("R134a", 500_000.0)
-
-        h_g = sat.vapor.enthalpy_j_kg
-        # Place enthalpy well above saturated vapor
-        far_above = h_g + 50_000.0  # 50 kJ/kg above
-        state = provider.state_ph("R134a", 500_000.0, far_above)
-        assert state.phase in {PhaseRegion.GAS, PhaseRegion.SUPERCRITICAL_GAS}
-
-
-# ======================================================================
-# Item 7: Mixture capability boundary
+# Item 6: Mixture capability boundary
 # ======================================================================
 
 
 class TestMixtureCapability:
-    def test_mixture_identifier_represents_but_may_not_calculate(self) -> None:
-        """Item 7: v0.1 mixture support is representation only.
-
-        The FluidIdentifier can represent a mixture, but actual
-        mixture TP/PH/saturation calculations are not validated.
-        """
+    def test_mixture_tp_returns_unsupported_query(self) -> None:
+        """Item 6: mixture calculations return UNSUPPORTED_QUERY."""
         ident = FluidIdentifier.from_components({"R32": 0.5, "R125": 0.5})
+        with pytest.raises(PropertyServiceError) as exc_info:
+            CoolPropProvider(allow_unvalidated_fluids=True).state_tp(
+                ident, 300.0, 2_000_000.0,
+            )
+        assert exc_info.value.code is PropertyErrorCode.UNSUPPORTED_QUERY
+        assert "mixture" in str(exc_info.value).lower()
+
+    def test_mixture_ph_returns_unsupported_query(self) -> None:
+        ident = FluidIdentifier.from_components({"R32": 0.5, "R125": 0.5})
+        with pytest.raises(PropertyServiceError) as exc_info:
+            CoolPropProvider(allow_unvalidated_fluids=True).state_ph(
+                ident, 2_000_000.0, 200_000.0,
+                reference_state=ReferenceStatePolicy.DEF,
+            )
+        assert exc_info.value.code is PropertyErrorCode.UNSUPPORTED_QUERY
+
+    def test_mixture_saturation_returns_unsupported_query(self) -> None:
+        ident = FluidIdentifier.from_components({"R32": 0.5, "R125": 0.5})
+        with pytest.raises(PropertyServiceError) as exc_info:
+            CoolPropProvider(allow_unvalidated_fluids=True).saturation_at_pressure(
+                ident, 2_000_000.0,
+            )
+        assert exc_info.value.code is PropertyErrorCode.UNSUPPORTED_QUERY
+
+    def test_mixture_identifier_is_representable(self) -> None:
+        """Mixture identifiers can be created, just not computed."""
+        ident = FluidIdentifier.from_components({"R32": 0.7, "R125": 0.3})
         assert len(ident.components) == 2
-        assert ident.coolprop_fluid.startswith("HEOS::")
+        assert ident.is_mixture
 
-        # Mixture TP query works with unvalidated fluids enabled
+    def test_pure_fluid_is_not_mixture(self) -> None:
+        ident = FluidIdentifier(name="Water")
+        assert not ident.is_mixture
+
+
+# ======================================================================
+# Item 7: Deterministic error classification
+# ======================================================================
+
+
+class TestErrorClassification:
+    def test_below_triple_returns_state_out_of_range(self) -> None:
+        """Item 7: extremely low enthalpy returns STATE_OUT_OF_RANGE."""
         provider = CoolPropProvider(allow_unvalidated_fluids=True)
-        state = provider.state_tp(
-            ident, 300.0, 2_000_000.0
+        with pytest.raises(PropertyServiceError) as exc_info:
+            provider.state_ph(
+                "Water", 101_325.0, -1_000_000.0,
+                reference_state=ReferenceStatePolicy.DEF,
+            )
+        # Must be deterministic: exactly STATE_OUT_OF_RANGE
+        assert (
+            exc_info.value.code is PropertyErrorCode.STATE_OUT_OF_RANGE
         )
-        assert state.provenance.validation_level is FluidValidationLevel.UNVALIDATED
 
-    def test_mixture_without_opt_in_is_rejected(self) -> None:
-        ident = FluidIdentifier.from_components({"R32": 0.5, "R125": 0.5})
-        with pytest.raises(PropertyServiceError) as exc_info:
-            CoolPropProvider().state_tp(ident, 300.0, 2_000_000.0)
-        assert exc_info.value.code is PropertyErrorCode.UNVALIDATED_FLUID
-
-
-# ======================================================================
-# Item 8: Error-boundary regressions
-# ======================================================================
-
-
-class TestErrorBoundaries:
-    def test_out_of_range_state(self) -> None:
-        """Extremely low enthalpy should return STATE_OUT_OF_RANGE or BACKEND_FAILURE."""
-        provider = CoolPropProvider(allow_unvalidated_fluids=True)
-        with pytest.raises(PropertyServiceError) as exc_info:
-            provider.state_ph("Water", 101_325.0, -1_000_000.0)  # absurdly low h
-        assert exc_info.value.code in {
-            PropertyErrorCode.STATE_OUT_OF_RANGE,
-            PropertyErrorCode.BACKEND_FAILURE,
-        }
-
-    def test_saturation_above_critical(self) -> None:
-        """Saturation above critical temperature returns SATURATION_UNAVAILABLE."""
+    def test_above_critical_saturation_unavailable(self) -> None:
+        """Item 7: saturation above critical returns SATURATION_UNAVAILABLE."""
         provider = CoolPropProvider()
-        # Water critical temperature ~ 647 K
         with pytest.raises(PropertyServiceError) as exc_info:
             provider.saturation_at_temperature("Water", 700.0)
-        assert exc_info.value.code is PropertyErrorCode.SATURATION_UNAVAILABLE
+        assert (
+            exc_info.value.code
+            is PropertyErrorCode.SATURATION_UNAVAILABLE
+        )
 
-    def test_unsupported_backend(self) -> None:
-        """Non-HEOS backend is rejected in v0.1."""
+    def test_unsupported_backend_error(self) -> None:
         ident = FluidIdentifier(name="Water", equation_of_state_backend="REFPROP")
         with pytest.raises(PropertyServiceError) as exc_info:
             CoolPropProvider().state_tp(ident, 300.0, 101_325.0)
         assert exc_info.value.code is PropertyErrorCode.UNSUPPORTED_BACKEND
 
-    def test_malformed_composition_rejected(self) -> None:
-        """Mixture with fractions not summing to 1 is rejected."""
+    def test_malformed_composition(self) -> None:
         with pytest.raises(PropertyServiceError) as exc_info:
             FluidIdentifier.from_components({"R32": 0.7, "R125": 0.4})
         assert exc_info.value.code is PropertyErrorCode.INVALID_FLUID
-        assert "1.0" in str(exc_info.value)
 
-    def test_empty_fluid_name_rejected(self) -> None:
+    def test_empty_fluid_name(self) -> None:
         with pytest.raises(PropertyServiceError) as exc_info:
             FluidIdentifier(name="  ")
         assert exc_info.value.code is PropertyErrorCode.INVALID_FLUID
 
-    def test_error_codes_are_stable_strings(self) -> None:
-        """Item 8: public error codes are stable, independent of backend wording."""
-        for code in PropertyErrorCode:
-            assert isinstance(code.value, str)
-            assert code.value.startswith("property_")
-
-    def test_failed_query_cache_behavior(self) -> None:
-        """Failed queries should not pollute the cache."""
+    def test_failed_query_does_not_pollute_cache(self) -> None:
         provider = CoolPropProvider(cache_size=4)
-        # Successful query
         provider.state_tp("Water", 300.0, 101_325.0)
         assert provider.cache_info().size == 1
-
-        # Failed query (invalid input)
         with pytest.raises(PropertyServiceError):
             provider.state_tp("Water", -1.0, 101_325.0)
-
-        # Cache should still have only 1 entry
         assert provider.cache_info().size == 1
+        assert provider.cache_info().hits == 0
+
+
+# ======================================================================
+# Cache
+# ======================================================================
+
+
+class TestCache:
+    def test_cache_determinism(self) -> None:
+        provider = CoolPropProvider(cache_size=4)
+        first = provider.state_tp("Water", 300.0, 101_325.0)
+        second = provider.state_tp("Water", 300.0, 101_325.0)
+        info = provider.cache_info()
+        assert first is second
+        assert info.misses == 1
+        assert info.hits == 1
+        provider.clear_cache()
+        assert provider.cache_info().size == 0

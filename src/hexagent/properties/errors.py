@@ -15,6 +15,7 @@ class PropertyErrorCode(StrEnum):
     UNSUPPORTED_QUERY = "property_unsupported_query"
     BACKEND_FAILURE = "property_backend_failure"
     NON_FINITE_RESULT = "property_non_finite_result"
+    CONFIGURATION_CHANGED = "property_configuration_changed"
 
 
 class PropertyServiceError(ValueError):

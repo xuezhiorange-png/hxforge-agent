@@ -42,6 +42,7 @@ Provide a deterministic, injectable fluid-property service with CoolProp as the 
 - [x] Deterministic cache keys and cache inspection are implemented.
 - [x] Tests require no network access.
 - [x] Round-1 review: 8 items addressed (reference state, validation matrix, PH ref-state, backend naming, serialization, PH tolerance, mixture boundary, error regressions).
+- [x] Round-2 review: 8 items addressed (runtime config guard, validation level correction, mandatory PH ref-state, FluidSpec adapter, strict serialization, mixture NOT_IMPLEMENTED, deterministic errors, documentation).
 - [ ] GitHub CI passes on Python 3.11 and 3.12.
 - [ ] Engineering review is complete.
 

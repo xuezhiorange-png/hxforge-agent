@@ -1,94 +1,87 @@
-# HXForge Property Backends
+# HXForge Property Backend Policy
 
-## v0.1 policy
+## v0.1 Reference-State Policy
 
-HXForge uses an injectable `PropertyProvider` contract. CoolProp with the HEOS backend is the approved default for v0.1. Property calculations are deterministic engineering-core operations; an LLM must never invent or interpolate property values.
+**Policy:** `DEF` (CoolProp default — IIR for refrigerants, NIST-JANAF for others)
 
-## Approved Tier-1 fluids
+The reference-state policy is fixed at provider construction time. The
+provider recomputes a per-fluid enthalpy-based configuration fingerprint
+before every query. If the fingerprint changes (e.g. external code calls
+`set_reference_state()`), the provider:
 
-TASK-003 validates these single-phase fluids:
+1. clears the cache;
+2. raises `property_configuration_changed`.
 
-- Water;
-- Air;
-- R134a;
-- R717 (alias: Ammonia).
+## Validation Tiers (DEC-016)
 
-Other CoolProp fluids and custom mixtures are rejected by default. They require an explicit `allow_unvalidated_fluids=True` opt-in and their results carry `UNVALIDATED` provenance.
+| Level | Meaning | v0.1 status |
+|---|---|---|
+| `BENCHMARK_VALIDATED` | Validated against independently sourced reference data | Not available — all current fixtures are same-backend regressions |
+| `SUPPORTED_TIER_1` | Approved name allowlist; same-backend regression tests pass | **Active** for Water, Air, R134a, R717 |
+| `UNVALIDATED` | Not in the approved set | Requires `allow_unvalidated_fluids=True` |
 
-## Supported queries
+### Validation Matrix
 
-### TP
+Backend regression fixtures are recorded in `VALIDATION_MATRIX` with:
 
-Inputs are absolute temperature in kelvin and absolute pressure in pascal. The provider returns temperature, pressure, density, constant-pressure heat capacity, dynamic viscosity, thermal conductivity, specific enthalpy, specific entropy and phase classification.
+- `dataset_id` — unique identifier (e.g. `HXFORGE-V01-WATER-TP-REGRESSION-001`)
+- `validation_basis` — always `backend_regression` in v0.1
+- `source` — identifies the CoolProp version and backend
+- `revision` — dataset version date
 
-### PH
+These fixtures are NOT independent benchmarks. They verify that the
+same CoolProp HEOS backend produces consistent results across runs.
 
-Inputs are absolute pressure in pascal and specific enthalpy in joule per kilogram. States inside the saturated-liquid/saturated-vapor enthalpy interval are rejected as two-phase.
+## Mixture Capability (v0.1)
 
-### Saturation at pressure
+**Policy:** Mixture identifiers are representable, but all mixture
+property calculations return `property_unsupported_query`.
 
-The provider returns separate saturated-liquid (`Q=0`) and saturated-vapor (`Q=1`) states. This supports pure and pseudo-pure fluids; mixtures may have different bubble and dew temperatures.
+- `FluidIdentifier` can represent mixtures with mole-fraction composition.
+- TP, PH, saturation-at-pressure, and saturation-at-temperature queries
+  on mixture identifiers are rejected with `UNSUPPORTED_QUERY`.
+- The `allow_unvalidated_fluids` flag does NOT enable mixture calculations.
+- Actual mixture support requires validated mixing rules and is planned
+  for a future milestone.
 
-### Saturation at temperature
+## PH Reference-State Semantics
 
-The provider returns separate saturated-liquid and saturated-vapor states. Mixtures may have different bubble and dew pressures.
+PH queries require an explicit `reference_state` argument matching the
+provider's `reference_state_policy` (currently `DEF`). Mismatched or
+omitted reference states are rejected with `property_invalid_input`.
 
-## Phase and saturation safety
+The `PropertyProvider` protocol declares `reference_state` as a mandatory
+keyword-only argument on `state_ph()`.
 
-CoolProp may report ambiguity or errors very close to saturation. HXForge therefore performs an explicit saturation-distance check before a TP query. The default relative tolerance is `1e-6` and is part of the cache key.
+## Provider vs. EOS Backend Identity
 
-The provider never silently converts a two-phase or ambiguous state into a single-phase result:
+| Concept | Field | v0.1 value | Example |
+|---|---|---|---|
+| Property provider | `FluidSpec.backend` / `provider_id` | `CoolProp` | `CoolProp` |
+| Equation-of-state backend | `FluidIdentifier.equation_of_state_backend` | `HEOS` | `HEOS` |
 
-- TP states close to saturation return `property_near_saturation`;
-- PH states near a saturation endpoint return `property_near_saturation`;
-- PH states inside the two-phase enthalpy interval return `property_two_phase_state`;
-- unavailable saturation states return `property_saturation_unavailable`.
+The `FluidIdentifier.from_fluid_spec()` adapter:
 
-## Structured errors
+- Accepts `provider_id` (must be `CoolProp`)
+- Accepts `equation_of_state_backend` (default `HEOS`)
+- Rejects unsupported provider/EOS combinations
+- Documents composition basis (v0.1: `mole_fraction` only)
 
-The public error codes are:
+## Error Codes
 
-- `property_invalid_fluid`;
-- `property_unvalidated_fluid`;
-- `property_invalid_input`;
-- `property_state_out_of_range`;
-- `property_near_saturation`;
-- `property_two_phase_state`;
-- `property_saturation_unavailable`;
-- `property_unsupported_backend`;
-- `property_unsupported_query`;
-- `property_backend_failure`;
-- `property_non_finite_result`.
+| Code | Meaning |
+|---|---|
+| `property_configuration_changed` | CoolProp global state changed since provider construction |
+| `property_state_out_of_range` | State is outside the valid fluid domain |
+| `property_saturation_unavailable` | Saturation properties unavailable (e.g. above critical) |
+| `property_unsupported_query` | Query type not implemented (e.g. mixture calculations) |
+| `property_unsupported_backend` | Non-HEOS backend in v0.1 |
 
-Errors include context such as fluid identity, query type, inputs and the original backend message.
+## Serialization
 
-## Provenance
+Property results serialize to strict versioned JSON:
 
-Every result records:
-
-- backend name;
-- CoolProp version;
-- CoolProp git revision;
-- canonical fluid identifier;
-- Tier-1 or unvalidated status;
-- query type;
-- exact SI inputs;
-- cache-policy version.
-
-## Cache design
-
-The cache is provider-instance scoped and bounded. Its key contains:
-
-- backend name, version and git revision;
-- canonical fluid identifier and composition;
-- query type;
-- exact input values;
-- near-saturation tolerance;
-- unvalidated-fluid policy;
-- cache-policy version.
-
-No ambient pressure, reference state, locale or hidden global engineering default is used in the key. Cache statistics and explicit clearing are available through the provider API.
-
-## Scope boundary
-
-This service does not implement heat balances, heat-transfer correlations, pressure-drop correlations, exchanger geometry, materials, costing or mechanical-code checks. PH and saturation support does not imply that downstream two-phase exchanger solvers are implemented.
+- `FluidStateModel` and `SaturationStateModel` use `extra="forbid"`
+- `result_schema_version` is constrained to `Literal["1.0"]`
+- `PropertyProvenanceModel` includes all provenance fields
+- `FluidState.from_json()` returns a domain `FluidState`, not a model
