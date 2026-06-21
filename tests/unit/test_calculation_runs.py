@@ -43,6 +43,7 @@ def _pending_run(**overrides) -> CalculationRun:
         status=CalculationRunStatus.PENDING,
         started_at=FIXED_NOW,
         input_hash=ZERO_HASH,
+        git_commit="abcdef0",
     )
     defaults.update(overrides)
     return CalculationRun(**defaults)
@@ -57,6 +58,7 @@ def _running_run(**overrides) -> CalculationRun:
         status=CalculationRunStatus.RUNNING,
         started_at=FIXED_NOW,
         input_hash=ZERO_HASH,
+        git_commit="abcdef0",
     )
     defaults.update(overrides)
     return CalculationRun(**defaults)
@@ -284,6 +286,7 @@ class TestCalculationRunValidation:
                 run_type=CalculationRunType.SCREEN,
                 status=CalculationRunStatus.PENDING,
                 started_at=FIXED_NOW,
+                git_commit="abcdef0",
                 input_hash=ZERO_HASH,
                 bogus_field="should fail",
             )

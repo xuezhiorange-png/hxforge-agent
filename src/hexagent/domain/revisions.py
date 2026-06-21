@@ -329,7 +329,7 @@ class CalculationRun(BaseModel):
     started_at: datetime
     completed_at: datetime | None = None
     software_version: str = Field(default="0.1.0")
-    git_commit: str = Field(default="no-git")
+    git_commit: str
     input_hash: str
     result_hash: str | None = None
     property_backend: dict[str, Any] | None = None

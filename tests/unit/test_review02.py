@@ -255,6 +255,7 @@ def _make_calculation_run(
     failure: RunFailure | None = None,
     blockers: tuple[EngineeringMessage, ...] = (),
     provenance_graph: ProvenanceGraph | None = None,
+    git_commit: str = "abcdef0",
 ) -> CalculationRun:
     return CalculationRun(
         run_id=run_id or FIXED_IDS[10],
@@ -269,6 +270,7 @@ def _make_calculation_run(
         failure=failure,
         blockers=blockers,
         provenance_graph=provenance_graph or _minimal_valid_provenance_graph(),
+        git_commit=git_commit,
     )
 
 
@@ -605,6 +607,7 @@ class TestCalculationRunInputIdentity:
                 run_type=CalculationRunType.SCREEN,
                 status=CalculationRunStatus.PENDING,
                 started_at=FIXED_NOW,
+                git_commit="abcdef0",
                 provenance_graph=_minimal_valid_provenance_graph(),
                 # input_hash is missing
             )
@@ -619,6 +622,7 @@ class TestCalculationRunInputIdentity:
                 run_type=CalculationRunType.SCREEN,
                 status=CalculationRunStatus.PENDING,
                 started_at=FIXED_NOW,
+                git_commit="abcdef0",
                 input_hash="md5:" + "a" * 32,  # wrong format
                 provenance_graph=_minimal_valid_provenance_graph(),
             )

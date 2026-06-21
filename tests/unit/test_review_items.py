@@ -390,6 +390,7 @@ class TestItem2DeepImmutability:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            git_commit="abcdef0",
             input_hash=rev.content_hash,
             provenance_graph=_make_valid_provenance_graph(),
         )
@@ -458,6 +459,7 @@ class TestItem2DeepImmutability:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            git_commit="abcdef0",
             input_hash=rev.content_hash,
             provenance_graph=_make_valid_provenance_graph(),
         )
@@ -858,6 +860,7 @@ class TestItem6CalculationRunInvariants:
             status=CalculationRunStatus.PENDING,
             started_at=FIXED_NOW,
             input_hash=VALID_RESULT_HASH,
+            git_commit="abcdef0",
         )
         defaults.update(overrides)
         return defaults
@@ -1025,6 +1028,7 @@ class TestItem7RunIdentityFieldProtection:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            git_commit="abcdef0",
             input_hash=rev.content_hash,
             provenance_graph=_make_valid_provenance_graph(),
         )
@@ -1220,6 +1224,7 @@ class TestItem8ProvenanceGraph:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            git_commit="abcdef0",
             input_hash=rev.content_hash,
             provenance_graph=valid_graph,
         )
@@ -1544,6 +1549,7 @@ class TestItem10AdditionalChecks:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            git_commit="abcdef0",
             input_hash=rev.content_hash,
             provenance_graph=_make_valid_provenance_graph(),
         )

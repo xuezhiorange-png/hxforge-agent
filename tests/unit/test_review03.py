@@ -250,6 +250,7 @@ def _make_calculation_run(
     failure: RunFailure | None = None,
     blockers: tuple[EngineeringMessage, ...] = (),
     provenance_graph: ProvenanceGraph | None = None,
+    git_commit: str = "abcdef0",
 ) -> CalculationRun:
     return CalculationRun(
         run_id=run_id or FIXED_IDS[10],
@@ -264,6 +265,7 @@ def _make_calculation_run(
         failure=failure,
         blockers=blockers,
         provenance_graph=provenance_graph or _minimal_valid_provenance_graph(),
+        git_commit=git_commit,
     )
 
 
@@ -953,6 +955,21 @@ class TestProvenancePersistenceContract:
 
 class TestGitCommitValidation:
     """CalculationRun.git_commit validates: 7-40 hex or exactly 'no-git'."""
+
+    def test_missing_git_commit_rejected(self) -> None:
+        """Omitting git_commit → ValidationError (field is required)."""
+        with pytest.raises(ValidationError, match="git_commit"):
+            CalculationRun(
+                run_id=FIXED_IDS[35],
+                case_id=FIXED_IDS[0],
+                case_revision_id=FIXED_IDS[1],
+                run_type=CalculationRunType.SCREEN,
+                status=CalculationRunStatus.PENDING,
+                started_at=FIXED_NOW,
+                input_hash=VALID_HASH,
+                provenance_graph=_minimal_valid_provenance_graph(),
+                # git_commit is missing
+            )
 
     def _base_run_kwargs(self, git_commit: str) -> dict:
         """Return minimal CalculationRun kwargs with the given git_commit."""

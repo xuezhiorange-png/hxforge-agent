@@ -616,6 +616,7 @@ class TestFullRunWorkflow:
                 status=CalculationRunStatus.SUCCEEDED,
                 started_at=run.started_at,
                 completed_at=datetime(2026, 1, 1, 0, 0, 20, tzinfo=UTC),
+                git_commit="abcdef0",
                 input_hash=run.input_hash,
             )
 
