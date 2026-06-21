@@ -1,37 +1,79 @@
 # TASK-002 — Unit-safe quantity model
 
-**Status:** READY  
+**Status:** IN_PROGRESS  
 **Milestone:** M1  
 **Priority:** P0  
-**Depends on:** TASK-001
+**Depends on:** TASK-001  
+**GitHub Issue:** #4  
+**Branch:** `codex/task-002-units-and-quantities`
 
 ## Objective
 
-Implement strict quantity parsing and SI normalization, including correct treatment of absolute temperatures and temperature differences.
+Implement strict public quantity parsing and SI normalization under approved DEC-005, including correct treatment of absolute temperatures, temperature differences, absolute pressure and pressure difference.
 
 ## In scope
 
 - Pydantic quantity schema and Pint adapter.
-- Allowed units by physical dimension.
+- Explicit unit allowlists by physical quantity kind.
 - SI normalization and display-unit conversion.
 - Absolute temperature versus delta-temperature semantics.
-- Serialization, validation errors and round-trip behavior.
+- Absolute pressure versus pressure-difference semantics.
+- Structured conversion and validation errors.
+- Serialization, canonicalization and round-trip behavior.
+- Migration of current public domain fields to typed quantities.
+- Parameterized and property-based tests.
+- `docs/UNITS.md`.
+
+## Implemented quantity kinds
+
+- mass flow;
+- volume flow;
+- absolute temperature;
+- temperature difference;
+- absolute pressure;
+- pressure difference;
+- power/duty;
+- area;
+- length;
+- velocity;
+- fouling resistance;
+- specific enthalpy;
+- dimensionless values.
 
 ## Expected files
 
 - `src/hexagent/core/units.py`
 - `src/hexagent/domain/quantities.py`
+- `src/hexagent/domain/models.py`
 - `tests/unit/test_units.py`
 - `docs/UNITS.md`
 
 ## Acceptance criteria
 
-- [ ] Invalid dimensions are rejected with structured errors.
-- [ ] Celsius/Fahrenheit absolute temperatures convert correctly.
-- [ ] Temperature differences do not receive absolute-temperature offsets.
-- [ ] Mass flow, pressure, duty, area and fouling resistance are covered.
-- [ ] Public calculation functions do not accept undocumented unitless values.
+- [x] Invalid dimensions are rejected with structured errors.
+- [x] Celsius/Fahrenheit absolute temperatures convert correctly.
+- [x] Temperature differences do not receive absolute-temperature offsets.
+- [x] Mass flow, volume flow, pressure, duty, area and fouling resistance are covered.
+- [x] Absolute pressure and pressure difference use separate public types.
+- [x] Generic unchecked `Quantity` construction is rejected.
+- [x] Current public domain fields use typed quantities.
+- [x] SI/display conversions support deterministic serialization and round trips.
+- [x] Local Ruff, mypy and pytest gates pass.
+- [ ] GitHub CI, including pip-audit, passes.
+- [ ] Engineering review is complete.
 
-## Test plan
+## Validation completed locally
 
-Use parameterized and property-based tests for conversions, round trips, offset temperatures, extreme values and dimension mismatches.
+- Ruff: passed.
+- mypy strict mode: passed.
+- pytest: 86 passed.
+- Unit-module coverage: above 90%.
+- pip-audit: deferred to GitHub CI because the local runtime could not resolve pypi.org.
+
+## Out of scope
+
+- fluid property calculations;
+- heat-balance or specification-closure solvers;
+- exchanger heat-transfer or pressure-drop correlations;
+- material, cost or standards-provider logic;
+- two-phase calculation implementation.
