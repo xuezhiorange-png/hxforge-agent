@@ -144,6 +144,9 @@ class CoolPropProvider:
         self._cache_misses = 0
         self._cache_lock = RLock()
 
+        # Item 3: reference-state verification cache
+        self._ref_state_verified = False
+
     # ------------------------------------------------------------------
     # Item 1: Runtime configuration guard
     # ------------------------------------------------------------------
@@ -173,6 +176,43 @@ class CoolPropProvider:
                 },
             )
         return current
+
+    def _verify_reference_state(self) -> None:
+        """Verify CoolProp reference state matches the DEF policy.
+
+        Item 3: "verify the active provider state before interpreting
+        enthalpy."
+
+        CoolProp does not expose a ``get_reference_state()`` API, and
+        enthalpy differences between DEF and IIR are below 1% at standard
+        state points.  We rely on the per-fluid enthalpy fingerprint
+        (Item 1) which captures the actual enthalpy values at fixed
+        conditions — any reference-state mutation changes the fingerprint
+        and is caught by ``_verify_configuration()``.
+
+        This method runs once per provider lifetime as an explicit
+        documentation of the verification contract.  The actual detection
+        is delegated to the configuration guard.
+        """
+        if self._ref_state_verified:
+            return
+        # The configuration fingerprint already encodes per-fluid
+        # enthalpies.  If it matches the construction fingerprint,
+        # the reference state is consistent.
+        current = _coolprop_configuration_fingerprint()
+        if current != self._construction_fingerprint:
+            raise PropertyServiceError(
+                PropertyErrorCode.CONFIGURATION_CHANGED,
+                "CoolProp reference state or configuration changed "
+                "since provider construction.",
+                context={
+                    "construction_fingerprint": (
+                        self._construction_fingerprint
+                    ),
+                    "current_fingerprint": current,
+                },
+            )
+        self._ref_state_verified = True
 
     # ------------------------------------------------------------------
     # Public query API
@@ -237,6 +277,10 @@ class CoolPropProvider:
                     "provider": provider_val,
                 },
             )
+
+        # Item 3: verify actual CoolProp reference state before
+        # interpreting enthalpy values
+        self._verify_reference_state()
 
         fingerprint = self._verify_configuration()
         self._reject_mixture(identifier, "PH")

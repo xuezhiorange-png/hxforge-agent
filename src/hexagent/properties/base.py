@@ -154,13 +154,13 @@ class FluidIdentifier:
             components=tuple(sorted(components.items())),
         )
 
-    # Item 4: FluidSpec adapter — accepts provider_id + explicit EOS backend
+    # Item 4: FluidSpec adapter — accepts FluidSpec object or provider_id
 
     @classmethod
     def from_fluid_spec(
         cls,
-        provider_id: str,
-        name: str,
+        spec_or_provider: Any,
+        name: str = "",
         *,
         equation_of_state_backend: str = "HEOS",
         composition: dict[str, float] | None = None,
@@ -168,13 +168,46 @@ class FluidIdentifier:
     ) -> FluidIdentifier:
         """Create a :class:`FluidIdentifier` from a public FluidSpec.
 
-        ``provider_id`` is the property provider name (e.g. ``CoolProp``).
-        ``equation_of_state_backend`` is the CoolProp EOS backend
-        (e.g. ``HEOS``).  ``composition_basis`` documents the basis for
-        mixture fractions (v0.1 only supports ``mole_fraction``).
+        Accepts either:
+        - an actual ``FluidSpec`` object (preferred), or
+        - ``provider_id`` as a string (e.g. ``"CoolProp"``).
 
-        Rejects unsupported provider/EOS combinations.
+        ``equation_of_state_backend`` defaults to ``HEOS``.
+        ``composition_basis`` is validated (v0.1: ``mole_fraction`` only).
         """
+        # Accept actual FluidSpec object
+        if hasattr(spec_or_provider, "backend") and hasattr(
+            spec_or_provider, "name"
+        ):
+            provider_id = spec_or_provider.backend
+            fluid_name = spec_or_provider.name
+            comp = getattr(spec_or_provider, "composition", None)
+            return cls._from_provider_and_name(
+                provider_id,
+                fluid_name,
+                equation_of_state_backend=equation_of_state_backend,
+                composition=comp,
+                composition_basis=composition_basis,
+            )
+        # String provider_id path
+        return cls._from_provider_and_name(
+            str(spec_or_provider),
+            name,
+            equation_of_state_backend=equation_of_state_backend,
+            composition=composition,
+            composition_basis=composition_basis,
+        )
+
+    @classmethod
+    def _from_provider_and_name(
+        cls,
+        provider_id: str,
+        name: str,
+        *,
+        equation_of_state_backend: str,
+        composition: dict[str, float] | None,
+        composition_basis: str,
+    ) -> FluidIdentifier:
         if provider_id != "CoolProp":
             raise PropertyServiceError(
                 PropertyErrorCode.UNSUPPORTED_BACKEND,
@@ -184,7 +217,8 @@ class FluidIdentifier:
         if composition_basis != "mole_fraction":
             raise PropertyServiceError(
                 PropertyErrorCode.INVALID_FLUID,
-                f"Composition basis {composition_basis!r} is not supported in v0.1.",
+                f"Composition basis {composition_basis!r} "
+                "is not supported in v0.1.",
                 context={"composition_basis": composition_basis},
             )
         if composition:
@@ -193,7 +227,10 @@ class FluidIdentifier:
                 equation_of_state_backend=equation_of_state_backend,
                 name=name,
             )
-        return cls(name=name, equation_of_state_backend=equation_of_state_backend)
+        return cls(
+            name=name,
+            equation_of_state_backend=equation_of_state_backend,
+        )
 
     # Properties
 
@@ -370,14 +407,14 @@ class PropertyProvenanceModel(BaseModel):
     backend_version: str
     backend_git_revision: str
     fluid_identifier: str
-    validation_level: str
+    validation_level: FluidValidationLevel
     validation_dataset_id: str | None = None
     validation_dataset_revision: str | None = None
     validation_basis: str | None = None
-    query_type: str
+    query_type: PropertyQueryType
     inputs: dict[str, float]
     cache_policy_version: str
-    reference_state_policy: str
+    reference_state_policy: ReferenceStatePolicy
     configuration_fingerprint: str
     result_schema_version: str = Field(default="1.0", pattern=r"^1\.0$")
 
@@ -405,14 +442,14 @@ class PropertyProvenance:
             backend_version=self.backend_version,
             backend_git_revision=self.backend_git_revision,
             fluid_identifier=self.fluid_identifier,
-            validation_level=self.validation_level.value,
+            validation_level=self.validation_level,
             validation_dataset_id=self.validation_dataset_id,
             validation_dataset_revision=self.validation_dataset_revision,
             validation_basis=self.validation_basis,
-            query_type=self.query_type.value,
+            query_type=self.query_type,
             inputs=dict(self.inputs),
             cache_policy_version=self.cache_policy_version,
-            reference_state_policy=self.reference_state_policy.value,
+            reference_state_policy=self.reference_state_policy,
             configuration_fingerprint=self.configuration_fingerprint,
             result_schema_version=self.result_schema_version,
         )
