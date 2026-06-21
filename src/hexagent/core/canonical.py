@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import math
@@ -43,12 +44,18 @@ def _preprocess(obj: Any) -> Any:
         utc = obj.astimezone(UTC)
         return utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-    # Quantity-like → {value, unit, kind}
+    # Quantity-like → canonical dict using SI value + kind for
+    # content-identity; display unit is metadata, not part of the hash.
     if hasattr(obj, "value") and hasattr(obj, "unit") and hasattr(obj, "kind"):
         kind = obj.kind
+        # Compute SI value so that e.g. 100 °C and 373.15 K produce the
+        # same content hash when the kind is ABSOLUTE_TEMPERATURE.
+        si_val = obj.value
+        if kind is not None and hasattr(obj, "to_si"):
+            with contextlib.suppress(Exception):
+                si_val = obj.to_si().value
         return {
-            "value": obj.value,
-            "unit": obj.unit,
+            "si_value": si_val,
             "kind": kind.value if kind is not None else None,
         }
 
@@ -56,10 +63,14 @@ def _preprocess(obj: Any) -> Any:
     if hasattr(obj, "model_dump"):
         return {k: _preprocess(v) for k, v in obj.model_dump().items()}
 
-    # tuple / frozenset → sorted list
-    if isinstance(obj, (tuple, frozenset)):
+    # frozenset → sorted list (sets are unordered by definition)
+    if isinstance(obj, frozenset):
         items = [_preprocess(item) for item in obj]
         return sorted(items, key=lambda x: json.dumps(x, sort_keys=True))
+
+    # tuple → ordered list (tuples preserve insertion order)
+    if isinstance(obj, tuple):
+        return [_preprocess(item) for item in obj]
 
     # set → sorted list
     if isinstance(obj, set):
@@ -100,9 +111,12 @@ def _canonical_encoder(obj: Any) -> Any:
         return utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     if hasattr(obj, "value") and hasattr(obj, "unit") and hasattr(obj, "kind"):
         kind = obj.kind
+        si_val = obj.value
+        if kind is not None and hasattr(obj, "to_si"):
+            with contextlib.suppress(Exception):
+                si_val = obj.to_si().value
         return {
-            "value": obj.value,
-            "unit": obj.unit,
+            "si_value": si_val,
             "kind": kind.value if kind is not None else None,
         }
     if hasattr(obj, "model_dump"):

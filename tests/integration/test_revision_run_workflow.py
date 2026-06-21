@@ -186,8 +186,8 @@ class TestFullRevisionWorkflow:
         rev2 = rev_service.create_revision_from_parent(
             parent=rev1,
             new_case=case_v2,
+            created_by="agent-1",
             change_summary="Lowered outlet temp",
-            changed_fields=("hot_stream.outlet_temperature",),
             clock=clock,
             id_gen=id_gen,
         )
@@ -213,7 +213,8 @@ class TestFullRevisionWorkflow:
         case2 = _make_case(outlet_temp=300.0)
         rev2 = rev_service.create_revision_from_parent(
             parent=rev1, new_case=case2,
-            change_summary="v2", changed_fields=(),
+            created_by="agent-1",
+            change_summary="v2",
             clock=clock, id_gen=id_gen,
         )
         rev_repo.add(rev2)
@@ -252,8 +253,8 @@ class TestFullRevisionWorkflow:
             rev_service.create_revision_from_parent(
                 parent=rev1,
                 new_case=case2_wrong,
+                created_by="agent-1",
                 change_summary="wrong case",
-                changed_fields=(),
                 clock=clock,
                 id_gen=id_gen,
             )
@@ -381,7 +382,7 @@ class TestFullRunWorkflow:
 
         blocker = EngineeringMessage(
             code=ErrorCode.PROPERTY_UNAVAILABLE,
-            severity=EngineeringMessageSeverity.CRITICAL,
+            severity=EngineeringMessageSeverity.BLOCKER,
             message="Fluid properties not available for the given state",
         )
         clock.advance(seconds=1)
@@ -412,6 +413,7 @@ class TestFullRunWorkflow:
             id_gen=id_gen,
         )
         assert run.status == CalculationRunStatus.PENDING
+        clock.advance(seconds=1)
         run = run_service.cancel_run(run, clock)
         assert run.status == CalculationRunStatus.CANCELLED
 
@@ -479,7 +481,7 @@ class TestFullRunWorkflow:
         clock: FixedClock,
         id_gen: FixedIdGenerator,
     ) -> None:
-        """A SUCCEEDED run with the default zero-hash fails integrity."""
+        """A SUCCEEDED run cannot be created without a valid result_hash."""
         case = _make_case()
         rev = rev_service.create_initial_revision(
             case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
@@ -494,20 +496,19 @@ class TestFullRunWorkflow:
             clock=clock,
             id_gen=id_gen,
         )
-        # Manually create a bad succeeded run (in practice RunService prevents this)
+        # SUCCEEDED without result_hash is now rejected at construction time
         from hexagent.domain.revisions import CalculationRun as CR
-        bad_run = CR(
-            run_id=run.run_id,
-            case_id=run.case_id,
-            case_revision_id=run.case_revision_id,
-            run_type=run.run_type,
-            status=CalculationRunStatus.SUCCEEDED,
-            started_at=run.started_at,
-            completed_at=datetime(2026, 1, 1, 0, 0, 20, tzinfo=UTC),
-            result_hash="sha256:" + "0" * 64,  # zero hash — not a real result
-            input_hash=run.input_hash,
-        )
-        assert run_service.verify_run_integrity(bad_run) is False
+        with pytest.raises(ValidationError, match="result_hash"):
+            CR(
+                run_id=run.run_id,
+                case_id=run.case_id,
+                case_revision_id=run.case_revision_id,
+                run_type=run.run_type,
+                status=CalculationRunStatus.SUCCEEDED,
+                started_at=run.started_at,
+                completed_at=datetime(2026, 1, 1, 0, 0, 20, tzinfo=UTC),
+                input_hash=run.input_hash,
+            )
 
     def test_multiple_runs_on_same_revision(
         self,

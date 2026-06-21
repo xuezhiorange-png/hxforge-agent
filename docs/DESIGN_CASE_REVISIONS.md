@@ -6,7 +6,8 @@ hashing, structured diffs and a parent-chain audit trail.
 ## Why revisions are immutable
 
 Every engineering decision must be traceable. Once a `DesignCaseRevision` is
-created it is never modified — the dataclass is frozen (`frozen=True`).
+created it is never modified — the dataclass is frozen (`frozen=True`) and
+repositories return deep copies.
 
 | Property | Benefit |
 |---|---|
@@ -14,6 +15,7 @@ created it is never modified — the dataclass is frozen (`frozen=True`).
 | **Reproducibility** | Two engineers running the same calculation against the same `revision_id` receive identical results. |
 | **Regression detection** | A change in `content_hash` for the same design input immediately signals a tool or data change. |
 | **Concurrency safety** | No locks or optimistic-version fields are needed; a revision is a value object. |
+| **Deep immutability** | Repositories store and return deep copies. Callers cannot mutate repository state through retrieved objects. |
 
 ## Identifiers: `revision_id` vs `case_id`
 
@@ -35,13 +37,16 @@ rev-1 (revision_number=1, parent=None)
        └─ rev-3 (revision_number=3, parent=rev-2)
 ```
 
-**Invariants enforced at construction:**
+**Invariants enforced at construction and repository level:**
 
 1. `revision_number ≥ 1`.
 2. First revision (`revision_number == 1`) must have `parent_revision_id is None`.
 3. Subsequent revisions (`revision_number > 1`) must have a non-None
-   `parent_revision_id` pointing to an existing revision of the same `case_id`.
+   `parent_revision_id` pointing to an existing revision of the **same** `case_id`.
 4. `revision_number` is monotonically increasing and unique per `case_id`.
+5. No-op revisions (identical content to parent) are rejected.
+6. `created_by` is required for every revision (never copied from parent).
+7. `changed_fields` is computed internally by recursive diff, not supplied by caller.
 
 ## Canonical JSON rules
 
@@ -57,23 +62,26 @@ design case payload. The rules are:
 | **Enum** | Serialised as `.value` (the string literal). |
 | **UUID** | Serialised as the 36-character hyphenated string. |
 | **datetime** | Converted to UTC, then formatted as `%Y-%m-%dT%H:%M:%S.%fZ`. Timezone-naive datetimes are rejected. |
-| **Quantity objects** | Serialised as `{"value": <float>, "unit": <str>, "kind": <str or null>}`. The SI value is always used for hashing. |
-| **tuple / frozenset / set** | Converted to a sorted list (sorted by their canonical JSON representation). |
+| **Quantity objects** | Serialised as `{"si_value": <float>, "kind": <str or null>}`. Only the SI value and dimension kind are included — display units are excluded from content identity. |
+| **tuple** | Order is **preserved** (converted to ordered list). |
+| **frozenset / set** | Converted to a **sorted** list (sorted by canonical JSON representation). |
 | **Pydantic models** | Converted via `model_dump()` then recursively pre-processed. |
 | **Nested dicts** | Keys are sorted recursively at every level. |
 | **Nested lists** | Elements are recursively pre-processed; order is preserved. |
 
 ### Unit equivalence
 
-A quantity's hash is based on its **SI value**, not its display unit.
+A quantity's hash is based on its **SI value** and **dimension kind**, not
+its display unit. The display unit is excluded from the content hash.
 
-```
-Quantity(value=100.0, unit="°C")   →  {"value": 373.15, "unit": "K", "kind": "temperature"}
-Quantity(value=373.15, unit="K")   →  {"value": 373.15, "unit": "K", "kind": "temperature"}
+```python
+# These produce the same canonical JSON and hash:
+AbsoluteTemperature(value=100.0, unit="degC")   → {"si_value": 373.15, "kind": "absolute_temperature"}
+AbsoluteTemperature(value=373.15, unit="K")     → {"si_value": 373.15, "kind": "absolute_temperature"}
 ```
 
-Both produce the same canonical JSON and therefore the same content hash,
-regardless of the original display unit.
+This ensures that the same physical condition expressed in different units
+produces the same design content hash.
 
 ## Hash scope
 
@@ -111,70 +119,108 @@ without breaking existing consumers.
 
 ## `RevisionDiff` — field-level comparison
 
-A `RevisionDiff` records what changed between two consecutive revisions:
+A `RevisionDiff` records what changed between two revisions using recursive,
+path-level diffs with before/after values:
 
 | Field | Type | Description |
 |---|---|---|
 | `from_revision_id` | `UUID` | Source revision. |
 | `to_revision_id` | `UUID` | Target revision. |
-| `changed_fields` | `tuple[str, ...]` | Dot-separated paths of fields that differ. |
 | `content_hash_before` | `str` | Hash of the source revision's canonical payload. |
 | `content_hash_after` | `str` | Hash of the target revision's canonical payload. |
+| `field_changes` | `tuple[dict, ...]` | Sorted change records with `path`, `before`, `after`. |
 
-### Path format
+### Change record format
 
-Changed fields use dot-separated paths that match the canonical JSON
-structure:
+Each entry in `field_changes` is a dict:
 
+```python
+{"path": "hot_stream.inlet_temperature", "before": 353.15, "after": 363.15}
+{"path": "cold_stream", "before": "__MISSING__", "after": {...}}
 ```
-hot_stream.inlet_state.temperature
-cold_stream.fouling_resistance.value
-constraints.design_pressure_hot
-```
+
+- `path`: dot-separated path matching the canonical JSON structure
+- `before`: canonical value from old revision (or `"__MISSING__"` for additions)
+- `after`: canonical value from new revision (or `"__MISSING__"` for removals)
+
+### `changed_paths` property
+
+Returns a sorted tuple of just the path strings — useful for quick inspection.
 
 ### `is_identical` property
 
 Returns `True` if `content_hash_before == content_hash_after` — useful for
 detecting no-op revisions (same content, different metadata).
 
-## Repository protocol
+## CalculationRun invariants
 
-`DesignCaseRevisionRepository` defines the persistence contract:
+The `CalculationRun` Pydantic model enforces status-dependent invariants
+at construction time via `model_validator`:
+
+| Status | Required fields | Prohibited fields |
+|---|---|---|
+| `SUCCEEDED` | `result_hash` (valid `sha256:<64-hex>`) | `failure` |
+| `FAILED` | `failure` | — |
+| `BLOCKED` | `blockers` (≥ 1) | — |
+| Terminal (`SUCCEEDED/FAILED/BLOCKED/CANCELLED`) | `completed_at` > `started_at` | — |
+| Non-terminal (`PENDING/RUNNING`) | — | `completed_at` must be `None` |
+
+### `result_hash` format
+
+Must match `sha256:<64 lowercase hex>` when present. `None` for non-SUCCEEDED
+runs. No zero-sentinel placeholder.
+
+### `schema_version`
+
+Typed as `Literal["1.0"]` — only `"1.0"` is accepted.
+
+## Repository deep-copy policy
+
+All in-memory repositories store and return **deep copies**:
+
+- `add()` stores a `copy.deepcopy()` of the entity.
+- `get()` returns a `copy.deepcopy()` of the stored entity.
+- `list_by_case()` / `list_by_revision()` return tuples of deep copies.
+
+This guarantees callers cannot mutate repository state through retrieved objects.
+
+## Repository identity-field protection
+
+The `CalculationRun` repository `update()` rejects changes to immutable
+identity fields:
+
+- `case_id`, `case_revision_id`, `run_type`, `input_hash`
+- `git_commit`, `software_version`, `schema_version`
+
+Only mutable fields (`status`, `result_hash`, `failure`, `blockers`,
+`completed_at`, `warnings`, `provenance_graph`) may change during updates.
+
+## Repository protocol
 
 ```python
 class DesignCaseRevisionRepository(Protocol):
     def add(self, revision: DesignCaseRevision) -> None: ...
     def get(self, revision_id: UUID) -> DesignCaseRevision: ...
+    def latest(self, case_id: UUID) -> DesignCaseRevision | None: ...
     def list_by_case(self, case_id: UUID) -> tuple[DesignCaseRevision, ...]: ...
+
+class CalculationRunRepository(Protocol):
+    def add(self, run: CalculationRun) -> None: ...
+    def get(self, run_id: UUID) -> CalculationRun: ...
+    def update(self, run: CalculationRun) -> None: ...
+    def list_by_revision(self, revision_id: UUID) -> tuple[CalculationRun, ...]: ...
 ```
-
-The in-memory implementation (`MemoryDesignCaseRevisionRepository`) provides
-a reference implementation suitable for testing. A PostgreSQL / SQLAlchemy
-implementation is planned for the database integration phase.
-
-## Future database integration path
-
-The current in-memory repository will be replaced by a persistent store:
-
-1. **Schema**: A `design_case_revisions` table with `revision_id` (PK),
-   `case_id` (indexed), `revision_number`, `canonical_payload` (JSONB),
-   `content_hash` (indexed), and metadata columns.
-2. **Uniqueness**: A unique constraint on `(case_id, revision_number)`.
-3. **Hash index**: A B-tree index on `content_hash` for fast lookups by
-   content.
-4. **Audit**: Append-only; rows are never updated or deleted. Soft-deletion
-   is not used.
-5. **Migration**: Alembic-managed; the frozen dataclass and Pydantic schemas
-   serve as the source of truth for column types.
 
 ## Related
 
 - `src/hexagent/domain/revisions.py` — `DesignCaseRevision`, `RevisionDiff`,
   `CalculationRun`, error classes.
-- `src/hexagent/core/canonical.py` — `canonical_json`, `sha256_digest`,
-  `canonicalize_design_case`.
-- `src/hexagent/application/revision_service.py` — `RevisionService` with
-  `create_initial_revision`, `create_revision_from_parent`,
-  `verify_revision_integrity`.
+- `src/hexagent/domain/provenance.py` — `ProvenanceGraph`, `ProvenanceNode`,
+  `ProvenanceNodeType` (includes RESULT, WARNING, BLOCKER).
+- `src/hexagent/domain/messages.py` — `EngineeringMessage`, `ErrorCode` (StrEnum),
+  `RunFailure`.
+- `src/hexagent/core/canonical.py` — `canonical_json`, `sha256_digest`.
+- `src/hexagent/application/revision_service.py` — `RevisionService`.
+- `src/hexagent/application/run_service.py` — `RunService`.
 - `src/hexagent/repositories/base.py` — Repository protocols.
 - `src/hexagent/repositories/memory.py` — In-memory implementations.

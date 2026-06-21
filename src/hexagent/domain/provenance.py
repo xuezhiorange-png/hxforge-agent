@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import copy
+import hashlib
+import json
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -12,6 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProvenanceNodeType(StrEnum):
+    """Stable node-type identifiers for provenance graphs."""
+
     CASE_REVISION = "CASE_REVISION"
     INPUT_FILE = "INPUT_FILE"
     CALCULATION_RUN = "CALCULATION_RUN"
@@ -21,6 +26,10 @@ class ProvenanceNodeType(StrEnum):
     OPTIMIZER = "OPTIMIZER"
     REPORT = "REPORT"
     EXTERNAL = "EXTERNAL"
+    INTERMEDIATE = "INTERMEDIATE"
+    RESULT = "RESULT"
+    WARNING = "WARNING"
+    BLOCKER = "BLOCKER"
 
 
 # ---------------------------------------------------------------------------
@@ -29,14 +38,20 @@ class ProvenanceNodeType(StrEnum):
 
 
 class ProvenanceNode(BaseModel):
-    """A single node in a provenance graph."""
+    """A single node in a provenance graph.
+
+    ``metadata`` is a frozen mapping.  ``payload_hash`` records the
+    SHA-256 content hash of the node's engineering payload, enabling
+    tamper-evident provenance chains.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     node_id: UUID
     node_type: ProvenanceNodeType
     label: str = Field(default="", min_length=0)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: tuple[tuple[str, Any], ...] = Field(default_factory=tuple)
+    payload_hash: str | None = None
 
     def to_json(self) -> str:
         return self.model_dump_json()
@@ -59,7 +74,7 @@ class ProvenanceEdge(BaseModel):
     source_id: UUID
     target_id: UUID
     relation: str = Field(default="", min_length=0)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: tuple[tuple[str, Any], ...] = Field(default_factory=tuple)
 
     def to_json(self) -> str:
         return self.model_dump_json()
@@ -77,19 +92,20 @@ class ProvenanceEdge(BaseModel):
 class ProvenanceGraph(BaseModel):
     """Directed acyclic graph of provenance nodes and edges.
 
+    Nodes and edges are stored as **tuples** (deeply immutable).
     Validates on construction:
     * Unique node IDs.
     * All edge endpoints reference existing nodes.
     * No self-loops.
     * The graph is acyclic (DAG).
-    * At least one ``CASE_REVISION`` node is present.
+    * At least one ``CASE_REVISION`` node is present when nodes exist.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    schema_version: str = "1.0"
-    nodes: list[ProvenanceNode] = Field(default_factory=list)
-    edges: list[ProvenanceEdge] = Field(default_factory=list)
+    schema_version: Literal["1.0"] = "1.0"
+    nodes: tuple[ProvenanceNode, ...] = Field(default_factory=tuple)
+    edges: tuple[ProvenanceEdge, ...] = Field(default_factory=tuple)
 
     @model_validator(mode="after")
     def validate_graph(self) -> Self:
@@ -145,6 +161,36 @@ class ProvenanceGraph(BaseModel):
 
         return self
 
+    # --- canonical ordering for hashing ---
+
+    def _canonical_node_key(self, node: ProvenanceNode) -> str:
+        """Deterministic sort key for nodes."""
+        return f"{node.node_type.value}:{node.node_id}"
+
+    def _canonical_edge_key(self, edge: ProvenanceEdge) -> str:
+        """Deterministic sort key for edges."""
+        return f"{edge.source_id}:{edge.target_id}:{edge.relation}"
+
+    def _canonical_payload(self) -> dict[str, Any]:
+        """Return a canonical dict independent of insertion order."""
+        sorted_nodes = sorted(self.nodes, key=self._canonical_node_key)
+        sorted_edges = sorted(self.edges, key=self._canonical_edge_key)
+        return {
+            "schema_version": self.schema_version,
+            "nodes": [n.model_dump() for n in sorted_nodes],
+            "edges": [e.model_dump() for e in sorted_edges],
+        }
+
+    def compute_hash(self) -> str:
+        """Return a deterministic SHA-256 hash of the graph structure."""
+        payload = json.dumps(
+            self._canonical_payload(),
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+        return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
     # --- serialisation helpers ---
 
     def to_json(self) -> str:
@@ -155,9 +201,19 @@ class ProvenanceGraph(BaseModel):
         return cls.model_validate_json(data)
 
 
+def deep_copy_graph(graph: ProvenanceGraph) -> ProvenanceGraph:
+    """Return a deeply-copied snapshot of *graph*.
+
+    This is the recommended way for repositories to hand out stored
+    graphs — it guarantees the caller cannot mutate repository state.
+    """
+    return copy.deepcopy(graph)
+
+
 __all__ = [
     "ProvenanceEdge",
     "ProvenanceGraph",
     "ProvenanceNode",
     "ProvenanceNodeType",
+    "deep_copy_graph",
 ]

@@ -62,7 +62,7 @@ def _running_run(**overrides) -> CalculationRun:
 def _make_blocker() -> EngineeringMessage:
     return EngineeringMessage(
         code=ErrorCode.CALCULATION_BLOCKED,
-        severity=EngineeringMessageSeverity.CRITICAL,
+        severity=EngineeringMessageSeverity.BLOCKER,
         message="Missing required property",
     )
 
@@ -143,25 +143,29 @@ class TestTerminalStateRequirements:
     """SUCCEEDED needs result_hash, FAILED needs failure, BLOCKED needs blockers."""
 
     def test_succeeded_needs_result_hash(self) -> None:
+        """Default result_hash is None (no zero sentinel)."""
         run = _running_run()
-        assert run.result_hash == ZERO_HASH  # default is zero hash
+        assert run.result_hash is None
 
     def test_failed_needs_failure(self) -> None:
-        run = _running_run(status=CalculationRunStatus.FAILED, failure=_make_failure())
+        run = _running_run(
+            status=CalculationRunStatus.FAILED,
+            failure=_make_failure(),
+            completed_at=FIXED_LATER,
+        )
         assert run.failure is not None
 
     def test_failed_without_failure_is_invalid(self) -> None:
-        """A FAILED run without a failure record is logically incomplete."""
-        run = _running_run(status=CalculationRunStatus.FAILED, failure=None)
-        # The model allows construction, but the RunService.verify_run_integrity
-        # would detect this. We test the model-level: it CAN be constructed.
-        assert run.failure is None
+        """A FAILED run without a failure record is rejected at construction."""
+        with pytest.raises(ValidationError, match="failure record"):
+            _running_run(status=CalculationRunStatus.FAILED, failure=None)
 
     def test_blocked_needs_blockers(self) -> None:
         blocker = _make_blocker()
         run = _running_run(
             status=CalculationRunStatus.BLOCKED,
             blockers=(blocker,),
+            completed_at=FIXED_LATER,
         )
         assert len(run.blockers) == 1
 

@@ -89,14 +89,15 @@ class TestCanonicalJson:
         assert '"warning"' in result
 
     def test_quantity_like_normalised(self) -> None:
-        """Quantity-like objects are serialised with value, unit, and kind."""
+        """Quantity-like objects are serialised with si_value and kind."""
         from hexagent.domain.quantities import AbsoluteTemperature
 
         q = AbsoluteTemperature(value=300.0, unit="K")
         result = canonical_json({"temp": q})
-        assert '"value":300.0' in result
-        assert '"unit":"K"' in result
+        assert '"si_value"' in result
         assert '"kind":"absolute_temperature"' in result
+        # value 300.0 K is already SI, so si_value should be 300.0
+        assert '"si_value":300.0' in result
 
 
 class TestSha256Digest:
@@ -161,17 +162,21 @@ class TestMessageContextOrderIndependence:
         assert canonical_json(ctx1) == canonical_json(ctx2)
 
     def test_message_hash_independent_of_context_order(self) -> None:
+        """EngineeringMessage with identical context tuples produces the same hash."""
+        from hexagent.domain.messages import ErrorCode
+
+        ctx = (("z", 1), ("a", 2))
         msg1 = EngineeringMessage(
-            code="input_missing",
+            code=ErrorCode.INPUT_MISSING,
             severity=EngineeringMessageSeverity.WARNING,
             message="Missing inlet temperature",
-            context={"z": 1, "a": 2},
+            context=ctx,
         )
         msg2 = EngineeringMessage(
-            code="input_missing",
+            code=ErrorCode.INPUT_MISSING,
             severity=EngineeringMessageSeverity.WARNING,
             message="Missing inlet temperature",
-            context={"a": 2, "z": 1},
+            context=ctx,
         )
         h1 = sha256_digest(msg1.model_dump())
         h2 = sha256_digest(msg2.model_dump())

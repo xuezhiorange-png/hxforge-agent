@@ -32,8 +32,8 @@ class TestEngineeringMessageSeverity:
     def test_error(self) -> None:
         assert EngineeringMessageSeverity.ERROR == "error"
 
-    def test_critical(self) -> None:
-        assert EngineeringMessageSeverity.CRITICAL == "critical"
+    def test_blocker(self) -> None:
+        assert EngineeringMessageSeverity.BLOCKER == "blocker"
 
     def test_all_values_are_lowercase(self) -> None:
         for sev in EngineeringMessageSeverity:
@@ -104,7 +104,7 @@ class TestEngineeringMessage:
             message="Informational note",
         )
         assert msg.severity == EngineeringMessageSeverity.INFO
-        assert msg.allows_continuation is False
+        assert msg.allows_continuation is True  # INFO allows continuation
 
     def test_create_warning_message(self) -> None:
         msg = EngineeringMessage(
@@ -124,30 +124,39 @@ class TestEngineeringMessage:
         )
         assert msg.severity == EngineeringMessageSeverity.ERROR
 
-    def test_create_critical_message(self) -> None:
+    def test_create_blocker_message(self) -> None:
         msg = EngineeringMessage(
             code=ErrorCode.INPUT_MISSING,
-            severity=EngineeringMessageSeverity.CRITICAL,
+            severity=EngineeringMessageSeverity.BLOCKER,
             message="Fatal: no fluid defined",
         )
-        assert msg.severity == EngineeringMessageSeverity.CRITICAL
+        assert msg.severity == EngineeringMessageSeverity.BLOCKER
 
-    def test_default_allows_continuation_false(self) -> None:
-        msg = EngineeringMessage(
+    def test_default_allows_continuation_by_severity(self) -> None:
+        # WARNING and INFO allow continuation
+        warn = EngineeringMessage(
             code=ErrorCode.INPUT_MISSING,
             severity=EngineeringMessageSeverity.WARNING,
             message="test",
         )
-        assert msg.allows_continuation is False
+        assert warn.allows_continuation is True
+        # ERROR and BLOCKER do not
+        err = EngineeringMessage(
+            code=ErrorCode.INPUT_MISSING,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="test",
+        )
+        assert err.allows_continuation is False
 
     def test_with_context(self) -> None:
         msg = EngineeringMessage(
             code=ErrorCode.INPUT_MISSING,
             severity=EngineeringMessageSeverity.WARNING,
             message="Missing data",
-            context={"field": "inlet_temperature", "stream": "hot"},
+            context=(("field", "inlet_temperature"), ("stream", "hot")),
         )
-        assert msg.context["field"] == "inlet_temperature"
+        ctx_dict = dict(msg.context)
+        assert ctx_dict["field"] == "inlet_temperature"
 
     def test_with_affected_paths(self) -> None:
         msg = EngineeringMessage(
@@ -174,7 +183,7 @@ class TestEngineeringMessage:
             message="Value out of range",
             source_module="properties.coolprop",
             affected_paths=("hot_stream",),
-            context={"min": 200, "max": 500},
+            context=(("min", 200), ("max", 500)),
             allows_continuation=True,
         )
         json_str = msg.to_json()
@@ -190,7 +199,7 @@ class TestEngineeringMessage:
     def test_code_must_not_be_empty(self) -> None:
         with pytest.raises((ValueError, ValidationError)):
             EngineeringMessage(
-                code="",
+                code="",  # type: ignore[arg-type]  # empty string not valid ErrorCode
                 severity=EngineeringMessageSeverity.WARNING,
                 message="test",
             )
@@ -224,14 +233,16 @@ class TestAllowsContinuationSemantics:
         # The message can carry a warning without blocking the run
         assert msg.severity == EngineeringMessageSeverity.WARNING
 
-    def test_warning_without_continuation(self) -> None:
+    def test_severity_overrides_continuation(self) -> None:
+        # Even if caller passes allows_continuation=False, WARNING severity
+        # overrides it to True
         msg = EngineeringMessage(
             code=ErrorCode.CALCULATION_NOT_CONVERGED,
             severity=EngineeringMessageSeverity.WARNING,
             message="Near singular matrix",
             allows_continuation=False,
         )
-        assert msg.allows_continuation is False
+        assert msg.allows_continuation is True  # derived from severity
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +273,7 @@ class TestRunFailure:
         f = RunFailure(
             code=ErrorCode.CALCULATION_NOT_CONVERGED,
             message="Error",
-            context={"iterations": 100},
+            context=(("iterations", 100),),
         )
         json_str = f.to_json()
         restored = RunFailure.from_json(json_str)
@@ -271,6 +282,6 @@ class TestRunFailure:
         assert restored.context == f.context
 
     def test_frozen(self) -> None:
-        f = RunFailure(code="test", message="test")
+        f = RunFailure(code=ErrorCode.BLOCKER, message="test")
         with pytest.raises((ValueError, ValidationError)):
             f.message = "changed"  # type: ignore[misc]

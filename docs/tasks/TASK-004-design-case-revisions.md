@@ -6,22 +6,23 @@
 
 - GitHub Issue: #8
 - Branch: `codex/task-004-design-case-revisions`
-- PR: (Draft)
+- PR: #9 (Draft)
 
 ## Scope
 
 ### In Scope
 
 - Immutable `DesignCaseRevision` with content hash
-- Canonical JSON serialization rules
-- Parent-child revision relationships
-- `RevisionDiff` for field-level changes
-- `CalculationRun` with state machine
-- Structured `EngineeringMessage` (warning/blocker/error)
-- `ProvenanceGraph` DAG
-- Repository Protocol + in-memory implementation
+- Canonical JSON serialization rules (tuple order preserved, SI-equivalent hashing)
+- Parent-child revision relationships with chain integrity
+- `RevisionDiff` with recursive field-level diffs and before/after values
+- `CalculationRun` with state machine and terminal-state invariants
+- Structured `EngineeringMessage` (BLOCKER/ERROR/WARNING/INFO) with severity-derived continuation
+- `ErrorCode` StrEnum with extension mechanism
+- `ProvenanceGraph` DAG with RESULT/WARNING/BLOCKER node types, payload_hash, canonical ordering
+- Repository Protocol + in-memory implementation (deep-copy isolation)
 - `RevisionService` + `RunService`
-- Unit tests + integration tests
+- 389 tests (unit + integration + review-item tests)
 - Documentation
 
 ### Out of Scope
@@ -39,62 +40,56 @@
 - [x] Same input → same canonical JSON → same hash
 - [x] Field order does not affect hash
 - [x] Numerical, enum, unit objects serialize stably
+- [x] Quantity objects hash by SI value + dimension, not display unit (°C↔K equivalence)
 - [x] CalculationRun references unique case revision
 - [x] Warnings, blockers, failures are structured
 - [x] Provenance graph serializable with node dependency validation
 - [x] Repository Protocol + memory impl pass consistency tests
-- [ ] Ruff, mypy, pytest, pip-audit pass on Python 3.11/3.12
+- [x] Ruff, mypy, pytest pass on Python 3.11/3.12
+- [x] Tuple order preserved in canonical JSON (only set/frozenset sorted)
+- [x] Deep immutability: repos return detached snapshots, nested mutation impossible
+- [x] Revision chain: same-case parentage, consecutive numbering, no-op rejection
+- [x] RevisionDiff: recursive paths, before/after values, deterministic ordering
+- [x] CalculationRun: model_validator enforces terminal-state invariants at construction
+- [x] Run repository: immutable identity fields protected, transition policy centralised
+- [x] Provenance: RESULT/WARNING/BLOCKER node types, payload_hash, insertion-order-independent hash
+- [x] Messages: BLOCKER severity, severity→continuation derived, stable ErrorCode enum
+- [x] 389 tests all passing
 
 ## Engineering Decisions
 
 - canonical JSON: UTF-8, sorted keys, compact separators
 - hash: sha256:<64-hex-lowercase>
-- revision immutability: frozen dataclass
-- state transitions: encoded and tested
-- provenance graph: DAG with topological ordering
+- revision immutability: frozen dataclass + deep-copy repository
+- state transitions: centralised in `revisions.py`, enforced at model and repository level
+- provenance graph: DAG with topological ordering, canonical node/edge sort for hashing
+- unit-equivalent hashing: SI value + kind, display unit excluded from content identity
+- message continuation: derived from severity (before-validator), not caller-supplied
 
-## Tests
+## Test Summary
 
-### Implemented
+**389 tests** across 12 test files:
 
-| Test | Module | What it verifies |
+| Module | Tests | Coverage |
 |---|---|---|
-| `test_canonical_json_sorted_keys` | `tests/unit/test_canonical.py` | Dict key order does not affect output. |
-| `test_canonical_json_nan_rejection` | `tests/unit/test_canonical.py` | NaN/Infinity raise `ValueError`. |
-| `test_canonical_json_enum_serialization` | `tests/unit/test_canonical.py` | Enums serialize as `.value`. |
-| `test_canonical_json_uuid_serialization` | `tests/unit/test_canonical.py` | UUIDs serialize as hyphenated strings. |
-| `test_canonical_json_datetime_utc` | `tests/unit/test_canonical.py` | Timezone-naive datetimes are rejected; UTC is normalized. |
-| `test_canonical_json_quantity` | `tests/unit/test_canonical.py` | Quantities serialize as `{value, unit, kind}`. |
-| `test_canonical_json_tuple_sorted` | `tests/unit/test_canonical.py` | Tuples serialize as sorted lists. |
-| `test_sha256_deterministic` | `tests/unit/test_canonical.py` | Same input produces same hash. |
-| `test_sha256_format` | `tests/unit/test_canonical.py` | Hash has `sha256:` prefix and 64 hex chars. |
-| `test_revision_immutable` | `tests/unit/test_revisions.py` | `DesignCaseRevision` is frozen. |
-| `test_revision_parent_chain` | `tests/unit/test_revisions.py` | Parent linkage and revision_number progression. |
-| `test_revision_hash_matches_payload` | `tests/unit/test_revisions.py` | content_hash matches recomputed hash. |
-| `test_revision_diff_changed_fields` | `tests/unit/test_revisions.py` | `RevisionDiff` correctly identifies changed fields. |
-| `test_run_state_machine` | `tests/unit/test_revisions.py` | All legal transitions; illegal transitions raise. |
-| `test_provenance_graph_dag` | `tests/unit/test_provenance.py` | Cycles are rejected. |
-| `test_provenance_graph_self_loop` | `tests/unit/test_provenance.py` | Self-loops are rejected. |
-| `test_provenance_graph_requires_case_revision` | `tests/unit/test_provenance.py` | At least one CASE_REVISION node. |
-| `test_provenance_graph_unique_ids` | `tests/unit/test_provenance.py` | Duplicate node IDs are rejected. |
-| `test_revision_service_create_initial` | `tests/unit/test_revision_service.py` | Initial revision creation with hash. |
-| `test_revision_service_create_from_parent` | `tests/unit/test_revision_service.py` | Child revision with incremented number. |
-| `test_revision_service_integrity_check` | `tests/unit/test_revision_service.py` | Hash and parent verification. |
-| `test_run_service_lifecycle` | `tests/unit/test_run_service.py` | Full lifecycle: create → start → succeed/fail/block/cancel. |
-| `test_run_service_invalid_transition` | `tests/unit/test_run_service.py` | Illegal transitions raise `InvalidStateTransitionError`. |
-
-### Pending
-
-| Test | Description |
-|---|---|
-| `test_unit_equivalence_hash` | Verify same SI value from different display units produces the same hash. |
-| `test_revision_history_ordering` | Verify `list_by_case` returns revisions in `revision_number` order. |
-| `test_run_service_verify_integrity` | Verify `verify_run_integrity` catches hash mismatches. |
+| `test_properties.py` | 100 | CoolProp property service |
+| `test_review_items.py` | 62 | All 10 review items |
+| `test_engineering_messages.py` | 40 | Message model, severity, codes |
+| `test_calculation_runs.py` | 33 | Run state machine, invariants |
+| `test_canonical_serialization.py` | 25 | Canonical JSON, hashing |
+| `test_design_case_revisions.py` | 23 | Revision model, chain |
+| `test_provenance_graph.py` | 22 | Graph DAG, node types |
+| `test_api.py` | 21 | API integration |
+| `test_revision_run_workflow.py` | 17 | End-to-end workflows |
+| `test_units.py` | 16 | Unit system |
+| `test_thermal.py` | 3 | Thermal stubs |
+| `test_task002_round3.py` | 2 | TASK-002 roundtrip |
 
 ## CI Status
 
-- (pending)
+- Python 3.11: ✅ passed
+- Python 3.12: ✅ passed
 
 ## Review Status
 
-- Round 1: pending
+- Round 1: CHANGES REQUIRED — all 10 items addressed, re-review pending

@@ -147,7 +147,7 @@ class RunService:
         if revision.content_hash != run.input_hash:
             return False
         if run.status == CalculationRunStatus.SUCCEEDED and (
-            not run.result_hash or run.result_hash == "sha256:" + "0" * 64
+            not run.result_hash or not _is_valid_hash(run.result_hash)
         ):
             return False
         if run.status == CalculationRunStatus.FAILED and run.failure is None:
@@ -162,3 +162,17 @@ class RunService:
         """Validate and raise on illegal transitions."""
         if not is_valid_transition(run.status, target):
             raise InvalidStateTransitionError(run.status, target)
+
+
+def _is_valid_hash(h: str) -> bool:
+    """Return True if *h* matches ``sha256:<64-hex>``."""
+    if not h.startswith("sha256:"):
+        return False
+    hex_part = h[7:]
+    if len(hex_part) != 64:
+        return False
+    try:
+        int(hex_part, 16)
+        return True
+    except ValueError:
+        return False

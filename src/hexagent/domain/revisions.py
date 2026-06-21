@@ -14,10 +14,10 @@ import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from hexagent.core.canonical import canonical_json, sha256_digest
 from hexagent.domain.messages import EngineeringMessage, RunFailure
@@ -209,23 +209,36 @@ class DesignCaseRevision:
 
 @dataclass(frozen=True)
 class RevisionDiff:
-    """Record of what changed between two consecutive revisions."""
+    """Record of what changed between two consecutive revisions.
+
+    ``field_changes`` contains recursive, path-level diffs with
+    before/after values, sorted by path.  Each entry is a dict with
+    keys ``path``, ``before`` and ``after``.
+    """
 
     from_revision_id: UUID = field()
     to_revision_id: UUID = field()
-    changed_fields: tuple[str, ...] = field()
     content_hash_before: str = field()
     content_hash_after: str = field()
+    field_changes: tuple[dict[str, Any], ...] = field(default_factory=tuple)
 
     @property
     def is_identical(self) -> bool:
         return self.content_hash_before == self.content_hash_after
 
+    @property
+    def changed_paths(self) -> tuple[str, ...]:
+        """Sorted tuple of dotted paths that changed."""
+        return tuple(c["path"] for c in self.field_changes)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "from_revision_id": str(self.from_revision_id),
             "to_revision_id": str(self.to_revision_id),
-            "changed_fields": list(self.changed_fields),
+            "field_changes": [
+                {"path": c["path"], "before": c["before"], "after": c["after"]}
+                for c in self.field_changes
+            ],
             "content_hash_before": self.content_hash_before,
             "content_hash_after": self.content_hash_after,
         }
@@ -238,7 +251,7 @@ class RevisionDiff:
         return cls(
             from_revision_id=UUID(data["from_revision_id"]),
             to_revision_id=UUID(data["to_revision_id"]),
-            changed_fields=tuple(data["changed_fields"]),
+            field_changes=tuple(data.get("field_changes", [])),
             content_hash_before=data["content_hash_before"],
             content_hash_after=data["content_hash_after"],
         )
@@ -254,11 +267,19 @@ class RevisionDiff:
 
 
 class CalculationRun(BaseModel):
-    """Immutable record of an engineering calculation execution."""
+    """Immutable record of an engineering calculation execution.
+
+    Model validators enforce status-dependent invariants:
+    - ``SUCCEEDED`` requires a valid ``result_hash`` and no ``failure``.
+    - ``FAILED`` requires a ``failure`` and no valid ``result_hash``.
+    - ``BLOCKED`` requires at least one ``blocker``.
+    - Terminal states require ``completed_at > started_at``.
+    - Non-terminal states must not have ``completed_at``.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    schema_version: str = "1.0"
+    schema_version: Literal["1.0"] = "1.0"
     run_id: UUID
     case_id: UUID
     case_revision_id: UUID
@@ -268,16 +289,64 @@ class CalculationRun(BaseModel):
     completed_at: datetime | None = None
     software_version: str = Field(default="0.1.0")
     git_commit: str = Field(default="")
-    input_hash: str = Field(default="sha256:" + "0" * 64)
-    result_hash: str = Field(default="sha256:" + "0" * 64)
+    input_hash: str = Field(default="")
+    result_hash: str | None = None
     property_backend: dict[str, Any] | None = None
     correlation_records: tuple[dict[str, Any], ...] = Field(default_factory=tuple)
     warnings: tuple[EngineeringMessage, ...] = Field(default_factory=tuple)
     blockers: tuple[EngineeringMessage, ...] = Field(default_factory=tuple)
     failure: RunFailure | None = None
     provenance_graph: ProvenanceGraph = Field(
-        default_factory=lambda: ProvenanceGraph(nodes=[], edges=[])
+        default_factory=lambda: ProvenanceGraph(nodes=(), edges=())
     )
+
+    @model_validator(mode="after")
+    def _validate_terminal_invariants(self) -> Self:
+        status = self.status
+
+        # SUCCEEDED: must have a valid result_hash
+        if status == CalculationRunStatus.SUCCEEDED:
+            if not self.result_hash or not _is_valid_run_hash(self.result_hash):
+                raise ValueError(
+                    "SUCCEEDED run must have a valid result_hash "
+                    f"(got {self.result_hash!r})"
+                )
+            if self.failure is not None:
+                raise ValueError("SUCCEEDED run must not have a failure record")
+
+        # FAILED: must have a failure record
+        if status == CalculationRunStatus.FAILED and self.failure is None:
+            raise ValueError("FAILED run must have a failure record")
+
+        # BLOCKED: must have at least one blocker
+        if status == CalculationRunStatus.BLOCKED and not self.blockers:
+            raise ValueError("BLOCKED run must have at least one blocker")
+
+        # Terminal states must have completed_at
+        if status in (
+            CalculationRunStatus.SUCCEEDED,
+            CalculationRunStatus.FAILED,
+            CalculationRunStatus.BLOCKED,
+            CalculationRunStatus.CANCELLED,
+        ):
+            if self.completed_at is None:
+                raise ValueError(
+                    f"Terminal status {status.value} requires completed_at"
+                )
+            if self.completed_at <= self.started_at:
+                raise ValueError(
+                    f"completed_at ({self.completed_at}) must be after "
+                    f"started_at ({self.started_at})"
+                )
+
+        # Non-terminal: must NOT have completed_at
+        non_terminal = status in (CalculationRunStatus.PENDING, CalculationRunStatus.RUNNING)
+        if non_terminal and self.completed_at is not None:
+            raise ValueError(
+                f"Non-terminal status {status.value} must not have completed_at"
+            )
+
+        return self
 
     # --- serialisation helpers ---
 
@@ -287,6 +356,20 @@ class CalculationRun(BaseModel):
     @classmethod
     def from_json(cls, data: str) -> Self:
         return cls.model_validate_json(data)
+
+
+def _is_valid_run_hash(h: str) -> bool:
+    """Return True if *h* matches ``sha256:<64-hex>``."""
+    if not h.startswith("sha256:"):
+        return False
+    hex_part = h[7:]
+    if len(hex_part) != 64:
+        return False
+    try:
+        int(hex_part, 16)
+        return True
+    except ValueError:
+        return False
 
 
 # ---------------------------------------------------------------------------
