@@ -130,7 +130,7 @@ def test_legacy_to_si_adapter_uses_typed_semantics() -> None:
         to_si(TemperatureDifference(value=10.0, unit="delta_degC"), "degC")
 
 
-@given(st.floats(min_value=-1.0e6, max_value=1.0e6, allow_nan=False, allow_infinity=False))
+@given(st.floats(min_value=1e-10, max_value=1.0e6, allow_nan=False, allow_infinity=False))
 def test_mass_flow_round_trip(value: float) -> None:
     original = MassFlow(value=value, unit="kg/s")
     restored = original.to("lb/h").to("kg/s")

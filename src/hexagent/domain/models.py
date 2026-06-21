@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, model_validator
 
 from hexagent.domain.quantities import (
     AbsolutePressure,
@@ -15,8 +15,22 @@ from hexagent.domain.quantities import (
     Power,
     PressureDifference,
     Quantity,
+    SpecificEnthalpy,
 )
 
+# ---------------------------------------------------------------------------
+# ITEM 4: Strict public input base model
+# ---------------------------------------------------------------------------
+
+class StrictBaseModel(BaseModel):
+    """Base model that rejects any unknown fields at construction time."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
 
 class PhaseHint(StrEnum):
     AUTO = "auto"
@@ -25,24 +39,145 @@ class PhaseHint(StrEnum):
     TWO_PHASE = "two_phase"
 
 
-class FluidSpec(BaseModel):
+class FoulingSourceType(StrEnum):
+    STANDARD = "STANDARD"
+    VENDOR = "VENDOR"
+    USER = "USER"
+    ASSUMED = "ASSUMED"
+
+
+class VerificationStatus(StrEnum):
+    VERIFIED = "VERIFIED"
+    UNVERIFIED_REFERENCE = "UNVERIFIED_REFERENCE"
+
+
+# ---------------------------------------------------------------------------
+# ITEM 4: FluidSpec → StrictBaseModel
+# ---------------------------------------------------------------------------
+
+class FluidSpec(StrictBaseModel):
     backend: str = "CoolProp"
     name: str
     composition: dict[str, float] | None = None
     phase_hint: PhaseHint = PhaseHint.AUTO
 
 
-class StreamSpec(BaseModel):
+# ---------------------------------------------------------------------------
+# ITEM 1: State-spec discriminated union
+# ---------------------------------------------------------------------------
+
+class TPStateSpec(StrictBaseModel):
+    """Temperature–pressure state specification."""
+
+    type: Literal["TP"]
+    temperature: AbsoluteTemperature
+    pressure: AbsolutePressure
+    schema_version: str = "1.0"
+
+
+class PHStateSpec(StrictBaseModel):
+    """Pressure–enthalpy state specification."""
+
+    type: Literal["PH"]
+    pressure: AbsolutePressure
+    enthalpy: SpecificEnthalpy
+    schema_version: str = "1.0"
+
+
+class PQStateSpec(StrictBaseModel):
+    """Pressure–quality state specification."""
+
+    type: Literal["PQ"]
+    pressure: AbsolutePressure
+    quality: float = Field(ge=0, le=1)
+    schema_version: str = "1.0"
+
+
+StateSpec = Annotated[
+    TPStateSpec | PHStateSpec | PQStateSpec, Discriminator("type")
+]
+
+
+# ---------------------------------------------------------------------------
+# ITEM 2: Structured fouling resistance
+# ---------------------------------------------------------------------------
+
+class FoulingSource(StrictBaseModel):
+    """Traceable origin of a fouling-resistance value."""
+
+    source_type: FoulingSourceType
+    reference_id: str
+    edition: str
+    table_or_clause: str
+    verification_status: VerificationStatus
+    note: str
+
+
+class FoulingResistanceSpec(StrictBaseModel):
+    """Structured fouling resistance with provenance."""
+
+    value: FoulingResistance
+    source: FoulingSource
+
+
+# ---------------------------------------------------------------------------
+# StreamSpec (modified with state_spec + fouling_resistance_spec)
+# ---------------------------------------------------------------------------
+
+class StreamSpec(StrictBaseModel):
     fluid: FluidSpec
     mass_flow: MassFlow
-    inlet_temperature: AbsoluteTemperature
-    inlet_pressure: AbsolutePressure
+    # Legacy fields kept Optional for backward compatibility
+    inlet_temperature: AbsoluteTemperature | None = None
+    inlet_pressure: AbsolutePressure | None = None
+    # New structured state specification
+    state_spec: StateSpec | None = None
     outlet_temperature: AbsoluteTemperature | None = None
     allowable_pressure_drop: PressureDifference | None = None
-    fouling_resistance: FoulingResistance
+    # Legacy fouling field kept Optional for backward compatibility
+    fouling_resistance: FoulingResistance | None = None
+    # New structured fouling specification
+    fouling_resistance_spec: FoulingResistanceSpec | None = None
+
+    @model_validator(mode="after")
+    def _check_state_specification(self) -> StreamSpec:
+        has_state = self.state_spec is not None
+        has_legacy_temp = self.inlet_temperature is not None
+        has_legacy_pres = self.inlet_pressure is not None
+        if has_state and (has_legacy_temp or has_legacy_pres):
+            raise ValueError(
+                "Cannot provide both state_spec and legacy "
+                "inlet_temperature/inlet_pressure."
+            )
+        if not has_state and not (has_legacy_temp and has_legacy_pres):
+            raise ValueError(
+                "Must provide either state_spec or both "
+                "inlet_temperature and inlet_pressure."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_fouling_specification(self) -> StreamSpec:
+        has_spec = self.fouling_resistance_spec is not None
+        has_legacy = self.fouling_resistance is not None
+        if has_spec and has_legacy:
+            raise ValueError(
+                "Cannot provide both fouling_resistance_spec and "
+                "legacy fouling_resistance."
+            )
+        if not has_spec and not has_legacy:
+            raise ValueError(
+                "Must provide either fouling_resistance_spec or "
+                "fouling_resistance."
+            )
+        return self
 
 
-class DesignConstraints(BaseModel):
+# ---------------------------------------------------------------------------
+# Design constraints and design case
+# ---------------------------------------------------------------------------
+
+class DesignConstraints(StrictBaseModel):
     design_pressure_hot: AbsolutePressure
     design_pressure_cold: AbsolutePressure
     design_temperature_hot: AbsoluteTemperature
@@ -51,7 +186,7 @@ class DesignConstraints(BaseModel):
     required_area_margin_fraction: float = Field(ge=0.0, le=1.0)
 
 
-class DesignCase(BaseModel):
+class DesignCase(StrictBaseModel):
     id: UUID = Field(default_factory=uuid4)
     name: str
     hot_stream: StreamSpec
@@ -71,6 +206,10 @@ class DesignCase(BaseModel):
             )
         return self
 
+
+# ---------------------------------------------------------------------------
+# Result / provenance models (remain plain BaseModel — not public input)
+# ---------------------------------------------------------------------------
 
 class WarningMessage(BaseModel):
     code: str
@@ -104,13 +243,22 @@ __all__ = [
     "DesignConstraints",
     "FluidSpec",
     "FoulingResistance",
+    "FoulingResistanceSpec",
+    "FoulingSource",
+    "FoulingSourceType",
     "Length",
     "MassFlow",
     "PhaseHint",
+    "PHStateSpec",
     "Power",
+    "PQStateSpec",
     "PressureDifference",
     "ProvenanceRecord",
     "Quantity",
+    "StateSpec",
     "StreamSpec",
+    "StrictBaseModel",
+    "TPStateSpec",
+    "VerificationStatus",
     "WarningMessage",
 ]

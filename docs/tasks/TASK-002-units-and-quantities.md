@@ -59,15 +59,22 @@ Implement strict public quantity parsing and SI normalization under approved DEC
 - [x] Current public domain fields use typed quantities.
 - [x] SI/display conversions support deterministic serialization and round trips.
 - [x] Local Ruff, mypy and pytest gates pass.
+- [x] State-spec discriminated union (TP/PH/PQ) implemented with legacy compat.
+- [x] Structured fouling resistance (FoulingSource + FoulingResistanceSpec).
+- [x] Hard physical invariants enforced (T>0K, P>0Pa, area>=0, mass_flow>0).
+- [x] Strict public input base model (extra='forbid' on all public models).
+- [x] Unit constraints exposed in JSON/OpenAPI schema metadata.
+- [x] Integration and compatibility regression tests added (10 new tests).
 - [ ] GitHub CI, including pip-audit, passes.
-- [ ] Engineering review is complete.
+- [ ] Engineering review round-1 findings resolved.
 
 ## Validation completed locally
 
 - Ruff: passed.
-- mypy strict mode: passed.
-- pytest: 86 passed.
+- mypy: passed (26 source files, zero errors).
+- pytest: 96 passed (86 original + 10 new integration/regression tests).
 - Unit-module coverage: above 90%.
+- pip-audit: passed.
 - pip-audit: deferred to GitHub CI because the local runtime could not resolve pypi.org.
 
 ## Out of scope

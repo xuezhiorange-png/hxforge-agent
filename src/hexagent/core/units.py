@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import Any, Protocol
 
 from pint import DimensionalityError, UndefinedUnitError, UnitRegistry
+from pydantic import ConfigDict
 
 
 class QuantityKind(StrEnum):
@@ -276,6 +277,104 @@ UNIT_RULES: dict[QuantityKind, UnitRule] = {
         ),
     ),
 }
+
+# ---------------------------------------------------------------------------
+# Schema metadata: representative examples per quantity kind
+# ---------------------------------------------------------------------------
+_EXAMPLES: dict[QuantityKind, list[dict[str, str]]] = {
+    QuantityKind.ABSOLUTE_TEMPERATURE: [
+        {"unit": "degC", "description": "Celsius"},
+        {"unit": "K", "description": "Kelvin"},
+        {"unit": "degF", "description": "Fahrenheit"},
+    ],
+    QuantityKind.ABSOLUTE_PRESSURE: [
+        {"unit": "bar(a)", "description": "bar absolute"},
+        {"unit": "kPa", "description": "kilopascal"},
+        {"unit": "psi(a)", "description": "psi absolute"},
+    ],
+    QuantityKind.MASS_FLOW: [
+        {"unit": "kg/s", "description": "kilogram per second"},
+        {"unit": "kg/h", "description": "kilogram per hour"},
+    ],
+    QuantityKind.TEMPERATURE_DIFFERENCE: [
+        {"unit": "K", "description": "kelvin"},
+        {"unit": "delta_degC", "description": "delta Celsius"},
+    ],
+    QuantityKind.PRESSURE_DIFFERENCE: [
+        {"unit": "kPa", "description": "kilopascal"},
+        {"unit": "bar", "description": "bar"},
+    ],
+    QuantityKind.VOLUME_FLOW: [
+        {"unit": "m^3/s", "description": "cubic metre per second"},
+        {"unit": "L/s", "description": "litre per second"},
+    ],
+    QuantityKind.POWER: [
+        {"unit": "kW", "description": "kilowatt"},
+        {"unit": "Btu/h", "description": "BTU per hour"},
+    ],
+    QuantityKind.AREA: [
+        {"unit": "m^2", "description": "square metre"},
+        {"unit": "ft^2", "description": "square foot"},
+    ],
+    QuantityKind.LENGTH: [
+        {"unit": "m", "description": "metre"},
+        {"unit": "ft", "description": "foot"},
+    ],
+    QuantityKind.VELOCITY: [
+        {"unit": "m/s", "description": "metre per second"},
+        {"unit": "ft/min", "description": "feet per minute"},
+    ],
+    QuantityKind.FOULING_RESISTANCE: [
+        {"unit": "m^2*K/W", "description": "si unit"},
+        {"unit": "h*ft^2*delta_degF/Btu", "description": "imperial unit"},
+    ],
+    QuantityKind.SPECIFIC_ENTHALPY: [
+        {"unit": "kJ/kg", "description": "kilojoule per kilogram"},
+        {"unit": "Btu/lb", "description": "BTU per pound"},
+    ],
+    QuantityKind.DIMENSIONLESS: [
+        {"unit": "dimensionless", "description": "dimensionless"},
+        {"unit": "%", "description": "percent"},
+    ],
+}
+
+
+def quantity_schema_metadata(kind: QuantityKind) -> dict[str, Any]:
+    """Return JSON-schema-ready metadata for a given *QuantityKind*.
+
+    The dict contains ``quantity_kind``, ``si_unit``, ``allowed_units`` and
+    ``examples`` – all the information a consumer needs to understand unit
+    constraints on a typed quantity field.
+    """
+    return {
+        "quantity_kind": kind.value,
+        "si_unit": UNIT_RULES[kind].si_unit,
+        "allowed_units": sorted(set(UNIT_RULES[kind].aliases.values())),
+        "examples": _EXAMPLES.get(kind, []),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Mixin that auto-injects unit metadata into Pydantic JSON schemas
+# ---------------------------------------------------------------------------
+class QuantitySchemaMixin:
+    """Mixin for Pydantic ``Quantity`` subclasses.
+
+    Any subclass that sets ``quantity_kind`` (a ``QuantityKind``) will
+    automatically receive a ``json_schema_extra`` block in its JSON schema
+    containing SI unit, allowed units and examples.  The injection happens
+    at class definition time via ``__init_subclass__``.
+    """
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:  # noqa: D105
+        super().__init_subclass__(**kwargs)
+        kind = getattr(cls, "quantity_kind", None)
+        if kind is not None and hasattr(kind, "value"):
+            metadata = quantity_schema_metadata(kind)
+            # Merge with existing model_config without clobbering other keys.
+            existing: dict[str, Any] = dict(getattr(cls, "model_config", {}))
+            existing["json_schema_extra"] = metadata
+            cls.model_config = ConfigDict(**existing)  # type: ignore[attr-defined,typeddict-item]
 
 
 @lru_cache(maxsize=1)
