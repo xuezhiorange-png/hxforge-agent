@@ -69,6 +69,21 @@ class ErrorCode(StrEnum):
     INVALID_STATE_TRANSITION = "invalid_state_transition"
     BLOCKER = "blocker"
 
+    # Correlation-specific error codes
+    CORRELATION_NOT_FOUND = "correlation_not_found"
+    CORRELATION_VERSION_NOT_FOUND = "correlation_version_not_found"
+    CORRELATION_DUPLICATE = "correlation_duplicate"
+    CORRELATION_DEPRECATED = "correlation_deprecated"
+    CORRELATION_WITHDRAWN = "correlation_withdrawn"
+    CORRELATION_GEOMETRY_INCOMPATIBLE = "correlation_geometry_incompatible"
+    CORRELATION_PHASE_INCOMPATIBLE = "correlation_phase_incompatible"
+    CORRELATION_FLOW_REGIME_INCOMPATIBLE = "correlation_flow_regime_incompatible"
+    CORRELATION_INPUT_MISSING = "correlation_input_missing"
+    CORRELATION_RECOMMENDED_RANGE_EXCEEDED = "correlation_recommended_range_exceeded"
+    CORRELATION_ABSOLUTE_RANGE_EXCEEDED = "correlation_absolute_range_exceeded"
+    CORRELATION_EXTRAPOLATION_USED = "correlation_extrapolation_used"
+    CORRELATION_SOURCE_UNVERIFIED = "correlation_source_unverified"
+
     @classmethod
     def is_valid_code(cls, code: str) -> bool:
         """Return True if *code* is a known constant or a valid extension."""
