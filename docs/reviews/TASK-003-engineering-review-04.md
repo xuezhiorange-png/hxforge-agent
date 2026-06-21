@@ -6,8 +6,6 @@
 **Decision:** RESOLVED  
 **CI:** Python 3.11 and 3.12 quality jobs passed.
 
-## Resolution
-
 All four Round-04 findings are closed:
 
 1. `PHStateSpec.reference_state` is schema-required and has no default.
@@ -16,5 +14,3 @@ All four Round-04 findings are closed:
 4. Promised range conditions are handled by explicit prechecks; unexpected backend exceptions map to `property_backend_failure` independent of message text.
 
 The related tests pass in the 191-test suite. Final approval is recorded in `docs/reviews/TASK-003-final-approval.md`.
-
-No heat balance, exchanger correlations, geometry selection, costing, mechanical design or downstream two-phase solvers were added in this PR.
