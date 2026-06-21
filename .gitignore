@@ -21,3 +21,4 @@ simulation_artifacts/
 *.vtu
 *.step
 *.stp
+.local/
