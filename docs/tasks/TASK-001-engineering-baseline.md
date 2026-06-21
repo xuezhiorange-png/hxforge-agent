@@ -108,9 +108,10 @@ Deliver:
 - [x] Absolute temperature and temperature difference are distinct.
 - [x] No numerical engineering default is hidden or implied.
 - [x] Supported and unsupported capability boundaries are explicit.
-- [x] Result states and human-review requirements are defined.
-- [x] Five baseline cases require no undocumented fields.
+- [x] Three-way state model (workflow_stage, verification_level, requires_review) is defined.
+- [x] Five baseline cases are fixed with concrete fluids, geometry, and structured fouling sources.
 - [x] No output language can be confused with certified pressure-vessel design.
+- [x] Result hash has a deterministic canonical payload definition.
 - [ ] Engineering owner approves or rejects each proposed decision in `DECISION_LOG.md`.
 
 ## Review gates

@@ -15,7 +15,7 @@ Status values: `PROPOSED`, `APPROVED`, `REJECTED`, `SUPERSEDED`.
 | DEC-003 | Two-phase services return `NOT_IMPLEMENTED` until validated | PROPOSED | Engineering owner |
 | DEC-004 | No hidden numerical engineering defaults | PROPOSED | Engineering owner |
 | DEC-005 | SI internal kernel; absolute temperature ≠ temperature difference | PROPOSED | Engineering owner |
-| DEC-006 | Result states split into `status` and `verification_level` | PROPOSED | Engineering + product owner |
+| DEC-006 | Three-way state model: workflow_stage, verification_level, requires_review | PROPOSED | Engineering + product owner |
 | DEC-007 | HXForge never claims certified compliance from preliminary calcs | PROPOSED | Engineering owner |
 | DEC-008 | Every numerical output includes provenance and structured warnings | PROPOSED | Engineering + software owner |
 | DEC-009 | Candidate generation limited to approved manufacturable catalog | PROPOSED | Engineering owner |
@@ -23,7 +23,7 @@ Status values: `PROPOSED`, `APPROVED`, `REJECTED`, `SUPERSEDED`.
 | DEC-011 | CoolProp is the first and default property backend for v0.1 | PROPOSED | Engineering owner |
 | DEC-012 | Each correlation declares its own applicability envelope; reject-by-default outside envelope | PROPOSED | Engineering owner |
 | DEC-013 | Candidate structures must come from versioned, sourced catalog; continuous opt must not invent procurement dimensions | PROPOSED | Engineering owner |
-| DEC-014 | Four-tier convergence: heat-balance tolerance, solver residual, state-variable change, max iterations | PROPOSED | Engineering owner |
+| DEC-014 | Typed convergence: heat-balance acceptance + per-solver absolute/relative tolerances + max iterations | PROPOSED | Engineering owner |
 | DEC-015 | Sizing uses discrete structure selection; rating reports margins without modifying structure | PROPOSED | Engineering owner |
 | DEC-016 | Three-tier fluid validation: mandatory, extended, independent-incompressible | PROPOSED | Engineering owner |
 | DEC-017 | Fouling source is a structured object; zero fouling requires explicit choice and Warning | PROPOSED | Engineering owner |
@@ -95,14 +95,14 @@ Status values: `PROPOSED`, `APPROVED`, `REJECTED`, `SUPERSEDED`.
 
 ---
 
-### DEC-006 — Result states split into status and verification_level
+### DEC-006 — Three-way state model: workflow stage, verification maturity, review requirement
 
 **Status:** PROPOSED
 **Owner:** Engineering + product owner
 
-**Decision:** Every calculation result carries two independent state fields:
+**Decision:** Every calculation result carries three independent fields: `workflow_stage`, `verification_level`, and `requires_review`.
 
-**`status`** — the execution state of the workflow:
+**`workflow_stage`** — the execution position of the workflow:
 
 | Value | Meaning |
 |---|---|
@@ -111,27 +111,37 @@ Status values: `PROPOSED`, `APPROVED`, `REJECTED`, `SUPERSEDED`.
 | `THERMAL_SERVICE_RESOLVED` | Phase, service type identified |
 | `TECHNOLOGIES_SCREENED` | Candidate families ranked |
 | `CANDIDATES_GENERATED` | Geometry candidates produced |
-| `CANDIDATES_RATED` | Candidates thermally/hydraulically rated |
-| `ENGINEERING_CHECKED` | Mechanical, material, risk checks done |
+| `CANDIDATES_RATED` | Candidates thermally and hydraulically rated |
+| `ENGINEERING_CHECKED` | Mechanical, material and risk checks done |
 | `COSTED` | Cost estimates attached |
-| `VERIFIED` | Benchmark/regression verified |
+| `VERIFICATION_COMPLETED` | Benchmark and regression verification step executed |
 | `REPORT_READY` | Report packaged |
 | `BLOCKED` | Terminal: input, safety, applicability, property or specification failure |
 | `NOT_IMPLEMENTED` | Terminal: capability not yet available |
 | `NON_CONVERGED` | Terminal: iterative solver failed to converge |
 
-**`verification_level`** — the maturity of the engineering result:
+**`verification_level`** — the evidence maturity of the engineering result:
 
 | Value | Meaning |
 |---|---|
-| `PRELIMINARY` | Calculation completed; requires engineering review |
-| `REVIEW_REQUIRED` | Result exists but assumptions or warnings need approval |
-| `VERIFIED` | Passes approved benchmark and review rules |
-| `N/A` | Not applicable (status is BLOCKED, NOT_IMPLEMENTED, or NON_CONVERGED) |
+| `UNVERIFIED` | Result produced but not yet compared against benchmarks or hand calculations |
+| `PRELIMINARY` | Calculation completed; engineering plausibility checked but not formally validated |
+| `BENCHMARK_VALIDATED` | Result passes approved benchmark cases within declared tolerances |
+| `ENGINEERING_APPROVED` | Result reviewed and approved by a qualified engineer |
+| `N/A` | Not applicable when workflow_stage is a terminal state (BLOCKED, NOT_IMPLEMENTED, NON_CONVERGED) |
 
-**Rationale / consequence:** Separates execution outcome from engineering maturity. Prevents conflating workflow termination (BLOCKED) with result confidence (PRELIMINARY).
+**`requires_review`** — whether a human engineering review is needed before the result can be used for decisions:
 
-**Affected modules:** All result schemas, API responses, report generation
+| Value | Derivation |
+|---|---|
+| `true` | Any WARNING is present, or any assumption/deviation from standard conditions exists, or verification_level is UNVERIFIED or PRELIMINARY |
+| `false` | verification_level is BENCHMARK_VALIDATED or ENGINEERING_APPROVED with no open warnings |
+
+`requires_review` is a derived boolean, not a user-set field. It is computed from warnings, assumptions, and verification_level.
+
+**Rationale / consequence:** Separates three orthogonal concerns: where the workflow is (stage), how mature the evidence is (verification_level), and whether human action is needed (requires_review). Prevents conflating workflow completion with engineering confidence, and prevents requiring review for trivially verified results.
+
+**Affected modules:** All result schemas, API responses, report generation, TASK-005
 
 ---
 
@@ -245,29 +255,52 @@ Status values: `PROPOSED`, `APPROVED`, `REJECTED`, `SUPERSEDED`.
 
 ---
 
-### DEC-014 — Four-tier convergence framework
+### DEC-014 — Typed convergence framework
 
 **Status:** PROPOSED
 **Owner:** Engineering owner
 
 **Decision:**
 
-Iterative solvers must declare and track four independent convergence parameters:
+Iterative solvers must declare and track typed convergence parameters. There are two independent convergence checks:
 
-| Parameter | Definition | Default threshold | Scope |
-|---|---|---|---|
-| **Heat-balance acceptance error** | Normalized energy imbalance between hot and cold sides: `abs(Q_hot - Q_cold) / max(Q_hot, Q_cold)` | < 0.1% | Energy balance solver |
-| **Solver residual tolerance** | Change in the primary solved variable between iterations (e.g., outlet temperature) | < 0.01 K | All iterative solvers |
-| **State-variable change tolerance** | Change in secondary derived quantities (e.g., U-value, NTU) between iterations | < 0.1% of previous value | Sizing/rating loops |
-| **Maximum iteration count** | Hard stop on total iterations | 100 | All iterative solvers |
+**A. Heat-balance acceptance** (energy closure)
 
-All four parameters are configurable and traceable in provenance.
+$$\epsilon_{HB} = \frac{|Q_{hot} - Q_{cold}|}{\max(|Q_{hot}|, |Q_{cold}|, Q_{floor})}$$
 
-When the maximum iteration count is reached without meeting tolerances, the run must terminate with status `NON_CONVERGED` and a `BLOCKED` blocker explaining which tolerance was not met. The solver must not return a partial result as if it converged.
+where $Q_{floor}$ is a non-zero reference floor (default: 1 W) to prevent division by near-zero values. The default acceptance threshold is $\epsilon_{HB} < 0.001$ (0.1%). This check applies to every solver that computes duty from two streams.
 
-**Rationale / consequence:** Prevents infinite loops, silent non-convergence, and premature acceptance of loosely converged results.
+**B. Numerical solver convergence** (per-solver)
 
-**Affected modules:** TASK-006 (heat balance), TASK-008 (rating), TASK-009 (sizing)
+Each iterative solver must declare a typed convergence specification:
+
+| Field | Type | Description |
+|---|---|---|
+| `primary_variable` | string | Name of the variable being solved (e.g., "outlet_temperature", "pressure", "U_value") |
+| `absolute_tolerance` | quantity (same dimension as primary_variable) | Maximum allowed absolute change between iterations |
+| `relative_tolerance` | dimensionless fraction | Maximum allowed relative change between iterations |
+| `scaling_quantity` | quantity (same dimension as primary_variable) | Reference scale for relative tolerance; prevents division by near-zero values |
+| `residual_definition` | string | How the residual is computed (e.g., "abs(x_n - x_{n-1})", "L2 norm of residual vector") |
+
+Convergence criterion: `abs(delta_x) <= absolute_tolerance + relative_tolerance * scaling_quantity`.
+
+Default values are solver-specific and must be declared per solver, not globally assigned. Example for an outlet-temperature solver:
+- `absolute_tolerance`: 0.005 K
+- `relative_tolerance`: 1e-6
+- `scaling_quantity`: |T_in| + 273.15 (absolute inlet temperature as scale)
+
+Example for a U-value iteration:
+- `absolute_tolerance`: 0.01 W/m²·K
+- `relative_tolerance`: 1e-4
+- `scaling_quantity`: current U estimate
+
+**C. Maximum iteration count** — configurable per solver, default 100, always traceable in provenance.
+
+All convergence parameters are configurable and traceable in provenance. When the maximum iteration count is reached without meeting tolerances, the run must terminate with workflow_stage `NON_CONVERGED` and a `BLOCKED` blocker explaining which tolerance was not met. The solver must not return the last iterate as a valid result.
+
+**Rationale / consequence:** Prevents assigning a dimensionally invalid universal threshold to solvers with different primary unknowns. Ensures each solver declares convergence criteria appropriate to its variable type and scale.
+
+**Affected modules:** TASK-006 (heat balance), TASK-008 (rating), TASK-009 (sizing), all iterative solvers
 
 ---
 
@@ -309,7 +342,7 @@ When the maximum iteration count is reached without meeting tolerances, the run 
 
 The v0.1 fluid validation scope is divided into three tiers:
 
-**Tier 1 — Mandatory validation (must pass before TASK-002 completes):**
+**Tier 1 — Mandatory validation (must pass before TASK-003 completes):**
 - Water (pure, single-phase)
 - Air (single-phase, ideal-gas-like behavior)
 - R134a (single-phase only; two-phase returns NOT_IMPLEMENTED)

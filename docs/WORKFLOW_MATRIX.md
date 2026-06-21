@@ -83,29 +83,34 @@ This document defines the minimum information required for each workflow, the ca
 
 ## 7. Result states
 
-### 7.1 Status (execution state)
+### 7.1 Workflow stage (execution state)
 
-Status tracks the workflow execution position. A run progresses through the following states:
+Stage tracks the workflow execution position. A run progresses through the following stages:
 
-`DRAFT → INPUT_VALIDATED → THERMAL_SERVICE_RESOLVED → TECHNOLOGIES_SCREENED → CANDIDATES_GENERATED → CANDIDATES_RATED → ENGINEERING_CHECKED → COSTED → VERIFIED → REPORT_READY`
+`DRAFT → INPUT_VALIDATED → THERMAL_SERVICE_RESOLVED → TECHNOLOGIES_SCREENED → CANDIDATES_GENERATED → CANDIDATES_RATED → ENGINEERING_CHECKED → COSTED → VERIFICATION_COMPLETED → REPORT_READY`
 
-A run may terminate at any point with a terminal status:
+A run may terminate at any point with a terminal stage:
 
-| Terminal status | Trigger |
+| Terminal stage | Trigger |
 |---|---|
 | `BLOCKED` | Input, safety, applicability, property or specification closure failure |
 | `NOT_IMPLEMENTED` | Requested capability exists in architecture but has no validated implementation |
 | `NON_CONVERGED` | Iterative solver reached maximum iterations without meeting tolerances (see DEC-014) |
 
-### 7.2 Verification level (result maturity)
+### 7.2 Verification level (evidence maturity)
 
-Verification level describes the engineering confidence of the result, independent of the execution status:
+Verification level describes the engineering evidence behind the result, independent of the workflow stage:
 
 | Level | Meaning |
 |---|---|
-| `PRELIMINARY` | Calculation completed; requires engineering review |
-| `REVIEW_REQUIRED` | Result exists but assumptions or warnings need approval |
-| `VERIFIED` | Passes approved benchmark and review rules |
-| `N/A` | Not applicable when status is a terminal state (BLOCKED, NOT_IMPLEMENTED, NON_CONVERGED) |
+| `UNVERIFIED` | Result produced but not yet compared against benchmarks |
+| `PRELIMINARY` | Calculation completed; plausibility checked but not formally validated |
+| `BENCHMARK_VALIDATED` | Passes approved benchmark cases within declared tolerances |
+| `ENGINEERING_APPROVED` | Reviewed and approved by a qualified engineer |
+| `N/A` | Not applicable when workflow_stage is a terminal state (BLOCKED, NOT_IMPLEMENTED, NON_CONVERGED) |
 
-The Agent must not advance the status merely to satisfy a user request.
+### 7.3 Review requirement
+
+`requires_review` is a derived boolean: `true` when any WARNING is present or verification_level is UNVERIFIED/PRELIMINARY; `false` when BENCHMARK_VALIDATED or ENGINEERING_APPROVED with no open warnings.
+
+The Agent must not advance the workflow_stage merely to satisfy a user request.

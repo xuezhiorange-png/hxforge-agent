@@ -16,7 +16,7 @@
 | `name` | User-facing case name | string | — | required |
 | `workflow` | screening, sizing or rating | enum | — | required |
 | `exchanger_type` | requested family or auto-screen | enum | — | required |
-| `standard_basis` | selected rule-pack reference | list/string | — | optional until mechanical work |
+| `standard_basis` | selected rule-pack reference | object: {standard_id: string, edition: string, scope: string} | — | optional until mechanical work |
 | `target_duty` | required heat-transfer rate | quantity | power | conditional |
 | `area_margin_fraction` | required excess area | number | dimensionless | optional, no hidden default |
 
@@ -34,7 +34,6 @@
 | `allowable_pressure_drop` | maximum permitted loss | quantity | pressure difference | required for constrained sizing |
 | `fouling_resistance.value` | fouling thermal resistance | quantity | area·temperature/power | required or explicitly zero with source |
 | `fouling_resistance.source` | structured fouling source object (see DEC-017) | object | — | required; fields: source_type, reference_id, edition, table_or_clause, note |
-| `roughness` | absolute surface roughness of wetted wall | quantity | length | optional, required for accurate friction calculations; if absent, material catalog default with explicit source |
 | `velocity_limit_max` | maximum allowable flow velocity | quantity | length/time | optional |
 | `velocity_limit_min` | minimum required flow velocity | quantity | length/time | optional |
 | `phase_hint` | auto, liquid, gas or two-phase | enum | — | optional |
@@ -69,6 +68,8 @@ For double-pipe rating, the geometry object must include:
 | `hairpin_count` | number of hairpin elements | integer | — | required |
 | `circuit_arrangement` | series, parallel, or mixed | enum | — | required |
 | `material` | tube and shell material identifier | string | — | required |
+| `inner_tube_roughness` | absolute roughness of inner tube wetted surface | quantity | length | required or resolved from material catalog with provenance |
+| `annulus_roughness` | absolute roughness of annulus wetted surfaces | quantity | length | required or resolved from material catalog with provenance |
 
 Unknown fields in the geometry object must cause a BLOCKED status, not be silently ignored.
 
@@ -77,8 +78,9 @@ Unknown fields in the geometry object must cause a BLOCKED status, not be silent
 | Field | Meaning | Type | Unit/status |
 |---|---|---|---|
 | `run_id` | calculation-run identifier | UUID | — |
-| `status` | execution state (see DEC-006 §7.1) | enum | one of: DRAFT, INPUT_VALIDATED, THERMAL_SERVICE_RESOLVED, TECHNOLOGIES_SCREENED, CANDIDATES_GENERATED, CANDIDATES_RATED, ENGINEERING_CHECKED, COSTED, VERIFIED, REPORT_READY, BLOCKED, NOT_IMPLEMENTED, NON_CONVERGED |
-| `verification_level` | result maturity (see DEC-006 §7.2) | enum | one of: PRELIMINARY, REVIEW_REQUIRED, VERIFIED, N/A |
+| `workflow_stage` | execution state (see DEC-006 §7.1) | enum | one of: DRAFT, INPUT_VALIDATED, THERMAL_SERVICE_RESOLVED, TECHNOLOGIES_SCREENED, CANDIDATES_GENERATED, CANDIDATES_RATED, ENGINEERING_CHECKED, COSTED, VERIFICATION_COMPLETED, REPORT_READY, BLOCKED, NOT_IMPLEMENTED, NON_CONVERGED |
+| `verification_level` | evidence maturity (see DEC-006 §7.2) | enum | one of: UNVERIFIED, PRELIMINARY, BENCHMARK_VALIDATED, ENGINEERING_APPROVED, N/A |
+| `requires_review` | derived: human review needed before use | boolean | true when warnings exist or verification_level is UNVERIFIED/PRELIMINARY |
 | `duty` | calculated or specified heat transfer | quantity | power |
 | `energy_balance_error` | normalized hot/cold residual | number | fraction |
 | `outlet_states` | solved stream outlets | object | unit-bearing |
@@ -88,7 +90,7 @@ Unknown fields in the geometry object must cause a BLOCKED status, not be silent
 | `warnings` | non-fatal engineering conditions | list | structured |
 | `blockers` | fatal conditions | list | structured |
 | `provenance` | formula/property/version trace | list/object | structured |
-| `result_hash` | deterministic hash of inputs + outputs + versions | string | — | always |
+| `result_hash` | deterministic hash of canonical inputs + outputs (see §8) | string | — | always |
 | `software_version` | HXForge version used | string | — | always |
 | `property_backend_version` | property provider version | string | — | always when properties used |
 
@@ -96,7 +98,7 @@ Unknown fields in the geometry object must cause a BLOCKED status, not be silent
 
 Permitted software defaults are limited to non-engineering behavior such as pagination or display formatting. Engineering defaults require an approved decision-log entry, a visible source and a user-facing warning.
 
-## 8. Provenance field semantics
+## 8. Provenance and result-hash semantics
 
 Every calculation run must record:
 - Input snapshot (all user-provided and resolved values with units)
@@ -108,6 +110,31 @@ Every calculation run must record:
 - Convergence status and iteration count (for iterative solvers)
 - Warnings and blockers with severity codes
 - Software version and Git commit hash
-- Result hash (SHA-256 of canonical JSON of inputs + outputs + versions)
 
-Sensitive information (API keys, customer names, internal cost data) must not appear in provenance records.
+### 8.1 Result hash (deterministic)
+
+`result_hash` is a SHA-256 hash of a canonical JSON payload. The payload includes **only** deterministic, reproducible fields:
+
+**Included in hash payload:**
+- All resolved input values (after unit normalization to SI)
+- `workflow_stage` (final value)
+- `verification_level` (final value)
+- Deterministic calculation outputs (duty, outlet states, pressure drops, geometry)
+- Formula/property backend names and versions
+- Software version and Git commit hash
+- `energy_balance_error`
+
+**Excluded from hash payload:**
+- `result_hash` itself (self-reference)
+- `run_id` (random UUID)
+- Timestamps, display formatting, locale-dependent text
+- `requires_review` (derived from warnings, which are included)
+- Warning/blocker message text (codes are included)
+
+**Numeric canonicalization:**
+- All floats are serialized with full precision (Python `repr` or equivalent)
+- Units are normalized to SI before hashing
+- Object keys are sorted alphabetically
+- Lists are order-dependent (input order is part of the hash)
+
+Sensitive information (API keys, customer names, internal cost data) must not appear in provenance records or hash payloads.

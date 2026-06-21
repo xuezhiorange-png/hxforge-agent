@@ -33,7 +33,7 @@ These families participate in technology screening but do not produce validated 
 ### Validated calculation capability (target for first vertical slice)
 - Double-pipe / hairpin — single-phase liquid-liquid and gas-liquid sizing, rating, optimization and reporting
 
-Only capabilities explicitly marked as validated may return engineering results that carry `verification_level = PRELIMINARY` or above.
+Only capabilities explicitly marked as validated may return engineering results. Implemented but not yet benchmark-validated calculations may legitimately carry `verification_level = PRELIMINARY`; validation maturity is represented by `verification_level`, not by the workflow stage.
 
 ## 4. v0.1 supported workflows
 
@@ -69,11 +69,11 @@ The first complete vertical slice is single-phase double-pipe service. It should
 
 ## 7. Result states
 
-Every calculation result carries two independent fields: `status` and `verification_level`.
+Every calculation result carries three independent fields: `workflow_stage`, `verification_level`, and `requires_review`.
 
-### 7.1 Status (execution state)
+### 7.1 Workflow stage (execution state)
 
-| Status | Meaning |
+| Stage | Meaning |
 |---|---|
 | `DRAFT` | Case created, not yet validated |
 | `INPUT_VALIDATED` | Inputs pass schema and engineering validation |
@@ -83,22 +83,30 @@ Every calculation result carries two independent fields: `status` and `verificat
 | `CANDIDATES_RATED` | Candidates thermally and hydraulically rated |
 | `ENGINEERING_CHECKED` | Mechanical, material and risk checks done |
 | `COSTED` | Cost estimates attached |
-| `VERIFIED` | Benchmark and regression verified |
+| `VERIFICATION_COMPLETED` | Benchmark and regression verification step executed |
 | `REPORT_READY` | Report packaged |
 | `BLOCKED` | Terminal: input, safety, applicability, property or specification failure |
 | `NOT_IMPLEMENTED` | Terminal: capability not yet available |
 | `NON_CONVERGED` | Terminal: iterative solver failed to converge |
 
-### 7.2 Verification level (result maturity)
+### 7.2 Verification level (evidence maturity)
 
-| Verification level | Meaning |
+| Level | Meaning |
 |---|---|
-| `PRELIMINARY` | Calculation completed; requires engineering review |
-| `REVIEW_REQUIRED` | Result exists but assumptions or warnings need approval |
-| `VERIFIED` | Passes approved benchmark and review rules |
-| `N/A` | Not applicable (status is BLOCKED, NOT_IMPLEMENTED, or NON_CONVERGED) |
+| `UNVERIFIED` | Result produced but not yet compared against benchmarks |
+| `PRELIMINARY` | Calculation completed; plausibility checked but not formally validated |
+| `BENCHMARK_VALIDATED` | Passes approved benchmark cases within declared tolerances |
+| `ENGINEERING_APPROVED` | Reviewed and approved by a qualified engineer |
+| `N/A` | Not applicable when workflow_stage is a terminal state |
 
-The Agent must not advance the status merely to satisfy a user request.
+### 7.3 Review requirement
+
+`requires_review` is a derived boolean field:
+
+- `true` when any WARNING is present, any assumption or deviation from standard conditions exists, or verification_level is `UNVERIFIED` or `PRELIMINARY`;
+- `false` when verification_level is `BENCHMARK_VALIDATED` or `ENGINEERING_APPROVED` with no open warnings.
+
+The Agent must not advance the workflow_stage merely to satisfy a user request.
 
 ## 8. User-facing outputs
 
