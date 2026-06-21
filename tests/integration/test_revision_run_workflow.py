@@ -309,7 +309,37 @@ class TestFullRunWorkflow:
         run = run_service.start_run(run, clock)
         assert run.status == CalculationRunStatus.RUNNING
 
-        # 4. Succeed
+        # 4. Set provenance graph and succeed
+        from uuid import uuid4 as _uuid4
+
+        from hexagent.domain.provenance import (
+            ProvenanceEdge,
+            ProvenanceGraph,
+            ProvenanceNode,
+            ProvenanceNodeType,
+        )
+        _na = ProvenanceNode(
+            node_id=_uuid4(),
+            node_type=ProvenanceNodeType.CASE_REVISION,
+            payload_hash="sha256:" + "1" * 64,
+        )
+        _nb = ProvenanceNode(
+            node_id=_uuid4(),
+            node_type=ProvenanceNodeType.CALCULATION_RUN,
+            payload_hash="sha256:" + "2" * 64,
+        )
+        _nc = ProvenanceNode(
+            node_id=_uuid4(),
+            node_type=ProvenanceNodeType.RESULT,
+            payload_hash="sha256:" + "3" * 64,
+        )
+        run = run.model_copy(update={"provenance_graph": ProvenanceGraph(
+            nodes=(_na, _nb, _nc),
+            edges=(
+                ProvenanceEdge(source_id=_na.node_id, target_id=_nb.node_id, relation="triggers"),
+                ProvenanceEdge(source_id=_nb.node_id, target_id=_nc.node_id, relation="produces"),
+            ),
+        )})
         clock.advance(seconds=5)
         run = run_service.succeed_run(
             run,
@@ -345,6 +375,36 @@ class TestFullRunWorkflow:
         clock.advance(seconds=1)
         run = run_service.start_run(run, clock)
 
+        # Set valid provenance graph before terminal state
+        from uuid import uuid4 as _uuid4
+
+        from hexagent.domain.provenance import (
+            ProvenanceEdge,
+            ProvenanceGraph,
+            ProvenanceNode,
+            ProvenanceNodeType,
+        )
+        _n1 = ProvenanceNode(
+            node_id=_uuid4(),
+            node_type=ProvenanceNodeType.CASE_REVISION,
+            payload_hash="sha256:" + "1" * 64,
+        )
+        _n2 = ProvenanceNode(
+            node_id=_uuid4(),
+            node_type=ProvenanceNodeType.CALCULATION_RUN,
+            payload_hash="sha256:" + "2" * 64,
+        )
+        run = run.model_copy(update={"provenance_graph": ProvenanceGraph(
+            nodes=(_n1, _n2),
+            edges=(
+                ProvenanceEdge(
+                    source_id=_n1.node_id,
+                    target_id=_n2.node_id,
+                    relation="triggers",
+                ),
+            ),
+        )})
+
         failure = RunFailure(
             code=ErrorCode.CALCULATION_NOT_CONVERGED,
             message="Solver diverged after 50 iterations",
@@ -379,6 +439,36 @@ class TestFullRunWorkflow:
         )
         clock.advance(seconds=1)
         run = run_service.start_run(run, clock)
+
+        # Set valid provenance graph before terminal state
+        from uuid import uuid4 as _uuid4
+
+        from hexagent.domain.provenance import (
+            ProvenanceEdge,
+            ProvenanceGraph,
+            ProvenanceNode,
+            ProvenanceNodeType,
+        )
+        _n1 = ProvenanceNode(
+            node_id=_uuid4(),
+            node_type=ProvenanceNodeType.CASE_REVISION,
+            payload_hash="sha256:" + "1" * 64,
+        )
+        _n2 = ProvenanceNode(
+            node_id=_uuid4(),
+            node_type=ProvenanceNodeType.CALCULATION_RUN,
+            payload_hash="sha256:" + "2" * 64,
+        )
+        run = run.model_copy(update={"provenance_graph": ProvenanceGraph(
+            nodes=(_n1, _n2),
+            edges=(
+                ProvenanceEdge(
+                    source_id=_n1.node_id,
+                    target_id=_n2.node_id,
+                    relation="triggers",
+                ),
+            ),
+        )})
 
         blocker = EngineeringMessage(
             code=ErrorCode.PROPERTY_UNAVAILABLE,
@@ -462,12 +552,41 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SCREEN,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="abc123",
             clock=clock,
             id_gen=id_gen,
         )
         clock.advance(seconds=1)
         run = run_service.start_run(run, clock)
+        # Set a valid provenance graph before succeeding
+        from uuid import uuid4
+
+        from hexagent.domain.provenance import (
+            ProvenanceEdge,
+            ProvenanceGraph,
+            ProvenanceNode,
+            ProvenanceNodeType,
+        )
+        n1 = ProvenanceNode(
+            node_id=uuid4(), node_type=ProvenanceNodeType.CASE_REVISION,
+            payload_hash="sha256:" + "1" * 64,
+        )
+        n2 = ProvenanceNode(
+            node_id=uuid4(), node_type=ProvenanceNodeType.CALCULATION_RUN,
+            payload_hash="sha256:" + "2" * 64,
+        )
+        n3 = ProvenanceNode(
+            node_id=uuid4(), node_type=ProvenanceNodeType.RESULT,
+            payload_hash="sha256:" + "3" * 64,
+        )
+        graph = ProvenanceGraph(
+            nodes=(n1, n2, n3),
+            edges=(
+                ProvenanceEdge(source_id=n1.node_id, target_id=n2.node_id, relation="triggers"),
+                ProvenanceEdge(source_id=n2.node_id, target_id=n3.node_id, relation="produces"),
+            ),
+        )
+        run = run.model_copy(update={"provenance_graph": graph})
         clock.advance(seconds=5)
         run = run_service.succeed_run(run, result_hash="sha256:" + "a" * 64, clock=clock)
 

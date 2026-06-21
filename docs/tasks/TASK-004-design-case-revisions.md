@@ -12,17 +12,17 @@
 
 ### In Scope
 
-- Immutable `DesignCaseRevision` with content hash
-- Canonical JSON serialization rules (tuple order preserved, SI-equivalent hashing)
-- Parent-child revision relationships with chain integrity
-- `RevisionDiff` with recursive field-level diffs and before/after values
-- `CalculationRun` with state machine and terminal-state invariants
+- Immutable `DesignCaseRevision` with **deep-frozen** canonical payload
+- Canonical JSON: tuple order preserved, set/frozenset sorted, SI-equivalent Quantity hashing
+- Parent-child revision chain with repository-level enforcement
+- `RevisionDiff` with **frozen** `FieldChange` dataclass entries (recursive paths, before/after)
+- `CalculationRun` with terminal-state invariants, required `input_hash` and `git_commit`
 - Structured `EngineeringMessage` (BLOCKER/ERROR/WARNING/INFO) with severity-derived continuation
 - `ErrorCode` StrEnum with extension mechanism
-- `ProvenanceGraph` DAG with RESULT/WARNING/BLOCKER node types, payload_hash, canonical ordering
-- Repository Protocol + in-memory implementation (deep-copy isolation)
+- `ProvenanceGraph` with RESULT/WARNING/BLOCKER node types, mandatory `payload_hash`
+- Repository Protocol + in-memory implementation (deep-copy, chain enforcement, PENDING-only add)
 - `RevisionService` + `RunService`
-- 389 tests (unit + integration + review-item tests)
+- 419 tests (unit + integration + review-item tests)
 - Documentation
 
 ### Out of Scope
@@ -34,62 +34,33 @@
 
 ## Acceptance Criteria
 
-- [x] Revision is immutable after creation
+- [x] Revision is immutable after creation (deep-frozen canonical_payload via MappingProxyType)
 - [x] Every case modification produces a new revision
 - [x] Revision contains parent, number, snapshot, content hash
 - [x] Same input → same canonical JSON → same hash
-- [x] Field order does not affect hash
-- [x] Numerical, enum, unit objects serialize stably
-- [x] Quantity objects hash by SI value + dimension, not display unit (°C↔K equivalence)
-- [x] CalculationRun references unique case revision
+- [x] Tuple order preserved; set/frozenset sorted
+- [x] Quantity objects hash by SI value + dimension, not display unit
+- [x] **Full DesignCase** unit-equivalent hashes (°C/K, bar/Pa, mm/m, kg/h/kg/s)
+- [x] CalculationRun requires valid `input_hash` (sha256:<64-hex>) and `git_commit`
 - [x] Warnings, blockers, failures are structured
-- [x] Provenance graph serializable with node dependency validation
-- [x] Repository Protocol + memory impl pass consistency tests
-- [x] Ruff, mypy, pytest pass on Python 3.11/3.12
-- [x] Tuple order preserved in canonical JSON (only set/frozenset sorted)
-- [x] Deep immutability: repos return detached snapshots, nested mutation impossible
-- [x] Revision chain: same-case parentage, consecutive numbering, no-op rejection
-- [x] RevisionDiff: recursive paths, before/after values, deterministic ordering
-- [x] CalculationRun: model_validator enforces terminal-state invariants at construction
-- [x] Run repository: immutable identity fields protected, transition policy centralised
-- [x] Provenance: RESULT/WARNING/BLOCKER node types, payload_hash, insertion-order-independent hash
-- [x] Messages: BLOCKER severity, severity→continuation derived, stable ErrorCode enum
-- [x] 389 tests all passing
-
-## Engineering Decisions
-
-- canonical JSON: UTF-8, sorted keys, compact separators
-- hash: sha256:<64-hex-lowercase>
-- revision immutability: frozen dataclass + deep-copy repository
-- state transitions: centralised in `revisions.py`, enforced at model and repository level
-- provenance graph: DAG with topological ordering, canonical node/edge sort for hashing
-- unit-equivalent hashing: SI value + kind, display unit excluded from content identity
-- message continuation: derived from severity (before-validator), not caller-supplied
+- [x] Provenance graph: RESULT/WARNING/BLOCKER node types, mandatory payload_hash
+- [x] Repository enforces same-case parentage and consecutive numbering
+- [x] Repository add() only accepts PENDING for runs
+- [x] Terminal states require non-empty graph with CASE_REVISION, CALCULATION_RUN, (RESULT for SUCCEEDED)
+- [x] FieldChange is a frozen dataclass (not mutable dict)
+- [x] contextlib.suppress removed — SI conversion fails closed
+- [x] 419 tests all passing
+- [x] Ruff, mypy, pip-audit clean
 
 ## Test Summary
 
-**389 tests** across 12 test files:
-
-| Module | Tests | Coverage |
-|---|---|---|
-| `test_properties.py` | 100 | CoolProp property service |
-| `test_review_items.py` | 62 | All 10 review items |
-| `test_engineering_messages.py` | 40 | Message model, severity, codes |
-| `test_calculation_runs.py` | 33 | Run state machine, invariants |
-| `test_canonical_serialization.py` | 25 | Canonical JSON, hashing |
-| `test_design_case_revisions.py` | 23 | Revision model, chain |
-| `test_provenance_graph.py` | 22 | Graph DAG, node types |
-| `test_api.py` | 21 | API integration |
-| `test_revision_run_workflow.py` | 17 | End-to-end workflows |
-| `test_units.py` | 16 | Unit system |
-| `test_thermal.py` | 3 | Thermal stubs |
-| `test_task002_round3.py` | 2 | TASK-002 roundtrip |
+**419 tests** across 13 test files.
 
 ## CI Status
 
-- Python 3.11: ✅ passed
-- Python 3.12: ✅ passed
+- Latest CI: ✅ All 4 jobs passed
 
 ## Review Status
 
-- Round 1: CHANGES REQUIRED — all 10 items addressed, re-review pending
+- Round 1: CHANGES REQUIRED — addressed
+- Round 2: CHANGES REQUIRED — addressed, re-review pending

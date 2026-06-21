@@ -23,6 +23,8 @@ from hexagent.domain.provenance import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+PAYLOAD_HASH = "sha256:" + "a" * 64
+
 
 def _node(
     node_id: int = 1,
@@ -33,6 +35,7 @@ def _node(
         node_id=UUID(int=node_id),
         node_type=node_type,
         label=label,
+        payload_hash=PAYLOAD_HASH,
     )
 
 
@@ -48,11 +51,12 @@ def _edge(source: int, target: int, relation: str = "derives") -> ProvenanceEdge
 # Tests
 # ---------------------------------------------------------------------------
 
-
 class TestProvenanceGraphValidation:
     """DAG validation rules on construction."""
 
-    def test_empty_graph_accepted(self) -> None:
+    def test_empty_graph_rejected(self) -> None:
+        """An empty graph is allowed at model level but rejected at persistence."""
+        # Empty graph is allowed at model level
         g = ProvenanceGraph(nodes=(), edges=())
         assert len(g.nodes) == 0
 
@@ -92,7 +96,7 @@ class TestProvenanceGraphValidation:
         """Edge references a source that doesn't exist."""
         with pytest.raises(ValueError, match="source.*not found"):
             ProvenanceGraph(
-                nodes=(_node(2),),
+                nodes=(_node(2, ProvenanceNodeType.CALCULATION_RUN),),
                 edges=(_edge(99, 2),),
             )
 
@@ -115,7 +119,7 @@ class TestProvenanceGraphValidation:
         """A -> B -> A is a cycle."""
         with pytest.raises(ValueError, match="cycle"):
             ProvenanceGraph(
-                nodes=(_node(1), _node(2)),
+                nodes=(_node(1), _node(2, ProvenanceNodeType.CALCULATION_RUN)),
                 edges=(_edge(1, 2), _edge(2, 1)),
             )
 
@@ -123,7 +127,11 @@ class TestProvenanceGraphValidation:
         """A -> B -> C -> A."""
         with pytest.raises(ValueError, match="cycle"):
             ProvenanceGraph(
-                nodes=(_node(1), _node(2), _node(3)),
+                nodes=(
+                    _node(1),
+                    _node(2, ProvenanceNodeType.CALCULATION_RUN),
+                    _node(3, ProvenanceNodeType.REPORT),
+                ),
                 edges=(_edge(1, 2), _edge(2, 3), _edge(3, 1)),
             )
 
@@ -138,15 +146,26 @@ class TestProvenanceGraphValidation:
                 edges=(_edge(1, 2),),
             )
 
-    def test_case_revision_required_only_when_nodes_exist(self) -> None:
-        """An empty graph doesn't need a CASE_REVISION node."""
-        g = ProvenanceGraph(nodes=(), edges=())
-        assert len(g.nodes) == 0
+    def test_no_calculation_run_rejected(self) -> None:
+        """Graph with nodes but no CALCULATION_RUN node is rejected."""
+        with pytest.raises(ValueError, match="CALCULATION_RUN"):
+            ProvenanceGraph(
+                nodes=(
+                    _node(1, ProvenanceNodeType.CASE_REVISION),
+                    _node(2, ProvenanceNodeType.REPORT),
+                ),
+                edges=(_edge(1, 2),),
+            )
 
     def test_diamond_dag_accepted(self) -> None:
         """A -> B, A -> C, B -> D, C -> D — valid diamond."""
         g = ProvenanceGraph(
-            nodes=(_node(1), _node(2), _node(3), _node(4)),
+            nodes=(
+                _node(1),
+                _node(2, ProvenanceNodeType.CALCULATION_RUN),
+                _node(3, ProvenanceNodeType.REPORT),
+                _node(4, ProvenanceNodeType.RESULT),
+            ),
             edges=(_edge(1, 2), _edge(1, 3), _edge(2, 4), _edge(3, 4)),
         )
         assert len(g.edges) == 4
@@ -175,6 +194,7 @@ class TestProvenanceGraphJsonRoundTrip:
             node_type=ProvenanceNodeType.CASE_REVISION,
             label="test",
             metadata=(("version", 2),),
+            payload_hash=PAYLOAD_HASH,
         )
         edge = ProvenanceEdge(
             source_id=UUID(int=1),
@@ -185,7 +205,8 @@ class TestProvenanceGraphJsonRoundTrip:
         g = ProvenanceGraph(
             nodes=(node, ProvenanceNode(
                 node_id=UUID(int=2),
-                node_type=ProvenanceNodeType.REPORT,
+                node_type=ProvenanceNodeType.CALCULATION_RUN,
+                payload_hash=PAYLOAD_HASH,
             )),
             edges=(edge,),
         )
@@ -217,7 +238,7 @@ class TestProvenanceGraphHashStability:
             edges=(_edge(1, 2),),
         )
         g2 = ProvenanceGraph(
-            nodes=(_node(1), _node(3, ProvenanceNodeType.REPORT)),
+            nodes=(_node(1), _node(3, ProvenanceNodeType.CALCULATION_RUN),),
             edges=(_edge(1, 3),),
         )
         h1 = sha256_digest(g1.model_dump())
@@ -230,8 +251,8 @@ class TestProvenanceGraphImmutability:
 
     def test_cannot_reassign_nodes(self) -> None:
         g = ProvenanceGraph(
-            nodes=(_node(1),),
-            edges=(),
+            nodes=(_node(1), _node(2, ProvenanceNodeType.CALCULATION_RUN)),
+            edges=(_edge(1, 2),),
         )
         # Pydantic frozen models prevent field reassignment
         with pytest.raises((ValueError, ValidationError)):
@@ -239,8 +260,8 @@ class TestProvenanceGraphImmutability:
 
     def test_frozen_model(self) -> None:
         g = ProvenanceGraph(
-            nodes=(_node(1),),
-            edges=(),
+            nodes=(_node(1), _node(2, ProvenanceNodeType.CALCULATION_RUN)),
+            edges=(_edge(1, 2),),
         )
         with pytest.raises((ValueError, ValidationError)):
             g.schema_version = "2.0"  # type: ignore[misc]

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
 import math
+import types
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
@@ -50,10 +50,10 @@ def _preprocess(obj: Any) -> Any:
         kind = obj.kind
         # Compute SI value so that e.g. 100 °C and 373.15 K produce the
         # same content hash when the kind is ABSOLUTE_TEMPERATURE.
+        # Fail closed: if SI conversion fails, raise immediately.
         si_val = obj.value
         if kind is not None and hasattr(obj, "to_si"):
-            with contextlib.suppress(Exception):
-                si_val = obj.to_si().value
+            si_val = obj.to_si().value
         return {
             "si_value": si_val,
             "kind": kind.value if kind is not None else None,
@@ -62,6 +62,14 @@ def _preprocess(obj: Any) -> Any:
     # Pydantic BaseModel → dict
     if hasattr(obj, "model_dump"):
         return {k: _preprocess(v) for k, v in obj.model_dump().items()}
+
+    # MappingProxyType (from deep_freeze) → recursively process values
+    if isinstance(obj, types.MappingProxyType):
+        return {k: _preprocess(v) for k, v in obj.items()}
+
+    # dict → recursively process values
+    if isinstance(obj, dict):
+        return {k: _preprocess(v) for k, v in obj.items()}
 
     # frozenset → sorted list (sets are unordered by definition)
     if isinstance(obj, frozenset):
@@ -80,10 +88,6 @@ def _preprocess(obj: Any) -> Any:
     # list → recursively process
     if isinstance(obj, list):
         return [_preprocess(item) for item in obj]
-
-    # dict → recursively process values
-    if isinstance(obj, dict):
-        return {k: _preprocess(v) for k, v in obj.items()}
 
     # primitives pass through
     return obj
@@ -113,14 +117,15 @@ def _canonical_encoder(obj: Any) -> Any:
         kind = obj.kind
         si_val = obj.value
         if kind is not None and hasattr(obj, "to_si"):
-            with contextlib.suppress(Exception):
-                si_val = obj.to_si().value
+            si_val = obj.to_si().value
         return {
             "si_value": si_val,
             "kind": kind.value if kind is not None else None,
         }
     if hasattr(obj, "model_dump"):
         return {k: _canonical_encoder(v) for k, v in obj.model_dump().items()}
+    if isinstance(obj, types.MappingProxyType):
+        return {k: _canonical_encoder(v) for k, v in obj.items()}
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON-serialisable")
 
 

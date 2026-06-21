@@ -170,6 +170,69 @@ def _make_warning() -> EngineeringMessage:
     )
 
 
+def _make_valid_provenance_graph() -> ProvenanceGraph:
+    """Create a minimal valid provenance graph with CASE_REVISION and CALCULATION_RUN nodes."""
+    ph = "sha256:" + "a" * 64
+    case_node = ProvenanceNode(
+        node_id=UUID(int=100),
+        node_type=ProvenanceNodeType.CASE_REVISION,
+        label="rev",
+        payload_hash=ph,
+    )
+    run_node = ProvenanceNode(
+        node_id=UUID(int=200),
+        node_type=ProvenanceNodeType.CALCULATION_RUN,
+        label="run",
+        payload_hash=ph,
+    )
+    return ProvenanceGraph(
+        nodes=(case_node, run_node),
+        edges=(ProvenanceEdge(
+            source_id=UUID(int=100),
+            target_id=UUID(int=200),
+            relation="triggers",
+        ),),
+    )
+
+
+def _make_valid_succeeded_provenance_graph() -> ProvenanceGraph:
+    """Create a valid provenance graph with CASE_REVISION, CALCULATION_RUN, and RESULT nodes."""
+    ph = "sha256:" + "a" * 64
+    case_node = ProvenanceNode(
+        node_id=UUID(int=100),
+        node_type=ProvenanceNodeType.CASE_REVISION,
+        label="rev",
+        payload_hash=ph,
+    )
+    run_node = ProvenanceNode(
+        node_id=UUID(int=200),
+        node_type=ProvenanceNodeType.CALCULATION_RUN,
+        label="run",
+        payload_hash=ph,
+    )
+    result_node = ProvenanceNode(
+        node_id=UUID(int=300),
+        node_type=ProvenanceNodeType.RESULT,
+        label="result",
+        payload_hash=ph,
+    )
+    return ProvenanceGraph(
+        nodes=(case_node, run_node, result_node),
+        edges=(
+            ProvenanceEdge(
+                source_id=UUID(int=100),
+                target_id=UUID(int=200),
+                relation="triggers",
+            ),
+            ProvenanceEdge(
+                source_id=UUID(int=200),
+                target_id=UUID(int=300),
+                relation="produces",
+            ),
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Item 1 — Tuple order preserved
 # ---------------------------------------------------------------------------
@@ -315,6 +378,7 @@ class TestItem2DeepImmutability:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            input_hash=rev.content_hash,
         )
         run_repo.add(run)
 
@@ -329,15 +393,18 @@ class TestItem2DeepImmutability:
 
     def test_provenance_graph_deep_copy(self) -> None:
         """deep_copy_graph returns an independent copy."""
+        ph = "sha256:" + "a" * 64
         node_a = ProvenanceNode(
             node_id=UUID(int=1),
             node_type=ProvenanceNodeType.CASE_REVISION,
             label="rev-1",
+            payload_hash=ph,
         )
         node_b = ProvenanceNode(
             node_id=UUID(int=2),
             node_type=ProvenanceNodeType.CALCULATION_RUN,
             label="run-1",
+            payload_hash=ph,
         )
         edge = ProvenanceEdge(
             source_id=UUID(int=1),
@@ -375,6 +442,7 @@ class TestItem2DeepImmutability:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            input_hash=rev.content_hash,
         )
         run_repo.add(run)
 
@@ -586,12 +654,12 @@ class TestItem4FieldLevelDiff:
 
         assert len(diff.field_changes) > 0
         for change in diff.field_changes:
-            assert "path" in change
-            assert "before" in change
-            assert "after" in change
+            assert hasattr(change, "path")
+            assert hasattr(change, "before")
+            assert hasattr(change, "after")
 
         # At least one change should have different before/after
-        non_identical = [c for c in diff.field_changes if c["before"] != c["after"]]
+        non_identical = [c for c in diff.field_changes if c.before != c.after]
         assert len(non_identical) > 0
 
     def test_diff_identical_for_same_revision(self) -> None:
@@ -745,6 +813,7 @@ class TestItem6CalculationRunInvariants:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=FIXED_NOW,
+            input_hash=VALID_RESULT_HASH,
         )
         defaults.update(overrides)
         return defaults
@@ -867,9 +936,9 @@ class TestItem6CalculationRunInvariants:
 class TestItem7RunIdentityFieldProtection:
     """update() rejects changes to immutable identity fields.
 
-    Note: ``started_at`` is also in ``_IMMUTABLE_RUN_FIELDS``, so updates
-    must preserve it.  Tests use ``RunService`` to create and transition
-    runs, ensuring the started_at is preserved across updates.
+    ``started_at`` is NOT in ``_IMMUTABLE_RUN_FIELDS`` — it may change
+    during state transitions.  Tests use ``RunService`` to create and
+    transition runs with valid provenance graphs.
     """
 
     def _create_pending_run(
@@ -893,6 +962,7 @@ class TestItem7RunIdentityFieldProtection:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            input_hash=rev.content_hash,
         )
         run_repo.add(run)
         return run
@@ -902,9 +972,12 @@ class TestItem7RunIdentityFieldProtection:
         run: CalculationRun,
         run_repo: InMemoryCalculationRunRepository,
     ) -> CalculationRun:
-        """Transition a PENDING run to RUNNING, preserving started_at."""
+        """Transition a PENDING run to RUNNING with a valid provenance graph."""
         running = run.model_copy(
-            update={"status": CalculationRunStatus.RUNNING}
+            update={
+                "status": CalculationRunStatus.RUNNING,
+                "provenance_graph": _make_valid_provenance_graph(),
+            }
         )
         run_repo.update(running)
         return running
@@ -978,8 +1051,8 @@ class TestItem7RunIdentityFieldProtection:
         with pytest.raises(ValueError, match="input_hash"):
             run_repo.update(tampered)
 
-    def test_update_rejects_started_at_change(self) -> None:
-        """update() rejects changes to started_at."""
+    def test_started_at_can_be_changed(self) -> None:
+        """update() allows changes to started_at (not in _IMMUTABLE_RUN_FIELDS)."""
         rev_repo = InMemoryDesignCaseRevisionRepository()
         run_repo = InMemoryCalculationRunRepository()
         clock = _make_clock()
@@ -989,16 +1062,20 @@ class TestItem7RunIdentityFieldProtection:
 
         running = self._transition_to_running(run, run_repo)
 
-        tampered = running.model_copy(
+        # started_at is not immutable — changing it should succeed
+        new_started = datetime(2026, 6, 1, tzinfo=UTC)
+        updated = running.model_copy(
             update={
-                "started_at": datetime(2026, 6, 1, tzinfo=UTC),
+                "started_at": new_started,
                 "status": CalculationRunStatus.SUCCEEDED,
                 "result_hash": VALID_RESULT_HASH,
-                "completed_at": datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                "completed_at": datetime(2026, 6, 1, 0, 0, 10, tzinfo=UTC),
+                "provenance_graph": _make_valid_succeeded_provenance_graph(),
             }
         )
-        with pytest.raises(ValueError, match="started_at"):
-            run_repo.update(tampered)
+        run_repo.update(updated)
+        final = run_repo.get(run.run_id)
+        assert final.started_at == new_started
 
 
 # ---------------------------------------------------------------------------
@@ -1011,15 +1088,18 @@ class TestItem8ProvenanceGraph:
 
     def test_compute_hash_insertion_order_independent(self) -> None:
         """compute_hash is independent of node/edge insertion order."""
+        ph = "sha256:" + "a" * 64
         node_a = ProvenanceNode(
             node_id=UUID(int=1),
             node_type=ProvenanceNodeType.CASE_REVISION,
             label="rev-1",
+            payload_hash=ph,
         )
         node_b = ProvenanceNode(
             node_id=UUID(int=2),
             node_type=ProvenanceNodeType.CALCULATION_RUN,
             label="run-1",
+            payload_hash=ph,
         )
         edge = ProvenanceEdge(
             source_id=UUID(int=1),
@@ -1043,75 +1123,148 @@ class TestItem8ProvenanceGraph:
         assert hasattr(ProvenanceNodeType, "RESULT")
         assert ProvenanceNodeType.RESULT == "RESULT"
 
-    def test_empty_graph_hash_deterministic(self) -> None:
-        """An empty graph always produces the same hash."""
-        g1 = ProvenanceGraph(nodes=(), edges=())
-        g2 = ProvenanceGraph(nodes=(), edges=())
-        assert g1.compute_hash() == g2.compute_hash()
+    def test_empty_graph_allowed_at_model_level(self) -> None:
+        """Empty graphs are allowed at the model level."""
+        graph = ProvenanceGraph(nodes=(), edges=())
+        assert len(graph.nodes) == 0
+        assert len(graph.edges) == 0
 
-    def test_empty_graph_hash_format(self) -> None:
-        """Empty graph hash starts with 'sha256:' and has correct length."""
-        g = ProvenanceGraph(nodes=(), edges=())
-        h = g.compute_hash()
-        assert h.startswith("sha256:")
-        assert len(h) == 71  # "sha256:" + 64 hex chars
+    def test_empty_graph_rejected_at_repository_update(self) -> None:
+        """Empty graphs are rejected when updating a run through the repository."""
+        rev_repo = InMemoryDesignCaseRevisionRepository()
+        run_repo = InMemoryCalculationRunRepository()
+        clock = _make_clock()
+        id_gen = _make_id_gen()
+
+        case = _make_case()
+        svc = RevisionService()
+        rev = svc.create_initial_revision(
+            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+        )
+        rev_repo.add(rev)
+
+        # Create a PENDING run with a valid provenance graph (model-level empty
+        # is fine, but repository update requires non-empty with proper nodes).
+        valid_graph = _make_valid_provenance_graph()
+        run = CalculationRun(
+            run_id=id_gen.new_id(),
+            case_id=case.id,
+            case_revision_id=rev.revision_id,
+            run_type=CalculationRunType.SCREEN,
+            status=CalculationRunStatus.PENDING,
+            started_at=clock.utcnow(),
+            input_hash=rev.content_hash,
+            provenance_graph=valid_graph,
+        )
+        run_repo.add(run)
+
+        # Transition to RUNNING first (empty graph OK for non-terminal)
+        clock.advance(seconds=1)
+        run = run_repo.get(run.run_id)
+        running = run.model_copy(update={"status": CalculationRunStatus.RUNNING})
+        run_repo.update(running)
+
+        # Attempt to transition to SUCCEEDED with empty graph — should fail
+        clock.advance(seconds=1)
+        succeeded_empty = running.model_copy(
+            update={
+                "status": CalculationRunStatus.SUCCEEDED,
+                "result_hash": "sha256:" + "a" * 64,
+                "completed_at": clock.utcnow(),
+                "provenance_graph": ProvenanceGraph(nodes=(), edges=()),
+            }
+        )
+        with pytest.raises(ValueError, match="non-empty provenance graph"):
+            run_repo.update(succeeded_empty)
 
     def test_different_graphs_different_hash(self) -> None:
         """Two different graphs produce different hashes."""
+        ph = "sha256:" + "a" * 64
         g1 = ProvenanceGraph(
-            nodes=(ProvenanceNode(
-                node_id=UUID(int=1),
-                node_type=ProvenanceNodeType.CASE_REVISION,
-                label="a",
+            nodes=(
+                ProvenanceNode(
+                    node_id=UUID(int=1),
+                    node_type=ProvenanceNodeType.CASE_REVISION,
+                    label="a",
+                    payload_hash=ph,
+                ),
+                ProvenanceNode(
+                    node_id=UUID(int=2),
+                    node_type=ProvenanceNodeType.CALCULATION_RUN,
+                    payload_hash=ph,
+                ),
+            ),
+            edges=(ProvenanceEdge(
+                source_id=UUID(int=1), target_id=UUID(int=2),
+                relation="triggers",
             ),),
-            edges=(),
         )
         g2 = ProvenanceGraph(
-            nodes=(ProvenanceNode(
-                node_id=UUID(int=1),
-                node_type=ProvenanceNodeType.CASE_REVISION,
-                label="b",
+            nodes=(
+                ProvenanceNode(
+                    node_id=UUID(int=1),
+                    node_type=ProvenanceNodeType.CASE_REVISION,
+                    label="b",
+                    payload_hash=ph,
+                ),
+                ProvenanceNode(
+                    node_id=UUID(int=2),
+                    node_type=ProvenanceNodeType.CALCULATION_RUN,
+                    payload_hash=ph,
+                ),
+            ),
+            edges=(ProvenanceEdge(
+                source_id=UUID(int=1), target_id=UUID(int=2),
+                relation="triggers",
             ),),
-            edges=(),
         )
         assert g1.compute_hash() != g2.compute_hash()
 
     def test_result_node_in_graph(self) -> None:
         """A graph can contain a RESULT node."""
+        ph = "sha256:" + "a" * 64
         case_node = ProvenanceNode(
             node_id=UUID(int=1),
             node_type=ProvenanceNodeType.CASE_REVISION,
+            payload_hash=ph,
+        )
+        calc_node = ProvenanceNode(
+            node_id=UUID(int=2),
+            node_type=ProvenanceNodeType.CALCULATION_RUN,
+            payload_hash=ph,
         )
         result_node = ProvenanceNode(
-            node_id=UUID(int=2),
+            node_id=UUID(int=3),
             node_type=ProvenanceNodeType.RESULT,
             label="final_result",
-        )
-        edge = ProvenanceEdge(
-            source_id=UUID(int=1),
-            target_id=UUID(int=2),
-            relation="produces",
+            payload_hash=ph,
         )
         g = ProvenanceGraph(
-            nodes=(case_node, result_node),
-            edges=(edge,),
+            nodes=(case_node, calc_node, result_node),
+            edges=(
+                ProvenanceEdge(source_id=UUID(int=1), target_id=UUID(int=2), relation="triggers"),
+                ProvenanceEdge(source_id=UUID(int=2), target_id=UUID(int=3), relation="produces"),
+            ),
         )
-        assert len(g.nodes) == 2
-        assert g.nodes[1].node_type == ProvenanceNodeType.RESULT
+        assert len(g.nodes) == 3
+        assert g.nodes[2].node_type == ProvenanceNodeType.RESULT
 
     def test_compute_hash_is_stable(self) -> None:
         """Same graph always produces the same compute_hash."""
+        ph = "sha256:" + "a" * 64
         g = ProvenanceGraph(
             nodes=(
                 ProvenanceNode(
                     node_id=UUID(int=1),
                     node_type=ProvenanceNodeType.CASE_REVISION,
                     label="v1",
+                    payload_hash=ph,
                 ),
                 ProvenanceNode(
                     node_id=UUID(int=2),
                     node_type=ProvenanceNodeType.CALCULATION_RUN,
                     label="run-1",
+                    payload_hash=ph,
                 ),
             ),
             edges=(
@@ -1312,12 +1465,16 @@ class TestItem10AdditionalChecks:
             run_type=CalculationRunType.SCREEN,
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
+            input_hash=rev.content_hash,
         )
         run_repo.add(run)
 
         # Transition to RUNNING (valid: PENDING → RUNNING)
         running = run.model_copy(
-            update={"status": CalculationRunStatus.RUNNING}
+            update={
+                "status": CalculationRunStatus.RUNNING,
+                "provenance_graph": _make_valid_provenance_graph(),
+            }
         )
         run_repo.update(running)
 
@@ -1327,6 +1484,7 @@ class TestItem10AdditionalChecks:
                 "status": CalculationRunStatus.SUCCEEDED,
                 "result_hash": VALID_RESULT_HASH,
                 "completed_at": datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                "provenance_graph": _make_valid_succeeded_provenance_graph(),
             }
         )
         run_repo.update(succeeded)

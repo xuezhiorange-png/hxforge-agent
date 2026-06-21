@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 from uuid import UUID
 
+from hexagent.domain.provenance import ProvenanceNodeType
 from hexagent.domain.revisions import (
     CalculationRun,
     CalculationRunStatus,
@@ -137,24 +138,21 @@ class InMemoryCalculationRunRepository:
     def add(self, run: CalculationRun) -> None:
         """Persist a new run with duplicate-ID checking.
 
-        Only accepts ``PENDING`` or ``RUNNING`` as initial status.
-        Stores a **deep copy**.
+        Only accepts ``PENDING`` as initial status.  ``RUNNING``
+        must be reached through a legal state transition via ``update()``.
 
         Raises
         ------
         DuplicateIdError
             If a run with the same ``run_id`` already exists.
         InvalidStateTransitionError
-            If the initial status is not valid.
+            If the initial status is not PENDING.
         """
         if run.run_id in self._by_id:
             raise DuplicateIdError("CalculationRun", str(run.run_id))
 
-        # Validate initial status
-        if run.status not in (
-            CalculationRunStatus.PENDING,
-            CalculationRunStatus.RUNNING,
-        ):
+        # Only PENDING is allowed as initial status
+        if run.status != CalculationRunStatus.PENDING:
             raise InvalidStateTransitionError(
                 "(new)", run.status,
             )
@@ -210,6 +208,33 @@ class InMemoryCalculationRunRepository:
 
         # 3. Status-dependent invariants
         _validate_run_invariants(run)
+
+        # 4. Terminal states: graph must be non-empty with required node types
+        terminal = run.status in (
+            CalculationRunStatus.SUCCEEDED,
+            CalculationRunStatus.FAILED,
+            CalculationRunStatus.BLOCKED,
+        )
+        if terminal:
+            if not run.provenance_graph.nodes:
+                raise ValueError(
+                    "Terminal run must have a non-empty provenance graph"
+                )
+            node_types = {n.node_type for n in run.provenance_graph.nodes}
+            if ProvenanceNodeType.CASE_REVISION not in node_types:
+                raise ValueError(
+                    "Terminal run graph must contain a CASE_REVISION node"
+                )
+            if ProvenanceNodeType.CALCULATION_RUN not in node_types:
+                raise ValueError(
+                    "Terminal run graph must contain a CALCULATION_RUN node"
+                )
+            result_missing = ProvenanceNodeType.RESULT not in node_types
+            if run.status == CalculationRunStatus.SUCCEEDED and result_missing:
+                    raise ValueError(
+                        "SUCCEEDED run must have a RESULT node "
+                        "in its provenance graph"
+                    )
 
         snapshot = copy.deepcopy(run)
         self._by_id[run.run_id] = snapshot

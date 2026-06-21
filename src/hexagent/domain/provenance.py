@@ -51,7 +51,24 @@ class ProvenanceNode(BaseModel):
     node_type: ProvenanceNodeType
     label: str = Field(default="", min_length=0)
     metadata: tuple[tuple[str, Any], ...] = Field(default_factory=tuple)
-    payload_hash: str | None = None
+    payload_hash: str
+
+    @model_validator(mode="after")
+    def _validate_payload_hash(self) -> Self:
+        if not self.payload_hash.startswith("sha256:"):
+            raise ValueError(
+                f"payload_hash must start with 'sha256:', got {self.payload_hash!r}"
+            )
+        hex_part = self.payload_hash[7:]
+        if len(hex_part) != 64:
+            raise ValueError(
+                f"payload_hash hex part must be 64 chars, got {len(hex_part)}"
+            )
+        try:
+            int(hex_part, 16)
+        except ValueError:
+            raise ValueError(f"payload_hash contains invalid hex: {self.payload_hash!r}") from None
+        return self
 
     def to_json(self) -> str:
         return self.model_dump_json()
@@ -149,14 +166,16 @@ class ProvenanceGraph(BaseModel):
         if visited != len(node_set):
             raise ValueError("Provenance graph contains a cycle")
 
-        # --- at least one CASE_REVISION node (only when nodes exist) ---
+        # --- when nodes exist, must contain CASE_REVISION and CALCULATION_RUN ---
         if self.nodes:
-            has_case_revision = any(
-                n.node_type == ProvenanceNodeType.CASE_REVISION for n in self.nodes
-            )
-            if not has_case_revision:
+            node_types = {n.node_type for n in self.nodes}
+            if ProvenanceNodeType.CASE_REVISION not in node_types:
                 raise ValueError(
-                    "Provenance graph must contain at least one CASE_REVISION node"
+                    "Provenance graph must contain a CASE_REVISION node"
+                )
+            if ProvenanceNodeType.CALCULATION_RUN not in node_types:
+                raise ValueError(
+                    "Provenance graph must contain a CALCULATION_RUN node"
                 )
 
         return self

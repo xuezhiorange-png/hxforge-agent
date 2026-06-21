@@ -20,6 +20,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from hexagent.core.canonical import canonical_json, sha256_digest
+from hexagent.core.immutability import deep_freeze
 from hexagent.domain.messages import EngineeringMessage, RunFailure
 from hexagent.domain.models import DesignCase
 from hexagent.domain.provenance import ProvenanceGraph
@@ -111,6 +112,9 @@ class DesignCaseRevision:
     changed_fields: tuple[str, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
+        # Deep-freeze canonical_payload to prevent post-construction mutation
+        object.__setattr__(self, "canonical_payload", deep_freeze(self.canonical_payload))
+
         # revision_number >= 1
         if self.revision_number < 1:
             raise ValueError(
@@ -143,6 +147,29 @@ class DesignCaseRevision:
             raise ValueError(
                 f"content_hash mismatch: expected {expected_hash}, got {self.content_hash}"
             )
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> DesignCaseRevision:
+        """Deep copy that handles deep-frozen canonical_payload (mappingproxy).
+
+        ``copy.deepcopy`` cannot pickle ``types.MappingProxyType`` objects
+        produced by :func:`~hexagent.core.immutability.deep_freeze`.  This
+        method bypasses the default pickling-based deepcopy by reconstructing
+        the frozen dataclass from its already-immutable field values.
+        """
+        return DesignCaseRevision(
+            revision_id=self.revision_id,
+            case_id=self.case_id,
+            revision_number=self.revision_number,
+            design_case=self.design_case,
+            canonical_payload=self.canonical_payload,  # already deep-frozen
+            content_hash=self.content_hash,
+            created_at=self.created_at,
+            created_by=self.created_by,
+            schema_version=self.schema_version,
+            parent_revision_id=self.parent_revision_id,
+            change_summary=self.change_summary,
+            changed_fields=self.changed_fields,
+        )
 
     # --- serialisation helpers ---
 
@@ -203,6 +230,23 @@ class DesignCaseRevision:
 
 
 # ---------------------------------------------------------------------------
+# FieldChange — immutable diff entry
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FieldChange:
+    """A single field-level change between two revisions.
+
+    Immutable: ``path``, ``before`` and ``after`` cannot be reassigned
+    after construction.
+    """
+    path: str = field()
+    before: Any = field()
+    after: Any = field()
+
+
+# ---------------------------------------------------------------------------
 # RevisionDiff — lightweight comparison between two revisions
 # ---------------------------------------------------------------------------
 
@@ -220,7 +264,7 @@ class RevisionDiff:
     to_revision_id: UUID = field()
     content_hash_before: str = field()
     content_hash_after: str = field()
-    field_changes: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+    field_changes: tuple[FieldChange, ...] = field(default_factory=tuple)
 
     @property
     def is_identical(self) -> bool:
@@ -229,14 +273,14 @@ class RevisionDiff:
     @property
     def changed_paths(self) -> tuple[str, ...]:
         """Sorted tuple of dotted paths that changed."""
-        return tuple(c["path"] for c in self.field_changes)
+        return tuple(c.path for c in self.field_changes)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "from_revision_id": str(self.from_revision_id),
             "to_revision_id": str(self.to_revision_id),
             "field_changes": [
-                {"path": c["path"], "before": c["before"], "after": c["after"]}
+                {"path": c.path, "before": c.before, "after": c.after}
                 for c in self.field_changes
             ],
             "content_hash_before": self.content_hash_before,
@@ -251,7 +295,10 @@ class RevisionDiff:
         return cls(
             from_revision_id=UUID(data["from_revision_id"]),
             to_revision_id=UUID(data["to_revision_id"]),
-            field_changes=tuple(data.get("field_changes", [])),
+            field_changes=tuple(
+                FieldChange(path=c["path"], before=c["before"], after=c["after"])
+                for c in data.get("field_changes", [])
+            ),
             content_hash_before=data["content_hash_before"],
             content_hash_after=data["content_hash_after"],
         )
@@ -288,8 +335,8 @@ class CalculationRun(BaseModel):
     started_at: datetime
     completed_at: datetime | None = None
     software_version: str = Field(default="0.1.0")
-    git_commit: str = Field(default="")
-    input_hash: str = Field(default="")
+    git_commit: str = Field(default="no-git")
+    input_hash: str
     result_hash: str | None = None
     property_backend: dict[str, Any] | None = None
     correlation_records: tuple[dict[str, Any], ...] = Field(default_factory=tuple)
@@ -302,6 +349,12 @@ class CalculationRun(BaseModel):
 
     @model_validator(mode="after")
     def _validate_terminal_invariants(self) -> Self:
+        # input_hash must be a valid sha256 hash
+        if not _is_valid_run_hash(self.input_hash):
+            raise ValueError(
+                f"input_hash must be sha256:<64-hex>, got {self.input_hash!r}"
+            )
+
         status = self.status
 
         # SUCCEEDED: must have a valid result_hash
@@ -437,6 +490,7 @@ __all__ = [
     "CalculationRunStatus",
     "CalculationRunType",
     "DesignCaseRevision",
+    "FieldChange",
     "RevisionDiff",
     "DuplicateIdError",
     "RevisionNumberConflictError",

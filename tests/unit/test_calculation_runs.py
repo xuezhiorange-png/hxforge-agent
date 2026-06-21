@@ -41,6 +41,7 @@ def _pending_run(**overrides) -> CalculationRun:
         run_type=CalculationRunType.SCREEN,
         status=CalculationRunStatus.PENDING,
         started_at=FIXED_NOW,
+        input_hash=ZERO_HASH,
     )
     defaults.update(overrides)
     return CalculationRun(**defaults)
@@ -54,6 +55,7 @@ def _running_run(**overrides) -> CalculationRun:
         run_type=CalculationRunType.SCREEN,
         status=CalculationRunStatus.RUNNING,
         started_at=FIXED_NOW,
+        input_hash=ZERO_HASH,
     )
     defaults.update(overrides)
     return CalculationRun(**defaults)
@@ -281,6 +283,7 @@ class TestCalculationRunValidation:
                 run_type=CalculationRunType.SCREEN,
                 status=CalculationRunStatus.PENDING,
                 started_at=FIXED_NOW,
+                input_hash=ZERO_HASH,
                 bogus_field="should fail",
             )
 

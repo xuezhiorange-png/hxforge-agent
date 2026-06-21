@@ -10,14 +10,16 @@ Key invariants enforced:
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from hexagent.core.canonical import sha256_digest
+from hexagent.core.canonical import canonicalize_design_case, sha256_digest
 from hexagent.core.time import Clock, IdGenerator
 from hexagent.domain.models import DesignCase
 from hexagent.domain.revisions import (
     DesignCaseRevision,
+    FieldChange,
     IntegrityError,
     RevisionDiff,
 )
@@ -314,24 +316,21 @@ class RevisionService:
 
 
 def _canonical_payload(case: DesignCase) -> dict[str, Any]:
-    """Build a deterministic dict from a DesignCase."""
-    raw = case.model_dump()
-    result: dict[str, Any] = _deep_sort(raw)
-    return result
+    """Build a deterministic, unit-equivalent dict from a DesignCase.
 
-
-def _deep_sort(obj: Any) -> Any:
-    """Recursively sort dicts so that canonical JSON is deterministic."""
-    if isinstance(obj, dict):
-        return {k: _deep_sort(v) for k, v in sorted(obj.items())}
-    if isinstance(obj, list):
-        return [_deep_sort(item) for item in obj]
-    return obj
+    Uses :func:`canonicalize_design_case` which processes Quantity objects
+    while they are still typed Pydantic objects (before ``model_dump()``
+    converts them to plain dicts).  This ensures that e.g.
+    ``AbsoluteTemperature(100, 'degC')`` and
+    ``AbsoluteTemperature(373.15, 'K')`` produce the same canonical
+    payload and content hash.
+    """
+    return canonicalize_design_case(case)
 
 
 def _compute_recursive_changed_fields(
-    old: dict[str, Any],
-    new: dict[str, Any],
+    old: Mapping[str, Any],
+    new: Mapping[str, Any],
     prefix: str = "",
 ) -> tuple[str, ...]:
     """Compute sorted tuple of dotted paths that differ between two dicts.
@@ -349,7 +348,7 @@ def _compute_recursive_changed_fields(
 
         if key not in old or key not in new:
             changed.append(path)
-        elif isinstance(old_val, dict) and isinstance(new_val, dict):
+        elif isinstance(old_val, (dict, Mapping)) and isinstance(new_val, (dict, Mapping)):
             changed.extend(
                 _compute_recursive_changed_fields(old_val, new_val, path)
             )
@@ -360,20 +359,19 @@ def _compute_recursive_changed_fields(
 
 
 def _compute_field_level_diff(
-    old: dict[str, Any],
-    new: dict[str, Any],
-    prefix: str = "",
-) -> tuple[dict[str, Any], ...]:
+    old: dict[str, Any], new: dict[str, Any], prefix: str = "",
+) -> tuple[FieldChange, ...]:
     """Compute recursive diff with paths, before/after values.
 
-    Returns a sorted tuple of change records, each containing:
+    Returns a sorted tuple of :class:`FieldChange` frozen dataclass
+    entries, each containing:
     - ``path``: dotted path like ``hot_stream.inlet_temperature``
     - ``before``: canonical value from old dict (or MISSING)
     - ``after``: canonical value from new dict (or MISSING)
     """
     MISSING = "__MISSING__"
     all_keys = sorted(set(old.keys()) | set(new.keys()))
-    changes: list[dict[str, Any]] = []
+    changes: list[FieldChange] = []
 
     for key in all_keys:
         path = f"{prefix}.{key}" if prefix else key
@@ -381,17 +379,17 @@ def _compute_field_level_diff(
         new_val = new.get(key, MISSING)
 
         if key not in old:
-            changes.append({"path": path, "before": MISSING, "after": new_val})
+            changes.append(FieldChange(path=path, before=MISSING, after=new_val))
         elif key not in new:
-            changes.append({"path": path, "before": old_val, "after": MISSING})
-        elif isinstance(old_val, dict) and isinstance(new_val, dict):
+            changes.append(FieldChange(path=path, before=old_val, after=MISSING))
+        elif isinstance(old_val, (dict, Mapping)) and isinstance(new_val, (dict, Mapping)):
             changes.extend(
-                _compute_field_level_diff(old_val, new_val, path)
+                _compute_field_level_diff(old_val, new_val, path)  # type: ignore[arg-type]
             )
         elif old_val != new_val:
-            changes.append({"path": path, "before": old_val, "after": new_val})
+            changes.append(FieldChange(path=path, before=old_val, after=new_val))
 
-    return tuple(sorted(changes, key=lambda c: c["path"]))
+    return tuple(sorted(changes, key=lambda c: c.path))
 
 
 __all__ = ["RevisionService"]
