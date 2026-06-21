@@ -1,5 +1,14 @@
+"""CoolProp HEOS property provider — deterministic, cache-safe, reference-state-aware.
+
+v0.1 reference-state policy: ``DEF`` (CoolProp default).
+Configuration fingerprint captures the process-wide CoolProp settings at
+provider instantiation so that external mutations cannot silently reuse
+stale cache entries.
+"""
+
 from __future__ import annotations
 
+import hashlib
 import math
 from collections import OrderedDict
 from dataclasses import replace
@@ -18,9 +27,70 @@ from hexagent.properties.base import (
     PropertyProvenance,
     PropertyQueryType,
     PropertyResult,
+    ReferenceStatePolicy,
     SaturationState,
 )
 from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
+
+
+def _coolprop_configuration_fingerprint() -> str:
+    """Capture a hash of process-wide CoolProp configuration.
+
+    This ensures that if a caller changes CoolProp settings (e.g.
+    ``set_reference_state`` or ``set_config``), cached results from the
+    previous configuration are not reused.
+    """
+    config_keys = [
+        "reference_state",
+        "ATMOSPHERIC_PRESSURE",
+        "COOLPROP_CONDUCTIVITY",
+        "COOLPROP_VISCOSITY",
+        "COOLPROP_CP",
+        "COOLPROP_RHO",
+    ]
+    parts: list[str] = []
+    for key in config_keys:
+        try:
+            val = str(CP.get_global_param_string(key))
+        except Exception:
+            val = "unset"
+        parts.append(f"{key}={val}")
+    blob = "|".join(parts)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+# ---------------------------------------------------------------------------
+# Fluid-support matrix (Item 2)
+# ---------------------------------------------------------------------------
+
+_TIER_1_ALIASES: dict[str, str] = {
+    "water": "Water",
+    "air": "Air",
+    "r134a": "R134a",
+    "r717": "R717",
+    "ammonia": "R717",
+}
+
+# Fluids that have been validated against the fixed VALIDATION_MATRIX
+# (dataset_id, state points, tolerances).  All other Tier-1 fluids are
+# SUPPORTED_TIER_1 only.
+_BENCHMARK_VALIDATED_FLUIDS: set[str] = {
+    "Water",
+    "Air",
+    "R134a",
+    "R717",
+}
+
+
+def _validation_level_for(canonical_name: str) -> FluidValidationLevel:
+    if canonical_name in _BENCHMARK_VALIDATED_FLUIDS:
+        return FluidValidationLevel.BENCHMARK_VALIDATED
+    return FluidValidationLevel.SUPPORTED_TIER_1
+
+
+# ---------------------------------------------------------------------------
+# Provider
+# ---------------------------------------------------------------------------
 
 
 class CoolPropProvider:
@@ -28,14 +98,7 @@ class CoolPropProvider:
 
     name = "CoolProp"
     cache_policy_version = "1.0"
-
-    _TIER_1_ALIASES = {
-        "water": "Water",
-        "air": "Air",
-        "r134a": "R134a",
-        "r717": "R717",
-        "ammonia": "R717",
-    }
+    reference_state_policy = ReferenceStatePolicy.DEF
 
     def __init__(
         self,
@@ -58,10 +121,18 @@ class CoolPropProvider:
             near_saturation_relative_tolerance
         )
         self.cache_size = cache_size
+
+        # Capture configuration fingerprint at construction time.
+        self._configuration_fingerprint = _coolprop_configuration_fingerprint()
+
         self._cache: OrderedDict[PropertyCacheKey, PropertyResult] = OrderedDict()
         self._cache_hits = 0
         self._cache_misses = 0
         self._cache_lock = RLock()
+
+    # ------------------------------------------------------------------
+    # Public query API
+    # ------------------------------------------------------------------
 
     def state_tp(
         self,
@@ -97,10 +168,29 @@ class CoolPropProvider:
         fluid: FluidIdentifier | str,
         pressure_pa: float,
         enthalpy_j_kg: float,
+        *,
+        reference_state: ReferenceStatePolicy = ReferenceStatePolicy.DEF,
     ) -> FluidState:
         identifier, validation = self._resolve_fluid(fluid)
         self._require_positive("pressure_pa", pressure_pa)
         self._require_finite("enthalpy_j_kg", enthalpy_j_kg)
+
+        # Item 3: reject mismatched PH reference states
+        if reference_state is not self.reference_state_policy:
+            provider_val = (
+                self.reference_state_policy.value
+                if hasattr(self.reference_state_policy, "value")
+                else str(self.reference_state_policy)
+            )
+            raise PropertyServiceError(
+                PropertyErrorCode.INVALID_INPUT,
+                "PH query reference-state policy does not match the provider policy.",
+                context={
+                    "requested": reference_state.value,
+                    "provider": provider_val,
+                },
+            )
+
         inputs = (
             ("pressure_pa", pressure_pa),
             ("enthalpy_j_kg", enthalpy_j_kg),
@@ -183,6 +273,10 @@ class CoolPropProvider:
             self._cache.clear()
             self._cache_hits = 0
             self._cache_misses = 0
+
+    # ------------------------------------------------------------------
+    # Internal — uncached computation
+    # ------------------------------------------------------------------
 
     def _state_tp_uncached(
         self,
@@ -366,6 +460,10 @@ class CoolPropProvider:
             },
         ) from exc
 
+    # ------------------------------------------------------------------
+    # Internal — state construction
+    # ------------------------------------------------------------------
+
     def _build_state(
         self,
         fluid: FluidIdentifier,
@@ -465,27 +563,31 @@ class CoolPropProvider:
                     },
                 )
 
+    # ------------------------------------------------------------------
+    # Internal — fluid resolution
+    # ------------------------------------------------------------------
+
     def _resolve_fluid(
         self,
         fluid: FluidIdentifier | str,
     ) -> tuple[FluidIdentifier, FluidValidationLevel]:
         identifier = FluidIdentifier.from_value(fluid)
-        if identifier.backend.upper() != "HEOS":
+        if identifier.equation_of_state_backend.upper() != "HEOS":
             raise PropertyServiceError(
                 PropertyErrorCode.UNSUPPORTED_BACKEND,
                 "Only the CoolProp HEOS backend is approved in v0.1.",
-                context={"backend": identifier.backend},
+                context={"backend": identifier.equation_of_state_backend},
             )
         validation = FluidValidationLevel.UNVALIDATED
         if not identifier.components:
-            canonical = self._TIER_1_ALIASES.get(identifier.name.casefold())
+            canonical = _TIER_1_ALIASES.get(identifier.name.casefold())
             if canonical is not None:
                 identifier = replace(
                     identifier,
                     name=canonical,
-                    backend="HEOS",
+                    equation_of_state_backend="HEOS",
                 )
-                validation = FluidValidationLevel.TIER_1_VALIDATED
+                validation = _validation_level_for(canonical)
 
         self._assert_fluid_exists(identifier)
         if (
@@ -521,6 +623,10 @@ class CoolPropProvider:
                 },
             )
 
+    # ------------------------------------------------------------------
+    # Internal — saturation boundary checks
+    # ------------------------------------------------------------------
+
     def _check_tp_near_saturation(
         self,
         fluid: FluidIdentifier,
@@ -555,6 +661,14 @@ class CoolPropProvider:
         pressure_pa: float,
         enthalpy_j_kg: float,
     ) -> None:
+        """Check PH state against saturation envelope.
+
+        Item 6: tolerance is scaled by ``abs(h_g - h_f)`` (the latent
+        heat at this pressure) with an explicit minimum floor, making it
+        reference-state invariant.  The previous ``max(abs(h_f),
+        abs(h_g), 1)`` scaled by absolute enthalpy which changes with
+        the reference convention.
+        """
         saturation_enthalpies = self._try_saturation_values(
             fluid,
             "Hmass",
@@ -564,7 +678,13 @@ class CoolPropProvider:
         if len(saturation_enthalpies) != 2:
             return
         lower, upper = sorted(saturation_enthalpies)
-        scale = max(abs(lower), abs(upper), 1.0)
+
+        # Item 6: reference-state-invariant scale
+        latent_heat = abs(upper - lower)
+        MIN_LATENT_FLOOR = 1.0  # J/kg — below this, the fluid has
+        # essentially no liquid–vapor distinction
+        scale = max(latent_heat, MIN_LATENT_FLOOR)
+
         boundary_distance = min(
             abs(enthalpy_j_kg - lower),
             abs(enthalpy_j_kg - upper),
@@ -579,6 +699,8 @@ class CoolPropProvider:
                     "enthalpy_j_kg": enthalpy_j_kg,
                     "saturated_liquid_enthalpy_j_kg": lower,
                     "saturated_vapor_enthalpy_j_kg": upper,
+                    "latent_heat_j_kg": latent_heat,
+                    "tolerance_scale_j_kg": scale,
                 },
             )
         if lower < enthalpy_j_kg < upper:
@@ -619,6 +741,10 @@ class CoolPropProvider:
             if math.isfinite(value):
                 values.append(value)
         return values
+
+    # ------------------------------------------------------------------
+    # Internal — phase detection
+    # ------------------------------------------------------------------
 
     def _phase(
         self,
@@ -676,6 +802,10 @@ class CoolPropProvider:
                 },
             )
 
+    # ------------------------------------------------------------------
+    # Internal — CoolProp property queries
+    # ------------------------------------------------------------------
+
     def _props(
         self,
         output: str,
@@ -725,6 +855,10 @@ class CoolPropProvider:
             },
         ) from exc
 
+    # ------------------------------------------------------------------
+    # Internal — provenance and cache
+    # ------------------------------------------------------------------
+
     def _provenance(
         self,
         fluid: FluidIdentifier,
@@ -741,6 +875,8 @@ class CoolPropProvider:
             query_type=query_type,
             inputs=inputs,
             cache_policy_version=self.cache_policy_version,
+            reference_state_policy=self.reference_state_policy,
+            configuration_fingerprint=self._configuration_fingerprint,
         )
 
     def _cache_key(
@@ -768,6 +904,8 @@ class CoolPropProvider:
             query_type=query_type,
             inputs=inputs,
             configuration=configuration,
+            reference_state_policy=self.reference_state_policy,
+            configuration_fingerprint=self._configuration_fingerprint,
         )
 
     def _cache_get(self, key: PropertyCacheKey) -> PropertyResult | None:

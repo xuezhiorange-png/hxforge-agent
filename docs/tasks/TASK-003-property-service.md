@@ -41,6 +41,7 @@ Provide a deterministic, injectable fluid-property service with CoolProp as the 
 - [x] Results record backend name, version, git revision and state provenance.
 - [x] Deterministic cache keys and cache inspection are implemented.
 - [x] Tests require no network access.
+- [x] Round-1 review: 8 items addressed (reference state, validation matrix, PH ref-state, backend naming, serialization, PH tolerance, mixture boundary, error regressions).
 - [ ] GitHub CI passes on Python 3.11 and 3.12.
 - [ ] Engineering review is complete.
 
@@ -52,7 +53,12 @@ Provide a deterministic, injectable fluid-property service with CoolProp as the 
 - exact saturation and two-phase rejection;
 - invalid fluids and invalid numeric inputs;
 - Tier-1 versus unvalidated-fluid policy;
-- cache determinism and mixture identity.
+- cache determinism and mixture identity;
+- PH reference-state mismatch rejection;
+- JSON round-trip serialization (FluidState, SaturationState);
+- PH saturation tolerance reference-state invariance;
+- mixture capability boundary (representation vs calculation);
+- error-boundary regressions (out-of-range, above-critical, unsupported backend, malformed composition, empty name, stable error codes, failed-query cache).
 
 ## Scope boundary
 
