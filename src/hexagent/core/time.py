@@ -8,15 +8,13 @@ from uuid import UUID, uuid4
 class Clock(Protocol):
     """Protocol for obtaining the current time."""
 
-    def utcnow(self) -> datetime:
-        ...
+    def utcnow(self) -> datetime: ...
 
 
 class IdGenerator(Protocol):
     """Protocol for generating unique identifiers."""
 
-    def new_id(self) -> UUID:
-        ...
+    def new_id(self) -> UUID: ...
 
 
 # ---------------------------------------------------------------------------

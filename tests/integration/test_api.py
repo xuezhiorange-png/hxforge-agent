@@ -32,6 +32,7 @@ EXAMPLE_PATH = Path(__file__).resolve().parents[2] / "examples" / "water_water_d
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_example() -> dict:
     """Load the canonical example JSON fixture."""
     return json.loads(EXAMPLE_PATH.read_text())
@@ -265,6 +266,7 @@ def test_mass_flow_rejects_zero() -> None:
 # (a) MassFlow schema metadata
 # -----------------------------------------------------------------------
 
+
 def test_schema_metadata_mass_flow() -> None:
     """MassFlow.model_json_schema() exposes quantity_kind, si_unit, allowed_units."""
     schema = MassFlow.model_json_schema()
@@ -277,6 +279,7 @@ def test_schema_metadata_mass_flow() -> None:
 # -----------------------------------------------------------------------
 # (b) AbsoluteTemperature schema metadata
 # -----------------------------------------------------------------------
+
 
 def test_schema_metadata_absolute_temperature() -> None:
     """AbsoluteTemperature schema exposes quantity_kind, si_unit, examples."""
@@ -291,6 +294,7 @@ def test_schema_metadata_absolute_temperature() -> None:
 # (c) TemperatureDifference schema metadata
 # -----------------------------------------------------------------------
 
+
 def test_schema_metadata_temperature_difference() -> None:
     """TemperatureDifference schema exposes quantity_kind."""
     schema = TemperatureDifference.model_json_schema()
@@ -300,6 +304,7 @@ def test_schema_metadata_temperature_difference() -> None:
 # -----------------------------------------------------------------------
 # (d) AbsolutePressure schema metadata
 # -----------------------------------------------------------------------
+
 
 def test_schema_metadata_absolute_pressure() -> None:
     """AbsolutePressure schema exposes quantity_kind and si_unit."""
@@ -316,6 +321,7 @@ def test_schema_metadata_absolute_pressure() -> None:
 # -----------------------------------------------------------------------
 # (e) Canonical TP design case — uses state_spec, not legacy fields
 # -----------------------------------------------------------------------
+
 
 def test_canonical_tp_design_case() -> None:
     """DesignCase with TP state_spec and structured fouling validates.
@@ -338,12 +344,11 @@ def test_canonical_tp_design_case() -> None:
 # (f) Bare fouling quantity rejected — must be structured
 # -----------------------------------------------------------------------
 
+
 def test_unsourced_fouling_rejected() -> None:
     """A bare fouling_resistance quantity (without source) must be rejected."""
     payload = _build_full_design_case_payload()
-    payload["hot_stream"]["fouling_resistance"] = {
-        "value": 0.0002, "unit": "m^2*K/W"
-    }
+    payload["hot_stream"]["fouling_resistance"] = {"value": 0.0002, "unit": "m^2*K/W"}
     with pytest.raises(ValidationError):
         DesignCase.model_validate(payload)
 
@@ -351,6 +356,7 @@ def test_unsourced_fouling_rejected() -> None:
 # -----------------------------------------------------------------------
 # (g) Unsupported schema_version rejected
 # -----------------------------------------------------------------------
+
 
 def test_unsupported_schema_version_rejected() -> None:
     """TPStateSpec with schema_version='9.9' must fail (not Literal '1.0')."""
@@ -367,6 +373,7 @@ def test_unsupported_schema_version_rejected() -> None:
 # (h) FluidSpec backend is required
 # -----------------------------------------------------------------------
 
+
 def test_fluid_backend_required() -> None:
     """FluidSpec without 'backend' must fail (field is required)."""
     with pytest.raises(ValidationError, match="backend"):
@@ -376,6 +383,7 @@ def test_fluid_backend_required() -> None:
 # -----------------------------------------------------------------------
 # (i) Legacy TP still works
 # -----------------------------------------------------------------------
+
 
 def test_legacy_tp_still_works() -> None:
     """StreamSpec with legacy inlet_temperature + inlet_pressure + structured fouling validates.
@@ -408,6 +416,7 @@ def test_legacy_tp_still_works() -> None:
 # (j) state_spec + legacy conflict rejected
 # -----------------------------------------------------------------------
 
+
 def test_state_spec_conflicting_with_legacy_rejected() -> None:
     """StreamSpec with BOTH state_spec TP AND inlet_temperature must fail."""
     payload = {
@@ -439,6 +448,7 @@ def test_state_spec_conflicting_with_legacy_rejected() -> None:
 # -----------------------------------------------------------------------
 # (k) Bare fouling dict not accepted by canonical model
 # -----------------------------------------------------------------------
+
 
 def test_bare_fouling_not_in_canonical_model() -> None:
     """StreamSpec with fouling_resistance as a plain dict (not structured) must fail."""

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import types
 from enum import StrEnum
 from typing import Any, Literal, Self
 from uuid import UUID
@@ -37,6 +38,25 @@ class ProvenanceNodeType(StrEnum):
 # ---------------------------------------------------------------------------
 
 
+def _deep_freeze_metadata_val(val: Any) -> Any:
+    """Recursively freeze a metadata value (used inside model_validator)."""
+    if isinstance(val, dict):
+        return types.MappingProxyType({k: _deep_freeze_metadata_val(v) for k, v in val.items()})
+    if isinstance(val, list):
+        return tuple(_deep_freeze_metadata_val(item) for item in val)
+    if isinstance(val, (set, frozenset)):
+        return tuple(
+            sorted(
+                (_deep_freeze_metadata_val(item) for item in val),
+                key=lambda x: repr(x),
+            )
+        )
+    if isinstance(val, tuple):
+        return tuple(_deep_freeze_metadata_val(item) for item in val)
+    # Primitives and known-immutable types pass through
+    return val
+
+
 class ProvenanceNode(BaseModel):
     """A single node in a provenance graph.
 
@@ -53,17 +73,30 @@ class ProvenanceNode(BaseModel):
     metadata: tuple[tuple[str, Any], ...] = Field(default_factory=tuple)
     payload_hash: str
 
+    @model_validator(mode="before")
+    @classmethod
+    def _freeze_metadata(cls, data: Any) -> Any:
+        """Recursively freeze metadata values before construction."""
+        if isinstance(data, dict) and "metadata" in data:
+            raw = data["metadata"]
+            frozen_pairs: list[tuple[str, Any]] = []
+            for pair in raw:
+                if isinstance(pair, (list, tuple)) and len(pair) == 2:
+                    key_val: tuple[Any, Any] = tuple(pair)
+                    frozen_val = _deep_freeze_metadata_val(key_val[1])
+                    frozen_pairs.append((str(key_val[0]), frozen_val))
+                else:
+                    frozen_pairs.append(pair)
+            data["metadata"] = tuple((k, v) for k, v in frozen_pairs)
+        return data
+
     @model_validator(mode="after")
     def _validate_payload_hash(self) -> Self:
         if not self.payload_hash.startswith("sha256:"):
-            raise ValueError(
-                f"payload_hash must start with 'sha256:', got {self.payload_hash!r}"
-            )
+            raise ValueError(f"payload_hash must start with 'sha256:', got {self.payload_hash!r}")
         hex_part = self.payload_hash[7:]
         if len(hex_part) != 64:
-            raise ValueError(
-                f"payload_hash hex part must be 64 chars, got {len(hex_part)}"
-            )
+            raise ValueError(f"payload_hash hex part must be 64 chars, got {len(hex_part)}")
         try:
             int(hex_part, 16)
         except ValueError:
@@ -92,6 +125,23 @@ class ProvenanceEdge(BaseModel):
     target_id: UUID
     relation: str = Field(default="", min_length=0)
     metadata: tuple[tuple[str, Any], ...] = Field(default_factory=tuple)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _freeze_metadata(cls, data: Any) -> Any:
+        """Recursively freeze metadata values before construction."""
+        if isinstance(data, dict) and "metadata" in data:
+            raw = data["metadata"]
+            frozen_pairs: list[tuple[str, Any]] = []
+            for pair in raw:
+                if isinstance(pair, (list, tuple)) and len(pair) == 2:
+                    key_val: tuple[Any, Any] = tuple(pair)
+                    frozen_val = _deep_freeze_metadata_val(key_val[1])
+                    frozen_pairs.append((str(key_val[0]), frozen_val))
+                else:
+                    frozen_pairs.append(pair)
+            data["metadata"] = tuple((k, v) for k, v in frozen_pairs)
+        return data
 
     def to_json(self) -> str:
         return self.model_dump_json()
@@ -170,13 +220,9 @@ class ProvenanceGraph(BaseModel):
         if self.nodes:
             node_types = {n.node_type for n in self.nodes}
             if ProvenanceNodeType.CASE_REVISION not in node_types:
-                raise ValueError(
-                    "Provenance graph must contain a CASE_REVISION node"
-                )
+                raise ValueError("Provenance graph must contain a CASE_REVISION node")
             if ProvenanceNodeType.CALCULATION_RUN not in node_types:
-                raise ValueError(
-                    "Provenance graph must contain a CALCULATION_RUN node"
-                )
+                raise ValueError("Provenance graph must contain a CALCULATION_RUN node")
 
         return self
 

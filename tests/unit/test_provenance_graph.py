@@ -4,6 +4,7 @@ Covers: valid DAG acceptance, duplicate nodes, missing edge references,
 self-loops, cycles, CASE_REVISION requirement, JSON round-trip, and
 hash stability.
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -50,6 +51,7 @@ def _edge(source: int, target: int, relation: str = "derives") -> ProvenanceEdge
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestProvenanceGraphValidation:
     """DAG validation rules on construction."""
@@ -203,11 +205,14 @@ class TestProvenanceGraphJsonRoundTrip:
             metadata=(("timestamp", "2026-01-01"),),
         )
         g = ProvenanceGraph(
-            nodes=(node, ProvenanceNode(
-                node_id=UUID(int=2),
-                node_type=ProvenanceNodeType.CALCULATION_RUN,
-                payload_hash=PAYLOAD_HASH,
-            )),
+            nodes=(
+                node,
+                ProvenanceNode(
+                    node_id=UUID(int=2),
+                    node_type=ProvenanceNodeType.CALCULATION_RUN,
+                    payload_hash=PAYLOAD_HASH,
+                ),
+            ),
             edges=(edge,),
         )
         json_str = g.to_json()
@@ -238,7 +243,10 @@ class TestProvenanceGraphHashStability:
             edges=(_edge(1, 2),),
         )
         g2 = ProvenanceGraph(
-            nodes=(_node(1), _node(3, ProvenanceNodeType.CALCULATION_RUN),),
+            nodes=(
+                _node(1),
+                _node(3, ProvenanceNodeType.CALCULATION_RUN),
+            ),
             edges=(_edge(1, 3),),
         )
         h1 = sha256_digest(g1.model_dump())

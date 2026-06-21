@@ -32,11 +32,7 @@ from hexagent.domain.quantities import (
 
 @pytest.mark.parametrize(
     ("kind", "unit"),
-    [
-        (kind, unit)
-        for kind in UNIT_RULES
-        for unit in allowed_units(kind)
-    ],
+    [(kind, unit) for kind in UNIT_RULES for unit in allowed_units(kind)],
 )
 def test_every_allowed_unit_converts_to_si(kind: object, unit: str) -> None:
     from hexagent.core.units import QuantityKind, convert_value

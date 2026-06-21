@@ -3,6 +3,7 @@
 Covers: key-order stability, UUID/datetime normalisation, NaN/Infinity
 rejection, hash determinism, and message-context order independence.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timezone
@@ -57,6 +58,7 @@ class TestCanonicalJson:
         """A non-UTC datetime is normalised to UTC before serialisation."""
         # 2026-01-01 02:00:00+02:00 == 2026-01-01 00:00:00+00:00
         from datetime import timedelta
+
         dt = datetime(2026, 1, 1, 2, 0, 0, tzinfo=timezone(offset=timedelta(hours=2)))
         obj = {"ts": dt}
         result = canonical_json(obj)
@@ -131,9 +133,7 @@ class TestCanonicalizeDesignCase:
         p2 = canonicalize_design_case(sample_design_case)
         assert sha256_digest(p1) == sha256_digest(p2)
 
-    def test_different_case_different_hash(
-        self, sample_design_case, sample_design_case_v2
-    ) -> None:
+    def test_different_case_different_hash(self, sample_design_case, sample_design_case_v2) -> None:
         h1 = sha256_digest(canonicalize_design_case(sample_design_case))
         h2 = sha256_digest(canonicalize_design_case(sample_design_case_v2))
         assert h1 != h2

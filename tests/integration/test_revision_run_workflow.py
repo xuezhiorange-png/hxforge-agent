@@ -3,6 +3,7 @@
 End-to-end: create a design case, make revisions, create a run, transition
 through the run lifecycle, and verify integrity.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -30,6 +31,12 @@ from hexagent.domain.models import (
     StreamSpec,
     VerificationStatus,
 )
+from hexagent.domain.provenance import (
+    ProvenanceEdge,
+    ProvenanceGraph,
+    ProvenanceNode,
+    ProvenanceNodeType,
+)
 from hexagent.domain.quantities import (
     AbsolutePressure,
     AbsoluteTemperature,
@@ -47,6 +54,59 @@ from hexagent.repositories.memory import (
     InMemoryCalculationRunRepository,
     InMemoryDesignCaseRevisionRepository,
 )
+
+
+def _make_minimal_graph() -> ProvenanceGraph:
+    """Minimal provenance graph with CASE_REVISION + CALCULATION_RUN."""
+    ph = "sha256:" + "a" * 64
+    case_node = ProvenanceNode(
+        node_id=UUID(int=100),
+        node_type=ProvenanceNodeType.CASE_REVISION,
+        payload_hash=ph,
+    )
+    run_node = ProvenanceNode(
+        node_id=UUID(int=200),
+        node_type=ProvenanceNodeType.CALCULATION_RUN,
+        payload_hash=ph,
+    )
+    return ProvenanceGraph(
+        nodes=(case_node, run_node),
+        edges=(
+            ProvenanceEdge(
+                source_id=UUID(int=100),
+                target_id=UUID(int=200),
+                relation="triggers",
+            ),
+        ),
+    )
+
+
+def _make_succeeded_graph() -> ProvenanceGraph:
+    """Provenance graph with CASE_REVISION + CALCULATION_RUN + RESULT."""
+    ph = "sha256:" + "a" * 64
+    case_node = ProvenanceNode(
+        node_id=UUID(int=100),
+        node_type=ProvenanceNodeType.CASE_REVISION,
+        payload_hash=ph,
+    )
+    run_node = ProvenanceNode(
+        node_id=UUID(int=200),
+        node_type=ProvenanceNodeType.CALCULATION_RUN,
+        payload_hash=ph,
+    )
+    result_node = ProvenanceNode(
+        node_id=UUID(int=300),
+        node_type=ProvenanceNodeType.RESULT,
+        payload_hash=ph,
+    )
+    return ProvenanceGraph(
+        nodes=(case_node, run_node, result_node),
+        edges=(
+            ProvenanceEdge(source_id=UUID(int=100), target_id=UUID(int=200), relation="triggers"),
+            ProvenanceEdge(source_id=UUID(int=200), target_id=UUID(int=300), relation="produces"),
+        ),
+    )
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -158,7 +218,10 @@ class TestFullRevisionWorkflow:
     ) -> None:
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -177,7 +240,10 @@ class TestFullRevisionWorkflow:
     ) -> None:
         case_v1 = _make_case()
         rev1 = rev_service.create_initial_revision(
-            case=case_v1, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case_v1,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
@@ -206,16 +272,21 @@ class TestFullRevisionWorkflow:
     ) -> None:
         case = _make_case()
         rev1 = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
         case2 = _make_case(outlet_temp=300.0)
         rev2 = rev_service.create_revision_from_parent(
-            parent=rev1, new_case=case2,
+            parent=rev1,
+            new_case=case2,
             created_by="agent-1",
             change_summary="v2",
-            clock=clock, id_gen=id_gen,
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev2)
 
@@ -233,7 +304,10 @@ class TestFullRevisionWorkflow:
     ) -> None:
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
         assert rev_service.verify_revision_integrity(rev, rev_repo) is True
@@ -246,7 +320,10 @@ class TestFullRevisionWorkflow:
     ) -> None:
         case1 = _make_case(case_id=FIXED_IDS[0])
         rev1 = rev_service.create_initial_revision(
-            case=case1, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case1,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         case2_wrong = _make_case(case_id=FIXED_IDS[1])
         with pytest.raises(ValueError, match="does not match"):
@@ -268,7 +345,10 @@ class TestFullRevisionWorkflow:
     ) -> None:
         case = _make_case()
         rev1 = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
         with pytest.raises(DuplicateIdError):
@@ -289,7 +369,10 @@ class TestFullRunWorkflow:
         # 1. Create a revision
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -298,9 +381,10 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SCREEN,
             software_version="0.1.0",
-            git_commit="abc123",
+            git_commit="abcdef0",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_succeeded_graph(),
         )
         assert run.status == CalculationRunStatus.PENDING
 
@@ -309,37 +393,7 @@ class TestFullRunWorkflow:
         run = run_service.start_run(run, clock)
         assert run.status == CalculationRunStatus.RUNNING
 
-        # 4. Set provenance graph and succeed
-        from uuid import uuid4 as _uuid4
-
-        from hexagent.domain.provenance import (
-            ProvenanceEdge,
-            ProvenanceGraph,
-            ProvenanceNode,
-            ProvenanceNodeType,
-        )
-        _na = ProvenanceNode(
-            node_id=_uuid4(),
-            node_type=ProvenanceNodeType.CASE_REVISION,
-            payload_hash="sha256:" + "1" * 64,
-        )
-        _nb = ProvenanceNode(
-            node_id=_uuid4(),
-            node_type=ProvenanceNodeType.CALCULATION_RUN,
-            payload_hash="sha256:" + "2" * 64,
-        )
-        _nc = ProvenanceNode(
-            node_id=_uuid4(),
-            node_type=ProvenanceNodeType.RESULT,
-            payload_hash="sha256:" + "3" * 64,
-        )
-        run = run.model_copy(update={"provenance_graph": ProvenanceGraph(
-            nodes=(_na, _nb, _nc),
-            edges=(
-                ProvenanceEdge(source_id=_na.node_id, target_id=_nb.node_id, relation="triggers"),
-                ProvenanceEdge(source_id=_nb.node_id, target_id=_nc.node_id, relation="produces"),
-            ),
-        )})
+        # 4. Succeed
         clock.advance(seconds=5)
         run = run_service.succeed_run(
             run,
@@ -360,7 +414,10 @@ class TestFullRunWorkflow:
     ) -> None:
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -368,42 +425,13 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SIZE,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="no-git",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_minimal_graph(),
         )
         clock.advance(seconds=1)
         run = run_service.start_run(run, clock)
-
-        # Set valid provenance graph before terminal state
-        from uuid import uuid4 as _uuid4
-
-        from hexagent.domain.provenance import (
-            ProvenanceEdge,
-            ProvenanceGraph,
-            ProvenanceNode,
-            ProvenanceNodeType,
-        )
-        _n1 = ProvenanceNode(
-            node_id=_uuid4(),
-            node_type=ProvenanceNodeType.CASE_REVISION,
-            payload_hash="sha256:" + "1" * 64,
-        )
-        _n2 = ProvenanceNode(
-            node_id=_uuid4(),
-            node_type=ProvenanceNodeType.CALCULATION_RUN,
-            payload_hash="sha256:" + "2" * 64,
-        )
-        run = run.model_copy(update={"provenance_graph": ProvenanceGraph(
-            nodes=(_n1, _n2),
-            edges=(
-                ProvenanceEdge(
-                    source_id=_n1.node_id,
-                    target_id=_n2.node_id,
-                    relation="triggers",
-                ),
-            ),
-        )})
 
         failure = RunFailure(
             code=ErrorCode.CALCULATION_NOT_CONVERGED,
@@ -425,7 +453,10 @@ class TestFullRunWorkflow:
     ) -> None:
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -433,42 +464,13 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SIZE,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="no-git",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_minimal_graph(),
         )
         clock.advance(seconds=1)
         run = run_service.start_run(run, clock)
-
-        # Set valid provenance graph before terminal state
-        from uuid import uuid4 as _uuid4
-
-        from hexagent.domain.provenance import (
-            ProvenanceEdge,
-            ProvenanceGraph,
-            ProvenanceNode,
-            ProvenanceNodeType,
-        )
-        _n1 = ProvenanceNode(
-            node_id=_uuid4(),
-            node_type=ProvenanceNodeType.CASE_REVISION,
-            payload_hash="sha256:" + "1" * 64,
-        )
-        _n2 = ProvenanceNode(
-            node_id=_uuid4(),
-            node_type=ProvenanceNodeType.CALCULATION_RUN,
-            payload_hash="sha256:" + "2" * 64,
-        )
-        run = run.model_copy(update={"provenance_graph": ProvenanceGraph(
-            nodes=(_n1, _n2),
-            edges=(
-                ProvenanceEdge(
-                    source_id=_n1.node_id,
-                    target_id=_n2.node_id,
-                    relation="triggers",
-                ),
-            ),
-        )})
 
         blocker = EngineeringMessage(
             code=ErrorCode.PROPERTY_UNAVAILABLE,
@@ -490,7 +492,10 @@ class TestFullRunWorkflow:
     ) -> None:
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -498,9 +503,10 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.REPORT,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="no-git",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_minimal_graph(),
         )
         assert run.status == CalculationRunStatus.PENDING
         clock.advance(seconds=1)
@@ -518,7 +524,10 @@ class TestFullRunWorkflow:
         """Cannot go directly from PENDING → SUCCEEDED."""
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -526,9 +535,10 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SCREEN,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="no-git",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_minimal_graph(),
         )
         with pytest.raises(InvalidStateTransitionError):
             run_service.succeed_run(run, result_hash="sha256:" + "b" * 64, clock=clock)
@@ -544,7 +554,10 @@ class TestFullRunWorkflow:
         """A successfully completed run passes integrity checks."""
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -552,41 +565,13 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SCREEN,
             software_version="0.1.0",
-            git_commit="abc123",
+            git_commit="abcdef0",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_succeeded_graph(),
         )
         clock.advance(seconds=1)
         run = run_service.start_run(run, clock)
-        # Set a valid provenance graph before succeeding
-        from uuid import uuid4
-
-        from hexagent.domain.provenance import (
-            ProvenanceEdge,
-            ProvenanceGraph,
-            ProvenanceNode,
-            ProvenanceNodeType,
-        )
-        n1 = ProvenanceNode(
-            node_id=uuid4(), node_type=ProvenanceNodeType.CASE_REVISION,
-            payload_hash="sha256:" + "1" * 64,
-        )
-        n2 = ProvenanceNode(
-            node_id=uuid4(), node_type=ProvenanceNodeType.CALCULATION_RUN,
-            payload_hash="sha256:" + "2" * 64,
-        )
-        n3 = ProvenanceNode(
-            node_id=uuid4(), node_type=ProvenanceNodeType.RESULT,
-            payload_hash="sha256:" + "3" * 64,
-        )
-        graph = ProvenanceGraph(
-            nodes=(n1, n2, n3),
-            edges=(
-                ProvenanceEdge(source_id=n1.node_id, target_id=n2.node_id, relation="triggers"),
-                ProvenanceEdge(source_id=n2.node_id, target_id=n3.node_id, relation="produces"),
-            ),
-        )
-        run = run.model_copy(update={"provenance_graph": graph})
         clock.advance(seconds=5)
         run = run_service.succeed_run(run, result_hash="sha256:" + "a" * 64, clock=clock)
 
@@ -603,7 +588,10 @@ class TestFullRunWorkflow:
         """A SUCCEEDED run cannot be created without a valid result_hash."""
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -611,12 +599,14 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SCREEN,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="no-git",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_minimal_graph(),
         )
         # SUCCEEDED without result_hash is now rejected at construction time
         from hexagent.domain.revisions import CalculationRun as CR
+
         with pytest.raises(ValidationError, match="result_hash"):
             CR(
                 run_id=run.run_id,
@@ -641,7 +631,10 @@ class TestFullRunWorkflow:
         """Multiple runs can target the same revision."""
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -649,17 +642,19 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SCREEN,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="no-git",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_minimal_graph(),
         )
         r2 = run_service.create_run(
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SIZE,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="no-git",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_minimal_graph(),
         )
         assert r1.run_id != r2.run_id
         assert r1.run_type != r2.run_type
@@ -679,7 +674,10 @@ class TestFullRunWorkflow:
         """Both DesignCaseRevision and CalculationRun are immutable."""
         case = _make_case()
         rev = rev_service.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -693,9 +691,10 @@ class TestFullRunWorkflow:
             case_revision_id=rev.revision_id,
             run_type=CalculationRunType.SCREEN,
             software_version="0.1.0",
-            git_commit="",
+            git_commit="no-git",
             clock=clock,
             id_gen=id_gen,
+            provenance_graph=_make_minimal_graph(),
         )
         with pytest.raises((ValueError, ValidationError)):
             run.status = CalculationRunStatus.SUCCEEDED  # type: ignore[misc]

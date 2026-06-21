@@ -1,4 +1,5 @@
 """Shared fixtures for HXForge TASK-004 tests."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -29,10 +30,7 @@ from hexagent.domain.quantities import (
 # ---------------------------------------------------------------------------
 
 FIXED_NOW = datetime(2026, 1, 1, tzinfo=UTC)
-FIXED_IDS = [
-    UUID(int=i)
-    for i in range(1, 20)
-]
+FIXED_IDS = [UUID(int=i) for i in range(1, 20)]
 
 
 def _make_fluid(name: str = "Water") -> FluidSpec:
@@ -69,9 +67,7 @@ def _make_hot_stream(
         inlet_pressure=AbsolutePressure(value=200000.0, unit="Pa"),
         fouling_resistance=_make_fouling_spec(),
         outlet_temperature=(
-            AbsoluteTemperature(value=outlet_temp, unit="K")
-            if outlet_temp is not None
-            else None
+            AbsoluteTemperature(value=outlet_temp, unit="K") if outlet_temp is not None else None
         ),
     )
 
@@ -88,9 +84,7 @@ def _make_cold_stream(
         inlet_pressure=AbsolutePressure(value=150000.0, unit="Pa"),
         fouling_resistance=_make_fouling_spec(),
         outlet_temperature=(
-            AbsoluteTemperature(value=outlet_temp, unit="K")
-            if outlet_temp is not None
-            else None
+            AbsoluteTemperature(value=outlet_temp, unit="K") if outlet_temp is not None else None
         ),
     )
 

@@ -38,9 +38,7 @@ def _preprocess(obj: Any) -> Any:
     # datetime → UTC ISO-8601
     if isinstance(obj, datetime):
         if obj.tzinfo is None:
-            raise ValueError(
-                "datetime must be timezone-aware for canonical serialisation"
-            )
+            raise ValueError("datetime must be timezone-aware for canonical serialisation")
         utc = obj.astimezone(UTC)
         return utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
@@ -153,13 +151,97 @@ def canonical_json(obj: Any) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _is_quantity(obj: Any) -> bool:
+    """Return True if *obj* is a Quantity-like object (before model_dump)."""
+    return (
+        hasattr(obj, "value")
+        and hasattr(obj, "unit")
+        and hasattr(obj, "kind")
+        and hasattr(obj, "to_si")
+    )
+
+
+def _walk_model_value(obj: Any) -> Any:
+    """Recursively walk a Pydantic model tree and produce canonical form.
+
+    Unlike :func:`_preprocess`, this function processes objects *before*
+    ``model_dump()`` is called, so Quantity objects retain their type
+    semantics and can be correctly SI-normalized.
+    """
+    # Quantity-like → canonical dict using SI value + kind
+    if _is_quantity(obj):
+        kind = obj.kind
+        si_val = obj.value
+        if kind is not None:
+            si_val = obj.to_si().value
+        return {
+            "si_value": si_val,
+            "kind": kind.value if kind is not None else None,
+        }
+
+    # Pydantic BaseModel → recurse into fields
+    if hasattr(obj, "model_dump") and hasattr(type(obj), "model_fields"):
+        result: dict[str, Any] = {}
+        for field_name in type(obj).model_fields:
+            if hasattr(obj, field_name):
+                val = getattr(obj, field_name)
+                result[field_name] = _walk_model_value(val)
+        return result
+
+    # dict → recurse values
+    if isinstance(obj, dict):
+        return {k: _walk_model_value(v) for k, v in obj.items()}
+
+    # frozenset → sorted list
+    if isinstance(obj, frozenset):
+        items = [_walk_model_value(item) for item in obj]
+        return sorted(items, key=lambda x: json.dumps(x, sort_keys=True, default=str))
+
+    # tuple → ordered list (preserving order)
+    if isinstance(obj, tuple):
+        return [_walk_model_value(item) for item in obj]
+
+    # set → sorted list
+    if isinstance(obj, set):
+        items = [_walk_model_value(item) for item in obj]
+        return sorted(items, key=lambda x: json.dumps(x, sort_keys=True, default=str))
+
+    # list → recurse
+    if isinstance(obj, list):
+        return [_walk_model_value(item) for item in obj]
+
+    # Enum → value
+    if isinstance(obj, Enum):
+        return obj.value
+
+    # UUID → string
+    if isinstance(obj, UUID):
+        return str(obj)
+
+    # datetime → UTC ISO-8601
+    if isinstance(obj, datetime):
+        if obj.tzinfo is None:
+            raise ValueError("datetime must be timezone-aware for canonical serialisation")
+        utc = obj.astimezone(UTC)
+        return utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+    # Non-finite float check
+    if isinstance(obj, float) and not math.isfinite(obj):
+        raise ValueError(f"Non-finite float {obj!r} cannot be serialised")
+
+    # Primitives pass through
+    return obj
+
+
 def canonicalize_design_case(case: DesignCase) -> dict[str, Any]:
     """Produce a canonical dict from a :class:`DesignCase`.
 
-    The result is deterministic (sorted keys, canonical types) and
-    suitable for hashing with :func:`sha256_digest`.
+    Walks the Pydantic model tree *before* ``model_dump()`` so that
+    Quantity objects retain their type semantics and are SI-normalized
+    during canonicalization.  The result is deterministic (sorted keys,
+    canonical types) and suitable for hashing with :func:`sha256_digest`.
     """
-    result: dict[str, Any] = _preprocess(case.model_dump())
+    result: dict[str, Any] = _walk_model_value(case)
     return result
 
 

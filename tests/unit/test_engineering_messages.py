@@ -3,6 +3,7 @@
 Covers: all severity levels, JSON round-trip, code constants, and
 allows_continuation semantics.
 """
+
 from __future__ import annotations
 
 import pytest

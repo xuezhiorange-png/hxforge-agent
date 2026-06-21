@@ -3,12 +3,14 @@
 Each state transition returns a NEW frozen CalculationRun —
 no in-place mutation is ever performed.
 """
+
 from __future__ import annotations
 
 from uuid import UUID
 
 from hexagent.core.time import Clock, IdGenerator
 from hexagent.domain.messages import EngineeringMessage, RunFailure
+from hexagent.domain.provenance import ProvenanceGraph
 from hexagent.domain.revisions import (
     CalculationRun,
     CalculationRunStatus,
@@ -41,10 +43,20 @@ class RunService:
         git_commit: str,
         clock: Clock,
         id_gen: IdGenerator,
+        provenance_graph: ProvenanceGraph | None = None,
     ) -> CalculationRun:
-        """Create a new PENDING calculation run."""
+        """Create a new PENDING calculation run.
+
+        Parameters
+        ----------
+        provenance_graph:
+            A non-empty provenance graph with at least ``CASE_REVISION``
+            and ``CALCULATION_RUN`` nodes.  Required by the persistence
+            contract — an empty graph is rejected at persist time.
+        """
         revision = self._revision_repo.get(case_revision_id)
         now = clock.utcnow()
+        graph = provenance_graph or ProvenanceGraph(nodes=(), edges=())
         run = CalculationRun(
             run_id=id_gen.new_id(),
             case_id=revision.case_id,
@@ -55,12 +67,15 @@ class RunService:
             software_version=software_version,
             git_commit=git_commit,
             input_hash=revision.content_hash,
+            provenance_graph=graph,
         )
         self._run_repo.add(run)
         return run
 
     def start_run(
-        self, run: CalculationRun, clock: Clock,
+        self,
+        run: CalculationRun,
+        clock: Clock,
     ) -> CalculationRun:
         """Transition PENDING → RUNNING."""
         self._check_transition(run, CalculationRunStatus.RUNNING)
@@ -74,7 +89,10 @@ class RunService:
         return new
 
     def succeed_run(
-        self, run: CalculationRun, result_hash: str, clock: Clock,
+        self,
+        run: CalculationRun,
+        result_hash: str,
+        clock: Clock,
     ) -> CalculationRun:
         """Transition RUNNING → SUCCEEDED."""
         self._check_transition(run, CalculationRunStatus.SUCCEEDED)
@@ -90,7 +108,10 @@ class RunService:
         return new
 
     def fail_run(
-        self, run: CalculationRun, failure: RunFailure, clock: Clock,
+        self,
+        run: CalculationRun,
+        failure: RunFailure,
+        clock: Clock,
     ) -> CalculationRun:
         """Transition RUNNING → FAILED."""
         self._check_transition(run, CalculationRunStatus.FAILED)
@@ -124,9 +145,7 @@ class RunService:
         self._run_repo.update(new)
         return new
 
-    def cancel_run(
-        self, run: CalculationRun, clock: Clock,
-    ) -> CalculationRun:
+    def cancel_run(self, run: CalculationRun, clock: Clock) -> CalculationRun:
         """Transition PENDING/RUNNING → CANCELLED."""
         self._check_transition(run, CalculationRunStatus.CANCELLED)
         now = clock.utcnow()
@@ -140,7 +159,8 @@ class RunService:
         return new
 
     def verify_run_integrity(
-        self, run: CalculationRun,
+        self,
+        run: CalculationRun,
     ) -> bool:
         """Verify run data integrity."""
         revision = self._revision_repo.get(run.case_revision_id)
@@ -157,7 +177,9 @@ class RunService:
         return not (run.completed_at and run.started_at and run.completed_at <= run.started_at)
 
     def _check_transition(
-        self, run: CalculationRun, target: CalculationRunStatus,
+        self,
+        run: CalculationRun,
+        target: CalculationRunStatus,
     ) -> None:
         """Validate and raise on illegal transitions."""
         if not is_valid_transition(run.status, target):

@@ -4,6 +4,7 @@ These are pure *structural* protocols (duck-typed interfaces) that decouple
 application services from persistence.  Any concrete store — in-memory,
 PostgreSQL, Redis — must satisfy these contracts.
 """
+
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable

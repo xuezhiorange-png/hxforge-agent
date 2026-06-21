@@ -3,6 +3,7 @@
 Covers: all valid/invalid transitions, terminal-state requirements,
 completed_at ordering, JSON round-trip, and immutability.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

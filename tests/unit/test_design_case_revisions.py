@@ -4,6 +4,7 @@ Covers: initial revision, child revisions, numbering, parent linkage,
 duplicate/number/wrong-case_id rejection, hash verification, and JSON
 round-trip.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -96,12 +97,16 @@ class TestDesignCaseRevisionCreation:
     def test_revision_numbers_consecutive(self, sample_design_case) -> None:
         r1 = _make_revision(sample_design_case, UUID(int=1))
         r2 = _make_revision(
-            sample_design_case, UUID(int=2),
-            revision_number=2, parent_revision_id=r1.revision_id,
+            sample_design_case,
+            UUID(int=2),
+            revision_number=2,
+            parent_revision_id=r1.revision_id,
         )
         r3 = _make_revision(
-            sample_design_case, UUID(int=3),
-            revision_number=3, parent_revision_id=r2.revision_id,
+            sample_design_case,
+            UUID(int=3),
+            revision_number=3,
+            parent_revision_id=r2.revision_id,
         )
         assert r1.revision_number == 1
         assert r2.revision_number == 2
@@ -110,16 +115,20 @@ class TestDesignCaseRevisionCreation:
     def test_parent_correct(self, sample_design_case) -> None:
         parent = _make_revision(sample_design_case, UUID(int=1))
         child = _make_revision(
-            sample_design_case, UUID(int=2),
-            revision_number=2, parent_revision_id=parent.revision_id,
+            sample_design_case,
+            UUID(int=2),
+            revision_number=2,
+            parent_revision_id=parent.revision_id,
         )
         assert child.parent_revision_id == parent.revision_id
 
     def test_parent_unmodified(self, sample_design_case) -> None:
         parent = _make_revision(sample_design_case, UUID(int=1))
         _make_revision(
-            sample_design_case, UUID(int=2),
-            revision_number=2, parent_revision_id=parent.revision_id,
+            sample_design_case,
+            UUID(int=2),
+            revision_number=2,
+            parent_revision_id=parent.revision_id,
         )
         # parent is a frozen dataclass — no mutation possible
         assert parent.revision_number == 1
@@ -203,9 +212,7 @@ class TestDesignCaseRevisionRepository:
         with pytest.raises(RevisionNumberConflictError):
             repo.add(r1_dup)
 
-    def test_wrong_case_id_different_cases(
-        self, sample_design_case, sample_design_case_v2
-    ) -> None:
+    def test_wrong_case_id_different_cases(self, sample_design_case, sample_design_case_v2) -> None:
         """Two cases can independently have revision_number=1."""
         repo = InMemoryDesignCaseRevisionRepository()
         r1_a = _make_revision(sample_design_case, UUID(int=1))
@@ -216,11 +223,13 @@ class TestDesignCaseRevisionRepository:
     def test_missing_parent_rejected(self, sample_design_case) -> None:
         repo = InMemoryDesignCaseRevisionRepository()
         child = _make_revision(
-            sample_design_case, UUID(int=2),
+            sample_design_case,
+            UUID(int=2),
             revision_number=2,
             parent_revision_id=UUID(int=999),
         )
         from hexagent.domain.revisions import MissingParentError
+
         with pytest.raises(MissingParentError):
             repo.add(child)
 

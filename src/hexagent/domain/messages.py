@@ -1,9 +1,46 @@
 from __future__ import annotations
 
+import types
 from enum import StrEnum
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+def _freeze_context_val(val: Any) -> Any:
+    """Recursively freeze a context value (used inside model_validator)."""
+    if isinstance(val, dict):
+        return types.MappingProxyType({k: _freeze_context_val(v) for k, v in val.items()})
+    if isinstance(val, list):
+        return tuple(_freeze_context_val(item) for item in val)
+    if isinstance(val, (set, frozenset)):
+        return tuple(
+            sorted(
+                (_freeze_context_val(item) for item in val),
+                key=lambda x: repr(x),
+            )
+        )
+    if isinstance(val, tuple):
+        return tuple(_freeze_context_val(item) for item in val)
+    return val
+
+
+def _freeze_context_tuples(data: dict[str, Any], key: str) -> dict[str, Any]:
+    """Freeze nested values in a tuple-of-tuples ``context`` field."""
+    if key not in data:
+        return data
+    raw = data[key]
+    frozen_pairs: list[tuple[str, Any]] = []
+    for pair in raw:
+        if isinstance(pair, (list, tuple)) and len(pair) == 2:
+            key_val: tuple[Any, Any] = tuple(pair)
+            frozen_val = _freeze_context_val(key_val[1])
+            frozen_pairs.append((str(key_val[0]), frozen_val))
+        else:
+            frozen_pairs.append(pair)
+    data[key] = tuple((k, v) for k, v in frozen_pairs)
+    return data
+
 
 # ---------------------------------------------------------------------------
 # Error codes (stable string enum)
@@ -79,7 +116,8 @@ class EngineeringMessage(BaseModel):
 
     The ``allows_continuation`` field is derived from ``severity`` by
     the model validator — callers should not set it explicitly.
-    ``context`` uses tuple-of-tuples for deep immutability.
+    ``context`` uses tuple-of-tuples with recursively frozen values
+    for deep immutability.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -95,8 +133,9 @@ class EngineeringMessage(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _derive_continuation(cls, data: dict[str, Any]) -> dict[str, Any]:
-        """Set ``allows_continuation`` from severity before construction."""
+    def _freeze_context_and_derive(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Freeze context values and set ``allows_continuation`` from severity."""
+        _freeze_context_tuples(data, "context")
         severity = data.get("severity")
         if severity:
             continuation_map = {
@@ -126,7 +165,8 @@ class EngineeringMessage(BaseModel):
 class RunFailure(BaseModel):
     """Structured failure record attached to a :class:`CalculationRun`.
 
-    ``context`` uses tuple-of-tuples for deep immutability.
+    ``context`` uses tuple-of-tuples with recursively frozen values
+    for deep immutability.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -136,6 +176,13 @@ class RunFailure(BaseModel):
     message: str = Field(min_length=1)
     traceback: str | None = None
     context: tuple[tuple[str, Any], ...] = Field(default_factory=tuple)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _freeze_context(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Recursively freeze context values before construction."""
+        _freeze_context_tuples(data, "context")
+        return data
 
     # --- serialisation helpers ---
 

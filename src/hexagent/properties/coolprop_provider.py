@@ -5,6 +5,7 @@ Configuration fingerprint is recomputed before every query to detect
 external mutations and fail closed.  A process-level lock protects
 the combined "verify + evaluate" operation as one atomic action.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -67,9 +68,7 @@ def _coolprop_configuration_fingerprint() -> str:
     parts.append(f"git={CP.get_global_param_string('gitrevision')}")
     for fluid, (t, p) in _REF_VERIFY_STATE_POINTS.items():
         try:
-            h = float(
-                CP.PropsSI("Hmass", "T", t, "P", p, fluid)
-            )
+            h = float(CP.PropsSI("Hmass", "T", t, "P", p, fluid))
             parts.append(f"{fluid}_{t}_{p}={h:.15e}")
         except Exception:
             parts.append(f"{fluid}_{t}_{p}=err")
@@ -120,22 +119,16 @@ class CoolPropProvider:
         cache_size: int = 256,
     ) -> None:
         if not math.isfinite(near_saturation_relative_tolerance):
-            raise ValueError(
-                "near_saturation_relative_tolerance must be finite"
-            )
+            raise ValueError("near_saturation_relative_tolerance must be finite")
         if not 0.0 < near_saturation_relative_tolerance < 1.0:
-            raise ValueError(
-                "near_saturation_relative_tolerance must be in (0, 1)"
-            )
+            raise ValueError("near_saturation_relative_tolerance must be in (0, 1)")
         if cache_size < 0:
             raise ValueError("cache_size must be non-negative")
 
         self.version = str(CP.get_global_param_string("version"))
         self.git_revision = str(CP.get_global_param_string("gitrevision"))
         self.allow_unvalidated_fluids = allow_unvalidated_fluids
-        self.near_saturation_relative_tolerance = (
-            near_saturation_relative_tolerance
-        )
+        self.near_saturation_relative_tolerance = near_saturation_relative_tolerance
         self.cache_size = cache_size
 
         # Item 1: Establish known DEF baseline during controlled init.
@@ -147,13 +140,9 @@ class CoolPropProvider:
         with _COOLPROP_STATE_LOCK:
             self._force_def_reference_state()
             self._def_baseline = self._capture_def_enthalpies()
-            self._construction_fingerprint = (
-                _coolprop_configuration_fingerprint()
-            )
+            self._construction_fingerprint = _coolprop_configuration_fingerprint()
 
-        self._cache: OrderedDict[PropertyCacheKey, PropertyResult] = (
-            OrderedDict()
-        )
+        self._cache: OrderedDict[PropertyCacheKey, PropertyResult] = OrderedDict()
         self._cache_hits = 0
         self._cache_misses = 0
         self._cache_lock = threading.Lock()
@@ -186,9 +175,7 @@ class CoolPropProvider:
         baseline: dict[str, float] = {}
         for fluid, (t, p) in _REF_VERIFY_STATE_POINTS.items():
             try:
-                h = float(
-                    CP.PropsSI("Hmass", "T", t, "P", p, fluid)
-                )
+                h = float(CP.PropsSI("Hmass", "T", t, "P", p, fluid))
                 baseline[fluid] = h
             except Exception:
                 baseline[fluid] = float("nan")
@@ -208,9 +195,7 @@ class CoolPropProvider:
             return
         t, p = _REF_VERIFY_STATE_POINTS[fluid_name]
         try:
-            h = float(
-                CP.PropsSI("Hmass", "T", t, "P", p, fluid_name)
-            )
+            h = float(CP.PropsSI("Hmass", "T", t, "P", p, fluid_name))
         except Exception:
             return  # Let the actual query handle the error
         if not math.isclose(h, expected, rel_tol=1e-6, abs_tol=1.0):
@@ -249,9 +234,7 @@ class CoolPropProvider:
                 "CoolProp global configuration changed since provider "
                 "construction. All cached results have been discarded.",
                 context={
-                    "construction_fingerprint": (
-                        self._construction_fingerprint
-                    ),
+                    "construction_fingerprint": (self._construction_fingerprint),
                     "current_fingerprint": current,
                 },
             )
@@ -280,9 +263,7 @@ class CoolPropProvider:
         # Item 1: atomic verify + evaluate under process lock
         with _COOLPROP_STATE_LOCK:
             fingerprint = self._verify_configuration(identifier.name)
-            key = self._cache_key(
-                identifier, PropertyQueryType.TP, inputs, fingerprint
-            )
+            key = self._cache_key(identifier, PropertyQueryType.TP, inputs, fingerprint)
             cached = self._cache_get(key)
             if cached is not None:
                 if not isinstance(cached, FluidState):
@@ -290,7 +271,10 @@ class CoolPropProvider:
                 return cached
 
             state = self._state_tp_uncached(
-                identifier, validation, temperature_k, pressure_pa,
+                identifier,
+                validation,
+                temperature_k,
+                pressure_pa,
                 fingerprint,
             )
             self._cache_store(key, state)
@@ -312,8 +296,7 @@ class CoolPropProvider:
         if reference_state is not self.reference_state_policy:
             raise PropertyServiceError(
                 PropertyErrorCode.INVALID_INPUT,
-                "PH query reference-state policy does not match "
-                "the provider policy.",
+                "PH query reference-state policy does not match the provider policy.",
                 context={
                     "requested": str(reference_state),
                     "provider": str(self.reference_state_policy),
@@ -330,9 +313,7 @@ class CoolPropProvider:
         # Item 1: atomic verify + evaluate under process lock
         with _COOLPROP_STATE_LOCK:
             fingerprint = self._verify_configuration(identifier.name)
-            key = self._cache_key(
-                identifier, PropertyQueryType.PH, inputs, fingerprint
-            )
+            key = self._cache_key(identifier, PropertyQueryType.PH, inputs, fingerprint)
             cached = self._cache_get(key)
             if cached is not None:
                 if not isinstance(cached, FluidState):
@@ -340,7 +321,10 @@ class CoolPropProvider:
                 return cached
 
             state = self._state_ph_uncached(
-                identifier, validation, pressure_pa, enthalpy_j_kg,
+                identifier,
+                validation,
+                pressure_pa,
+                enthalpy_j_kg,
                 fingerprint,
             )
             self._cache_store(key, state)
@@ -361,9 +345,7 @@ class CoolPropProvider:
         # Item 1: atomic verify + evaluate under process lock
         with _COOLPROP_STATE_LOCK:
             fingerprint = self._verify_configuration(identifier.name)
-            key = self._cache_key(
-                identifier, query_type, inputs, fingerprint
-            )
+            key = self._cache_key(identifier, query_type, inputs, fingerprint)
             cached = self._cache_get(key)
             if cached is not None:
                 if not isinstance(cached, SaturationState):
@@ -371,7 +353,10 @@ class CoolPropProvider:
                 return cached
 
             state = self._saturation_pressure_uncached(
-                identifier, validation, pressure_pa, fingerprint,
+                identifier,
+                validation,
+                pressure_pa,
+                fingerprint,
             )
             self._cache_store(key, state)
             return state
@@ -391,9 +376,7 @@ class CoolPropProvider:
         # Item 1: atomic verify + evaluate under process lock
         with _COOLPROP_STATE_LOCK:
             fingerprint = self._verify_configuration(identifier.name)
-            key = self._cache_key(
-                identifier, query_type, inputs, fingerprint
-            )
+            key = self._cache_key(identifier, query_type, inputs, fingerprint)
             cached = self._cache_get(key)
             if cached is not None:
                 if not isinstance(cached, SaturationState):
@@ -401,7 +384,10 @@ class CoolPropProvider:
                 return cached
 
             state = self._saturation_temperature_uncached(
-                identifier, validation, temperature_k, fingerprint,
+                identifier,
+                validation,
+                temperature_k,
+                fingerprint,
             )
             self._cache_store(key, state)
             return state
@@ -426,9 +412,7 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _reject_mixture(
-        identifier: FluidIdentifier, query_type: str
-    ) -> None:
+    def _reject_mixture(identifier: FluidIdentifier, query_type: str) -> None:
         if identifier.is_mixture:
             raise PropertyServiceError(
                 PropertyErrorCode.UNSUPPORTED_QUERY,
@@ -446,112 +430,179 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     def _state_tp_uncached(
-        self, fluid: FluidIdentifier, validation: FluidValidationLevel,
-        temperature_k: float, pressure_pa: float, fingerprint: str,
+        self,
+        fluid: FluidIdentifier,
+        validation: FluidValidationLevel,
+        temperature_k: float,
+        pressure_pa: float,
+        fingerprint: str,
     ) -> FluidState:
         # Item 5: explicit TP boundary pre-check
         self._pre_check_tp_limits(fluid, temperature_k, pressure_pa)
         self._check_tp_near_saturation(fluid, temperature_k, pressure_pa)
         phase = self._phase(
-            fluid, "T", temperature_k, "P", pressure_pa,
+            fluid,
+            "T",
+            temperature_k,
+            "P",
+            pressure_pa,
             PropertyQueryType.TP,
         )
         self._reject_unknown_phase(phase, fluid, PropertyQueryType.TP)
         return self._build_state(
-            fluid, validation, PropertyQueryType.TP,
-            "T", temperature_k, "P", pressure_pa,
-            phase=phase, quality=None, fingerprint=fingerprint,
+            fluid,
+            validation,
+            PropertyQueryType.TP,
+            "T",
+            temperature_k,
+            "P",
+            pressure_pa,
+            phase=phase,
+            quality=None,
+            fingerprint=fingerprint,
         )
 
     def _state_ph_uncached(
-        self, fluid: FluidIdentifier, validation: FluidValidationLevel,
-        pressure_pa: float, enthalpy_j_kg: float, fingerprint: str,
+        self,
+        fluid: FluidIdentifier,
+        validation: FluidValidationLevel,
+        pressure_pa: float,
+        enthalpy_j_kg: float,
+        fingerprint: str,
     ) -> FluidState:
         self._check_ph_saturation(fluid, pressure_pa, enthalpy_j_kg)
         phase = self._phase(
-            fluid, "P", pressure_pa, "Hmass", enthalpy_j_kg,
+            fluid,
+            "P",
+            pressure_pa,
+            "Hmass",
+            enthalpy_j_kg,
             PropertyQueryType.PH,
         )
         self._reject_unknown_phase(phase, fluid, PropertyQueryType.PH)
         return self._build_state(
-            fluid, validation, PropertyQueryType.PH,
-            "P", pressure_pa, "Hmass", enthalpy_j_kg,
-            phase=phase, quality=None, fingerprint=fingerprint,
+            fluid,
+            validation,
+            PropertyQueryType.PH,
+            "P",
+            pressure_pa,
+            "Hmass",
+            enthalpy_j_kg,
+            phase=phase,
+            quality=None,
+            fingerprint=fingerprint,
         )
 
     def _saturation_pressure_uncached(
-        self, fluid: FluidIdentifier, validation: FluidValidationLevel,
-        pressure_pa: float, fingerprint: str,
+        self,
+        fluid: FluidIdentifier,
+        validation: FluidValidationLevel,
+        pressure_pa: float,
+        fingerprint: str,
     ) -> SaturationState:
         query_type = PropertyQueryType.SATURATION_P
         # Item 5: explicit boundary pre-check before calling CoolProp
-        self._pre_check_saturation_boundaries(
-            fluid, "pressure_pa", pressure_pa
-        )
+        self._pre_check_saturation_boundaries(fluid, "pressure_pa", pressure_pa)
         try:
             liquid = self._build_state(
-                fluid, validation, query_type,
-                "P", pressure_pa, "Q", 0.0,
-                phase=PhaseRegion.SATURATED_LIQUID, quality=0.0,
+                fluid,
+                validation,
+                query_type,
+                "P",
+                pressure_pa,
+                "Q",
+                0.0,
+                phase=PhaseRegion.SATURATED_LIQUID,
+                quality=0.0,
                 fingerprint=fingerprint,
             )
             vapor = self._build_state(
-                fluid, validation, query_type,
-                "P", pressure_pa, "Q", 1.0,
-                phase=PhaseRegion.SATURATED_VAPOR, quality=1.0,
+                fluid,
+                validation,
+                query_type,
+                "P",
+                pressure_pa,
+                "Q",
+                1.0,
+                phase=PhaseRegion.SATURATED_VAPOR,
+                quality=1.0,
                 fingerprint=fingerprint,
             )
         except PropertyServiceError as exc:
-            self._raise_saturation_unavailable(
-                exc, fluid, "pressure_pa", pressure_pa
-            )
+            self._raise_saturation_unavailable(exc, fluid, "pressure_pa", pressure_pa)
         provenance = self._provenance(
-            fluid, validation, query_type,
-            (("pressure_pa", pressure_pa),), fingerprint,
+            fluid,
+            validation,
+            query_type,
+            (("pressure_pa", pressure_pa),),
+            fingerprint,
         )
         return SaturationState(
-            query_type=query_type, input_value=pressure_pa,
-            liquid=liquid, vapor=vapor, provenance=provenance,
+            query_type=query_type,
+            input_value=pressure_pa,
+            liquid=liquid,
+            vapor=vapor,
+            provenance=provenance,
         )
 
     def _saturation_temperature_uncached(
-        self, fluid: FluidIdentifier, validation: FluidValidationLevel,
-        temperature_k: float, fingerprint: str,
+        self,
+        fluid: FluidIdentifier,
+        validation: FluidValidationLevel,
+        temperature_k: float,
+        fingerprint: str,
     ) -> SaturationState:
         query_type = PropertyQueryType.SATURATION_T
         # Item 5: explicit boundary pre-check before calling CoolProp
-        self._pre_check_saturation_boundaries(
-            fluid, "temperature_k", temperature_k
-        )
+        self._pre_check_saturation_boundaries(fluid, "temperature_k", temperature_k)
         try:
             liquid = self._build_state(
-                fluid, validation, query_type,
-                "T", temperature_k, "Q", 0.0,
-                phase=PhaseRegion.SATURATED_LIQUID, quality=0.0,
+                fluid,
+                validation,
+                query_type,
+                "T",
+                temperature_k,
+                "Q",
+                0.0,
+                phase=PhaseRegion.SATURATED_LIQUID,
+                quality=0.0,
                 fingerprint=fingerprint,
             )
             vapor = self._build_state(
-                fluid, validation, query_type,
-                "T", temperature_k, "Q", 1.0,
-                phase=PhaseRegion.SATURATED_VAPOR, quality=1.0,
+                fluid,
+                validation,
+                query_type,
+                "T",
+                temperature_k,
+                "Q",
+                1.0,
+                phase=PhaseRegion.SATURATED_VAPOR,
+                quality=1.0,
                 fingerprint=fingerprint,
             )
         except PropertyServiceError as exc:
-            self._raise_saturation_unavailable(
-                exc, fluid, "temperature_k", temperature_k
-            )
+            self._raise_saturation_unavailable(exc, fluid, "temperature_k", temperature_k)
         provenance = self._provenance(
-            fluid, validation, query_type,
-            (("temperature_k", temperature_k),), fingerprint,
+            fluid,
+            validation,
+            query_type,
+            (("temperature_k", temperature_k),),
+            fingerprint,
         )
         return SaturationState(
-            query_type=query_type, input_value=temperature_k,
-            liquid=liquid, vapor=vapor, provenance=provenance,
+            query_type=query_type,
+            input_value=temperature_k,
+            liquid=liquid,
+            vapor=vapor,
+            provenance=provenance,
         )
 
     def _raise_saturation_unavailable(
-        self, exc: PropertyServiceError, fluid: FluidIdentifier,
-        input_name: str, input_value: float,
+        self,
+        exc: PropertyServiceError,
+        fluid: FluidIdentifier,
+        input_name: str,
+        input_value: float,
     ) -> NoReturn:
         if exc.code not in {
             PropertyErrorCode.STATE_OUT_OF_RANGE,
@@ -560,8 +611,7 @@ class CoolPropProvider:
             raise exc
         raise PropertyServiceError(
             PropertyErrorCode.SATURATION_UNAVAILABLE,
-            "Saturation properties are unavailable at the "
-            "requested state.",
+            "Saturation properties are unavailable at the requested state.",
             context={
                 "fluid": fluid.cache_identity,
                 input_name: input_value,
@@ -574,11 +624,17 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     def _build_state(
-        self, fluid: FluidIdentifier, validation: FluidValidationLevel,
+        self,
+        fluid: FluidIdentifier,
+        validation: FluidValidationLevel,
         query_type: PropertyQueryType,
-        input1_name: str, input1_value: float,
-        input2_name: str, input2_value: float,
-        *, phase: PhaseRegion, quality: float | None,
+        input1_name: str,
+        input1_value: float,
+        input2_name: str,
+        input2_value: float,
+        *,
+        phase: PhaseRegion,
+        quality: float | None,
         fingerprint: str,
     ) -> FluidState:
         inputs = (
@@ -587,30 +643,14 @@ class CoolPropProvider:
         )
         query = (input1_name, input1_value, input2_name, input2_value)
         values = {
-            "temperature_k": self._props(
-                "T", fluid, query_type, query
-            ),
-            "pressure_pa": self._props(
-                "P", fluid, query_type, query
-            ),
-            "density_kg_m3": self._props(
-                "Dmass", fluid, query_type, query
-            ),
-            "cp_j_kg_k": self._props(
-                "Cpmass", fluid, query_type, query
-            ),
-            "viscosity_pa_s": self._props(
-                "VISCOSITY", fluid, query_type, query
-            ),
-            "conductivity_w_m_k": self._props(
-                "CONDUCTIVITY", fluid, query_type, query
-            ),
-            "enthalpy_j_kg": self._props(
-                "Hmass", fluid, query_type, query
-            ),
-            "entropy_j_kg_k": self._props(
-                "Smass", fluid, query_type, query
-            ),
+            "temperature_k": self._props("T", fluid, query_type, query),
+            "pressure_pa": self._props("P", fluid, query_type, query),
+            "density_kg_m3": self._props("Dmass", fluid, query_type, query),
+            "cp_j_kg_k": self._props("Cpmass", fluid, query_type, query),
+            "viscosity_pa_s": self._props("VISCOSITY", fluid, query_type, query),
+            "conductivity_w_m_k": self._props("CONDUCTIVITY", fluid, query_type, query),
+            "enthalpy_j_kg": self._props("Hmass", fluid, query_type, query),
+            "entropy_j_kg_k": self._props("Smass", fluid, query_type, query),
         }
         self._validate_outputs(values, fluid, query_type)
         return FluidState(
@@ -624,13 +664,13 @@ class CoolPropProvider:
             entropy_j_kg_k=values["entropy_j_kg_k"],
             phase=phase,
             quality=quality,
-            provenance=self._provenance(
-                fluid, validation, query_type, inputs, fingerprint
-            ),
+            provenance=self._provenance(fluid, validation, query_type, inputs, fingerprint),
         )
 
     def _validate_outputs(
-        self, values: dict[str, float], fluid: FluidIdentifier,
+        self,
+        values: dict[str, float],
+        fluid: FluidIdentifier,
         query_type: PropertyQueryType,
     ) -> None:
         for name, value in values.items():
@@ -644,8 +684,12 @@ class CoolPropProvider:
                     },
                 )
         positive_outputs = (
-            "temperature_k", "pressure_pa", "density_kg_m3",
-            "cp_j_kg_k", "viscosity_pa_s", "conductivity_w_m_k",
+            "temperature_k",
+            "pressure_pa",
+            "density_kg_m3",
+            "cp_j_kg_k",
+            "viscosity_pa_s",
+            "conductivity_w_m_k",
         )
         for name in positive_outputs:
             if values[name] <= 0.0:
@@ -664,7 +708,8 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     def _resolve_fluid(
-        self, fluid: FluidIdentifier | str,
+        self,
+        fluid: FluidIdentifier | str,
     ) -> tuple[FluidIdentifier, FluidValidationLevel]:
         identifier = FluidIdentifier.from_value(fluid)
         if identifier.equation_of_state_backend.upper() != "HEOS":
@@ -687,28 +732,21 @@ class CoolPropProvider:
                 validation = _validation_level_for(canonical)
 
         self._assert_fluid_exists(identifier)
-        if (
-            validation is FluidValidationLevel.UNVALIDATED
-            and not self.allow_unvalidated_fluids
-        ):
+        if validation is FluidValidationLevel.UNVALIDATED and not self.allow_unvalidated_fluids:
             raise PropertyServiceError(
                 PropertyErrorCode.UNVALIDATED_FLUID,
-                "The requested fluid is not in the approved "
-                "Tier-1 validation set.",
+                "The requested fluid is not in the approved Tier-1 validation set.",
                 context={"fluid": identifier.cache_identity},
             )
         return identifier, validation
 
     def _assert_fluid_exists(self, fluid: FluidIdentifier) -> None:
         try:
-            molar_mass = float(
-                CP.PropsSI("M", fluid.coolprop_fluid)
-            )
+            molar_mass = float(CP.PropsSI("M", fluid.coolprop_fluid))
         except Exception as exc:
             raise PropertyServiceError(
                 PropertyErrorCode.INVALID_FLUID,
-                "CoolProp could not resolve the requested "
-                "fluid identifier.",
+                "CoolProp could not resolve the requested fluid identifier.",
                 context={
                     "fluid": fluid.cache_identity,
                     "backend_message": str(exc),
@@ -717,8 +755,7 @@ class CoolPropProvider:
         if not math.isfinite(molar_mass) or molar_mass <= 0.0:
             raise PropertyServiceError(
                 PropertyErrorCode.INVALID_FLUID,
-                "CoolProp returned an invalid molar mass "
-                "for the fluid.",
+                "CoolProp returned an invalid molar mass for the fluid.",
                 context={
                     "fluid": fluid.cache_identity,
                     "molar_mass": molar_mass,
@@ -730,20 +767,19 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     def _check_tp_near_saturation(
-        self, fluid: FluidIdentifier,
-        temperature_k: float, pressure_pa: float,
+        self,
+        fluid: FluidIdentifier,
+        temperature_k: float,
+        pressure_pa: float,
     ) -> None:
-        saturation_pressures = self._try_saturation_values(
-            fluid, "P", "T", temperature_k
-        )
+        saturation_pressures = self._try_saturation_values(fluid, "P", "T", temperature_k)
         for sp in saturation_pressures:
             denominator = max(abs(sp), 1.0)
             rel_dist = abs(pressure_pa - sp) / denominator
             if rel_dist <= self.near_saturation_relative_tolerance:
                 raise PropertyServiceError(
                     PropertyErrorCode.NEAR_SATURATION,
-                    "TP state is too close to the saturation "
-                    "boundary.",
+                    "TP state is too close to the saturation boundary.",
                     context={
                         "fluid": fluid.cache_identity,
                         "temperature_k": temperature_k,
@@ -754,12 +790,12 @@ class CoolPropProvider:
                 )
 
     def _check_ph_saturation(
-        self, fluid: FluidIdentifier,
-        pressure_pa: float, enthalpy_j_kg: float,
+        self,
+        fluid: FluidIdentifier,
+        pressure_pa: float,
+        enthalpy_j_kg: float,
     ) -> None:
-        saturation_enthalpies = self._try_saturation_values(
-            fluid, "Hmass", "P", pressure_pa
-        )
+        saturation_enthalpies = self._try_saturation_values(fluid, "Hmass", "P", pressure_pa)
         if len(saturation_enthalpies) != 2:
             return
         lower, upper = sorted(saturation_enthalpies)
@@ -773,10 +809,7 @@ class CoolPropProvider:
             abs(enthalpy_j_kg - lower),
             abs(enthalpy_j_kg - upper),
         )
-        if (
-            boundary_distance
-            <= self.near_saturation_relative_tolerance * scale
-        ):
+        if boundary_distance <= self.near_saturation_relative_tolerance * scale:
             raise PropertyServiceError(
                 PropertyErrorCode.NEAR_SATURATION,
                 "PH state is too close to a saturation boundary.",
@@ -793,8 +826,7 @@ class CoolPropProvider:
         if lower < enthalpy_j_kg < upper:
             raise PropertyServiceError(
                 PropertyErrorCode.TWO_PHASE_STATE,
-                "PH state lies inside the two-phase "
-                "enthalpy interval.",
+                "PH state lies inside the two-phase enthalpy interval.",
                 context={
                     "fluid": fluid.cache_identity,
                     "pressure_pa": pressure_pa,
@@ -805,16 +837,23 @@ class CoolPropProvider:
             )
 
     def _try_saturation_values(
-        self, fluid: FluidIdentifier, output: str,
-        fixed_input: str, fixed_value: float,
+        self,
+        fluid: FluidIdentifier,
+        output: str,
+        fixed_input: str,
+        fixed_value: float,
     ) -> list[float]:
         values: list[float] = []
         for quality in (0.0, 1.0):
             try:
                 value = float(
                     CP.PropsSI(
-                        output, fixed_input, fixed_value,
-                        "Q", quality, fluid.coolprop_fluid,
+                        output,
+                        fixed_input,
+                        fixed_value,
+                        "Q",
+                        quality,
+                        fluid.coolprop_fluid,
                     )
                 )
             except Exception:
@@ -828,16 +867,21 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     def _phase(
-        self, fluid: FluidIdentifier,
-        input1_name: str, input1_value: float,
-        input2_name: str, input2_value: float,
+        self,
+        fluid: FluidIdentifier,
+        input1_name: str,
+        input1_value: float,
+        input2_name: str,
+        input2_value: float,
         query_type: PropertyQueryType,
     ) -> PhaseRegion:
         try:
             phase_text = str(
                 CP.PhaseSI(
-                    input1_name, input1_value,
-                    input2_name, input2_value,
+                    input1_name,
+                    input1_value,
+                    input2_name,
+                    input2_value,
                     fluid.coolprop_fluid,
                 )
             )
@@ -863,7 +907,9 @@ class CoolPropProvider:
         return phase_map.get(phase_text, PhaseRegion.UNKNOWN)
 
     def _reject_unknown_phase(
-        self, phase: PhaseRegion, fluid: FluidIdentifier,
+        self,
+        phase: PhaseRegion,
+        fluid: FluidIdentifier,
         query_type: PropertyQueryType,
     ) -> None:
         if phase is PhaseRegion.UNKNOWN:
@@ -883,7 +929,9 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     def _props(
-        self, output: str, fluid: FluidIdentifier,
+        self,
+        output: str,
+        fluid: FluidIdentifier,
         query_type: PropertyQueryType,
         query: tuple[str, float, str, float],
     ) -> float:
@@ -891,8 +939,11 @@ class CoolPropProvider:
         try:
             return float(
                 CP.PropsSI(
-                    output, input1_name, input1_value,
-                    input2_name, input2_value,
+                    output,
+                    input1_name,
+                    input1_value,
+                    input2_name,
+                    input2_value,
                     fluid.coolprop_fluid,
                 )
             )
@@ -900,7 +951,9 @@ class CoolPropProvider:
             self._raise_backend_error(exc, fluid, query_type)
 
     def _raise_backend_error(
-        self, exc: Exception, fluid: FluidIdentifier,
+        self,
+        exc: Exception,
+        fluid: FluidIdentifier,
         query_type: PropertyQueryType,
     ) -> NoReturn:
         backend_message = str(exc)
@@ -938,8 +991,10 @@ class CoolPropProvider:
     }
 
     def _pre_check_tp_limits(
-        self, fluid: FluidIdentifier,
-        temperature_k: float, pressure_pa: float,
+        self,
+        fluid: FluidIdentifier,
+        temperature_k: float,
+        pressure_pa: float,
     ) -> None:
         """Explicit boundary check for TP queries.
 
@@ -962,8 +1017,10 @@ class CoolPropProvider:
                 )
 
     def _pre_check_saturation_boundaries(
-        self, fluid: FluidIdentifier,
-        input_name: str, input_value: float,
+        self,
+        fluid: FluidIdentifier,
+        input_name: str,
+        input_value: float,
     ) -> None:
         """Explicit boundary check for saturation queries.
 
@@ -997,7 +1054,9 @@ class CoolPropProvider:
             )
 
     def _classify_backend_error(
-        self, exc: Exception, fluid: FluidIdentifier,
+        self,
+        exc: Exception,
+        fluid: FluidIdentifier,
         query_type: PropertyQueryType,
     ) -> PropertyErrorCode:
         """Classify a CoolProp backend exception.
@@ -1015,7 +1074,8 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     def _match_validation_fixture(
-        self, fluid: FluidIdentifier,
+        self,
+        fluid: FluidIdentifier,
         query_type: PropertyQueryType,
         inputs: tuple[tuple[str, float], ...],
     ) -> tuple[str | None, str | None, str | None]:
@@ -1043,7 +1103,8 @@ class CoolPropProvider:
                     match = False
                     break
                 if not math.isclose(
-                    actual_val, expected_val,
+                    actual_val,
+                    expected_val,
                     rel_tol=sp.get("tolerance_rel", 0.01),
                 ):
                     match = False
@@ -1061,15 +1122,16 @@ class CoolPropProvider:
     # ------------------------------------------------------------------
 
     def _provenance(
-        self, fluid: FluidIdentifier,
+        self,
+        fluid: FluidIdentifier,
         validation: FluidValidationLevel,
         query_type: PropertyQueryType,
         inputs: tuple[tuple[str, float], ...],
         fingerprint: str,
     ) -> PropertyProvenance:
         # Item 3: populate dataset fields and validation basis
-        dataset_id, dataset_revision, fixture_basis = (
-            self._match_validation_fixture(fluid, query_type, inputs)
+        dataset_id, dataset_revision, fixture_basis = self._match_validation_fixture(
+            fluid, query_type, inputs
         )
         if fixture_basis is not None:
             # Fixture match: backend_regression with dataset info
@@ -1077,10 +1139,7 @@ class CoolPropProvider:
         elif validation is FluidValidationLevel.SUPPORTED_TIER_1:
             # Ordinary Tier-1 state, no fixture match
             validation_basis = "support_allowlist"
-        elif (
-            validation is FluidValidationLevel.UNVALIDATED
-            and self.allow_unvalidated_fluids
-        ):
+        elif validation is FluidValidationLevel.UNVALIDATED and self.allow_unvalidated_fluids:
             # Explicitly allowed unvalidated pure fluid
             validation_basis = "unvalidated_opt_in"
         else:
@@ -1102,16 +1161,15 @@ class CoolPropProvider:
         )
 
     def _cache_key(
-        self, fluid: FluidIdentifier,
+        self,
+        fluid: FluidIdentifier,
         query_type: PropertyQueryType,
         inputs: tuple[tuple[str, float], ...],
         fingerprint: str,
     ) -> PropertyCacheKey:
         configuration = (
-            ("allow_unvalidated_fluids",
-             str(self.allow_unvalidated_fluids)),
-            ("near_saturation_relative_tolerance",
-             self.near_saturation_relative_tolerance.hex()),
+            ("allow_unvalidated_fluids", str(self.allow_unvalidated_fluids)),
+            ("near_saturation_relative_tolerance", self.near_saturation_relative_tolerance.hex()),
             ("cache_policy_version", self.cache_policy_version),
         )
         return PropertyCacheKey(
@@ -1126,9 +1184,7 @@ class CoolPropProvider:
             configuration_fingerprint=fingerprint,
         )
 
-    def _cache_get(
-        self, key: PropertyCacheKey
-    ) -> PropertyResult | None:
+    def _cache_get(self, key: PropertyCacheKey) -> PropertyResult | None:
         if self.cache_size == 0:
             return None
         with self._cache_lock:
@@ -1140,9 +1196,7 @@ class CoolPropProvider:
             self._cache_hits += 1
             return cached
 
-    def _cache_store(
-        self, key: PropertyCacheKey, value: PropertyResult
-    ) -> None:
+    def _cache_store(self, key: PropertyCacheKey, value: PropertyResult) -> None:
         if self.cache_size == 0:
             return
         with self._cache_lock:

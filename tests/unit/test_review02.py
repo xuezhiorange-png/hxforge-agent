@@ -6,6 +6,7 @@
 4. CalculationRun input-hash identity requirements.
 5. Provenance graph structural contracts.
 """
+
 from __future__ import annotations
 
 import types
@@ -136,7 +137,9 @@ def _make_case(
         name=name,
         hot_stream=_make_stream(inlet_temp=350.0, outlet_temp=outlet_temp),
         cold_stream=_make_stream(
-            inlet_temp=290.0, outlet_temp=330.0, mass_flow=0.8,
+            inlet_temp=290.0,
+            outlet_temp=330.0,
+            mass_flow=0.8,
         ),
         constraints=_make_constraints(),
     )
@@ -407,7 +410,10 @@ class TestRepositoryChainConstraints:
 
         # Create rev#1 for case A through the service
         rev_a1 = svc.create_initial_revision(
-            case=case_a, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case_a,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
 
         # Manually create a child for case B pointing to case A's revision
@@ -482,12 +488,19 @@ class TestRepositoryChainConstraints:
         id_gen = _make_id_gen()
 
         rev1 = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         case_v2 = _make_case(outlet_temp=300.0)
         rev2 = svc.create_revision_from_parent(
-            parent=rev1, new_case=case_v2, created_by="agent-1",
-            change_summary="v2", clock=clock, id_gen=id_gen,
+            parent=rev1,
+            new_case=case_v2,
+            created_by="agent-1",
+            change_summary="v2",
+            clock=clock,
+            id_gen=id_gen,
         )
 
         assert rev1.revision_number == 1
@@ -702,16 +715,22 @@ class TestProvenanceContract:
             CalculationRunType,
         )
         from hexagent.repositories.memory import InMemoryCalculationRunRepository
+
         # Empty graph at model level — OK
         g = ProvenanceGraph(nodes=(), edges=())
         assert len(g.nodes) == 0
         # Try to persist a SUCCEEDED run with empty graph — rejected
         repo = InMemoryCalculationRunRepository()
         run = CalculationRun(
-            run_id=uuid4(), case_id=uuid4(),
-            case_revision_id=uuid4(), run_type=CalculationRunType.RATE,
-            status=CalculationRunStatus.PENDING, started_at=_make_clock().utcnow(),
-            git_commit="abc123", input_hash="sha256:" + "0" * 64,
+            run_id=uuid4(),
+            case_id=uuid4(),
+            case_revision_id=uuid4(),
+            run_type=CalculationRunType.RATE,
+            status=CalculationRunStatus.PENDING,
+            started_at=_make_clock().utcnow(),
+            git_commit="abcdef0",
+            input_hash="sha256:" + "0" * 64,
+            provenance_graph=_minimal_valid_provenance_graph(),
         )
         repo.add(run)
         clock = _make_clock()
@@ -722,11 +741,14 @@ class TestProvenanceContract:
         repo.update(run_running)
         # Then try SUCCEEDED with empty graph
         clock.advance(seconds=1)
-        run2 = run_running.model_copy(update={
-            "status": CalculationRunStatus.SUCCEEDED,
-            "result_hash": "sha256:" + "a" * 64,
-            "completed_at": clock.utcnow(),
-        })
+        run2 = run_running.model_copy(
+            update={
+                "status": CalculationRunStatus.SUCCEEDED,
+                "result_hash": "sha256:" + "a" * 64,
+                "completed_at": clock.utcnow(),
+                "provenance_graph": ProvenanceGraph(nodes=(), edges=()),
+            }
+        )
         with pytest.raises(ValueError, match="non-empty provenance graph"):
             repo.update(run2)
 

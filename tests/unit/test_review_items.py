@@ -11,6 +11,7 @@ Covers:
 8. Provenance graph hash determinism and RESULT node type.
 9. Message severity → allows_continuation semantics and extension codes.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -187,11 +188,13 @@ def _make_valid_provenance_graph() -> ProvenanceGraph:
     )
     return ProvenanceGraph(
         nodes=(case_node, run_node),
-        edges=(ProvenanceEdge(
-            source_id=UUID(int=100),
-            target_id=UUID(int=200),
-            relation="triggers",
-        ),),
+        edges=(
+            ProvenanceEdge(
+                source_id=UUID(int=100),
+                target_id=UUID(int=200),
+                relation="triggers",
+            ),
+        ),
     )
 
 
@@ -325,7 +328,10 @@ class TestItem2DeepImmutability:
 
         case = _make_case()
         rev = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         repo.add(rev)
 
@@ -346,7 +352,10 @@ class TestItem2DeepImmutability:
 
         case = _make_case()
         rev = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         repo.add(rev)
 
@@ -367,7 +376,10 @@ class TestItem2DeepImmutability:
         case = _make_case()
         svc = RevisionService()
         rev = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -379,6 +391,7 @@ class TestItem2DeepImmutability:
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
             input_hash=rev.content_hash,
+            provenance_graph=_make_valid_provenance_graph(),
         )
         run_repo.add(run)
 
@@ -431,7 +444,10 @@ class TestItem2DeepImmutability:
         case = _make_case()
         svc = RevisionService()
         rev = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -443,6 +459,7 @@ class TestItem2DeepImmutability:
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
             input_hash=rev.content_hash,
+            provenance_graph=_make_valid_provenance_graph(),
         )
         run_repo.add(run)
 
@@ -467,7 +484,10 @@ class TestItem3RevisionChainIntegrity:
 
         case = _make_case()
         rev1 = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
 
         with pytest.raises(ValueError, match="created_by must not be empty"):
@@ -488,7 +508,10 @@ class TestItem3RevisionChainIntegrity:
 
         case = _make_case()
         rev1 = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
 
         with pytest.raises(ValueError, match="no-op"):
@@ -510,7 +533,10 @@ class TestItem3RevisionChainIntegrity:
 
         case = _make_case()
         rev1 = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
@@ -537,7 +563,10 @@ class TestItem3RevisionChainIntegrity:
 
         case = _make_case()
         rev1 = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
@@ -579,7 +608,10 @@ class TestItem3RevisionChainIntegrity:
 
         case = _make_case()
         rev = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
         assert svc.verify_revision_integrity(rev, rev_repo) is True
@@ -602,7 +634,10 @@ class TestItem4FieldLevelDiff:
 
         case_v1 = _make_case(outlet_temp=310.0)
         rev1 = svc.create_initial_revision(
-            case=case_v1, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case_v1,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
@@ -635,7 +670,10 @@ class TestItem4FieldLevelDiff:
 
         case_v1 = _make_case(outlet_temp=310.0)
         rev1 = svc.create_initial_revision(
-            case=case_v1, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case_v1,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
@@ -671,7 +709,10 @@ class TestItem4FieldLevelDiff:
 
         case = _make_case()
         rev1 = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
@@ -688,7 +729,10 @@ class TestItem4FieldLevelDiff:
 
         case_v1 = _make_case(outlet_temp=310.0)
         rev1 = svc.create_initial_revision(
-            case=case_v1, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case_v1,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
@@ -821,62 +865,74 @@ class TestItem6CalculationRunInvariants:
     def test_succeeded_without_result_hash_rejected(self) -> None:
         """Constructing SUCCEEDED without a valid result_hash raises ValueError."""
         with pytest.raises(ValueError, match="result_hash"):
-            CalculationRun(**self._base_kwargs(
-                status=CalculationRunStatus.SUCCEEDED,
-                started_at=FIXED_NOW,
-                completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
-            ))
+            CalculationRun(
+                **self._base_kwargs(
+                    status=CalculationRunStatus.SUCCEEDED,
+                    started_at=FIXED_NOW,
+                    completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                )
+            )
 
     def test_succeeded_with_valid_hash_accepted(self) -> None:
         """SUCCEEDED with a valid result_hash is accepted."""
-        run = CalculationRun(**self._base_kwargs(
-            status=CalculationRunStatus.SUCCEEDED,
-            started_at=FIXED_NOW,
-            completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
-            result_hash=VALID_RESULT_HASH,
-        ))
+        run = CalculationRun(
+            **self._base_kwargs(
+                status=CalculationRunStatus.SUCCEEDED,
+                started_at=FIXED_NOW,
+                completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                result_hash=VALID_RESULT_HASH,
+            )
+        )
         assert run.status == CalculationRunStatus.SUCCEEDED
         assert run.result_hash == VALID_RESULT_HASH
 
     def test_failed_without_failure_rejected(self) -> None:
         """Constructing FAILED without a failure record raises ValueError."""
         with pytest.raises(ValueError, match="failure"):
-            CalculationRun(**self._base_kwargs(
-                status=CalculationRunStatus.FAILED,
-                started_at=FIXED_NOW,
-                completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
-                failure=None,
-            ))
+            CalculationRun(
+                **self._base_kwargs(
+                    status=CalculationRunStatus.FAILED,
+                    started_at=FIXED_NOW,
+                    completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                    failure=None,
+                )
+            )
 
     def test_failed_with_failure_accepted(self) -> None:
         """FAILED with a failure record is accepted."""
-        run = CalculationRun(**self._base_kwargs(
-            status=CalculationRunStatus.FAILED,
-            started_at=FIXED_NOW,
-            completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
-            failure=_make_failure(),
-        ))
+        run = CalculationRun(
+            **self._base_kwargs(
+                status=CalculationRunStatus.FAILED,
+                started_at=FIXED_NOW,
+                completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                failure=_make_failure(),
+            )
+        )
         assert run.status == CalculationRunStatus.FAILED
         assert run.failure is not None
 
     def test_blocked_without_blockers_rejected(self) -> None:
         """Constructing BLOCKED without blockers raises ValueError."""
         with pytest.raises(ValueError, match="blocker"):
-            CalculationRun(**self._base_kwargs(
-                status=CalculationRunStatus.BLOCKED,
-                started_at=FIXED_NOW,
-                completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
-                blockers=(),
-            ))
+            CalculationRun(
+                **self._base_kwargs(
+                    status=CalculationRunStatus.BLOCKED,
+                    started_at=FIXED_NOW,
+                    completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                    blockers=(),
+                )
+            )
 
     def test_blocked_with_blockers_accepted(self) -> None:
         """BLOCKED with at least one blocker is accepted."""
-        run = CalculationRun(**self._base_kwargs(
-            status=CalculationRunStatus.BLOCKED,
-            started_at=FIXED_NOW,
-            completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
-            blockers=(_make_blocker(),),
-        ))
+        run = CalculationRun(
+            **self._base_kwargs(
+                status=CalculationRunStatus.BLOCKED,
+                started_at=FIXED_NOW,
+                completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                blockers=(_make_blocker(),),
+            )
+        )
         assert run.status == CalculationRunStatus.BLOCKED
         assert len(run.blockers) == 1
 
@@ -909,23 +965,27 @@ class TestItem6CalculationRunInvariants:
         after = datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC)
 
         with pytest.raises(ValueError, match="must be after"):
-            CalculationRun(**self._base_kwargs(
-                status=CalculationRunStatus.SUCCEEDED,
-                started_at=after,
-                completed_at=before,
-                result_hash=VALID_RESULT_HASH,
-            ))
+            CalculationRun(
+                **self._base_kwargs(
+                    status=CalculationRunStatus.SUCCEEDED,
+                    started_at=after,
+                    completed_at=before,
+                    result_hash=VALID_RESULT_HASH,
+                )
+            )
 
     def test_succeeded_with_failure_rejected(self) -> None:
         """SUCCEEDED run must not have a failure record."""
         with pytest.raises(ValueError, match="must not have a failure"):
-            CalculationRun(**self._base_kwargs(
-                status=CalculationRunStatus.SUCCEEDED,
-                started_at=FIXED_NOW,
-                completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
-                result_hash=VALID_RESULT_HASH,
-                failure=_make_failure(),
-            ))
+            CalculationRun(
+                **self._base_kwargs(
+                    status=CalculationRunStatus.SUCCEEDED,
+                    started_at=FIXED_NOW,
+                    completed_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
+                    result_hash=VALID_RESULT_HASH,
+                    failure=_make_failure(),
+                )
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -951,7 +1011,10 @@ class TestItem7RunIdentityFieldProtection:
         case = _make_case()
         svc = RevisionService()
         rev = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -963,6 +1026,7 @@ class TestItem7RunIdentityFieldProtection:
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
             input_hash=rev.content_hash,
+            provenance_graph=_make_valid_provenance_graph(),
         )
         run_repo.add(run)
         return run
@@ -1139,7 +1203,10 @@ class TestItem8ProvenanceGraph:
         case = _make_case()
         svc = RevisionService()
         rev = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -1194,10 +1261,13 @@ class TestItem8ProvenanceGraph:
                     payload_hash=ph,
                 ),
             ),
-            edges=(ProvenanceEdge(
-                source_id=UUID(int=1), target_id=UUID(int=2),
-                relation="triggers",
-            ),),
+            edges=(
+                ProvenanceEdge(
+                    source_id=UUID(int=1),
+                    target_id=UUID(int=2),
+                    relation="triggers",
+                ),
+            ),
         )
         g2 = ProvenanceGraph(
             nodes=(
@@ -1213,10 +1283,13 @@ class TestItem8ProvenanceGraph:
                     payload_hash=ph,
                 ),
             ),
-            edges=(ProvenanceEdge(
-                source_id=UUID(int=1), target_id=UUID(int=2),
-                relation="triggers",
-            ),),
+            edges=(
+                ProvenanceEdge(
+                    source_id=UUID(int=1),
+                    target_id=UUID(int=2),
+                    relation="triggers",
+                ),
+            ),
         )
         assert g1.compute_hash() != g2.compute_hash()
 
@@ -1418,7 +1491,10 @@ class TestItem10AdditionalChecks:
             constraints=_make_constraints(),
         )
         rev1 = svc.create_initial_revision(
-            case=case_v1, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case_v1,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev1)
 
@@ -1454,7 +1530,10 @@ class TestItem10AdditionalChecks:
         case = _make_case()
         svc = RevisionService()
         rev = svc.create_initial_revision(
-            case=case, created_by="agent-1", clock=clock, id_gen=id_gen,
+            case=case,
+            created_by="agent-1",
+            clock=clock,
+            id_gen=id_gen,
         )
         rev_repo.add(rev)
 
@@ -1466,6 +1545,7 @@ class TestItem10AdditionalChecks:
             status=CalculationRunStatus.PENDING,
             started_at=clock.utcnow(),
             input_hash=rev.content_hash,
+            provenance_graph=_make_valid_provenance_graph(),
         )
         run_repo.add(run)
 

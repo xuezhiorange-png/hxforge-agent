@@ -8,6 +8,7 @@ Key invariants enforced:
 - ``changed_fields`` is computed internally from recursive payload diff.
 - Same-case parentage is verified in the repository ``add()``.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -121,8 +122,7 @@ class RevisionService:
         # 1. Verify case_id match
         if new_case.id != parent.case_id:
             raise ValueError(
-                f"New case id {new_case.id} does not match "
-                f"parent case id {parent.case_id}"
+                f"New case id {new_case.id} does not match parent case id {parent.case_id}"
             )
 
         # 2. Verify created_by is not empty
@@ -136,13 +136,13 @@ class RevisionService:
         # 4. Reject no-op revisions (identical content)
         if h == parent.content_hash:
             raise ValueError(
-                "New revision is identical to parent — "
-                "no-op revisions are not allowed"
+                "New revision is identical to parent — no-op revisions are not allowed"
             )
 
         # 5. Compute changed_fields recursively (never trust caller)
         changed_fields = _compute_recursive_changed_fields(
-            parent.canonical_payload, canonical_payload,
+            parent.canonical_payload,
+            canonical_payload,
         )
 
         # 6. Increment revision_number
@@ -291,9 +291,7 @@ class RevisionService:
                 ) from err
 
             if parent.case_id != current.case_id:
-                raise IntegrityError(
-                    f"Chain case mismatch at revision {current.revision_id}"
-                )
+                raise IntegrityError(f"Chain case mismatch at revision {current.revision_id}")
 
             if parent.revision_number != expected_number - 1:
                 raise IntegrityError(
@@ -305,9 +303,7 @@ class RevisionService:
             current = parent
 
         if expected_number != 1:
-            raise IntegrityError(
-                f"Chain does not start at revision 1 (reached {expected_number})"
-            )
+            raise IntegrityError(f"Chain does not start at revision 1 (reached {expected_number})")
 
 
 # ---------------------------------------------------------------------------
@@ -349,9 +345,7 @@ def _compute_recursive_changed_fields(
         if key not in old or key not in new:
             changed.append(path)
         elif isinstance(old_val, (dict, Mapping)) and isinstance(new_val, (dict, Mapping)):
-            changed.extend(
-                _compute_recursive_changed_fields(old_val, new_val, path)
-            )
+            changed.extend(_compute_recursive_changed_fields(old_val, new_val, path))
         elif old_val != new_val:
             changed.append(path)
 
@@ -359,7 +353,9 @@ def _compute_recursive_changed_fields(
 
 
 def _compute_field_level_diff(
-    old: dict[str, Any], new: dict[str, Any], prefix: str = "",
+    old: dict[str, Any],
+    new: dict[str, Any],
+    prefix: str = "",
 ) -> tuple[FieldChange, ...]:
     """Compute recursive diff with paths, before/after values.
 

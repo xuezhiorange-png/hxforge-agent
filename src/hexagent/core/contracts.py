@@ -9,11 +9,9 @@ from hexagent.properties.base import FluidState, PropertyProvider
 class ExchangerService(Protocol):
     exchanger_type: str
 
-    def size(self, case: DesignCase) -> CalculationResult:
-        ...
+    def size(self, case: DesignCase) -> CalculationResult: ...
 
-    def rate(self, case: DesignCase, geometry: dict[str, float]) -> CalculationResult:
-        ...
+    def rate(self, case: DesignCase, geometry: dict[str, float]) -> CalculationResult: ...
 
 
 __all__ = ["ExchangerService", "FluidState", "PropertyProvider"]
