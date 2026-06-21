@@ -22,7 +22,7 @@
 - `ProvenanceGraph` with RESULT/WARNING/BLOCKER node types, mandatory `payload_hash`
 - Repository Protocol + in-memory implementation (deep-copy, chain enforcement, PENDING-only add)
 - `RevisionService` + `RunService`
-- 419 tests (unit + integration + review-item tests)
+- 456 tests (unit + integration + review-item + review03 tests)
 - Documentation
 
 ### Out of Scope
