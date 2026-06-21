@@ -17,6 +17,7 @@ from hexagent.domain.quantities import (
     Quantity,
     SpecificEnthalpy,
 )
+from hexagent.properties.base import ReferenceStatePolicy
 
 
 class StrictBaseModel(BaseModel):
@@ -61,12 +62,30 @@ class TPStateSpec(StrictBaseModel):
 
 
 class PHStateSpec(StrictBaseModel):
-    """Pressure-enthalpy state specification."""
+    """Pressure-enthalpy state specification.
+
+    ``reference_state`` is required to ensure the caller explicitly
+    declares the enthalpy reference convention.  Omitting it produces
+    a structured validation error, not a runtime TypeError.
+    """
 
     type: Literal["PH"]
     pressure: AbsolutePressure
     enthalpy: SpecificEnthalpy
+    reference_state: ReferenceStatePolicy = ReferenceStatePolicy.DEF
     schema_version: Literal["1.0"] = "1.0"
+
+    def to_provider_args(self) -> dict[str, object]:
+        """Convert to arguments for :meth:`PropertyProvider.state_ph`.
+
+        Returns a deterministic dict with SI values and the reference
+        state identifier, suitable for direct ``**`` unpacking.
+        """
+        return {
+            "pressure_pa": self.pressure.si_value,
+            "enthalpy_j_kg": self.enthalpy.si_value,
+            "reference_state": self.reference_state,
+        }
 
 
 class PQStateSpec(StrictBaseModel):

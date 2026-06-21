@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from pydantic import BaseModel, ConfigDict
+
 
 class PropertyErrorCode(StrEnum):
     INVALID_FLUID = "property_invalid_fluid"
@@ -16,6 +18,22 @@ class PropertyErrorCode(StrEnum):
     BACKEND_FAILURE = "property_backend_failure"
     NON_FINITE_RESULT = "property_non_finite_result"
     CONFIGURATION_CHANGED = "property_configuration_changed"
+
+
+# Item 4: strict versioned error model for API serialization
+class PropertyServiceErrorModel(BaseModel):
+    """Strict versioned Pydantic model for property service errors.
+
+    ``extra="forbid"`` ensures no unknown fields leak through.
+    ``code`` uses the stable ``PropertyErrorCode`` enum, not free text.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_version: str = "1.0"
+    code: PropertyErrorCode
+    message: str
+    context: dict[str, object] = {}
 
 
 class PropertyServiceError(ValueError):
@@ -38,3 +56,30 @@ class PropertyServiceError(ValueError):
             "message": str(self),
             "context": self.context,
         }
+
+    def to_model(self) -> PropertyServiceErrorModel:
+        """Serialize to a strict Pydantic model."""
+        return PropertyServiceErrorModel(
+            code=self.code,
+            message=str(self),
+            context=self.context,
+        )
+
+    def to_json(self) -> str:
+        """Serialize to deterministic JSON."""
+        return self.to_model().model_dump_json()
+
+    @classmethod
+    def from_model(cls, model: PropertyServiceErrorModel) -> PropertyServiceError:
+        """Reconstruct from a Pydantic model."""
+        return cls(
+            code=model.code,
+            message=model.message,
+            context=dict(model.context),
+        )
+
+    @classmethod
+    def from_json(cls, raw: str) -> PropertyServiceError:
+        """Reconstruct from JSON string."""
+        model = PropertyServiceErrorModel.model_validate_json(raw)
+        return cls.from_model(model)

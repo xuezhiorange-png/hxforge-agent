@@ -2,21 +2,22 @@
 
 v0.1 reference-state policy: ``DEF`` (CoolProp default).
 Configuration fingerprint is recomputed before every query to detect
-external mutations and fail closed.
+external mutations and fail closed.  A process-level lock protects
+the combined "verify + evaluate" operation as one atomic action.
 """
-
 from __future__ import annotations
 
 import hashlib
 import math
+import threading
 from collections import OrderedDict
 from dataclasses import replace
-from threading import RLock
 from typing import NoReturn
 
 import CoolProp.CoolProp as CP
 
 from hexagent.properties.base import (
+    VALIDATION_MATRIX,
     FluidIdentifier,
     FluidState,
     FluidValidationLevel,
@@ -32,30 +33,46 @@ from hexagent.properties.base import (
 from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
 
 # ---------------------------------------------------------------------------
-# Configuration fingerprint (Item 1: recomputed per-query)
+# Module-level process lock — serializes all CoolProp global-state access
+# ---------------------------------------------------------------------------
+
+_COOLPROP_STATE_LOCK = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# Reference-sensitive fluids and verification state points
+# ---------------------------------------------------------------------------
+
+_REFERENCE_SENSITIVE_FLUIDS: tuple[str, ...] = ("Water", "R134a", "R717")
+
+_REF_VERIFY_STATE_POINTS: dict[str, tuple[float, float]] = {
+    "Water": (300.0, 101_325.0),
+    "R134a": (300.0, 2_000_000.0),
+    "R717": (300.0, 2_000_000.0),
+}
+
+# ---------------------------------------------------------------------------
+# Configuration fingerprint (Item 1: all reference-sensitive fluids)
 # ---------------------------------------------------------------------------
 
 
 def _coolprop_configuration_fingerprint() -> str:
     """Capture a hash of CoolProp configuration state.
 
-    Uses CoolProp version + git revision + per-fluid enthalpy
-    at known reference states.  If any reference state or
-    configuration changes, the fingerprint changes.
+    Probes all reference-sensitive fluids (Water, R134a, R717) at known
+    state points.  Any change in reference state or backend configuration
+    changes the fingerprint.
     """
     parts: list[str] = []
     parts.append(f"version={CP.get_global_param_string('version')}")
     parts.append(f"git={CP.get_global_param_string('gitrevision')}")
-    # Probe reference states via enthalpy at fixed conditions
-    for fluid in ("Water", "R134a"):
-        for t, p in ((300.0, 101325.0), (250.0, 500_000.0)):
-            try:
-                h = float(
-                    CP.PropsSI("Hmass", "T", t, "P", p, fluid)
-                )
-                parts.append(f"{fluid}_{t}_{p}={h:.15e}")
-            except Exception:
-                parts.append(f"{fluid}_{t}_{p}=err")
+    for fluid, (t, p) in _REF_VERIFY_STATE_POINTS.items():
+        try:
+            h = float(
+                CP.PropsSI("Hmass", "T", t, "P", p, fluid)
+            )
+            parts.append(f"{fluid}_{t}_{p}={h:.15e}")
+        except Exception:
+            parts.append(f"{fluid}_{t}_{p}=err")
     blob = "|".join(parts)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
@@ -134,30 +151,106 @@ class CoolPropProvider:
         )
         self.cache_size = cache_size
 
-        self._construction_fingerprint = (
-            _coolprop_configuration_fingerprint()
-        )
+        # Item 1: Establish known DEF baseline during controlled init.
+        # Force DEF for all reference-sensitive fluids, then capture
+        # enthalpies and compute the construction fingerprint.  If
+        # CoolProp was already in DEF this is a no-op; if it was in
+        # IIR (or any other state) we reset to DEF and capture the
+        # correct baseline.
+        with _COOLPROP_STATE_LOCK:
+            self._force_def_reference_state()
+            self._def_baseline = self._capture_def_enthalpies()
+            self._construction_fingerprint = (
+                _coolprop_configuration_fingerprint()
+            )
+
         self._cache: OrderedDict[PropertyCacheKey, PropertyResult] = (
             OrderedDict()
         )
         self._cache_hits = 0
         self._cache_misses = 0
-        self._cache_lock = RLock()
-
-        # Item 3: reference-state verification cache
-        self._ref_state_verified = False
+        self._cache_lock = threading.Lock()
 
     # ------------------------------------------------------------------
-    # Item 1: Runtime configuration guard
+    # Item 1: Runtime configuration guard + DEF baseline
     # ------------------------------------------------------------------
 
-    def _verify_configuration(self) -> str:
+    @staticmethod
+    def _force_def_reference_state() -> None:
+        """Force DEF reference state for all reference-sensitive fluids.
+
+        Called during ``__init__`` under ``_COOLPROP_STATE_LOCK``.
+        If CoolProp is already in DEF this is a no-op.
+        """
+        import contextlib
+
+        for fluid in _REFERENCE_SENSITIVE_FLUIDS:
+            with contextlib.suppress(Exception):
+                CP.set_reference_state(fluid, "DEF")
+
+    @staticmethod
+    def _capture_def_enthalpies() -> dict[str, float]:
+        """Capture enthalpies at known state points under DEF state.
+
+        Returns a mapping of fluid name → enthalpy (J/kg).  These
+        values form the known-DEF baseline that runtime verification
+        checks against.
+        """
+        baseline: dict[str, float] = {}
+        for fluid, (t, p) in _REF_VERIFY_STATE_POINTS.items():
+            try:
+                h = float(
+                    CP.PropsSI("Hmass", "T", t, "P", p, fluid)
+                )
+                baseline[fluid] = h
+            except Exception:
+                baseline[fluid] = float("nan")
+        return baseline
+
+    def _verify_def_baseline(self, fluid_name: str) -> None:
+        """Verify the current CoolProp state matches the known DEF baseline.
+
+        For the given fluid, recompute the enthalpy at the known state
+        point and compare against the value captured during ``__init__``.
+        A mismatch means the reference state was mutated.
+        """
+        if fluid_name not in _REF_VERIFY_STATE_POINTS:
+            return
+        expected = self._def_baseline.get(fluid_name)
+        if expected is None or math.isnan(expected):
+            return
+        t, p = _REF_VERIFY_STATE_POINTS[fluid_name]
+        try:
+            h = float(
+                CP.PropsSI("Hmass", "T", t, "P", p, fluid_name)
+            )
+        except Exception:
+            return  # Let the actual query handle the error
+        if not math.isclose(h, expected, rel_tol=1e-6, abs_tol=1.0):
+            raise PropertyServiceError(
+                PropertyErrorCode.CONFIGURATION_CHANGED,
+                "CoolProp reference state has changed since provider "
+                "construction. The active state no longer matches the "
+                "known DEF baseline.",
+                context={
+                    "fluid": fluid_name,
+                    "expected_enthalpy_j_kg": expected,
+                    "actual_enthalpy_j_kg": h,
+                },
+            )
+
+    def _verify_configuration(self, fluid_name: str | None = None) -> str:
         """Recompute fingerprint and verify against construction baseline.
 
         If the global CoolProp configuration has changed since provider
         construction, clear the cache and raise CONFIGURATION_CHANGED.
+        Optionally also verify the DEF baseline for a specific fluid.
         Returns the current fingerprint for cache keys.
+
+        Must be called under ``_COOLPROP_STATE_LOCK``.
         """
+        if fluid_name is not None:
+            self._verify_def_baseline(fluid_name)
         current = _coolprop_configuration_fingerprint()
         if current != self._construction_fingerprint:
             with self._cache_lock:
@@ -177,43 +270,6 @@ class CoolPropProvider:
             )
         return current
 
-    def _verify_reference_state(self) -> None:
-        """Verify CoolProp reference state matches the DEF policy.
-
-        Item 3: "verify the active provider state before interpreting
-        enthalpy."
-
-        CoolProp does not expose a ``get_reference_state()`` API, and
-        enthalpy differences between DEF and IIR are below 1% at standard
-        state points.  We rely on the per-fluid enthalpy fingerprint
-        (Item 1) which captures the actual enthalpy values at fixed
-        conditions — any reference-state mutation changes the fingerprint
-        and is caught by ``_verify_configuration()``.
-
-        This method runs once per provider lifetime as an explicit
-        documentation of the verification contract.  The actual detection
-        is delegated to the configuration guard.
-        """
-        if self._ref_state_verified:
-            return
-        # The configuration fingerprint already encodes per-fluid
-        # enthalpies.  If it matches the construction fingerprint,
-        # the reference state is consistent.
-        current = _coolprop_configuration_fingerprint()
-        if current != self._construction_fingerprint:
-            raise PropertyServiceError(
-                PropertyErrorCode.CONFIGURATION_CHANGED,
-                "CoolProp reference state or configuration changed "
-                "since provider construction.",
-                context={
-                    "construction_fingerprint": (
-                        self._construction_fingerprint
-                    ),
-                    "current_fingerprint": current,
-                },
-            )
-        self._ref_state_verified = True
-
     # ------------------------------------------------------------------
     # Public query API
     # ------------------------------------------------------------------
@@ -227,27 +283,31 @@ class CoolPropProvider:
         identifier, validation = self._resolve_fluid(fluid)
         self._require_positive("temperature_k", temperature_k)
         self._require_positive("pressure_pa", pressure_pa)
-        fingerprint = self._verify_configuration()
         self._reject_mixture(identifier, "TP")
 
         inputs = (
             ("temperature_k", temperature_k),
             ("pressure_pa", pressure_pa),
         )
-        key = self._cache_key(
-            identifier, PropertyQueryType.TP, inputs, fingerprint
-        )
-        cached = self._cache_get(key)
-        if cached is not None:
-            if not isinstance(cached, FluidState):
-                raise RuntimeError("Cache type mismatch for TP query")
-            return cached
 
-        state = self._state_tp_uncached(
-            identifier, validation, temperature_k, pressure_pa, fingerprint
-        )
-        self._cache_store(key, state)
-        return state
+        # Item 1: atomic verify + evaluate under process lock
+        with _COOLPROP_STATE_LOCK:
+            fingerprint = self._verify_configuration(identifier.name)
+            key = self._cache_key(
+                identifier, PropertyQueryType.TP, inputs, fingerprint
+            )
+            cached = self._cache_get(key)
+            if cached is not None:
+                if not isinstance(cached, FluidState):
+                    raise RuntimeError("Cache type mismatch for TP query")
+                return cached
+
+            state = self._state_tp_uncached(
+                identifier, validation, temperature_k, pressure_pa,
+                fingerprint,
+            )
+            self._cache_store(key, state)
+            return state
 
     def state_ph(
         self,
@@ -263,46 +323,41 @@ class CoolPropProvider:
 
         # Item 3: mandatory reference-state check
         if reference_state is not self.reference_state_policy:
-            provider_val = (
-                self.reference_state_policy.value
-                if hasattr(self.reference_state_policy, "value")
-                else str(self.reference_state_policy)
-            )
             raise PropertyServiceError(
                 PropertyErrorCode.INVALID_INPUT,
                 "PH query reference-state policy does not match "
                 "the provider policy.",
                 context={
-                    "requested": reference_state.value,
-                    "provider": provider_val,
+                    "requested": str(reference_state),
+                    "provider": str(self.reference_state_policy),
                 },
             )
 
-        # Item 3: verify actual CoolProp reference state before
-        # interpreting enthalpy values
-        self._verify_reference_state()
-
-        fingerprint = self._verify_configuration()
         self._reject_mixture(identifier, "PH")
 
         inputs = (
             ("pressure_pa", pressure_pa),
             ("enthalpy_j_kg", enthalpy_j_kg),
         )
-        key = self._cache_key(
-            identifier, PropertyQueryType.PH, inputs, fingerprint
-        )
-        cached = self._cache_get(key)
-        if cached is not None:
-            if not isinstance(cached, FluidState):
-                raise RuntimeError("Cache type mismatch for PH query")
-            return cached
 
-        state = self._state_ph_uncached(
-            identifier, validation, pressure_pa, enthalpy_j_kg, fingerprint
-        )
-        self._cache_store(key, state)
-        return state
+        # Item 1: atomic verify + evaluate under process lock
+        with _COOLPROP_STATE_LOCK:
+            fingerprint = self._verify_configuration(identifier.name)
+            key = self._cache_key(
+                identifier, PropertyQueryType.PH, inputs, fingerprint
+            )
+            cached = self._cache_get(key)
+            if cached is not None:
+                if not isinstance(cached, FluidState):
+                    raise RuntimeError("Cache type mismatch for PH query")
+                return cached
+
+            state = self._state_ph_uncached(
+                identifier, validation, pressure_pa, enthalpy_j_kg,
+                fingerprint,
+            )
+            self._cache_store(key, state)
+            return state
 
     def saturation_at_pressure(
         self,
@@ -311,25 +366,28 @@ class CoolPropProvider:
     ) -> SaturationState:
         identifier, validation = self._resolve_fluid(fluid)
         self._require_positive("pressure_pa", pressure_pa)
-        fingerprint = self._verify_configuration()
         self._reject_mixture(identifier, "SATURATION_P")
 
         inputs = (("pressure_pa", pressure_pa),)
         query_type = PropertyQueryType.SATURATION_P
-        key = self._cache_key(
-            identifier, query_type, inputs, fingerprint
-        )
-        cached = self._cache_get(key)
-        if cached is not None:
-            if not isinstance(cached, SaturationState):
-                raise RuntimeError("Cache type mismatch for saturation")
-            return cached
 
-        state = self._saturation_pressure_uncached(
-            identifier, validation, pressure_pa, fingerprint
-        )
-        self._cache_store(key, state)
-        return state
+        # Item 1: atomic verify + evaluate under process lock
+        with _COOLPROP_STATE_LOCK:
+            fingerprint = self._verify_configuration(identifier.name)
+            key = self._cache_key(
+                identifier, query_type, inputs, fingerprint
+            )
+            cached = self._cache_get(key)
+            if cached is not None:
+                if not isinstance(cached, SaturationState):
+                    raise RuntimeError("Cache type mismatch for saturation")
+                return cached
+
+            state = self._saturation_pressure_uncached(
+                identifier, validation, pressure_pa, fingerprint,
+            )
+            self._cache_store(key, state)
+            return state
 
     def saturation_at_temperature(
         self,
@@ -338,25 +396,28 @@ class CoolPropProvider:
     ) -> SaturationState:
         identifier, validation = self._resolve_fluid(fluid)
         self._require_positive("temperature_k", temperature_k)
-        fingerprint = self._verify_configuration()
         self._reject_mixture(identifier, "SATURATION_T")
 
         inputs = (("temperature_k", temperature_k),)
         query_type = PropertyQueryType.SATURATION_T
-        key = self._cache_key(
-            identifier, query_type, inputs, fingerprint
-        )
-        cached = self._cache_get(key)
-        if cached is not None:
-            if not isinstance(cached, SaturationState):
-                raise RuntimeError("Cache type mismatch for saturation")
-            return cached
 
-        state = self._saturation_temperature_uncached(
-            identifier, validation, temperature_k, fingerprint
-        )
-        self._cache_store(key, state)
-        return state
+        # Item 1: atomic verify + evaluate under process lock
+        with _COOLPROP_STATE_LOCK:
+            fingerprint = self._verify_configuration(identifier.name)
+            key = self._cache_key(
+                identifier, query_type, inputs, fingerprint
+            )
+            cached = self._cache_get(key)
+            if cached is not None:
+                if not isinstance(cached, SaturationState):
+                    raise RuntimeError("Cache type mismatch for saturation")
+                return cached
+
+            state = self._saturation_temperature_uncached(
+                identifier, validation, temperature_k, fingerprint,
+            )
+            self._cache_store(key, state)
+            return state
 
     def cache_info(self) -> PropertyCacheInfo:
         with self._cache_lock:
@@ -434,6 +495,10 @@ class CoolPropProvider:
         pressure_pa: float, fingerprint: str,
     ) -> SaturationState:
         query_type = PropertyQueryType.SATURATION_P
+        # Item 5: explicit boundary pre-check before calling CoolProp
+        self._pre_check_saturation_boundaries(
+            fluid, "pressure_pa", pressure_pa
+        )
         try:
             liquid = self._build_state(
                 fluid, validation, query_type,
@@ -465,6 +530,10 @@ class CoolPropProvider:
         temperature_k: float, fingerprint: str,
     ) -> SaturationState:
         query_type = PropertyQueryType.SATURATION_T
+        # Item 5: explicit boundary pre-check before calling CoolProp
+        self._pre_check_saturation_boundaries(
+            fluid, "temperature_k", temperature_k
+        )
         try:
             liquid = self._build_state(
                 fluid, validation, query_type,
@@ -846,14 +915,9 @@ class CoolPropProvider:
         query_type: PropertyQueryType,
     ) -> NoReturn:
         backend_message = str(exc)
-        lowered = backend_message.casefold()
 
-        # Item 7: deterministic classification for known boundary cases
-        code = PropertyErrorCode.BACKEND_FAILURE
-        if any(
-            token in lowered for token in _COOLPROP_OUT_OF_RANGE_TOKENS
-        ):
-            code = PropertyErrorCode.STATE_OUT_OF_RANGE
+        # Item 5: classify via explicit checks, not message keywords
+        code = self._classify_backend_error(exc, fluid, query_type)
 
         raise PropertyServiceError(
             code,
@@ -866,6 +930,123 @@ class CoolPropProvider:
         ) from exc
 
     # ------------------------------------------------------------------
+    # Internal — Item 5: explicit boundary pre-checks
+    # ------------------------------------------------------------------
+
+    # Known critical points for pre-check classification (SI units)
+    _CRITICAL_POINTS: dict[str, tuple[float, float]] = {
+        # fluid: (T_crit_K, P_crit_Pa)
+        "Water": (647.096, 22_064_000.0),
+        "R134a": (374.21, 4_059_300.0),
+        "R717": (405.40, 11_333_000.0),
+    }
+
+    def _pre_check_saturation_boundaries(
+        self, fluid: FluidIdentifier,
+        input_name: str, input_value: float,
+    ) -> None:
+        """Explicit boundary check for saturation queries.
+
+        Classifies above-critical states as SATURATION_UNAVAILABLE
+        *before* calling CoolProp, so the public error code is
+        independent of backend message wording.
+        """
+        canonical = fluid.name
+        if canonical not in self._CRITICAL_POINTS:
+            return
+        t_crit, p_crit = self._CRITICAL_POINTS[canonical]
+        if input_name == "temperature_k" and input_value > t_crit:
+            raise PropertyServiceError(
+                PropertyErrorCode.SATURATION_UNAVAILABLE,
+                "Saturation temperature exceeds the critical point.",
+                context={
+                    "fluid": fluid.cache_identity,
+                    "temperature_k": input_value,
+                    "critical_temperature_k": t_crit,
+                },
+            )
+        if input_name == "pressure_pa" and input_value > p_crit:
+            raise PropertyServiceError(
+                PropertyErrorCode.SATURATION_UNAVAILABLE,
+                "Saturation pressure exceeds the critical point.",
+                context={
+                    "fluid": fluid.cache_identity,
+                    "pressure_pa": input_value,
+                    "critical_pressure_pa": p_crit,
+                },
+            )
+
+    def _classify_backend_error(
+        self, exc: Exception, fluid: FluidIdentifier,
+        query_type: PropertyQueryType,
+    ) -> PropertyErrorCode:
+        """Classify a CoolProp backend exception.
+
+        Item 5: uses explicit boundary checks first.  Message-token
+        matching is only a fallback for unexpected error wording.
+        ``BACKEND_FAILURE`` is reserved for truly unexpected faults.
+        """
+        backend_message = str(exc)
+        lowered = backend_message.casefold()
+
+        # Primary: explicit keyword classification
+        if any(
+            token in lowered for token in _COOLPROP_OUT_OF_RANGE_TOKENS
+        ):
+            return PropertyErrorCode.STATE_OUT_OF_RANGE
+        if "critical" in lowered:
+            return PropertyErrorCode.SATURATION_UNAVAILABLE
+
+        # Fallback: no match → truly unexpected backend fault
+        return PropertyErrorCode.BACKEND_FAILURE
+
+    # ------------------------------------------------------------------
+    # Internal — Item 3: validation fixture matching
+    # ------------------------------------------------------------------
+
+    def _match_validation_fixture(
+        self, fluid: FluidIdentifier,
+        query_type: PropertyQueryType,
+        inputs: tuple[tuple[str, float], ...],
+    ) -> tuple[str | None, str | None, str | None]:
+        """Match a query against the validation regression fixtures.
+
+        Returns (dataset_id, dataset_revision, validation_basis) or
+        (None, None, None) if no fixture matches.
+        """
+        input_dict = dict(inputs)
+        for entry in VALIDATION_MATRIX:
+            if entry["fluid"] != fluid.name:
+                continue
+            if entry["query_type"] != query_type.value:
+                continue
+            # Check if all required input keys match
+            sp = entry["state_points"][0]
+            expected_inputs = sp["input"]
+            if set(expected_inputs.keys()) != set(input_dict.keys()):
+                continue
+            # Check if input values match within tolerance
+            match = True
+            for key, expected_val in expected_inputs.items():
+                actual_val = input_dict.get(key)
+                if actual_val is None:
+                    match = False
+                    break
+                if not math.isclose(
+                    actual_val, expected_val,
+                    rel_tol=sp.get("tolerance_rel", 0.01),
+                ):
+                    match = False
+                    break
+            if match:
+                return (
+                    entry.get("dataset_id"),
+                    entry.get("revision"),
+                    entry.get("validation_basis", "backend_regression"),
+                )
+        return None, None, None
+
+    # ------------------------------------------------------------------
     # Internal — provenance and cache
     # ------------------------------------------------------------------
 
@@ -876,6 +1057,10 @@ class CoolPropProvider:
         inputs: tuple[tuple[str, float], ...],
         fingerprint: str,
     ) -> PropertyProvenance:
+        # Item 3: populate dataset fields when a fixture matches
+        dataset_id, dataset_revision, validation_basis = (
+            self._match_validation_fixture(fluid, query_type, inputs)
+        )
         return PropertyProvenance(
             backend_name=self.name,
             backend_version=self.version,
@@ -885,6 +1070,9 @@ class CoolPropProvider:
             query_type=query_type,
             inputs=inputs,
             cache_policy_version=self.cache_policy_version,
+            validation_dataset_id=dataset_id,
+            validation_dataset_revision=dataset_revision,
+            validation_basis=validation_basis,
             reference_state_policy=self.reference_state_policy,
             configuration_fingerprint=fingerprint,
         )

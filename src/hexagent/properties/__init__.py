@@ -16,7 +16,11 @@ from hexagent.properties.base import (
     SaturationStateModel,
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
-from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
+from hexagent.properties.errors import (
+    PropertyErrorCode,
+    PropertyServiceError,
+    PropertyServiceErrorModel,
+)
 
 __all__ = [
     "CoolPropProvider",
@@ -33,6 +37,7 @@ __all__ = [
     "PropertyProvider",
     "PropertyQueryType",
     "PropertyServiceError",
+    "PropertyServiceErrorModel",
     "ReferenceStatePolicy",
     "SaturationState",
     "SaturationStateModel",

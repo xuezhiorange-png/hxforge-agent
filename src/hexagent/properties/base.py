@@ -11,11 +11,14 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Protocol, TypeAlias
+from typing import Any, Literal, Protocol, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
+from hexagent.properties.errors import (
+    PropertyErrorCode,
+    PropertyServiceError,
+)
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -416,7 +419,7 @@ class PropertyProvenanceModel(BaseModel):
     cache_policy_version: str
     reference_state_policy: ReferenceStatePolicy
     configuration_fingerprint: str
-    result_schema_version: str = Field(default="1.0", pattern=r"^1\.0$")
+    result_schema_version: Literal["1.0"] = "1.0"
 
 
 @dataclass(frozen=True)
@@ -434,7 +437,7 @@ class PropertyProvenance:
     validation_basis: str | None = None
     reference_state_policy: ReferenceStatePolicy = ReferenceStatePolicy.DEF
     configuration_fingerprint: str = ""
-    result_schema_version: str = "1.0"
+    result_schema_version: Literal["1.0"] = "1.0"
 
     def to_model(self) -> PropertyProvenanceModel:
         return PropertyProvenanceModel(
@@ -468,7 +471,7 @@ class FluidStateModel(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    result_schema_version: str = Field(default="1.0", pattern=r"^1\.0$")
+    result_schema_version: Literal["1.0"] = "1.0"
     temperature_k: float
     pressure_pa: float
     density_kg_m3: float
@@ -477,7 +480,7 @@ class FluidStateModel(BaseModel):
     conductivity_w_m_k: float
     enthalpy_j_kg: float
     entropy_j_kg_k: float
-    phase: str
+    phase: PhaseRegion
     quality: float | None = None
     provenance: PropertyProvenanceModel
 
@@ -487,8 +490,8 @@ class SaturationStateModel(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    result_schema_version: str = Field(default="1.0", pattern=r"^1\.0$")
-    query_type: str
+    result_schema_version: Literal["1.0"] = "1.0"
+    query_type: PropertyQueryType
     input_value: float
     liquid: FluidStateModel
     vapor: FluidStateModel
@@ -524,7 +527,7 @@ class FluidState:
             conductivity_w_m_k=self.conductivity_w_m_k,
             enthalpy_j_kg=self.enthalpy_j_kg,
             entropy_j_kg_k=self.entropy_j_kg_k,
-            phase=self.phase.value,
+            phase=self.phase,
             quality=self.quality,
             provenance=self.provenance.to_model(),
         )
@@ -579,7 +582,7 @@ class SaturationState:
 
     def to_model(self) -> SaturationStateModel:
         return SaturationStateModel(
-            query_type=self.query_type.value,
+            query_type=self.query_type,
             input_value=self.input_value,
             liquid=self.liquid.to_model(),
             vapor=self.vapor.to_model(),

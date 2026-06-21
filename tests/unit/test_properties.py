@@ -549,37 +549,55 @@ class TestCache:
 
 
 # ======================================================================
-# Item 3: Reference state verification via enthalpy comparison
+# Item 1: DEF baseline guard (replaces old reference-state verification)
 # ======================================================================
 
 
-class TestReferenceStateVerification:
-    def test_reference_state_verified_on_first_ph_query(self) -> None:
-        """Item 3: _verify_reference_state runs on first PH query."""
+class TestDEFBaselineGuard:
+    def test_def_baseline_captured_during_init(self) -> None:
+        """Item 1: provider captures DEF enthalpies during construction."""
         provider = CoolPropProvider()
-        assert not provider._ref_state_verified
-        tp = provider.state_tp("Water", 330.0, 300_000.0)
-        provider.state_ph(
-            "Water", 300_000.0, tp.enthalpy_j_kg,
-            reference_state=ReferenceStatePolicy.DEF,
-        )
-        assert provider._ref_state_verified
+        assert hasattr(provider, "_def_baseline")
+        assert "Water" in provider._def_baseline
+        assert "R134a" in provider._def_baseline
+        assert "R717" in provider._def_baseline
+        for fluid, h in provider._def_baseline.items():
+            assert math.isfinite(h), f"{fluid} baseline is not finite"
 
-    def test_reference_state_uses_fingerprint_guard(self) -> None:
-        """Item 3: ref-state verification delegates to fingerprint guard.
+    def test_r717_mutation_detected_by_baseline(self) -> None:
+        """Item 1: R717 mutation is caught by the DEF baseline check."""
+        import CoolProp.CoolProp as CP
 
-        CoolProp's DEF/IIR reference states produce nearly identical
-        enthalpies (<0.001% difference), so direct enthalpy comparison
-        cannot reliably detect the mutation.  The configuration
-        fingerprint (which encodes per-fluid enthalpies) catches any
-        reference-state change that alters CoolProp's internal state.
-        """
-        provider = CoolPropProvider()
-        # Normal verification succeeds
-        provider._verify_reference_state()
-        assert provider._ref_state_verified
-        # Second call is a no-op (cached)
-        provider._verify_reference_state()
+        provider = CoolPropProvider(cache_size=4)
+        # Normal query succeeds
+        provider.state_tp("R717", 300.0, 2_000_000.0)
+        assert provider.cache_info().size == 1
+
+        try:
+            CP.set_reference_state("R717", "IIR")
+            with pytest.raises(PropertyServiceError) as exc_info:
+                provider.state_tp("R717", 300.0, 2_000_000.0)
+            assert (
+                exc_info.value.code
+                is PropertyErrorCode.CONFIGURATION_CHANGED
+            )
+            assert "DEF baseline" in str(exc_info.value)
+        finally:
+            CP.set_reference_state("R717", "DEF")
+
+    def test_def_baseline_force_during_init(self) -> None:
+        """Item 1: init forces DEF even if CoolProp was in IIR."""
+        import CoolProp.CoolProp as CP
+
+        try:
+            CP.set_reference_state("R134a", "IIR")
+            provider = CoolPropProvider()
+            # Provider should have forced DEF and captured correct baseline
+            # A normal query should succeed (not use stale IIR values)
+            state = provider.state_tp("R134a", 300.0, 2_000_000.0)
+            assert state.temperature_k == pytest.approx(300.0, rel=1e-6)
+        finally:
+            CP.set_reference_state("R134a", "DEF")
 
 
 # ======================================================================
@@ -680,3 +698,324 @@ class TestCanonicalJSON:
         # Same inputs should produce same JSON (modulo fingerprint which
         # is the same in the same process)
         assert state1.to_json() == state2.to_json()
+
+
+# ======================================================================
+# Item 1: Atomic lock — verification and evaluation under one lock
+# ======================================================================
+
+
+class TestAtomicLock:
+    def test_concurrent_mutation_detected(self) -> None:
+        """Item 1: if CoolProp is mutated, the next query detects it."""
+        import CoolProp.CoolProp as CP
+
+        provider = CoolPropProvider(cache_size=4)
+        provider.state_tp("R134a", 300.0, 2_000_000.0)
+        try:
+            CP.set_reference_state("R134a", "IIR")
+            with pytest.raises(PropertyServiceError) as exc_info:
+                provider.state_tp("R134a", 300.0, 2_000_000.0)
+            assert (
+                exc_info.value.code
+                is PropertyErrorCode.CONFIGURATION_CHANGED
+            )
+        finally:
+            CP.set_reference_state("R134a", "DEF")
+
+
+# ======================================================================
+# Item 2: PHStateSpec with reference_state + adapter
+# ======================================================================
+
+
+class TestPHStateSpecReferenceState:
+    def test_ph_state_spec_requires_reference_state(self) -> None:
+        """Item 2: PHStateSpec has a reference_state field."""
+        from hexagent.domain.models import PHStateSpec
+        from hexagent.domain.quantities import AbsolutePressure, SpecificEnthalpy
+
+        spec = PHStateSpec(
+            type="PH",
+            pressure=AbsolutePressure(value=101_325.0, unit="Pa"),
+            enthalpy=SpecificEnthalpy(value=100_000.0, unit="J/kg"),
+            reference_state=ReferenceStatePolicy.DEF,
+        )
+        assert spec.reference_state is ReferenceStatePolicy.DEF
+
+    def test_ph_state_spec_to_provider_args(self) -> None:
+        """Item 2: adapter converts PHStateSpec to provider kwargs."""
+        from hexagent.domain.models import PHStateSpec
+        from hexagent.domain.quantities import AbsolutePressure, SpecificEnthalpy
+
+        spec = PHStateSpec(
+            type="PH",
+            pressure=AbsolutePressure(value=300_000.0, unit="Pa"),
+            enthalpy=SpecificEnthalpy(value=200_000.0, unit="J/kg"),
+            reference_state=ReferenceStatePolicy.DEF,
+        )
+        args = spec.to_provider_args()
+        assert args["pressure_pa"] == 300_000.0
+        assert args["enthalpy_j_kg"] == 200_000.0
+        assert args["reference_state"] is ReferenceStatePolicy.DEF
+
+    def test_ph_state_spec_json_round_trip(self) -> None:
+        """Item 2: PHStateSpec serializes and deserializes with ref state."""
+        from hexagent.domain.models import PHStateSpec
+        from hexagent.domain.quantities import AbsolutePressure, SpecificEnthalpy
+
+        spec = PHStateSpec(
+            type="PH",
+            pressure=AbsolutePressure(value=101_325.0, unit="Pa"),
+            enthalpy=SpecificEnthalpy(value=100_000.0, unit="J/kg"),
+            reference_state=ReferenceStatePolicy.DEF,
+        )
+        json_str = spec.model_dump_json()
+        restored = PHStateSpec.model_validate_json(json_str)
+        assert restored.reference_state is ReferenceStatePolicy.DEF
+        assert restored.pressure.si_value == 101_325.0
+
+    def test_ph_state_spec_rejects_unknown_reference(self) -> None:
+        """Item 2: unknown reference state value is rejected."""
+        from hexagent.domain.models import PHStateSpec
+        from hexagent.domain.quantities import AbsolutePressure, SpecificEnthalpy
+
+        with pytest.raises((ValueError, TypeError)):
+            PHStateSpec(
+                type="PH",
+                pressure=AbsolutePressure(value=101_325.0, unit="Pa"),
+                enthalpy=SpecificEnthalpy(value=100_000.0, unit="J/kg"),
+                reference_state="UNKNOWN",
+            )
+
+    def test_ph_state_spec_adapter_e2e(self) -> None:
+        """Item 2: PHStateSpec → provider.state_ph end-to-end."""
+        from hexagent.domain.models import PHStateSpec
+        from hexagent.domain.quantities import AbsolutePressure, SpecificEnthalpy
+
+        provider = CoolPropProvider()
+        tp = provider.state_tp("Water", 330.0, 300_000.0)
+        spec = PHStateSpec(
+            type="PH",
+            pressure=AbsolutePressure(value=300_000.0, unit="Pa"),
+            enthalpy=SpecificEnthalpy(
+                value=tp.enthalpy_j_kg, unit="J/kg"
+            ),
+            reference_state=ReferenceStatePolicy.DEF,
+        )
+        args = spec.to_provider_args()
+        ph = provider.state_ph(
+            "Water",
+            args["pressure_pa"],
+            args["enthalpy_j_kg"],
+            reference_state=args["reference_state"],
+        )
+        assert ph.temperature_k == pytest.approx(330.0, rel=1e-8)
+
+
+# ======================================================================
+# Item 3: Validation provenance — fixture matching
+# ======================================================================
+
+
+class TestValidationProvenance:
+    def test_fixture_match_populates_dataset_fields(self) -> None:
+        """Item 3: matching fixture populates dataset_id in provenance."""
+        provider = CoolPropProvider()
+        state = provider.state_tp("Water", 300.0, 101_325.0)
+        assert state.provenance.validation_dataset_id is not None
+        assert "WATER" in state.provenance.validation_dataset_id
+        assert state.provenance.validation_basis == "backend_regression"
+        assert state.provenance.validation_dataset_revision is not None
+
+    def test_non_matching_query_has_no_dataset(self) -> None:
+        """Item 3: non-fixture query has None dataset fields."""
+        provider = CoolPropProvider()
+        state = provider.state_tp("Water", 350.0, 500_000.0)
+        assert state.provenance.validation_dataset_id is None
+        assert state.provenance.validation_basis is None
+
+    def test_r134a_saturation_fixture_match(self) -> None:
+        """Item 3: R134a saturation fixture is matched."""
+        provider = CoolPropProvider()
+        sat = provider.saturation_at_pressure("R134a", 500_000.0)
+        assert sat.provenance.validation_dataset_id is not None
+        assert "R134A" in sat.provenance.validation_dataset_id
+        assert sat.provenance.validation_basis == "backend_regression"
+
+    def test_r717_fixture_match(self) -> None:
+        """Item 3: R717 fixture is matched."""
+        provider = CoolPropProvider()
+        state = provider.state_tp("R717", 300.0, 2_000_000.0)
+        assert state.provenance.validation_dataset_id is not None
+        assert "R717" in state.provenance.validation_dataset_id
+
+    def test_fixture_match_in_provenance_json(self) -> None:
+        """Item 3: fixture fields survive JSON round trip."""
+        provider = CoolPropProvider()
+        state = provider.state_tp("Water", 300.0, 101_325.0)
+        restored = FluidState.from_json(state.to_json())
+        assert restored.provenance.validation_dataset_id is not None
+        assert restored.provenance.validation_basis == "backend_regression"
+
+
+# ======================================================================
+# Item 4: Strict serialization — Literal version, enum fields, error model
+# ======================================================================
+
+
+class TestStrictSerializationV2:
+    def test_literal_schema_version_in_provenance(self) -> None:
+        """Item 4: result_schema_version is Literal['1.0'], not pattern."""
+        provider = CoolPropProvider()
+        state = provider.state_tp("Water", 300.0, 101_325.0)
+        model = state.to_model()
+        assert model.result_schema_version == "1.0"
+        # Literal["1.0"] rejects other values
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            model.model_validate(
+                {**model.model_dump(), "result_schema_version": "2.0"}
+            )
+
+    def test_enum_phase_in_model(self) -> None:
+        """Item 4: phase field is PhaseRegion enum, not plain string."""
+        provider = CoolPropProvider()
+        state = provider.state_tp("Water", 300.0, 101_325.0)
+        model = state.to_model()
+        assert isinstance(model.phase, PhaseRegion)
+        assert model.phase is PhaseRegion.LIQUID
+
+    def test_enum_query_type_in_saturation_model(self) -> None:
+        """Item 4: query_type field is PropertyQueryType enum."""
+        provider = CoolPropProvider()
+        sat = provider.saturation_at_pressure("R134a", 500_000.0)
+        model = sat.to_model()
+        assert isinstance(model.query_type, PropertyQueryType)
+        assert model.query_type is PropertyQueryType.SATURATION_P
+
+    def test_error_model_strict_round_trip(self) -> None:
+        """Item 4: PropertyServiceError → JSON → error model round trip."""
+
+        err = PropertyServiceError(
+            PropertyErrorCode.STATE_OUT_OF_RANGE,
+            "test error message",
+            context={"fluid": "HEOS::Water", "value": -1.0},
+        )
+        json_str = err.to_json()
+        restored = PropertyServiceError.from_json(json_str)
+        assert restored.code is PropertyErrorCode.STATE_OUT_OF_RANGE
+        assert str(restored) == "test error message"
+        assert restored.context["fluid"] == "HEOS::Water"
+        assert restored.context["value"] == -1.0
+
+    def test_error_model_rejects_extra_fields(self) -> None:
+        """Item 4: error model has extra=forbid."""
+        from hexagent.properties.errors import PropertyServiceErrorModel
+
+        with pytest.raises((ValueError, TypeError)):
+            PropertyServiceErrorModel.model_validate({
+                "code": "property_invalid_input",
+                "message": "test",
+                "extra_field": "bad",
+            })
+
+    def test_error_model_has_literal_version(self) -> None:
+        """Item 4: error model includes schema_version."""
+
+        err = PropertyServiceError(
+            PropertyErrorCode.INVALID_INPUT, "test"
+        )
+        model = err.to_model()
+        assert model.schema_version == "1.0"
+
+    def test_error_model_is_json_safe(self) -> None:
+        """Item 4: error model serializes to valid JSON."""
+        import json
+
+        err = PropertyServiceError(
+            PropertyErrorCode.BACKEND_FAILURE,
+            "backend error",
+            context={"nested": {"key": "value"}},
+        )
+        model = err.to_model()
+        dumped = model.model_dump()
+        serialized = json.dumps(dumped)
+        parsed = json.loads(serialized)
+        assert parsed["code"] == "property_backend_failure"
+        assert parsed["context"]["nested"]["key"] == "value"
+
+
+# ======================================================================
+# Item 5: Error classification — explicit pre-checks, not message tokens
+# ======================================================================
+
+
+class TestErrorClassificationV2:
+    def test_above_critical_pressure_returns_saturation_unavailable(
+        self,
+    ) -> None:
+        """Item 5: above-critical pressure pre-check returns SATURATION_UNAVAILABLE."""
+        provider = CoolPropProvider()
+        with pytest.raises(PropertyServiceError) as exc_info:
+            provider.saturation_at_pressure("Water", 25_000_000.0)
+        assert (
+            exc_info.value.code
+            is PropertyErrorCode.SATURATION_UNAVAILABLE
+        )
+        assert "critical" in str(exc_info.value).lower()
+
+    def test_above_critical_temperature_returns_saturation_unavailable(
+        self,
+    ) -> None:
+        """Item 5: above-critical temperature pre-check."""
+        provider = CoolPropProvider()
+        with pytest.raises(PropertyServiceError) as exc_info:
+            provider.saturation_at_temperature("Water", 700.0)
+        assert (
+            exc_info.value.code
+            is PropertyErrorCode.SATURATION_UNAVAILABLE
+        )
+
+    def test_below_triple_returns_state_out_of_range(self) -> None:
+        """Item 5: below-triple-point enthalpy returns STATE_OUT_OF_RANGE."""
+        provider = CoolPropProvider(allow_unvalidated_fluids=True)
+        with pytest.raises(PropertyServiceError) as exc_info:
+            provider.state_ph(
+                "Water", 101_325.0, -1_000_000.0,
+                reference_state=ReferenceStatePolicy.DEF,
+            )
+        assert (
+            exc_info.value.code is PropertyErrorCode.STATE_OUT_OF_RANGE
+        )
+
+    def test_pre_check_has_critical_context(self) -> None:
+        """Item 5: pre-check error includes critical point in context."""
+        provider = CoolPropProvider()
+        with pytest.raises(PropertyServiceError) as exc_info:
+            provider.saturation_at_pressure("Water", 25_000_000.0)
+        ctx = exc_info.value.context
+        assert "critical_pressure_pa" in ctx
+        assert ctx["critical_pressure_pa"] == 22_064_000.0
+
+    def test_failed_query_does_not_pollute_cache_v2(self) -> None:
+        """Item 5: failed queries do not create cache entries."""
+        provider = CoolPropProvider(cache_size=4)
+        provider.state_tp("Water", 300.0, 101_325.0)
+        assert provider.cache_info().size == 1
+        with pytest.raises(PropertyServiceError):
+            provider.state_tp("Water", -1.0, 101_325.0)
+        assert provider.cache_info().size == 1
+        assert provider.cache_info().hits == 0
+
+    def test_different_messages_same_code(self) -> None:
+        """Item 5: different CoolProp messages produce the same public code."""
+        # Both below-triple and out-of-range should give STATE_OUT_OF_RANGE
+        provider = CoolPropProvider(allow_unvalidated_fluids=True)
+        with pytest.raises(PropertyServiceError) as exc1:
+            provider.state_ph(
+                "Water", 101_325.0, -1_000_000.0,
+                reference_state=ReferenceStatePolicy.DEF,
+            )
+        # Different error message, same code
+        assert exc1.value.code is PropertyErrorCode.STATE_OUT_OF_RANGE
