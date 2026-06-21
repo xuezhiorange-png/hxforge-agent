@@ -6,17 +6,23 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
+from hexagent.domain.quantities import (
+    AbsolutePressure,
+    AbsoluteTemperature,
+    FoulingResistance,
+    Length,
+    MassFlow,
+    Power,
+    PressureDifference,
+    Quantity,
+)
+
 
 class PhaseHint(StrEnum):
     AUTO = "auto"
     LIQUID = "liquid"
     GAS = "gas"
     TWO_PHASE = "two_phase"
-
-
-class Quantity(BaseModel):
-    value: float
-    unit: str
 
 
 class FluidSpec(BaseModel):
@@ -28,25 +34,21 @@ class FluidSpec(BaseModel):
 
 class StreamSpec(BaseModel):
     fluid: FluidSpec
-    mass_flow: Quantity
-    inlet_temperature: Quantity
-    inlet_pressure: Quantity
-    outlet_temperature: Quantity | None = None
-    allowable_pressure_drop: Quantity | None = None
-    fouling_resistance: Quantity = Field(
-        default_factory=lambda: Quantity(value=0.0, unit="m^2*K/W")
-    )
+    mass_flow: MassFlow
+    inlet_temperature: AbsoluteTemperature
+    inlet_pressure: AbsolutePressure
+    outlet_temperature: AbsoluteTemperature | None = None
+    allowable_pressure_drop: PressureDifference | None = None
+    fouling_resistance: FoulingResistance
 
 
 class DesignConstraints(BaseModel):
-    design_pressure_hot: Quantity
-    design_pressure_cold: Quantity
-    design_temperature_hot: Quantity
-    design_temperature_cold: Quantity
-    corrosion_allowance: Quantity = Field(
-        default_factory=lambda: Quantity(value=0.0, unit="mm")
-    )
-    required_area_margin_fraction: float = Field(default=0.10, ge=0.0, le=1.0)
+    design_pressure_hot: AbsolutePressure
+    design_pressure_cold: AbsolutePressure
+    design_temperature_hot: AbsoluteTemperature
+    design_temperature_cold: AbsoluteTemperature
+    corrosion_allowance: Length | None = None
+    required_area_margin_fraction: float = Field(ge=0.0, le=1.0)
 
 
 class DesignCase(BaseModel):
@@ -55,7 +57,7 @@ class DesignCase(BaseModel):
     hot_stream: StreamSpec
     cold_stream: StreamSpec
     constraints: DesignConstraints
-    target_duty: Quantity | None = None
+    target_duty: Power | None = None
 
     @model_validator(mode="after")
     def check_thermal_specification(self) -> DesignCase:
@@ -92,3 +94,23 @@ class CalculationResult(BaseModel):
     outputs: dict[str, Any]
     warnings: list[WarningMessage] = Field(default_factory=list)
     provenance: list[ProvenanceRecord] = Field(default_factory=list)
+
+
+__all__ = [
+    "AbsolutePressure",
+    "AbsoluteTemperature",
+    "CalculationResult",
+    "DesignCase",
+    "DesignConstraints",
+    "FluidSpec",
+    "FoulingResistance",
+    "Length",
+    "MassFlow",
+    "PhaseHint",
+    "Power",
+    "PressureDifference",
+    "ProvenanceRecord",
+    "Quantity",
+    "StreamSpec",
+    "WarningMessage",
+]
