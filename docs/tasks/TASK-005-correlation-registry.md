@@ -7,7 +7,7 @@
 - GitHub Issue: #10
 - Branch: `codex/task-005-correlation-registry`
 - PR: #11 (Draft)
-- Head SHA: `94cb09d`
+- Head SHA: `a3c8d19`
 
 ## Scope
 
@@ -32,7 +32,7 @@
 
 ## Test Count
 
-626 total (457 existing + 169 new)
+685 total (457 existing + 228 new)
 
 ## Engineering Decisions
 
