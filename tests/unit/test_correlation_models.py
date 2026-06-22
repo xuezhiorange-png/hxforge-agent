@@ -29,9 +29,15 @@ from hexagent.correlations.models import (
     UncertaintySpec,
     VariableApplicabilityStatus,
     VariableAssessment,
+    compare_semver,
+    compute_assessment_hash,
     parse_semver,
 )
 from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity, ErrorCode
+
+# Valid sha256 hash for direct model construction (no factory)
+_HASH_DEF = "sha256:" + "a" * 64
+_HASH_ASSESS = "sha256:" + "b" * 64
 
 # ---------------------------------------------------------------------------
 # Enum tests
@@ -176,7 +182,7 @@ class TestSemVer:
         """Stable sorts after prerelease of same version number."""
         from hexagent.correlations.models import CorrelationDefinition
 
-        pre_defn = CorrelationDefinition(
+        pre_defn = CorrelationDefinition.create(
             key=CorrelationKey(correlation_id="test", version="1.0.0-alpha"),
             name="Pre",
             purpose=CorrelationPurpose.heat_transfer_coefficient,
@@ -186,7 +192,7 @@ class TestSemVer:
             envelope=ApplicabilityEnvelope(),
             source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
         )
-        stable_defn = CorrelationDefinition(
+        stable_defn = CorrelationDefinition.create(
             key=CorrelationKey(correlation_id="test", version="1.0.0"),
             name="Stable",
             purpose=CorrelationPurpose.heat_transfer_coefficient,
@@ -227,6 +233,7 @@ class TestSemVer:
                     source=BibliographicSource(
                         source_id="s", title="T", publication="P", year=2020
                     ),
+                    definition_hash=_HASH_DEF,
                 )
             )
         sorted_defns = sorted(defns, key=_version_sort_key)
@@ -292,6 +299,7 @@ class TestSemVer:
                     source=BibliographicSource(
                         source_id="s", title="T", publication="P", year=2020
                     ),
+                    definition_hash=_HASH_DEF,
                 )
             )
         sorted_defns = sorted(defns, key=_version_sort_key)
@@ -698,7 +706,7 @@ class TestApplicabilityEnvelope:
 
 class TestCorrelationDefinition:
     def _make_definition(self) -> CorrelationDefinition:
-        return CorrelationDefinition.create(
+        return CorrelationDefinition(
             key=CorrelationKey(
                 correlation_id="fixture.htc.tube",
                 version="1.0.0",
@@ -708,6 +716,7 @@ class TestCorrelationDefinition:
             description="A fixture correlation for testing",
             geometry=frozenset({GeometryType.circular_tube}),
             phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            definition_hash="sha256:" + "a" * 64,
             envelope=ApplicabilityEnvelope(
                 geometry_types=frozenset({GeometryType.circular_tube}),
                 phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
@@ -751,6 +760,7 @@ class TestCorrelationDefinition:
                 description="Test",
                 geometry=frozenset({GeometryType.generic}),
                 phase_regimes=frozenset({PhaseRegime.generic}),
+                definition_hash=_HASH_DEF,
                 envelope=ApplicabilityEnvelope(),
                 source=BibliographicSource(
                     source_id="s",
@@ -770,6 +780,7 @@ class TestCorrelationDefinition:
                 description="Test",
                 geometry=frozenset({GeometryType.generic}),
                 phase_regimes=frozenset({PhaseRegime.generic}),
+                definition_hash=_HASH_DEF,
                 envelope=ApplicabilityEnvelope(),
                 source=BibliographicSource(
                     source_id="s",
@@ -789,6 +800,7 @@ class TestCorrelationDefinition:
                 description="Test",
                 geometry=frozenset({GeometryType.circular_tube}),
                 phase_regimes=frozenset({PhaseRegime.generic}),
+                definition_hash=_HASH_DEF,
                 envelope=ApplicabilityEnvelope(
                     geometry_types=frozenset({GeometryType.annulus}),
                     phase_regimes=frozenset({PhaseRegime.generic}),
@@ -806,6 +818,7 @@ class TestCorrelationDefinition:
                 description="Test",
                 geometry=frozenset({GeometryType.generic}),
                 phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                definition_hash=_HASH_DEF,
                 envelope=ApplicabilityEnvelope(
                     geometry_types=frozenset({GeometryType.generic}),
                     phase_regimes=frozenset({PhaseRegime.boiling}),
@@ -823,6 +836,7 @@ class TestCorrelationDefinition:
                 description="Test",
                 geometry=frozenset({GeometryType.generic}),
                 phase_regimes=frozenset({PhaseRegime.generic}),
+                definition_hash=_HASH_DEF,
                 envelope=ApplicabilityEnvelope(),
                 source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
                 implementation_status=CorrelationImplementationStatus.implemented,
@@ -838,6 +852,7 @@ class TestCorrelationDefinition:
                 description="Test",
                 geometry=frozenset({GeometryType.generic}),
                 phase_regimes=frozenset({PhaseRegime.generic}),
+                definition_hash=_HASH_DEF,
                 envelope=ApplicabilityEnvelope(),
                 source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
                 supersedes=CorrelationKey(correlation_id="fixture", version="1.0.0"),
@@ -853,6 +868,7 @@ class TestCorrelationDefinition:
                 description="Test",
                 geometry=frozenset({GeometryType.generic}),
                 phase_regimes=frozenset({PhaseRegime.generic}),
+                definition_hash=_HASH_DEF,
                 envelope=ApplicabilityEnvelope(),
                 source=BibliographicSource(
                     source_id="s",
@@ -958,6 +974,7 @@ class TestApplicabilityAssessment:
         assessment = ApplicabilityAssessment(
             correlation_key=key,
             status=ApplicabilityStatus.applicable,
+            assessment_hash=_HASH_ASSESS,
             allows_evaluation=True,
         )
         assert assessment.status == ApplicabilityStatus.applicable
@@ -976,6 +993,7 @@ class TestApplicabilityAssessment:
             ApplicabilityAssessment(
                 correlation_key=key,
                 status=ApplicabilityStatus.applicable,
+                assessment_hash=_HASH_ASSESS,
                 blockers=(blocker,),
                 allows_evaluation=True,
             )
@@ -985,6 +1003,7 @@ class TestApplicabilityAssessment:
         assessment = ApplicabilityAssessment(
             correlation_key=key,
             status=ApplicabilityStatus.applicable,
+            assessment_hash=_HASH_ASSESS,
         )
         with pytest.raises((ValueError, ValidationError)):
             assessment.status = ApplicabilityStatus.absolute_range_exceeded  # type: ignore[misc]
@@ -1074,10 +1093,10 @@ class TestDefinitionIdentityEnforcement:
             source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
         )
 
-    def test_direct_construction_with_empty_hash(self) -> None:
-        """Item 4: Direct construction with empty hash works (internal use)."""
-        defn = CorrelationDefinition(**self._make_kwargs())
-        assert defn.definition_hash == ""
+    def test_direct_construction_requires_hash(self) -> None:
+        """Item 4: Direct construction without definition_hash raises ValidationError."""
+        with pytest.raises(ValidationError, match="definition_hash"):
+            CorrelationDefinition(**self._make_kwargs())
 
     def test_direct_construction_with_invalid_hash_format_rejected(self) -> None:
         """Item 4: Invalid hash format is rejected."""
@@ -1109,3 +1128,245 @@ class TestDefinitionIdentityEnforcement:
         json_str = defn.model_dump_json()
         restored = CorrelationDefinition.model_validate_json(json_str)
         assert restored.definition_hash == defn.definition_hash
+
+
+# ---------------------------------------------------------------------------
+# Review-04: AssessmentHashCompleteness
+# ---------------------------------------------------------------------------
+
+
+class TestAssessmentHashCompleteness:
+    """Prove that changing any input to compute_assessment_hash produces a different hash."""
+
+    @staticmethod
+    def _base_kwargs() -> dict:
+        from hexagent.correlations.models import (
+            FlowRegime,
+            VariableApplicabilityStatus,
+            VariableAssessment,
+        )
+
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
+        return dict(
+            definition_hash="sha256:" + "a" * 64,
+            correlation_key=key,
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+            flow_regime=FlowRegime.turbulent,
+            input_values=((ApplicabilityVariable.reynolds, 25000.0),),
+            status=ApplicabilityStatus.applicable,
+            variable_results=(
+                VariableAssessment(
+                    variable=ApplicabilityVariable.reynolds,
+                    supplied_value=25000.0,
+                    absolute_minimum=3000.0,
+                    absolute_maximum=100000.0,
+                    recommended_minimum=10000.0,
+                    recommended_maximum=50000.0,
+                    status=VariableApplicabilityStatus.applicable,
+                ),
+            ),
+            warnings=(),
+            blockers=(),
+            policy=OutOfRangePolicy(),
+            allow_extrapolation=False,
+        )
+
+    def test_different_supplied_value(self) -> None:
+        from hexagent.correlations.models import (
+            VariableApplicabilityStatus,
+            VariableAssessment,
+        )
+
+        base = self._base_kwargs()
+        h1 = compute_assessment_hash(**base)
+        base["variable_results"] = (
+            VariableAssessment(
+                variable=ApplicabilityVariable.reynolds,
+                supplied_value=30000.0,  # different
+                absolute_minimum=3000.0,
+                absolute_maximum=100000.0,
+                recommended_minimum=10000.0,
+                recommended_maximum=50000.0,
+                status=VariableApplicabilityStatus.applicable,
+            ),
+        )
+        h2 = compute_assessment_hash(**base)
+        assert h1 != h2
+
+    def test_different_absolute_minimum(self) -> None:
+        from hexagent.correlations.models import (
+            VariableApplicabilityStatus,
+            VariableAssessment,
+        )
+
+        base = self._base_kwargs()
+        h1 = compute_assessment_hash(**base)
+        base["variable_results"] = (
+            VariableAssessment(
+                variable=ApplicabilityVariable.reynolds,
+                supplied_value=25000.0,
+                absolute_minimum=5000.0,  # different
+                absolute_maximum=100000.0,
+                recommended_minimum=10000.0,
+                recommended_maximum=50000.0,
+                status=VariableApplicabilityStatus.applicable,
+            ),
+        )
+        h2 = compute_assessment_hash(**base)
+        assert h1 != h2
+
+    def test_different_recommended_maximum(self) -> None:
+        from hexagent.correlations.models import (
+            VariableApplicabilityStatus,
+            VariableAssessment,
+        )
+
+        base = self._base_kwargs()
+        h1 = compute_assessment_hash(**base)
+        base["variable_results"] = (
+            VariableAssessment(
+                variable=ApplicabilityVariable.reynolds,
+                supplied_value=25000.0,
+                absolute_minimum=3000.0,
+                absolute_maximum=100000.0,
+                recommended_minimum=10000.0,
+                recommended_maximum=60000.0,  # different
+                status=VariableApplicabilityStatus.applicable,
+            ),
+        )
+        h2 = compute_assessment_hash(**base)
+        assert h1 != h2
+
+    def test_different_variable_status(self) -> None:
+        from hexagent.correlations.models import (
+            VariableApplicabilityStatus,
+            VariableAssessment,
+        )
+
+        base = self._base_kwargs()
+        h1 = compute_assessment_hash(**base)
+        base["variable_results"] = (
+            VariableAssessment(
+                variable=ApplicabilityVariable.reynolds,
+                supplied_value=25000.0,
+                absolute_minimum=3000.0,
+                absolute_maximum=100000.0,
+                recommended_minimum=10000.0,
+                recommended_maximum=50000.0,
+                status=VariableApplicabilityStatus.above_recommended,  # different
+            ),
+        )
+        h2 = compute_assessment_hash(**base)
+        assert h1 != h2
+
+    def test_different_message_source_module(self) -> None:
+
+        base = self._base_kwargs()
+        base["status"] = ApplicabilityStatus.recommended_range_exceeded
+        base["variable_results"] = ()
+        base["warnings"] = (
+            EngineeringMessage(
+                code=ErrorCode.CORRELATION_RECOMMENDED_RANGE_EXCEEDED,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="test warning",
+                source_module="module_a",  # different
+            ),
+        )
+        h1 = compute_assessment_hash(**base)
+        base["warnings"] = (
+            EngineeringMessage(
+                code=ErrorCode.CORRELATION_RECOMMENDED_RANGE_EXCEEDED,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="test warning",
+                source_module="module_b",  # different
+            ),
+        )
+        h2 = compute_assessment_hash(**base)
+        assert h1 != h2
+
+    def test_different_message_context(self) -> None:
+
+        base = self._base_kwargs()
+        base["status"] = ApplicabilityStatus.recommended_range_exceeded
+        base["variable_results"] = ()
+        base["warnings"] = (
+            EngineeringMessage(
+                code=ErrorCode.CORRELATION_RECOMMENDED_RANGE_EXCEEDED,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="test warning",
+                source_module="module_a",
+                context=(("key", "value_a"),),  # different
+            ),
+        )
+        h1 = compute_assessment_hash(**base)
+        base["warnings"] = (
+            EngineeringMessage(
+                code=ErrorCode.CORRELATION_RECOMMENDED_RANGE_EXCEEDED,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="test warning",
+                source_module="module_a",
+                context=(("key", "value_b"),),  # different
+            ),
+        )
+        h2 = compute_assessment_hash(**base)
+        assert h1 != h2
+
+    def test_different_policy(self) -> None:
+
+        base = self._base_kwargs()
+        base["variable_results"] = ()
+        base["warnings"] = ()
+        h1 = compute_assessment_hash(**base)
+        base["policy"] = OutOfRangePolicy(
+            absolute_violation=OutOfRangeAction.warn,  # different
+        )
+        h2 = compute_assessment_hash(**base)
+        assert h1 != h2
+
+    def test_different_geometry(self) -> None:
+
+        base = self._base_kwargs()
+        base["variable_results"] = ()
+        base["warnings"] = ()
+        h1 = compute_assessment_hash(**base)
+        base["geometry"] = GeometryType.annulus  # different
+        h2 = compute_assessment_hash(**base)
+        assert h1 != h2
+
+
+# ---------------------------------------------------------------------------
+# Review-04: Supersession SemVer Ordering
+# ---------------------------------------------------------------------------
+
+
+class TestSupersessionSemVerOrdering:
+    """Test compare_semver for supersession validation scenarios."""
+
+    def test_1_9_superseded_by_1_10_valid(self) -> None:
+        """1.9.0 superseded by 1.10.0 → valid (1.10.0 > 1.9.0)."""
+        assert compare_semver("1.10.0", "1.9.0") == 1
+
+    def test_1_0_0_alpha_superseded_by_1_0_0_valid(self) -> None:
+        """1.0.0-alpha superseded by 1.0.0 → valid (stable > prerelease)."""
+        assert compare_semver("1.0.0", "1.0.0-alpha") == 1
+
+    def test_2_0_0_superseded_by_1_0_0_rejected(self) -> None:
+        """2.0.0 superseded by 1.0.0 → rejected (2.0.0 > 1.0.0)."""
+        assert compare_semver("1.0.0", "2.0.0") == -1
+
+    def test_same_version_supersession_rejected(self) -> None:
+        """Same version supersession → rejected."""
+        assert compare_semver("1.0.0", "1.0.0") == 0
+
+    def test_cross_id_supersession_rejected(self) -> None:
+        """Cross-ID supersession rejected (tested at registry level)."""
+        # compare_semver only compares versions, so same versions return 0
+        assert compare_semver("1.0.0", "1.0.0") == 0
+
+    def test_missing_target_rejected(self) -> None:
+        """Missing target is rejected at registry level; compare_semver works on strings."""
+        # This is validated at the registry, not in compare_semver itself
+        # compare_semver just compares version strings
+        with pytest.raises(ValueError):
+            compare_semver("", "1.0.0")

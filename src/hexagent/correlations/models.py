@@ -219,6 +219,36 @@ def parse_semver(version: str) -> tuple[int, int, int, tuple[tuple[int, int | st
     return (major, minor, patch, prerelease)
 
 
+def compare_semver(v1: str, v2: str) -> int:
+    """Compare two SemVer strings. Returns -1, 0, or 1.
+
+    Returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2.
+    Uses SemVer precedence rules including prerelease comparison.
+    """
+    p1 = parse_semver(v1)  # (major, minor, patch, prerelease)
+    p2 = parse_semver(v2)
+    # Compare (major, minor, patch) as tuples
+    core1 = (p1[0], p1[1], p1[2])
+    core2 = (p2[0], p2[1], p2[2])
+    if core1 != core2:
+        return -1 if core1 < core2 else 1
+    # Same core: prerelease < no prerelease
+    pre1, pre2 = p1[3], p2[3]
+    if pre1 and not pre2:
+        return -1  # pre1 < pre2
+    if not pre1 and pre2:
+        return 1  # pre1 > pre2
+    if not pre1 and not pre2:
+        return 0  # both stable, equal
+    # Both prerelease: compare using the same encoding as _normalize_semver_prerelease
+    e1, e2 = pre1, pre2
+    if e1 < e2:
+        return -1
+    if e1 > e2:
+        return 1
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -453,13 +483,14 @@ class CorrelationDefinition(BaseModel):
     implementation_ref: str | None = None
     supersedes: CorrelationKey | None = None
     tags: frozenset[str] = frozenset()
-    definition_hash: str = ""
+    definition_hash: str
 
     @field_validator("definition_hash")
     @classmethod
     def _validate_definition_hash(cls, v: str) -> str:
-        if v:  # Non-empty must be valid format
-            _validate_hash_format(v, "definition_hash")
+        if not v:
+            raise ValueError("definition_hash must not be empty")
+        _validate_hash_format(v, "definition_hash")
         return v
 
     @model_validator(mode="after")
@@ -511,16 +542,16 @@ class CorrelationDefinition(BaseModel):
     def create(cls, **kwargs: Any) -> CorrelationDefinition:
         """Factory that auto-computes definition_hash.
 
-        Creates the model without hash, computes hash from the canonical
-        payload, then re-validates with the valid hash.
+        Uses model_construct for the intermediate (unvalidated) step,
+        then validates the final result with model_validate to ensure
+        all validators run including hash format check.
         """
         kwargs.pop("definition_hash", None)
-        # Build the definition without hash
-        defn = cls(**{**kwargs, "definition_hash": ""})
-        # Compute hash from the definition
-        computed = compute_definition_hash(defn)
-        # Re-validate with the hash (this runs all validators including hash format check)
-        return cls.model_validate({**defn.model_dump(), "definition_hash": computed})
+        # Construct without validation to get the canonical payload
+        temp = cls.model_construct(**{k: v for k, v in kwargs.items() if k in cls.model_fields})
+        computed = compute_definition_hash(temp)
+        # Full validation with the computed hash
+        return cls.model_validate({**temp.model_dump(), "definition_hash": computed})
 
 
 class CorrelationApplicabilityInput(BaseModel):
@@ -592,13 +623,14 @@ class ApplicabilityAssessment(BaseModel):
     warnings: tuple[EngineeringMessage, ...] = ()
     blockers: tuple[EngineeringMessage, ...] = ()
     allows_evaluation: bool = False
-    assessment_hash: str = ""
+    assessment_hash: str
 
     @field_validator("assessment_hash")
     @classmethod
     def _validate_assessment_hash(cls, v: str) -> str:
-        if v:
-            _validate_hash_format(v, "assessment_hash")
+        if not v:
+            raise ValueError("assessment_hash must not be empty")
+        _validate_hash_format(v, "assessment_hash")
         return v
 
     @model_validator(mode="after")
@@ -656,9 +688,27 @@ def compute_assessment_hash(
 
     # Sort variable results by variable name for canonical ordering
     sorted_vrs = tuple(sorted(variable_results, key=lambda vr: vr.variable.value))
-    # Sort warning/blocker codes for canonical ordering
-    warning_data = sorted([(w.code.value, w.message, w.severity.value) for w in warnings])
-    blocker_data = sorted([(b.code.value, b.message, b.severity.value) for b in blockers])
+
+    # Sort warning/blocker codes for canonical ordering (full message payload)
+    def _canonicalize_message(msg: EngineeringMessage) -> dict[str, Any]:
+        """Full canonical payload of an EngineeringMessage for hashing."""
+        return {
+            "code": msg.code.value,
+            "severity": msg.severity.value,
+            "message": msg.message,
+            "source_module": msg.source_module,
+            "context": [(k, v) for k, v in msg.context],
+            "allows_continuation": msg.allows_continuation,
+        }
+
+    warning_data = sorted(
+        [_canonicalize_message(w) for w in warnings],
+        key=lambda d: (d["code"], d["message"]),
+    )
+    blocker_data = sorted(
+        [_canonicalize_message(b) for b in blockers],
+        key=lambda d: (d["code"], d["message"]),
+    )
     # Sort input values for canonical ordering
     sorted_input_values = sorted(
         [(var.value, val) for var, val in input_values], key=lambda x: x[0]
@@ -679,6 +729,10 @@ def compute_assessment_hash(
             {
                 "variable": vr.variable.value,
                 "supplied_value": vr.supplied_value,
+                "absolute_minimum": vr.absolute_minimum,
+                "absolute_maximum": vr.absolute_maximum,
+                "recommended_minimum": vr.recommended_minimum,
+                "recommended_maximum": vr.recommended_maximum,
                 "status": vr.status.value,
             }
             for vr in sorted_vrs
@@ -719,6 +773,7 @@ __all__ = [
     "UncertaintySpec",
     "VariableApplicabilityStatus",
     "VariableAssessment",
+    "compare_semver",
     "compute_assessment_hash",
     "compute_definition_hash",
     "parse_semver",

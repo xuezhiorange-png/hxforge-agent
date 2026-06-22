@@ -22,6 +22,7 @@ from hexagent.correlations.models import (
     CorrelationPurpose,
     GeometryType,
     PhaseRegime,
+    compare_semver,
     compute_definition_hash,
     parse_semver,
 )
@@ -139,8 +140,8 @@ class InMemoryCorrelationRegistry:
                     "supersedes references different correlation ID: "
                     f"{definition.supersedes.correlation_id}",
                 )
-            # Must be earlier version
-            if key.version <= definition.supersedes.version:
+            # Must be earlier version (SemVer-aware comparison)
+            if compare_semver(definition.supersedes.version, key.version) >= 0:
                 raise CorrelationError(
                     ErrorCode.CORRELATION_NOT_FOUND,
                     f"supersedes version {definition.supersedes.version} must be earlier"

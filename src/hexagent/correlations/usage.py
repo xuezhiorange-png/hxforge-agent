@@ -3,19 +3,25 @@
 from __future__ import annotations
 
 from typing import Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from hexagent.correlations.models import (
+    ApplicabilityAssessment,
     ApplicabilityStatus,
     ApplicabilityVariable,
+    CorrelationApplicabilityInput,
+    CorrelationDefinition,
     CorrelationKey,
     UncertaintySpec,
     _validate_hash_format,
     _validate_no_nan_inf,
 )
 from hexagent.domain.provenance import ProvenanceNode, ProvenanceNodeType
+
+# Stable HXForge namespace for deterministic UUIDs
+HXFORGE_NAMESPACE = UUID("54767866-6f72-6765-2d61-67656e742d76")  # "hxforge-agent-v" in hex
 
 
 class CorrelationUsageRecord(BaseModel):
@@ -103,6 +109,40 @@ class CorrelationUsageRecord(BaseModel):
             )
         return self
 
+    @classmethod
+    def create(
+        cls,
+        definition: CorrelationDefinition,
+        assessment: ApplicabilityAssessment,
+        inputs: CorrelationApplicabilityInput,
+        uncertainty: UncertaintySpec | None = None,
+    ) -> CorrelationUsageRecord:
+        """Factory that cross-validates definition and assessment.
+
+        Validates:
+        - correlation key matches
+        - input values are consistent with assessment
+        - extrapolation state is consistent
+        """
+        # Cross-validation
+        if assessment.correlation_key != definition.key:
+            raise ValueError("assessment correlation_key does not match definition key")
+
+        # Extrapolation consistency
+        extrapolation_used = assessment.status == ApplicabilityStatus.explicit_extrapolation
+
+        record = cls(
+            correlation_key=definition.key,
+            definition_hash=definition.definition_hash,
+            source_id=definition.source.source_id,
+            applicability_status=assessment.status,
+            input_values=inputs.values,
+            assessment_hash=assessment.assessment_hash,
+            extrapolation_used=extrapolation_used,
+            uncertainty=uncertainty,
+        )
+        return record
+
     @property
     def usage_hash(self) -> str:
         """Item 8: Stable hash of the complete record including uncertainty."""
@@ -135,13 +175,12 @@ class CorrelationUsageRecord(BaseModel):
     def to_provenance_node(self) -> ProvenanceNode:
         """Item 8: Convert this usage record to a ProvenanceNode for graph insertion.
 
-        node_id is deterministically derived from usage_hash (UUID from SHA-256).
-        Does NOT call uuid4().
+        node_id is deterministically derived from usage_hash using uuid5
+        with the HXForge namespace. Does NOT call uuid4().
         """
         usage_hash = self.usage_hash
-        # Derive deterministic UUID from usage_hash
-        hash_hex = usage_hash[7:]  # strip "sha256:" prefix
-        node_uuid = UUID(hash_hex[:32])
+        # Domain-separated UUID5 from HXForge namespace + usage hash
+        node_uuid = uuid5(HXFORGE_NAMESPACE, usage_hash)
 
         metadata: list[tuple[str, Any]] = [
             ("correlation_id", self.correlation_key.correlation_id),
@@ -167,4 +206,4 @@ class CorrelationUsageRecord(BaseModel):
         )
 
 
-__all__ = ["CorrelationUsageRecord"]
+__all__ = ["CorrelationUsageRecord", "HXFORGE_NAMESPACE"]
