@@ -1338,7 +1338,7 @@ def _solve_outlet_temperature(
             "final_state",
             t_lower,
             t_upper,
-            brent_algo_iters=brent_result.iterations,
+            brent_algo_iters=brent_iterations[0],
         )
         raise _SolverNotConverged(
             f"Final state evaluation failed at solved temperature {t_solution:.4f} K.",
@@ -1354,7 +1354,7 @@ def _solve_outlet_temperature(
         brent_iterations[0],
         bracket_probes[0],
         solver_calls,
-        brent_result.iterations,
+        brent_iterations[0],
     )
 
 
