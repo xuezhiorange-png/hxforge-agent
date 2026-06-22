@@ -529,14 +529,7 @@ def assess_applicability(
     # Item 8: Handle fallback_required as non-continuable
     # fallback_required is already non-continuable by severity=ERROR
 
-    # 8. Derive allows_evaluation from status + policy
-    allows_evaluation = _policy_allows_evaluation(
-        overall_status,
-        policy,
-        inputs.allow_extrapolation,
-    )
-
-    # 9. Compute assessment_hash
+    # 8. Compute assessment_hash
     assessment_hash = compute_assessment_hash(
         definition_hash=definition.definition_hash,
         correlation_key=key,
@@ -558,7 +551,6 @@ def assess_applicability(
         variable_results=tuple(variable_results),
         warnings=tuple(warnings),
         blockers=tuple(blockers),
-        allows_evaluation=allows_evaluation,
         assessment_hash=assessment_hash,
     )
 

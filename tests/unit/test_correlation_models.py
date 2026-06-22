@@ -39,6 +39,57 @@ from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSever
 _HASH_DEF = "sha256:" + "a" * 64
 _HASH_ASSESS = "sha256:" + "b" * 64
 
+
+# ---------------------------------------------------------------------------
+# Helpers for Review-05 tests
+# ---------------------------------------------------------------------------
+
+
+def _make_applicability_definition(
+    *,
+    geometry_types: frozenset[GeometryType] | None = None,
+    phase_regimes: frozenset[PhaseRegime] | None = None,
+    flow_regimes: frozenset[FlowRegime] | None = None,
+) -> CorrelationDefinition:
+    """Build a minimal valid CorrelationDefinition for assessment tests."""
+    gt = geometry_types or frozenset({GeometryType.circular_tube})
+    pr = phase_regimes or frozenset({PhaseRegime.single_phase_liquid})
+    fr = flow_regimes or frozenset({FlowRegime.turbulent})
+    return CorrelationDefinition.create(
+        key=CorrelationKey(correlation_id="fixture.htc.tube", version="1.0.0"),
+        name="Fixture HTC Tube",
+        purpose=CorrelationPurpose.heat_transfer_coefficient,
+        description="A fixture correlation for testing",
+        geometry=gt,
+        phase_regimes=pr,
+        envelope=ApplicabilityEnvelope(
+            geometry_types=gt,
+            phase_regimes=pr,
+            flow_regimes=fr,
+        ),
+        source=BibliographicSource(
+            source_id="src-001",
+            title="Fictional Paper",
+            publication="Fictional Journal",
+            year=2020,
+        ),
+    )
+
+
+def _make_applicability_input(
+    *,
+    geometry: GeometryType = GeometryType.circular_tube,
+    phase_regime: PhaseRegime = PhaseRegime.single_phase_liquid,
+    flow_regime: FlowRegime = FlowRegime.turbulent,
+) -> CorrelationApplicabilityInput:
+    """Build a minimal valid CorrelationApplicabilityInput."""
+    return CorrelationApplicabilityInput(
+        geometry=geometry,
+        phase_regime=phase_regime,
+        flow_regime=flow_regime,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Enum tests
 # ---------------------------------------------------------------------------
@@ -975,10 +1026,9 @@ class TestApplicabilityAssessment:
             correlation_key=key,
             status=ApplicabilityStatus.applicable,
             assessment_hash=_HASH_ASSESS,
-            allows_evaluation=True,
         )
         assert assessment.status == ApplicabilityStatus.applicable
-        assert assessment.allows_evaluation is True
+        assert assessment.allows_evaluation is True  # derived from empty blockers
         assert assessment.schema_version == "1.0"
 
     def test_applicable_with_blockers_rejected(self) -> None:
@@ -995,7 +1045,6 @@ class TestApplicabilityAssessment:
                 status=ApplicabilityStatus.applicable,
                 assessment_hash=_HASH_ASSESS,
                 blockers=(blocker,),
-                allows_evaluation=True,
             )
 
     def test_frozen(self) -> None:
@@ -1007,6 +1056,88 @@ class TestApplicabilityAssessment:
         )
         with pytest.raises((ValueError, ValidationError)):
             assessment.status = ApplicabilityStatus.absolute_range_exceeded  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Review-05: allows_evaluation closure — init=False
+# ---------------------------------------------------------------------------
+
+
+class TestAllowsEvaluationClosure:
+    """allows_evaluation must NOT be a public constructor parameter.
+
+    It is ``Field(init=False)`` and always derived from ``self.blockers``
+    by the model validator.
+    """
+
+    def test_constructor_rejects_allows_evaluation(self) -> None:
+        """Passing allows_evaluation to the constructor raises ValidationError."""
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
+        with pytest.raises(ValidationError):
+            ApplicabilityAssessment(
+                correlation_key=key,
+                status=ApplicabilityStatus.applicable,
+                assessment_hash=_HASH_ASSESS,
+                allows_evaluation=True,  # type: ignore[call-arg]
+            )
+
+    def test_json_roundtrip_preserves_allows_evaluation(self) -> None:
+        """model_dump → model_validate round-trip preserves allows_evaluation."""
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
+        original = ApplicabilityAssessment(
+            correlation_key=key,
+            status=ApplicabilityStatus.applicable,
+            assessment_hash=_HASH_ASSESS,
+        )
+        assert original.allows_evaluation is True  # no blockers → True
+
+        json_str = original.model_dump_json()
+        restored = ApplicabilityAssessment.model_validate_json(json_str)
+        assert restored.allows_evaluation is True
+        assert restored.status == original.status
+        assert restored.assessment_hash == original.assessment_hash
+
+    def test_json_roundtrip_with_blockers(self) -> None:
+        """Round-trip preserves allows_evaluation=False when blockers exist."""
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
+        blocker = EngineeringMessage(
+            code=ErrorCode.CORRELATION_ABSOLUTE_RANGE_EXCEEDED,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="out of range",
+        )
+        original = ApplicabilityAssessment(
+            correlation_key=key,
+            status=ApplicabilityStatus.absolute_range_exceeded,
+            assessment_hash=_HASH_ASSESS,
+            blockers=(blocker,),
+        )
+        assert original.allows_evaluation is False  # has blockers → False
+
+        json_str = original.model_dump_json()
+        restored = ApplicabilityAssessment.model_validate_json(json_str)
+        assert restored.allows_evaluation is False
+
+    def test_engine_derived_allows_evaluation_no_blockers(self) -> None:
+        """Engine-generated assessment with no blockers has allows_evaluation=True."""
+        from hexagent.correlations.applicability import assess_applicability
+
+        defn = _make_applicability_definition()
+        inputs = _make_applicability_input()
+        result = assess_applicability(defn, inputs)
+        assert result.allows_evaluation is True
+        assert len(result.blockers) == 0
+
+    def test_engine_derived_allows_evaluation_with_blockers(self) -> None:
+        """Engine-generated assessment with blockers has allows_evaluation=False."""
+        from hexagent.correlations.applicability import assess_applicability
+
+        defn = _make_applicability_definition(
+            geometry_types=frozenset({GeometryType.circular_tube}),
+        )
+        inputs = _make_applicability_input(geometry=GeometryType.annulus)
+        result = assess_applicability(defn, inputs)
+        assert result.allows_evaluation is False
+        assert len(result.blockers) >= 1
 
 
 # ---------------------------------------------------------------------------

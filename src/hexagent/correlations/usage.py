@@ -117,18 +117,34 @@ class CorrelationUsageRecord(BaseModel):
         inputs: CorrelationApplicabilityInput,
         uncertainty: UncertaintySpec | None = None,
     ) -> CorrelationUsageRecord:
-        """Factory that cross-validates definition and assessment.
+        """Factory that cross-validates definition, assessment, and inputs.
 
-        Validates:
-        - correlation key matches
-        - input values are consistent with assessment
-        - extrapolation state is consistent
+        Recomputes the expected assessment from definition+inputs and
+        verifies the supplied assessment matches.  This prevents callers
+        from injecting a forged or mismatched assessment.
         """
-        # Cross-validation
-        if assessment.correlation_key != definition.key:
-            raise ValueError("assessment correlation_key does not match definition key")
+        from hexagent.correlations.applicability import assess_applicability
 
-        # Extrapolation consistency
+        # Recompute expected assessment from the authoritative sources
+        expected = assess_applicability(definition, inputs)
+
+        # Cross-validate supplied assessment against expected
+        if assessment.correlation_key != expected.correlation_key:
+            raise ValueError("assessment.correlation_key does not match expected")
+        if assessment.assessment_hash != expected.assessment_hash:
+            raise ValueError("assessment.assessment_hash does not match expected")
+        if assessment.status != expected.status:
+            raise ValueError("assessment.status does not match expected")
+        if assessment.variable_results != expected.variable_results:
+            raise ValueError("assessment.variable_results do not match expected")
+        if assessment.warnings != expected.warnings:
+            raise ValueError("assessment.warnings do not match expected")
+        if assessment.blockers != expected.blockers:
+            raise ValueError("assessment.blockers do not match expected")
+        if assessment.allows_evaluation != expected.allows_evaluation:
+            raise ValueError("assessment.allows_evaluation does not match expected")
+
+        # Derive fields from verified assessment
         extrapolation_used = assessment.status == ApplicabilityStatus.explicit_extrapolation
 
         record = cls(

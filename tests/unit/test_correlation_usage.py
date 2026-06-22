@@ -6,8 +6,10 @@ import pytest
 from pydantic import ValidationError
 
 from hexagent.correlations.models import (
+    ApplicabilityAssessment,
     ApplicabilityStatus,
     ApplicabilityVariable,
+    CorrelationApplicabilityInput,
     CorrelationKey,
     FlowRegime,
     GeometryType,
@@ -507,41 +509,65 @@ class TestUsageRecordFactory:
             CorrelationUsageRecord.create(defn, assessment, inputs)
 
     def test_factory_detects_extrapolation(self) -> None:
+        """Factory correctly sets extrapolation_used when assessment has explicit_extrapolation."""
+        from hexagent.correlations.applicability import assess_applicability
         from hexagent.correlations.models import (
-            ApplicabilityAssessment,
+            ApplicabilityEnvelope,
+            BibliographicSource,
             CorrelationApplicabilityInput,
-            FlowRegime,
+            CorrelationDefinition,
+            CorrelationKey,
+            CorrelationPurpose,
             GeometryType,
+            NumericBound,
+            OutOfRangeAction,
+            OutOfRangePolicy,
             PhaseRegime,
-            compute_assessment_hash,
         )
 
-        defn, _ = self._make_definition_and_assessment()
-        assessment_hash = compute_assessment_hash(
-            definition_hash=defn.definition_hash,
-            correlation_key=defn.key,
-            geometry=GeometryType.generic,
-            phase_regime=PhaseRegime.generic,
-            flow_regime=FlowRegime.not_applicable,
-            input_values=(),
-            status=ApplicabilityStatus.explicit_extrapolation,
-            variable_results=(),
-            warnings=(),
-            blockers=(),
-            policy=OutOfRangePolicy(),
-            allow_extrapolation=True,
+        # Definition with allow_explicit_opt_in policy
+        defn = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="fixture.extrap", version="1.0.0"),
+            name="Fixture Extrapolation",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.generic}),
+            phase_regimes=frozenset({PhaseRegime.generic}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.generic}),
+                phase_regimes=frozenset({PhaseRegime.generic}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=3000.0,
+                        maximum=100000.0,
+                    ),
+                ),
+                required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            ),
+            source=BibliographicSource(
+                source_id="src-001",
+                title="Test",
+                publication="Test Journal",
+                year=2020,
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.allow_explicit_opt_in,
+            ),
         )
-        assessment = ApplicabilityAssessment(
-            correlation_key=defn.key,
-            status=ApplicabilityStatus.explicit_extrapolation,
-            assessment_hash=assessment_hash,
-        )
+
         inputs = CorrelationApplicabilityInput(
             geometry=GeometryType.generic,
             phase_regime=PhaseRegime.generic,
             flow_regime=FlowRegime.not_applicable,
+            values={ApplicabilityVariable.reynolds: 150000.0},  # above absolute max
             allow_extrapolation=True,
         )
+
+        # Get the real assessment from the engine
+        assessment = assess_applicability(defn, inputs)
+        assert assessment.status == ApplicabilityStatus.explicit_extrapolation
+
         record = CorrelationUsageRecord.create(defn, assessment, inputs)
         assert record.extrapolation_used is True
 
@@ -572,3 +598,261 @@ class TestUsageRecordFactory:
         record = CorrelationUsageRecord.create(defn, assessment, inputs)
         node = record.to_provenance_node()
         assert node.node_id.version == 5
+
+
+# ---------------------------------------------------------------------------
+# Review-05: Cross-validation in CorrelationUsageRecord.create()
+# ---------------------------------------------------------------------------
+
+
+class TestUsageRecordCrossValidation:
+    """The factory recomputes assess_applicability and cross-validates."""
+
+    @staticmethod
+    def _build_defn_and_inputs(
+        *,
+        key_id: str = "fixture.htc",
+        geometry: GeometryType = GeometryType.circular_tube,
+        phase: PhaseRegime = PhaseRegime.single_phase_liquid,
+        flow: FlowRegime = FlowRegime.turbulent,
+        bounds: tuple | None = None,
+        policy: OutOfRangePolicy | None = None,
+        values: dict | None = None,
+        allow_extrapolation: bool = False,
+    ):
+        """Build a definition + inputs for cross-validation tests."""
+        from hexagent.correlations.applicability import assess_applicability
+        from hexagent.correlations.models import (
+            ApplicabilityEnvelope,
+            BibliographicSource,
+            CorrelationApplicabilityInput,
+            CorrelationDefinition,
+            CorrelationKey,
+            CorrelationPurpose,
+        )
+
+        gt = frozenset({geometry})
+        pr = frozenset({phase})
+        fr = frozenset({flow})
+        bnds = bounds or ()
+        ri = frozenset({b.variable for b in bnds}) if bnds else frozenset()
+
+        defn = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id=key_id, version="1.0.0"),
+            name=f"Fixture {key_id}",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=gt,
+            phase_regimes=pr,
+            envelope=ApplicabilityEnvelope(
+                geometry_types=gt,
+                phase_regimes=pr,
+                flow_regimes=fr,
+                bounds=bnds,
+                required_inputs=ri,
+            ),
+            source=BibliographicSource(
+                source_id="src-001",
+                title="Test",
+                publication="Test Journal",
+                year=2020,
+            ),
+            out_of_range_policy=policy or OutOfRangePolicy(),
+        )
+
+        inputs = CorrelationApplicabilityInput(
+            geometry=geometry,
+            phase_regime=phase,
+            flow_regime=flow,
+            values=values or {},
+            allow_extrapolation=allow_extrapolation,
+        )
+
+        assessment = assess_applicability(defn, inputs)
+        return defn, inputs, assessment
+
+    def test_valid_definition_assessment_inputs_succeeds(self) -> None:
+        """Valid definition + matching assessment + inputs → record created."""
+        defn, inputs, assessment = self._build_defn_and_inputs(
+            values={ApplicabilityVariable.reynolds: 25000.0},
+        )
+        record = CorrelationUsageRecord.create(defn, assessment, inputs)
+        assert record.correlation_key == defn.key
+        assert record.applicability_status == assessment.status
+
+    def test_forged_assessment_hash_rejected(self) -> None:
+        """Forged assessment_hash does not match recomputed → rejected."""
+
+        defn, inputs, assessment = self._build_defn_and_inputs(
+            values={ApplicabilityVariable.reynolds: 25000.0},
+        )
+        # Create a forged assessment with a different hash
+        forged = ApplicabilityAssessment(
+            correlation_key=assessment.correlation_key,
+            status=assessment.status,
+            assessment_hash="sha256:" + "f" * 64,  # forged hash
+        )
+        with pytest.raises(ValueError, match="assessment_hash does not match"):
+            CorrelationUsageRecord.create(defn, forged, inputs)
+
+    def test_forged_status_rejected(self) -> None:
+        """Forged status does not match recomputed → rejected."""
+        defn, inputs, assessment = self._build_defn_and_inputs(
+            values={ApplicabilityVariable.reynolds: 25000.0},
+        )
+        # Create a forged assessment with a different status
+        forged = ApplicabilityAssessment(
+            correlation_key=assessment.correlation_key,
+            status=ApplicabilityStatus.absolute_range_exceeded,  # forged
+            assessment_hash=assessment.assessment_hash,
+        )
+        with pytest.raises(ValueError, match="assessment.status does not match"):
+            CorrelationUsageRecord.create(defn, forged, inputs)
+
+    def test_forged_blockers_rejected(self) -> None:
+        """Forged blockers do not match recomputed → rejected."""
+        from hexagent.correlations.models import NumericBound
+
+        # Use inputs that produce a blocked assessment
+        defn, inputs, assessment = self._build_defn_and_inputs(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            values={ApplicabilityVariable.reynolds: 150000.0},  # above max → blocker
+        )
+        assert len(assessment.blockers) >= 1  # real assessment has blockers
+        # Create a forged assessment with matching status/hash/variable_results
+        # but EMPTY blockers — the blocker check should catch this
+        forged = ApplicabilityAssessment(
+            correlation_key=assessment.correlation_key,
+            status=assessment.status,
+            assessment_hash=assessment.assessment_hash,
+            variable_results=assessment.variable_results,  # match
+            blockers=(),  # forged: stripped all blockers
+        )
+        with pytest.raises(ValueError, match="assessment.blockers do not match expected"):
+            CorrelationUsageRecord.create(defn, forged, inputs)
+
+    def test_different_inputs_rejected(self) -> None:
+        """Same key but different inputs → recomputed assessment differs → rejected."""
+        from hexagent.correlations.models import NumericBound
+
+        defn, inputs_b, assessment_b = self._build_defn_and_inputs(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            values={ApplicabilityVariable.reynolds: 25000.0},
+        )
+        # Use assessment from correct inputs with wrong inputs
+        wrong_inputs = CorrelationApplicabilityInput(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+            flow_regime=FlowRegime.turbulent,
+            values={ApplicabilityVariable.reynolds: 150000.0},  # different
+        )
+        with pytest.raises(ValueError, match="does not match"):
+            CorrelationUsageRecord.create(defn, assessment_b, wrong_inputs)
+
+    def test_different_definition_policy_rejected(self) -> None:
+        """Same key but different policy → recomputed assessment differs → rejected."""
+        from hexagent.correlations.applicability import assess_applicability
+        from hexagent.correlations.models import (
+            ApplicabilityEnvelope,
+            BibliographicSource,
+            CorrelationApplicabilityInput,
+            CorrelationDefinition,
+            CorrelationKey,
+            CorrelationPurpose,
+            NumericBound,
+            OutOfRangeAction,
+            OutOfRangePolicy,
+        )
+
+        # Definition with block policy
+        defn_block = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="fixture.policy", version="1.0.0"),
+            name="Fixture Policy",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                flow_regimes=frozenset({FlowRegime.turbulent}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=3000.0,
+                        maximum=100000.0,
+                    ),
+                ),
+                required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            ),
+            source=BibliographicSource(
+                source_id="src-001",
+                title="Test",
+                publication="Test Journal",
+                year=2020,
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.block,
+            ),
+        )
+
+        inputs = CorrelationApplicabilityInput(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+            flow_regime=FlowRegime.turbulent,
+            values={ApplicabilityVariable.reynolds: 150000.0},
+        )
+
+        # Get assessment from block policy
+        assessment_block = assess_applicability(defn_block, inputs)
+        assert assessment_block.status == ApplicabilityStatus.absolute_range_exceeded
+
+        # Now create a different definition with warn policy
+        defn_warn = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="fixture.warn", version="1.0.0"),
+            name="Fixture Warn",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                flow_regimes=frozenset({FlowRegime.turbulent}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=3000.0,
+                        maximum=100000.0,
+                    ),
+                ),
+                required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            ),
+            source=BibliographicSource(
+                source_id="src-002",
+                title="Test Warn",
+                publication="Test Journal",
+                year=2020,
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.warn,
+            ),
+        )
+
+        # Try to use assessment from block-policy defn with warn-policy defn
+        # The factory recomputes using defn_warn, which produces warnings not blockers
+        # assessment_block has blockers → mismatch
+        with pytest.raises(ValueError, match="does not match"):
+            CorrelationUsageRecord.create(defn_warn, assessment_block, inputs)

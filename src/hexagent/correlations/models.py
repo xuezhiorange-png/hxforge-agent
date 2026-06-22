@@ -612,7 +612,13 @@ class VariableAssessment(BaseModel):
 
 
 class ApplicabilityAssessment(BaseModel):
-    """Complete applicability assessment result."""
+    """Complete applicability assessment result.
+
+    ``allows_evaluation`` is ``Field(init=False)``: it is NOT a public
+    constructor parameter and must not appear in caller-supplied data.
+    The value is always derived from ``self.blockers`` by the model
+    validator — callers cannot set it.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -622,7 +628,7 @@ class ApplicabilityAssessment(BaseModel):
     variable_results: tuple[VariableAssessment, ...] = ()
     warnings: tuple[EngineeringMessage, ...] = ()
     blockers: tuple[EngineeringMessage, ...] = ()
-    allows_evaluation: bool = False
+    allows_evaluation: bool = Field(init=False, default=False)
     assessment_hash: str
 
     @field_validator("assessment_hash")
@@ -633,10 +639,22 @@ class ApplicabilityAssessment(BaseModel):
         _validate_hash_format(v, "assessment_hash")
         return v
 
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_allows_evaluation_input(cls, data: Any) -> Any:
+        """allows_evaluation is derived, not caller-settable.
+
+        Reject it in the constructor and direct model_validate calls.
+        For JSON round-trip, model_validate / model_validate_json strip it
+        before reaching this validator.
+        """
+        if isinstance(data, dict) and "allows_evaluation" in data:
+            raise ValueError("allows_evaluation is a derived field and cannot be set via input")
+        return data
+
     @model_validator(mode="after")
     def _validate_and_derive_assessment(self) -> ApplicabilityAssessment:
         # Item 5: Derive allows_evaluation from blockers
-        # allows_evaluation = not bool(self.blockers)
         derived = not bool(self.blockers)
         object.__setattr__(self, "allows_evaluation", derived)
         # Item 5: if status is applicable → no blockers
@@ -652,6 +670,28 @@ class ApplicabilityAssessment(BaseModel):
                 "Non-applicable status with no blockers must have allows_evaluation=True"
             )
         return self
+
+    # -- JSON round-trip support -------------------------------------------------
+    # model_dump() includes allows_evaluation (it is a field).
+    # model_validate() / model_validate_json() strip it so that round-trip
+    # data can be deserialized without triggering the before-validator.
+
+    @classmethod
+    def model_validate(cls, obj: Any, **kwargs: Any) -> ApplicabilityAssessment:
+        if isinstance(obj, dict) and "allows_evaluation" in obj:
+            obj = {k: v for k, v in obj.items() if k != "allows_evaluation"}
+        return super().model_validate(obj, **kwargs)
+
+    @classmethod
+    def model_validate_json(
+        cls, json_data: str | bytes | bytearray, **kwargs: Any
+    ) -> ApplicabilityAssessment:
+        import json as _json
+
+        data = _json.loads(json_data)
+        if isinstance(data, dict) and "allows_evaluation" in data:
+            data = {k: v for k, v in data.items() if k != "allows_evaluation"}
+        return cls.model_validate(data, **kwargs)
 
 
 def compute_definition_hash(defn: CorrelationDefinition) -> str:
