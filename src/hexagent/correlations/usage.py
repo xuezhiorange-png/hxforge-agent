@@ -84,7 +84,8 @@ class CorrelationUsageRecord(BaseModel):
     @model_validator(mode="after")
     def _validate_consistency(self) -> CorrelationUsageRecord:
         """Item 8: If applicability_status is explicit_extrapolation then
-        extrapolation_used must be True."""
+        extrapolation_used must be True.  Bidirectional: extrapolation_used=True
+        requires applicability_status='explicit_extrapolation'."""
         if (
             self.applicability_status == ApplicabilityStatus.explicit_extrapolation
             and not self.extrapolation_used
@@ -92,6 +93,13 @@ class CorrelationUsageRecord(BaseModel):
             raise ValueError(
                 "extrapolation_used must be True when applicability_status "
                 "is explicit_extrapolation"
+            )
+        if (
+            self.extrapolation_used
+            and self.applicability_status != ApplicabilityStatus.explicit_extrapolation
+        ):
+            raise ValueError(
+                "extrapolation_used=True requires applicability_status='explicit_extrapolation'"
             )
         return self
 
@@ -116,6 +124,7 @@ class CorrelationUsageRecord(BaseModel):
                     "relative_uncertainty_fraction": self.uncertainty.relative_uncertainty_fraction,
                     "confidence_level_fraction": self.uncertainty.confidence_level_fraction,
                     "basis": self.uncertainty.basis,
+                    "source_id": self.uncertainty.source_id,
                 }
                 if self.uncertainty is not None
                 else None
@@ -146,6 +155,8 @@ class CorrelationUsageRecord(BaseModel):
         ]
         if self.uncertainty is not None:
             metadata.append(("uncertainty_basis", self.uncertainty.basis))
+            if self.uncertainty.source_id:
+                metadata.append(("uncertainty_source_id", self.uncertainty.source_id))
 
         return ProvenanceNode(
             node_id=node_uuid,

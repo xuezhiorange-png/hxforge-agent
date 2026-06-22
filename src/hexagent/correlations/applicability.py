@@ -24,6 +24,30 @@ from hexagent.correlations.models import (
 from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity, ErrorCode
 
 
+def _action_to_severity(
+    action: OutOfRangeAction, allow_extrapolation: bool
+) -> EngineeringMessageSeverity:
+    """Centralized action→severity mapping.
+
+    allow_explicit_opt_in:
+      - with opt-in → WARNING (continuable)
+      - without opt-in → BLOCKER (not continuable)
+    """
+    if action == OutOfRangeAction.block:
+        return EngineeringMessageSeverity.BLOCKER
+    if action == OutOfRangeAction.warn:
+        return EngineeringMessageSeverity.WARNING
+    if action == OutOfRangeAction.allow_explicit_opt_in:
+        return (
+            EngineeringMessageSeverity.WARNING
+            if allow_extrapolation
+            else EngineeringMessageSeverity.BLOCKER
+        )
+    if action == OutOfRangeAction.fallback_required:
+        return EngineeringMessageSeverity.ERROR
+    return EngineeringMessageSeverity.BLOCKER
+
+
 def _check_geometry_compatible(
     geometry: GeometryType,
     allowed: frozenset[GeometryType],
@@ -141,20 +165,7 @@ def _build_boundary_messages(
     else:
         return ()
 
-    severity_map = {
-        OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
-        OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-        OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
-    }
-    if policy == OutOfRangeAction.allow_explicit_opt_in:
-        # Item 3: allow_explicit_opt_in without opt-in → BLOCKER; with opt-in → WARNING
-        severity = (
-            EngineeringMessageSeverity.WARNING
-            if allow_extrapolation
-            else EngineeringMessageSeverity.BLOCKER
-        )
-    else:
-        severity = severity_map.get(policy, EngineeringMessageSeverity.WARNING)
+    severity = _action_to_severity(policy, allow_extrapolation)
 
     # Build range info string
     range_parts: list[str] = []
@@ -257,16 +268,35 @@ def _policy_allows_evaluation(
         return True
 
     if status == ApplicabilityStatus.missing_input:
-        return policy.missing_input == OutOfRangeAction.warn
+        if policy.missing_input == OutOfRangeAction.warn:
+            return True
+        return (
+            policy.missing_input == OutOfRangeAction.allow_explicit_opt_in and allow_extrapolation
+        )
 
     if status == ApplicabilityStatus.incompatible_geometry:
-        return policy.incompatible_geometry == OutOfRangeAction.warn
+        if policy.incompatible_geometry == OutOfRangeAction.warn:
+            return True
+        return (
+            policy.incompatible_geometry == OutOfRangeAction.allow_explicit_opt_in
+            and allow_extrapolation
+        )
 
     if status == ApplicabilityStatus.incompatible_phase:
-        return policy.incompatible_phase == OutOfRangeAction.warn
+        if policy.incompatible_phase == OutOfRangeAction.warn:
+            return True
+        return (
+            policy.incompatible_phase == OutOfRangeAction.allow_explicit_opt_in
+            and allow_extrapolation
+        )
 
     if status == ApplicabilityStatus.incompatible_flow_regime:
-        return policy.incompatible_flow_regime == OutOfRangeAction.warn
+        if policy.incompatible_flow_regime == OutOfRangeAction.warn:
+            return True
+        return (
+            policy.incompatible_flow_regime == OutOfRangeAction.allow_explicit_opt_in
+            and allow_extrapolation
+        )
 
     # any other status → False
     return False
@@ -396,12 +426,7 @@ def assess_applicability(
     # Missing required input messages
     if has_missing_required:
         missing_policy = policy.missing_input
-        missing_severity = {
-            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
-            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
-        }.get(missing_policy, EngineeringMessageSeverity.BLOCKER)
+        missing_severity = _action_to_severity(missing_policy, inputs.allow_extrapolation)
         for vr in variable_results:
             if vr.status == VariableApplicabilityStatus.missing:
                 msg = EngineeringMessage(
@@ -426,14 +451,8 @@ def assess_applicability(
 
     # Incompatibility messages
     if not geometry_compatible:
-        _geo_severity_map = {
-            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
-            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
-        }
-        _geo_severity = _geo_severity_map.get(
-            policy.incompatible_geometry, EngineeringMessageSeverity.BLOCKER
+        _geo_severity = _action_to_severity(
+            policy.incompatible_geometry, inputs.allow_extrapolation
         )
         geo_msg = EngineeringMessage(
             code=ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
@@ -456,15 +475,7 @@ def assess_applicability(
             blockers.append(geo_msg)
 
     if not phase_compatible:
-        _phase_severity_map = {
-            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
-            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
-        }
-        _phase_severity = _phase_severity_map.get(
-            policy.incompatible_phase, EngineeringMessageSeverity.BLOCKER
-        )
+        _phase_severity = _action_to_severity(policy.incompatible_phase, inputs.allow_extrapolation)
         phase_msg = EngineeringMessage(
             code=ErrorCode.CORRELATION_PHASE_INCOMPATIBLE,
             severity=_phase_severity,
@@ -489,14 +500,8 @@ def assess_applicability(
             blockers.append(phase_msg)
 
     if not flow_compatible:
-        _flow_severity_map = {
-            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
-            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
-            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
-        }
-        _flow_severity = _flow_severity_map.get(
-            policy.incompatible_flow_regime, EngineeringMessageSeverity.BLOCKER
+        _flow_severity = _action_to_severity(
+            policy.incompatible_flow_regime, inputs.allow_extrapolation
         )
         flow_msg = EngineeringMessage(
             code=ErrorCode.CORRELATION_FLOW_REGIME_INCOMPATIBLE,
@@ -535,6 +540,10 @@ def assess_applicability(
     assessment_hash = compute_assessment_hash(
         definition_hash=definition.definition_hash,
         correlation_key=key,
+        geometry=inputs.geometry,
+        phase_regime=inputs.phase_regime,
+        flow_regime=inputs.flow_regime,
+        input_values=inputs.values,
         status=overall_status,
         variable_results=tuple(variable_results),
         warnings=tuple(warnings),

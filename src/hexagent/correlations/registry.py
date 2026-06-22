@@ -8,6 +8,7 @@ from typing import Protocol
 from hexagent.correlations.applicability import assess_applicability
 from hexagent.correlations.errors import (
     CorrelationDuplicateError,
+    CorrelationError,
     CorrelationHashMismatchError,
     CorrelationNotFoundError,
     CorrelationVersionNotFoundError,
@@ -24,6 +25,7 @@ from hexagent.correlations.models import (
     compute_definition_hash,
     parse_semver,
 )
+from hexagent.domain.messages import ErrorCode
 
 SortKey = tuple[int, int, int, int, tuple[tuple[int, int | str], ...]]
 
@@ -127,6 +129,33 @@ class InMemoryCorrelationRegistry:
                 key.correlation_id,
                 key.version,
             )
+
+        # Supersedes validation
+        if definition.supersedes is not None:
+            # Must share same correlation ID
+            if definition.supersedes.correlation_id != key.correlation_id:
+                raise CorrelationError(
+                    ErrorCode.CORRELATION_NOT_FOUND,
+                    "supersedes references different correlation ID: "
+                    f"{definition.supersedes.correlation_id}",
+                )
+            # Must be earlier version
+            if key.version <= definition.supersedes.version:
+                raise CorrelationError(
+                    ErrorCode.CORRELATION_NOT_FOUND,
+                    f"supersedes version {definition.supersedes.version} must be earlier"
+                    f" than {key.version}",
+                )
+            # Must exist in registry
+            try:
+                self.get(definition.supersedes)
+            except (CorrelationNotFoundError, CorrelationVersionNotFoundError) as exc:
+                raise CorrelationError(
+                    ErrorCode.CORRELATION_NOT_FOUND,
+                    "supersedes target not found: "
+                    f"{definition.supersedes.correlation_id} "
+                    f"v{definition.supersedes.version}",
+                ) from exc
 
         self._store[key] = copy.deepcopy(definition)
 

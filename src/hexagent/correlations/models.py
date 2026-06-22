@@ -148,7 +148,9 @@ class VariableApplicabilityStatus(StrEnum):
 
 _VALID_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 # Item 2: Fully-anchored SemVer regex — rejects trailing junk and build metadata
-_SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$")
+_SEMVER_RE = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$"
+)
 _DOI_RE = re.compile(r"^10\.\d{4,9}/[^\s]+$")
 _HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
@@ -209,7 +211,7 @@ def parse_semver(version: str) -> tuple[int, int, int, tuple[tuple[int, int | st
     - Numeric < alphanumeric
     - Fewer identifiers < more identifiers (when prefix matches)
     """
-    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", version)
+    match = re.match(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(.+))?$", version)
     if not match:
         raise ValueError(f"Invalid SemVer string: {version!r}")
     major, minor, patch = int(match.group(1)), int(match.group(2)), int(match.group(3))
@@ -453,6 +455,13 @@ class CorrelationDefinition(BaseModel):
     tags: frozenset[str] = frozenset()
     definition_hash: str = ""
 
+    @field_validator("definition_hash")
+    @classmethod
+    def _validate_definition_hash(cls, v: str) -> str:
+        if v:  # Non-empty must be valid format
+            _validate_hash_format(v, "definition_hash")
+        return v
+
     @model_validator(mode="after")
     def _validate_definition(self) -> CorrelationDefinition:
         # Item 3: geometry must equal envelope.geometry_types
@@ -500,15 +509,18 @@ class CorrelationDefinition(BaseModel):
 
     @classmethod
     def create(cls, **kwargs: Any) -> CorrelationDefinition:
-        """Factory that auto-computes definition_hash."""
-        # Remove definition_hash from kwargs if present, so it gets set
-        # by the model as empty, then we compute and update
+        """Factory that auto-computes definition_hash.
+
+        Creates the model without hash, computes hash from the canonical
+        payload, then re-validates with the valid hash.
+        """
         kwargs.pop("definition_hash", None)
-        # First create with a temporary hash to pass validation
-        # We need to bypass the empty check temporarily
-        temp = cls(**{**kwargs, "definition_hash": "temp"})
-        computed = compute_definition_hash(temp)
-        return temp.model_copy(update={"definition_hash": computed})
+        # Build the definition without hash
+        defn = cls(**{**kwargs, "definition_hash": ""})
+        # Compute hash from the definition
+        computed = compute_definition_hash(defn)
+        # Re-validate with the hash (this runs all validators including hash format check)
+        return cls.model_validate({**defn.model_dump(), "definition_hash": computed})
 
 
 class CorrelationApplicabilityInput(BaseModel):
@@ -623,6 +635,10 @@ def compute_assessment_hash(
     *,
     definition_hash: str,
     correlation_key: CorrelationKey,
+    geometry: GeometryType,
+    phase_regime: PhaseRegime,
+    flow_regime: FlowRegime,
+    input_values: tuple[tuple[ApplicabilityVariable, float], ...],
     status: ApplicabilityStatus,
     variable_results: tuple[VariableAssessment, ...],
     warnings: tuple[EngineeringMessage, ...],
@@ -630,14 +646,23 @@ def compute_assessment_hash(
     policy: OutOfRangePolicy,
     allow_extrapolation: bool,
 ) -> str:
-    """Compute a canonical assessment hash that is order-independent."""
+    """Compute a canonical assessment hash that is order-independent.
+
+    Includes the COMPLETE input identity: definition_hash, correlation_key,
+    geometry, phase, flow, all input values, status, variable results,
+    warnings, blockers, policy (all 6 fields), and allow_extrapolation.
+    """
     from hexagent.core.canonical import sha256_digest
 
     # Sort variable results by variable name for canonical ordering
     sorted_vrs = tuple(sorted(variable_results, key=lambda vr: vr.variable.value))
     # Sort warning/blocker codes for canonical ordering
-    warning_codes = sorted([(w.code.value, w.severity.value) for w in warnings])
-    blocker_codes = sorted([(b.code.value, b.severity.value) for b in blockers])
+    warning_data = sorted([(w.code.value, w.message, w.severity.value) for w in warnings])
+    blocker_data = sorted([(b.code.value, b.message, b.severity.value) for b in blockers])
+    # Sort input values for canonical ordering
+    sorted_input_values = sorted(
+        [(var.value, val) for var, val in input_values], key=lambda x: x[0]
+    )
 
     payload = {
         "definition_hash": definition_hash,
@@ -645,6 +670,10 @@ def compute_assessment_hash(
             "correlation_id": correlation_key.correlation_id,
             "version": correlation_key.version,
         },
+        "geometry": geometry.value,
+        "phase_regime": phase_regime.value,
+        "flow_regime": flow_regime.value,
+        "input_values": sorted_input_values,
         "status": status.value,
         "variable_results": [
             {
@@ -654,12 +683,15 @@ def compute_assessment_hash(
             }
             for vr in sorted_vrs
         ],
-        "warning_codes": warning_codes,
-        "blocker_codes": blocker_codes,
+        "warning_data": warning_data,
+        "blocker_data": blocker_data,
         "policy": {
             "absolute_violation": policy.absolute_violation.value,
             "recommended_violation": policy.recommended_violation.value,
             "missing_input": policy.missing_input.value,
+            "incompatible_geometry": policy.incompatible_geometry.value,
+            "incompatible_phase": policy.incompatible_phase.value,
+            "incompatible_flow_regime": policy.incompatible_flow_regime.value,
         },
         "allow_extrapolation": allow_extrapolation,
     }

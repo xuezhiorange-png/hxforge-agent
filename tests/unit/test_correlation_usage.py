@@ -283,3 +283,78 @@ class TestCorrelationUsageRecord:
                 assessment_hash=_HASH_B,
                 extrapolation_used=False,
             )
+
+    # -------------------------------------------------------------------------
+    # Item 5: usage_hash includes source_id from UncertaintySpec
+    # -------------------------------------------------------------------------
+
+    def test_usage_hash_includes_uncertainty_source_id(self) -> None:
+        """Item 5: usage_hash includes uncertainty.source_id."""
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
+        record1 = CorrelationUsageRecord(
+            correlation_key=key,
+            definition_hash=_HASH_A,
+            source_id="src-001",
+            applicability_status=ApplicabilityStatus.applicable,
+            input_values=((ApplicabilityVariable.reynolds, 25000.0),),
+            assessment_hash=_HASH_B,
+            extrapolation_used=False,
+            uncertainty=UncertaintySpec(basis="test", source_id="unc-src-1"),
+        )
+        record2 = CorrelationUsageRecord(
+            correlation_key=key,
+            definition_hash=_HASH_A,
+            source_id="src-001",
+            applicability_status=ApplicabilityStatus.applicable,
+            input_values=((ApplicabilityVariable.reynolds, 25000.0),),
+            assessment_hash=_HASH_B,
+            extrapolation_used=False,
+            uncertainty=UncertaintySpec(basis="test", source_id="unc-src-2"),
+        )
+        assert record1.usage_hash != record2.usage_hash
+
+    # -------------------------------------------------------------------------
+    # Item 5: Bidirectional extrapolation consistency
+    # -------------------------------------------------------------------------
+
+    def test_extrapolation_used_with_non_extrapolation_status_rejected(self) -> None:
+        """Item 5: extrapolation_used=True + non-extrapolation status → rejected."""
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
+        with pytest.raises(ValidationError, match="extrapolation_used=True requires"):
+            CorrelationUsageRecord(
+                correlation_key=key,
+                definition_hash=_HASH_A,
+                source_id="src-001",
+                applicability_status=ApplicabilityStatus.applicable,
+                input_values=((ApplicabilityVariable.reynolds, 25000.0),),
+                assessment_hash=_HASH_B,
+                extrapolation_used=True,
+            )
+
+    # -------------------------------------------------------------------------
+    # Item 5: Provenance metadata includes uncertainty source_id
+    # -------------------------------------------------------------------------
+
+    def test_provenance_includes_uncertainty_source_id(self) -> None:
+        """Item 5: Provenance metadata includes uncertainty source_id."""
+        key = CorrelationKey(correlation_id="fixture.htc", version="1.0.0")
+        uncertainty = UncertaintySpec(
+            basis="Test uncertainty",
+            relative_uncertainty_fraction=0.15,
+            confidence_level_fraction=0.95,
+            source_id="unc-001",
+        )
+        record = CorrelationUsageRecord(
+            correlation_key=key,
+            definition_hash=_HASH_A,
+            source_id="src-001",
+            applicability_status=ApplicabilityStatus.applicable,
+            input_values=((ApplicabilityVariable.reynolds, 25000.0),),
+            assessment_hash=_HASH_B,
+            extrapolation_used=False,
+            uncertainty=uncertainty,
+        )
+        node = record.to_provenance_node()
+        meta_dict = dict(node.metadata)
+        assert meta_dict["uncertainty_basis"] == "Test uncertainty"
+        assert meta_dict["uncertainty_source_id"] == "unc-001"

@@ -1013,3 +1013,99 @@ class TestVariableAssessment:
             status=VariableApplicabilityStatus.missing,
         )
         assert va.supplied_value is None
+
+
+# ---------------------------------------------------------------------------
+# Item 1: SemVer leading zeros in core-version
+# ---------------------------------------------------------------------------
+
+
+class TestSemVerLeadingZeros:
+    def test_invalid_version_leading_zero_major(self) -> None:
+        """Item 1: Leading zero in major version rejected."""
+        with pytest.raises(ValidationError, match="version"):
+            CorrelationKey(correlation_id="test", version="01.0.0")
+
+    def test_invalid_version_leading_zero_minor(self) -> None:
+        """Item 1: Leading zero in minor version rejected."""
+        with pytest.raises(ValidationError, match="version"):
+            CorrelationKey(correlation_id="test", version="1.01.0")
+
+    def test_invalid_version_leading_zero_patch(self) -> None:
+        """Item 1: Leading zero in patch version rejected."""
+        with pytest.raises(ValidationError, match="version"):
+            CorrelationKey(correlation_id="test", version="1.0.01")
+
+    def test_valid_version_zero_major(self) -> None:
+        """Item 1: 0.0.1 is valid (no leading zeros)."""
+        key = CorrelationKey(correlation_id="test", version="0.0.1")
+        assert key.version == "0.0.1"
+
+    def test_parse_semver_rejects_leading_zeros(self) -> None:
+        """Item 1: parse_semver also rejects leading zeros."""
+        with pytest.raises(ValueError, match="Invalid SemVer"):
+            parse_semver("01.0.0")
+        with pytest.raises(ValueError, match="Invalid SemVer"):
+            parse_semver("1.01.0")
+        with pytest.raises(ValueError, match="Invalid SemVer"):
+            parse_semver("1.0.01")
+
+    def test_parse_semver_accepts_zero_version(self) -> None:
+        """Item 1: parse_semver accepts 0.0.1."""
+        major, minor, patch, pre = parse_semver("0.0.1")
+        assert (major, minor, patch) == (0, 0, 1)
+
+
+# ---------------------------------------------------------------------------
+# Item 4: Definition identity enforcement
+# ---------------------------------------------------------------------------
+
+
+class TestDefinitionIdentityEnforcement:
+    def _make_kwargs(self) -> dict:
+        return dict(
+            key=CorrelationKey(correlation_id="fixture.htc", version="1.0.0"),
+            name="Test",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.generic}),
+            phase_regimes=frozenset({PhaseRegime.generic}),
+            envelope=ApplicabilityEnvelope(),
+            source=BibliographicSource(source_id="s", title="T", publication="P", year=2020),
+        )
+
+    def test_direct_construction_with_empty_hash(self) -> None:
+        """Item 4: Direct construction with empty hash works (internal use)."""
+        defn = CorrelationDefinition(**self._make_kwargs())
+        assert defn.definition_hash == ""
+
+    def test_direct_construction_with_invalid_hash_format_rejected(self) -> None:
+        """Item 4: Invalid hash format is rejected."""
+        with pytest.raises(ValidationError, match="definition_hash"):
+            CorrelationDefinition(**{**self._make_kwargs(), "definition_hash": "not-a-hash"})
+
+    def test_create_produces_valid_hash(self) -> None:
+        """Item 4: .create() produces a valid hash."""
+        defn = CorrelationDefinition.create(**self._make_kwargs())
+        assert defn.definition_hash.startswith("sha256:")
+        assert len(defn.definition_hash) == 71  # "sha256:" (7) + 64 hex chars
+
+    def test_tamper_hash_detected(self) -> None:
+        """Item 4: Tampered hash is rejected at registry."""
+        from hexagent.correlations.errors import CorrelationHashMismatchError
+        from hexagent.correlations.registry import InMemoryCorrelationRegistry
+
+        # Tamper with hash
+        registry = InMemoryCorrelationRegistry()
+        # Build a definition with wrong hash
+        bad_hash = "sha256:" + "0" * 64
+        bad_defn = CorrelationDefinition(**{**self._make_kwargs(), "definition_hash": bad_hash})
+        with pytest.raises(CorrelationHashMismatchError):
+            registry.register(bad_defn)
+
+    def test_json_roundtrip_preserves_hash(self) -> None:
+        """Item 4: JSON round-trip preserves the hash."""
+        defn = CorrelationDefinition.create(**self._make_kwargs())
+        json_str = defn.model_dump_json()
+        restored = CorrelationDefinition.model_validate_json(json_str)
+        assert restored.definition_hash == defn.definition_hash

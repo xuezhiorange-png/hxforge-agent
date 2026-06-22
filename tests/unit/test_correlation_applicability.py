@@ -637,3 +637,287 @@ class TestAssessApplicability:
         result = assess_applicability(defn, inputs)
         assert result.status == ApplicabilityStatus.missing_input
         assert result.allows_evaluation is True
+
+    # -------------------------------------------------------------------------
+    # Item 2: Comprehensive decision-table tests for allow_explicit_opt_in
+    # across ALL violation types
+    # -------------------------------------------------------------------------
+
+    def test_opt_in_missing_input_no_extrapolation(self) -> None:
+        """Item 2: missing_input=allow_explicit_opt_in + no opt-in → BLOCKER."""
+        defn = _make_definition(
+            required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            out_of_range_policy=OutOfRangePolicy(
+                missing_input=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(values={}, allow_extrapolation=False)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.missing_input
+        assert result.allows_evaluation is False
+        # All missing-input messages should be BLOCKER
+        missing_msgs = [m for m in result.blockers if "missing" in m.message.lower()]
+        assert len(missing_msgs) >= 1
+
+    def test_opt_in_missing_input_with_extrapolation(self) -> None:
+        """Item 2: missing_input=allow_explicit_opt_in + opt-in → WARNING."""
+        defn = _make_definition(
+            required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            out_of_range_policy=OutOfRangePolicy(
+                missing_input=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(values={}, allow_extrapolation=True)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.missing_input
+        assert result.allows_evaluation is True
+        # All missing-input messages should be WARNING
+        missing_warnings = [m for m in result.warnings if "missing" in m.message.lower()]
+        assert len(missing_warnings) >= 1
+
+    def test_opt_in_geometry_no_extrapolation(self) -> None:
+        """Item 2: incompatible_geometry=allow_explicit_opt_in + no opt-in → BLOCKER."""
+        defn = _make_definition(
+            geometry_types=frozenset({GeometryType.circular_tube}),
+            out_of_range_policy=OutOfRangePolicy(
+                incompatible_geometry=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(geometry=GeometryType.annulus, allow_extrapolation=False)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.incompatible_geometry
+        assert result.allows_evaluation is False
+        geo_blockers = [m for m in result.blockers if "geometry" in m.message.lower()]
+        assert len(geo_blockers) >= 1
+
+    def test_opt_in_geometry_with_extrapolation(self) -> None:
+        """Item 2: incompatible_geometry=allow_explicit_opt_in + opt-in → WARNING."""
+        defn = _make_definition(
+            geometry_types=frozenset({GeometryType.circular_tube}),
+            out_of_range_policy=OutOfRangePolicy(
+                incompatible_geometry=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(geometry=GeometryType.annulus, allow_extrapolation=True)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.incompatible_geometry
+        assert result.allows_evaluation is True
+        geo_warnings = [m for m in result.warnings if "geometry" in m.message.lower()]
+        assert len(geo_warnings) >= 1
+
+    def test_opt_in_phase_no_extrapolation(self) -> None:
+        """Item 2: incompatible_phase=allow_explicit_opt_in + no opt-in → BLOCKER."""
+        defn = _make_definition(
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            out_of_range_policy=OutOfRangePolicy(
+                incompatible_phase=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(phase_regime=PhaseRegime.boiling, allow_extrapolation=False)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.incompatible_phase
+        assert result.allows_evaluation is False
+        phase_blockers = [m for m in result.blockers if "phase" in m.message.lower()]
+        assert len(phase_blockers) >= 1
+
+    def test_opt_in_phase_with_extrapolation(self) -> None:
+        """Item 2: incompatible_phase=allow_explicit_opt_in + opt-in → WARNING."""
+        defn = _make_definition(
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            out_of_range_policy=OutOfRangePolicy(
+                incompatible_phase=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(phase_regime=PhaseRegime.boiling, allow_extrapolation=True)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.incompatible_phase
+        assert result.allows_evaluation is True
+        phase_warnings = [m for m in result.warnings if "phase" in m.message.lower()]
+        assert len(phase_warnings) >= 1
+
+    def test_opt_in_flow_no_extrapolation(self) -> None:
+        """Item 2: incompatible_flow_regime=allow_explicit_opt_in + no opt-in → BLOCKER."""
+        defn = _make_definition(
+            flow_regimes=frozenset({FlowRegime.turbulent}),
+            out_of_range_policy=OutOfRangePolicy(
+                incompatible_flow_regime=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(flow_regime=FlowRegime.laminar, allow_extrapolation=False)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.incompatible_flow_regime
+        assert result.allows_evaluation is False
+        flow_blockers = [m for m in result.blockers if "flow" in m.message.lower()]
+        assert len(flow_blockers) >= 1
+
+    def test_opt_in_flow_with_extrapolation(self) -> None:
+        """Item 2: incompatible_flow_regime=allow_explicit_opt_in + opt-in → WARNING."""
+        defn = _make_definition(
+            flow_regimes=frozenset({FlowRegime.turbulent}),
+            out_of_range_policy=OutOfRangePolicy(
+                incompatible_flow_regime=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(flow_regime=FlowRegime.laminar, allow_extrapolation=True)
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.incompatible_flow_regime
+        assert result.allows_evaluation is True
+        flow_warnings = [m for m in result.warnings if "flow" in m.message.lower()]
+        assert len(flow_warnings) >= 1
+
+    def test_opt_in_recommended_range_no_extrapolation(self) -> None:
+        """Item 2: recommended_violation=allow_explicit_opt_in + no opt-in → BLOCKER."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                    recommended_minimum=10000.0,
+                    recommended_maximum=50000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                recommended_violation=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 75000.0},
+            allow_extrapolation=False,
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.recommended_range_exceeded
+        assert result.allows_evaluation is False
+
+    def test_opt_in_recommended_range_with_extrapolation(self) -> None:
+        """Item 2: recommended_violation=allow_explicit_opt_in + opt-in → explicit_extrapolation."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                    recommended_minimum=10000.0,
+                    recommended_maximum=50000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                recommended_violation=OutOfRangeAction.allow_explicit_opt_in,
+            ),
+        )
+        inputs = _make_input(
+            values={ApplicabilityVariable.reynolds: 75000.0},
+            allow_extrapolation=True,
+        )
+        result = assess_applicability(defn, inputs)
+        assert result.status == ApplicabilityStatus.explicit_extrapolation
+        assert result.allows_evaluation is True
+
+    # -------------------------------------------------------------------------
+    # Item 3: Assessment hash completeness tests
+    # -------------------------------------------------------------------------
+
+    def test_assessment_hash_includes_geometry(self) -> None:
+        """Item 3: Changing geometry changes assessment hash."""
+        defn = _make_definition(
+            geometry_types=frozenset({GeometryType.generic}),
+            phase_regimes=frozenset({PhaseRegime.generic}),
+        )
+        inputs1 = _make_input(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+        )
+        inputs2 = _make_input(
+            geometry=GeometryType.annulus,
+            phase_regime=PhaseRegime.single_phase_liquid,
+        )
+        r1 = assess_applicability(defn, inputs1)
+        r2 = assess_applicability(defn, inputs2)
+        # Different geometry → different hash
+        assert r1.assessment_hash != r2.assessment_hash
+
+    def test_assessment_hash_includes_phase(self) -> None:
+        """Item 3: Changing phase changes assessment hash."""
+        defn = _make_definition(
+            geometry_types=frozenset({GeometryType.generic}),
+            phase_regimes=frozenset({PhaseRegime.generic}),
+        )
+        inputs1 = _make_input(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.single_phase_liquid,
+        )
+        inputs2 = _make_input(
+            geometry=GeometryType.circular_tube,
+            phase_regime=PhaseRegime.boiling,
+        )
+        r1 = assess_applicability(defn, inputs1)
+        r2 = assess_applicability(defn, inputs2)
+        assert r1.assessment_hash != r2.assessment_hash
+
+    def test_assessment_hash_includes_flow(self) -> None:
+        """Item 3: Changing flow changes assessment hash."""
+        defn = _make_definition(
+            flow_regimes=frozenset({FlowRegime.turbulent}),
+        )
+        inputs1 = _make_input(flow_regime=FlowRegime.turbulent)
+        inputs2 = _make_input(flow_regime=FlowRegime.laminar)
+        r1 = assess_applicability(defn, inputs1)
+        r2 = assess_applicability(defn, inputs2)
+        assert r1.assessment_hash != r2.assessment_hash
+
+    def test_assessment_hash_includes_input_values(self) -> None:
+        """Item 3: Changing input values changes hash."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+        )
+        inputs1 = _make_input(values={ApplicabilityVariable.reynolds: 25000.0})
+        inputs2 = _make_input(values={ApplicabilityVariable.reynolds: 50000.0})
+        r1 = assess_applicability(defn, inputs1)
+        r2 = assess_applicability(defn, inputs2)
+        assert r1.assessment_hash != r2.assessment_hash
+
+    def test_assessment_hash_includes_policy(self) -> None:
+        """Item 3: Changing policy changes hash."""
+        defn = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.block,
+            ),
+        )
+        defn2 = _make_definition(
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=3000.0,
+                    maximum=100000.0,
+                ),
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.warn,
+            ),
+        )
+        inputs = _make_input(values={ApplicabilityVariable.reynolds: 150000.0})
+        r1 = assess_applicability(defn, inputs)
+        r2 = assess_applicability(defn2, inputs)
+        assert r1.assessment_hash != r2.assessment_hash
+
+    def test_assessment_hash_includes_allow_extrapolation(self) -> None:
+        """Item 3: Changing allow_extrapolation changes hash."""
+        defn = _make_definition()
+        inputs1 = _make_input(allow_extrapolation=False)
+        inputs2 = _make_input(allow_extrapolation=True)
+        r1 = assess_applicability(defn, inputs1)
+        r2 = assess_applicability(defn, inputs2)
+        assert r1.assessment_hash != r2.assessment_hash

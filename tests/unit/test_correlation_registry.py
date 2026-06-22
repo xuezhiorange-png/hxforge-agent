@@ -45,6 +45,7 @@ def _make_definition(
     ),
     implementation_ref: str | None = None,
     tags: frozenset[str] = frozenset(),
+    supersedes: CorrelationKey | None = None,
 ) -> CorrelationDefinition:
     gt = geometry or frozenset({GeometryType.circular_tube})
     pr = phase_regimes or frozenset({PhaseRegime.single_phase_liquid})
@@ -94,6 +95,7 @@ def _make_definition(
         implementation_status=implementation_status,
         implementation_ref=imp_ref,
         tags=tags,
+        supersedes=supersedes,
     )
 
 
@@ -417,3 +419,124 @@ class TestInMemoryCorrelationRegistry:
             "1.0.0-beta",
             "1.0.0",
         ]
+
+    # -------------------------------------------------------------------------
+    # Item 5: Supersedes validation
+    # -------------------------------------------------------------------------
+
+    def test_supersedes_different_correlation_id_rejected(self) -> None:
+        """Item 5: supersedes references different correlation ID → rejected."""
+        from hexagent.correlations.errors import CorrelationError
+
+        reg = InMemoryCorrelationRegistry()
+        # Register v1.0.0 of "fixture.a"
+        reg.register(_make_definition(correlation_id="fixture.a", version="1.0.0"))
+        # Try to register v2.0.0 of "fixture.b" that supersedes "fixture.a" v1.0.0
+        defn = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="fixture.b", version="2.0.0"),
+            name="Fixture B v2",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                flow_regimes=frozenset({FlowRegime.turbulent}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds, minimum=3000.0, maximum=100000.0
+                    ),
+                ),
+                required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            ),
+            source=BibliographicSource(
+                source_id="src-001", title="Paper", publication="Journal", year=2020
+            ),
+            supersedes=CorrelationKey(correlation_id="fixture.a", version="1.0.0"),
+        )
+        with pytest.raises(
+            CorrelationError, match="supersedes references different correlation ID"
+        ):
+            reg.register(defn)
+
+    def test_supersedes_same_or_later_version_rejected(self) -> None:
+        """Item 5: supersedes version must be earlier than new version."""
+        from hexagent.correlations.errors import CorrelationError
+
+        reg = InMemoryCorrelationRegistry()
+        reg.register(_make_definition(version="2.0.0"))
+        # Try to register v1.0.0 that supersedes v2.0.0 (wrong direction)
+        defn = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="fixture.htc.tube", version="1.0.0"),
+            name="Fixture v1",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                flow_regimes=frozenset({FlowRegime.turbulent}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds, minimum=3000.0, maximum=100000.0
+                    ),
+                ),
+                required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            ),
+            source=BibliographicSource(
+                source_id="src-001", title="Paper", publication="Journal", year=2020
+            ),
+            supersedes=CorrelationKey(correlation_id="fixture.htc.tube", version="2.0.0"),
+        )
+        with pytest.raises(CorrelationError, match="supersedes version"):
+            reg.register(defn)
+
+    def test_supersedes_target_not_found_rejected(self) -> None:
+        """Item 5: supersedes target must exist in registry."""
+        from hexagent.correlations.errors import CorrelationError
+
+        reg = InMemoryCorrelationRegistry()
+        # Try to register v2.0.0 that supersedes v1.0.0 (not registered)
+        defn = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="fixture.htc.tube", version="2.0.0"),
+            name="Fixture v2",
+            purpose=CorrelationPurpose.heat_transfer_coefficient,
+            description="Test",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                flow_regimes=frozenset({FlowRegime.turbulent}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds, minimum=3000.0, maximum=100000.0
+                    ),
+                ),
+                required_inputs=frozenset({ApplicabilityVariable.reynolds}),
+            ),
+            source=BibliographicSource(
+                source_id="src-001", title="Paper", publication="Journal", year=2020
+            ),
+            supersedes=CorrelationKey(correlation_id="fixture.htc.tube", version="1.0.0"),
+        )
+        with pytest.raises(CorrelationError, match="supersedes target not found"):
+            reg.register(defn)
+
+    def test_supersedes_valid_registration(self) -> None:
+        """Item 5: Valid supersedes registration succeeds."""
+        reg = InMemoryCorrelationRegistry()
+        reg.register(_make_definition(version="1.0.0"))
+        # v2.0.0 supersedes v1.0.0 — should succeed
+        reg.register(
+            _make_definition(
+                version="2.0.0",
+                supersedes=CorrelationKey(
+                    correlation_id="fixture.htc.tube",
+                    version="1.0.0",
+                ),
+            )
+        )
+        assert len(reg.list_versions("fixture.htc.tube")) == 2
