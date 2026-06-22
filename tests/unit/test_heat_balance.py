@@ -9,10 +9,12 @@ Covers all required test scenarios from the task card.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from uuid import UUID
 
 import pytest
+from pydantic import ValidationError
 
 from hexagent.core.heat_balance import (
     FlowArrangement,
@@ -1739,3 +1741,543 @@ class TestNewFieldNames:
         result = solve_heat_balance(inp, provider)
         assert isinstance(result.brent_algorithm_iteration_count, int)
         assert result.brent_algorithm_iteration_count > 0
+
+
+# ======================================================================
+# Review-09 Regression Tests
+# ======================================================================
+
+
+class TestRequestIdentityCollision:
+    """Changing any single request-identity field must change the result hash."""
+
+    @staticmethod
+    def _base_result() -> HeatBalanceResult:
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        return solve_heat_balance(inp, provider)
+
+    def _modify_and_compare_provider(self, modify_fn) -> None:
+        base = self._base_result()
+        modified = modify_fn(base)
+        assert modified.verify_hash() is False, (
+            "verify_hash must return False when provider identity is modified"
+        )
+
+    def _modify_and_compare(self, modify_fn) -> None:
+        base = self._base_result()
+        modified = modify_fn(base)
+        # model_copy preserves stored result_hash, but recomputed hash
+        # from modified request_identity won't match → verify_hash must fail
+        assert modified.verify_hash() is False, (
+            "verify_hash must return False when request-identity is modified"
+        )
+
+    def test_hot_mass_flow(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, hot_mass_flow_kg_s=999.0
+                    )
+                }
+            )
+        )
+
+    def test_cold_mass_flow(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, cold_mass_flow_kg_s=999.0
+                    )
+                }
+            )
+        )
+
+    def test_inlet_pressure(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, hot_inlet_pressure_pa=1e6
+                    )
+                }
+            )
+        )
+
+    def test_supplied_outlet_temperature(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, hot_outlet_temperature_k=320.0
+                    )
+                }
+            )
+        )
+
+    def test_known_duty(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, known_duty_w=12345.0
+                    )
+                }
+            )
+        )
+
+    def test_fluid_eos_backend(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, hot_fluid_backend="REFPROP"
+                    )
+                }
+            )
+        )
+
+    def test_mixture_components(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, hot_fluid_components=(("N2", 0.8), ("O2", 0.2))
+                    )
+                }
+            )
+        )
+
+    def test_bracket_step(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, solver_bracket_step_k=50.0
+                    )
+                }
+            )
+        )
+
+    def test_max_bracket_span(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, solver_max_bracket_span_k=999.0
+                    )
+                }
+            )
+        )
+
+    def test_absolute_energy_tolerance(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, solver_absolute_energy_tolerance_w=0.001
+                    )
+                }
+            )
+        )
+
+    def test_near_zero_threshold(self) -> None:
+        self._modify_and_compare(
+            lambda r: r.model_copy(
+                update={
+                    "request_identity": dataclasses.replace(
+                        r.request_identity, solver_near_zero_duty_threshold_w=0.5
+                    )
+                }
+            )
+        )
+
+    def test_configuration_fingerprint(self) -> None:
+        self._modify_and_compare_provider(
+            lambda r: r.model_copy(
+                update={
+                    "provider_identity": dataclasses.replace(
+                        r.provider_identity, configuration_fingerprint="tampered"
+                    )
+                }
+            )
+        )
+
+    def test_cache_policy_version(self) -> None:
+        self._modify_and_compare_provider(
+            lambda r: r.model_copy(
+                update={
+                    "provider_identity": dataclasses.replace(
+                        r.provider_identity, cache_policy_version="tampered"
+                    )
+                }
+            )
+        )
+
+
+class TestJSONTamperDetection:
+    """Modifying material fields via JSON and reloading must break verify_hash."""
+
+    @staticmethod
+    def _base_result() -> HeatBalanceResult:
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        return solve_heat_balance(inp, provider)
+
+    def _tamper_field(self, field_path: str, value) -> None:
+        base = self._base_result()
+        d = base.model_dump(mode="json")
+        # Navigate to nested field
+        parts = field_path.split(".")
+        obj = d
+        for part in parts[:-1]:
+            obj = obj[part]
+        obj[parts[-1]] = value
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_hash() is False, (
+            f"verify_hash must return False after tampering {field_path}"
+        )
+
+    def test_tamper_solver_converged(self) -> None:
+        """Tamper solver_converged on SUCCEEDED → model rejects or verify_hash fails."""
+        base = self._base_result()
+        d = base.model_dump(mode="json")
+        d["solver_converged"] = False
+        try:
+            restored = HeatBalanceResult.model_validate(d)
+            # If model accepts it, verify_hash must catch it
+            assert restored.verify_hash() is False
+        except (ValidationError, ValueError):
+            pass  # Model rejected at validation — acceptable
+
+    def test_tamper_status(self) -> None:
+        """Tamper status on SUCCEEDED → model rejects or verify_hash fails."""
+        base = self._base_result()
+        d = base.model_dump(mode="json")
+        d["status"] = "blocked"
+        try:
+            restored = HeatBalanceResult.model_validate(d)
+            assert restored.verify_hash() is False
+        except (ValidationError, ValueError):
+            pass  # Model rejected at validation — acceptable
+
+    def test_tamper_duty(self) -> None:
+        self._tamper_field("duty_w", 999999.0)
+
+    def test_tamper_request_mass_flow(self) -> None:
+        self._tamper_field("request_identity.hot_mass_flow_kg_s", 999.0)
+
+    def test_tamper_solver_control(self) -> None:
+        self._tamper_field("request_identity.solver_temperature_tolerance", 0.999)
+
+    def test_tamper_property_call_identity(self) -> None:
+        base = self._base_result()
+        if not base.property_calls:
+            pytest.skip("No property calls to tamper")
+        d = base.model_dump(mode="json")
+        d["property_calls"][0]["backend_name"] = "Tampered"
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_hash() is False
+
+    def test_tamper_warning(self) -> None:
+        base = self._base_result()
+        if not base.warnings:
+            pytest.skip("No warnings to tamper")
+        d = base.model_dump(mode="json")
+        d["warnings"][0]["message"] = "tampered"
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_hash() is False
+
+    def test_tamper_blocker(self) -> None:
+        """Tamper a blocked result's blocker message."""
+        provider = MockPropertyProvider(fail_fluid="Water")
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        if not result.blockers:
+            pytest.skip("No blockers to tamper")
+        d = result.model_dump(mode="json")
+        d["blockers"][0]["message"] = "tampered"
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_hash() is False
+
+    def test_tamper_failure(self) -> None:
+        """Tamper a failed result's failure message."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        sp = SolverParams(
+            temperature_tolerance=1e-4,
+            energy_tolerance=1e-3,
+            max_iterations=1,
+            bracket_step_k=10.0,
+            max_bracket_span_k=1.0,
+        )
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0, solver_params=sp)
+        result = solve_heat_balance(inp, provider)
+        if result.status != HeatBalanceStatus.FAILED or result.failure is None:
+            pytest.skip("No failure to tamper")
+        d = result.model_dump(mode="json")
+        d["failure"]["message"] = "tampered"
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_hash() is False
+
+    def test_tamper_solver_counter(self) -> None:
+        self._tamper_field("bracket_probe_count", 999)
+
+    def test_tamper_state_property(self) -> None:
+        base = self._base_result()
+        if base.hot_outlet_state is None:
+            pytest.skip("No hot outlet state")
+        d = base.model_dump(mode="json")
+        d["hot_outlet_state"]["temperature_k"] = 999.0
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_hash() is False
+
+    def test_valid_format_wrong_hash(self) -> None:
+        """A valid-format SHA-256 hash that doesn't match must fail."""
+        base = self._base_result()
+        wrong_hash = "sha256:" + "a" * 64
+        tampered = base.model_copy(update={"result_hash": wrong_hash})
+        # Need to also bypass _field_hash check
+        object.__setattr__(tampered, "_field_hash", tampered._compute_field_hash())
+        assert tampered.verify_hash() is False
+
+
+class TestSolverCountPrecision:
+    """Solver counts must be precise and separately asserted."""
+
+    def test_endpoint_exact_root_zero_iterations(self) -> None:
+        """When the root is exactly at a bracket endpoint, Brent iterations = 0."""
+        provider = MockPropertyProvider()
+        # Zero duty with no outlets specified: solver finds outlets = inlets
+        hot = _water_stream(inlet_t=350.0, outlet_t=None, mass_flow=1.0)
+        cold = _water_stream(inlet_t=310.0, outlet_t=None, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=0.0)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.SUCCEEDED
+        assert result.brent_algorithm_iteration_count == 0
+
+    def test_ordinary_root_uses_scipy_iterations(self) -> None:
+        """Normal interior root uses Brent algorithm iterations from SciPy."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.SUCCEEDED
+        assert result.brent_algorithm_iteration_count > 0
+
+    def test_function_evaluations_vs_iterations(self) -> None:
+        """Function evaluations and algorithm iterations are separately tracked."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        # Both should be positive and potentially different
+        assert result.brent_function_evaluation_count > 0
+        assert result.brent_algorithm_iteration_count > 0
+        # They may be equal (Brent counts each eval as an iteration) but
+        # they are tracked independently
+
+    def test_bracket_probes_separate_from_brent(self) -> None:
+        """Bracket probes are counted separately from Brent evaluations."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        assert result.bracket_probe_count >= 0
+        assert result.brent_function_evaluation_count >= 0
+
+    def test_failure_path_counts(self) -> None:
+        """Solver failure path still records non-negative counts."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        sp = SolverParams(
+            temperature_tolerance=1e-4,
+            energy_tolerance=1e-3,
+            max_iterations=1,
+            bracket_step_k=10.0,
+            max_bracket_span_k=1.0,
+        )
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0, solver_params=sp)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.FAILED
+        assert result.bracket_probe_count >= 0
+        assert result.brent_function_evaluation_count >= 0
+        assert result.brent_algorithm_iteration_count >= 0
+
+    def test_counts_in_failure_context(self) -> None:
+        """Failed result's failure.context includes all three solver counts."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        sp = SolverParams(
+            temperature_tolerance=1e-4,
+            energy_tolerance=1e-3,
+            max_iterations=1,
+            bracket_step_k=10.0,
+            max_bracket_span_k=1.0,
+        )
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0, solver_params=sp)
+        result = solve_heat_balance(inp, provider)
+        assert result.failure is not None
+        ctx = dict(result.failure.context)
+        assert "bracket_probe_count" in ctx
+        assert "brent_function_evaluation_count" in ctx
+        assert "brent_algorithm_iteration_count" in ctx
+
+
+class TestFailedPropertyCallIdentity:
+    """Failed PropertyCall records must use correct identity fields, no faking."""
+
+    def test_failed_call_config_fingerprint_is_empty(self) -> None:
+        """Failed call's configuration_fingerprint must be empty, not provider.git_revision."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        failed_calls = [c for c in result.property_calls if not c.success]
+        for call in failed_calls:
+            assert call.configuration_fingerprint == "", (
+                "Failed call must NOT fake configuration_fingerprint"
+            )
+            assert call.cache_policy_version == "", "Failed call must NOT fake cache_policy_version"
+            # backend_git_revision SHOULD come from the provider
+            assert call.backend_git_revision != ""
+
+    def test_successful_call_has_real_identity(self) -> None:
+        """Successful call gets configuration_fingerprint from provenance."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        successful_calls = [c for c in result.property_calls if c.success]
+        assert len(successful_calls) > 0
+        for call in successful_calls:
+            # From mock provenance
+            assert call.configuration_fingerprint == "mock"
+            assert call.cache_policy_version == "v1"
+            assert call.backend_git_revision == "mock"
+
+    def test_failed_and_successful_same_provider(self) -> None:
+        """Both failed and successful calls derive from the same provider identity."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        # All calls share the same backend_name
+        names = {c.backend_name for c in result.property_calls}
+        assert names == {"MockProvider"}
+        versions = {c.backend_version for c in result.property_calls}
+        assert versions == {"0.1.0-test"}
+
+
+class TestVerifyHashComprehensive:
+    """Comprehensive verify_hash behavior tests."""
+
+    def test_normal_result_returns_true(self) -> None:
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        assert result.verify_hash() is True
+
+    def test_json_roundtrip_returns_true(self) -> None:
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        json_str = result.model_dump_json()
+        restored = HeatBalanceResult.model_validate_json(json_str)
+        assert restored.verify_hash() is True
+
+    def test_tampered_content_returns_false(self) -> None:
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        tampered = result.model_copy(update={"duty_w": 999999.0})
+        # Manually update field_hash so integrity check passes, but recomputed hash won't match
+        object.__setattr__(tampered, "_field_hash", tampered._compute_field_hash())
+        assert tampered.verify_hash() is False
+
+    def test_valid_format_wrong_hash_returns_false(self) -> None:
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        wrong = result.model_copy(update={"result_hash": "sha256:" + "a" * 64})
+        object.__setattr__(wrong, "_field_hash", wrong._compute_field_hash())
+        assert wrong.verify_hash() is False
+
+    def test_blocked_result_verify_hash(self) -> None:
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold)  # under-specified
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.BLOCKED
+        assert result.verify_hash() is True

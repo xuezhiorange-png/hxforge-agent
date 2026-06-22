@@ -413,9 +413,124 @@ class HeatBalanceInput:
                 raise ValueError(f"Duty must be >= 0, got {self.known_duty_w}")
 
 
-# ---------------------------------------------------------------------------
-# Heat-balance result (immutable, hashable)
-# ---------------------------------------------------------------------------
+def _build_request_identity(
+    inp: HeatBalanceInput,
+    provider: PropertyProvider,
+    config_fingerprint: str = "",
+    cache_policy_version: str = "",
+) -> RequestIdentity:
+    """Build a frozen RequestIdentity from input and provider."""
+    return RequestIdentity(
+        hot_fluid_name=str(inp.hot.fluid_identifier),
+        hot_fluid_backend=inp.hot.fluid_identifier.equation_of_state_backend,
+        hot_fluid_components=inp.hot.fluid_identifier.components,
+        cold_fluid_name=str(inp.cold.fluid_identifier),
+        cold_fluid_backend=inp.cold.fluid_identifier.equation_of_state_backend,
+        cold_fluid_components=inp.cold.fluid_identifier.components,
+        hot_mass_flow_kg_s=inp.hot.mass_flow_kg_s,
+        cold_mass_flow_kg_s=inp.cold.mass_flow_kg_s,
+        hot_inlet_pressure_pa=inp.hot.inlet_pressure_pa,
+        cold_inlet_pressure_pa=inp.cold.inlet_pressure_pa,
+        hot_inlet_temperature_k=inp.hot.inlet_temperature_k,
+        cold_inlet_temperature_k=inp.cold.inlet_temperature_k,
+        hot_outlet_temperature_k=inp.hot.outlet_temperature_k,
+        cold_outlet_temperature_k=inp.cold.outlet_temperature_k,
+        known_duty_w=inp.known_duty_w,
+        flow_arrangement=inp.flow_arrangement.value,
+        solver_temperature_tolerance=inp.solver_params.temperature_tolerance,
+        solver_energy_tolerance=inp.solver_params.energy_tolerance,
+        solver_max_iterations=inp.solver_params.max_iterations,
+        solver_bracket_step_k=inp.solver_params.bracket_step_k,
+        solver_max_bracket_span_k=inp.solver_params.max_bracket_span_k,
+        solver_absolute_energy_tolerance_w=inp.solver_params.absolute_energy_tolerance_w,
+        solver_near_zero_duty_threshold_w=inp.solver_params.near_zero_duty_threshold_w,
+        provider_name=provider.name,
+        provider_version=provider.version,
+        provider_git_revision=getattr(provider, "git_revision", ""),
+        reference_state_policy=provider.reference_state_policy.value,
+        configuration_fingerprint=config_fingerprint,
+        cache_policy_version=cache_policy_version,
+    )
+
+
+def _build_provider_identity_from_state(
+    state: FluidState, provider: PropertyProvider
+) -> ProviderIdentitySnapshot:
+    """Build ProviderIdentitySnapshot from a successful FluidState's provenance."""
+    prov = state.provenance
+    return ProviderIdentitySnapshot(
+        name=provider.name,
+        version=provider.version,
+        git_revision=getattr(provider, "git_revision", ""),
+        reference_state_policy=provider.reference_state_policy.value,
+        configuration_fingerprint=prov.configuration_fingerprint,
+        cache_policy_version=prov.cache_policy_version,
+    )
+
+
+@dataclass(frozen=True)
+class ProviderIdentitySnapshot:
+    """Frozen snapshot of property-provider configuration identity.
+
+    Captures the provider's configuration state from real protocol
+    fields.  ``configuration_fingerprint`` and ``cache_policy_version``
+    are obtained from the first successful property call's provenance;
+    they are empty strings if no successful call has been made.
+    """
+
+    name: str
+    version: str
+    git_revision: str
+    reference_state_policy: str
+    configuration_fingerprint: str = ""
+    cache_policy_version: str = ""
+
+
+@dataclass(frozen=True)
+class RequestIdentity:
+    """Frozen, serializable snapshot of all original request fields.
+
+    Stored inside ``HeatBalanceResult`` so that ``verify_hash()`` can
+    rebuild the canonical payload without circular dependencies.
+    Every field that enters the result hash is captured here exactly
+    as provided by the caller.
+    """
+
+    # Fluid identity
+    hot_fluid_name: str
+    hot_fluid_backend: str
+    hot_fluid_components: tuple[tuple[str, float], ...]
+    cold_fluid_name: str
+    cold_fluid_backend: str
+    cold_fluid_components: tuple[tuple[str, float], ...]
+    # Stream inputs
+    hot_mass_flow_kg_s: float
+    cold_mass_flow_kg_s: float
+    hot_inlet_pressure_pa: float
+    cold_inlet_pressure_pa: float
+    hot_inlet_temperature_k: float
+    cold_inlet_temperature_k: float
+    hot_outlet_temperature_k: float | None
+    cold_outlet_temperature_k: float | None
+    known_duty_w: float | None
+    # Flow arrangement
+    flow_arrangement: str  # FlowArrangement.value
+    # Solver controls
+    solver_temperature_tolerance: float
+    solver_energy_tolerance: float
+    solver_max_iterations: int
+    solver_bracket_step_k: float
+    solver_max_bracket_span_k: float
+    solver_absolute_energy_tolerance_w: float
+    solver_near_zero_duty_threshold_w: float
+    # Provider identity (from protocol fields)
+    provider_name: str
+    provider_version: str
+    provider_git_revision: str
+    reference_state_policy: str
+    # Provider configuration (from first successful call's provenance)
+    configuration_fingerprint: str
+    cache_policy_version: str
 
 
 class HeatBalanceResult(BaseModel):
@@ -462,6 +577,8 @@ class HeatBalanceResult(BaseModel):
     provider_name: str
     provider_version: str
     provider_git_revision: str
+    provider_identity: ProviderIdentitySnapshot
+    request_identity: RequestIdentity
     _field_hash: str = PrivateAttr(default="")
 
     @model_validator(mode="after")
@@ -605,6 +722,8 @@ class HeatBalanceResult(BaseModel):
         the payload (no circular dependency).
         """
         payload = _build_result_payload(
+            request_identity=self.request_identity,
+            provider_identity=self.provider_identity,
             specification_mode=self.specification_mode,
             flow_arrangement=self.flow_arrangement,
             hot_inlet=self.hot_inlet_state,
@@ -626,12 +745,7 @@ class HeatBalanceResult(BaseModel):
             bracket_probe_count=self.bracket_probe_count,
             brent_function_evaluation_count=self.brent_function_evaluation_count,
             brent_algorithm_iteration_count=self.brent_algorithm_iteration_count,
-            solver_temperature_tolerance=self.solver_temperature_tolerance,
-            solver_energy_tolerance=self.solver_energy_tolerance,
-            solver_max_iterations=self.solver_max_iterations,
-            provider_name=self.provider_name,
-            provider_version=self.provider_version,
-            provider_git_revision=self.provider_git_revision,
+            solver_converged=self.solver_converged,
         )
         return sha256_digest(payload)
 
@@ -1408,14 +1522,10 @@ def _record_property_call(
             backend_git_revision=(
                 prov.backend_git_revision if prov is not None else provider.git_revision
             ),
-            configuration_fingerprint=(
-                prov.configuration_fingerprint if prov is not None else provider.git_revision
-            ),
+            configuration_fingerprint=(prov.configuration_fingerprint if prov is not None else ""),
             validation_level=(prov.validation_level.value if prov is not None else "unvalidated"),
             validation_dataset_id=(prov.validation_dataset_id if prov is not None else None),
-            cache_policy_version=(
-                prov.cache_policy_version if prov is not None else provider.git_revision
-            ),
+            cache_policy_version=(prov.cache_policy_version if prov is not None else ""),
         )
     )
 
@@ -1543,6 +1653,9 @@ def _message_to_dict(msg: EngineeringMessage | dict[str, Any]) -> dict[str, Any]
 
 
 def _compute_result_hash(
+    *,
+    request_identity: RequestIdentity,
+    provider_identity: ProviderIdentitySnapshot,
     specification_mode: SpecificationMode,
     flow_arrangement: FlowArrangement,
     hot_inlet: FluidStateModel | None,
@@ -1557,7 +1670,6 @@ def _compute_result_hash(
     residual_w: float | None,
     relative_imbalance: float | None,
     energy_balance_accepted: bool,
-    *,
     status: HeatBalanceStatus,
     duty_w: float | None,
     acceptance_basis: AcceptanceBasis,
@@ -1565,20 +1677,12 @@ def _compute_result_hash(
     bracket_probe_count: int = 0,
     brent_function_evaluation_count: int = 0,
     brent_algorithm_iteration_count: int = 0,
-    solver_temperature_tolerance: float = 0.0,
-    solver_energy_tolerance: float = 0.0,
-    solver_max_iterations: int = 0,
-    provider_name: str = "",
-    provider_version: str = "",
-    provider_git_revision: str = "",
+    solver_converged: bool = False,
 ) -> str:
-    """Compute deterministic SHA-256 hash of the result.
-
-    Includes only fields available in the result object (no circular
-    dependency on result_hash itself).  The same payload is rebuilt
-    by ``HeatBalanceResult._recompute_result_hash`` for verification.
-    """
+    """Compute deterministic SHA-256 hash of the result."""
     payload = _build_result_payload(
+        request_identity=request_identity,
+        provider_identity=provider_identity,
         specification_mode=specification_mode,
         flow_arrangement=flow_arrangement,
         hot_inlet=hot_inlet,
@@ -1600,17 +1704,15 @@ def _compute_result_hash(
         bracket_probe_count=bracket_probe_count,
         brent_function_evaluation_count=brent_function_evaluation_count,
         brent_algorithm_iteration_count=brent_algorithm_iteration_count,
-        solver_temperature_tolerance=solver_temperature_tolerance,
-        solver_energy_tolerance=solver_energy_tolerance,
-        solver_max_iterations=solver_max_iterations,
-        provider_name=provider_name,
-        provider_version=provider_version,
-        provider_git_revision=provider_git_revision,
+        solver_converged=solver_converged,
     )
     return sha256_digest(payload)
 
 
 def _build_result_payload(
+    *,
+    request_identity: RequestIdentity,
+    provider_identity: ProviderIdentitySnapshot,
     specification_mode: SpecificationMode,
     flow_arrangement: FlowArrangement,
     hot_inlet: FluidStateModel | None,
@@ -1625,7 +1727,6 @@ def _build_result_payload(
     residual_w: float | None,
     relative_imbalance: float | None,
     energy_balance_accepted: bool,
-    *,
     status: HeatBalanceStatus,
     duty_w: float | None,
     acceptance_basis: AcceptanceBasis,
@@ -1633,12 +1734,7 @@ def _build_result_payload(
     bracket_probe_count: int = 0,
     brent_function_evaluation_count: int = 0,
     brent_algorithm_iteration_count: int = 0,
-    solver_temperature_tolerance: float = 0.0,
-    solver_energy_tolerance: float = 0.0,
-    solver_max_iterations: int = 0,
-    provider_name: str = "",
-    provider_version: str = "",
-    provider_git_revision: str = "",
+    solver_converged: bool = False,
 ) -> dict[str, Any]:
     """Build the canonical payload dict used for result hashing.
 
@@ -1670,51 +1766,47 @@ def _build_result_payload(
         }
 
     return {
+        # Request identity (original inputs)
+        "hot_fluid_name": request_identity.hot_fluid_name,
+        "hot_fluid_backend": request_identity.hot_fluid_backend,
+        "hot_fluid_components": request_identity.hot_fluid_components,
+        "cold_fluid_name": request_identity.cold_fluid_name,
+        "cold_fluid_backend": request_identity.cold_fluid_backend,
+        "cold_fluid_components": request_identity.cold_fluid_components,
+        "hot_mass_flow_kg_s": request_identity.hot_mass_flow_kg_s,
+        "cold_mass_flow_kg_s": request_identity.cold_mass_flow_kg_s,
+        "hot_inlet_pressure_pa": request_identity.hot_inlet_pressure_pa,
+        "cold_inlet_pressure_pa": request_identity.cold_inlet_pressure_pa,
+        "hot_inlet_temperature_k": request_identity.hot_inlet_temperature_k,
+        "cold_inlet_temperature_k": request_identity.cold_inlet_temperature_k,
+        "hot_outlet_temperature_k": request_identity.hot_outlet_temperature_k,
+        "cold_outlet_temperature_k": request_identity.cold_outlet_temperature_k,
+        "known_duty_w": request_identity.known_duty_w,
+        "solver_temperature_tolerance": request_identity.solver_temperature_tolerance,
+        "solver_energy_tolerance": request_identity.solver_energy_tolerance,
+        "solver_max_iterations": request_identity.solver_max_iterations,
+        "solver_bracket_step_k": request_identity.solver_bracket_step_k,
+        "solver_max_bracket_span_k": request_identity.solver_max_bracket_span_k,
+        "solver_absolute_energy_tolerance_w": request_identity.solver_absolute_energy_tolerance_w,
+        "solver_near_zero_duty_threshold_w": request_identity.solver_near_zero_duty_threshold_w,
+        # Provider identity
+        "provider_name": provider_identity.name,
+        "provider_version": provider_identity.version,
+        "provider_git_revision": provider_identity.git_revision,
+        "reference_state_policy": provider_identity.reference_state_policy,
+        "configuration_fingerprint": provider_identity.configuration_fingerprint,
+        "cache_policy_version": provider_identity.cache_policy_version,
+        # Flow arrangement
         "specification_mode": specification_mode.value,
         "flow_arrangement": flow_arrangement.value,
-        # Fluid identity — extracted from FluidStateModel provenance
-        "hot_fluid_name": (
-            hot_inlet.provenance.fluid_identifier
-            if hot_inlet is not None
-            else (hot_outlet.provenance.fluid_identifier if hot_outlet is not None else "")
-        ),
-        "hot_fluid_backend": "HEOS",
-        "hot_fluid_components": (),
-        "cold_fluid_name": (
-            cold_inlet.provenance.fluid_identifier
-            if cold_inlet is not None
-            else (cold_outlet.provenance.fluid_identifier if cold_outlet is not None else "")
-        ),
-        "cold_fluid_backend": "HEOS",
-        "cold_fluid_components": (),
-        "hot_mass_flow_kg_s": None,
-        "cold_mass_flow_kg_s": None,
-        "hot_inlet_pressure_pa": None,
-        "cold_inlet_pressure_pa": None,
-        "hot_inlet_temperature_k": None,
-        "cold_inlet_temperature_k": None,
-        "hot_outlet_temperature_k": None,
-        "cold_outlet_temperature_k": None,
-        "known_duty_w": None,
-        "solver_temperature_tolerance": solver_temperature_tolerance,
-        "solver_energy_tolerance": solver_energy_tolerance,
-        "solver_max_iterations": solver_max_iterations,
-        "provider_name": provider_name,
-        "provider_version": provider_version,
-        "provider_git_revision": provider_git_revision,
-        "solver_bracket_step_k": None,
-        "solver_max_bracket_span_k": None,
-        "solver_absolute_energy_tolerance_w": None,
-        "solver_near_zero_duty_threshold_w": None,
-        "provider_configuration_fingerprint": "",
-        # Solved states (None if unavailable)
+        # Solved states
         "hot_inlet": hot_inlet_dict,
         "hot_outlet": hot_outlet_dict,
         "cold_inlet": cold_inlet_dict,
         "cold_outlet": cold_outlet_dict,
-        # Property call results (complete)
+        # Property call results
         "property_calls": [_property_call_record_to_dict(pc) for pc in property_calls],
-        # Messages (complete)
+        # Messages
         "warnings": [_message_to_dict(m) for m in warnings],
         "blockers": [_message_to_dict(m) for m in blockers],
         # Energy balance fields
@@ -1727,6 +1819,7 @@ def _build_result_payload(
         # Result identity
         "status": status.value,
         "duty_w": duty_w,
+        "solver_converged": solver_converged,
         "failure": failure_dict,
         # Software version
         "software_version": _SOFTWARE_VERSION,
@@ -2125,30 +2218,29 @@ def _handle_zero_duty(
     hot_model = hot_inlet_state.to_model()
     cold_model = cold_inlet_state.to_model()
 
+    request_identity = _build_request_identity(inp, provider)
+    provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
+
     result_hash = _compute_result_hash(
-        SpecificationMode.KNOWN_DUTY,
-        inp.flow_arrangement,
-        hot_model,
-        hot_model,
-        cold_model,
-        cold_model,
-        tuple(property_calls),
-        tuple(warnings),
-        tuple(blockers),
-        q_hot_w,
-        q_cold_w,
-        residual_w,
-        relative_imbalance,
-        energy_balance_accepted,
+        request_identity=request_identity,
+        provider_identity=provider_identity,
+        specification_mode=SpecificationMode.KNOWN_DUTY,
+        flow_arrangement=inp.flow_arrangement,
+        hot_inlet=hot_model,
+        hot_outlet=hot_model,
+        cold_inlet=cold_model,
+        cold_outlet=cold_model,
+        property_calls=tuple(property_calls),
+        warnings=tuple(warnings),
+        blockers=tuple(blockers),
+        q_hot_w=q_hot_w,
+        q_cold_w=q_cold_w,
+        residual_w=residual_w,
+        relative_imbalance=relative_imbalance,
+        energy_balance_accepted=energy_balance_accepted,
         status=status,
         duty_w=0.0 if not has_blockers else None,
         acceptance_basis=acceptance_basis,
-        solver_temperature_tolerance=inp.solver_params.temperature_tolerance,
-        solver_energy_tolerance=inp.solver_params.energy_tolerance,
-        solver_max_iterations=inp.solver_params.max_iterations,
-        provider_name=provider.name,
-        provider_version=provider.version,
-        provider_git_revision=getattr(provider, "git_revision", ""),
     )
 
     provenance = _build_provenance(
@@ -2197,6 +2289,8 @@ def _handle_zero_duty(
         provider_name=provider.name,
         provider_version=provider.version,
         provider_git_revision=getattr(provider, "git_revision", ""),
+        provider_identity=provider_identity,
+        request_identity=request_identity,
     )
 
 
@@ -2248,30 +2342,38 @@ def _make_blocked_result(
     relative_imbalance: float | None = None
     energy_balance_accepted = False
 
+    # Build identity snapshots
+    request_identity = _build_request_identity(inp, provider)
+    if hot_inlet_state is not None:
+        provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
+    else:
+        provider_identity = ProviderIdentitySnapshot(
+            name=provider.name,
+            version=provider.version,
+            git_revision=getattr(provider, "git_revision", ""),
+            reference_state_policy=provider.reference_state_policy.value,
+        )
+
     result_hash = _compute_result_hash(
-        specification_mode,
-        inp.flow_arrangement,
-        hot_model,
-        hot_outlet_model,
-        cold_model,
-        cold_outlet_model,
-        tuple(property_calls),
-        tuple(warnings),
-        tuple(blockers),
-        q_hot_w,
-        q_cold_w,
-        residual_w,
-        relative_imbalance,
-        energy_balance_accepted,
+        request_identity=request_identity,
+        provider_identity=provider_identity,
+        specification_mode=specification_mode,
+        flow_arrangement=inp.flow_arrangement,
+        hot_inlet=hot_model,
+        hot_outlet=hot_outlet_model,
+        cold_inlet=cold_model,
+        cold_outlet=cold_outlet_model,
+        property_calls=tuple(property_calls),
+        warnings=tuple(warnings),
+        blockers=tuple(blockers),
+        q_hot_w=q_hot_w,
+        q_cold_w=q_cold_w,
+        residual_w=residual_w,
+        relative_imbalance=relative_imbalance,
+        energy_balance_accepted=energy_balance_accepted,
         status=HeatBalanceStatus.BLOCKED,
         duty_w=None,
         acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
-        solver_temperature_tolerance=inp.solver_params.temperature_tolerance,
-        solver_energy_tolerance=inp.solver_params.energy_tolerance,
-        solver_max_iterations=inp.solver_params.max_iterations,
-        provider_name=provider.name,
-        provider_version=provider.version,
-        provider_git_revision=getattr(provider, "git_revision", ""),
     )
 
     provenance = _build_provenance(
@@ -2320,6 +2422,8 @@ def _make_blocked_result(
         provider_name=provider.name,
         provider_version=provider.version,
         provider_git_revision=getattr(provider, "git_revision", ""),
+        provider_identity=provider_identity,
+        request_identity=request_identity,
     )
 
 
@@ -2422,21 +2526,35 @@ def _make_failed_result(
     relative_imbalance: float | None = None
     energy_balance_accepted = False
 
+    # Build identity snapshots
+    request_identity = _build_request_identity(inp, provider)
+    if hot_inlet_state is not None:
+        provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
+    else:
+        provider_identity = ProviderIdentitySnapshot(
+            name=provider.name,
+            version=provider.version,
+            git_revision=getattr(provider, "git_revision", ""),
+            reference_state_policy=provider.reference_state_policy.value,
+        )
+
     result_hash = _compute_result_hash(
-        specification_mode,
-        inp.flow_arrangement,
-        hot_model,
-        hot_outlet_model,
-        cold_model,
-        cold_outlet_model,
-        tuple(all_calls),
-        tuple(warnings),
-        (),
-        q_hot_w,
-        q_cold_w,
-        residual_w,
-        relative_imbalance,
-        energy_balance_accepted,
+        request_identity=request_identity,
+        provider_identity=provider_identity,
+        specification_mode=specification_mode,
+        flow_arrangement=inp.flow_arrangement,
+        hot_inlet=hot_model,
+        hot_outlet=hot_outlet_model,
+        cold_inlet=cold_model,
+        cold_outlet=cold_outlet_model,
+        property_calls=tuple(all_calls),
+        warnings=tuple(warnings),
+        blockers=(),
+        q_hot_w=q_hot_w,
+        q_cold_w=q_cold_w,
+        residual_w=residual_w,
+        relative_imbalance=relative_imbalance,
+        energy_balance_accepted=energy_balance_accepted,
         status=HeatBalanceStatus.FAILED,
         duty_w=None,
         acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
@@ -2444,12 +2562,6 @@ def _make_failed_result(
         bracket_probe_count=solver_info.bracket_probe_count,
         brent_function_evaluation_count=solver_info.brent_function_evaluation_count,
         brent_algorithm_iteration_count=solver_info.brent_algorithm_iteration_count,
-        solver_temperature_tolerance=inp.solver_params.temperature_tolerance,
-        solver_energy_tolerance=inp.solver_params.energy_tolerance,
-        solver_max_iterations=inp.solver_params.max_iterations,
-        provider_name=provider.name,
-        provider_version=provider.version,
-        provider_git_revision=getattr(provider, "git_revision", ""),
     )
 
     provenance = _build_provenance(
@@ -2500,6 +2612,8 @@ def _make_failed_result(
         provider_name=provider.name,
         provider_version=provider.version,
         provider_git_revision=getattr(provider, "git_revision", ""),
+        provider_identity=provider_identity,
+        request_identity=request_identity,
     )
 
 
@@ -3615,33 +3729,34 @@ def solve_heat_balance(
     cold_model = cold_inlet_state.to_model()
     cold_outlet_model = cold_outlet_state.to_model()
 
+    # Build identity snapshots
+    request_identity = _build_request_identity(inp, provider)
+    provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
+
     result_hash = _compute_result_hash(
-        mode,
-        inp.flow_arrangement,
-        hot_model,
-        hot_outlet_model,
-        cold_model,
-        cold_outlet_model,
-        tuple(property_calls),
-        tuple(warnings),
-        tuple(blockers),
-        q_hot,
-        q_cold,
-        residual_w,
-        relative_imbalance,
-        energy_balance_accepted,
+        request_identity=request_identity,
+        provider_identity=provider_identity,
+        specification_mode=mode,
+        flow_arrangement=inp.flow_arrangement,
+        hot_inlet=hot_model,
+        hot_outlet=hot_outlet_model,
+        cold_inlet=cold_model,
+        cold_outlet=cold_outlet_model,
+        property_calls=tuple(property_calls),
+        warnings=tuple(warnings),
+        blockers=tuple(blockers),
+        q_hot_w=q_hot,
+        q_cold_w=q_cold,
+        residual_w=residual_w,
+        relative_imbalance=relative_imbalance,
+        energy_balance_accepted=energy_balance_accepted,
         status=status,
         duty_w=final_duty_w,
         acceptance_basis=acceptance_basis,
         bracket_probe_count=total_bracket_probe_count,
         brent_function_evaluation_count=total_brent_function_evaluations,
         brent_algorithm_iteration_count=total_brent_algorithm_iteration_count,
-        solver_temperature_tolerance=inp.solver_params.temperature_tolerance,
-        solver_energy_tolerance=inp.solver_params.energy_tolerance,
-        solver_max_iterations=inp.solver_params.max_iterations,
-        provider_name=provider.name,
-        provider_version=provider.version,
-        provider_git_revision=getattr(provider, "git_revision", ""),
+        solver_converged=solver_converged,
     )
 
     provenance = _build_provenance(
@@ -3704,6 +3819,8 @@ def solve_heat_balance(
         provider_name=provider.name,
         provider_version=provider.version,
         provider_git_revision=getattr(provider, "git_revision", ""),
+        provider_identity=provider_identity,
+        request_identity=request_identity,
     )
 
 

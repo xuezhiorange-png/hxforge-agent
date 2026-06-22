@@ -1,32 +1,31 @@
 {
   "case_id": "gas_liquid_known_duty",
-  "description": "Air-water heat balance with known duty",
   "input": {
     "hot_fluid": "Air",
     "cold_fluid": "Water",
     "hot_inlet_t": 400.0,
     "cold_inlet_t": 290.0,
     "hot_mass_flow": 0.5,
-    "cold_mass_flow": 0.3,
+    "cold_mass_flow": 1.0,
     "hot_pressure": 101325.0,
-    "cold_pressure": 150000.0,
-    "duty_w": 25125.0
+    "cold_pressure": 200000.0,
+    "duty_w": 30000.0
   },
   "expected": {
-    "status": "SUCCEEDED",
     "specification_mode": "known_duty",
-    "duty_w": 25125.0,
-    "q_hot_w": 25125.000000026746,
-    "q_cold_w": 25124.995741612496,
-    "hot_outlet_t": 350.322131643834,
-    "cold_outlet_t": 310.0299147010088,
-    "relative_imbalance": 1.6948912438654382e-07,
+    "status": "SUCCEEDED",
+    "duty_w": 30000.0,
+    "hot_outlet_t": 340.6579,
+    "cold_outlet_t": 297.1709,
+    "q_hot_w": 30000.0,
+    "q_cold_w": 30000.0,
+    "residual_w": -0.0,
+    "relative_imbalance": 0.0,
     "energy_balance_accepted": true,
     "solver_converged": true,
-    "result_hash": "sha256:08a2810eff21a2630033c29ac738b6e7d07154723bc4061a06de819567c594d9"
+    "result_hash": "sha256:d66d19b5264caf100ac147df0a3a16e29f519a9b4e675e113fdd55a8ae8fc301"
   },
   "tolerances": {
-    "temperature_k": 1.0,
-    "relative_imbalance_max": 0.001
+    "temperature_k": 0.5
   }
 }

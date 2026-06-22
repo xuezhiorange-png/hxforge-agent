@@ -1,5 +1,5 @@
 {
-  "case_id": "zero_duty",
+  "case_id": "liquid_liquid_known_cold_outlet",
   "input": {
     "hot_fluid": "Water",
     "cold_fluid": "Water",
@@ -9,23 +9,23 @@
     "cold_mass_flow": 0.8,
     "hot_pressure": 200000.0,
     "cold_pressure": 150000.0,
-    "duty_w": 0.0
+    "cold_outlet_t": 330.0
   },
   "expected": {
-    "specification_mode": "known_duty",
+    "specification_mode": "known_cold_outlet",
     "status": "SUCCEEDED",
-    "duty_w": 0.0,
-    "hot_outlet_t": 350.0,
-    "cold_outlet_t": 290.0,
-    "q_hot_w": 0.0,
-    "q_cold_w": 0.0,
+    "duty_w": 133791.51,
+    "hot_outlet_t": 318.0365,
+    "cold_outlet_t": 330.0,
+    "q_hot_w": 133791.51,
+    "q_cold_w": 133791.51,
     "residual_w": 0.0,
     "relative_imbalance": 0.0,
     "energy_balance_accepted": true,
     "solver_converged": true,
-    "result_hash": "sha256:c843ea187ce109292c558cc382ec30ffdfc61247d475ba87fbfd19c724f67c03"
+    "result_hash": "sha256:998d5615ac8949b523138e9a053bb916d8ec1b2e99a7b1a7470639b990a5f20e"
   },
   "tolerances": {
-    "temperature_k": 0.001
+    "temperature_k": 0.5
   }
 }

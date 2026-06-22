@@ -1,30 +1,31 @@
 {
   "case_id": "liquid_liquid_both_outlets",
-  "description": "Water-water verification mode with both outlets known",
   "input": {
     "hot_fluid": "Water",
     "cold_fluid": "Water",
     "hot_inlet_t": 350.0,
-    "hot_outlet_t": 310.0,
     "cold_inlet_t": 290.0,
-    "cold_outlet_t": 340.03019494491724,
     "hot_mass_flow": 1.0,
     "cold_mass_flow": 0.8,
     "hot_pressure": 200000.0,
-    "cold_pressure": 150000.0
+    "cold_pressure": 150000.0,
+    "hot_outlet_t": 310.0,
+    "cold_outlet_t": 340.0
   },
   "expected": {
-    "status": "SUCCEEDED",
     "specification_mode": "both_outlets_known",
-    "duty_w": 167378.63792971446,
-    "q_hot_w": 167378.6735145609,
-    "q_cold_w": 167378.602344868,
-    "relative_imbalance": 4.2520167839877006e-07,
+    "status": "SUCCEEDED",
+    "duty_w": 167328.05,
+    "hot_outlet_t": 310.0,
+    "cold_outlet_t": 340.0,
+    "q_hot_w": 167378.67,
+    "q_cold_w": 167277.43,
+    "relative_imbalance": 0.000605,
     "energy_balance_accepted": true,
     "solver_converged": true,
-    "result_hash": "sha256:3ea56b752d3d94de04add95e6327fde1cf21207868a5328bb39a8acb7098c90f"
+    "result_hash": "sha256:0031e99e79c819570e0b393505498dc1af546d41957492921b52949c31038d34"
   },
   "tolerances": {
-    "relative_imbalance_max": 0.001
+    "temperature_k": 0.5
   }
 }

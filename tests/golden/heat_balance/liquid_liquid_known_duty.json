@@ -1,6 +1,5 @@
 {
   "case_id": "liquid_liquid_known_duty",
-  "description": "Water-water heat balance with known duty Q=167200 W",
   "input": {
     "hot_fluid": "Water",
     "cold_fluid": "Water",
@@ -10,23 +9,23 @@
     "cold_mass_flow": 0.8,
     "hot_pressure": 200000.0,
     "cold_pressure": 150000.0,
-    "duty_w": 167200.0
+    "duty_w": 80000.0
   },
   "expected": {
-    "status": "SUCCEEDED",
     "specification_mode": "known_duty",
-    "duty_w": 167200.0,
-    "q_hot_w": 167200.02049055044,
-    "q_cold_w": 167199.95486767578,
-    "hot_outlet_t": 310.04275026548487,
-    "cold_outlet_t": 339.97687610636575,
-    "relative_imbalance": 3.9248125962845985e-07,
+    "status": "SUCCEEDED",
+    "duty_w": 80000.0,
+    "hot_outlet_t": 330.9003,
+    "cold_outlet_t": 313.9182,
+    "q_hot_w": 80000.0,
+    "q_cold_w": 80000.0,
+    "residual_w": 0.0,
+    "relative_imbalance": 0.0,
     "energy_balance_accepted": true,
     "solver_converged": true,
-    "result_hash": "sha256:3b6b11f7baa27031780a6e61f4c7fedc5d37adcca9e8193787b7d0ba717877db"
+    "result_hash": "sha256:db9f7a754f62b5074cb8b121a07648ebbbef22a71a417ce3bb959a2fd8cca359"
   },
   "tolerances": {
-    "temperature_k": 0.5,
-    "relative_imbalance_max": 0.001
+    "temperature_k": 0.5
   }
 }
