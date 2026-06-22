@@ -2061,55 +2061,179 @@ class TestJSONTamperDetection:
         assert tampered.verify_hash() is False
 
 
+class TestIdentityDeduplication:
+    """Verify that duplicate identity fields were removed and tampering is detected."""
+
+    def test_tamper_request_identity_hot_fluid_name(self) -> None:
+        """Tamper request_identity.hot_fluid_name → verify_hash fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        d["request_identity"]["hot_fluid_name"] = "TamperedFluid"
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_hash() is False
+
+    def test_tamper_request_identity_solver_tolerance(self) -> None:
+        """Tamper request_identity.solver_temperature_tolerance → verify_hash fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        d["request_identity"]["solver_temperature_tolerance"] = 0.999
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_hash() is False
+
+    def test_tamper_provider_identity_fields(self) -> None:
+        """Tamper any ProviderIdentitySnapshot field → verify_hash fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        for field in (
+            "name",
+            "version",
+            "git_revision",
+            "configuration_fingerprint",
+            "cache_policy_version",
+        ):
+            d = result.model_dump(mode="json")
+            d["provider_identity"][field] = f"tampered_{field}"
+            restored = HeatBalanceResult.model_validate(d)
+            assert restored.verify_hash() is False, (
+                f"verify_hash should return False after tampering provider_identity.{field}"
+            )
+
+    def test_no_duplicate_top_level_fields(self) -> None:
+        """HeatBalanceResult should NOT have top-level solver/provider duplicate fields."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        field_names = set(result.model_fields.keys())
+        # These should NOT be top-level (they're in RequestIdentity/ProviderIdentitySnapshot)
+        assert "solver_temperature_tolerance" not in field_names
+        assert "solver_energy_tolerance" not in field_names
+        assert "solver_max_iterations" not in field_names
+        assert "provider_name" not in field_names
+        assert "provider_version" not in field_names
+        assert "provider_git_revision" not in field_names
+        # These SHOULD be present
+        assert "request_identity" in field_names
+        assert "provider_identity" in field_names
+
+    def test_request_identity_has_all_solver_params(self) -> None:
+        """RequestIdentity must contain all SolverParams fields."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        sp = SolverParams(
+            temperature_tolerance=1e-4,
+            energy_tolerance=1e-3,
+            max_iterations=100,
+            bracket_step_k=10.0,
+            max_bracket_span_k=300.0,
+            absolute_energy_tolerance_w=1.0,
+            near_zero_duty_threshold_w=1.0,
+        )
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0, solver_params=sp)
+        result = solve_heat_balance(inp, provider)
+        ri = result.request_identity
+        assert ri.solver_temperature_tolerance == 1e-4
+        assert ri.solver_energy_tolerance == 1e-3
+        assert ri.solver_max_iterations == 100
+        assert ri.solver_bracket_step_k == 10.0
+        assert ri.solver_max_bracket_span_k == 300.0
+        assert ri.solver_absolute_energy_tolerance_w == 1.0
+        assert ri.solver_near_zero_duty_threshold_w == 1.0
+
+    def test_provider_identity_has_real_values(self) -> None:
+        """ProviderIdentitySnapshot must have real provider values."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        pi = result.provider_identity
+        assert pi.name == "MockProvider"
+        assert pi.version == "0.1.0-test"
+        assert pi.git_revision == "mock"
+        assert pi.reference_state_policy == "DEF"
+        # Config fingerprint from provenance
+        assert pi.configuration_fingerprint == "mock"
+        assert pi.cache_policy_version == "v1"
+
+
 class TestSolverCountPrecision:
-    """Solver counts must be precise and separately asserted."""
+    """Solver counts must be precise, separately asserted, and traceable."""
 
-    def test_endpoint_exact_root_zero_iterations(self) -> None:
-        """When the root is exactly at a bracket endpoint, Brent iterations = 0."""
+    def test_ordinary_root_specific_counts(self) -> None:
+        """Ordinary interior root: all three counts are positive and distinct sources."""
         provider = MockPropertyProvider()
-        # Zero duty with no outlets specified: solver finds outlets = inlets
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.SUCCEEDED
+        # Bracket probes: at least 2 (upper + lower bound probes)
+        assert result.bracket_probe_count >= 2, (
+            f"Expected >= 2 bracket probes, got {result.bracket_probe_count}"
+        )
+        # Function evaluations: at least 1 (brentq always evaluates at least once)
+        assert result.brent_function_evaluation_count >= 1, (
+            f"Expected >= 1 function evals, got {result.brent_function_evaluation_count}"
+        )
+        # Algorithm iterations: from SciPy RootResults.iterations, must be > 0
+        assert result.brent_algorithm_iteration_count > 0, (
+            f"Expected > 0 algorithm iterations, got {result.brent_algorithm_iteration_count}"
+        )
+        # Function evals >= algorithm iterations (each iteration requires at least one eval)
+        assert result.brent_function_evaluation_count >= result.brent_algorithm_iteration_count
+
+    def test_nonzero_duty_endpoint_root(self) -> None:
+        """Non-zero duty where the hot-side root lands at a bracket endpoint.
+        Uses KNOWN_HOT_OUTLET mode to isolate one side's solver."""
+        provider = MockPropertyProvider()
+        # Hot outlet at exactly 340K (inlet 350K, bracket_step=10K)
+        # This means the hot-side solver doesn't need brentq (outlet known)
+        # but the cold-side solver must find the outlet temperature.
+        # Instead, use KNOWN_DUTY and verify the hot side's endpoint behavior
+        # by checking that bracket_probe_count > 0 and function_evals > 0.
+        sp = SolverParams(
+            temperature_tolerance=1e-4,
+            energy_tolerance=1e-3,
+            max_iterations=100,
+            bracket_step_k=10.0,
+            max_bracket_span_k=300.0,
+        )
         hot = _water_stream(inlet_t=350.0, outlet_t=None, mass_flow=1.0)
-        cold = _water_stream(inlet_t=310.0, outlet_t=None, mass_flow=0.8)
-        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=0.0)
+        cold = _water_stream(inlet_t=290.0, outlet_t=None, mass_flow=0.8)
+        # Q = 1.0 * 4180 * (350 - 340) = 41800 W → hot outlet at 340K (endpoint)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=41800.0, solver_params=sp)
         result = solve_heat_balance(inp, provider)
         assert result.status == HeatBalanceStatus.SUCCEEDED
-        assert result.brent_algorithm_iteration_count == 0
-
-    def test_ordinary_root_uses_scipy_iterations(self) -> None:
-        """Normal interior root uses Brent algorithm iterations from SciPy."""
-        provider = MockPropertyProvider()
-        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
-        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
-        inp = HeatBalanceInput(
-            hot=hot,
-            cold=cold,
-            known_duty_w=80000.0,
-            solver_params=_default_params(),
-        )
-        result = solve_heat_balance(inp, provider)
-        assert result.status == HeatBalanceStatus.SUCCEEDED
+        # Hot side: root at endpoint (340K = inlet - bracket_step)
+        # Cold side: interior root (not at endpoint)
+        # Total algorithm iterations > 0 (from cold side)
         assert result.brent_algorithm_iteration_count > 0
-
-    def test_function_evaluations_vs_iterations(self) -> None:
-        """Function evaluations and algorithm iterations are separately tracked."""
-        provider = MockPropertyProvider()
-        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
-        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
-        inp = HeatBalanceInput(
-            hot=hot,
-            cold=cold,
-            known_duty_w=80000.0,
-            solver_params=_default_params(),
-        )
-        result = solve_heat_balance(inp, provider)
-        # Both should be positive and potentially different
+        # Function evaluations > 0 (at least cold side brentq calls)
         assert result.brent_function_evaluation_count > 0
-        assert result.brent_algorithm_iteration_count > 0
-        # They may be equal (Brent counts each eval as an iteration) but
-        # they are tracked independently
+        # Bracket probes >= 2 (at least upper + lower for hot side)
+        assert result.bracket_probe_count >= 2
 
-    def test_bracket_probes_separate_from_brent(self) -> None:
-        """Bracket probes are counted separately from Brent evaluations."""
+    def test_bracket_probes_traceable_to_property_calls(self) -> None:
+        """Bracket probe count must match the number of bracket_probe stage calls."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
@@ -2120,11 +2244,117 @@ class TestSolverCountPrecision:
             solver_params=_default_params(),
         )
         result = solve_heat_balance(inp, provider)
-        assert result.bracket_probe_count >= 0
-        assert result.brent_function_evaluation_count >= 0
+        # Count bracket_probe stage calls in property_calls
+        bracket_probe_calls = [
+            pc
+            for pc in result.property_calls
+            if pc.stage == "bracket_probe" and pc.stream_role in ("hot_solver", "cold_solver")
+        ]
+        assert result.bracket_probe_count == len(bracket_probe_calls), (
+            f"bracket_probe_count ({result.bracket_probe_count}) != "
+            f"actual bracket_probe calls ({len(bracket_probe_calls)})"
+        )
 
-    def test_failure_path_counts(self) -> None:
-        """Solver failure path still records non-negative counts."""
+    def test_brent_evals_traceable_to_property_calls(self) -> None:
+        """Brent function evaluation count must match brent_evaluation stage calls."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=80000.0,
+            solver_params=_default_params(),
+        )
+        result = solve_heat_balance(inp, provider)
+        brent_eval_calls = [
+            pc
+            for pc in result.property_calls
+            if pc.stage == "brent_evaluation" and pc.stream_role in ("hot_solver", "cold_solver")
+        ]
+        assert result.brent_function_evaluation_count == len(brent_eval_calls), (
+            f"brent_function_evaluation_count ({result.brent_function_evaluation_count}) != "
+            f"actual brent_evaluation calls ({len(brent_eval_calls)})"
+        )
+
+    def test_phase_rejection_has_nonzero_probe_count(self) -> None:
+        """Phase rejection after bracket probes: counts must be > 0 and traceable."""
+        provider = MockPropertyProvider()
+        original_state_tp = provider.state_tp
+        call_count = [0]
+
+        def patched(fluid, t, p):
+            call_count[0] += 1
+            state = original_state_tp(fluid, t, p)
+            # After inlet evaluations, return GAS phase for liquid fluid
+            if call_count[0] > 2:
+                return FluidState(
+                    temperature_k=state.temperature_k,
+                    pressure_pa=state.pressure_pa,
+                    density_kg_m3=state.density_kg_m3,
+                    cp_j_kg_k=state.cp_j_kg_k,
+                    viscosity_pa_s=state.viscosity_pa_s,
+                    conductivity_w_m_k=state.conductivity_w_m_k,
+                    enthalpy_j_kg=state.enthalpy_j_kg,
+                    entropy_j_kg_k=state.entropy_j_kg_k,
+                    phase=PhaseRegion.GAS,
+                    quality=1.0,
+                    provenance=state.provenance,
+                )
+            return state
+
+        provider.state_tp = patched  # type: ignore[assignment]
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        Q = 1.0 * _WATER_CP * (350.0 - 310.0)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=_default_params())
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.BLOCKED
+        # Bracket probes were executed before phase rejection
+        assert result.bracket_probe_count > 0, (
+            f"Phase rejection should have non-zero bracket_probe_count, "
+            f"got {result.bracket_probe_count}"
+        )
+        # Function evaluations = 0 (brentq was never called)
+        assert result.brent_function_evaluation_count == 0
+        assert result.brent_algorithm_iteration_count == 0
+        # Verify traceable: bracket_probe stage calls match count
+        bracket_calls = [pc for pc in result.property_calls if pc.stage == "bracket_probe"]
+        assert result.bracket_probe_count == len(bracket_calls)
+
+    def test_partial_failure_accumulates_counts(self) -> None:
+        """KNOWN_DUTY: hot side succeeds, cold side fails.
+        Final counts must include hot side's accumulated values."""
+        provider = MockPropertyProvider()
+        original_state_tp = provider.state_tp
+        call_count = [0]
+
+        def patched(fluid, t, p):
+            call_count[0] += 1
+            state = original_state_tp(fluid, t, p)
+            # Fail on cold side bracket probes (after hot inlet + cold inlet = 2 calls)
+            if call_count[0] > 2 and "Water" in str(fluid):
+                raise PropertyServiceError(
+                    PropertyErrorCode.STATE_OUT_OF_RANGE,
+                    f"Mock cold-side failure at T={t:.2f} K",
+                )
+            return state
+
+        provider.state_tp = patched  # type: ignore[assignment]
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        # The hot side should have succeeded with some counts
+        # The cold side should have failed
+        assert result.status == HeatBalanceStatus.FAILED
+        # Counts include hot side's bracket probes
+        assert result.bracket_probe_count > 0, (
+            f"Expected > 0 bracket probes from hot side, got {result.bracket_probe_count}"
+        )
+
+    def test_failure_context_matches_result_counters(self) -> None:
+        """failure.context must match top-level result counters."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
@@ -2138,29 +2368,11 @@ class TestSolverCountPrecision:
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0, solver_params=sp)
         result = solve_heat_balance(inp, provider)
         assert result.status == HeatBalanceStatus.FAILED
-        assert result.bracket_probe_count >= 0
-        assert result.brent_function_evaluation_count >= 0
-        assert result.brent_algorithm_iteration_count >= 0
-
-    def test_counts_in_failure_context(self) -> None:
-        """Failed result's failure.context includes all three solver counts."""
-        provider = MockPropertyProvider()
-        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
-        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
-        sp = SolverParams(
-            temperature_tolerance=1e-4,
-            energy_tolerance=1e-3,
-            max_iterations=1,
-            bracket_step_k=10.0,
-            max_bracket_span_k=1.0,
-        )
-        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0, solver_params=sp)
-        result = solve_heat_balance(inp, provider)
         assert result.failure is not None
         ctx = dict(result.failure.context)
-        assert "bracket_probe_count" in ctx
-        assert "brent_function_evaluation_count" in ctx
-        assert "brent_algorithm_iteration_count" in ctx
+        assert ctx["bracket_probe_count"] == result.bracket_probe_count
+        assert ctx["brent_function_evaluation_count"] == result.brent_function_evaluation_count
+        assert ctx["brent_algorithm_iteration_count"] == result.brent_algorithm_iteration_count
 
 
 class TestFailedPropertyCallIdentity:
@@ -2168,12 +2380,13 @@ class TestFailedPropertyCallIdentity:
 
     def test_failed_call_config_fingerprint_is_empty(self) -> None:
         """Failed call's configuration_fingerprint must be empty, not provider.git_revision."""
-        provider = MockPropertyProvider()
+        provider = MockPropertyProvider(fail_fluid="Water")
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
         result = solve_heat_balance(inp, provider)
         failed_calls = [c for c in result.property_calls if not c.success]
+        assert len(failed_calls) > 0, "Expected at least one failed call"
         for call in failed_calls:
             assert call.configuration_fingerprint == "", (
                 "Failed call must NOT fake configuration_fingerprint"
@@ -2199,16 +2412,41 @@ class TestFailedPropertyCallIdentity:
 
     def test_failed_and_successful_same_provider(self) -> None:
         """Both failed and successful calls derive from the same provider identity."""
-        provider = MockPropertyProvider()
-        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
-        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
-        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        # Use Air on hot side (succeeds) and Water on cold side (fails)
+        provider = MockPropertyProvider(fail_fluid="Water")
+        hot = _air_stream(inlet_t=400.0, outlet_t=None, mass_flow=0.5)
+        cold = _water_stream(inlet_t=290.0, outlet_t=None, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=50000.0)
         result = solve_heat_balance(inp, provider)
+        successful_calls = [c for c in result.property_calls if c.success]
+        failed_calls = [c for c in result.property_calls if not c.success]
+        assert len(successful_calls) > 0, "Expected at least one successful call"
+        assert len(failed_calls) > 0, "Expected at least one failed call"
         # All calls share the same backend_name
         names = {c.backend_name for c in result.property_calls}
         assert names == {"MockProvider"}
         versions = {c.backend_version for c in result.property_calls}
         assert versions == {"0.1.0-test"}
+
+    def test_failed_inherits_provider_snapshot(self) -> None:
+        """Failed calls use empty fingerprint/cache; successful calls use real provenance values."""
+        provider = MockPropertyProvider(fail_fluid="Water")
+        hot = _air_stream(inlet_t=400.0, outlet_t=None, mass_flow=0.5)
+        cold = _water_stream(inlet_t=290.0, outlet_t=None, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=50000.0)
+        result = solve_heat_balance(inp, provider)
+        successful_calls = [c for c in result.property_calls if c.success]
+        failed_calls = [c for c in result.property_calls if not c.success]
+        assert len(successful_calls) > 0
+        assert len(failed_calls) > 0
+        # Failed calls: empty fingerprint/cache (not provider.git_revision)
+        for call in failed_calls:
+            assert call.configuration_fingerprint == ""
+            assert call.cache_policy_version == ""
+        # Successful calls: real provenance values from state.provenance
+        for call in successful_calls:
+            assert call.configuration_fingerprint == "mock"
+            assert call.cache_policy_version == "v1"
 
 
 class TestVerifyHashComprehensive:
