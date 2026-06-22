@@ -128,37 +128,48 @@ The `HeatBalanceResult` is a **frozen Pydantic model** containing:
 - `cold_inlet_state` / `cold_outlet_state`: Temperature and enthalpy dicts
 - `residual_w`: Energy residual (Q_hot - Q_cold)
 - `relative_imbalance`: |residual| / max(|Q_hot|, |Q_cold|)
-- `solver_iterations`: Number of root-finding iterations
-- `solver_converged`: Whether relative imbalance < tolerance
+- `bracket_probe_count`: Provider calls during bracket search
+- `brent_function_evaluation_count`: Brent residual function evaluations
+- `brent_algorithm_iteration_count`: Brent algorithm iterations from SciPy
+- `solver_converged`: Whether the Brent solver found a root
 - `property_calls`: Traceable property evaluation records
 - `warnings`: Non-fatal diagnostic messages
 - `blockers`: Fatal error messages
+- `failure`: RunFailure record (for FAILED status only)
 - `result_hash`: Deterministic SHA-256 content hash
 - `provenance_graph`: Valid DAG of calculation provenance
+- `request_identity`: Frozen snapshot of all original request fields
+- `provider_identity`: Frozen snapshot of provider configuration identity
 
 ### Deterministic Hashing
 
-The result hash is computed from:
-- Specification mode
+The result hash is computed via `_build_result_payload()` — the single source of truth. Both construction and verification call this function. The payload includes:
+- Request identity (fluid EOS backend, components, mass flows, pressures, temperatures, known duty, solver params, provider config)
+- Provider identity (name, version, git revision, reference state, config fingerprint, cache policy)
+- Specification mode, flow arrangement
 - All four fluid states (inlet/outlet × hot/cold)
-- Duty, residual, and relative imbalance
+- Energy balance fields (q_hot, q_cold, residual, relative imbalance, acceptance basis)
+- Status, duty, solver convergence, failure
+- Three solver counters (bracket probes, Brent function evaluations, Brent algorithm iterations)
+- Property call trace, warnings, blockers
 - Software version
 
-Same inputs + same property results + same software version = same hash.
-Changing any input changes the hash.
+Same inputs + same property results + same software identity = same hash.
+Any change to request identity, provider identity, or result fields changes the hash.
+`verify_hash()` rebuilds the canonical payload from stored fields and compares.
 
 ## Provenance
 
-The provenance graph is a valid DAG containing:
+The provenance graph is a valid DAG. When a `CalculationContext` is provided with a `design_case_revision_id`, the graph includes a `CASE_REVISION` root node; otherwise it starts with `CALCULATION_RUN`.
 
-- `CASE_REVISION` node
-- `CALCULATION_RUN` node (with mode, iterations, convergence, version)
-- `PROPERTY_CALL` nodes (one per property evaluation)
+- Optional `CASE_REVISION` root node (only when `context.design_case_revision_id` is provided)
+- `CALCULATION_RUN` node (with mode, solver counts, convergence, version, three solver counters)
+- `PROPERTY_CALL` nodes (one per property evaluation, including failed calls)
 - `RESULT` node (with result hash)
 - `WARNING` and `BLOCKER` nodes (as applicable)
 
 Edges:
-- `case_revision → calculation_run` (triggers)
+- `case_revision → calculation_run` (triggers, when case revision exists)
 - `calculation_run → property_call` (calls)
 - `calculation_run → result` (produces)
 - `calculation_run → warning/blocker` (emits)
