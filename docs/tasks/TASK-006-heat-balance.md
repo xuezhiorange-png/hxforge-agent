@@ -125,8 +125,8 @@ Supported and unsupported combinations must be explicitly enumerated. Under-spec
 | Review-03 | `fffe610` | #128 | CHANGES REQUIRED | 2026-06-22 |
 | Review-04 | `a389108` | #128 | CHANGES REQUIRED | 2026-06-22 |
 | Review-05 | `796e10c` | #131 | CHANGES REQUIRED | 2026-06-22 |
-| Review-06 | TBD | TBD | TBD | TBD |
+| Review-06 | `b9a04c4` | #131 | IN_PROGRESS | 2026-06-22 |
 
-**Current head:** `796e10cc86ad24900e44321b5839a2682704c0c1`
+**Current head:** `b9a04c4`
 **Test count:** 803 passed
 **CI:** Python 3.11 ✅ · Python 3.12 ✅ (run #131, `27953945196`)

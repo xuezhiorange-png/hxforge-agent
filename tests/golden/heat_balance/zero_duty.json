@@ -1,6 +1,6 @@
 {
   "case_id": "zero_duty",
-  "description": "Zero duty — outlets equal inlets",
+  "description": "Zero duty \u2014 outlets equal inlets",
   "input": {
     "hot_fluid": "Water",
     "cold_fluid": "Water",
@@ -22,7 +22,7 @@
     "q_cold_w": 0.0,
     "relative_imbalance": 0.0,
     "energy_balance_accepted": true,
-    "result_hash": "sha256:755876c77f76e99938449472709d6974b713e27aa07440b6f0615fa9cc67aa14"
+    "result_hash": "sha256:4684684cb4474a70ef85cee9c938e528efa0e67618ae6b50a28b87cb146d6874"
   },
   "tolerances": {
     "temperature_k": 0.001

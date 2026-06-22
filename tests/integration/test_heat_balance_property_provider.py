@@ -546,7 +546,7 @@ class TestSolverConvergenceCoolProp:
         )
 
         assert result.solver_converged
-        assert result.solver_iterations > 0
+        assert result.brent_function_evaluation_count > 0
         assert result.relative_imbalance < 0.001
 
     def test_iterations_reasonable(self, provider: CoolPropProvider) -> None:
@@ -564,4 +564,4 @@ class TestSolverConvergenceCoolProp:
             provider,
         )
         # Brent's method typically converges in < 20 iterations
-        assert result.solver_iterations < 50
+        assert result.brent_function_evaluation_count < 50
