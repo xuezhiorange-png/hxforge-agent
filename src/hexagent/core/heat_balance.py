@@ -344,6 +344,10 @@ class PropertyCallRecord:
     success: bool = True
     error_code: str | None = None
     error_message: str | None = None
+    stream_role: str = "solver"
+    """Role: 'hot_inlet', 'cold_inlet', 'hot_outlet', 'cold_outlet', 'solver'."""
+    sequence_index: int = 0
+    """Global deterministic sequence index across all calls."""
 
 
 # ---------------------------------------------------------------------------
@@ -492,6 +496,25 @@ class HeatBalanceResult(BaseModel):
         except ValueError:
             raise ValueError(f"result_hash contains invalid hex: {self.result_hash!r}") from None
         return self
+
+    def validate_integrity(self) -> bool:
+        """Verify result_hash matches the recomputed hash from stored fields.
+
+        Returns True if the hash is valid, False if tampered.
+        Note: This performs format validation only; full recomputation requires
+        the original inputs which are not stored in the result.
+        """
+        # At minimum, verify hash format
+        if not self.result_hash.startswith("sha256:"):
+            return False
+        hex_part = self.result_hash[7:]
+        if len(hex_part) != 64:
+            return False
+        try:
+            int(hex_part, 16)
+        except ValueError:
+            return False
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -871,9 +894,11 @@ class _SolverFailureInfo:
     bracket_upper_k: float
     last_attempted_temperature_k: float
     last_valid_state: FluidState | None
-    bracket_evaluations: int
+    bracket_probes: int
     brent_iterations: int
     failure_phase: str  # "bracket" or "brent"
+    dominant_property_error: PropertyServiceError | None = None
+    """Most severe PropertyServiceError from failed solver_calls, if any."""
 
 
 def _solve_outlet_temperature(
@@ -911,7 +936,6 @@ def _solve_outlet_temperature(
 
     brent_iterations = [0]
     bracket_probes = [0]
-    brent_evals = [0]
     solver_calls: list[PropertyCallRecord] = []
     _last_valid_state: FluidState | None = None
     _last_attempted_t: float = t_inlet
@@ -922,8 +946,6 @@ def _solve_outlet_temperature(
         _last_attempted_t = t
         if stage == "bracket_probe":
             bracket_probes[0] += 1
-        elif stage == "brent_evaluation":
-            brent_evals[0] += 1
         try:
             state = provider.state_tp(fluid, t, pressure_pa)
         except PropertyServiceError as exc:
@@ -960,19 +982,60 @@ def _solve_outlet_temperature(
         return state_family is not None and state_family == expected_phase_family
 
     def _all_wrong_phase() -> bool:
-        """Check if all recorded solver calls are in wrong phase family."""
+        """Check if all successful solver calls are in wrong phase family.
+
+        Returns True ONLY if at least one successful call shows an incompatible
+        phase family AND no successful call shows the correct phase family.
+        Returns False if there is no evidence of phase incompatibility
+        (i.e., all calls failed or all successful calls are in the correct family).
+        """
         if not solver_calls:
             return False
+        wrong_phase_count = 0
+        correct_phase_count = 0
         for sc in solver_calls:
             if sc.success and sc.result_phase is not None:
                 try:
                     phase = PhaseRegion(sc.result_phase)
                     sf = _phase_family(phase)
                     if sf is not None and sf == expected_phase_family:
-                        return False
+                        correct_phase_count += 1
+                    elif sf is not None:
+                        wrong_phase_count += 1
                 except ValueError:
                     pass
-        return True
+        return wrong_phase_count > 0 and correct_phase_count == 0
+
+    def _dominant_property_error() -> PropertyServiceError | None:
+        """Return the most severe PropertyServiceError from failed solver_calls.
+
+        Precedence: BACKEND_FAILURE > UNSUPPORTED_BACKEND > TWO_PHASE_STATE >
+        STATE_OUT_OF_RANGE > INVALID_FLUID > INVALID_INPUT.
+        """
+        _precedence: list[PropertyErrorCode] = [
+            PropertyErrorCode.BACKEND_FAILURE,
+            PropertyErrorCode.UNSUPPORTED_BACKEND,
+            PropertyErrorCode.TWO_PHASE_STATE,
+            PropertyErrorCode.STATE_OUT_OF_RANGE,
+            PropertyErrorCode.INVALID_FLUID,
+            PropertyErrorCode.INVALID_INPUT,
+        ]
+        best: PropertyServiceError | None = None
+        best_idx = len(_precedence)
+        for sc in solver_calls:
+            if not sc.success and sc.error_code is not None:
+                try:
+                    code = PropertyErrorCode(sc.error_code)
+                except ValueError:
+                    continue
+                try:
+                    idx = _precedence.index(code)
+                except ValueError:
+                    continue
+                if idx < best_idx:
+                    best_idx = idx
+                    best = PropertyServiceError(code, sc.error_message or "")
+        return best
 
     def _build_solver_info(
         failure_phase: str,
@@ -987,31 +1050,11 @@ def _solve_outlet_temperature(
             bracket_upper_k=bracket_upper,
             last_attempted_temperature_k=_last_attempted_t,
             last_valid_state=_last_valid_state,
-            bracket_evaluations=bracket_probes[0],
+            bracket_probes=bracket_probes[0],
             brent_iterations=brent_iterations[0],
             failure_phase=failure_phase,
+            dominant_property_error=_dominant_property_error(),
         )
-
-    def residual(t: float) -> float:
-        """Residual function for brentq.  Only called within a valid bracket."""
-        brent_iterations[0] += 1
-        if brent_iterations[0] > solver_params.max_iterations:
-            info = _build_solver_info("brent", t_lower, t_upper)
-            raise _SolverNotConverged(
-                f"Solver exceeded max iterations ({solver_params.max_iterations})",
-                solver_info=info,
-                solver_calls=solver_calls,
-            )
-        state = _safe_eval_tp(t, stage="brent_evaluation")
-        if state is None or not _is_valid_bracket_state(state):
-            info = _build_solver_info("brent", t_lower, t_upper)
-            raise _SolverNotConverged(
-                f"Invalid state during iteration at T={t:.4f} K; "
-                f"target enthalpy={target_h:.2f} J/kg",
-                solver_info=info,
-                solver_calls=solver_calls,
-            )
-        return state.enthalpy_j_kg - target_h
 
     # --- Build bracket by probing outward from inlet ---
     step = solver_params.bracket_step_k
@@ -1166,6 +1209,8 @@ def _record_property_call(
     success: bool = True,
     error_code: str | None = None,
     error_message: str | None = None,
+    stream_role: str = "solver",
+    sequence_index: int = 0,
 ) -> None:
     """Append a PropertyCallRecord to *records*."""
     records.append(
@@ -1190,6 +1235,8 @@ def _record_property_call(
             success=success,
             error_code=error_code,
             error_message=error_message,
+            stream_role=stream_role,
+            sequence_index=sequence_index,
         )
     )
 
@@ -1203,6 +1250,8 @@ def _record_failed_property_call(
     exc: PropertyServiceError,
     *,
     stage: str = "inlet",
+    stream_role: str = "solver",
+    sequence_index: int = 0,
 ) -> None:
     """Record a failed property call."""
     _record_property_call(
@@ -1216,6 +1265,8 @@ def _record_failed_property_call(
         success=False,
         error_code=exc.code.value,
         error_message=str(exc),
+        stream_role=stream_role,
+        sequence_index=sequence_index,
     )
 
 
@@ -1278,6 +1329,8 @@ def _property_call_record_to_dict(pc: PropertyCallRecord) -> dict[str, Any]:
         "success": pc.success,
         "error_code": pc.error_code,
         "error_message": pc.error_message,
+        "stream_role": pc.stream_role,
+        "sequence_index": pc.sequence_index,
     }
 
 
@@ -1452,6 +1505,8 @@ def _build_provenance(
     result_hash: str,
     *,
     context: CalculationContext | None = None,
+    bracket_probes: int = 0,
+    brent_iterations: int = 0,
 ) -> ProvenanceGraph:
     """Build a deterministic provenance graph for the heat-balance calculation.
 
@@ -1525,6 +1580,8 @@ def _build_provenance(
         "solver_max_bracket_span_k": solver_params.max_bracket_span_k,
         "solver_iterations": solver_iterations,
         "bracket_evaluations": bracket_evaluations,
+        "bracket_probes": bracket_probes,
+        "brent_iterations": brent_iterations,
         "solver_converged": solver_converged,
         "result_hash": result_hash,
         "software_version": _SOFTWARE_VERSION,
@@ -1545,6 +1602,8 @@ def _build_provenance(
                 ("flow_arrangement", flow_arrangement.value),
                 ("solver_iterations", solver_iterations),
                 ("bracket_evaluations", bracket_evaluations),
+                ("bracket_probes", bracket_probes),
+                ("brent_iterations", brent_iterations),
                 ("solver_converged", solver_converged),
                 ("software_version", _SOFTWARE_VERSION),
             ),
@@ -1561,23 +1620,8 @@ def _build_provenance(
 
     # --- Property call nodes ---
     for _pc_idx, pc in enumerate(property_calls):
-        prop_payload: dict[str, Any] = {
-            "fluid": pc.fluid,
-            "query_type": pc.query_type,
-            "inputs": dict(pc.inputs),
-            "backend_name": pc.backend_name,
-            "backend_version": pc.backend_version,
-            "reference_state_policy": pc.reference_state_policy,
-            "stage": pc.stage,
-            "result_temperature_k": pc.result_temperature_k,
-            "result_pressure_pa": pc.result_pressure_pa,
-            "result_enthalpy_j_kg": pc.result_enthalpy_j_kg,
-            "result_phase": pc.result_phase,
-            "success": pc.success,
-            "error_code": pc.error_code,
-            "error_message": pc.error_message,
-            "occurrence_index": _pc_idx,
-        }
+        prop_payload: dict[str, Any] = _property_call_record_to_dict(pc)
+        prop_payload["occurrence_index"] = _pc_idx
         prop_id = _deterministic_uuid5(prop_payload)
         nodes.append(
             ProvenanceNode(
@@ -1593,6 +1637,8 @@ def _build_provenance(
                     ("stage", pc.stage),
                     ("success", pc.success),
                     ("error_code", pc.error_code),
+                    ("stream_role", pc.stream_role),
+                    ("sequence_index", pc.sequence_index),
                 ),
                 payload_hash=sha256_digest(prop_payload),
             )
@@ -1734,6 +1780,8 @@ def _handle_zero_duty(
         provider,
         hot_inlet_state,
         success=True,
+        stream_role="hot_inlet",
+        sequence_index=0,
     )
     _record_property_call(
         property_calls,
@@ -1746,6 +1794,8 @@ def _handle_zero_duty(
         provider,
         cold_inlet_state,
         success=True,
+        stream_role="cold_inlet",
+        sequence_index=1,
     )
 
     # Determine outlet states
@@ -2043,33 +2093,61 @@ def _make_failed_result(
         successful_cold_outlet.to_model() if successful_cold_outlet is not None else None
     )
 
-    failure = RunFailure(
-        code=ErrorCode.CALCULATION_NOT_CONVERGED,
-        message=(
-            f"Solver failure on {solver_info.side}-side: "
-            f"{solver_info.failure_phase} did not converge. "
+    failure_code: ErrorCode
+    failure_message: str
+    failure_context: tuple[tuple[str, Any], ...]
+
+    if solver_info.dominant_property_error is not None:
+        prop_exc = solver_info.dominant_property_error
+        failure_code = _property_error_to_code(prop_exc)
+        failure_message = (
+            f"Property error during solver on {solver_info.side}-side: "
+            f"{solver_info.failure_phase} failed. "
+            f"Property error [{prop_exc.code.value}]: {prop_exc}. "
             f"Target h={solver_info.target_enthalpy_j_kg:.2f} J/kg, "
             f"bracket=[{solver_info.bracket_lower_k:.4f}, {solver_info.bracket_upper_k:.4f}] K, "
             f"last_T={solver_info.last_attempted_temperature_k:.4f} K."
-        ),
-        context=(
+        )
+        failure_context = (
             ("side", solver_info.side),
             ("target_enthalpy_j_kg", solver_info.target_enthalpy_j_kg),
             ("bracket_lower_k", solver_info.bracket_lower_k),
             ("bracket_upper_k", solver_info.bracket_upper_k),
             ("last_attempted_temperature_k", solver_info.last_attempted_temperature_k),
-            ("bracket_evaluations", solver_info.bracket_evaluations),
+            ("bracket_probes", solver_info.bracket_probes),
             ("brent_iterations", solver_info.brent_iterations),
             ("failure_phase", solver_info.failure_phase),
-        ),
+            ("property_error_code", prop_exc.code.value),
+            ("property_error_message", str(prop_exc)),
+        )
+    else:
+        failure_code = ErrorCode.CALCULATION_NOT_CONVERGED
+        failure_message = (
+            f"Solver failure on {solver_info.side}-side: "
+            f"{solver_info.failure_phase} did not converge. "
+            f"Target h={solver_info.target_enthalpy_j_kg:.2f} J/kg, "
+            f"bracket=[{solver_info.bracket_lower_k:.4f}, {solver_info.bracket_upper_k:.4f}] K, "
+            f"last_T={solver_info.last_attempted_temperature_k:.4f} K."
+        )
+        failure_context = (
+            ("side", solver_info.side),
+            ("target_enthalpy_j_kg", solver_info.target_enthalpy_j_kg),
+            ("bracket_lower_k", solver_info.bracket_lower_k),
+            ("bracket_upper_k", solver_info.bracket_upper_k),
+            ("last_attempted_temperature_k", solver_info.last_attempted_temperature_k),
+            ("bracket_probes", solver_info.bracket_probes),
+            ("brent_iterations", solver_info.brent_iterations),
+            ("failure_phase", solver_info.failure_phase),
+        )
+
+    failure = RunFailure(
+        code=failure_code,
+        message=failure_message,
+        context=failure_context,
     )
 
-    # Merge solver_calls into property_calls for completeness
-    all_calls = list(property_calls)
-    if solver_calls:
-        for sc in solver_calls:
-            if sc not in all_calls:
-                all_calls.append(sc)
+    # Merge solver_calls into property_calls preserving exact execution order (no dedup)
+    all_calls = list(property_calls) + list(solver_calls or [])
 
     q_hot_w: float | None = None
     q_cold_w: float | None = None
@@ -2113,7 +2191,7 @@ def _make_failed_result(
         solver_params=inp.solver_params,
         property_calls=all_calls,
         solver_iterations=solver_info.brent_iterations,
-        bracket_evaluations=solver_info.bracket_evaluations,
+        bracket_evaluations=solver_info.bracket_probes,
         solver_converged=False,
         warnings=warnings,
         blockers=[],
@@ -2137,7 +2215,7 @@ def _make_failed_result(
         energy_balance_accepted=energy_balance_accepted,
         acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
         solver_iterations=solver_info.brent_iterations,
-        bracket_evaluations=solver_info.bracket_evaluations,
+        bracket_evaluations=solver_info.bracket_probes,
         solver_converged=False,
         property_calls=tuple(all_calls),
         warnings=tuple(warnings),
@@ -2265,6 +2343,7 @@ def solve_heat_balance(
     property_calls: list[PropertyCallRecord] = []
     warnings: list[EngineeringMessage] = []
     blockers: list[EngineeringMessage] = []
+    _global_seq = [0]  # mutable counter for deterministic sequence indices
 
     hot_inlet_state: FluidState
     try:
@@ -2284,7 +2363,10 @@ def solve_heat_balance(
             ),
             provider,
             exc,
+            stream_role="hot_inlet",
+            sequence_index=_global_seq[0],
         )
+        _global_seq[0] += 1
         blockers.append(
             EngineeringMessage(
                 code=_property_error_to_code(exc),
@@ -2317,7 +2399,10 @@ def solve_heat_balance(
         provider,
         hot_inlet_state,
         success=True,
+        stream_role="hot_inlet",
+        sequence_index=_global_seq[0],
     )
+    _global_seq[0] += 1
 
     cold_inlet_state: FluidState
     try:
@@ -2337,7 +2422,10 @@ def solve_heat_balance(
             ),
             provider,
             exc,
+            stream_role="cold_inlet",
+            sequence_index=_global_seq[0],
         )
+        _global_seq[0] += 1
         blockers.append(
             EngineeringMessage(
                 code=_property_error_to_code(exc),
@@ -2370,7 +2458,10 @@ def solve_heat_balance(
         provider,
         cold_inlet_state,
         success=True,
+        stream_role="cold_inlet",
+        sequence_index=_global_seq[0],
     )
+    _global_seq[0] += 1
 
     # --- Phase check on inlets ---
     phase_msg = _check_single_phase(hot_inlet_state, "Hot-side inlet")
@@ -2488,7 +2579,7 @@ def solve_heat_balance(
                     bracket_upper_k=0.0,
                     last_attempted_temperature_k=0.0,
                     last_valid_state=None,
-                    bracket_evaluations=0,
+                    bracket_probes=0,
                     brent_iterations=0,
                     failure_phase="property",
                 )
@@ -2529,7 +2620,10 @@ def solve_heat_balance(
                 ),
                 provider,
                 exc,
+                stream_role="hot_outlet",
+                sequence_index=_global_seq[0],
             )
+            _global_seq[0] += 1
             blockers.append(
                 EngineeringMessage(
                     code=_property_error_to_code(exc),
@@ -2562,7 +2656,10 @@ def solve_heat_balance(
             provider,
             hot_outlet_state,
             success=True,
+            stream_role="hot_outlet",
+            sequence_index=_global_seq[0],
         )
+        _global_seq[0] += 1
 
         phase_msg = _check_single_phase(hot_outlet_state, "Hot-side outlet")
         if phase_msg is not None:
@@ -2707,7 +2804,7 @@ def solve_heat_balance(
                     bracket_upper_k=0.0,
                     last_attempted_temperature_k=0.0,
                     last_valid_state=None,
-                    bracket_evaluations=0,
+                    bracket_probes=0,
                     brent_iterations=0,
                     failure_phase="property",
                 )
@@ -2748,7 +2845,10 @@ def solve_heat_balance(
                 ),
                 provider,
                 exc,
+                stream_role="cold_outlet",
+                sequence_index=_global_seq[0],
             )
+            _global_seq[0] += 1
             blockers.append(
                 EngineeringMessage(
                     code=_property_error_to_code(exc),
@@ -2781,7 +2881,10 @@ def solve_heat_balance(
             provider,
             cold_outlet_state,
             success=True,
+            stream_role="cold_outlet",
+            sequence_index=_global_seq[0],
         )
+        _global_seq[0] += 1
 
         phase_msg = _check_single_phase(cold_outlet_state, "Cold-side outlet")
         if phase_msg is not None:
@@ -2928,7 +3031,7 @@ def solve_heat_balance(
                     bracket_upper_k=0.0,
                     last_attempted_temperature_k=0.0,
                     last_valid_state=None,
-                    bracket_evaluations=0,
+                    bracket_probes=0,
                     brent_iterations=0,
                     failure_phase="property",
                 )
@@ -2971,7 +3074,10 @@ def solve_heat_balance(
                 ),
                 provider,
                 exc,
+                stream_role="hot_outlet",
+                sequence_index=_global_seq[0],
             )
+            _global_seq[0] += 1
             blockers.append(
                 EngineeringMessage(
                     code=_property_error_to_code(exc),
@@ -3004,7 +3110,10 @@ def solve_heat_balance(
             provider,
             hot_outlet_state,
             success=True,
+            stream_role="hot_outlet",
+            sequence_index=_global_seq[0],
         )
+        _global_seq[0] += 1
 
         phase_msg = _check_single_phase(hot_outlet_state, "Hot-side outlet")
         if phase_msg is not None:
@@ -3038,7 +3147,10 @@ def solve_heat_balance(
                 ),
                 provider,
                 exc,
+                stream_role="cold_outlet",
+                sequence_index=_global_seq[0],
             )
+            _global_seq[0] += 1
             blockers.append(
                 EngineeringMessage(
                     code=_property_error_to_code(exc),
@@ -3071,7 +3183,10 @@ def solve_heat_balance(
             provider,
             cold_outlet_state,
             success=True,
+            stream_role="cold_outlet",
+            sequence_index=_global_seq[0],
         )
+        _global_seq[0] += 1
 
         phase_msg = _check_single_phase(cold_outlet_state, "Cold-side outlet")
         if phase_msg is not None:

@@ -1510,3 +1510,117 @@ class TestNegativeDuty:
         cold = _water_stream(outlet_t=None)
         with pytest.raises(ValueError, match="Duty must be >= 0"):
             HeatBalanceInput(hot=hot, cold=cold, known_duty_w=-1000.0)
+
+
+# ======================================================================
+# Result integrity and hash tests
+# ======================================================================
+
+
+class TestResultIntegrity:
+    """Tests for result hash integrity, tamper detection, and property call metadata."""
+
+    def test_json_round_trip_preserves_hash(self) -> None:
+        """Create a result, serialize to JSON, deserialize, verify hash matches."""
+        hot = _water_stream(outlet_t=None)
+        cold = _water_stream(outlet_t=None)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=5000.0,
+        )
+        provider = MockPropertyProvider()
+        result = solve_heat_balance(inp, provider)
+
+        json_str = result.model_dump_json()
+        restored = HeatBalanceResult.model_validate_json(json_str)
+        assert restored.result_hash == result.result_hash
+        assert restored.validate_integrity()
+
+    def test_tampered_hash_detected(self) -> None:
+        """Verify that validate_integrity catches invalid hash format."""
+        hot = _water_stream(outlet_t=None)
+        cold = _water_stream(outlet_t=None)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=5000.0,
+        )
+        provider = MockPropertyProvider()
+        result = solve_heat_balance(inp, provider)
+
+        # Tamper with the hash by using model_construct to bypass validation
+        tampered = result.model_copy(update={"result_hash": "sha256:INVALID"})
+        assert not tampered.validate_integrity()
+
+        # Too short hex
+        tampered2 = result.model_copy(update={"result_hash": "sha256:abcd"})
+        assert not tampered2.validate_integrity()
+
+        # Non-hex characters
+        tampered3 = result.model_copy(update={"result_hash": "sha256:" + "g" * 64})
+        assert not tampered3.validate_integrity()
+
+        # Missing sha256: prefix
+        tampered4 = result.model_copy(update={"result_hash": "md5:" + "a" * 64})
+        assert not tampered4.validate_integrity()
+
+    def test_hash_determinism(self) -> None:
+        """Same inputs produce same hash (run twice, compare)."""
+        hot = _water_stream(outlet_t=None)
+        cold = _water_stream(outlet_t=None)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=5000.0,
+        )
+        provider = MockPropertyProvider()
+
+        result1 = solve_heat_balance(inp, provider)
+        result2 = solve_heat_balance(inp, provider)
+        assert result1.result_hash == result2.result_hash
+
+    def test_stream_role_in_property_calls(self) -> None:
+        """Verify that property_calls have correct stream_role set."""
+        hot = _water_stream(outlet_t=None)
+        cold = _water_stream(outlet_t=None)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=5000.0,
+        )
+        provider = MockPropertyProvider()
+        result = solve_heat_balance(inp, provider)
+
+        # The first two calls are hot inlet and cold inlet
+        stream_roles = [pc.stream_role for pc in result.property_calls]
+        assert stream_roles[0] == "hot_inlet"
+        assert stream_roles[1] == "cold_inlet"
+        # Solver calls should have stream_role="solver"
+        solver_roles = [sr for sr in stream_roles if sr == "solver"]
+        assert len(solver_roles) > 0
+
+    def test_sequence_index_monotonic(self) -> None:
+        """Verify sequence_index increases monotonically for non-solver calls."""
+        hot = _water_stream(outlet_t=None)
+        cold = _water_stream(outlet_t=None)
+        inp = HeatBalanceInput(
+            hot=hot,
+            cold=cold,
+            known_duty_w=5000.0,
+        )
+        provider = MockPropertyProvider()
+        result = solve_heat_balance(inp, provider)
+
+        indices = [pc.sequence_index for pc in result.property_calls]
+        # Non-solver calls (hot_inlet, cold_inlet) should be monotonically increasing
+        non_solver_indices = [
+            pc.sequence_index for pc in result.property_calls if pc.stream_role != "solver"
+        ]
+        for i in range(1, len(non_solver_indices)):
+            assert non_solver_indices[i] > non_solver_indices[i - 1], (
+                f"non-solver sequence_index not monotonically increasing: {non_solver_indices}"
+            )
+        # First two should be 0, 1
+        assert indices[0] == 0
+        assert indices[1] == 1

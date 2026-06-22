@@ -22,7 +22,7 @@
     "relative_imbalance": 4.2520167839877006e-07,
     "energy_balance_accepted": true,
     "solver_converged": true,
-    "result_hash": "sha256:b93f5d50b9f82b7bfd34d3f654e9b5c8c524b942c52fde5137782bd4d4e25f58"
+    "result_hash": "sha256:ce095f943108fe84c0cb3287f06f2be24b7f6b894ae94f74fdf568e8664a18e3"
   },
   "tolerances": {
     "relative_imbalance_max": 0.001
