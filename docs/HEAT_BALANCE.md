@@ -49,6 +49,18 @@ hot_outlet  cold_outlet  duty    → mode
 
 Uses **Brent's method** (`scipy.optimize.brentq`) for bounded root-finding.
 
+### Endpoint Detection
+
+Before calling Brent's method, the solver checks if either bracket endpoint
+is an exact (or near-exact) root by evaluating `|f(endpoint)| < absolute_energy_tolerance_w`.
+If so, the endpoint is accepted directly:
+- Algorithm iterations = 0
+- Brent function evaluations = 0 (no brentq call)
+- Bracket probes retain their real count
+
+Non-endpoint roots use brentq normally, and algorithm iterations come
+directly from SciPy's `RootResults.iterations` without post-hoc override.
+
 ### Control Parameters
 
 | Parameter | Default | Description |
@@ -144,9 +156,9 @@ The `HeatBalanceResult` is a **frozen Pydantic model** containing:
 ### Deterministic Hashing
 
 The result hash is computed via `_build_result_payload()` — the single source of truth. Both construction and verification call this function. The payload includes:
-- Request identity (fluid EOS backend, components, mass flows, pressures, temperatures, known duty, solver params, provider config)
-- Provider identity (name, version, git revision, reference state, config fingerprint, cache policy)
-- Specification mode, flow arrangement
+- Request identity (fluid EOS backend, components, mass flows, pressures, temperatures, known duty, flow arrangement, solver params) — **canonical source for request fields**
+- Provider identity (name, version, git revision, reference state, config fingerprint, cache policy) — **canonical source for provider config** (from `ProviderIdentitySnapshot`)
+- Specification mode
 - All four fluid states (inlet/outlet × hot/cold)
 - Energy balance fields (q_hot, q_cold, residual, relative imbalance, acceptance basis)
 - Status, duty, solver convergence, failure
@@ -154,22 +166,25 @@ The result hash is computed via `_build_result_payload()` — the single source 
 - Property call trace, warnings, blockers
 - Software version
 
+`RequestIdentity` contains only request-side fields (fluid identity, stream inputs, solver params, flow arrangement). Provider configuration fields were removed to eliminate duplication — `ProviderIdentitySnapshot` is the sole canonical source for provider identity.
+
 Same inputs + same property results + same software identity = same hash.
 Any change to request identity, provider identity, or result fields changes the hash.
 `verify_hash()` rebuilds the canonical payload from stored fields and compares.
 
 ## Provenance
 
-The provenance graph is a valid DAG. When a `CalculationContext` is provided with a `design_case_revision_id`, the graph includes a `CASE_REVISION` root node; otherwise it starts with `CALCULATION_RUN`.
+The provenance graph is a valid DAG. When a `CalculationContext` is provided with a `design_case_revision_id`, the graph includes a `CASE_REVISION` root node; otherwise it starts with an `EXTERNAL` root node.
 
+- `EXTERNAL` root node (when no `design_case_revision_id` — the default)
 - Optional `CASE_REVISION` root node (only when `context.design_case_revision_id` is provided)
-- `CALCULATION_RUN` node (with mode, solver counts, convergence, version, three solver counters)
+- `CALCULATION_RUN` node (with mode, flow arrangement, solver counts — bracket_probe_count, brent_function_evaluation_count, brent_algorithm_iteration_count, convergence, software version)
 - `PROPERTY_CALL` nodes (one per property evaluation, including failed calls)
 - `RESULT` node (with result hash)
 - `WARNING` and `BLOCKER` nodes (as applicable)
 
 Edges:
-- `case_revision → calculation_run` (triggers, when case revision exists)
+- `external/case_revision → calculation_run` (triggers)
 - `calculation_run → property_call` (calls)
 - `calculation_run → result` (produces)
 - `calculation_run → warning/blocker` (emits)

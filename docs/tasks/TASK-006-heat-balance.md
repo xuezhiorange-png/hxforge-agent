@@ -130,8 +130,9 @@ Supported and unsupported combinations must be explicitly enumerated. Under-spec
 | Review-08 | `4c0ea24` | #14 | CHANGES REQUIRED | 2026-06-22 |
 | Review-09 | `7745663` | #14 | IN_PROGRESS | 2026-06-22 |
 | Review-10 | `3b5eada` | #14 | IN_PROGRESS | 2026-06-22 |
-| Review-11 | `7d106cb` | #14 | IN_PROGRESS | 2026-06-22 |
+|| Review-11 | `7d106cb` | #14 | IN_PROGRESS | 2026-06-22 ||
+| Review-12 | `0b58f1b` | #14 | IN_PROGRESS | 2026-06-22 |
 
-**Current head:** `7d106cbe8cb1813e19fe4be4b07659b079be554b`
-**Test count:** 856 passed
-**CI:** Python 3.11 ✅ · Python 3.12 ✅ (run `27972431432`)
+**Current head:** `0b58f1b11bf7e0401c7193f4d28b46f95bdd5c63`
+**Test count:** 868 passed
+**CI:** Python 3.11 ✅ · Python 3.12 ✅ (run `27974294657`)
