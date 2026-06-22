@@ -1,0 +1,26 @@
+{
+  "case_id": "zero_duty",
+  "description": "Zero duty \u2014 outlets equal inlets",
+  "input": {
+    "hot_fluid": "Water",
+    "cold_fluid": "Water",
+    "hot_inlet_t": 350.0,
+    "cold_inlet_t": 290.0,
+    "hot_mass_flow": 1.0,
+    "cold_mass_flow": 0.8,
+    "hot_pressure": 200000.0,
+    "cold_pressure": 150000.0,
+    "duty_w": 0.0
+  },
+  "expected": {
+    "specification_mode": "known_duty",
+    "duty_w": 0.0,
+    "hot_outlet_t": 350.0,
+    "cold_outlet_t": 290.0,
+    "residual_w": 0.0,
+    "relative_imbalance": 0.0
+  },
+  "tolerances": {
+    "temperature_k": 0.001
+  }
+}

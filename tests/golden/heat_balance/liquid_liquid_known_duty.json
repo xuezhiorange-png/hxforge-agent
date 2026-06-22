@@ -1,0 +1,29 @@
+{
+  "case_id": "liquid_liquid_known_duty",
+  "description": "Water-water heat balance with known duty Q=167200 W",
+  "input": {
+    "hot_fluid": "Water",
+    "cold_fluid": "Water",
+    "hot_inlet_t": 350.0,
+    "cold_inlet_t": 290.0,
+    "hot_mass_flow": 1.0,
+    "cold_mass_flow": 0.8,
+    "hot_pressure": 200000.0,
+    "cold_pressure": 150000.0,
+    "duty_w": 167200.0
+  },
+  "expected": {
+    "specification_mode": "known_duty",
+    "duty_w": 167200.0,
+    "hot_outlet_t": 310.04275026548487,
+    "cold_outlet_t": 339.97687610636575,
+    "residual_w": 0.06562287465203553,
+    "relative_imbalance": 3.9248125962845985e-07,
+    "solver_converged": true,
+    "result_hash": "sha256:c24967de22d2ddee3ffab2cfbec9c9853b990c618b479eb78bfc2d18ef4b3972"
+  },
+  "tolerances": {
+    "temperature_k": 0.5,
+    "relative_imbalance_max": 0.001
+  }
+}

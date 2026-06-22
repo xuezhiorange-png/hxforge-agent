@@ -51,3 +51,7 @@ packages = ["hexagent"]
 [[tool.mypy.overrides]]
 module = ["CoolProp", "CoolProp.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["scipy", "scipy.*"]
+ignore_missing_imports = true

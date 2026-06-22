@@ -1,0 +1,27 @@
+{
+  "case_id": "liquid_liquid_both_outlets",
+  "description": "Water-water verification mode with both outlets known",
+  "input": {
+    "hot_fluid": "Water",
+    "cold_fluid": "Water",
+    "hot_inlet_t": 350.0,
+    "hot_outlet_t": 310.0,
+    "cold_inlet_t": 290.0,
+    "cold_outlet_t": 340.03019494491724,
+    "hot_mass_flow": 1.0,
+    "cold_mass_flow": 0.8,
+    "hot_pressure": 200000.0,
+    "cold_pressure": 150000.0
+  },
+  "expected": {
+    "specification_mode": "both_outlets_known",
+    "duty_w": 167378.63792971446,
+    "residual_w": 0.07116969290655106,
+    "relative_imbalance": 4.2520167839877006e-07,
+    "solver_converged": true,
+    "result_hash": "sha256:4af63b914c2a4d1938ccf5c8f1a1e14c180aa7b10f5a7f5498011a3e0e037377"
+  },
+  "tolerances": {
+    "relative_imbalance_max": 0.001
+  }
+}

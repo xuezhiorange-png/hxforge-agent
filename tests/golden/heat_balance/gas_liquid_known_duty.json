@@ -1,0 +1,29 @@
+{
+  "case_id": "gas_liquid_known_duty",
+  "description": "Air-water heat balance with known duty",
+  "input": {
+    "hot_fluid": "Air",
+    "cold_fluid": "Water",
+    "hot_inlet_t": 400.0,
+    "cold_inlet_t": 290.0,
+    "hot_mass_flow": 0.5,
+    "cold_mass_flow": 0.3,
+    "hot_pressure": 101325.0,
+    "cold_pressure": 150000.0,
+    "duty_w": 25125.0
+  },
+  "expected": {
+    "specification_mode": "known_duty",
+    "duty_w": 25125.0,
+    "hot_outlet_t": 350.322131643834,
+    "cold_outlet_t": 310.0299147010088,
+    "residual_w": 0.004258414250216447,
+    "relative_imbalance": 1.6948912438654382e-07,
+    "solver_converged": true,
+    "result_hash": "sha256:3be0e2aa17be9bf2bb37ea3bdfbd6cc76af7c8690944db087a9d1b12ee96c678"
+  },
+  "tolerances": {
+    "temperature_k": 1.0,
+    "relative_imbalance_max": 0.001
+  }
+}
