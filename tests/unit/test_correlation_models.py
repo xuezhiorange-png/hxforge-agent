@@ -138,11 +138,11 @@ class TestSemVer:
     def test_valid_prerelease(self) -> None:
         major, minor, patch, pre = parse_semver("1.0.0-alpha")
         assert (major, minor, patch) == (1, 0, 0)
-        assert pre == ("alpha",)
+        assert pre == ((1, "alpha"),)
 
     def test_valid_prerelease_numeric(self) -> None:
         major, minor, patch, pre = parse_semver("1.0.0-alpha.1")
-        assert pre == ("alpha", 1)
+        assert pre == ((1, "alpha"), (0, 1))
 
     def test_malformed_no_patch(self) -> None:
         with pytest.raises(ValueError, match="Invalid SemVer"):
@@ -236,6 +236,69 @@ class TestSemVer:
             "1.0.0-alpha.1",
             "1.0.0-alpha.2",
             "1.0.0-alpha.10",
+            "1.0.0-beta",
+            "1.0.0",
+        ]
+
+    def test_prerelease_mixed_numeric_vs_alpha(self) -> None:
+        """Item 2: Numeric < alpha per SemVer spec: 1.0.0-1 < 1.0.0-alpha."""
+        _, _, _, pre_num = parse_semver("1.0.0-1")
+        _, _, _, pre_alpha = parse_semver("1.0.0-alpha")
+        assert pre_num < pre_alpha
+
+    def test_prerelease_alpha_vs_numeric_ordering(self) -> None:
+        """Item 2: Alpha > numeric: 1.0.0-alpha > 1.0.0-1 (alpha is larger)."""
+        _, _, _, pre_num = parse_semver("1.0.0-1")
+        _, _, _, pre_alpha = parse_semver("1.0.0-alpha")
+        assert not (pre_alpha < pre_num)
+
+    def test_leading_zero_numeric_rejected(self) -> None:
+        """Item 2: Leading zeros in numeric identifiers are rejected."""
+        with pytest.raises(ValueError, match="Leading zeros not allowed"):
+            parse_semver("1.0.0-01")
+
+    def test_leading_zeros_multiple_rejected(self) -> None:
+        """Item 2: Multiple leading zeros rejected."""
+        with pytest.raises(ValueError, match="Leading zeros not allowed"):
+            parse_semver("1.0.0-007")
+
+    def test_zero_identifier_allowed(self) -> None:
+        """Item 2: Literal '0' is a valid numeric identifier."""
+        major, minor, patch, pre = parse_semver("1.0.0-0")
+        assert pre == ((0, 0),)
+
+    def test_version_sorting_mixed_numeric_alpha(self) -> None:
+        """Item 2: Mixed numeric/alpha prerelease sorts correctly."""
+        from hexagent.correlations.models import CorrelationDefinition
+        from hexagent.correlations.registry import _version_sort_key
+
+        versions = [
+            "1.0.0-alpha",
+            "1.0.0-1",
+            "1.0.0-beta",
+            "1.0.0",
+        ]
+        defns = []
+        for v in versions:
+            defns.append(
+                CorrelationDefinition(
+                    key=CorrelationKey(correlation_id="test", version=v),
+                    name=v,
+                    purpose=CorrelationPurpose.heat_transfer_coefficient,
+                    description="Test",
+                    geometry=frozenset({GeometryType.generic}),
+                    phase_regimes=frozenset({PhaseRegime.generic}),
+                    envelope=ApplicabilityEnvelope(),
+                    source=BibliographicSource(
+                        source_id="s", title="T", publication="P", year=2020
+                    ),
+                )
+            )
+        sorted_defns = sorted(defns, key=_version_sort_key)
+        sorted_versions = [d.key.version for d in sorted_defns]
+        assert sorted_versions == [
+            "1.0.0-1",
+            "1.0.0-alpha",
             "1.0.0-beta",
             "1.0.0",
         ]
@@ -635,7 +698,7 @@ class TestApplicabilityEnvelope:
 
 class TestCorrelationDefinition:
     def _make_definition(self) -> CorrelationDefinition:
-        return CorrelationDefinition(
+        return CorrelationDefinition.create(
             key=CorrelationKey(
                 correlation_id="fixture.htc.tube",
                 version="1.0.0",

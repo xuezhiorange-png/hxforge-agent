@@ -107,8 +107,13 @@ def _build_boundary_messages(
     var_result: VariableAssessment,
     out_of_range_policy: OutOfRangeAction,
     recommended_policy: OutOfRangeAction,
+    missing_input_policy: OutOfRangeAction = OutOfRangeAction.block,
+    allow_extrapolation: bool = False,
 ) -> tuple[EngineeringMessage, ...]:
-    """Build warning/blocker messages for out-of-range variables."""
+    """Build warning/blocker messages for out-of-range variables.
+
+    Item 3: allow_explicit_opt_in without opt-in → BLOCKER.
+    """
     status = var_result.status
 
     if status in (VariableApplicabilityStatus.applicable, VariableApplicabilityStatus.missing):
@@ -132,20 +137,24 @@ def _build_boundary_messages(
         code = ErrorCode.CORRELATION_RECOMMENDED_RANGE_EXCEEDED
     elif status == VariableApplicabilityStatus.missing:
         code = ErrorCode.CORRELATION_INPUT_MISSING
-        # Use the caller-provided missing_input policy (not hardcoded)
-        # The caller should pass the correct policy; we keep default here
-        # as a fallback
-        policy = OutOfRangeAction.block
+        policy = missing_input_policy
     else:
         return ()
 
     severity_map = {
         OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
         OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
-        OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
         OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
     }
-    severity = severity_map.get(policy, EngineeringMessageSeverity.WARNING)
+    if policy == OutOfRangeAction.allow_explicit_opt_in:
+        # Item 3: allow_explicit_opt_in without opt-in → BLOCKER; with opt-in → WARNING
+        severity = (
+            EngineeringMessageSeverity.WARNING
+            if allow_extrapolation
+            else EngineeringMessageSeverity.BLOCKER
+        )
+    else:
+        severity = severity_map.get(policy, EngineeringMessageSeverity.WARNING)
 
     # Build range info string
     range_parts: list[str] = []
@@ -256,7 +265,10 @@ def _policy_allows_evaluation(
     if status == ApplicabilityStatus.incompatible_phase:
         return policy.incompatible_phase == OutOfRangeAction.warn
 
-    # incompatible_flow_regime and any other status → False
+    if status == ApplicabilityStatus.incompatible_flow_regime:
+        return policy.incompatible_flow_regime == OutOfRangeAction.warn
+
+    # any other status → False
     return False
 
 
@@ -373,6 +385,7 @@ def assess_applicability(
             vr,
             policy.absolute_violation,
             policy.recommended_violation,
+            allow_extrapolation=inputs.allow_extrapolation,
         )
         for msg in msgs:
             if msg.allows_continuation:
@@ -413,9 +426,18 @@ def assess_applicability(
 
     # Incompatibility messages
     if not geometry_compatible:
+        _geo_severity_map = {
+            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
+            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
+            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
+            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
+        }
+        _geo_severity = _geo_severity_map.get(
+            policy.incompatible_geometry, EngineeringMessageSeverity.BLOCKER
+        )
         geo_msg = EngineeringMessage(
             code=ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
-            severity=EngineeringMessageSeverity.BLOCKER,
+            severity=_geo_severity,
             message=(
                 f"Geometry '{inputs.geometry.value}' incompatible with "
                 f"{key.correlation_id} v{key.version}"
@@ -428,12 +450,24 @@ def assess_applicability(
                 ("allowed", ",".join(sorted(g.value for g in envelope.geometry_types))),
             ),
         )
-        blockers.append(geo_msg)
+        if geo_msg.allows_continuation:
+            warnings.append(geo_msg)
+        else:
+            blockers.append(geo_msg)
 
     if not phase_compatible:
+        _phase_severity_map = {
+            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
+            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
+            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
+            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
+        }
+        _phase_severity = _phase_severity_map.get(
+            policy.incompatible_phase, EngineeringMessageSeverity.BLOCKER
+        )
         phase_msg = EngineeringMessage(
             code=ErrorCode.CORRELATION_PHASE_INCOMPATIBLE,
-            severity=EngineeringMessageSeverity.BLOCKER,
+            severity=_phase_severity,
             message=(
                 f"Phase regime '{inputs.phase_regime.value}' incompatible with "
                 f"{key.correlation_id} v{key.version}"
@@ -449,12 +483,24 @@ def assess_applicability(
                 ),
             ),
         )
-        blockers.append(phase_msg)
+        if phase_msg.allows_continuation:
+            warnings.append(phase_msg)
+        else:
+            blockers.append(phase_msg)
 
     if not flow_compatible:
+        _flow_severity_map = {
+            OutOfRangeAction.block: EngineeringMessageSeverity.BLOCKER,
+            OutOfRangeAction.warn: EngineeringMessageSeverity.WARNING,
+            OutOfRangeAction.allow_explicit_opt_in: EngineeringMessageSeverity.WARNING,
+            OutOfRangeAction.fallback_required: EngineeringMessageSeverity.ERROR,
+        }
+        _flow_severity = _flow_severity_map.get(
+            policy.incompatible_flow_regime, EngineeringMessageSeverity.BLOCKER
+        )
         flow_msg = EngineeringMessage(
             code=ErrorCode.CORRELATION_FLOW_REGIME_INCOMPATIBLE,
-            severity=EngineeringMessageSeverity.BLOCKER,
+            severity=_flow_severity,
             message=(
                 f"Flow regime '{inputs.flow_regime.value}' incompatible with "
                 f"{key.correlation_id} v{key.version}"
@@ -470,7 +516,10 @@ def assess_applicability(
                 ),
             ),
         )
-        blockers.append(flow_msg)
+        if flow_msg.allows_continuation:
+            warnings.append(flow_msg)
+        else:
+            blockers.append(flow_msg)
 
     # Item 8: Handle fallback_required as non-continuable
     # fallback_required is already non-continuable by severity=ERROR

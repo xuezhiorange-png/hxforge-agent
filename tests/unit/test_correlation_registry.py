@@ -71,7 +71,7 @@ def _make_definition(
     ):
         imp_ref = f"impl-{correlation_id}-{version}"
 
-    return CorrelationDefinition(
+    return CorrelationDefinition.create(
         key=CorrelationKey(correlation_id=correlation_id, version=version),
         name=f"Fixture {correlation_id} v{version}",
         purpose=purpose,

@@ -25,7 +25,7 @@ from hexagent.correlations.models import (
     parse_semver,
 )
 
-SortKey = tuple[int, int, int, int, tuple[int | str, ...]]
+SortKey = tuple[int, int, int, int, tuple[tuple[int, int | str], ...]]
 
 
 def _version_sort_key(defn: CorrelationDefinition) -> SortKey:
@@ -99,23 +99,28 @@ class InMemoryCorrelationRegistry:
         """Register a correlation definition.
 
         Raises CorrelationDuplicateError if the key already exists.
-        Raises CorrelationHashMismatchError if the definition_hash doesn't match.
+        Raises CorrelationHashMismatchError if the definition_hash is empty or wrong.
+        Item 4: Reject empty definition_hash at registry boundary.
         Item 6: Always recomputes and verifies definition_hash on register.
         """
         key = definition.key
 
+        # Item 4: Reject empty definition_hash — must be pre-computed via .create()
+        if not definition.definition_hash:
+            raise CorrelationHashMismatchError(
+                key.correlation_id,
+                expected="sha256:<computed>",
+                actual="(empty)",
+            )
+
         # Item 6: Always recompute and verify definition_hash
         computed_hash = compute_definition_hash(definition)
-        if definition.definition_hash:
-            if computed_hash != definition.definition_hash:
-                raise CorrelationHashMismatchError(
-                    key.correlation_id,
-                    expected=definition.definition_hash,
-                    actual=computed_hash,
-                )
-        else:
-            # If no hash provided, set it to the computed one
-            definition = definition.model_copy(update={"definition_hash": computed_hash})
+        if computed_hash != definition.definition_hash:
+            raise CorrelationHashMismatchError(
+                key.correlation_id,
+                expected=definition.definition_hash,
+                actual=computed_hash,
+            )
 
         if key in self._store:
             raise CorrelationDuplicateError(

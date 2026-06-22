@@ -43,7 +43,7 @@ def _make_definition(
     ri = required_inputs if required_inputs is not None else frozenset()
     if bnds and not ri:
         ri = frozenset({b.variable for b in bnds})
-    return CorrelationDefinition(
+    return CorrelationDefinition.create(
         key=CorrelationKey(correlation_id="fixture.htc.tube", version="1.0.0"),
         name="Fixture HTC Tube",
         purpose=CorrelationPurpose.heat_transfer_coefficient,

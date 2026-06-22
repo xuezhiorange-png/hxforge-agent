@@ -174,29 +174,38 @@ def _validate_hash_format(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must match sha256:<64 lowercase hex>, got {value!r}")
 
 
-def _normalize_semver_prerelease(prerelease: str) -> tuple[int | str, ...]:
+def _normalize_semver_prerelease(prerelease: str) -> tuple[tuple[int, int | str], ...]:
     """Parse a SemVer prerelease string into a tuple of dot-separated identifiers.
 
-    Numeric identifiers are stored as ints for numeric comparison,
-    alphanumeric identifiers as strings for lexical comparison.
+    Each identifier is encoded as ``(0, int_value)`` for numeric identifiers
+    and ``(1, str_value)`` for alphanumeric identifiers.  This ensures
+    ``numeric < alphanumeric`` per the SemVer specification and avoids
+    ``TypeError`` when comparing ``int`` vs ``str``.
+
+    Leading zeros in numeric identifiers are rejected (except literal ``0``).
     """
     if not prerelease:
         return ()
-    parts: list[int | str] = []
+    parts: list[tuple[int, int | str]] = []
     for part in prerelease.split("."):
+        # Reject leading zeros in numeric identifiers (e.g. "01", "007")
+        if part.isdigit() and len(part) > 1 and part[0] == "0":
+            raise ValueError(
+                f"Leading zeros not allowed in numeric prerelease identifier: {part!r}"
+            )
         try:
-            parts.append(int(part))
+            parts.append((0, int(part)))
         except ValueError:
-            parts.append(part)
+            parts.append((1, part))
     return tuple(parts)
 
 
-def parse_semver(version: str) -> tuple[int, int, int, tuple[int | str, ...]]:
+def parse_semver(version: str) -> tuple[int, int, int, tuple[tuple[int, int | str], ...]]:
     """Parse a SemVer string into (major, minor, patch, prerelease_tuple).
 
     Prerelease identifiers are compared by SemVer precedence:
-    - Numeric identifiers compared numerically
-    - Alphanumeric identifiers compared lexically
+    - Numeric identifiers compared numerically (encoded as ``(0, int_val)``)
+    - Alphanumeric identifiers compared lexically (encoded as ``(1, str_val)``)
     - Numeric < alphanumeric
     - Fewer identifiers < more identifiers (when prefix matches)
     """
@@ -417,6 +426,7 @@ class OutOfRangePolicy(BaseModel):
     missing_input: OutOfRangeAction = OutOfRangeAction.block
     incompatible_geometry: OutOfRangeAction = OutOfRangeAction.block
     incompatible_phase: OutOfRangeAction = OutOfRangeAction.block
+    incompatible_flow_regime: OutOfRangeAction = OutOfRangeAction.block
 
 
 class CorrelationDefinition(BaseModel):
@@ -487,6 +497,18 @@ class CorrelationDefinition(BaseModel):
         ):
             raise ValueError("Correlation cannot supersede itself (same key)")
         return self
+
+    @classmethod
+    def create(cls, **kwargs: Any) -> CorrelationDefinition:
+        """Factory that auto-computes definition_hash."""
+        # Remove definition_hash from kwargs if present, so it gets set
+        # by the model as empty, then we compute and update
+        kwargs.pop("definition_hash", None)
+        # First create with a temporary hash to pass validation
+        # We need to bypass the empty check temporarily
+        temp = cls(**{**kwargs, "definition_hash": "temp"})
+        computed = compute_definition_hash(temp)
+        return temp.model_copy(update={"definition_hash": computed})
 
 
 class CorrelationApplicabilityInput(BaseModel):
@@ -568,13 +590,23 @@ class ApplicabilityAssessment(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _validate_assessment(self) -> ApplicabilityAssessment:
+    def _validate_and_derive_assessment(self) -> ApplicabilityAssessment:
+        # Item 5: Derive allows_evaluation from blockers
+        # allows_evaluation = not bool(self.blockers)
+        derived = not bool(self.blockers)
+        object.__setattr__(self, "allows_evaluation", derived)
         # Item 5: if status is applicable → no blockers
         if self.status == ApplicabilityStatus.applicable and self.blockers:
             raise ValueError("applicable status must not have blockers")
-        # Item 5: if status has blockers → allows_evaluation must be False
-        if self.blockers and self.allows_evaluation:
-            raise ValueError("Status with blockers must have allows_evaluation=False")
+        # Item 5: if status has no blockers but non-applicable → allows_evaluation=True
+        if (
+            self.status != ApplicabilityStatus.applicable
+            and not self.blockers
+            and not self.allows_evaluation
+        ):
+            raise ValueError(
+                "Non-applicable status with no blockers must have allows_evaluation=True"
+            )
         return self
 
 

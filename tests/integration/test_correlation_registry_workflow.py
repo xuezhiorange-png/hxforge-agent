@@ -33,7 +33,7 @@ from hexagent.domain.provenance import ProvenanceNodeType
 
 def _fixture_htc_v1() -> CorrelationDefinition:
     """Fixture: heat transfer coefficient correlation v1.0.0."""
-    return CorrelationDefinition(
+    return CorrelationDefinition.create(
         key=CorrelationKey(correlation_id="fixture.htc.tube", version="1.0.0"),
         name="Fixture HTC Tube v1",
         purpose=CorrelationPurpose.heat_transfer_coefficient,
@@ -86,7 +86,7 @@ def _fixture_htc_v1() -> CorrelationDefinition:
 
 def _fixture_htc_v2() -> CorrelationDefinition:
     """Fixture: HTC correlation v2.0.0 (supersedes v1)."""
-    return CorrelationDefinition(
+    return CorrelationDefinition.create(
         key=CorrelationKey(correlation_id="fixture.htc.tube", version="2.0.0"),
         name="Fixture HTC Tube v2",
         purpose=CorrelationPurpose.heat_transfer_coefficient,
@@ -135,7 +135,7 @@ def _fixture_htc_v2() -> CorrelationDefinition:
 
 def _fixture_ff() -> CorrelationDefinition:
     """Fixture: friction factor correlation."""
-    return CorrelationDefinition(
+    return CorrelationDefinition.create(
         key=CorrelationKey(correlation_id="fixture.ff.tube", version="1.0.0"),
         name="Fixture Friction Factor",
         purpose=CorrelationPurpose.friction_factor,
@@ -320,7 +320,7 @@ class TestRegistryWorkflow:
         reg = InMemoryCorrelationRegistry()
         reg.register(_fixture_htc_v1())
         # Create a deprecated version
-        deprecated_v2 = CorrelationDefinition(
+        deprecated_v2 = CorrelationDefinition.create(
             key=CorrelationKey(correlation_id="fixture.htc.tube", version="2.0.0"),
             name="Fixture HTC Tube v2",
             purpose=CorrelationPurpose.heat_transfer_coefficient,
