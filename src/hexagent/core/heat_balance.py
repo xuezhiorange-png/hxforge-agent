@@ -88,13 +88,12 @@ class SolverParams:
     (dimensionless).  Results above this threshold are flagged.
 
     ``max_iterations``: maximum number of function evaluations per
-    root-finding call.  Default 100 000; Brent's method typically
-    converges in <20 iterations so this is a generous safety cap.
+    root-finding call.
     """
 
     temperature_tolerance: float = 1e-4
     energy_tolerance: float = 1e-3
-    max_iterations: int = 100_000
+    max_iterations: int = 100
 
 
 # ---------------------------------------------------------------------------
