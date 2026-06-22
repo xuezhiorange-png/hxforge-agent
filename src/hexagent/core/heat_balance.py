@@ -415,11 +415,12 @@ class HeatBalanceInput:
 
 def _build_request_identity(
     inp: HeatBalanceInput,
-    provider: PropertyProvider,
-    config_fingerprint: str = "",
-    cache_policy_version: str = "",
 ) -> RequestIdentity:
-    """Build a frozen RequestIdentity from input and provider."""
+    """Build a frozen RequestIdentity from input.
+
+    Provider identity is NOT included here — it lives exclusively in
+    ``ProviderIdentitySnapshot``.
+    """
     return RequestIdentity(
         hot_fluid_name=str(inp.hot.fluid_identifier),
         hot_fluid_backend=inp.hot.fluid_identifier.equation_of_state_backend,
@@ -444,12 +445,6 @@ def _build_request_identity(
         solver_max_bracket_span_k=inp.solver_params.max_bracket_span_k,
         solver_absolute_energy_tolerance_w=inp.solver_params.absolute_energy_tolerance_w,
         solver_near_zero_duty_threshold_w=inp.solver_params.near_zero_duty_threshold_w,
-        provider_name=provider.name,
-        provider_version=provider.version,
-        provider_git_revision=getattr(provider, "git_revision", ""),
-        reference_state_policy=provider.reference_state_policy.value,
-        configuration_fingerprint=config_fingerprint,
-        cache_policy_version=cache_policy_version,
     )
 
 
@@ -494,6 +489,9 @@ class RequestIdentity:
     rebuild the canonical payload without circular dependencies.
     Every field that enters the result hash is captured here exactly
     as provided by the caller.
+
+    Provider configuration identity lives exclusively in
+    ``ProviderIdentitySnapshot`` — it is never duplicated here.
     """
 
     # Fluid identity
@@ -523,14 +521,6 @@ class RequestIdentity:
     solver_max_bracket_span_k: float
     solver_absolute_energy_tolerance_w: float
     solver_near_zero_duty_threshold_w: float
-    # Provider identity (from protocol fields)
-    provider_name: str
-    provider_version: str
-    provider_git_revision: str
-    reference_state_policy: str
-    # Provider configuration (from first successful call's provenance)
-    configuration_fingerprint: str
-    cache_policy_version: str
 
 
 class HeatBalanceResult(BaseModel):
@@ -1387,61 +1377,78 @@ def _solve_outlet_temperature(
                 phase_rejected=_all_wrong_phase(),
             )
 
-    # --- Solve with brentq ---
-    # We know f_upper and f_lower have opposite signs from the bracket search.
-    def _brent_residual(t: float) -> float:
-        """Wrapper for brentq that counts function evaluations."""
-        brent_func_eval_count[0] += 1
-        if brent_func_eval_count[0] > solver_params.max_iterations:
-            info = _build_solver_info("brent", t_lower, t_upper)
-            raise _SolverNotConverged(
-                f"Solver exceeded max iterations ({solver_params.max_iterations})",
-                solver_info=info,
-                solver_calls=solver_calls,
-            )
-        state = _safe_eval_tp(t, stage="brent_evaluation")
+    # --- Check for exact root at bracket endpoints BEFORE calling brentq ---
+    # This avoids unnecessary Brent evaluations and gives correct iteration counts.
+    _energy_tol = solver_params.absolute_energy_tolerance_w
+
+    def _residual_at(t: float) -> float | None:
+        """Evaluate residual at a single temperature without recording as brent_eval."""
+        state = _safe_eval_tp(t, stage="bracket_probe")
         if state is None or not _is_valid_bracket_state(state):
-            info = _build_solver_info("brent", t_lower, t_upper)
-            raise _SolverNotConverged(
-                f"Invalid state during Brent iteration at T={t:.4f} K; "
-                f"target enthalpy={target_h:.2f} J/kg",
-                solver_info=info,
-                solver_calls=solver_calls,
-            )
+            return None
         return state.enthalpy_j_kg - target_h
 
-    try:
-        t_solution, brent_result = brentq(
-            _brent_residual,
-            t_lower,
-            t_upper,
-            xtol=solver_params.temperature_tolerance,
-            maxiter=solver_params.max_iterations,
-            full_output=True,
-        )
-    except (_SolverNotConverged, ValueError) as exc:
-        if isinstance(exc, _SolverNotConverged):
-            info = exc.solver_info
-            calls = exc.solver_calls
-        else:
-            info = _build_solver_info("brent", t_lower, t_upper)
-            calls = solver_calls
-        raise _SolverNotConverged(
-            f"Root-finding failed: {exc}. Target enthalpy={target_h:.2f} J/kg, "
-            f"bracket=[{t_lower:.2f}, {t_upper:.2f}] K.",
-            solver_info=info,
-            solver_calls=calls,
-        ) from exc
+    _endpoint_solved = False
+    t_solution: float
+    brent_algo_iters: int = 0
 
-    # Algorithm iterations from SciPy RootResults
-    brent_algo_iters: int = brent_result.iterations
+    if f_lower is not None and abs(f_lower) < _energy_tol:
+        # Lower endpoint is an exact (or near-exact) root — accept directly
+        t_solution = t_lower
+        _endpoint_solved = True
+    elif f_upper is not None and abs(f_upper) < _energy_tol:
+        # Upper endpoint is an exact (or near-exact) root — accept directly
+        t_solution = t_upper
+        _endpoint_solved = True
 
-    # Endpoint check: if root is at a bracket endpoint, iterations = 0
-    if (
-        abs(t_solution - t_lower) < solver_params.temperature_tolerance
-        or abs(t_solution - t_upper) < solver_params.temperature_tolerance
-    ):
-        brent_algo_iters = 0
+    if not _endpoint_solved:
+        # --- Solve with brentq ---
+        def _brent_residual(t: float) -> float:
+            """Wrapper for brentq that counts function evaluations."""
+            brent_func_eval_count[0] += 1
+            if brent_func_eval_count[0] > solver_params.max_iterations:
+                info = _build_solver_info("brent", t_lower, t_upper)
+                raise _SolverNotConverged(
+                    f"Solver exceeded max iterations ({solver_params.max_iterations})",
+                    solver_info=info,
+                    solver_calls=solver_calls,
+                )
+            state = _safe_eval_tp(t, stage="brent_evaluation")
+            if state is None or not _is_valid_bracket_state(state):
+                info = _build_solver_info("brent", t_lower, t_upper)
+                raise _SolverNotConverged(
+                    f"Invalid state during Brent iteration at T={t:.4f} K; "
+                    f"target enthalpy={target_h:.2f} J/kg",
+                    solver_info=info,
+                    solver_calls=solver_calls,
+                )
+            return state.enthalpy_j_kg - target_h
+
+        try:
+            t_solution, brent_result = brentq(
+                _brent_residual,
+                t_lower,
+                t_upper,
+                xtol=solver_params.temperature_tolerance,
+                maxiter=solver_params.max_iterations,
+                full_output=True,
+            )
+        except (_SolverNotConverged, ValueError) as exc:
+            if isinstance(exc, _SolverNotConverged):
+                info = exc.solver_info
+                calls = exc.solver_calls
+            else:
+                info = _build_solver_info("brent", t_lower, t_upper)
+                calls = solver_calls
+            raise _SolverNotConverged(
+                f"Root-finding failed: {exc}. Target enthalpy={target_h:.2f} J/kg, "
+                f"bracket=[{t_lower:.2f}, {t_upper:.2f}] K.",
+                solver_info=info,
+                solver_calls=calls,
+            ) from exc
+
+        # Algorithm iterations from SciPy RootResults — use directly, no override
+        brent_algo_iters = brent_result.iterations
 
     # Get the final state at the solved temperature
     outlet_state = _safe_eval_tp(t_solution, stage="final_state")
@@ -1466,7 +1473,7 @@ def _solve_outlet_temperature(
         brent_func_eval_count[0],  # function evaluations
         bracket_probes[0],  # bracket probes
         solver_calls,  # solver calls
-        brent_algo_iters,  # algorithm iterations (from SciPy)
+        brent_algo_iters,  # algorithm iterations (0 if endpoint, SciPy value otherwise)
     )
 
 
@@ -1787,16 +1794,16 @@ def _build_result_payload(
         "solver_max_bracket_span_k": request_identity.solver_max_bracket_span_k,
         "solver_absolute_energy_tolerance_w": request_identity.solver_absolute_energy_tolerance_w,
         "solver_near_zero_duty_threshold_w": request_identity.solver_near_zero_duty_threshold_w,
-        # Provider identity
+        # Provider identity (canonical source: ProviderIdentitySnapshot only)
         "provider_name": provider_identity.name,
         "provider_version": provider_identity.version,
         "provider_git_revision": provider_identity.git_revision,
         "reference_state_policy": provider_identity.reference_state_policy,
         "configuration_fingerprint": provider_identity.configuration_fingerprint,
         "cache_policy_version": provider_identity.cache_policy_version,
-        # Flow arrangement
+        # Flow arrangement (canonical source: request_identity)
         "specification_mode": specification_mode.value,
-        "flow_arrangement": flow_arrangement.value,
+        "flow_arrangement": request_identity.flow_arrangement,
         # Solved states
         "hot_inlet": hot_inlet_dict,
         "hot_outlet": hot_outlet_dict,
@@ -2219,7 +2226,7 @@ def _handle_zero_duty(
     hot_model = hot_inlet_state.to_model()
     cold_model = cold_inlet_state.to_model()
 
-    request_identity = _build_request_identity(inp, provider)
+    request_identity = _build_request_identity(inp)
     provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
 
     result_hash = _compute_result_hash(
@@ -2342,7 +2349,7 @@ def _make_blocked_result(
     energy_balance_accepted = False
 
     # Build identity snapshots
-    request_identity = _build_request_identity(inp, provider)
+    request_identity = _build_request_identity(inp)
     if hot_inlet_state is not None:
         provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
     else:
@@ -2373,6 +2380,10 @@ def _make_blocked_result(
         status=HeatBalanceStatus.BLOCKED,
         duty_w=None,
         acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
+        bracket_probe_count=bracket_probe_count,
+        brent_function_evaluation_count=brent_function_evaluation_count,
+        brent_algorithm_iteration_count=brent_algorithm_iteration_count,
+        solver_converged=False,
     )
 
     provenance = _build_provenance(
@@ -2441,6 +2452,9 @@ def _make_failed_result(
     solver_calls: list[PropertyCallRecord] | None = None,
     successful_hot_outlet: FluidState | None = None,
     successful_cold_outlet: FluidState | None = None,
+    cumulative_bracket_probe_count: int | None = None,
+    cumulative_brent_function_evaluation_count: int | None = None,
+    cumulative_brent_algorithm_iteration_count: int | None = None,
 ) -> HeatBalanceResult:
     """Build a FAILED HeatBalanceResult when the solver does not converge.
 
@@ -2461,6 +2475,24 @@ def _make_failed_result(
     failure_message: str
     failure_context: tuple[tuple[str, Any], ...]
 
+    # Use cumulative counts (prior side + failing side) when provided,
+    # otherwise fall back to solver_info's own counts.
+    _cum_bp = (
+        cumulative_bracket_probe_count
+        if cumulative_bracket_probe_count is not None
+        else solver_info.bracket_probe_count
+    )
+    _cum_bfe = (
+        cumulative_brent_function_evaluation_count
+        if cumulative_brent_function_evaluation_count is not None
+        else solver_info.brent_function_evaluation_count
+    )
+    _cum_bai = (
+        cumulative_brent_algorithm_iteration_count
+        if cumulative_brent_algorithm_iteration_count is not None
+        else solver_info.brent_algorithm_iteration_count
+    )
+
     if solver_info.dominant_property_error is not None:
         prop_exc = solver_info.dominant_property_error
         failure_code = _property_error_to_code(prop_exc)
@@ -2478,9 +2510,9 @@ def _make_failed_result(
             ("bracket_lower_k", solver_info.bracket_lower_k),
             ("bracket_upper_k", solver_info.bracket_upper_k),
             ("last_attempted_temperature_k", solver_info.last_attempted_temperature_k),
-            ("bracket_probe_count", solver_info.bracket_probe_count),
-            ("brent_function_evaluation_count", solver_info.brent_function_evaluation_count),
-            ("brent_algorithm_iteration_count", solver_info.brent_algorithm_iteration_count),
+            ("bracket_probe_count", _cum_bp),
+            ("brent_function_evaluation_count", _cum_bfe),
+            ("brent_algorithm_iteration_count", _cum_bai),
             ("failure_phase", solver_info.failure_phase),
             ("property_error_code", prop_exc.code.value),
             ("property_error_message", str(prop_exc)),
@@ -2500,9 +2532,9 @@ def _make_failed_result(
             ("bracket_lower_k", solver_info.bracket_lower_k),
             ("bracket_upper_k", solver_info.bracket_upper_k),
             ("last_attempted_temperature_k", solver_info.last_attempted_temperature_k),
-            ("bracket_probe_count", solver_info.bracket_probe_count),
-            ("brent_function_evaluation_count", solver_info.brent_function_evaluation_count),
-            ("brent_algorithm_iteration_count", solver_info.brent_algorithm_iteration_count),
+            ("bracket_probe_count", _cum_bp),
+            ("brent_function_evaluation_count", _cum_bfe),
+            ("brent_algorithm_iteration_count", _cum_bai),
             ("failure_phase", solver_info.failure_phase),
         )
 
@@ -2522,7 +2554,7 @@ def _make_failed_result(
     energy_balance_accepted = False
 
     # Build identity snapshots
-    request_identity = _build_request_identity(inp, provider)
+    request_identity = _build_request_identity(inp)
     if hot_inlet_state is not None:
         provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
     else:
@@ -2554,9 +2586,9 @@ def _make_failed_result(
         duty_w=None,
         acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
         failure=failure,
-        bracket_probe_count=solver_info.bracket_probe_count,
-        brent_function_evaluation_count=solver_info.brent_function_evaluation_count,
-        brent_algorithm_iteration_count=solver_info.brent_algorithm_iteration_count,
+        bracket_probe_count=_cum_bp,
+        brent_function_evaluation_count=_cum_bfe,
+        brent_algorithm_iteration_count=_cum_bai,
     )
 
     provenance = _build_provenance(
@@ -2567,9 +2599,9 @@ def _make_failed_result(
         known_duty_w=inp.known_duty_w,
         solver_params=inp.solver_params,
         property_calls=all_calls,
-        brent_function_evaluation_count=solver_info.brent_function_evaluation_count,
-        bracket_probe_count=solver_info.bracket_probe_count,
-        brent_algorithm_iteration_count=solver_info.brent_algorithm_iteration_count,
+        brent_function_evaluation_count=_cum_bfe,
+        bracket_probe_count=_cum_bp,
+        brent_algorithm_iteration_count=_cum_bai,
         solver_converged=False,
         warnings=warnings,
         blockers=[],
@@ -2592,9 +2624,9 @@ def _make_failed_result(
         relative_imbalance=relative_imbalance,
         energy_balance_accepted=energy_balance_accepted,
         acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
-        bracket_probe_count=solver_info.bracket_probe_count,
-        brent_function_evaluation_count=solver_info.brent_function_evaluation_count,
-        brent_algorithm_iteration_count=solver_info.brent_algorithm_iteration_count,
+        bracket_probe_count=_cum_bp,
+        brent_function_evaluation_count=_cum_bfe,
+        brent_algorithm_iteration_count=_cum_bai,
         solver_converged=False,
         property_calls=tuple(all_calls),
         warnings=tuple(warnings),
@@ -2896,6 +2928,10 @@ def solve_heat_balance(
     if mode == SpecificationMode.KNOWN_DUTY:
         assert inp.known_duty_w is not None
         # Solve both outlets independently
+        # Initialize cumulative counters for the case where hot-side fails
+        iters_hot = 0
+        be_hot = 0
+        _brent_algo_iters_hot = 0
         try:
             hot_outlet_state, iters_hot, be_hot, _calls_hot, _brent_algo_iters_hot = (
                 _solve_outlet_temperature(
@@ -2930,6 +2966,10 @@ def solve_heat_balance(
             if isinstance(exc, (_BracketExhausted, _SolverNotConverged)):
                 solver_info = exc.solver_info
                 solver_calls = exc.solver_calls
+                # Accumulate: prior side's counts + failing side's counts
+                cumulative_bp = iters_hot + solver_info.bracket_probe_count
+                cumulative_bfe = be_hot + solver_info.brent_function_evaluation_count
+                cumulative_bai = _brent_algo_iters_hot + solver_info.brent_algorithm_iteration_count
                 # Phase-rejection is BLOCKED + UNSUPPORTED_SERVICE, not FAILED
                 if isinstance(exc, _BracketExhausted) and exc.phase_rejected:
                     side_label = "hot" if solver_info.side == "hot" else "cold"
@@ -2957,9 +2997,9 @@ def solve_heat_balance(
                         warnings,
                         blockers,
                         context=context,
-                        bracket_probe_count=solver_info.bracket_probe_count,
-                        brent_function_evaluation_count=solver_info.brent_function_evaluation_count,
-                        brent_algorithm_iteration_count=solver_info.brent_algorithm_iteration_count,
+                        bracket_probe_count=cumulative_bp,
+                        brent_function_evaluation_count=cumulative_bfe,
+                        brent_algorithm_iteration_count=cumulative_bai,
                     )
             else:
                 # PropertyServiceError — build minimal solver_info
@@ -2975,6 +3015,10 @@ def solve_heat_balance(
                     failure_phase="property",
                 )
                 solver_calls = []
+                # Accumulate prior side's counts
+                cumulative_bp = iters_hot + solver_info.bracket_probe_count
+                cumulative_bfe = be_hot + solver_info.brent_function_evaluation_count
+                cumulative_bai = _brent_algo_iters_hot + solver_info.brent_algorithm_iteration_count
             return _make_failed_result(
                 inp,
                 provider,
@@ -2986,6 +3030,9 @@ def solve_heat_balance(
                 solver_info,
                 context=context,
                 solver_calls=solver_calls,
+                cumulative_bracket_probe_count=cumulative_bp,
+                cumulative_brent_function_evaluation_count=cumulative_bfe,
+                cumulative_brent_algorithm_iteration_count=cumulative_bai,
             )
         total_brent_function_evaluations = iters_hot + iters_cold
         total_bracket_probe_count = be_hot + be_cold
@@ -3729,7 +3776,7 @@ def solve_heat_balance(
     cold_outlet_model = cold_outlet_state.to_model()
 
     # Build identity snapshots
-    request_identity = _build_request_identity(inp, provider)
+    request_identity = _build_request_identity(inp)
     provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
 
     result_hash = _compute_result_hash(
