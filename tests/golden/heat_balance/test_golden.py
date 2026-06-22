@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from hexagent.core.heat_balance import (
+    FlowArrangement,
     HeatBalanceInput,
     SolverParams,
     StreamState,
@@ -79,6 +80,7 @@ def test_golden_case(case: dict, provider: CoolPropProvider) -> None:
         cold=cold,
         known_duty_w=inp_data.get("duty_w"),
         solver_params=params,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
     )
 
     result = solve_heat_balance(inp, provider)
@@ -86,20 +88,30 @@ def test_golden_case(case: dict, provider: CoolPropProvider) -> None:
     # Assert specification mode
     assert result.specification_mode.value == expected["specification_mode"]
 
+    # Assert status
+    if "status" in expected:
+        assert result.status.value == expected["status"]
+
     # Assert duty
     if "duty_w" in expected:
         assert result.duty_w == pytest.approx(expected["duty_w"], abs=10.0)
 
-    # Assert temperatures
+    # Assert temperatures (FluidStateModel attribute access)
     temp_tol = tols.get("temperature_k", 0.5)
     if "hot_outlet_t" in expected:
-        assert result.hot_outlet_state["temperature_k"] == pytest.approx(
+        assert result.hot_outlet_state.temperature_k == pytest.approx(
             expected["hot_outlet_t"], abs=temp_tol
         )
     if "cold_outlet_t" in expected:
-        assert result.cold_outlet_state["temperature_k"] == pytest.approx(
+        assert result.cold_outlet_state.temperature_k == pytest.approx(
             expected["cold_outlet_t"], abs=temp_tol
         )
+
+    # Assert q_hot_w / q_cold_w
+    if "q_hot_w" in expected:
+        assert result.q_hot_w == pytest.approx(expected["q_hot_w"], abs=10.0)
+    if "q_cold_w" in expected:
+        assert result.q_cold_w == pytest.approx(expected["q_cold_w"], abs=10.0)
 
     # Assert residual
     if "residual_w" in expected:
@@ -108,6 +120,10 @@ def test_golden_case(case: dict, provider: CoolPropProvider) -> None:
     # Assert relative imbalance
     imb_tol = tols.get("relative_imbalance_max", 0.001)
     assert result.relative_imbalance < imb_tol
+
+    # Assert energy_balance_accepted
+    if "energy_balance_accepted" in expected:
+        assert result.energy_balance_accepted == expected["energy_balance_accepted"]
 
     # Assert convergence
     if "solver_converged" in expected:

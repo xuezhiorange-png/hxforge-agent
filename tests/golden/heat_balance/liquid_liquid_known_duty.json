@@ -13,14 +13,17 @@
     "duty_w": 167200.0
   },
   "expected": {
+    "status": "SUCCEEDED",
     "specification_mode": "known_duty",
     "duty_w": 167200.0,
+    "q_hot_w": 167200.02049055044,
+    "q_cold_w": 167199.95486767578,
     "hot_outlet_t": 310.04275026548487,
     "cold_outlet_t": 339.97687610636575,
-    "residual_w": 0.06562287465203553,
     "relative_imbalance": 3.9248125962845985e-07,
+    "energy_balance_accepted": true,
     "solver_converged": true,
-    "result_hash": "sha256:c24967de22d2ddee3ffab2cfbec9c9853b990c618b479eb78bfc2d18ef4b3972"
+    "result_hash": "sha256:c297ab3f047d441921e796c6e24cf8181fe69de1aded259964a1cc1a6258e1ca"
   },
   "tolerances": {
     "temperature_k": 0.5,

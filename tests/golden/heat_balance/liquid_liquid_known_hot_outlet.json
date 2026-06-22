@@ -13,13 +13,16 @@
     "cold_pressure": 150000.0
   },
   "expected": {
+    "status": "SUCCEEDED",
     "specification_mode": "known_hot_outlet",
     "duty_w": 167378.6735145609,
+    "q_hot_w": 167378.6735145609,
+    "q_cold_w": 167378.602344868,
     "cold_outlet_t": 340.03019494491724,
-    "residual_w": 0.07116969290655106,
     "relative_imbalance": 4.2520167839877006e-07,
+    "energy_balance_accepted": true,
     "solver_converged": true,
-    "result_hash": "sha256:79cdf88068de066b05b3a67e137e0f5888b9f6af29cca23dad5dd0c6e4d4af83"
+    "result_hash": "sha256:019b65396319d72910a80cb52615fcf77c860d94c2743d56d23284d006515163"
   },
   "tolerances": {
     "temperature_k": 0.5,
