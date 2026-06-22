@@ -33,7 +33,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid5
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
 from scipy.optimize import brentq
 
 from hexagent.core.canonical import sha256_digest
@@ -345,9 +345,20 @@ class PropertyCallRecord:
     error_code: str | None = None
     error_message: str | None = None
     stream_role: str = "solver"
-    """Role: 'hot_inlet', 'cold_inlet', 'hot_outlet', 'cold_outlet', 'solver'."""
+    """Role: 'hot_inlet', 'cold_inlet', 'hot_outlet', 'cold_outlet',
+    'hot_solver', 'cold_solver'."""
     sequence_index: int = 0
     """Global deterministic sequence index across all calls."""
+    backend_git_revision: str = ""
+    """Provider backend git revision from property provenance."""
+    configuration_fingerprint: str = ""
+    """Provider configuration fingerprint from property provenance."""
+    validation_level: str = ""
+    """Validation level from property provenance (e.g. 'unvalidated')."""
+    validation_dataset_id: str | None = None
+    """Validation dataset ID from property provenance, if any."""
+    cache_policy_version: str = ""
+    """Cache policy version from property provenance."""
 
 
 # ---------------------------------------------------------------------------
@@ -433,6 +444,9 @@ class HeatBalanceResult(BaseModel):
     acceptance_basis: AcceptanceBasis
     solver_iterations: int
     bracket_evaluations: int
+    brent_algorithm_iterations: int = 0
+    """Actual Brent algorithm iterations from SciPy's RootResults.iterations.
+    Populated when full_output=True is used."""
     solver_converged: bool
     property_calls: tuple[PropertyCallRecord, ...]
     warnings: tuple[EngineeringMessage, ...]
@@ -440,6 +454,7 @@ class HeatBalanceResult(BaseModel):
     failure: RunFailure | None = None
     result_hash: str
     provenance_graph: ProvenanceGraph
+    _field_hash: str = PrivateAttr(default="")
 
     @model_validator(mode="after")
     def _validate_no_nan_inf(self) -> HeatBalanceResult:
@@ -497,24 +512,53 @@ class HeatBalanceResult(BaseModel):
             raise ValueError(f"result_hash contains invalid hex: {self.result_hash!r}") from None
         return self
 
-    def validate_integrity(self) -> bool:
-        """Verify result_hash matches the recomputed hash from stored fields.
+    def model_post_init(self, __context: Any) -> None:
+        """Compute field hash for tamper detection."""
+        object.__setattr__(self, "_field_hash", self._compute_field_hash())
 
-        Returns True if the hash is valid, False if tampered.
-        Note: This performs format validation only; full recomputation requires
-        the original inputs which are not stored in the result.
+    def _compute_field_hash(self) -> str:
+        """Compute SHA-256 of all public fields for tamper detection."""
+
+        def _stm(s: FluidStateModel | None) -> dict[str, Any] | None:
+            if s is None:
+                return None
+            if isinstance(s, dict):
+                return s
+            return s.model_dump()
+
+        payload: dict[str, Any] = {
+            "status": self.status.value,
+            "specification_mode": self.specification_mode.value,
+            "flow_arrangement": self.flow_arrangement.value,
+            "duty_w": self.duty_w,
+            "hot_inlet_state": _stm(self.hot_inlet_state),
+            "hot_outlet_state": _stm(self.hot_outlet_state),
+            "cold_inlet_state": _stm(self.cold_inlet_state),
+            "cold_outlet_state": _stm(self.cold_outlet_state),
+            "q_hot_w": self.q_hot_w,
+            "q_cold_w": self.q_cold_w,
+            "residual_w": self.residual_w,
+            "relative_imbalance": self.relative_imbalance,
+            "energy_balance_accepted": self.energy_balance_accepted,
+            "acceptance_basis": self.acceptance_basis.value,
+            "solver_iterations": self.solver_iterations,
+            "bracket_evaluations": self.bracket_evaluations,
+            "brent_algorithm_iterations": self.brent_algorithm_iterations,
+            "solver_converged": self.solver_converged,
+            "property_calls": [_property_call_record_to_dict(pc) for pc in self.property_calls],
+            "warnings": [_message_to_dict(m) for m in self.warnings],
+            "blockers": [_message_to_dict(m) for m in self.blockers],
+            "result_hash": self.result_hash,
+        }
+        return sha256_digest(payload)
+
+    def validate_integrity(self) -> bool:
+        """Verify no fields have been tampered with after construction.
+
+        Recomputes a hash of all public fields and compares with the
+        hash stored at construction time.
         """
-        # At minimum, verify hash format
-        if not self.result_hash.startswith("sha256:"):
-            return False
-        hex_part = self.result_hash[7:]
-        if len(hex_part) != 64:
-            return False
-        try:
-            int(hex_part, 16)
-        except ValueError:
-            return False
-        return True
+        return self._field_hash == self._compute_field_hash()
 
 
 # ---------------------------------------------------------------------------
@@ -912,7 +956,8 @@ def _solve_outlet_temperature(
     solver_params: SolverParams,
     property_calls: list[PropertyCallRecord],
     expected_phase_family: frozenset[PhaseRegion],
-) -> tuple[FluidState, int, int, list[PropertyCallRecord]]:
+    global_seq: list[int],
+) -> tuple[FluidState, int, int, list[PropertyCallRecord], int]:
     """Solve for the unknown outlet temperature using Brent's method.
 
     Phase-safe: only expands the bracket to temperatures where the
@@ -920,7 +965,8 @@ def _solve_outlet_temperature(
     family.  ALL provider calls (successful and failed) are recorded
     with explicit stage identifiers.
 
-    Returns ``(outlet_state, brent_iterations, bracket_probes, solver_calls)``.
+    Returns ``(outlet_state, brent_function_evals, bracket_probes, solver_calls,
+    brent_algorithm_iterations)``.
 
     Raises ``_BracketExhausted`` if no valid bracket can be found, or
     ``_SolverNotConverged`` if Brent does not converge.
@@ -939,6 +985,7 @@ def _solve_outlet_temperature(
     solver_calls: list[PropertyCallRecord] = []
     _last_valid_state: FluidState | None = None
     _last_attempted_t: float = t_inlet
+    _solver_stream_role = "hot_solver" if is_hot_side else "cold_solver"
 
     def _safe_eval_tp(t: float, stage: str) -> FluidState | None:
         """Evaluate state at (t, P).  Records ALL calls.  Returns None on failure."""
@@ -957,7 +1004,10 @@ def _solve_outlet_temperature(
                 provider,
                 exc,
                 stage=stage,
+                stream_role=_solver_stream_role,
+                sequence_index=global_seq[0],
             )
+            global_seq[0] += 1
             return None
         _record_property_call(
             solver_calls,
@@ -967,7 +1017,10 @@ def _solve_outlet_temperature(
             provider,
             state,
             stage=stage,
+            stream_role=_solver_stream_role,
+            sequence_index=global_seq[0],
         )
+        global_seq[0] += 1
         nonlocal _last_valid_state
         _last_valid_state = state
         return state
@@ -982,29 +1035,35 @@ def _solve_outlet_temperature(
         return state_family is not None and state_family == expected_phase_family
 
     def _all_wrong_phase() -> bool:
-        """Check if all successful solver calls are in wrong phase family.
+        """Check if bracket probes are all in the wrong phase family.
 
-        Returns True ONLY if at least one successful call shows an incompatible
-        phase family AND no successful call shows the correct phase family.
-        Returns False if there is no evidence of phase incompatibility
-        (i.e., all calls failed or all successful calls are in the correct family).
+        Returns True ONLY if there are successful bracket-probe-stage calls
+        AND NONE of them are in the expected phase family.  This means
+        the bracket search found states, but they were all in an incompatible
+        phase — a genuine phase-rejection scenario.
+
+        Returns False if:
+        - No successful bracket probes exist (all failed → property issue,
+          not phase).
+        - At least one bracket probe is in the expected phase family
+          (the bracket search found valid candidates but could not form
+          a sign-changing pair → numerical failure, not phase rejection).
         """
-        if not solver_calls:
-            return False
-        wrong_phase_count = 0
-        correct_phase_count = 0
+        has_wrong_phase = False
+        has_correct_phase = False
         for sc in solver_calls:
-            if sc.success and sc.result_phase is not None:
+            if sc.success and sc.stage == "bracket_probe" and sc.result_phase is not None:
                 try:
                     phase = PhaseRegion(sc.result_phase)
                     sf = _phase_family(phase)
                     if sf is not None and sf == expected_phase_family:
-                        correct_phase_count += 1
+                        has_correct_phase = True
                     elif sf is not None:
-                        wrong_phase_count += 1
+                        has_wrong_phase = True
                 except ValueError:
                     pass
-        return wrong_phase_count > 0 and correct_phase_count == 0
+        # Phase-rejected only if bracket probes exist but ALL are wrong-phase
+        return has_wrong_phase and not has_correct_phase
 
     def _dominant_property_error() -> PropertyServiceError | None:
         """Return the most severe PropertyServiceError from failed solver_calls.
@@ -1155,12 +1214,13 @@ def _solve_outlet_temperature(
         return state.enthalpy_j_kg - target_h
 
     try:
-        t_solution = brentq(
+        t_solution, brent_result = brentq(
             _brent_residual,
             t_lower,
             t_upper,
             xtol=solver_params.temperature_tolerance,
             maxiter=solver_params.max_iterations,
+            full_output=True,
         )
     except (_SolverNotConverged, ValueError) as exc:
         if isinstance(exc, _SolverNotConverged):
@@ -1189,7 +1249,13 @@ def _solve_outlet_temperature(
     # Merge solver_calls into the caller's property_calls
     property_calls.extend(solver_calls)
 
-    return outlet_state, brent_iterations[0], bracket_probes[0], solver_calls
+    return (
+        outlet_state,
+        brent_iterations[0],
+        bracket_probes[0],
+        solver_calls,
+        brent_result.iterations,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1213,6 +1279,8 @@ def _record_property_call(
     sequence_index: int = 0,
 ) -> None:
     """Append a PropertyCallRecord to *records*."""
+    # Extract provider/configuration identity from the state's provenance
+    prov = state.provenance if state is not None else None
     records.append(
         PropertyCallRecord(
             fluid=str(fluid),
@@ -1237,6 +1305,11 @@ def _record_property_call(
             error_message=error_message,
             stream_role=stream_role,
             sequence_index=sequence_index,
+            backend_git_revision=prov.backend_git_revision if prov is not None else "",
+            configuration_fingerprint=prov.configuration_fingerprint if prov is not None else "",
+            validation_level=prov.validation_level.value if prov is not None else "",
+            validation_dataset_id=prov.validation_dataset_id if prov is not None else None,
+            cache_policy_version=prov.cache_policy_version if prov is not None else "",
         )
     )
 
@@ -1306,8 +1379,13 @@ def _fluid_state_model_to_dict(state: FluidStateModel) -> dict[str, Any]:
     }
 
 
-def _property_call_record_to_dict(pc: PropertyCallRecord) -> dict[str, Any]:
-    """Convert PropertyCallRecord to a canonical dict for hashing."""
+def _property_call_record_to_dict(pc: PropertyCallRecord | dict[str, Any]) -> dict[str, Any]:
+    """Convert PropertyCallRecord to a canonical dict for hashing.
+
+    Also handles dict inputs (e.g. from model_construct/model_dump).
+    """
+    if isinstance(pc, dict):
+        return pc
     return {
         "fluid": pc.fluid,
         "query_type": pc.query_type,
@@ -1331,11 +1409,21 @@ def _property_call_record_to_dict(pc: PropertyCallRecord) -> dict[str, Any]:
         "error_message": pc.error_message,
         "stream_role": pc.stream_role,
         "sequence_index": pc.sequence_index,
+        "backend_git_revision": pc.backend_git_revision,
+        "configuration_fingerprint": pc.configuration_fingerprint,
+        "validation_level": pc.validation_level,
+        "validation_dataset_id": pc.validation_dataset_id,
+        "cache_policy_version": pc.cache_policy_version,
     }
 
 
-def _message_to_dict(msg: EngineeringMessage) -> dict[str, Any]:
-    """Convert EngineeringMessage to a canonical dict for hashing."""
+def _message_to_dict(msg: EngineeringMessage | dict[str, Any]) -> dict[str, Any]:
+    """Convert EngineeringMessage to a canonical dict for hashing.
+
+    Also handles dict inputs (e.g. from model_construct/model_dump).
+    """
+    if isinstance(msg, dict):
+        return msg
     return {
         "schema_version": msg.schema_version,
         "code": msg.code.value,
@@ -2507,6 +2595,7 @@ def solve_heat_balance(
     # --- Solve based on specification mode ---
     total_brent_iterations = 0
     total_bracket_evaluations = 0
+    total_brent_algorithm_iterations = 0
     hot_outlet_state: FluidState
     cold_outlet_state: FluidState
     duty_w: float
@@ -2515,27 +2604,33 @@ def solve_heat_balance(
         assert inp.known_duty_w is not None
         # Solve both outlets independently
         try:
-            hot_outlet_state, iters_hot, be_hot, _calls_hot = _solve_outlet_temperature(
-                provider,
-                inp.hot.fluid_identifier,
-                hot_inlet_state,
-                inp.hot.mass_flow_kg_s,
-                inp.known_duty_w,
-                is_hot_side=True,
-                solver_params=inp.solver_params,
-                property_calls=property_calls,
-                expected_phase_family=hot_phase_family,
+            hot_outlet_state, iters_hot, be_hot, _calls_hot, _brent_iters_hot = (
+                _solve_outlet_temperature(
+                    provider,
+                    inp.hot.fluid_identifier,
+                    hot_inlet_state,
+                    inp.hot.mass_flow_kg_s,
+                    inp.known_duty_w,
+                    is_hot_side=True,
+                    solver_params=inp.solver_params,
+                    property_calls=property_calls,
+                    expected_phase_family=hot_phase_family,
+                    global_seq=_global_seq,
+                )
             )
-            cold_outlet_state, iters_cold, be_cold, _calls_cold = _solve_outlet_temperature(
-                provider,
-                inp.cold.fluid_identifier,
-                cold_inlet_state,
-                inp.cold.mass_flow_kg_s,
-                inp.known_duty_w,
-                is_hot_side=False,
-                solver_params=inp.solver_params,
-                property_calls=property_calls,
-                expected_phase_family=cold_phase_family,
+            cold_outlet_state, iters_cold, be_cold, _calls_cold, _brent_iters_cold = (
+                _solve_outlet_temperature(
+                    provider,
+                    inp.cold.fluid_identifier,
+                    cold_inlet_state,
+                    inp.cold.mass_flow_kg_s,
+                    inp.known_duty_w,
+                    is_hot_side=False,
+                    solver_params=inp.solver_params,
+                    property_calls=property_calls,
+                    expected_phase_family=cold_phase_family,
+                    global_seq=_global_seq,
+                )
             )
         except (_BracketExhausted, _SolverNotConverged, PropertyServiceError) as exc:
             # Extract structured info from exceptions
@@ -2598,6 +2693,7 @@ def solve_heat_balance(
             )
         total_brent_iterations = iters_hot + iters_cold
         total_bracket_evaluations = be_hot + be_cold
+        total_brent_algorithm_iterations = _brent_iters_hot + _brent_iters_cold
         duty_w = inp.known_duty_w
 
     elif mode == SpecificationMode.KNOWN_HOT_OUTLET:
@@ -2752,16 +2848,19 @@ def solve_heat_balance(
 
         # Solve cold outlet
         try:
-            cold_outlet_state, iters_cold, be_cold, _calls_cold = _solve_outlet_temperature(
-                provider,
-                inp.cold.fluid_identifier,
-                cold_inlet_state,
-                inp.cold.mass_flow_kg_s,
-                duty_w,
-                is_hot_side=False,
-                solver_params=inp.solver_params,
-                property_calls=property_calls,
-                expected_phase_family=cold_phase_family,
+            cold_outlet_state, iters_cold, be_cold, _calls_cold, _brent_iters_cold = (
+                _solve_outlet_temperature(
+                    provider,
+                    inp.cold.fluid_identifier,
+                    cold_inlet_state,
+                    inp.cold.mass_flow_kg_s,
+                    duty_w,
+                    is_hot_side=False,
+                    solver_params=inp.solver_params,
+                    property_calls=property_calls,
+                    expected_phase_family=cold_phase_family,
+                    global_seq=_global_seq,
+                )
             )
         except (_BracketExhausted, _SolverNotConverged, PropertyServiceError) as exc:
             # Extract structured info from exceptions
@@ -2824,6 +2923,7 @@ def solve_heat_balance(
             )
         total_brent_iterations = iters_cold
         total_bracket_evaluations = be_cold
+        total_brent_algorithm_iterations = _brent_iters_cold
 
     elif mode == SpecificationMode.KNOWN_COLD_OUTLET:
         assert inp.cold.outlet_temperature_k is not None
@@ -2979,16 +3079,19 @@ def solve_heat_balance(
 
         # Solve hot outlet
         try:
-            hot_outlet_state, iters_hot, be_hot, _calls_hot = _solve_outlet_temperature(
-                provider,
-                inp.hot.fluid_identifier,
-                hot_inlet_state,
-                inp.hot.mass_flow_kg_s,
-                duty_w,
-                is_hot_side=True,
-                solver_params=inp.solver_params,
-                property_calls=property_calls,
-                expected_phase_family=hot_phase_family,
+            hot_outlet_state, iters_hot, be_hot, _calls_hot, _brent_iters_hot = (
+                _solve_outlet_temperature(
+                    provider,
+                    inp.hot.fluid_identifier,
+                    hot_inlet_state,
+                    inp.hot.mass_flow_kg_s,
+                    duty_w,
+                    is_hot_side=True,
+                    solver_params=inp.solver_params,
+                    property_calls=property_calls,
+                    expected_phase_family=hot_phase_family,
+                    global_seq=_global_seq,
+                )
             )
         except (_BracketExhausted, _SolverNotConverged, PropertyServiceError) as exc:
             # Extract structured info from exceptions
@@ -3051,6 +3154,7 @@ def solve_heat_balance(
             )
         total_brent_iterations = iters_hot
         total_bracket_evaluations = be_hot
+        total_brent_algorithm_iterations = _brent_iters_hot
 
     elif mode == SpecificationMode.BOTH_OUTLETS_KNOWN:
         # Both outlets known → verify energy balance
@@ -3394,6 +3498,7 @@ def solve_heat_balance(
         acceptance_basis=acceptance_basis,
         solver_iterations=total_brent_iterations,
         bracket_evaluations=total_bracket_evaluations,
+        brent_algorithm_iterations=total_brent_algorithm_iterations,
         solver_converged=solver_converged,
         property_calls=tuple(property_calls),
         warnings=tuple(warnings),

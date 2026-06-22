@@ -115,3 +115,18 @@ Supported and unsupported combinations must be explicitly enumerated. Under-spec
 - Complete pytest suite.
 - pip-audit.
 - Python 3.11 and 3.12 CI.
+
+## Review history
+
+| Round | Head | CI Run | Decision | Date |
+|-------|------|--------|----------|------|
+| Review-01 | `1919098` | #125 | CHANGES REQUIRED | 2026-06-22 |
+| Review-02 | `858acc3` | #125 | CHANGES REQUIRED | 2026-06-22 |
+| Review-03 | `fffe610` | #128 | CHANGES REQUIRED | 2026-06-22 |
+| Review-04 | `a389108` | #128 | CHANGES REQUIRED | 2026-06-22 |
+| Review-05 | `796e10c` | #131 | CHANGES REQUIRED | 2026-06-22 |
+| Review-06 | TBD | TBD | TBD | TBD |
+
+**Current head:** `796e10cc86ad24900e44321b5839a2682704c0c1`
+**Test count:** 803 passed
+**CI:** Python 3.11 ✅ · Python 3.12 ✅ (run #131, `27953945196`)
