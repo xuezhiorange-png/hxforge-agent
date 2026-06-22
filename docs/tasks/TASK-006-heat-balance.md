@@ -5,11 +5,21 @@
 **Priority:** P0  
 **Depends on:** TASK-002, TASK-003, TASK-005  
 **GitHub Issue:** #13  
-**Branch:** `codex/task-006-heat-balance`
+**Branch:** `codex/task-006-heat-balance`  
+**Draft PR:** #14
 
 ## Objective
 
 Resolve valid combinations of duty, flow and inlet/outlet states while enforcing energy conservation, phase consistency and temperature feasibility.
+
+## Current engineering status
+
+The first implementation is complete and CI is green, but Engineering Review Rounds 1 and 2 identified unresolved domain contracts. TASK-006 remains `IN_PROGRESS` and PR #14 must remain Draft until all review items are closed.
+
+Authoritative reviews:
+
+- `docs/reviews/TASK-006-engineering-review-01.md`
+- `docs/reviews/TASK-006-engineering-review-02.md`
 
 ## In scope
 
@@ -17,7 +27,7 @@ Resolve valid combinations of duty, flow and inlet/outlet states while enforcing
 - Known-duty, known-outlet and mixed specification modes.
 - Hot/cold energy residual and tolerance.
 - Terminal-temperature, minimum-approach and temperature-cross checks.
-- Property-provider iteration at representative or segmented states.
+- Property-provider evaluation and deterministic unknown-outlet solution.
 - Explicit unsupported response for phase change.
 - Structured warnings, blockers and run failures.
 - Deterministic result hashing and provenance serialization.
@@ -30,50 +40,49 @@ Resolve valid combinations of duty, flow and inlet/outlet states while enforcing
 - Geometry sizing, rating, candidate generation or optimization.
 - Two-phase heat balance.
 - Database, API and report implementation.
+- TASK-007 scope.
 
 ## Required engineering contracts
 
-### Specification modes
+### Specification closure
 
-The implementation must explicitly enumerate supported and unsupported combinations rather than infer them implicitly. At minimum:
-
-- both inlet states, both mass flows and one outlet known;
-- both inlet states, both mass flows and duty known;
-- both inlet states, both mass flows and both outlets known for verification;
-- one side fully specified and the other outlet unknown;
-- mixed specification with one independently solvable unknown.
-
-Under-specified and over-specified combinations must return stable structured errors.
+Supported and unsupported combinations must be explicitly enumerated. Under-specified and over-specified combinations must return stable structured results rather than relying on exception-message parsing.
 
 ### Energy convention
 
 - Heat duty is positive from hot stream to cold stream.
-- Hot-side enthalpy decrease and cold-side enthalpy increase are both reported as positive transferred heat.
-- Residual and relative imbalance definitions must be explicit and documented.
-- Approved solutions require relative imbalance below `0.001` (0.1%).
-- Zero-duty cases must be handled explicitly, without division by zero.
+- `Q_hot = m_hot × (h_hot,in − h_hot,out)`.
+- `Q_cold = m_cold × (h_cold,out − h_cold,in)`.
+- Residual and acceptance basis must be explicit and dimensionally consistent.
+- Approved non-zero-duty solutions require relative imbalance below `0.001`.
+- Zero/near-zero duty requires an explicit absolute tolerance in watts.
 
-### Property evaluation
+### Property and phase safety
 
-- Use `PropertyProvider`; do not embed constant heat-capacity assumptions in public services.
-- Record provider name/version, fluid identity and all evaluated states.
-- Detect property failures and out-of-range states as structured blockers.
-- Phase-change or unsupported phase transitions must return `NOT_IMPLEMENTED`/`UNSUPPORTED_SERVICE`, never a guessed sensible-heat result.
+- Use the existing `PropertyProvider`; no fixed-Cp assumptions in public services.
+- Record actual provider calls, including failures.
+- Do not substitute synthetic residuals for invalid thermodynamic states.
+- Reject saturated states, unsupported phases and incompatible inlet/outlet phase-family transitions.
 
 ### Temperature feasibility
 
-- Reject hot outlet above hot inlet for positive duty.
-- Reject cold outlet below cold inlet for positive duty.
-- Detect terminal temperature cross.
-- Detect non-positive terminal approach where applicable.
-- Use explicit tolerance for near-equality; do not rely on exact floating-point equality.
+- v0.1 supports explicitly declared counterflow only.
+- Terminal pairs must follow counterflow topology.
+- Non-positive terminal approach and true temperature cross are blockers.
+- Near-zero positive approach may be a warning under an explicit tolerance policy.
+
+### Result and failure contracts
+
+- `solve_heat_balance()` must not leak private solver exceptions.
+- Structural errors return `BLOCKED`; numerical convergence failures return `FAILED` with `RunFailure`.
+- Blocked/failed results must not contain fabricated thermodynamic states or fabricated property calls.
+- Public models are deeply immutable and recursively finite.
 
 ### Determinism and provenance
 
-- Public result models are immutable and reject NaN/Inf.
-- Canonical serialization and result hash are deterministic.
-- Provenance includes design/case revision identity, property calls, solver/specification mode, warnings, blockers and software version.
-- Same canonical input, provider result and software version yield the same result hash.
+- Result hash covers complete request, provider, solver, result, messages and failure identity.
+- Provenance uses real domain identities where available and must not invent case-revision lineage.
+- Node IDs and JSON serialization are deterministic for the same canonical calculation.
 
 ## Expected files
 
@@ -84,38 +93,25 @@ Under-specified and over-specified combinations must return stable structured er
 - `tests/golden/heat_balance/*.json`
 - `docs/HEAT_BALANCE.md`
 
-Existing unit, property, provenance and structured-message modules must be reused rather than duplicated.
-
 ## Acceptance criteria
 
-- [ ] All supported specification combinations are enumerated and validated.
-- [ ] Under- and over-specified cases return actionable structured errors.
-- [ ] Energy imbalance is below 0.1% for approved cases.
-- [ ] Impossible outlet temperatures are rejected.
-- [ ] Terminal cross and non-positive approach violations are rejected.
-- [ ] Zero flow, zero duty, negative flow and invalid state inputs are deterministic.
-- [ ] Phase-change cases return explicit unsupported status in v0.1.
-- [ ] Property-provider calls and versions are captured in provenance.
-- [ ] Canonical result hashing is repeatable and changes with material inputs.
-- [ ] No NaN/Inf escapes public result models.
-- [ ] Existing tests remain green.
-- [ ] Ruff, Ruff format, repository-wide mypy, pytest and pip-audit pass on Python 3.11 and 3.12.
+- [ ] Supported specification combinations are enumerated and validated.
+- [ ] Under-/over-specification returns structured blockers.
+- [ ] Public API does not leak private solver exceptions.
+- [ ] Relative and absolute energy acceptance are dimensionally explicit.
+- [ ] Impossible temperatures and non-positive terminal approaches are blocked.
+- [ ] Phase-change and invalid iterative states cannot be accepted.
+- [ ] Zero-duty specifications cannot be silently overwritten.
+- [ ] Result models are deeply immutable and recursively finite.
+- [ ] Result hashes are complete and deterministic.
+- [ ] Provenance contains no invented case-revision identity.
+- [ ] Flow arrangement is explicit at the domain-service boundary.
+- [ ] Existing and new tests remain green on Python 3.11 and 3.12.
 
-## Test plan
+## Quality gates
 
-- liquid-liquid nominal balance;
-- gas-liquid nominal balance;
-- one unknown hot outlet;
-- one unknown cold outlet;
-- known duty;
-- both outlets known for verification;
-- inconsistent duty/outlet specifications;
-- under-specified and over-specified combinations;
-- zero and negative flow;
-- zero duty;
-- temperature cross and terminal pinch;
-- property-provider failure and out-of-range state;
-- explicit phase-change rejection;
-- hash repeatability and changed-input detection;
-- provenance graph serialization;
-- golden cases with documented tolerances.
+- Ruff and Ruff format.
+- Repository-wide mypy.
+- Complete pytest suite.
+- pip-audit.
+- Python 3.11 and 3.12 CI.
