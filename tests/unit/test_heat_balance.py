@@ -285,11 +285,11 @@ class TestItem1JSONRoundTrip:
         params = SolverParams(bracket_step_k=0.001, max_bracket_span_k=0.001, max_iterations=1)
         Q = 1.0 * _WATER_CP * (350.0 - 310.0)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=params)
-        # _BracketExhausted is raised when bracket search fails
-        from hexagent.core.heat_balance import _BracketExhausted
-
-        with pytest.raises(_BracketExhausted):
-            solve_heat_balance(inp, provider)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.FAILED
+        assert result.failure is not None
+        assert result.solver_converged is False
+        assert result.energy_balance_accepted is False
 
 
 # ======================================================================
@@ -520,7 +520,7 @@ class TestItem4PhaseChecking:
         )
 
     def test_cross_family_blocked(self) -> None:
-        """Liquid inlet, gas outlet → _BracketExhausted raised (bracket search
+        """Liquid inlet, gas outlet → FAILED result (bracket search
         fails because all temperatures return gas phase, not the expected liquid family)."""
         provider = MockPropertyProvider()
         original_state_tp = provider.state_tp
@@ -553,10 +553,11 @@ class TestItem4PhaseChecking:
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
         Q = 1.0 * _WATER_CP * (350.0 - 310.0)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=_default_params())
-        from hexagent.core.heat_balance import _BracketExhausted
-
-        with pytest.raises(_BracketExhausted):
-            solve_heat_balance(inp, provider)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.BLOCKED
+        assert any(
+            "phase" in b.message.lower() or "family" in b.message.lower() for b in result.blockers
+        )
 
     def test_property_failure_recorded(self) -> None:
         """Property call failure during iteration → recorded in property_calls."""
@@ -581,7 +582,7 @@ class TestItem4PhaseChecking:
         assert result.status in (HeatBalanceStatus.BLOCKED, HeatBalanceStatus.FAILED)
 
     def test_no_valid_bracket_raises(self) -> None:
-        """No valid bracket → _BracketExhausted raised.
+        """No valid bracket → FAILED result.
 
         Cold outlet target (364K) is above the valid range (280-360K),
         so the cold-side bracket search fails.
@@ -592,23 +593,21 @@ class TestItem4PhaseChecking:
         # Q=250000 → cold outlet target ≈ 364K (above 360K valid range)
         Q = 250000.0
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=_default_params())
-        from hexagent.core.heat_balance import _BracketExhausted
-
-        with pytest.raises(_BracketExhausted):
-            solve_heat_balance(inp, provider)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.FAILED
+        assert result.failure is not None
 
     def test_iteration_exhaustion(self) -> None:
-        """Iteration exhaustion → _BracketExhausted or _SolverNotConverged raised."""
+        """Iteration exhaustion → FAILED result."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
         Q = 1.0 * _WATER_CP * (350.0 - 310.0)
         params = SolverParams(max_iterations=1, bracket_step_k=0.01, max_bracket_span_k=300.0)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=params)
-        from hexagent.core.heat_balance import _BracketExhausted, _SolverNotConverged
-
-        with pytest.raises((_BracketExhausted, _SolverNotConverged)):
-            solve_heat_balance(inp, provider)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.FAILED
+        assert result.failure is not None
 
 
 # ======================================================================
@@ -934,7 +933,7 @@ class TestItem8Provenance:
         result = solve_heat_balance(inp, provider)
 
         node_types = {n.node_type.value for n in result.provenance_graph.nodes}
-        assert "CASE_REVISION" in node_types
+        assert "EXTERNAL" in node_types
         assert "CALCULATION_RUN" in node_types
         assert "RESULT" in node_types
         assert "PROPERTY_CALL" in node_types
@@ -969,30 +968,28 @@ class TestItem9SolverParams:
             SolverParams(max_bracket_span_k=-1.0)
 
     def test_bracket_exhaustion_raises(self) -> None:
-        """Bracket exhaustion → _BracketExhausted raised."""
+        """Bracket exhaustion → FAILED result."""
         provider = MockPropertyProvider(out_of_range_temps=(280.0, 360.0))
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
         # Q=250000 → cold outlet target ≈ 364K (above 360K valid range)
         Q = 250000.0
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=_default_params())
-        from hexagent.core.heat_balance import _BracketExhausted
-
-        with pytest.raises(_BracketExhausted):
-            solve_heat_balance(inp, provider)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.FAILED
+        assert result.failure is not None
 
     def test_iteration_exhaustion_raises(self) -> None:
-        """Iteration exhaustion → _BracketExhausted or _SolverNotConverged raised."""
+        """Iteration exhaustion → FAILED result."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
         Q = 1.0 * _WATER_CP * (350.0 - 310.0)
         params = SolverParams(max_iterations=1, bracket_step_k=0.01, max_bracket_span_k=300.0)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=params)
-        from hexagent.core.heat_balance import _BracketExhausted, _SolverNotConverged
-
-        with pytest.raises((_BracketExhausted, _SolverNotConverged)):
-            solve_heat_balance(inp, provider)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.FAILED
+        assert result.failure is not None
 
 
 # ======================================================================

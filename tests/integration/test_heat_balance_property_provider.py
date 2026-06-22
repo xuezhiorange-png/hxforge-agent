@@ -417,9 +417,9 @@ class TestProvenanceRealProperties:
         )
 
         assert isinstance(result.provenance_graph, ProvenanceGraph)
-        # Should have CASE_REVISION, CALCULATION_RUN, PROPERTY_CALL, RESULT nodes
+        # Should have EXTERNAL, CALCULATION_RUN, PROPERTY_CALL, RESULT nodes
         node_types = {n.node_type.value for n in result.provenance_graph.nodes}
-        assert "CASE_REVISION" in node_types
+        assert "EXTERNAL" in node_types
         assert "CALCULATION_RUN" in node_types
         assert "PROPERTY_CALL" in node_types
         assert "RESULT" in node_types
@@ -455,7 +455,12 @@ class TestThermalServiceIntegration:
         cold = _water_cold(inlet_t=290.0, outlet_t=None, mass_flow=0.8)
         case = _make_case(hot, cold)
 
-        result = run_heat_balance(case, provider, solver_params=_TOLERANCE)
+        result = run_heat_balance(
+            case,
+            provider,
+            solver_params=_TOLERANCE,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+        )
 
         assert result.specification_mode == SpecificationMode.KNOWN_HOT_OUTLET
         assert result.duty_w is not None
@@ -468,7 +473,12 @@ class TestThermalServiceIntegration:
         q_approx = 1.0 * 4180.0 * (350.0 - 310.0)
         case = _make_case(hot, cold, duty_w=q_approx)
 
-        result = run_heat_balance(case, provider, solver_params=_TOLERANCE)
+        result = run_heat_balance(
+            case,
+            provider,
+            solver_params=_TOLERANCE,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+        )
 
         assert result.specification_mode == SpecificationMode.KNOWN_DUTY
         assert result.solver_converged

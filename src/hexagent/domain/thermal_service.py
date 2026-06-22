@@ -24,7 +24,6 @@ from hexagent.core.heat_balance import (
     StreamState,
     solve_heat_balance,
 )
-from hexagent.domain.messages import EngineeringMessage
 from hexagent.domain.models import DesignCase
 from hexagent.properties.base import FluidIdentifier, PropertyProvider
 
@@ -45,22 +44,12 @@ def _extract_stream_state(
     )
 
 
-def _get_flow_arrangement(case: DesignCase) -> tuple[FlowArrangement, EngineeringMessage | None]:
-    """Determine the flow arrangement from the design case.
-
-    Currently, DesignCase does not carry flow arrangement info.
-    Defaults to COUNTERFLOW with an informational warning.
-    """
-    # Future: extract from case when DesignCase gains flow_arrangement
-    return FlowArrangement.COUNTERFLOW, None
-
-
 def run_heat_balance(
     case: DesignCase,
     provider: PropertyProvider,
     *,
     solver_params: SolverParams | None = None,
-    flow_arrangement: FlowArrangement | None = None,
+    flow_arrangement: FlowArrangement,
 ) -> HeatBalanceResult:
     """Run a heat-balance calculation for a design case.
 
@@ -72,8 +61,8 @@ def run_heat_balance(
         Property provider for thermodynamic state evaluation.
     solver_params : SolverParams, optional
         Override default solver parameters.
-    flow_arrangement : FlowArrangement, optional
-        Override the flow arrangement.  Defaults to COUNTERFLOW.
+    flow_arrangement : FlowArrangement
+        Explicit flow arrangement.  Must be provided — no silent default.
 
     Returns
     -------
@@ -85,20 +74,12 @@ def run_heat_balance(
 
     params = solver_params or SolverParams()
 
-    # Determine flow arrangement
-    if flow_arrangement is not None:
-        arrangement = flow_arrangement
-    else:
-        arrangement, _warning = _get_flow_arrangement(case)
-        # _warning is None for now; future DesignCase extensions may
-        # emit a warning when flow arrangement is not explicitly set.
-
     inp = HeatBalanceInput(
         hot=hot_state,
         cold=cold_state,
         known_duty_w=(case.target_duty.si_value if case.target_duty is not None else None),
         solver_params=params,
-        flow_arrangement=arrangement,
+        flow_arrangement=flow_arrangement,
     )
 
     return solve_heat_balance(inp, provider)
