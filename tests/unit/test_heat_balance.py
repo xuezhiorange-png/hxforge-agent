@@ -554,10 +554,11 @@ class TestItem4PhaseChecking:
         Q = 1.0 * _WATER_CP * (350.0 - 310.0)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=_default_params())
         result = solve_heat_balance(inp, provider)
-        assert result.status == HeatBalanceStatus.BLOCKED
-        assert any(
-            "phase" in b.message.lower() or "family" in b.message.lower() for b in result.blockers
-        )
+        # Phase-safe bracketing rejects cross-family states → FAILED
+        assert result.status == HeatBalanceStatus.FAILED
+        assert result.failure is not None
+        msg = result.failure.message.lower()
+        assert "bracket" in msg or "phase" in msg
 
     def test_property_failure_recorded(self) -> None:
         """Property call failure during iteration → recorded in property_calls."""

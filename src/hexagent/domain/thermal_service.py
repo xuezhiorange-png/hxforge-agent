@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any
 
 from hexagent.core.heat_balance import (
+    CalculationContext,
     FlowArrangement,
     HeatBalanceInput,
     HeatBalanceResult,
@@ -50,6 +51,7 @@ def run_heat_balance(
     *,
     solver_params: SolverParams | None = None,
     flow_arrangement: FlowArrangement,
+    context: CalculationContext | None = None,
 ) -> HeatBalanceResult:
     """Run a heat-balance calculation for a design case.
 
@@ -82,7 +84,7 @@ def run_heat_balance(
         flow_arrangement=flow_arrangement,
     )
 
-    return solve_heat_balance(inp, provider)
+    return solve_heat_balance(inp, provider, context=context)
 
 
 __all__ = ["run_heat_balance"]
