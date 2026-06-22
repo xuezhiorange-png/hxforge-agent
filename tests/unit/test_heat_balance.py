@@ -520,8 +520,9 @@ class TestItem4PhaseChecking:
         )
 
     def test_cross_family_blocked(self) -> None:
-        """Liquid inlet, gas outlet → FAILED result (bracket search
-        fails because all temperatures return gas phase, not the expected liquid family)."""
+        """Liquid inlet, gas outlet → BLOCKED result (bracket search
+        fails because all temperatures return gas phase, not the expected liquid family).
+        Phase rejection is classified as BLOCKED + UNSUPPORTED_SERVICE."""
         provider = MockPropertyProvider()
         original_state_tp = provider.state_tp
 
@@ -554,11 +555,12 @@ class TestItem4PhaseChecking:
         Q = 1.0 * _WATER_CP * (350.0 - 310.0)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=Q, solver_params=_default_params())
         result = solve_heat_balance(inp, provider)
-        # Phase-safe bracketing rejects cross-family states → FAILED
-        assert result.status == HeatBalanceStatus.FAILED
-        assert result.failure is not None
-        msg = result.failure.message.lower()
-        assert "bracket" in msg or "phase" in msg
+        # Phase-safe bracketing rejects cross-family states → BLOCKED (phase rejection)
+        assert result.status == HeatBalanceStatus.BLOCKED
+        assert any(
+            "phase" in b.message.lower() or "unsupported" in b.code.value.lower()
+            for b in result.blockers
+        )
 
     def test_property_failure_recorded(self) -> None:
         """Property call failure during iteration → recorded in property_calls."""
@@ -716,10 +718,12 @@ class TestItem6Immutability:
         inp = HeatBalanceInput(hot=hot, cold=cold)
         result = solve_heat_balance(inp, provider)
         assert result.status == HeatBalanceStatus.BLOCKED
-        assert math.isfinite(result.residual_w)
-        assert math.isfinite(result.relative_imbalance)
-        assert math.isfinite(result.q_hot_w)
-        assert math.isfinite(result.q_cold_w)
+        # Energy fields are None in BLOCKED results (not faked zeros)
+        assert result.residual_w is None
+        assert result.relative_imbalance is None
+        assert result.q_hot_w is None
+        assert result.q_cold_w is None
+        assert result.acceptance_basis == "not_evaluated"
 
 
 # ======================================================================

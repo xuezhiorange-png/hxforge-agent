@@ -28,7 +28,6 @@ raises for domain errors.  The ``status`` field indicates the outcome:
 from __future__ import annotations
 
 import math
-import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -205,6 +204,7 @@ class AcceptanceBasis(StrEnum):
     RELATIVE = "relative"
     ABSOLUTE = "absolute"
     ZERO_DUTY = "zero_duty"
+    NOT_EVALUATED = "not_evaluated"
 
 
 # ---------------------------------------------------------------------------
@@ -335,6 +335,12 @@ class PropertyCallRecord:
     result_pressure_pa: float | None = None
     result_enthalpy_j_kg: float | None = None
     result_phase: str | None = None
+    result_density_kg_m3: float | None = None
+    result_cp_j_kg_k: float | None = None
+    result_viscosity_pa_s: float | None = None
+    result_conductivity_w_m_k: float | None = None
+    result_entropy_j_kg_k: float | None = None
+    result_quality: float | None = None
     success: bool = True
     error_code: str | None = None
     error_message: str | None = None
@@ -415,10 +421,10 @@ class HeatBalanceResult(BaseModel):
     hot_outlet_state: FluidStateModel | None
     cold_inlet_state: FluidStateModel | None
     cold_outlet_state: FluidStateModel | None
-    q_hot_w: float
-    q_cold_w: float
-    residual_w: float
-    relative_imbalance: float
+    q_hot_w: float | None = None
+    q_cold_w: float | None = None
+    residual_w: float | None = None
+    relative_imbalance: float | None = None
     energy_balance_accepted: bool
     acceptance_basis: AcceptanceBasis
     solver_iterations: int
@@ -441,7 +447,7 @@ class HeatBalanceResult(BaseModel):
             "q_cold_w",
         ):
             val = getattr(self, name)
-            if not math.isfinite(val):
+            if val is not None and not math.isfinite(val):
                 raise ValueError(f"{name} must be finite, got {val!r}")
         if self.duty_w is not None and not math.isfinite(self.duty_w):
             raise ValueError(f"duty_w must be finite, got {self.duty_w!r}")
@@ -586,7 +592,7 @@ def _check_phase_family_match(
             ),
             source_module="heat_balance",
         )
-    if inlet_family is not outlet_family:
+    if inlet_family != outlet_family:
         return EngineeringMessage(
             code=ErrorCode.UNSUPPORTED_SERVICE,
             severity=EngineeringMessageSeverity.BLOCKER,
@@ -785,21 +791,29 @@ def _verify_duty_consistency(
 
 def _energy_gate_message(
     basis: AcceptanceBasis,
-    relative_imbalance: float,
-    residual_w: float,
-    q_hot: float,
-    q_cold: float,
+    relative_imbalance: float | None,
+    residual_w: float | None,
+    q_hot: float | None,
+    q_cold: float | None,
     params: SolverParams,
 ) -> str:
     """Build a basis-specific energy gate blocker message."""
-    base = f"q_hot={q_hot:.2f} W, q_cold={q_cold:.2f} W."
+    base = (
+        f"q_hot={q_hot:.2f} W, q_cold={q_cold:.2f} W."
+        if q_hot is not None and q_cold is not None
+        else "Energy fields not evaluated."
+    )
+    if basis == AcceptanceBasis.NOT_EVALUATED:
+        return f"Energy balance was not evaluated. {base}"
     if basis == AcceptanceBasis.ABSOLUTE:
+        res = abs(residual_w) if residual_w is not None else 0.0
         return (
-            f"Absolute energy residual {abs(residual_w):.2f} W exceeds "
+            f"Absolute energy residual {res:.2f} W exceeds "
             f"absolute tolerance {params.absolute_energy_tolerance_w} W. {base}"
         )
     if basis == AcceptanceBasis.ZERO_DUTY:
-        return f"Zero-duty energy check failed. Residual {abs(residual_w):.2f} W. {base}"
+        res = abs(residual_w) if residual_w is not None else 0.0
+        return f"Zero-duty energy check failed. Residual {res:.2f} W. {base}"
     return (
         f"Relative energy imbalance {relative_imbalance:.6f} exceeds "
         f"tolerance {params.energy_tolerance}. {base}"
@@ -814,9 +828,33 @@ def _energy_gate_message(
 class _BracketExhausted(Exception):
     """Raised internally when the bracket search fails."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        solver_info: _SolverFailureInfo,
+        solver_calls: list[PropertyCallRecord],
+        phase_rejected: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.solver_info = solver_info
+        self.solver_calls = solver_calls
+        self.phase_rejected = phase_rejected
+
 
 class _SolverNotConverged(Exception):
     """Raised internally when Brent fails to converge."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        solver_info: _SolverFailureInfo,
+        solver_calls: list[PropertyCallRecord],
+    ) -> None:
+        super().__init__(message)
+        self.solver_info = solver_info
+        self.solver_calls = solver_calls
 
 
 @dataclass(frozen=True)
@@ -857,7 +895,7 @@ def _solve_outlet_temperature(
     family.  ALL provider calls (successful and failed) are recorded
     with explicit stage identifiers.
 
-    Returns ``(outlet_state, brent_iterations, bracket_evaluations, solver_calls)``.
+    Returns ``(outlet_state, brent_iterations, bracket_probes, solver_calls)``.
 
     Raises ``_BracketExhausted`` if no valid bracket can be found, or
     ``_SolverNotConverged`` if Brent does not converge.
@@ -872,7 +910,8 @@ def _solve_outlet_temperature(
     t_inlet = inlet_state.temperature_k
 
     brent_iterations = [0]
-    bracket_evaluations = [0]
+    bracket_probes = [0]
+    brent_evals = [0]
     solver_calls: list[PropertyCallRecord] = []
     _last_valid_state: FluidState | None = None
     _last_attempted_t: float = t_inlet
@@ -881,7 +920,10 @@ def _solve_outlet_temperature(
         """Evaluate state at (t, P).  Records ALL calls.  Returns None on failure."""
         nonlocal _last_attempted_t
         _last_attempted_t = t
-        bracket_evaluations[0] += 1
+        if stage == "bracket_probe":
+            bracket_probes[0] += 1
+        elif stage == "brent_evaluation":
+            brent_evals[0] += 1
         try:
             state = provider.state_tp(fluid, t, pressure_pa)
         except PropertyServiceError as exc:
@@ -917,18 +959,57 @@ def _solve_outlet_temperature(
         state_family = _phase_family(state.phase)
         return state_family is not None and state_family == expected_phase_family
 
+    def _all_wrong_phase() -> bool:
+        """Check if all recorded solver calls are in wrong phase family."""
+        if not solver_calls:
+            return False
+        for sc in solver_calls:
+            if sc.success and sc.result_phase is not None:
+                try:
+                    phase = PhaseRegion(sc.result_phase)
+                    sf = _phase_family(phase)
+                    if sf is not None and sf == expected_phase_family:
+                        return False
+                except ValueError:
+                    pass
+        return True
+
+    def _build_solver_info(
+        failure_phase: str,
+        bracket_lower: float,
+        bracket_upper: float,
+    ) -> _SolverFailureInfo:
+        """Build structured failure info from current solver state."""
+        return _SolverFailureInfo(
+            side="hot" if is_hot_side else "cold",
+            target_enthalpy_j_kg=target_h,
+            bracket_lower_k=bracket_lower,
+            bracket_upper_k=bracket_upper,
+            last_attempted_temperature_k=_last_attempted_t,
+            last_valid_state=_last_valid_state,
+            bracket_evaluations=bracket_probes[0],
+            brent_iterations=brent_iterations[0],
+            failure_phase=failure_phase,
+        )
+
     def residual(t: float) -> float:
         """Residual function for brentq.  Only called within a valid bracket."""
         brent_iterations[0] += 1
         if brent_iterations[0] > solver_params.max_iterations:
+            info = _build_solver_info("brent", t_lower, t_upper)
             raise _SolverNotConverged(
-                f"Solver exceeded max iterations ({solver_params.max_iterations})"
+                f"Solver exceeded max iterations ({solver_params.max_iterations})",
+                solver_info=info,
+                solver_calls=solver_calls,
             )
         state = _safe_eval_tp(t, stage="brent_evaluation")
         if state is None or not _is_valid_bracket_state(state):
+            info = _build_solver_info("brent", t_lower, t_upper)
             raise _SolverNotConverged(
                 f"Invalid state during iteration at T={t:.4f} K; "
-                f"target enthalpy={target_h:.2f} J/kg"
+                f"target enthalpy={target_h:.2f} J/kg",
+                solver_info=info,
+                solver_calls=solver_calls,
             )
         return state.enthalpy_j_kg - target_h
 
@@ -965,12 +1046,14 @@ def _solve_outlet_temperature(
             t_lower -= step
         else:
             # Exhausted bracket search
+            info = _build_solver_info("bracket", t_lower, t_upper)
             raise _BracketExhausted(
                 f"Could not find valid bracket for {'hot' if is_hot_side else 'cold'}-side "
                 f"outlet. Target enthalpy={target_h:.2f} J/kg, inlet T={t_inlet:.2f} K, "
-                f"bracket=[{t_lower:.2f}, {t_upper:.2f}] K, "
-                f"last_valid_T={_last_valid_state.temperature_k if _last_valid_state else None}, "
-                f"evaluations={bracket_evaluations[0]}."
+                f"bracket=[{t_lower:.2f}, {t_upper:.2f}] K.",
+                solver_info=info,
+                solver_calls=solver_calls,
+                phase_rejected=_all_wrong_phase(),
             )
 
     else:
@@ -995,12 +1078,14 @@ def _solve_outlet_temperature(
             # Skip invalid temperature — continue probing
             t_upper += step
         else:
+            info = _build_solver_info("bracket", t_lower, t_upper)
             raise _BracketExhausted(
                 f"Could not find valid bracket for {'hot' if is_hot_side else 'cold'}-side "
                 f"outlet. Target enthalpy={target_h:.2f} J/kg, inlet T={t_inlet:.2f} K, "
-                f"bracket=[{t_lower:.2f}, {t_upper:.2f}] K, "
-                f"last_valid_T={_last_valid_state.temperature_k if _last_valid_state else None}, "
-                f"evaluations={bracket_evaluations[0]}."
+                f"bracket=[{t_lower:.2f}, {t_upper:.2f}] K.",
+                solver_info=info,
+                solver_calls=solver_calls,
+                phase_rejected=_all_wrong_phase(),
             )
 
     # --- Solve with brentq ---
@@ -1009,14 +1094,20 @@ def _solve_outlet_temperature(
         """Wrapper for brentq that counts iterations."""
         brent_iterations[0] += 1
         if brent_iterations[0] > solver_params.max_iterations:
+            info = _build_solver_info("brent", t_lower, t_upper)
             raise _SolverNotConverged(
-                f"Solver exceeded max iterations ({solver_params.max_iterations})"
+                f"Solver exceeded max iterations ({solver_params.max_iterations})",
+                solver_info=info,
+                solver_calls=solver_calls,
             )
         state = _safe_eval_tp(t, stage="brent_evaluation")
         if state is None or not _is_valid_bracket_state(state):
+            info = _build_solver_info("brent", t_lower, t_upper)
             raise _SolverNotConverged(
                 f"Invalid state during Brent iteration at T={t:.4f} K; "
-                f"target enthalpy={target_h:.2f} J/kg"
+                f"target enthalpy={target_h:.2f} J/kg",
+                solver_info=info,
+                solver_calls=solver_calls,
             )
         return state.enthalpy_j_kg - target_h
 
@@ -1029,22 +1120,33 @@ def _solve_outlet_temperature(
             maxiter=solver_params.max_iterations,
         )
     except (_SolverNotConverged, ValueError) as exc:
+        if isinstance(exc, _SolverNotConverged):
+            info = exc.solver_info
+            calls = exc.solver_calls
+        else:
+            info = _build_solver_info("brent", t_lower, t_upper)
+            calls = solver_calls
         raise _SolverNotConverged(
             f"Root-finding failed: {exc}. Target enthalpy={target_h:.2f} J/kg, "
-            f"bracket=[{t_lower:.2f}, {t_upper:.2f}] K."
+            f"bracket=[{t_lower:.2f}, {t_upper:.2f}] K.",
+            solver_info=info,
+            solver_calls=calls,
         ) from exc
 
     # Get the final state at the solved temperature
     outlet_state = _safe_eval_tp(t_solution, stage="final_state")
     if outlet_state is None:
+        info = _build_solver_info("final_state", t_lower, t_upper)
         raise _SolverNotConverged(
-            f"Final state evaluation failed at solved temperature {t_solution:.4f} K."
+            f"Final state evaluation failed at solved temperature {t_solution:.4f} K.",
+            solver_info=info,
+            solver_calls=solver_calls,
         )
 
     # Merge solver_calls into the caller's property_calls
     property_calls.extend(solver_calls)
 
-    return outlet_state, brent_iterations[0], bracket_evaluations[0], solver_calls
+    return outlet_state, brent_iterations[0], bracket_probes[0], solver_calls
 
 
 # ---------------------------------------------------------------------------
@@ -1079,6 +1181,12 @@ def _record_property_call(
             result_pressure_pa=state.pressure_pa if state is not None else None,
             result_enthalpy_j_kg=state.enthalpy_j_kg if state is not None else None,
             result_phase=state.phase.value if state is not None else None,
+            result_density_kg_m3=state.density_kg_m3 if state is not None else None,
+            result_cp_j_kg_k=state.cp_j_kg_k if state is not None else None,
+            result_viscosity_pa_s=state.viscosity_pa_s if state is not None else None,
+            result_conductivity_w_m_k=state.conductivity_w_m_k if state is not None else None,
+            result_entropy_j_kg_k=state.entropy_j_kg_k if state is not None else None,
+            result_quality=state.quality if state is not None else None,
             success=success,
             error_code=error_code,
             error_message=error_message,
@@ -1134,12 +1242,14 @@ def _fluid_state_model_to_dict(state: FluidStateModel) -> dict[str, Any]:
         "backend_name": prov.backend_name,
         "backend_version": prov.backend_version,
         "backend_git_revision": prov.backend_git_revision,
+        "fluid_identifier": prov.fluid_identifier,
         "reference_state_policy": prov.reference_state_policy.value,
         "validation_level": prov.validation_level.value,
         "validation_dataset_id": prov.validation_dataset_id,
         "validation_dataset_revision": prov.validation_dataset_revision,
         "validation_basis": prov.validation_basis,
         "query_type": prov.query_type.value,
+        "inputs": prov.inputs,
         "cache_policy_version": prov.cache_policy_version,
         "configuration_fingerprint": prov.configuration_fingerprint,
     }
@@ -1159,6 +1269,12 @@ def _property_call_record_to_dict(pc: PropertyCallRecord) -> dict[str, Any]:
         "result_pressure_pa": pc.result_pressure_pa,
         "result_enthalpy_j_kg": pc.result_enthalpy_j_kg,
         "result_phase": pc.result_phase,
+        "result_density_kg_m3": pc.result_density_kg_m3,
+        "result_cp_j_kg_k": pc.result_cp_j_kg_k,
+        "result_viscosity_pa_s": pc.result_viscosity_pa_s,
+        "result_conductivity_w_m_k": pc.result_conductivity_w_m_k,
+        "result_entropy_j_kg_k": pc.result_entropy_j_kg_k,
+        "result_quality": pc.result_quality,
         "success": pc.success,
         "error_code": pc.error_code,
         "error_message": pc.error_message,
@@ -1194,10 +1310,10 @@ def _compute_result_hash(
     property_calls: tuple[PropertyCallRecord, ...],
     warnings: tuple[EngineeringMessage, ...],
     blockers: tuple[EngineeringMessage, ...],
-    q_hot_w: float,
-    q_cold_w: float,
-    residual_w: float,
-    relative_imbalance: float,
+    q_hot_w: float | None,
+    q_cold_w: float | None,
+    residual_w: float | None,
+    relative_imbalance: float | None,
     energy_balance_accepted: bool,
     software_version: str,
     *,
@@ -1220,14 +1336,21 @@ def _compute_result_hash(
     # Provider git revision
     provider_git_revision = getattr(provider, "git_revision", "")
 
-    # Provider configuration fingerprint — derive from property provenance
-    # of the first successfully queried state rather than private attributes
+    # Provider configuration fingerprint — derive from first available
+    # property call record's provenance, or fall back to git_revision.
     _prov_fingerprint = ""
-    for _s in (hot_inlet, cold_inlet):
-        if _s is not None:
-            _prov_fingerprint = _s.provenance.configuration_fingerprint
-            if _prov_fingerprint:
-                break
+    if property_calls:
+        # Use the first successful property call record to derive fingerprint.
+        # The PropertyCallRecord itself does not carry configuration_fingerprint,
+        # so we use the state model provenance from hot_inlet/cold_inlet if available,
+        # otherwise fall back to the provider's git_revision.
+        for _s in (hot_inlet, cold_inlet):
+            if _s is not None:
+                _prov_fingerprint = _s.provenance.configuration_fingerprint
+                if _prov_fingerprint:
+                    break
+    if not _prov_fingerprint:
+        _prov_fingerprint = provider_git_revision
     provider_config_fingerprint = _prov_fingerprint
 
     # Failure dict
@@ -1285,7 +1408,7 @@ def _compute_result_hash(
         # Messages (complete)
         "warnings": [_message_to_dict(m) for m in warnings],
         "blockers": [_message_to_dict(m) for m in blockers],
-        # Energy balance fields
+        # Energy balance fields (None sentinel for NOT_EVALUATED)
         "q_hot_w": q_hot_w,
         "q_cold_w": q_cold_w,
         "residual_w": residual_w,
@@ -1445,6 +1568,7 @@ def _build_provenance(
             "backend_name": pc.backend_name,
             "backend_version": pc.backend_version,
             "reference_state_policy": pc.reference_state_policy,
+            "stage": pc.stage,
             "result_temperature_k": pc.result_temperature_k,
             "result_pressure_pa": pc.result_pressure_pa,
             "result_enthalpy_j_kg": pc.result_enthalpy_j_kg,
@@ -1466,6 +1590,7 @@ def _build_provenance(
                     ("backend_name", pc.backend_name),
                     ("backend_version", pc.backend_version),
                     ("reference_state_policy", pc.reference_state_policy),
+                    ("stage", pc.stage),
                     ("success", pc.success),
                     ("error_code", pc.error_code),
                 ),
@@ -1672,18 +1797,26 @@ def _handle_zero_duty(
             blockers.append(phase_msg)
 
     # Energy balance: q_hot = 0, q_cold = 0, residual = 0
-    q_hot_w = 0.0
-    q_cold_w = 0.0
-    residual_w = 0.0
-    relative_imbalance = 0.0
-
-    # When blockers exist, energy balance is not accepted
+    # When blocked, energy fields are None (not evaluated); when succeeded, real values.
     has_blockers = len(blockers) > 0
     energy_balance_accepted = not has_blockers
     solver_converged = not has_blockers
 
     # Determine status
     status = HeatBalanceStatus.BLOCKED if has_blockers else HeatBalanceStatus.SUCCEEDED
+
+    if has_blockers:
+        q_hot_w: float | None = None
+        q_cold_w: float | None = None
+        residual_w: float | None = None
+        relative_imbalance: float | None = None
+        acceptance_basis = AcceptanceBasis.NOT_EVALUATED
+    else:
+        q_hot_w = 0.0
+        q_cold_w = 0.0
+        residual_w = 0.0
+        relative_imbalance = 0.0
+        acceptance_basis = AcceptanceBasis.ZERO_DUTY
 
     # Compute hash
     hot_model = hot_inlet_state.to_model()
@@ -1712,7 +1845,7 @@ def _handle_zero_duty(
         _SOFTWARE_VERSION,
         status=status,
         duty_w=0.0 if not has_blockers else None,
-        acceptance_basis=AcceptanceBasis.ZERO_DUTY,
+        acceptance_basis=acceptance_basis,
     )
 
     provenance = _build_provenance(
@@ -1738,15 +1871,15 @@ def _handle_zero_duty(
         flow_arrangement=inp.flow_arrangement,
         duty_w=0.0 if not has_blockers else None,
         hot_inlet_state=hot_model,
-        hot_outlet_state=hot_model,
+        hot_outlet_state=hot_model if not has_blockers else None,
         cold_inlet_state=cold_model,
-        cold_outlet_state=cold_model,
+        cold_outlet_state=cold_model if not has_blockers else None,
         q_hot_w=q_hot_w,
         q_cold_w=q_cold_w,
         residual_w=residual_w,
         relative_imbalance=relative_imbalance,
         energy_balance_accepted=energy_balance_accepted,
-        acceptance_basis=AcceptanceBasis.ZERO_DUTY,
+        acceptance_basis=acceptance_basis,
         solver_iterations=0,
         bracket_evaluations=0,
         solver_converged=solver_converged,
@@ -1800,10 +1933,10 @@ def _make_blocked_result(
     hot_outlet_model = None
     cold_outlet_model = None
 
-    q_hot_w = 0.0
-    q_cold_w = 0.0
-    residual_w = 0.0
-    relative_imbalance = 0.0
+    q_hot_w: float | None = None
+    q_cold_w: float | None = None
+    residual_w: float | None = None
+    relative_imbalance: float | None = None
     energy_balance_accepted = False
 
     result_hash = _compute_result_hash(
@@ -1829,7 +1962,7 @@ def _make_blocked_result(
         _SOFTWARE_VERSION,
         status=HeatBalanceStatus.BLOCKED,
         duty_w=None,
-        acceptance_basis=AcceptanceBasis.RELATIVE,
+        acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
     )
 
     provenance = _build_provenance(
@@ -1863,7 +1996,7 @@ def _make_blocked_result(
         residual_w=residual_w,
         relative_imbalance=relative_imbalance,
         energy_balance_accepted=energy_balance_accepted,
-        acceptance_basis=AcceptanceBasis.RELATIVE,
+        acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
         solver_iterations=0,
         bracket_evaluations=0,
         solver_converged=False,
@@ -1891,6 +2024,9 @@ def _make_failed_result(
     solver_info: _SolverFailureInfo,
     *,
     context: CalculationContext | None = None,
+    solver_calls: list[PropertyCallRecord] | None = None,
+    successful_hot_outlet: FluidState | None = None,
+    successful_cold_outlet: FluidState | None = None,
 ) -> HeatBalanceResult:
     """Build a FAILED HeatBalanceResult when the solver does not converge.
 
@@ -1899,9 +2035,12 @@ def _make_failed_result(
     hot_model = hot_inlet_state.to_model() if hot_inlet_state is not None else None
     cold_model = cold_inlet_state.to_model() if cold_inlet_state is not None else None
 
-    # Build partial state info
-    last_valid_model = (
-        solver_info.last_valid_state.to_model() if solver_info.last_valid_state else None
+    # Build partial state info from successful outlets if available
+    hot_outlet_model = (
+        successful_hot_outlet.to_model() if successful_hot_outlet is not None else None
+    )
+    cold_outlet_model = (
+        successful_cold_outlet.to_model() if successful_cold_outlet is not None else None
     )
 
     failure = RunFailure(
@@ -1925,25 +2064,32 @@ def _make_failed_result(
         ),
     )
 
-    q_hot_w = 0.0
-    q_cold_w = 0.0
-    residual_w = 0.0
-    relative_imbalance = 0.0
+    # Merge solver_calls into property_calls for completeness
+    all_calls = list(property_calls)
+    if solver_calls:
+        for sc in solver_calls:
+            if sc not in all_calls:
+                all_calls.append(sc)
+
+    q_hot_w: float | None = None
+    q_cold_w: float | None = None
+    residual_w: float | None = None
+    relative_imbalance: float | None = None
     energy_balance_accepted = False
 
     result_hash = _compute_result_hash(
         specification_mode,
         inp.flow_arrangement,
         hot_model,
-        last_valid_model if solver_info.side == "hot" else None,
+        hot_outlet_model,
         cold_model,
-        last_valid_model if solver_info.side == "cold" else None,
+        cold_outlet_model,
         inp.hot,
         inp.cold,
         inp.known_duty_w,
         inp.solver_params,
         provider,
-        tuple(property_calls),
+        tuple(all_calls),
         tuple(warnings),
         (),
         q_hot_w,
@@ -1954,7 +2100,7 @@ def _make_failed_result(
         _SOFTWARE_VERSION,
         status=HeatBalanceStatus.FAILED,
         duty_w=None,
-        acceptance_basis=AcceptanceBasis.RELATIVE,
+        acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
         failure=failure,
     )
 
@@ -1965,7 +2111,7 @@ def _make_failed_result(
         cold=inp.cold,
         known_duty_w=inp.known_duty_w,
         solver_params=inp.solver_params,
-        property_calls=property_calls,
+        property_calls=all_calls,
         solver_iterations=solver_info.brent_iterations,
         bracket_evaluations=solver_info.bracket_evaluations,
         solver_converged=False,
@@ -1981,19 +2127,19 @@ def _make_failed_result(
         flow_arrangement=inp.flow_arrangement,
         duty_w=None,
         hot_inlet_state=hot_model,
-        hot_outlet_state=last_valid_model if solver_info.side == "hot" else None,
+        hot_outlet_state=hot_outlet_model,
         cold_inlet_state=cold_model,
-        cold_outlet_state=last_valid_model if solver_info.side == "cold" else None,
+        cold_outlet_state=cold_outlet_model,
         q_hot_w=q_hot_w,
         q_cold_w=q_cold_w,
         residual_w=residual_w,
         relative_imbalance=relative_imbalance,
         energy_balance_accepted=energy_balance_accepted,
-        acceptance_basis=AcceptanceBasis.RELATIVE,
+        acceptance_basis=AcceptanceBasis.NOT_EVALUATED,
         solver_iterations=solver_info.brent_iterations,
         bracket_evaluations=solver_info.bracket_evaluations,
         solver_converged=False,
-        property_calls=tuple(property_calls),
+        property_calls=tuple(all_calls),
         warnings=tuple(warnings),
         blockers=(),
         failure=failure,
@@ -2301,49 +2447,52 @@ def solve_heat_balance(
                 expected_phase_family=cold_phase_family,
             )
         except (_BracketExhausted, _SolverNotConverged, PropertyServiceError) as exc:
-            # Determine which side failed and build structured info
-            side = "unknown"
-            target_h = 0.0
-            bracket_lo = bracket_hi = last_t = 0.0
-            last_valid = None
-            be_count = bi_count = 0
-            phase = "bracket"
-            if isinstance(exc, _BracketExhausted):
-                phase = "bracket"
-            elif isinstance(exc, _SolverNotConverged):
-                phase = "brent"
-            elif isinstance(exc, PropertyServiceError):
-                phase = "property"
-            # Parse bracket info from exception message if available
-            m_lo = re.search(r"bracket=\[([0-9.]+),\s*([0-9.]+)\]", str(exc))
-            if m_lo:
-                bracket_lo, bracket_hi = float(m_lo.group(1)), float(m_lo.group(2))
-            m_last = re.search(r"last_valid_T=([0-9.]+)", str(exc))
-            if m_last:
-                last_t = float(m_last.group(1))
-            m_ev = re.search(r"evaluations=(\d+)", str(exc))
-            if m_ev:
-                be_count = int(m_ev.group(1))
-            # Determine side from exception context
-            if "hot" in str(exc).lower():
-                side = "hot"
-                target_h = hot_inlet_state.enthalpy_j_kg - inp.known_duty_w / inp.hot.mass_flow_kg_s
+            # Extract structured info from exceptions
+            if isinstance(exc, (_BracketExhausted, _SolverNotConverged)):
+                solver_info = exc.solver_info
+                solver_calls = exc.solver_calls
+                # Phase-rejection is BLOCKED + UNSUPPORTED_SERVICE, not FAILED
+                if isinstance(exc, _BracketExhausted) and exc.phase_rejected:
+                    side_label = "hot" if solver_info.side == "hot" else "cold"
+                    blockers.append(
+                        EngineeringMessage(
+                            code=ErrorCode.UNSUPPORTED_SERVICE,
+                            severity=EngineeringMessageSeverity.BLOCKER,
+                            message=(
+                                f"{side_label.capitalize()}-side bracket search found no states "
+                                f"in the expected phase family. Phase transition is not "
+                                f"supported in v0.1."
+                            ),
+                            source_module="heat_balance",
+                        )
+                    )
+                    # Merge solver calls into property_calls
+                    property_calls.extend(solver_calls)
+                    return _make_blocked_result(
+                        inp,
+                        provider,
+                        mode,
+                        hot_inlet_state,
+                        cold_inlet_state,
+                        property_calls,
+                        warnings,
+                        blockers,
+                        context=context,
+                    )
             else:
-                side = "cold"
-                target_h = (
-                    cold_inlet_state.enthalpy_j_kg + inp.known_duty_w / inp.cold.mass_flow_kg_s
+                # PropertyServiceError — build minimal solver_info
+                solver_info = _SolverFailureInfo(
+                    side="unknown",
+                    target_enthalpy_j_kg=0.0,
+                    bracket_lower_k=0.0,
+                    bracket_upper_k=0.0,
+                    last_attempted_temperature_k=0.0,
+                    last_valid_state=None,
+                    bracket_evaluations=0,
+                    brent_iterations=0,
+                    failure_phase="property",
                 )
-            solver_info = _SolverFailureInfo(
-                side=side,
-                target_enthalpy_j_kg=target_h,
-                bracket_lower_k=bracket_lo,
-                bracket_upper_k=bracket_hi,
-                last_attempted_temperature_k=last_t,
-                last_valid_state=last_valid,
-                bracket_evaluations=be_count,
-                brent_iterations=bi_count,
-                failure_phase=phase,
-            )
+                solver_calls = []
             return _make_failed_result(
                 inp,
                 provider,
@@ -2354,6 +2503,7 @@ def solve_heat_balance(
                 warnings,
                 solver_info,
                 context=context,
+                solver_calls=solver_calls,
             )
         total_brent_iterations = iters_hot + iters_cold
         total_bracket_evaluations = be_hot + be_cold
@@ -2517,38 +2667,51 @@ def solve_heat_balance(
                 expected_phase_family=cold_phase_family,
             )
         except (_BracketExhausted, _SolverNotConverged, PropertyServiceError) as exc:
-            side = "cold"
-            target_h = cold_inlet_state.enthalpy_j_kg + duty_w / inp.cold.mass_flow_kg_s
-            bracket_lo = bracket_hi = last_t = 0.0
-            last_valid = None
-            be_count = bi_count = 0
-            phase = "brent"
-            if isinstance(exc, _BracketExhausted):
-                phase = "bracket"
-            elif isinstance(exc, PropertyServiceError):
-                phase = "property"
-            import re as _re
-
-            m_lo = _re.search(r"bracket=\[([0-9.]+),\s*([0-9.]+)\]", str(exc))
-            if m_lo:
-                bracket_lo, bracket_hi = float(m_lo.group(1)), float(m_lo.group(2))
-            m_last = _re.search(r"last_valid_T=([0-9.]+)", str(exc))
-            if m_last:
-                last_t = float(m_last.group(1))
-            m_ev = _re.search(r"evaluations=(\d+)", str(exc))
-            if m_ev:
-                be_count = int(m_ev.group(1))
-            solver_info = _SolverFailureInfo(
-                side=side,
-                target_enthalpy_j_kg=target_h,
-                bracket_lower_k=bracket_lo,
-                bracket_upper_k=bracket_hi,
-                last_attempted_temperature_k=last_t,
-                last_valid_state=last_valid,
-                bracket_evaluations=be_count,
-                brent_iterations=bi_count,
-                failure_phase=phase,
-            )
+            # Extract structured info from exceptions
+            if isinstance(exc, (_BracketExhausted, _SolverNotConverged)):
+                solver_info = exc.solver_info
+                solver_calls = exc.solver_calls
+                # Phase-rejection is BLOCKED + UNSUPPORTED_SERVICE
+                if isinstance(exc, _BracketExhausted) and exc.phase_rejected:
+                    blockers.append(
+                        EngineeringMessage(
+                            code=ErrorCode.UNSUPPORTED_SERVICE,
+                            severity=EngineeringMessageSeverity.BLOCKER,
+                            message=(
+                                "Cold-side bracket search found no states "
+                                "in the expected phase family. Phase transition is not "
+                                "supported in v0.1."
+                            ),
+                            source_module="heat_balance",
+                        )
+                    )
+                    property_calls.extend(solver_calls)
+                    return _make_blocked_result(
+                        inp,
+                        provider,
+                        mode,
+                        hot_inlet_state,
+                        cold_inlet_state,
+                        property_calls,
+                        warnings,
+                        blockers,
+                        context=context,
+                    )
+            else:
+                solver_info = _SolverFailureInfo(
+                    side="cold",
+                    target_enthalpy_j_kg=(
+                        cold_inlet_state.enthalpy_j_kg + duty_w / inp.cold.mass_flow_kg_s
+                    ),
+                    bracket_lower_k=0.0,
+                    bracket_upper_k=0.0,
+                    last_attempted_temperature_k=0.0,
+                    last_valid_state=None,
+                    bracket_evaluations=0,
+                    brent_iterations=0,
+                    failure_phase="property",
+                )
+                solver_calls = []
             return _make_failed_result(
                 inp,
                 provider,
@@ -2559,6 +2722,8 @@ def solve_heat_balance(
                 warnings,
                 solver_info,
                 context=context,
+                solver_calls=solver_calls,
+                successful_hot_outlet=hot_outlet_state,
             )
         total_brent_iterations = iters_cold
         total_bracket_evaluations = be_cold
@@ -2723,36 +2888,51 @@ def solve_heat_balance(
                 expected_phase_family=hot_phase_family,
             )
         except (_BracketExhausted, _SolverNotConverged, PropertyServiceError) as exc:
-            side = "hot"
-            target_h = hot_inlet_state.enthalpy_j_kg - duty_w / inp.hot.mass_flow_kg_s
-            bracket_lo = bracket_hi = last_t = 0.0
-            last_valid = None
-            be_count = bi_count = 0
-            phase = "brent"
-            if isinstance(exc, _BracketExhausted):
-                phase = "bracket"
-            elif isinstance(exc, PropertyServiceError):
-                phase = "property"
-            m_lo = re.search(r"bracket=\[([0-9.]+),\s*([0-9.]+)\]", str(exc))
-            if m_lo:
-                bracket_lo, bracket_hi = float(m_lo.group(1)), float(m_lo.group(2))
-            m_last = re.search(r"last_valid_T=([0-9.]+)", str(exc))
-            if m_last:
-                last_t = float(m_last.group(1))
-            m_ev = re.search(r"evaluations=(\d+)", str(exc))
-            if m_ev:
-                be_count = int(m_ev.group(1))
-            solver_info = _SolverFailureInfo(
-                side=side,
-                target_enthalpy_j_kg=target_h,
-                bracket_lower_k=bracket_lo,
-                bracket_upper_k=bracket_hi,
-                last_attempted_temperature_k=last_t,
-                last_valid_state=last_valid,
-                bracket_evaluations=be_count,
-                brent_iterations=bi_count,
-                failure_phase=phase,
-            )
+            # Extract structured info from exceptions
+            if isinstance(exc, (_BracketExhausted, _SolverNotConverged)):
+                solver_info = exc.solver_info
+                solver_calls = exc.solver_calls
+                # Phase-rejection is BLOCKED + UNSUPPORTED_SERVICE
+                if isinstance(exc, _BracketExhausted) and exc.phase_rejected:
+                    blockers.append(
+                        EngineeringMessage(
+                            code=ErrorCode.UNSUPPORTED_SERVICE,
+                            severity=EngineeringMessageSeverity.BLOCKER,
+                            message=(
+                                "Hot-side bracket search found no states "
+                                "in the expected phase family. Phase transition is not "
+                                "supported in v0.1."
+                            ),
+                            source_module="heat_balance",
+                        )
+                    )
+                    property_calls.extend(solver_calls)
+                    return _make_blocked_result(
+                        inp,
+                        provider,
+                        mode,
+                        hot_inlet_state,
+                        cold_inlet_state,
+                        property_calls,
+                        warnings,
+                        blockers,
+                        context=context,
+                    )
+            else:
+                solver_info = _SolverFailureInfo(
+                    side="hot",
+                    target_enthalpy_j_kg=(
+                        hot_inlet_state.enthalpy_j_kg - duty_w / inp.hot.mass_flow_kg_s
+                    ),
+                    bracket_lower_k=0.0,
+                    bracket_upper_k=0.0,
+                    last_attempted_temperature_k=0.0,
+                    last_valid_state=None,
+                    bracket_evaluations=0,
+                    brent_iterations=0,
+                    failure_phase="property",
+                )
+                solver_calls = []
             return _make_failed_result(
                 inp,
                 provider,
@@ -2763,6 +2943,8 @@ def solve_heat_balance(
                 warnings,
                 solver_info,
                 context=context,
+                solver_calls=solver_calls,
+                successful_cold_outlet=cold_outlet_state,
             )
         total_brent_iterations = iters_hot
         total_bracket_evaluations = be_hot

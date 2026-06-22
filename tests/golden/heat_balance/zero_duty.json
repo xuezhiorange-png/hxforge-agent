@@ -22,7 +22,7 @@
     "q_cold_w": 0.0,
     "relative_imbalance": 0.0,
     "energy_balance_accepted": true,
-    "result_hash": "sha256:465bf7ac59fcd4edf39ad15b823a04639dc04811be880c486d40a3a05eac698d"
+    "result_hash": "sha256:469c8a8fc2e5a80d622cd0d88b0d191e587cca8c00be055d2ef70918143f5370"
   },
   "tolerances": {
     "temperature_k": 0.001
