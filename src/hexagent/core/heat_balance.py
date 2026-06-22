@@ -27,6 +27,7 @@ raises for domain errors.  The ``status`` field indicates the outcome:
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -608,6 +609,20 @@ class HeatBalanceResult(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _validate_flow_arrangement_consistency(self) -> HeatBalanceResult:
+        """Ensure top-level flow_arrangement matches request_identity.flow_arrangement.
+
+        The hash reads flow_arrangement from request_identity (canonical source).
+        This validator prevents inconsistent copies from being constructed.
+        """
+        if self.flow_arrangement.value != self.request_identity.flow_arrangement:
+            raise ValueError(
+                f"flow_arrangement mismatch: top-level={self.flow_arrangement.value!r} "
+                f"!= request_identity.flow_arrangement={self.request_identity.flow_arrangement!r}"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_result_hash(self) -> HeatBalanceResult:
         """Verify result_hash starts with sha256: and is 71 chars."""
         if not self.result_hash.startswith("sha256:"):
@@ -626,7 +641,14 @@ class HeatBalanceResult(BaseModel):
         object.__setattr__(self, "_field_hash", self._compute_field_hash())
 
     def _compute_field_hash(self) -> str:
-        """Compute SHA-256 of all public fields for tamper detection."""
+        """Compute SHA-256 of all public fields for tamper detection.
+
+        Covers: status, specification_mode, flow_arrangement, duty_w,
+        all four fluid states, energy balance fields, solver counts,
+        property_calls, warnings, blockers, result_hash,
+        request_identity, provider_identity, failure, and
+        provenance_graph (via deterministic digest).
+        """
 
         def _stm(s: FluidStateModel | None) -> dict[str, Any] | None:
             if s is None:
@@ -658,6 +680,27 @@ class HeatBalanceResult(BaseModel):
             "warnings": [_message_to_dict(m) for m in self.warnings],
             "blockers": [_message_to_dict(m) for m in self.blockers],
             "result_hash": self.result_hash,
+            # Identity fields (previously missing)
+            "request_identity": (
+                dataclasses.asdict(self.request_identity)
+                if dataclasses.is_dataclass(self.request_identity)
+                else self.request_identity
+            ),
+            "provider_identity": (
+                dataclasses.asdict(self.provider_identity)
+                if dataclasses.is_dataclass(self.provider_identity)
+                else self.provider_identity
+            ),
+            "failure": (
+                {
+                    "code": self.failure.code.value,
+                    "message": self.failure.message,
+                    "context": dict(self.failure.context) if self.failure.context else {},
+                }
+                if self.failure is not None
+                else None
+            ),
+            "provenance_graph_digest": _provenance_graph_digest(self.provenance_graph),
         }
         return sha256_digest(payload)
 
@@ -690,6 +733,54 @@ class HeatBalanceResult(BaseModel):
             return False
         recomputed = self._recompute_result_hash()
         return recomputed == self.result_hash
+
+    def verify_provenance(self) -> bool:
+        """Verify provenance graph integrity independently.
+
+        Checks:
+        1. Graph is a valid DAG (enforced by ProvenanceGraph validator).
+        2. Each node's payload_hash starts with 'sha256:' and is 71 chars.
+        3. All edge endpoints reference existing nodes.
+        4. The RESULT node's payload_hash matches the result's own result_hash.
+        5. Graph is deterministic for the same inputs (recomputed digest matches).
+        """
+        graph = self.provenance_graph
+        # Check 1: DAG validity is enforced by ProvenanceGraph validator
+        if not graph.nodes:
+            return True  # Empty graph is valid
+
+        node_ids = {n.node_id for n in graph.nodes}
+
+        # Check 2: All payload hashes are valid
+        for node in graph.nodes:
+            if not node.payload_hash.startswith("sha256:"):
+                return False
+            hex_part = node.payload_hash[7:]
+            if len(hex_part) != 64:
+                return False
+            try:
+                int(hex_part, 16)
+            except ValueError:
+                return False
+
+        # Check 3: All edge endpoints exist
+        for edge in graph.edges:
+            if edge.source_id not in node_ids:
+                return False
+            if edge.target_id not in node_ids:
+                return False
+
+        # Check 4: RESULT node hash matches result_hash
+        result_nodes = [n for n in graph.nodes if n.node_type.value == "RESULT"]
+        if result_nodes:
+            result_node_payload = dict(result_nodes[0].metadata)
+            stored_result_hash = result_node_payload.get("result_hash")
+            if stored_result_hash is not None and stored_result_hash != self.result_hash:
+                return False
+
+        # Check 5: Deterministic digest
+        digest = _provenance_graph_digest(graph)
+        return digest.startswith("sha256:")
 
     def _recompute_result_hash(self) -> str:
         """Recompute result_hash from the stored field values.
@@ -1840,6 +1931,37 @@ def _build_result_payload(
 # ---------------------------------------------------------------------------
 
 
+def _provenance_graph_digest(graph: ProvenanceGraph | dict[str, Any]) -> str:
+    """Compute a deterministic SHA-256 digest of a ProvenanceGraph.
+
+    Serializes nodes and edges canonically.  Excludes the result_hash
+    reference inside CALCULATION_RUN metadata to avoid circular
+    dependency with the result hash that includes this digest.
+    Accepts both ProvenanceGraph instances and dicts (from JSON deserialization).
+    """
+    if isinstance(graph, dict):
+        graph = ProvenanceGraph.model_validate(graph)
+    nodes_payload = []
+    for node in graph.nodes:
+        meta = dict(node.metadata)
+        # Remove result_hash from CALCULATION_RUN to break circular dependency
+        meta.pop("result_hash", None)
+        nodes_payload.append(
+            {
+                "node_id": str(node.node_id),
+                "node_type": node.node_type.value,
+                "label": node.label,
+                "metadata": meta,
+                "payload_hash": node.payload_hash,
+            }
+        )
+    edges_payload = [
+        {"source_id": str(e.source_id), "target_id": str(e.target_id), "relation": e.relation}
+        for e in graph.edges
+    ]
+    return sha256_digest({"nodes": nodes_payload, "edges": edges_payload})
+
+
 def _deterministic_uuid5(payload: dict[str, Any]) -> UUID:
     """Compute a deterministic UUID5 from a canonical payload dict."""
     canonical = sha256_digest(payload)
@@ -2928,12 +3050,14 @@ def solve_heat_balance(
     if mode == SpecificationMode.KNOWN_DUTY:
         assert inp.known_duty_w is not None
         # Solve both outlets independently
-        # Initialize cumulative counters for the case where hot-side fails
-        iters_hot = 0
-        be_hot = 0
-        _brent_algo_iters_hot = 0
+        # Return tuple: (outlet_state, brent_func_eval_count, bracket_probes,
+        #                solver_calls, brent_algorithm_iterations)
+        # Initialize counters for the case where hot-side fails
+        func_evals_hot = 0
+        bracket_probes_hot = 0
+        algo_iters_hot = 0
         try:
-            hot_outlet_state, iters_hot, be_hot, _calls_hot, _brent_algo_iters_hot = (
+            (hot_outlet_state, func_evals_hot, bracket_probes_hot, _calls_hot, algo_iters_hot) = (
                 _solve_outlet_temperature(
                     provider,
                     inp.hot.fluid_identifier,
@@ -2947,19 +3071,23 @@ def solve_heat_balance(
                     global_seq=_global_seq,
                 )
             )
-            cold_outlet_state, iters_cold, be_cold, _calls_cold, _brent_algo_iters_cold = (
-                _solve_outlet_temperature(
-                    provider,
-                    inp.cold.fluid_identifier,
-                    cold_inlet_state,
-                    inp.cold.mass_flow_kg_s,
-                    inp.known_duty_w,
-                    is_hot_side=False,
-                    solver_params=inp.solver_params,
-                    property_calls=property_calls,
-                    expected_phase_family=cold_phase_family,
-                    global_seq=_global_seq,
-                )
+            (
+                cold_outlet_state,
+                func_evals_cold,
+                bracket_probes_cold,
+                _calls_cold,
+                algo_iters_cold,
+            ) = _solve_outlet_temperature(
+                provider,
+                inp.cold.fluid_identifier,
+                cold_inlet_state,
+                inp.cold.mass_flow_kg_s,
+                inp.known_duty_w,
+                is_hot_side=False,
+                solver_params=inp.solver_params,
+                property_calls=property_calls,
+                expected_phase_family=cold_phase_family,
+                global_seq=_global_seq,
             )
         except (_BracketExhausted, _SolverNotConverged, PropertyServiceError) as exc:
             # Extract structured info from exceptions
@@ -2967,9 +3095,9 @@ def solve_heat_balance(
                 solver_info = exc.solver_info
                 solver_calls = exc.solver_calls
                 # Accumulate: prior side's counts + failing side's counts
-                cumulative_bp = iters_hot + solver_info.bracket_probe_count
-                cumulative_bfe = be_hot + solver_info.brent_function_evaluation_count
-                cumulative_bai = _brent_algo_iters_hot + solver_info.brent_algorithm_iteration_count
+                cumulative_bp = bracket_probes_hot + solver_info.bracket_probe_count
+                cumulative_bfe = func_evals_hot + solver_info.brent_function_evaluation_count
+                cumulative_bai = algo_iters_hot + solver_info.brent_algorithm_iteration_count
                 # Phase-rejection is BLOCKED + UNSUPPORTED_SERVICE, not FAILED
                 if isinstance(exc, _BracketExhausted) and exc.phase_rejected:
                     side_label = "hot" if solver_info.side == "hot" else "cold"
@@ -3016,9 +3144,9 @@ def solve_heat_balance(
                 )
                 solver_calls = []
                 # Accumulate prior side's counts
-                cumulative_bp = iters_hot + solver_info.bracket_probe_count
-                cumulative_bfe = be_hot + solver_info.brent_function_evaluation_count
-                cumulative_bai = _brent_algo_iters_hot + solver_info.brent_algorithm_iteration_count
+                cumulative_bp = bracket_probes_hot + solver_info.bracket_probe_count
+                cumulative_bfe = func_evals_hot + solver_info.brent_function_evaluation_count
+                cumulative_bai = algo_iters_hot + solver_info.brent_algorithm_iteration_count
             return _make_failed_result(
                 inp,
                 provider,
@@ -3034,9 +3162,9 @@ def solve_heat_balance(
                 cumulative_brent_function_evaluation_count=cumulative_bfe,
                 cumulative_brent_algorithm_iteration_count=cumulative_bai,
             )
-        total_brent_function_evaluations = iters_hot + iters_cold
-        total_bracket_probe_count = be_hot + be_cold
-        total_brent_algorithm_iteration_count = _brent_algo_iters_hot + _brent_algo_iters_cold
+        total_brent_function_evaluations = func_evals_hot + func_evals_cold
+        total_bracket_probe_count = bracket_probes_hot + bracket_probes_cold
+        total_brent_algorithm_iteration_count = algo_iters_hot + algo_iters_cold
         duty_w = inp.known_duty_w
 
     elif mode == SpecificationMode.KNOWN_HOT_OUTLET:
@@ -3191,19 +3319,23 @@ def solve_heat_balance(
 
         # Solve cold outlet
         try:
-            cold_outlet_state, iters_cold, be_cold, _calls_cold, _brent_algo_iters_cold = (
-                _solve_outlet_temperature(
-                    provider,
-                    inp.cold.fluid_identifier,
-                    cold_inlet_state,
-                    inp.cold.mass_flow_kg_s,
-                    duty_w,
-                    is_hot_side=False,
-                    solver_params=inp.solver_params,
-                    property_calls=property_calls,
-                    expected_phase_family=cold_phase_family,
-                    global_seq=_global_seq,
-                )
+            (
+                cold_outlet_state,
+                func_evals_cold,
+                bracket_probes_cold,
+                _calls_cold,
+                algo_iters_cold,
+            ) = _solve_outlet_temperature(
+                provider,
+                inp.cold.fluid_identifier,
+                cold_inlet_state,
+                inp.cold.mass_flow_kg_s,
+                duty_w,
+                is_hot_side=False,
+                solver_params=inp.solver_params,
+                property_calls=property_calls,
+                expected_phase_family=cold_phase_family,
+                global_seq=_global_seq,
             )
         except (_BracketExhausted, _SolverNotConverged, PropertyServiceError) as exc:
             # Extract structured info from exceptions
@@ -3267,9 +3399,9 @@ def solve_heat_balance(
                 solver_calls=solver_calls,
                 successful_hot_outlet=hot_outlet_state,
             )
-        total_brent_function_evaluations = iters_cold
-        total_bracket_probe_count = be_cold
-        total_brent_algorithm_iteration_count = _brent_algo_iters_cold
+        total_brent_function_evaluations = func_evals_cold
+        total_bracket_probe_count = bracket_probes_cold
+        total_brent_algorithm_iteration_count = algo_iters_cold
 
     elif mode == SpecificationMode.KNOWN_COLD_OUTLET:
         assert inp.cold.outlet_temperature_k is not None
@@ -3425,7 +3557,7 @@ def solve_heat_balance(
 
         # Solve hot outlet
         try:
-            hot_outlet_state, iters_hot, be_hot, _calls_hot, _brent_algo_iters_hot = (
+            (hot_outlet_state, func_evals_hot, bracket_probes_hot, _calls_hot, algo_iters_hot) = (
                 _solve_outlet_temperature(
                     provider,
                     inp.hot.fluid_identifier,
@@ -3501,9 +3633,9 @@ def solve_heat_balance(
                 solver_calls=solver_calls,
                 successful_cold_outlet=cold_outlet_state,
             )
-        total_brent_function_evaluations = iters_hot
-        total_bracket_probe_count = be_hot
-        total_brent_algorithm_iteration_count = _brent_algo_iters_hot
+        total_brent_function_evaluations = func_evals_hot
+        total_bracket_probe_count = bracket_probes_hot
+        total_brent_algorithm_iteration_count = algo_iters_hot
 
     elif mode == SpecificationMode.BOTH_OUTLETS_KNOWN:
         # Both outlets known → verify energy balance

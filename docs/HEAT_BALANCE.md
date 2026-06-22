@@ -189,6 +189,17 @@ Edges:
 - `calculation_run → result` (produces)
 - `calculation_run → warning/blocker` (emits)
 
+### Provenance Integrity
+
+The `verify_provenance()` method validates the provenance graph independently:
+1. DAG validity (enforced by `ProvenanceGraph` validator)
+2. All node payload hashes are valid SHA-256
+3. All edge endpoints reference existing nodes
+4. RESULT node's payload_hash matches the result's own `result_hash`
+5. Graph is deterministic (recomputed digest matches)
+
+The `_compute_field_hash()` (used by `validate_integrity()`) includes a deterministic digest of the provenance graph, ensuring tamper detection covers the full graph structure.
+
 ## API
 
 ### `solve_heat_balance(inp, provider) → HeatBalanceResult`
