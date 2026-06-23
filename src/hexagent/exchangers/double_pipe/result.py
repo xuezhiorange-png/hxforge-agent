@@ -362,6 +362,13 @@ class RatingResult(BaseModel):
             "LMTD_k",
             "energy_residual_w",
             "ua_lmtd_residual_w",
+            # Closure diagnostics
+            "Q_hot_w",
+            "Q_cold_w",
+            "relative_energy_residual",
+            "energy_tolerance_w",
+            "relative_ua_lmtd_residual",
+            "ua_lmtd_tolerance_w",
         ]
         for name in float_fields:
             val = getattr(self, name)

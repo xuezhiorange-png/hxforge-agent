@@ -43,13 +43,9 @@ class DoublePipeRatingService:
         flow_arrangement: FlowArrangement = FlowArrangement.COUNTERFLOW,
         solver_params: SolverParams | None = None,
         context: CalculationContext | None = None,
-        tube_boundary_condition: ThermalBoundaryCondition = (
-            ThermalBoundaryCondition.constant_wall_temperature
-        ),
-        annulus_boundary_condition: ThermalBoundaryCondition = (
-            ThermalBoundaryCondition.inner_wall_heated
-        ),
-        minimum_terminal_delta_t: float = 0.5,
+        tube_boundary_condition: ThermalBoundaryCondition,
+        annulus_boundary_condition: ThermalBoundaryCondition,
+        minimum_terminal_delta_t: float,
     ) -> RatingResult:
         """Execute a fixed-geometry double-pipe rating.
 

@@ -566,6 +566,7 @@ def _blocked_result(
         warnings=tuple(warnings),
         blockers=tuple(blockers),
         status=RatingStatus.BLOCKED,
+        core_provenance_digest=core_provenance_digest,
     )
 
     # Rebuild provenance with the real result_hash (adding RESULT node)
@@ -732,6 +733,7 @@ def _failed_result(
         blockers=tuple(blockers),
         failure=failure,
         status=RatingStatus.FAILED,
+        core_provenance_digest=core_provenance_digest,
     )
 
     provenance_graph = build_provenance(
@@ -2092,13 +2094,18 @@ def rate_double_pipe(
     def residual_fn(Q: float) -> float:
         """Evaluate residual Q - UA(Q) x LMTD(Q).
 
-        Raises TrialEvaluationAbort for infeasible trials instead of
-        returning sentinel residuals. The abort propagates through the
-        solver and is caught at the rate_double_pipe boundary.
+        Uses accumulate=False so that property calls are only recorded
+        at the boundary: successful trials accumulate directly, and
+        aborted trials carry their calls via TrialEvaluationAbort.
+        This ensures each real provider invocation is recorded exactly once.
         """
-        trial = _evaluate_trial(Q)
+        trial = _evaluate_trial(Q, accumulate=False)
         if not trial.feasible or trial.residual_w is None:
+            # Accumulate the failed trial's calls at the abort boundary
+            property_calls.extend(trial.property_calls)
             raise TrialEvaluationAbort(trial)
+        # Accumulate successful trial's calls
+        property_calls.extend(trial.property_calls)
         return trial.residual_w
 
     # =====================================================================
@@ -2116,8 +2123,8 @@ def rate_double_pipe(
         )
     except TrialEvaluationAbort as abort:
         trial = abort.trial
-        # Propagate ALL property calls from the failed trial
-        property_calls.extend(trial.property_calls)
+        # Property calls already accumulated in residual_fn's failure branch.
+        # Only propagate warnings and blockers from the abort trial.
         warnings.extend(trial.warnings)
         blockers.extend(trial.blockers)
         # Map abort to structured BLOCKED result
@@ -2401,12 +2408,12 @@ def rate_double_pipe(
     ua_lmtd_tolerance_w_val: float | None = None
     if UA_final > 0 and lmtd_final > 0 and math.isfinite(UA_final) and math.isfinite(lmtd_final):
         ua_lmtd_residual_w = abs(Q_sol - UA_final * lmtd_final)
+        # Frozen tolerance: max(abs(Q), abs(UA*LMTD), 1.0) as base
+        _ua_lmtd_base = max(abs(Q_sol), abs(UA_final * lmtd_final), 1.0)
         ua_lmtd_tolerance_w_val = max(
-            _ENERGY_RESIDUAL_ABS_TOL, _ENERGY_RESIDUAL_REL_TOL * max(abs(Q_sol), 1.0)
+            _ENERGY_RESIDUAL_ABS_TOL, _ENERGY_RESIDUAL_REL_TOL * _ua_lmtd_base
         )
-        relative_ua_lmtd_residual = ua_lmtd_residual_w / max(
-            abs(Q_sol), abs(UA_final * lmtd_final), 1.0
-        )
+        relative_ua_lmtd_residual = ua_lmtd_residual_w / _ua_lmtd_base
         if ua_lmtd_residual_w > ua_lmtd_tolerance_w_val:
             blockers.append(
                 _make_blocker(
