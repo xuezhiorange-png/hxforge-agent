@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import math
+from copy import deepcopy
 from uuid import uuid4
 
 import pytest
@@ -77,7 +78,12 @@ from hexagent.correlations.tube import (
     TubeTurbulentGnielinski,
 )
 from hexagent.domain.messages import ErrorCode
-from hexagent.domain.provenance import ProvenanceGraph, ProvenanceNodeType
+from hexagent.domain.provenance import (
+    ProvenanceEdge,
+    ProvenanceGraph,
+    ProvenanceNode,
+    ProvenanceNodeType,
+)
 
 # ---------------------------------------------------------------------------
 # Shared test constants and helpers
@@ -1948,3 +1954,566 @@ class TestAnnulusGeometryConsistency:
         g = _ann_geom()
         dh = 4.0 * g.flow_area_m2 / g.total_wetted_perimeter_m
         assert dh == pytest.approx(g.hydraulic_diameter_m, rel=1e-12)
+
+
+# =====================================================================
+# J. Third-Round Review Tests — TASK-007
+
+
+# ---------------------------------------------------------------------------
+# Local helpers for third-round review tests
+# ---------------------------------------------------------------------------
+
+
+def _make_zero_flow_blocked() -> CorrelationResult:
+    """Zero mass flow → BLOCKED, no assessment."""
+    flow = _water_flow(mass_flow=0.0)
+    return evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+
+
+def _make_applicability_blocked() -> CorrelationResult:
+    """Re=2500 (transitional) → BLOCKED."""
+    target_re = 2500.0
+    m_dot = target_re * TUBE_A * MU / TUBE_DH
+    flow = _water_flow(mass_flow=m_dot)
+    return evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+
+
+def _make_c4_maturity_blocked(*, di: float = ANN_DI, do: float = ANN_DO) -> CorrelationResult:
+    """Annulus laminar inner wall heated, C4 metadata_only → BLOCKED."""
+    g = _ann_geom(di=di, do=do, heated="inner")
+    target_re = 1000.0
+    ann_a = math.pi / 4.0 * (do**2 - di**2)
+    ann_dh = do - di
+    m_dot = target_re * ann_a * MU / ann_dh
+    flow = _water_flow(mass_flow=m_dot)
+    return evaluate_hx_correlation(g, flow, "inner_wall_heated")
+
+
+# ---------------------------------------------------------------------------
+# Test J1: Blocked Results Categories
+# ---------------------------------------------------------------------------
+
+
+class TestBlockedResultsCategories:
+    """J1: Three distinct blocked result types — hash, provenance, JSON round-trip."""
+
+    def test_zero_flow_blocked_no_assessment(self) -> None:
+        r = _make_zero_flow_blocked()
+        assert r.status == CorrelationStatus.BLOCKED
+        assert r.applicability_assessment is None
+        assert r.verify_hash() is True
+        assert r.verify_provenance() is True
+
+    def test_zero_flow_blocked_json_roundtrip(self) -> None:
+        r = _make_zero_flow_blocked()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+        assert restored.verify_hash() is True
+        assert restored.verify_provenance() is True
+
+    def test_applicability_blocked(self) -> None:
+        r = _make_applicability_blocked()
+        assert r.status == CorrelationStatus.BLOCKED
+        assert r.flow_regime == "transitional"
+        assert r.verify_hash() is True
+        assert r.verify_provenance() is True
+
+    def test_applicability_blocked_json_roundtrip(self) -> None:
+        r = _make_applicability_blocked()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+        assert restored.verify_hash() is True
+        assert restored.verify_provenance() is True
+
+    def test_c4_maturity_blocked(self) -> None:
+        r = _make_c4_maturity_blocked()
+        assert r.status == CorrelationStatus.BLOCKED
+        assert r.applicability_assessment is not None
+        assert r.verify_hash() is True
+        assert r.verify_provenance() is True
+        assert any("metadata_only" in b.message for b in r.blockers)
+
+    def test_c4_maturity_blocked_json_roundtrip(self) -> None:
+        r = _make_c4_maturity_blocked()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+        assert restored.verify_hash() is True
+        assert restored.verify_provenance() is True
+        assert any("metadata_only" in b.message for b in restored.blockers)
+
+
+# ---------------------------------------------------------------------------
+# Test J2: C4 Maturity Blocked — All Kappa Values
+# ---------------------------------------------------------------------------
+
+
+class TestC4MaturityBlockedAllKappa:
+    """J2: C4 at κ=0.05, 0.5, 0.85 all return the same metadata_only blocker."""
+
+    @pytest.mark.parametrize(
+        "kappa_label, di, do",
+        [
+            ("kappa_005", 0.0025, 0.050),
+            ("kappa_050", 0.025, 0.050),
+            ("kappa_085", 0.0425, 0.050),
+        ],
+    )
+    def test_same_metadata_only_blocker(self, kappa_label: str, di: float, do: float) -> None:
+        r = _make_c4_maturity_blocked(di=di, do=do)
+        assert r.status == CorrelationStatus.BLOCKED
+        assert r.applicability_assessment is not None
+        assert any(b.code == ErrorCode.NOT_IMPLEMENTED for b in r.blockers)
+        assert any("metadata_only" in b.message for b in r.blockers)
+        assert r.applicability_assessment.status.value == "incompatible_phase"
+
+    def test_all_kappa_same_blocker_type(self) -> None:
+        """All three kappa values produce the same blocker code."""
+        results = []
+        for di, do in [(0.0025, 0.050), (0.025, 0.050), (0.0425, 0.050)]:
+            results.append(_make_c4_maturity_blocked(di=di, do=do))
+        codes = [tuple(b.code for b in r.blockers) for r in results]
+        assert all(c == codes[0] for c in codes)
+
+
+# ---------------------------------------------------------------------------
+# Test J3: C4 Metadata-Only Not In Evaluator
+# ---------------------------------------------------------------------------
+
+
+class TestC4MetadataOnlyNotInEvaluator:
+    """J3: C4 metadata_only never enters the evaluator — assessment from selection layer."""
+
+    def test_assessment_status_incompatible_phase(self) -> None:
+        r = _make_c4_maturity_blocked()
+        assert r.status == CorrelationStatus.BLOCKED
+        assert r.applicability_assessment is not None
+        assert r.applicability_assessment.status.value == "incompatible_phase"
+
+    def test_blocker_code_not_implemented(self) -> None:
+        r = _make_c4_maturity_blocked()
+        assert any(b.code == ErrorCode.NOT_IMPLEMENTED for b in r.blockers)
+        assert r.selected_correlation is None
+
+    def test_no_correlation_selected(self) -> None:
+        """C4 metadata_only → selected_correlation is None."""
+        r = _make_c4_maturity_blocked()
+        assert r.selected_correlation is None
+        assert (
+            r.applicability_assessment is not None
+            and r.applicability_assessment.correlation_key.correlation_id
+            == "annulus_laminar_inner_chf"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test J4: Provenance Exact Topology Tampering
+# ---------------------------------------------------------------------------
+
+
+class TestProvenanceExactTopologyTampering:
+    """J4: Five tamper scenarios on succeeded provenance graph."""
+
+    def _get_succeeded_result(self) -> CorrelationResult:
+        return _make_result_tube_laminar()
+
+    def test_extra_disconnected_root(self) -> None:
+        """Adding an extra disconnected root node → verify_provenance False."""
+        r = self._get_succeeded_result()
+        assert r.verify_provenance() is True
+        r2 = deepcopy(r)
+        graph = r2.provenance_graph
+        extra_root = ProvenanceNode(
+            node_id=uuid4(),
+            node_type=ProvenanceNodeType.EXTERNAL,
+            label="extra_root",
+            payload_hash="sha256:" + "aa" * 32,
+        )
+        new_graph = ProvenanceGraph(
+            nodes=graph.nodes + (extra_root,),
+            edges=graph.edges,
+        )
+        object.__setattr__(r2, "provenance_graph", new_graph)
+        object.__setattr__(r2, "provenance_digest", _provenance_graph_digest(new_graph))
+        assert r2.verify_provenance() is False
+        assert r.verify_provenance() is True
+
+    def test_extra_edge_between_existing_nodes(self) -> None:
+        """Adding an extra edge between existing nodes → verify_provenance False."""
+        r = self._get_succeeded_result()
+        assert r.verify_provenance() is True
+        r2 = deepcopy(r)
+        graph = r2.provenance_graph
+        if len(graph.nodes) >= 2:
+            n1, n2 = graph.nodes[0], graph.nodes[1]
+            extra_edge = ProvenanceEdge(
+                source_id=n1.node_id,
+                target_id=n2.node_id,
+                relation="extra_relation",
+            )
+            new_graph = ProvenanceGraph(
+                nodes=graph.nodes,
+                edges=graph.edges + (extra_edge,),
+            )
+            object.__setattr__(r2, "provenance_graph", new_graph)
+            object.__setattr__(r2, "provenance_digest", _provenance_graph_digest(new_graph))
+            assert r2.verify_provenance() is False
+        assert r.verify_provenance() is True
+
+    def test_remove_expected_edge(self) -> None:
+        """Removing an expected edge → verify_provenance False."""
+        r = self._get_succeeded_result()
+        assert r.verify_provenance() is True
+        r2 = deepcopy(r)
+        graph = r2.provenance_graph
+        if graph.edges:
+            new_graph = ProvenanceGraph(
+                nodes=graph.nodes,
+                edges=graph.edges[1:],
+            )
+            object.__setattr__(r2, "provenance_graph", new_graph)
+            object.__setattr__(r2, "provenance_digest", _provenance_graph_digest(new_graph))
+            assert r2.verify_provenance() is False
+        assert r.verify_provenance() is True
+
+    def test_change_edge_relation(self) -> None:
+        """Changing an edge relation → verify_provenance False."""
+        r = self._get_succeeded_result()
+        assert r.verify_provenance() is True
+        r2 = deepcopy(r)
+        graph = r2.provenance_graph
+        if graph.edges:
+            old_edge = graph.edges[0]
+            new_edge = ProvenanceEdge(
+                source_id=old_edge.source_id,
+                target_id=old_edge.target_id,
+                relation="wrong_relation",
+            )
+            new_graph = ProvenanceGraph(
+                nodes=graph.nodes,
+                edges=(new_edge,) + graph.edges[1:],
+            )
+            object.__setattr__(r2, "provenance_graph", new_graph)
+            object.__setattr__(r2, "provenance_digest", _provenance_graph_digest(new_graph))
+            assert r2.verify_provenance() is False
+        assert r.verify_provenance() is True
+
+    def test_add_duplicate_semantic_node(self) -> None:
+        """Adding a duplicate node of the same semantic type → verify_provenance False."""
+        r = self._get_succeeded_result()
+        assert r.verify_provenance() is True
+        r2 = deepcopy(r)
+        graph = r2.provenance_graph
+        corr_nodes = [n for n in graph.nodes if n.node_type == ProvenanceNodeType.CORRELATION]
+        if corr_nodes:
+            src = corr_nodes[0]
+            dup = ProvenanceNode(
+                node_id=uuid4(),
+                node_type=ProvenanceNodeType.CORRELATION,
+                label=src.label,
+                metadata=src.metadata,
+                payload_hash=src.payload_hash,
+            )
+            new_graph = ProvenanceGraph(
+                nodes=graph.nodes + (dup,),
+                edges=graph.edges,
+            )
+            object.__setattr__(r2, "provenance_graph", new_graph)
+            object.__setattr__(r2, "provenance_digest", _provenance_graph_digest(new_graph))
+            assert r2.verify_provenance() is False
+        assert r.verify_provenance() is True
+
+
+# ---------------------------------------------------------------------------
+# Test J5: Assessment Hash Semantic Verification
+# ---------------------------------------------------------------------------
+
+
+class TestAssessmentHashSemanticVerification:
+    """J5: Assessment hash verification for applicability-blocked results."""
+
+    def _get_blocked_assessment(self) -> ApplicabilityAssessment:
+        r = _make_c4_maturity_blocked()
+        assert r.applicability_assessment is not None
+        return r.applicability_assessment
+
+    def test_verify_assessment_hash_true(self) -> None:
+        a = self._get_blocked_assessment()
+        assert a.verify_assessment_hash() is True
+
+    def test_json_roundtrip_preserves_hash(self) -> None:
+        a = self._get_blocked_assessment()
+        json_str = a.model_dump_json()
+        restored = ApplicabilityAssessment.model_validate_json(json_str)
+        assert restored.verify_assessment_hash() is True
+        assert restored.assessment_hash == a.assessment_hash
+
+    def test_tamper_definition_hash_breaks(self) -> None:
+        a = self._get_blocked_assessment()
+        assert a.identity_snapshot is not None
+        tampered = a.model_copy(
+            update={
+                "identity_snapshot": a.identity_snapshot.model_copy(
+                    update={"definition_hash": "sha256:" + "ff" * 32}
+                )
+            }
+        )
+        assert tampered.verify_assessment_hash() is False
+
+    def test_tamper_assessment_hash_breaks(self) -> None:
+        a = self._get_blocked_assessment()
+        tampered = a.model_copy(update={"assessment_hash": "sha256:" + "00" * 32})
+        assert tampered.verify_assessment_hash() is False
+
+    def test_tamper_status_breaks(self) -> None:
+        a = self._get_blocked_assessment()
+        # Use absolute_range_exceeded (non-applicable, won't fail validator)
+        # Must pass enum value, not string — model_copy bypasses validators
+        from hexagent.correlations.models import ApplicabilityStatus
+
+        tampered = a.model_copy(update={"status": ApplicabilityStatus.absolute_range_exceeded})
+        assert tampered.verify_assessment_hash() is False
+
+    def test_tamper_geometry_breaks(self) -> None:
+        a = self._get_blocked_assessment()
+        assert a.identity_snapshot is not None
+        tampered = a.model_copy(
+            update={
+                "identity_snapshot": a.identity_snapshot.model_copy(
+                    update={"geometry": GeometryType.circular_tube}
+                )
+            }
+        )
+        assert tampered.verify_assessment_hash() is False
+
+
+# ---------------------------------------------------------------------------
+# Test J6: Typed Boundary Conditions
+# ---------------------------------------------------------------------------
+
+
+class TestTypedBoundaryConditionsAdapter:
+    """J6: ThermalBoundaryCondition enum adapter tests."""
+
+    def test_enum_direct_call(self) -> None:
+        """Enum value passed directly → should work."""
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(
+            _tube_geom(), flow, ThermalBoundaryCondition.constant_wall_temperature
+        )
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.selected_correlation is not None
+
+    def test_valid_string_adapter(self) -> None:
+        """Valid string → converted to enum internally → should work."""
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.selected_correlation is not None
+
+    def test_invalid_string_blocked(self) -> None:
+        """Invalid string → BLOCKED with CORRELATION_GEOMETRY_INCOMPATIBLE."""
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "invalid_bc")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert any(b.code == ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE for b in result.blockers)
+
+    def test_select_correlation_receives_enum(self) -> None:
+        """select_correlation with enum directly works."""
+        reg = _registry()
+        result = select_correlation(
+            reg,
+            _tube_geom(),
+            ThermalBoundaryCondition.constant_wall_temperature,
+            FlowRegime.laminar,
+            200.0,
+            7.0,
+        )
+        assert result.selected_definition is not None
+        assert result.selection_status == "selected"
+
+
+# ---------------------------------------------------------------------------
+# Test J7: Frozen Registry Isolation
+# ---------------------------------------------------------------------------
+
+
+class TestFrozenRegistryIsolation:
+    """J7: _get_registry() returns deep copies — mutations don't leak."""
+
+    def test_mutation_does_not_persist(self) -> None:
+        """Registering a fake definition in one copy doesn't affect the next copy."""
+        from hexagent.correlations.errors import CorrelationNotFoundError
+        from hexagent.correlations.models import (
+            ApplicabilityEnvelope,
+            BibliographicSource,
+            CorrelationDefinition,
+            CorrelationImplementationStatus,
+            CorrelationKey,
+            CorrelationPurpose,
+            NumericBound,
+            UncertaintySpec,
+        )
+        from hexagent.correlations.models import FlowRegime as ModelsFlowRegime
+
+        reg1 = _get_registry()
+        count1 = len(reg1.search())
+
+        fake_defn = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="fake_isolation_test", version="1.0.0"),
+            name="Fake Isolation Test",
+            purpose=CorrelationPurpose.nusselt_number,
+            description="Test",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                flow_regimes=frozenset({ModelsFlowRegime.laminar}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=0.0,
+                        maximum=2300.0,
+                        minimum_inclusive=False,
+                        maximum_inclusive=False,
+                    ),
+                ),
+                required_inputs=frozenset(
+                    {
+                        ApplicabilityVariable.reynolds,
+                        ApplicabilityVariable.prandtl,
+                    }
+                ),
+            ),
+            source=BibliographicSource(
+                source_id="test",
+                title="T",
+                publication="P",
+                year=2024,
+                verification_status=SourceVerificationStatus.primary_source_checked,
+            ),
+            uncertainty=UncertaintySpec(basis="test"),
+            implementation_status=CorrelationImplementationStatus.validated,
+            implementation_ref="test.ref",
+            tags=frozenset(
+                {
+                    "bc:constant_wall_temperature",
+                    "nusselt_basis:inside_diameter",
+                    "priority:10",
+                }
+            ),
+        )
+        reg1.register(fake_defn)
+
+        reg2 = _get_registry()
+        count2 = len(reg2.search())
+        assert count1 == count2
+        # Fake definition should NOT be in the fresh copy
+        with pytest.raises(CorrelationNotFoundError):
+            reg2.get(CorrelationKey(correlation_id="fake_isolation_test", version="1.0.0"))
+
+    def test_multiple_copies_independent(self) -> None:
+        """Three consecutive calls to _get_registry() return independent copies."""
+        r1 = _get_registry()
+        r2 = _get_registry()
+        r3 = _get_registry()
+        c1 = len(r1.search())
+        c2 = len(r2.search())
+        c3 = len(r3.search())
+        assert c1 == c2 == c3
+
+
+# ---------------------------------------------------------------------------
+# Test J8: Assessment Identity Snapshot Round-Trip
+# ---------------------------------------------------------------------------
+
+
+class TestAssessmentIdentitySnapshotRoundTrip:
+    """J8: Assessment identity_snapshot survives model_dump → model_validate."""
+
+    def test_roundtrip_preserves_identity_snapshot(self) -> None:
+        r = _make_c4_maturity_blocked()
+        a = r.applicability_assessment
+        assert a is not None
+        assert a.identity_snapshot is not None
+
+        data = a.model_dump()
+        restored = ApplicabilityAssessment.model_validate(data)
+
+        assert restored.identity_snapshot is not None
+        assert restored.identity_snapshot.definition_hash == a.identity_snapshot.definition_hash
+        assert restored.identity_snapshot.geometry == a.identity_snapshot.geometry
+        assert restored.identity_snapshot.phase_regime == a.identity_snapshot.phase_regime
+        assert restored.identity_snapshot.flow_regime == a.identity_snapshot.flow_regime
+        assert restored.identity_snapshot.input_values == a.identity_snapshot.input_values
+        assert restored.identity_snapshot.policy == a.identity_snapshot.policy
+        assert (
+            restored.identity_snapshot.allow_extrapolation
+            == a.identity_snapshot.allow_extrapolation
+        )
+
+    def test_verify_hash_before_and_after_roundtrip(self) -> None:
+        r = _make_c4_maturity_blocked()
+        a = r.applicability_assessment
+        assert a is not None
+
+        assert a.verify_assessment_hash() is True
+
+        data = a.model_dump()
+        restored = ApplicabilityAssessment.model_validate(data)
+        assert restored.verify_assessment_hash() is True
+
+    def test_identity_snapshot_fields_complete(self) -> None:
+        """identity_snapshot contains all required fields."""
+        r = _make_c4_maturity_blocked()
+        a = r.applicability_assessment
+        assert a is not None
+        snap = a.identity_snapshot
+        assert snap is not None
+
+        assert isinstance(snap.definition_hash, str)
+        assert snap.definition_hash.startswith("sha256:")
+        assert isinstance(snap.geometry, GeometryType)
+        assert isinstance(snap.phase_regime, PhaseRegime)
+        assert hasattr(snap.flow_regime, "value")
+        assert snap.flow_regime.value in (
+            "laminar",
+            "transitional",
+            "turbulent",
+            "mixed",
+            "not_applicable",
+        )
+        assert isinstance(snap.input_values, tuple)
+        assert len(snap.input_values) > 0
+        for _var, val in snap.input_values:
+            assert isinstance(val, float)
+        assert hasattr(snap.policy, "absolute_violation")
+        assert isinstance(snap.allow_extrapolation, bool)
+
+    def test_json_roundtrip_preserves_hash(self) -> None:
+        """JSON round-trip of assessment preserves hash verification."""
+        r = _make_c4_maturity_blocked()
+        a = r.applicability_assessment
+        assert a is not None
+
+        json_str = a.model_dump_json()
+        restored = ApplicabilityAssessment.model_validate_json(json_str)
+        assert restored.verify_assessment_hash() is True
+        assert restored.identity_snapshot is not None
+        assert a.identity_snapshot is not None
+        assert restored.identity_snapshot.definition_hash == a.identity_snapshot.definition_hash
+
+    def test_succeeded_result_also_has_snapshot(self) -> None:
+        """Succeeded result's assessment also has identity_snapshot."""
+        r = _make_result_tube_laminar()
+        a = r.applicability_assessment
+        assert a is not None
+        assert a.identity_snapshot is not None
+        assert a.verify_assessment_hash() is True
+
+        data = a.model_dump()
+        restored = ApplicabilityAssessment.model_validate(data)
+        assert restored.verify_assessment_hash() is True
+        assert restored.identity_snapshot is not None
+        assert restored.identity_snapshot.geometry == GeometryType.circular_tube

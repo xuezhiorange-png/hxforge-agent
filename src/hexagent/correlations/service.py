@@ -54,18 +54,18 @@ from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSever
 
 _VALID_ANNULUS_BC = frozenset(
     {
-        "inner_wall_heated",
-        "outer_wall_heated",
-        "both_walls_heated",
-        "constant_wall_temperature",
-        "constant_heat_flux",
+        ThermalBoundaryCondition.inner_wall_heated,
+        ThermalBoundaryCondition.outer_wall_heated,
+        ThermalBoundaryCondition.both_walls_heated,
+        ThermalBoundaryCondition.constant_wall_temperature,
+        ThermalBoundaryCondition.constant_heat_flux,
     }
 )
 
 _VALID_TUBE_BC = frozenset(
     {
-        "constant_wall_temperature",
-        "constant_heat_flux",
+        ThermalBoundaryCondition.constant_wall_temperature,
+        ThermalBoundaryCondition.constant_heat_flux,
     }
 )
 
@@ -116,10 +116,6 @@ def _build_default_registry() -> InMemoryCorrelationRegistry:
     - Applicability envelope with numeric bounds
     - Tags for boundary condition and Nusselt basis
     """
-    from hexagent.correlations.annulus import (
-        _KAPPA_ABSOLUTE_MAX,
-        _KAPPA_ABSOLUTE_MIN,
-    )
     from hexagent.correlations.models import (
         ApplicabilityEnvelope,
         ApplicabilityVariable,
@@ -330,6 +326,8 @@ def _build_default_registry() -> InMemoryCorrelationRegistry:
 
     # C4: Annulus laminar inner CHF
     # STATUS: metadata_only — source data pending verification
+    # NO NumericBound for diameter_ratio — placeholder κ bounds removed
+    # because they were not backed by verified source data.
     _register(
         CorrelationDefinition.create(
             key=CorrelationKey(correlation_id="annulus_laminar_inner_chf", version="1.0.0"),
@@ -363,14 +361,10 @@ def _build_default_registry() -> InMemoryCorrelationRegistry:
                         minimum=0.6,
                         minimum_inclusive=False,
                     ),
-                    NumericBound(
-                        variable=ApplicabilityVariable.diameter_ratio,
-                        minimum=_KAPPA_ABSOLUTE_MIN,
-                        maximum=_KAPPA_ABSOLUTE_MAX,
-                        minimum_inclusive=True,
-                        maximum_inclusive=True,
-                        tolerance_fraction=1e-6,
-                    ),
+                    # NOTE: No diameter_ratio bound — placeholder κ bounds
+                    # [0.1, 0.75] removed because they are unverified.
+                    # C4 is blocked by implementation_status=metadata_only
+                    # before any numeric assessment is performed.
                 ),
                 required_inputs=frozenset(
                     {
@@ -540,13 +534,19 @@ class CalculationContext:
 def evaluate_hx_correlation(
     geometry: CircularTubeGeometry | ConcentricAnnulusGeometry,
     flow: FlowPropertiesInput,
-    boundary_condition: str = "constant_wall_temperature",
+    boundary_condition: ThermalBoundaryCondition | str = "constant_wall_temperature",
     context: CalculationContext | None = None,
 ) -> CorrelationResult:
     """Evaluate single-phase convective heat-transfer correlation.
 
     This is the main entry point for TASK-007.
     Uses the TASK-004 registry and applicability engine.
+
+    Args:
+        geometry: Flow geometry (tube or annulus).
+        flow: Flow properties input.
+        boundary_condition: Typed ThermalBoundaryCondition or string (converted at boundary).
+        context: Optional calculation context for provenance.
     """
     warnings: list[EngineeringMessage] = []
     blockers: list[EngineeringMessage] = []
@@ -574,26 +574,30 @@ def evaluate_hx_correlation(
         return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
 
     # --- Step 2: Convert and validate boundary condition ---
-    try:
-        bc_enum = ThermalBoundaryCondition(boundary_condition)
-    except ValueError:
-        blockers.append(
-            _make_blocker(
-                ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
-                f"Invalid boundary condition: {boundary_condition!r}",
-                (("boundary_condition", boundary_condition),),
-            )
-        )
-        return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
-
-    # Validate boundary condition vs geometry
-    if isinstance(geometry, ConcentricAnnulusGeometry):
-        if bc_enum.value not in _VALID_ANNULUS_BC:
+    # Accept str or ThermalBoundaryCondition; convert at domain boundary
+    if isinstance(boundary_condition, str):
+        try:
+            bc_enum = ThermalBoundaryCondition(boundary_condition)
+        except ValueError:
             blockers.append(
                 _make_blocker(
                     ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
-                    f"Unsupported boundary condition for annulus: {boundary_condition!r}",
+                    f"Invalid boundary condition: {boundary_condition!r}",
                     (("boundary_condition", boundary_condition),),
+                )
+            )
+            return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
+    else:
+        bc_enum = boundary_condition
+
+    # Validate boundary condition vs geometry
+    if isinstance(geometry, ConcentricAnnulusGeometry):
+        if bc_enum not in _VALID_ANNULUS_BC:
+            blockers.append(
+                _make_blocker(
+                    ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
+                    f"Unsupported boundary condition for annulus: {bc_enum.value!r}",
+                    (("boundary_condition", bc_enum.value),),
                 )
             )
             return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
@@ -606,7 +610,7 @@ def evaluate_hx_correlation(
                     ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
                     f"Boundary condition 'inner_wall_heated' requires heated_surface='inner', "
                     f"got '{hs}'",
-                    (("heated_surface", hs), ("boundary_condition", boundary_condition)),
+                    (("heated_surface", hs), ("boundary_condition", bc_enum.value)),
                 )
             )
             return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
@@ -616,7 +620,7 @@ def evaluate_hx_correlation(
                     ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
                     f"Boundary condition 'outer_wall_heated' requires heated_surface='outer', "
                     f"got '{hs}'",
-                    (("heated_surface", hs), ("boundary_condition", boundary_condition)),
+                    (("heated_surface", hs), ("boundary_condition", bc_enum.value)),
                 )
             )
             return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
@@ -626,17 +630,17 @@ def evaluate_hx_correlation(
                     ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
                     f"Boundary condition 'both_walls_heated' requires heated_surface='both', "
                     f"got '{hs}'",
-                    (("heated_surface", hs), ("boundary_condition", boundary_condition)),
+                    (("heated_surface", hs), ("boundary_condition", bc_enum.value)),
                 )
             )
             return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
     else:
-        if bc_enum.value not in _VALID_TUBE_BC:
+        if bc_enum not in _VALID_TUBE_BC:
             blockers.append(
                 _make_blocker(
                     ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
-                    f"Unsupported boundary condition for tube: {boundary_condition!r}",
-                    (("boundary_condition", boundary_condition),),
+                    f"Unsupported boundary condition for tube: {bc_enum.value!r}",
+                    (("boundary_condition", bc_enum.value),),
                 )
             )
             return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
@@ -713,7 +717,7 @@ def evaluate_hx_correlation(
     selection_result = select_correlation(
         registry=registry,
         geometry=geometry,
-        boundary_condition=bc_enum.value,
+        boundary_condition=bc_enum,
         flow_regime=regime,
         reynolds=reynolds,
         prandtl=prandtl,
@@ -747,10 +751,10 @@ def evaluate_hx_correlation(
                 _make_blocker(
                     ErrorCode.CORRELATION_NOT_FOUND,
                     f"No applicable correlation for geometry={type(geometry).__name__}, "
-                    f"bc={boundary_condition!r}, regime={regime.value!r}",
+                    f"bc={bc_enum.value!r}, regime={regime.value!r}",
                     (
                         ("geometry_type", type(geometry).__name__),
-                        ("boundary_condition", boundary_condition),
+                        ("boundary_condition", bc_enum.value),
                         ("flow_regime", regime.value),
                     ),
                 )
@@ -886,7 +890,6 @@ def evaluate_hx_correlation(
             velocity=velocity,
             area=area,
             dh=dh,
-            regime=regime.value,
         )
 
     # --- Step 8: Compute h using correlation-specific D_char ---

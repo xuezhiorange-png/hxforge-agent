@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from functools import cmp_to_key
 
 from hexagent.correlations.applicability import assess_applicability
-from hexagent.correlations.flow import FlowRegime, NusseltBasis
+from hexagent.correlations.flow import FlowRegime, NusseltBasis, ThermalBoundaryCondition
 from hexagent.correlations.geometry import CircularTubeGeometry, ConcentricAnnulusGeometry
 from hexagent.correlations.models import (
     ApplicabilityAssessment,
@@ -76,14 +76,22 @@ def _extract_priority(definition: CorrelationDefinition) -> int:
     return 0
 
 
-def _is_boundary_compatible(definition: CorrelationDefinition, boundary_condition: str) -> bool:
+def _is_boundary_compatible(
+    definition: CorrelationDefinition,
+    boundary_condition: ThermalBoundaryCondition | str,
+) -> bool:
     """Check if a correlation definition supports the given boundary condition.
 
     Boundary condition compatibility is driven by definition metadata:
     tags with ``bc:`` prefix (e.g. ``bc:constant_wall_temperature``).
     This replaces the previous correlation_id string-matching approach.
+    Accepts both enum and string; converts at boundary.
     """
-    return f"bc:{boundary_condition}" in definition.tags
+    if isinstance(boundary_condition, str):
+        bc_value = boundary_condition
+    else:
+        bc_value = boundary_condition.value
+    return f"bc:{bc_value}" in definition.tags
 
 
 def _get_nusselt_basis(definition: CorrelationDefinition) -> str:
@@ -143,7 +151,7 @@ def _compare_candidates(
 def select_correlation(
     registry: InMemoryCorrelationRegistry,
     geometry: CircularTubeGeometry | ConcentricAnnulusGeometry,
-    boundary_condition: str,
+    boundary_condition: ThermalBoundaryCondition | str,
     flow_regime: FlowRegime,
     reynolds: float,
     prandtl: float,
@@ -152,10 +160,42 @@ def select_correlation(
 ) -> SelectionResult:
     """Select the best correlation candidate deterministically using the registry.
 
+    Args:
+        registry: The correlation registry to search.
+        geometry: Flow geometry.
+        boundary_condition: Typed boundary condition enum or string (converted at boundary).
+        flow_regime: Classified flow regime.
+        reynolds: Reynolds number.
+        prandtl: Prandtl number.
+        diameter_ratio: Diameter ratio kappa (annulus only).
+        has_wall_viscosity: Whether wall viscosity is available.
+
     Returns a :class:`SelectionResult` with the selected definition (or None),
     its applicability assessment, any rejected candidates with full context,
     a status string, and any blocker messages.
     """
+    # Convert str → enum at the domain boundary
+    if isinstance(boundary_condition, str):
+        try:
+            bc_enum = ThermalBoundaryCondition(boundary_condition)
+        except ValueError:
+            return SelectionResult(
+                selected_definition=None,
+                selected_assessment=None,
+                rejected_candidates=(),
+                selection_status="blocked",
+                blockers=(
+                    EngineeringMessage(
+                        code=ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
+                        severity=EngineeringMessageSeverity.BLOCKER,
+                        message=f"Invalid boundary condition: {boundary_condition!r}",
+                        source_module="correlations.selection",
+                    ),
+                ),
+            )
+    else:
+        bc_enum = boundary_condition
+
     # Map geometry to GeometryType for the registry
     if isinstance(geometry, CircularTubeGeometry):
         geo_type = GeometryType.circular_tube
@@ -209,8 +249,82 @@ def select_correlation(
         if model_flow not in defn.envelope.flow_regimes:
             continue
 
-        # Check boundary condition compatibility (tag-driven)
-        if not _is_boundary_compatible(defn, boundary_condition):
+        # Check boundary condition compatibility (tag-driven, enum-based)
+        if not _is_boundary_compatible(defn, bc_enum):
+            continue
+
+        # Check implementation status: metadata_only → blocked without evaluation
+        if defn.implementation_status.value == "metadata_only":
+            from hexagent.correlations.models import (
+                ApplicabilityIdentitySnapshot,
+                ApplicabilityStatus,
+                OutOfRangePolicy,
+                compute_assessment_hash,
+            )
+
+            # Build the blocker message
+            blocker_msg = EngineeringMessage(
+                code=ErrorCode.NOT_IMPLEMENTED,
+                severity=EngineeringMessageSeverity.BLOCKER,
+                message=(
+                    f"Correlation {defn.key.correlation_id} v{defn.key.version} "
+                    f"is metadata_only — source data pending verification. "
+                    f"implementation_status=metadata_only, "
+                    f"source_verification_status={defn.source.verification_status.value}"
+                ),
+                source_module="correlations.selection",
+                context=(
+                    ("correlation_id", defn.key.correlation_id),
+                    ("version", defn.key.version),
+                    ("implementation_status", "metadata_only"),
+                    ("source_verification_status", defn.source.verification_status.value),
+                ),
+            )
+
+            # Build identity snapshot
+            identity_snapshot = ApplicabilityIdentitySnapshot(
+                definition_hash=defn.definition_hash,
+                geometry=geo_type,
+                phase_regime=PhaseRegime.single_phase_liquid,
+                flow_regime=model_flow,
+                input_values=(
+                    (ApplicabilityVariable.reynolds, reynolds),
+                    (ApplicabilityVariable.prandtl, prandtl),
+                ),
+                policy=OutOfRangePolicy(),
+                allow_extrapolation=False,
+            )
+
+            # Compute assessment hash before constructing (hash must not be empty)
+            assessment_hash = compute_assessment_hash(
+                definition_hash=defn.definition_hash,
+                correlation_key=defn.key,
+                geometry=geo_type,
+                phase_regime=PhaseRegime.single_phase_liquid,
+                flow_regime=model_flow,
+                input_values=(
+                    (ApplicabilityVariable.reynolds, reynolds),
+                    (ApplicabilityVariable.prandtl, prandtl),
+                ),
+                status=ApplicabilityStatus.incompatible_phase,
+                variable_results=(),
+                warnings=(),
+                blockers=(blocker_msg,),
+                policy=OutOfRangePolicy(),
+                allow_extrapolation=False,
+            )
+
+            # Construct the blocked assessment with hash
+            blocked_assessment = ApplicabilityAssessment(
+                correlation_key=defn.key,
+                status=ApplicabilityStatus.incompatible_phase,
+                variable_results=(),
+                warnings=(),
+                blockers=(blocker_msg,),
+                assessment_hash=assessment_hash,
+                identity_snapshot=identity_snapshot,
+            )
+            rejected.append((defn, blocked_assessment))
             continue
 
         # Build applicability input

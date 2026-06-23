@@ -7,8 +7,9 @@ Implements:
 Sources:
 - C4: Kays, W.M., Crawford, M.E., "Convective Heat and Mass Transfer,"
   3rd Edition, McGraw-Hill, 1993, Chapter 9, Table 9-1.
-  NOTE: Source data pending independent verification. Correlation is
-  currently metadata_only / unverified. Do NOT claim primary_source_checked.
+  STATUS: metadata_only / unverified. The correlation is structurally present
+  but all numeric data is pending independent engineer verification.
+  Do NOT claim primary_source_checked or validated.
 - C5: Gnielinski (1976) adapted via hydraulic diameter per engineering
   judgment. Kays & Crawford 3rd ed. Ch. 10 citation not independently
   verified for this specific adaptation. Source verification: unverified.
@@ -23,7 +24,7 @@ import math
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
-# C4 data status: UNVERIFIED
+# C4 data status: UNVERIFIED / metadata_only
 #
 # The reviewer independently confirmed that the fully developed
 # asymmetric-heating annulus solution in Kays & Crawford 3rd ed.
@@ -31,36 +32,24 @@ from dataclasses import dataclass
 # Nusselt numbers with the annulus hydraulic diameter D_h.
 #
 # The previously implemented values (4.85, 5.70, 7.30, 10.10 at
-# κ = 0.1, 0.25, 0.5, 0.75) referenced "Table 8-2" and claimed
+# kappa = 0.1, 0.25, 0.5, 0.75) referenced "Table 8-2" and claimed
 # D_i basis — both are INCORRECT per the reviewer's independent check.
 #
-# Until an engineer provides the verified Table 9-1 values with
-# correct D_h basis, C4 is marked metadata_only and computation
-# is BLOCKED by the service layer.
+# PLACEHOLDER CONSTANTS REMOVED: _PLACEHOLDER_KAPPA, _PLACEHOLDER_NU_DH,
+# _KAPPA_ABSOLUTE_MIN, _KAPPA_ABSOLUTE_MAX have been deleted because
+# they are not backed by verified source data and must not enter any
+# runtime decision (registry bounds, applicability checks, etc.).
 #
-# The interpolation function below is retained as a placeholder
-# but the service will not call it until data is verified.
+# C4 is blocked at the SERVICE LAYER by implementation_status=metadata_only.
+# The service returns NOT_IMPLEMENTED before calling evaluate().
+# No interpolation function is invoked.
 # ---------------------------------------------------------------------------
 
-# Placeholder data — MUST BE REPLACED with verified Table 9-1 values.
-# These are NOT claimed as authoritative.
-_PLACEHOLDER_KAPPA: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75)
-_PLACEHOLDER_NU_DH: tuple[float, ...] = (0.0, 0.0, 0.0, 0.0)  # Placeholder
 
-# Frozen range bounds for the placeholder data
-_KAPPA_ABSOLUTE_MIN = 0.1
-_KAPPA_ABSOLUTE_MAX = 0.75
+def _interpolate_nu_laminar_inner(kappa: float) -> float:  # noqa: ARG001
+    """Placeholder — MUST NOT be called until source data is verified.
 
-
-def _interpolate_nu_laminar_inner(kappa: float) -> float:
-    """Interpolate Nu from placeholder data for inner wall heated, outer insulated.
-
-    WARNING: This function uses UNVERIFIED placeholder data.
-    The service layer BLOCKS C4 computation until authoritative
-    Table 9-1 values are provided by an engineer.
-
-    kappa = D_inner / D_outer.
-    Nu is based on hydraulic diameter D_h (per Kays & Crawford convention).
+    RAISES NotImplementedError unconditionally.
     """
     raise NotImplementedError(
         "C4 annulus laminar correlation data is pending source verification. "
@@ -81,9 +70,9 @@ class AnnulusLaminarInnerCHF:
     Per the reviewer's independent check:
     - Nu is based on hydraulic diameter D_h (NOT inner diameter D_i)
     - The previously cited "Table 8-2" is incorrect for this problem
-    - The κ/Nu values need re-extraction from the correct table
+    - The kappa/Nu values need re-extraction from the correct table
 
-    Valid for: Re_h < 2300, Pr > 0.6, 0 < κ < 1 (exact bounds TBD).
+    Valid for: Re_h < 2300, Pr > 0.6, 0 < kappa < 1 (exact bounds TBD).
     h = Nu * k / D_h (once data is verified).
     """
 
@@ -100,8 +89,6 @@ class AnnulusLaminarInnerCHF:
     reynolds_max: float = 2300.0
     prandtl_min: float = 0.6
     prandtl_max: float = float("inf")
-    diameter_ratio_min: float = 0.0  # exclusive (TBD after verification)
-    diameter_ratio_max: float = 1.0  # exclusive (TBD after verification)
     requires_wall_viscosity: bool = False
     priority: int = 10
     nusselt_basis: str = "hydraulic_diameter"  # Per Kays & Crawford convention
@@ -149,8 +136,6 @@ class AnnulusTurbulentGnielinskiDH:
     reynolds_max: float = 5e6
     prandtl_min: float = 0.5
     prandtl_max: float = 2000.0
-    diameter_ratio_min: float = 0.0
-    diameter_ratio_max: float = 1.0
     requires_wall_viscosity: bool = False
     is_adaptation: bool = True
     adaptation_limitation: str = (

@@ -611,6 +611,24 @@ class VariableAssessment(BaseModel):
     status: VariableApplicabilityStatus = VariableApplicabilityStatus.applicable
 
 
+class ApplicabilityIdentitySnapshot(BaseModel):
+    """Immutable snapshot of the inputs needed to recompute assessment_hash.
+
+    Stored inside ApplicabilityAssessment so that ``verify_assessment_hash()``
+    can recompute and verify the hash after JSON round-trip.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    definition_hash: str
+    geometry: GeometryType
+    phase_regime: PhaseRegime
+    flow_regime: FlowRegime
+    input_values: tuple[tuple[ApplicabilityVariable, float], ...]
+    policy: OutOfRangePolicy
+    allow_extrapolation: bool
+
+
 class ApplicabilityAssessment(BaseModel):
     """Complete applicability assessment result.
 
@@ -618,6 +636,10 @@ class ApplicabilityAssessment(BaseModel):
     constructor parameter and must not appear in caller-supplied data.
     The value is always derived from ``self.blockers`` by the model
     validator — callers cannot set it.
+
+    ``identity_snapshot`` stores the authoritative inputs needed to
+    recompute ``assessment_hash``.  It is included in serialization so
+    that ``verify_assessment_hash()`` works after a JSON round-trip.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -630,6 +652,7 @@ class ApplicabilityAssessment(BaseModel):
     blockers: tuple[EngineeringMessage, ...] = ()
     allows_evaluation: bool = Field(init=False, default=False)
     assessment_hash: str
+    identity_snapshot: ApplicabilityIdentitySnapshot | None = None
 
     @field_validator("assessment_hash")
     @classmethod
@@ -670,6 +693,31 @@ class ApplicabilityAssessment(BaseModel):
                 "Non-applicable status with no blockers must have allows_evaluation=True"
             )
         return self
+
+    def verify_assessment_hash(self) -> bool:
+        """Recompute assessment_hash from the identity snapshot and compare.
+
+        Returns True if the stored hash matches the recomputed hash.
+        Returns False if identity_snapshot is missing or hash mismatches.
+        """
+        if self.identity_snapshot is None:
+            return False
+        snap = self.identity_snapshot
+        recomputed = compute_assessment_hash(
+            definition_hash=snap.definition_hash,
+            correlation_key=self.correlation_key,
+            geometry=snap.geometry,
+            phase_regime=snap.phase_regime,
+            flow_regime=snap.flow_regime,
+            input_values=snap.input_values,
+            status=self.status,
+            variable_results=self.variable_results,
+            warnings=self.warnings,
+            blockers=self.blockers,
+            policy=snap.policy,
+            allow_extrapolation=snap.allow_extrapolation,
+        )
+        return recomputed == self.assessment_hash
 
     # -- JSON round-trip support -------------------------------------------------
     # model_dump() includes allows_evaluation (it is a field).
@@ -795,6 +843,7 @@ def compute_assessment_hash(
 __all__ = [
     "ApplicabilityAssessment",
     "ApplicabilityEnvelope",
+    "ApplicabilityIdentitySnapshot",
     "ApplicabilityStatus",
     "ApplicabilityVariable",
     "BibliographicSource",

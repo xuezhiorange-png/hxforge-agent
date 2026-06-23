@@ -93,29 +93,21 @@ Implement a deterministic, source-traceable single-phase convective heat-transfe
 - **Heating/cooling:** Both
 - **Priority:** 10
 
-#### C4: Annulus Laminar — Constant Heat Flux, Inner Wall Heated
+#### C4: Annulus Laminar — Inner Wall Heated, Outer Insulated
 
 - **Correlation ID:** `annulus_laminar_inner_chf`
 - **Version:** `1.0.0`
-- **Source:** Kays, W.M., Crawford, M.E., "Convective Heat and Mass Transfer," 3rd Edition, McGraw-Hill, 1993, Table 8-2 (Nusselt numbers for annulus, one wall heated, other insulated).
-- **Equation:** Nu_i = f(diameter_ratio) — tabulated values interpolated. For fully developed laminar flow, inner wall heated, outer insulated:
-  - d*/D = 0: Nu = ∞ (concentric limit, use tube value as proxy with warning)
-  - d*/D = 0.25: Nu ≈ 5.7
-  - d*/D = 0.50: Nu ≈ 7.3
-  - d*/D = 0.75: Nu ≈ 10.1
-  - d*/D = 1.00: Nu ≈ ∞ (parallel plate limit → Nu = 8.235)
-- **Approximation:** For this implementation, use the correlation: Nu_i ≈ C_1 + C_2 * (d*/D)^a with coefficients fitted to Kays table data. Alternatively, use hydraulic-diameter adaptation with explicit limitation warning.
-- **Geometry:** concentric_annulus
-- **Flow regime:** laminar (Re_h < 2300)
-- **Boundary condition:** inner_wall_heated (outer insulated)
-- **Reynolds range:** (0, 2300) based on hydraulic diameter
-- **Prandtl range:** (0.6, ∞)
-- **Characteristic length basis:** D_i (inner tube outer diameter) — h = Nu_i · k / D_i
-- **Diameter ratio range:** [0.1, 0.75] inclusive (verified Kays data only, no extrapolation)
-- **Development length:** Assumes fully developed
-- **Wall property requirements:** None
-- **Heating/cooling:** Both
-- **Priority:** 10
+- **Source:** Kays, W.M., Crawford, M.E., "Convective Heat and Mass Transfer," 3rd Edition, McGraw-Hill, 1993, **Chapter 9, Table 9-1** (NOT Table 8-2).
+- **Status:** **metadata_only / unverified** — data pending independent engineer verification.
+- **Characteristic length basis:** Hydraulic diameter D_h (NOT inner tube OD D_i).
+- **Previously incorrect claims (corrected in Round 2/3):**
+  - Table 8-2 → Table 9-1 (Chapter 9, not Chapter 8)
+  - D_i basis → D_h basis
+  - Values 4.85, 5.70, 7.30, 10.10 → NOT verified, removed
+  - κ range [0.1, 0.75] → removed (unverified bounds)
+- **Diameter ratio range:** TBD — no NumericBound registered; blocked by implementation_status=metadata_only
+- **Implementation:** Blocked at selection layer before evaluator is called. Service returns NOT_IMPLEMENTED.
+- **Remaining work:** C4 complete implementation is deferred to a follow-up task.
 
 #### C5: Annulus Turbulent — Hydraulic Diameter Adaptation of Gnielinski
 

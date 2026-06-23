@@ -342,6 +342,7 @@ class CorrelationResult(BaseModel):
         """Verify that result_hash is correct and integrity is intact.
 
         Rebuilds identity payload WITHOUT result_hash and compares.
+        Also verifies assessment hash if an assessment is present.
         """
         if not self.result_hash.startswith("sha256:"):
             return False
@@ -353,6 +354,10 @@ class CorrelationResult(BaseModel):
         except ValueError:
             return False
         if not self.validate_integrity():
+            return False
+        # Verify assessment hash if present
+        assessment = self.applicability_assessment
+        if assessment is not None and not assessment.verify_assessment_hash():
             return False
         recomputed = self._compute_result_hash()
         return recomputed == self.result_hash
@@ -465,15 +470,45 @@ class CorrelationResult(BaseModel):
                 elif node.node_type == ProvenanceNodeType.WARNING:
                     meta = dict(node.metadata)
                     code = meta.get("code", "")
-                    message = meta.get("message", "")
-                    source_module = "correlations.service"
-                    payload = _build_warning_payload(code, message, source_module)
+                    message_text = meta.get("message", "")
+                    # Match against actual result warnings to get real source_module
+                    matched_msg = next(
+                        (
+                            w
+                            for w in self.warnings
+                            if w.code.value == code and w.message == message_text
+                        ),
+                        None,
+                    )
+                    if matched_msg is None:
+                        return False
+                    payload = _build_warning_payload(
+                        code,
+                        message_text,
+                        matched_msg.source_module,
+                        matched_msg.allows_continuation,
+                    )
                 elif node.node_type == ProvenanceNodeType.BLOCKER:
                     meta = dict(node.metadata)
                     code = meta.get("code", "")
-                    message = meta.get("message", "")
-                    source_module = "correlations.service"
-                    payload = _build_blocker_payload(code, message, source_module)
+                    message_text = meta.get("message", "")
+                    # Match against actual result blockers to get real source_module
+                    matched_msg = next(
+                        (
+                            b
+                            for b in self.blockers
+                            if b.code.value == code and b.message == message_text
+                        ),
+                        None,
+                    )
+                    if matched_msg is None:
+                        return False
+                    payload = _build_blocker_payload(
+                        code,
+                        message_text,
+                        matched_msg.source_module,
+                        matched_msg.allows_continuation,
+                    )
                 elif node.node_type == ProvenanceNodeType.RESULT:
                     assessment_hash = ""
                     if self.applicability_assessment is not None:
@@ -538,9 +573,16 @@ class CorrelationResult(BaseModel):
                 corr_meta = dict(corr_nodes[0].metadata)
                 if self.selected_correlation is None:
                     return False
-                if corr_meta.get("correlation_id") != self.selected_correlation.correlation_id:
+                sc = self.selected_correlation
+                if corr_meta.get("correlation_id") != sc.correlation_id:
                     return False
-                if corr_meta.get("version") != self.selected_correlation.version:
+                if corr_meta.get("version") != sc.version:
+                    return False
+                if corr_meta.get("definition_hash") != sc.definition_hash:
+                    return False
+                if corr_meta.get("source_title") != sc.source_title:
+                    return False
+                if corr_meta.get("nusselt_basis") != sc.nusselt_basis:
                     return False
             else:
                 # BLOCKED: no correlation should be selected, no CORRELATION node
@@ -579,7 +621,60 @@ class CorrelationResult(BaseModel):
             if len(result_nodes) != 1:
                 return False
             result_meta = dict(result_nodes[0].metadata)
-            return result_meta.get("status") == self.status.value
+            if result_meta.get("status") != self.status.value:
+                return False
+
+            # 14. Exact topology verification
+            # Build expected node types and edges from result semantics
+            expected_root_type = (
+                ProvenanceNodeType.CASE_REVISION
+                if ctx.design_case_revision_id is not None
+                else ProvenanceNodeType.EXTERNAL
+            )
+            expected_node_types = [expected_root_type, ProvenanceNodeType.CALCULATION_RUN]
+            if self.status == CorrelationStatus.SUCCEEDED and self.selected_correlation is not None:
+                expected_node_types.append(ProvenanceNodeType.CORRELATION)
+            expected_node_types.extend([ProvenanceNodeType.WARNING] * len(self.warnings))
+            expected_node_types.extend([ProvenanceNodeType.BLOCKER] * len(self.blockers))
+            expected_node_types.append(ProvenanceNodeType.RESULT)
+
+            actual_node_types = sorted([n.node_type.value for n in graph.nodes])
+            expected_node_types_sorted = sorted([t.value for t in expected_node_types])
+            if actual_node_types != expected_node_types_sorted:
+                return False
+
+            # Build expected edges: root->calc, calc->result, calc->corr, calc->warn*, calc->block*
+            # Find node IDs by type
+            node_by_type: dict[str, list[UUID]] = {}
+            for n in graph.nodes:
+                node_by_type.setdefault(n.node_type.value, []).append(n.node_id)
+
+            root_id_actual = node_by_type[expected_root_type.value][0]
+            calc_id_actual = node_by_type[ProvenanceNodeType.CALCULATION_RUN.value][0]
+            result_id_actual = node_by_type[ProvenanceNodeType.RESULT.value][0]
+
+            expected_edges: set[tuple[str, str, str]] = set()
+            expected_edges.add((str(root_id_actual), str(calc_id_actual), "triggers"))
+            expected_edges.add((str(calc_id_actual), str(result_id_actual), "produces"))
+            if ProvenanceNodeType.CORRELATION.value in node_by_type:
+                for cid in node_by_type[ProvenanceNodeType.CORRELATION.value]:
+                    expected_edges.add((str(calc_id_actual), str(cid), "uses"))
+            for wid in node_by_type.get(ProvenanceNodeType.WARNING.value, []):
+                expected_edges.add((str(calc_id_actual), str(wid), "emits"))
+            for bid in node_by_type.get(ProvenanceNodeType.BLOCKER.value, []):
+                expected_edges.add((str(calc_id_actual), str(bid), "emits"))
+
+            actual_edges = {(str(e.source_id), str(e.target_id), e.relation) for e in graph.edges}
+            if actual_edges != expected_edges:
+                return False
+
+            # Exactly one root (no extra disconnected roots)
+            root_count = sum(
+                1
+                for n in graph.nodes
+                if n.node_type in (ProvenanceNodeType.EXTERNAL, ProvenanceNodeType.CASE_REVISION)
+            )
+            return root_count == 1
         except Exception:
             return False
 
@@ -730,6 +825,7 @@ def _build_warning_payload(
     code: str,
     message: str,
     source_module: str,
+    allows_continuation: bool = True,
 ) -> dict[str, Any]:
     """Rebuild the canonical payload for a WARNING node."""
     return {
@@ -737,6 +833,7 @@ def _build_warning_payload(
         "severity": "warning",
         "message": message,
         "source_module": source_module,
+        "allows_continuation": allows_continuation,
     }
 
 
@@ -744,6 +841,7 @@ def _build_blocker_payload(
     code: str,
     message: str,
     source_module: str,
+    allows_continuation: bool = False,
 ) -> dict[str, Any]:
     """Rebuild the canonical payload for a BLOCKER node."""
     return {
@@ -751,6 +849,7 @@ def _build_blocker_payload(
         "severity": "blocker",
         "message": message,
         "source_module": source_module,
+        "allows_continuation": allows_continuation,
     }
 
 
@@ -892,6 +991,7 @@ def _build_provenance_graph(
             "severity": w.severity.value,
             "message": w.message,
             "source_module": w.source_module,
+            "allows_continuation": w.allows_continuation,
         }
         warn_id = _deterministic_uuid5(warn_payload)
         nodes.append(
@@ -916,6 +1016,7 @@ def _build_provenance_graph(
             "severity": b.severity.value,
             "message": b.message,
             "source_module": b.source_module,
+            "allows_continuation": b.allows_continuation,
         }
         block_id = _deterministic_uuid5(block_payload)
         nodes.append(
