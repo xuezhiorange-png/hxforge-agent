@@ -136,7 +136,8 @@ Supported and unsupported combinations must be explicitly enumerated. Under-spec
 | Review-14 | `3beaeb1` | #14 | CHANGES REQUIRED | 2026-06-23 |
 | Review-15 | `602fda4` | 27994422952 | CHANGES REQUIRED | 2026-06-23 |
 | Review-16 | `8cc210d` | 27995704383 | CHANGES REQUIRED | 2026-06-23 |
-| Review-17 | `cb69a85` | 27997224259 | IN_PROGRESS | 2026-06-23 |
+| Review-17 | `d93646e` | 27997396995 | CHANGES REQUIRED | 2026-06-23 |
+| Review-18 | `ae424e8` | 27998095729 | CHANGES REQUIRED | 2026-06-23 |
 
 Review-12 implementation commit: `0b58f1b11bf7e0401c7193f4d28b46f95bdd5c63`
 Implementation CI: `27974294657`
@@ -149,4 +150,6 @@ Review-15 CI: `27994422952`
 Review-16 implementation commit: `b9574bbc639494f76d7f011b841960c6c34d2bcc`
 Review-16 CI: `27995620330`
 Review-17 implementation commit: `cb69a8507fe3849b6c674ef853ae9b04b5205032`
-Review-17 CI: `27997224259`
+Review-17 CI: `27997396995`
+Review-18 implementation commit: `ae424e86853489fc06f1bdadbf0d907b65354e58`
+Review-18 CI: `27998095729`
