@@ -1,8 +1,12 @@
-"""Q-based Brent solver for double-pipe rating with dynamic bracket.
+"""Q-based solver for double-pipe rating with dynamic bracket.
 
 The solver uses heat duty *Q* as the sole scalar root variable and
 residual ``Q − UA(Q)·LMTD(Q)`` as the objective.  Dynamic bracket
-construction ensures the solver cannot converge to infeasible states.
+construction via PropertyProvider enthalpy limits ensures the solver
+cannot converge to infeasible states.
+
+Implements a bisection-secant hybrid that tracks the final bracket
+for rigorous convergence verification.
 """
 
 from __future__ import annotations
@@ -11,8 +15,6 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-
-from scipy.optimize import brentq
 
 # ---------------------------------------------------------------------------
 # Solver status
@@ -40,23 +42,24 @@ class SolverParams:
     """Control parameters for the Q-based root-finding solver.
 
     Convergence requires ALL of:
-      - ``|residual_Q| <= max(absolute_residual_w, relative_residual_fraction × max(|Q|, 1))``
-      - bracket width (in outlet-temperature effect) <= ``bracket_temperature_tolerance_k``
+      - ``|residual_Q| <= max(absolute_residual_w, relative_residual_fraction × max(|Q|, 1 W))``
+      - bracket width converted to outlet-temperature effect <= ``bracket_temperature_tolerance_k``
       - iterations <= ``max_iterations``
+
+    No bypass conditions are permitted.
     """
 
     absolute_residual_w: float = 1e-3
     """Absolute residual tolerance [W]."""
+
     relative_residual_fraction: float = 1e-8
     """Relative residual fraction (dimensionless)."""
+
     bracket_temperature_tolerance_k: float = 1e-4
     """Maximum bracket width converted to outlet-temperature effect [K]."""
+
     max_iterations: int = 100
     """Maximum Brent iterations."""
-    q_step_fraction: float = 0.1
-    """Fraction of Q_max for initial bracket probing."""
-    max_q_fraction: float = 0.99
-    """Maximum fraction of theoretical Q_max for bracket upper bound."""
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.absolute_residual_w) or self.absolute_residual_w < 0:
@@ -87,12 +90,25 @@ class SolverParams:
 
 @dataclass(frozen=True)
 class SolverResult:
-    """Output of the Q-based Brent solver."""
+    """Output of the Q-based solver.
+
+    Records both initial and final bracket for rigorous convergence
+    verification.  The final bracket is the actual bracket at termination,
+    not the initial probe bracket.
+    """
 
     converged: bool
     q_solution_w: float
     residual_w: float
-    bracket_width_w: float
+
+    # Bracket tracking
+    initial_bracket_low_w: float
+    initial_bracket_high_w: float
+    final_bracket_low_w: float
+    final_bracket_high_w: float
+    final_bracket_width_w: float
+    final_bracket_temperature_effect_k: float
+
     iterations: int
     function_evaluations: int
     termination_reason: SolverTermination
@@ -104,7 +120,12 @@ class SolverResult:
             "converged": self.converged,
             "q_solution_w": self.q_solution_w,
             "residual_w": self.residual_w,
-            "bracket_width_w": self.bracket_width_w,
+            "initial_bracket_low_w": self.initial_bracket_low_w,
+            "initial_bracket_high_w": self.initial_bracket_high_w,
+            "final_bracket_low_w": self.final_bracket_low_w,
+            "final_bracket_high_w": self.final_bracket_high_w,
+            "final_bracket_width_w": self.final_bracket_width_w,
+            "final_bracket_temperature_effect_k": self.final_bracket_temperature_effect_k,
             "iterations": self.iterations,
             "function_evaluations": self.function_evaluations,
             "termination_reason": self.termination_reason.value,
@@ -120,71 +141,125 @@ class SolverResult:
 
 
 # ---------------------------------------------------------------------------
-# Bracket construction
+# Bisection-secant hybrid with bracket tracking
 # ---------------------------------------------------------------------------
 
 
-def compute_q_max(
-    m_hot: float,
-    m_cold: float,
-    h_hot_in: float,
-    h_cold_in: float,
-    th_in: float,
-    tc_in: float,
-    flow_arrangement: str,
-    min_terminal_dt_k: float = 0.5,
-) -> float | None:
-    """Compute the maximum feasible duty from enthalpy reach limits.
+def _bisect_secant(
+    f: object,
+    xa: float,
+    xb: float,
+    xtol: float,
+    rtol: float,
+    maxiter: int,
+) -> tuple[float, float, int, int, float, float]:
+    """Bisection-secant hybrid root-finding with final bracket tracking.
 
-    The maximum Q is the smaller of:
-      - Hot side: m_hot × (h_hot_in − h_hot_min)  where T_hot_min = T_cold_in + min_terminal_dt
-      - Cold side: m_cold × (h_cold_max − h_cold_in)  where T_cold_max = T_hot_in − min_terminal_dt
+    Returns (x_sol, f_sol, n_iter, n_func, final_a, final_b).
 
-    For counter-flow: both terminal ΔT must remain positive.
-    For parallel-flow: hot outlet must exceed cold outlet at the exit.
-
-    Returns None if no feasible Q > 0 exists.
+    Maintains the invariant f(a)*f(b) <= 0 at all times.  Uses secant
+    method for acceleration when safe, falls back to bisection otherwise.
+    The final bracket [final_a, final_b] is the actual bracket at
+    termination.
     """
-    if m_hot <= 0 or m_cold <= 0:
-        return None
+    assert callable(f)
 
-    # Maximum possible temperature change
-    max_delta_th = th_in - tc_in - min_terminal_dt_k
-    max_delta_tc = th_in - tc_in - min_terminal_dt_k
+    a = xa
+    b = xb
+    fa = f(a)
+    fb = f(b)
 
-    if max_delta_th <= 0 and max_delta_tc <= 0:
-        return None
+    if fa * fb > 0:
+        raise ValueError("f(a) and f(b) must have opposite signs")
 
-    # Approximate Q_max using average Cp (conservative upper bound)
-    # We use a rough estimate: Q_max ≈ min(C_hot, C冷水) × ΔT_max
-    # But for bracketing, we use a generous upper bound.
-    # The actual upper bound is limited by the enthalpy change.
-    # We'll return a conservative estimate.
-    q_max_hot = m_hot * max(0.0, max_delta_th) * 4200.0  # rough Cp_water
-    q_max_cold = m_cold * max(0.0, max_delta_tc) * 4200.0
+    # Ensure fa <= 0 <= fb
+    if fa > 0:
+        a, b = b, a
+        fa, fb = fb, fa
 
-    q_max = min(q_max_hot, q_max_cold)
-    if q_max <= 0:
-        return None
+    n_func = 2
+    n_iter = 0
 
-    return q_max
+    for _ in range(maxiter):
+        n_iter += 1
+
+        # Convergence check: bracket narrow enough
+        tol = xtol + rtol * max(abs(a), abs(b))
+        if b - a <= 2 * tol:
+            break
+
+        # Bisection midpoint
+        m = 0.5 * (a + b)
+        fm = f(m)
+        n_func += 1
+
+        if fm == 0:
+            a, b = m, m
+            fa, fb = fm, fm
+            break
+
+        if fa * fm < 0:
+            # Root in [a, m]
+            b, fb = m, fm
+        elif fm * fb < 0:
+            # Root in [m, b]
+            a, fa = m, fm
+        else:
+            # fm has same sign as both fa and fb — shouldn't happen
+            # with a valid bracket, but handle gracefully
+            break
+
+        # Try secant acceleration: extrapolate from a and b
+        if abs(fa) > 0 and abs(fb) > 0 and a != b:
+            fb / fa
+            # Secant step: x_new = b - fb * (b - a) / (fb - fa)
+            denom = fb - fa
+            if abs(denom) > 1e-30:
+                x_sec = b - fb * (b - a) / denom
+                # Only use secant if it lands inside the bracket
+                if a < x_sec < b:
+                    fs = f(x_sec)
+                    n_func += 1
+                    if fs == 0:
+                        a, b = x_sec, x_sec
+                        fa, fb = fs, fs
+                        break
+                    if fa * fs < 0:
+                        b, fb = x_sec, fs
+                    elif fs * fb < 0:
+                        a, fa = x_sec, fs
+                    # If fs has same sign as both, secant didn't help — keep bracket
+
+    # Return the bracket endpoints and the point closest to zero
+    if abs(fa) <= abs(fb):
+        x_sol, f_sol = a, fa
+    else:
+        x_sol, f_sol = b, fb
+
+    return x_sol, f_sol, n_iter, n_func, a, b
+
+
+# ---------------------------------------------------------------------------
+# Bracket construction (property-based)
+# ---------------------------------------------------------------------------
 
 
 def find_bracket(
     residual_fn: Callable[[float], float],
     q_max: float,
     params: SolverParams,
-    c_hot: float | None = None,
 ) -> tuple[float, float] | None:
     """Find a bracket [q_low, q_high] where residual changes sign.
 
-    Starts from Q = 0 and probes upward.  If no sign change is found,
-    performs deterministic interval probing.
+    Starts from Q = 0 and probes upward in 20 equal steps.
+    If no sign change is found, returns None.
 
     Returns None if no valid bracket exists.
     """
+    assert callable(residual_fn)
+
     q_low = 0.0
-    q_high = q_max * params.max_q_fraction
+    q_high = q_max
 
     if q_high <= 0:
         return None
@@ -211,11 +286,9 @@ def find_bracket(
         r_try = residual_fn(q_try)
 
         if not math.isfinite(r_try):
-            # Skip non-finite points but continue probing
             continue
 
         if r_prev * r_try < 0:
-            # Sign change found
             return (q_prev, q_try)
 
         r_prev = r_try
@@ -225,7 +298,6 @@ def find_bracket(
     if r_prev * r_low < 0:
         return (0.0, q_prev)
 
-    # No sign change found
     return None
 
 
@@ -238,9 +310,9 @@ def solve_rating(
     residual_fn: Callable[[float], float],
     q_max: float,
     params: SolverParams | None = None,
-    c_hot: float | None = None,
+    c_effective_w_k: float | None = None,
 ) -> SolverResult:
-    """Solve for Q using Brent's method with dynamic bracket.
+    """Solve for Q using bisection-secant hybrid with dynamic bracket.
 
     Parameters
     ----------
@@ -251,8 +323,9 @@ def solve_rating(
         Maximum feasible duty from enthalpy reach limits [W].
     params :
         Solver control parameters.
-    c_hot :
-        Hot-side capacity rate [W/K] for bracket-width-to-temperature conversion.
+    c_effective_w_k :
+        Effective capacity rate [W/K] for bracket-width-to-temperature
+        conversion.  Typically min(C_hot, C_cold).
     """
     if params is None:
         params = SolverParams()
@@ -262,7 +335,12 @@ def solve_rating(
             converged=False,
             q_solution_w=0.0,
             residual_w=float("nan"),
-            bracket_width_w=0.0,
+            initial_bracket_low_w=0.0,
+            initial_bracket_high_w=0.0,
+            final_bracket_low_w=0.0,
+            final_bracket_high_w=0.0,
+            final_bracket_width_w=0.0,
+            final_bracket_temperature_effect_k=float("nan"),
             iterations=0,
             function_evaluations=0,
             termination_reason=SolverTermination.ZERO_DUTY,
@@ -270,13 +348,18 @@ def solve_rating(
         )
 
     # Find bracket
-    bracket = find_bracket(residual_fn, q_max, params, c_hot)
+    bracket = find_bracket(residual_fn, q_max, params)
     if bracket is None:
         return SolverResult(
             converged=False,
             q_solution_w=0.0,
             residual_w=float("nan"),
-            bracket_width_w=0.0,
+            initial_bracket_low_w=0.0,
+            initial_bracket_high_w=q_max,
+            final_bracket_low_w=0.0,
+            final_bracket_high_w=q_max,
+            final_bracket_width_w=q_max,
+            final_bracket_temperature_effect_k=float("nan"),
             iterations=0,
             function_evaluations=0,
             termination_reason=SolverTermination.BRACKET_NOT_FOUND,
@@ -284,6 +367,8 @@ def solve_rating(
         )
 
     q_low, q_high = bracket
+    initial_bracket_low = q_low
+    initial_bracket_high = q_high
 
     # Handle zero-duty case
     if q_low == 0.0 and q_high == 0.0:
@@ -292,52 +377,63 @@ def solve_rating(
             converged=True,
             q_solution_w=0.0,
             residual_w=r,
-            bracket_width_w=0.0,
+            initial_bracket_low_w=0.0,
+            initial_bracket_high_w=0.0,
+            final_bracket_low_w=0.0,
+            final_bracket_high_w=0.0,
+            final_bracket_width_w=0.0,
+            final_bracket_temperature_effect_k=0.0,
             iterations=0,
             function_evaluations=1,
             termination_reason=SolverTermination.ZERO_DUTY,
             solver_params=params,
         )
 
-    # Run Brent's method
+    # Run bisection-secant hybrid
     try:
-        q_sol, info = brentq(
+        q_sol, r_sol, n_iter, n_func, final_a, final_b = _bisect_secant(
             residual_fn,
             q_low,
             q_high,
-            xtol=1e-12,  # Tiny xtol; we do our own convergence check
+            xtol=1e-12,
             rtol=1e-12,
             maxiter=params.max_iterations,
-            full_output=True,
         )
-        r_sol = residual_fn(q_sol)
-        n_eval = info.function_calls
-        n_iter = info.iterations
-    except ValueError:
-        # brentq raises ValueError if no sign change (shouldn't happen with
-        # our bracket, but defensive)
+    except (ValueError, AssertionError):
         return SolverResult(
             converged=False,
             q_solution_w=0.0,
             residual_w=float("nan"),
-            bracket_width_w=q_high - q_low,
+            initial_bracket_low_w=initial_bracket_low,
+            initial_bracket_high_w=initial_bracket_high,
+            final_bracket_low_w=q_low,
+            final_bracket_high_w=q_high,
+            final_bracket_width_w=q_high - q_low,
+            final_bracket_temperature_effect_k=float("nan"),
             iterations=0,
             function_evaluations=0,
             termination_reason=SolverTermination.BRACKET_NOT_FOUND,
             solver_params=params,
         )
 
-    # Check convergence
-    tol = max(params.absolute_residual_w, params.relative_residual_fraction * max(abs(q_sol), 1.0))
-    converged = abs(r_sol) <= tol
+    # Compute final bracket width
+    final_bracket_width = abs(final_b - final_a)
 
-    # Check bracket width in temperature terms (only when capacity rate is known)
-    # Skip bracket check if residual is already very small (root is precise)
-    bracket_width = q_high - q_low
-    if converged and c_hot is not None and c_hot > 0:
-        bracket_dt = bracket_width / c_hot
-        if bracket_dt > params.bracket_temperature_tolerance_k and abs(r_sol) > tol * 0.1:
-            converged = False
+    # Compute bracket temperature effect
+    bracket_dt = float("nan")
+    if c_effective_w_k is not None and c_effective_w_k > 0:
+        bracket_dt = final_bracket_width / c_effective_w_k
+
+    # Check convergence — ALL conditions must be satisfied
+    residual_tol = max(
+        params.absolute_residual_w,
+        params.relative_residual_fraction * max(abs(q_sol), 1.0),
+    )
+    residual_ok = abs(r_sol) <= residual_tol
+
+    bracket_ok = math.isfinite(bracket_dt) and bracket_dt <= params.bracket_temperature_tolerance_k
+
+    converged = residual_ok and bracket_ok and n_iter <= params.max_iterations
 
     termination = SolverTermination.CONVERGED if converged else SolverTermination.NON_CONVERGENCE
 
@@ -345,9 +441,14 @@ def solve_rating(
         converged=converged,
         q_solution_w=q_sol,
         residual_w=r_sol,
-        bracket_width_w=bracket_width,
+        initial_bracket_low_w=initial_bracket_low,
+        initial_bracket_high_w=initial_bracket_high,
+        final_bracket_low_w=final_a,
+        final_bracket_high_w=final_b,
+        final_bracket_width_w=final_bracket_width,
+        final_bracket_temperature_effect_k=bracket_dt,
         iterations=n_iter,
-        function_evaluations=n_eval,
+        function_evaluations=n_func,
         termination_reason=termination,
         solver_params=params,
     )

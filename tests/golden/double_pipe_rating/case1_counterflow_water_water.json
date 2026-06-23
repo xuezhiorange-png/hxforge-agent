@@ -1,6 +1,6 @@
 {
   "case_id": "case1_counterflow_water_water",
-  "description": "Constant-property water-water counter-flow rating with real CoolProp properties. Verifies solver convergence, physically reasonable outlet temperatures, and energy balance closure.",
+  "description": "Counter-flow water-water rating. D_i=0.02, D_o=0.025, D_outer=0.04, L=3, hot=0.5kg/s@350K, cold=1.5kg/s@300K, 200kPa/150kPa.",
   "geometry": {
     "inner_tube_inner_diameter_m": 0.020,
     "inner_tube_outer_diameter_m": 0.025,
@@ -24,15 +24,19 @@
   "flow_arrangement": "counterflow",
   "expected": {
     "status": "succeeded",
-    "heat_duty_w_min": 10000,
-    "heat_duty_w_max": 50000,
-    "hot_outlet_temperature_k_max": 350.0,
-    "cold_outlet_temperature_k_min": 300.0,
-    "converged": true
+    "converged": true,
+    "heat_duty_w": 14499.486309991638,
+    "hot_outlet_temperature_k": 343.0822521365865,
+    "cold_outlet_temperature_k": 302.31242764847565,
+    "UA_w_k": 319.75267128783406,
+    "LMTD_k": 45.345942698746214,
+    "energy_residual_w_max": 1e-6
   },
   "tolerances": {
+    "temperature_relative": 0.01,
     "heat_duty_relative": 0.05,
-    "temperature_absolute_k": 2.0,
+    "UA_relative": 0.05,
+    "LMTD_relative": 0.05,
     "energy_residual_relative": 0.05
   }
 }

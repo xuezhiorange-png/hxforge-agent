@@ -63,6 +63,51 @@ class RatingStatus(StrEnum):
 
 
 # ---------------------------------------------------------------------------
+# Snapshot dataclasses
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FluidStateSnapshot:
+    """Immutable snapshot of a fluid thermodynamic state point."""
+
+    temperature_k: float
+    pressure_pa: float
+    enthalpy_j_kg: float
+    density_kg_m3: float | None = None
+    cp_j_kg_k: float | None = None
+    viscosity_pa_s: float | None = None
+    conductivity_w_m_k: float | None = None
+    phase: str = ""
+    quality: float = 0.0
+
+
+@dataclass(frozen=True)
+class SelectedCorrelationSnapshot:
+    """Immutable snapshot of a selected heat-transfer correlation."""
+
+    correlation_id: str = ""
+    version: str = ""
+    definition_hash: str = ""
+    source_title: str = ""
+    source_authors: str = ""
+    source_year: int = 0
+    source_reference: str = ""
+    source_verification_status: str = "unverified"
+    nusselt_basis: str = "hydraulic_diameter"
+    is_adaptation: bool = False
+    adaptation_limitation: str = ""
+
+
+@dataclass(frozen=True)
+class ApplicabilitySnapshot:
+    """Immutable snapshot of a correlation applicability assessment."""
+
+    status: str = ""
+    assessment_hash: str = ""
+
+
+# ---------------------------------------------------------------------------
 # Local helper models
 # ---------------------------------------------------------------------------
 
@@ -98,6 +143,10 @@ class RatingRequestIdentity:
     solver_relative_residual_fraction: float
     solver_bracket_temperature_tolerance_k: float
     solver_max_iterations: int
+    # Boundary conditions
+    tube_boundary_condition: str = "constant_wall_temperature"
+    annulus_boundary_condition: str = "inner_wall_heated"
+    minimum_terminal_delta_t: float = 0.5
 
 
 class ResistanceBreakdownModel(BaseModel):
@@ -121,9 +170,16 @@ class SolverDetailsModel(BaseModel):
 
     iterations: int
     residual_w: float
-    bracket_width_w: float
     function_evaluations: int
     termination_reason: str
+    # Bracket tracking
+    initial_bracket_low_w: float = 0.0
+    initial_bracket_high_w: float = 0.0
+    final_bracket_low_w: float = 0.0
+    final_bracket_high_w: float = 0.0
+    final_bracket_width_w: float = 0.0
+    final_bracket_temperature_effect_k: float = 0.0
+    residual_tolerance_w: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +273,27 @@ class RatingResult(BaseModel):
     result_hash: str
     provenance_graph: ProvenanceGraph
     provenance_digest: str = ""
+
+    # --- Fluid state snapshots ---
+    hot_inlet_state: FluidStateSnapshot | None = None
+    cold_inlet_state: FluidStateSnapshot | None = None
+    hot_outlet_state: FluidStateSnapshot | None = None
+    cold_outlet_state: FluidStateSnapshot | None = None
+    tube_side_inlet_state: FluidStateSnapshot | None = None
+    tube_side_outlet_state: FluidStateSnapshot | None = None
+    annulus_side_inlet_state: FluidStateSnapshot | None = None
+    annulus_side_outlet_state: FluidStateSnapshot | None = None
+    tube_bulk_state: FluidStateSnapshot | None = None
+    annulus_bulk_state: FluidStateSnapshot | None = None
+
+    # --- Correlation & applicability snapshots ---
+    tube_selected_correlation: SelectedCorrelationSnapshot | None = None
+    annulus_selected_correlation: SelectedCorrelationSnapshot | None = None
+    tube_applicability: ApplicabilitySnapshot | None = None
+    annulus_applicability: ApplicabilitySnapshot | None = None
+
+    # --- Core provenance digest ---
+    core_provenance_digest: str = ""
 
     # --- Private field hash for tamper detection ---
     _field_hash: str = PrivateAttr(default="")
@@ -388,6 +465,81 @@ class RatingResult(BaseModel):
                 else None
             ),
             "provenance_graph_digest": _provenance_graph_digest(self.provenance_graph),
+            # Fluid state snapshots
+            "hot_inlet_state": (
+                dataclasses.asdict(self.hot_inlet_state)
+                if self.hot_inlet_state is not None
+                else None
+            ),
+            "cold_inlet_state": (
+                dataclasses.asdict(self.cold_inlet_state)
+                if self.cold_inlet_state is not None
+                else None
+            ),
+            "hot_outlet_state": (
+                dataclasses.asdict(self.hot_outlet_state)
+                if self.hot_outlet_state is not None
+                else None
+            ),
+            "cold_outlet_state": (
+                dataclasses.asdict(self.cold_outlet_state)
+                if self.cold_outlet_state is not None
+                else None
+            ),
+            "tube_side_inlet_state": (
+                dataclasses.asdict(self.tube_side_inlet_state)
+                if self.tube_side_inlet_state is not None
+                else None
+            ),
+            "tube_side_outlet_state": (
+                dataclasses.asdict(self.tube_side_outlet_state)
+                if self.tube_side_outlet_state is not None
+                else None
+            ),
+            "annulus_side_inlet_state": (
+                dataclasses.asdict(self.annulus_side_inlet_state)
+                if self.annulus_side_inlet_state is not None
+                else None
+            ),
+            "annulus_side_outlet_state": (
+                dataclasses.asdict(self.annulus_side_outlet_state)
+                if self.annulus_side_outlet_state is not None
+                else None
+            ),
+            "tube_bulk_state": (
+                dataclasses.asdict(self.tube_bulk_state)
+                if self.tube_bulk_state is not None
+                else None
+            ),
+            "annulus_bulk_state": (
+                dataclasses.asdict(self.annulus_bulk_state)
+                if self.annulus_bulk_state is not None
+                else None
+            ),
+            # Correlation snapshots
+            "tube_selected_correlation": (
+                dataclasses.asdict(self.tube_selected_correlation)
+                if self.tube_selected_correlation is not None
+                else None
+            ),
+            "annulus_selected_correlation": (
+                dataclasses.asdict(self.annulus_selected_correlation)
+                if self.annulus_selected_correlation is not None
+                else None
+            ),
+            # Applicability snapshots
+            "tube_applicability": (
+                dataclasses.asdict(self.tube_applicability)
+                if self.tube_applicability is not None
+                else None
+            ),
+            "annulus_applicability": (
+                dataclasses.asdict(self.annulus_applicability)
+                if self.annulus_applicability is not None
+                else None
+            ),
+            # Core provenance digest
+            "core_provenance_digest": self.core_provenance_digest,
         }
         return sha256_digest(payload)
 
@@ -448,7 +600,7 @@ class RatingResult(BaseModel):
                 return False
             if result_node.label != "double_pipe_rating_result":
                 return False
-            if result_node.metadata != ((("result_hash", self.result_hash),)):
+            if result_node.metadata != (((("result_hash", self.result_hash)),)):
                 return False
             if result_node.payload_hash != sha256_digest(result_payload):
                 return False
@@ -605,6 +757,55 @@ class RatingResult(BaseModel):
             if pc_node_map:
                 return False
 
+            # 5b. CORRELATION nodes
+            corr_nodes = nodes_by_type.get(ProvenanceNodeType.CORRELATION, [])
+            expected_corr_nodes = 0
+            if self.tube_selected_correlation is not None:
+                expected_corr_nodes += 1
+            if self.annulus_selected_correlation is not None:
+                expected_corr_nodes += 1
+            if len(corr_nodes) != expected_corr_nodes:
+                return False
+
+            corr_node_map: dict[UUID, ProvenanceNode] = {n.node_id: n for n in corr_nodes}
+            for side, corr_snap, appl_snap in (
+                (
+                    "tube",
+                    self.tube_selected_correlation,
+                    self.tube_applicability,
+                ),
+                (
+                    "annulus",
+                    self.annulus_selected_correlation,
+                    self.annulus_applicability,
+                ),
+            ):
+                if corr_snap is None:
+                    continue
+                corr_payload: dict[str, Any] = _build_correlation_payload(
+                    side=side,
+                    correlation_info=corr_snap,
+                    applicability_info=appl_snap,
+                )
+                expected_corr_id = _deterministic_uuid5(corr_payload)
+                corr_node = corr_node_map.pop(expected_corr_id, None)
+                if corr_node is None:
+                    return False
+                expected_corr_label = f"correlation_{side}"
+                if corr_node.label != expected_corr_label:
+                    return False
+                if corr_node.payload_hash != sha256_digest(corr_payload):
+                    return False
+                expected_corr_meta: tuple[tuple[str, Any], ...] = (
+                    ("side", side),
+                    ("correlation_id", corr_snap.correlation_id),
+                    ("version", corr_snap.version),
+                )
+                if corr_node.metadata != expected_corr_meta:
+                    return False
+            if corr_node_map:
+                return False
+
             # 6. WARNING nodes
             warn_nodes = nodes_by_type.get(ProvenanceNodeType.WARNING, [])
             if len(warn_nodes) != len(self.warnings):
@@ -696,6 +897,7 @@ class RatingResult(BaseModel):
                 ProvenanceNodeType.CASE_REVISION,
                 ProvenanceNodeType.CALCULATION_RUN,
                 ProvenanceNodeType.PROPERTY_CALL,
+                ProvenanceNodeType.CORRELATION,
                 ProvenanceNodeType.WARNING,
                 ProvenanceNodeType.BLOCKER,
                 ProvenanceNodeType.RESULT,
@@ -711,6 +913,9 @@ class RatingResult(BaseModel):
             # CALCULATION_RUN → each PROPERTY_CALL (calls)
             for pc_n in pc_nodes:
                 expected_edge_counts[(str(calc_node.node_id), str(pc_n.node_id), "calls")] += 1
+            # CALCULATION_RUN → each CORRELATION (selects)
+            for corr_n in corr_nodes:
+                expected_edge_counts[(str(calc_node.node_id), str(corr_n.node_id), "selects")] += 1
             # CALCULATION_RUN → each WARNING (emits)
             for w_n in warn_nodes:
                 expected_edge_counts[(str(calc_node.node_id), str(w_n.node_id), "emits")] += 1
@@ -802,6 +1007,22 @@ class RatingResult(BaseModel):
             failure=self.failure,
             status=self.status,
             provenance_digest=self.provenance_digest,
+            # New snapshot fields
+            hot_inlet_state=self.hot_inlet_state,
+            cold_inlet_state=self.cold_inlet_state,
+            hot_outlet_state=self.hot_outlet_state,
+            cold_outlet_state=self.cold_outlet_state,
+            tube_side_inlet_state=self.tube_side_inlet_state,
+            tube_side_outlet_state=self.tube_side_outlet_state,
+            annulus_side_inlet_state=self.annulus_side_inlet_state,
+            annulus_side_outlet_state=self.annulus_side_outlet_state,
+            tube_bulk_state=self.tube_bulk_state,
+            annulus_bulk_state=self.annulus_bulk_state,
+            tube_selected_correlation_snap=self.tube_selected_correlation,
+            annulus_selected_correlation_snap=self.annulus_selected_correlation,
+            tube_applicability_snap=self.tube_applicability,
+            annulus_applicability_snap=self.annulus_applicability,
+            core_provenance_digest=self.core_provenance_digest,
         )
         return sha256_digest(payload)
 
@@ -859,6 +1080,22 @@ def _build_identity_payload(
     failure: RunFailure | None,
     status: RatingStatus,
     provenance_digest: str,
+    # New snapshot fields
+    hot_inlet_state: FluidStateSnapshot | None = None,
+    cold_inlet_state: FluidStateSnapshot | None = None,
+    hot_outlet_state: FluidStateSnapshot | None = None,
+    cold_outlet_state: FluidStateSnapshot | None = None,
+    tube_side_inlet_state: FluidStateSnapshot | None = None,
+    tube_side_outlet_state: FluidStateSnapshot | None = None,
+    annulus_side_inlet_state: FluidStateSnapshot | None = None,
+    annulus_side_outlet_state: FluidStateSnapshot | None = None,
+    tube_bulk_state: FluidStateSnapshot | None = None,
+    annulus_bulk_state: FluidStateSnapshot | None = None,
+    tube_selected_correlation_snap: SelectedCorrelationSnapshot | None = None,
+    annulus_selected_correlation_snap: SelectedCorrelationSnapshot | None = None,
+    tube_applicability_snap: ApplicabilitySnapshot | None = None,
+    annulus_applicability_snap: ApplicabilitySnapshot | None = None,
+    core_provenance_digest: str = "",
 ) -> dict[str, Any]:
     """Build the canonical payload dict used for result hashing.
 
@@ -896,6 +1133,9 @@ def _build_identity_payload(
             request_identity.solver_bracket_temperature_tolerance_k
         ),
         "solver_max_iterations": request_identity.solver_max_iterations,
+        "tube_boundary_condition": request_identity.tube_boundary_condition,
+        "annulus_boundary_condition": request_identity.annulus_boundary_condition,
+        "minimum_terminal_delta_t": request_identity.minimum_terminal_delta_t,
         # Provider identity
         "provider_name": provider_identity.name,
         "provider_version": provider_identity.version,
@@ -969,6 +1209,67 @@ def _build_identity_payload(
         "software_version": _SOFTWARE_VERSION,
         # Provenance digest
         "provenance_digest": provenance_digest,
+        # Fluid state snapshots
+        "hot_inlet_state": (
+            dataclasses.asdict(hot_inlet_state) if hot_inlet_state is not None else None
+        ),
+        "cold_inlet_state": (
+            dataclasses.asdict(cold_inlet_state) if cold_inlet_state is not None else None
+        ),
+        "hot_outlet_state": (
+            dataclasses.asdict(hot_outlet_state) if hot_outlet_state is not None else None
+        ),
+        "cold_outlet_state": (
+            dataclasses.asdict(cold_outlet_state) if cold_outlet_state is not None else None
+        ),
+        "tube_side_inlet_state": (
+            dataclasses.asdict(tube_side_inlet_state) if tube_side_inlet_state is not None else None
+        ),
+        "tube_side_outlet_state": (
+            dataclasses.asdict(tube_side_outlet_state)
+            if tube_side_outlet_state is not None
+            else None
+        ),
+        "annulus_side_inlet_state": (
+            dataclasses.asdict(annulus_side_inlet_state)
+            if annulus_side_inlet_state is not None
+            else None
+        ),
+        "annulus_side_outlet_state": (
+            dataclasses.asdict(annulus_side_outlet_state)
+            if annulus_side_outlet_state is not None
+            else None
+        ),
+        "tube_bulk_state": (
+            dataclasses.asdict(tube_bulk_state) if tube_bulk_state is not None else None
+        ),
+        "annulus_bulk_state": (
+            dataclasses.asdict(annulus_bulk_state) if annulus_bulk_state is not None else None
+        ),
+        # Correlation snapshots
+        "tube_selected_correlation": (
+            dataclasses.asdict(tube_selected_correlation_snap)
+            if tube_selected_correlation_snap is not None
+            else None
+        ),
+        "annulus_selected_correlation": (
+            dataclasses.asdict(annulus_selected_correlation_snap)
+            if annulus_selected_correlation_snap is not None
+            else None
+        ),
+        # Applicability snapshots
+        "tube_applicability": (
+            dataclasses.asdict(tube_applicability_snap)
+            if tube_applicability_snap is not None
+            else None
+        ),
+        "annulus_applicability": (
+            dataclasses.asdict(annulus_applicability_snap)
+            if annulus_applicability_snap is not None
+            else None
+        ),
+        # Core provenance digest
+        "core_provenance_digest": core_provenance_digest,
     }
 
 
@@ -1026,6 +1327,15 @@ def _message_to_dict(msg: EngineeringMessage | dict[str, Any]) -> dict[str, Any]
         "context": dict(msg.context) if msg.context else {},
         "allows_continuation": msg.allows_continuation,
     }
+
+
+def _snapshot_to_dict(
+    snap: FluidStateSnapshot | SelectedCorrelationSnapshot | ApplicabilitySnapshot | None,
+) -> dict[str, Any] | None:
+    """Convert a frozen snapshot dataclass to a plain dict for hashing."""
+    if snap is None:
+        return None
+    return dataclasses.asdict(snap)
 
 
 # ---------------------------------------------------------------------------
@@ -1104,6 +1414,33 @@ def _build_calculation_run_payload(
     }
 
 
+def _build_correlation_payload(
+    *,
+    side: str,
+    correlation_info: SelectedCorrelationSnapshot,
+    applicability_info: ApplicabilitySnapshot | None,
+) -> dict[str, Any]:
+    """Build the canonical CORRELATION node payload dict."""
+    appl_status = applicability_info.status if applicability_info is not None else ""
+    assess_hash = applicability_info.assessment_hash if applicability_info is not None else ""
+    return {
+        "side": side,
+        "correlation_id": correlation_info.correlation_id,
+        "version": correlation_info.version,
+        "definition_hash": correlation_info.definition_hash,
+        "source_title": correlation_info.source_title,
+        "source_authors": correlation_info.source_authors,
+        "source_year": correlation_info.source_year,
+        "source_reference": correlation_info.source_reference,
+        "source_verification_status": correlation_info.source_verification_status,
+        "nusselt_basis": correlation_info.nusselt_basis,
+        "applicability_status": appl_status,
+        "assessment_hash": assess_hash,
+        "is_adaptation": correlation_info.is_adaptation,
+        "adaptation_limitation": correlation_info.adaptation_limitation,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Provenance graph construction
 # ---------------------------------------------------------------------------
@@ -1119,6 +1456,10 @@ def build_provenance_core(
     *,
     execution_context: ExecutionContextSnapshot | None = None,
     request_identity: RatingRequestIdentity | None = None,
+    tube_correlation_info: SelectedCorrelationSnapshot | None = None,
+    annulus_correlation_info: SelectedCorrelationSnapshot | None = None,
+    tube_applicability: ApplicabilitySnapshot | None = None,
+    annulus_applicability: ApplicabilitySnapshot | None = None,
 ) -> tuple[ProvenanceGraph, list[ProvenanceNode], list[ProvenanceEdge]]:
     """Build the core provenance graph WITHOUT the RESULT node.
 
@@ -1237,6 +1578,40 @@ def build_provenance_core(
             )
         )
 
+    # --- Correlation nodes ---
+    for side, corr_info, appl_info in (
+        ("tube", tube_correlation_info, tube_applicability),
+        ("annulus", annulus_correlation_info, annulus_applicability),
+    ):
+        if corr_info is None:
+            continue
+        corr_payload: dict[str, Any] = _build_correlation_payload(
+            side=side,
+            correlation_info=corr_info,
+            applicability_info=appl_info,
+        )
+        corr_id = _deterministic_uuid5(corr_payload)
+        nodes.append(
+            ProvenanceNode(
+                node_id=corr_id,
+                node_type=ProvenanceNodeType.CORRELATION,
+                label=f"correlation_{side}",
+                metadata=(
+                    ("side", side),
+                    ("correlation_id", corr_info.correlation_id),
+                    ("version", corr_info.version),
+                ),
+                payload_hash=sha256_digest(corr_payload),
+            )
+        )
+        edges.append(
+            ProvenanceEdge(
+                source_id=calc_id,
+                target_id=corr_id,
+                relation="selects",
+            )
+        )
+
     # --- Warning nodes ---
     for _w_idx, w in enumerate(warnings):
         warn_payload: dict[str, Any] = {
@@ -1318,6 +1693,10 @@ def build_provenance(
     *,
     execution_context: ExecutionContextSnapshot | None = None,
     request_identity: RatingRequestIdentity | None = None,
+    tube_correlation_info: SelectedCorrelationSnapshot | None = None,
+    annulus_correlation_info: SelectedCorrelationSnapshot | None = None,
+    tube_applicability: ApplicabilitySnapshot | None = None,
+    annulus_applicability: ApplicabilitySnapshot | None = None,
 ) -> ProvenanceGraph:
     """Build a deterministic provenance graph for the double-pipe rating.
 
@@ -1335,6 +1714,10 @@ def build_provenance(
         blockers=blockers,
         execution_context=execution_context,
         request_identity=request_identity,
+        tube_correlation_info=tube_correlation_info,
+        annulus_correlation_info=annulus_correlation_info,
+        tube_applicability=tube_applicability,
+        annulus_applicability=annulus_applicability,
     )
 
     # Find the CALCULATION_RUN node for the RESULT edge
@@ -1353,7 +1736,7 @@ def build_provenance(
             node_id=result_id,
             node_type=ProvenanceNodeType.RESULT,
             label="double_pipe_rating_result",
-            metadata=((("result_hash", result_hash),)),
+            metadata=(("result_hash", result_hash),),
             payload_hash=sha256_digest(result_payload),
         )
     )
@@ -1419,6 +1802,22 @@ def compute_result_hash(
     failure: RunFailure | None = None,
     status: RatingStatus = RatingStatus.SUCCEEDED,
     provenance_digest: str = "",
+    # New snapshot fields
+    hot_inlet_state: FluidStateSnapshot | None = None,
+    cold_inlet_state: FluidStateSnapshot | None = None,
+    hot_outlet_state: FluidStateSnapshot | None = None,
+    cold_outlet_state: FluidStateSnapshot | None = None,
+    tube_side_inlet_state: FluidStateSnapshot | None = None,
+    tube_side_outlet_state: FluidStateSnapshot | None = None,
+    annulus_side_inlet_state: FluidStateSnapshot | None = None,
+    annulus_side_outlet_state: FluidStateSnapshot | None = None,
+    tube_bulk_state: FluidStateSnapshot | None = None,
+    annulus_bulk_state: FluidStateSnapshot | None = None,
+    tube_selected_correlation_snap: SelectedCorrelationSnapshot | None = None,
+    annulus_selected_correlation_snap: SelectedCorrelationSnapshot | None = None,
+    tube_applicability_snap: ApplicabilitySnapshot | None = None,
+    annulus_applicability_snap: ApplicabilitySnapshot | None = None,
+    core_provenance_digest: str = "",
 ) -> str:
     """Compute deterministic SHA-256 hash of the result."""
     payload = _build_identity_payload(
@@ -1468,5 +1867,21 @@ def compute_result_hash(
         failure=failure,
         status=status,
         provenance_digest=provenance_digest,
+        # New snapshot fields
+        hot_inlet_state=hot_inlet_state,
+        cold_inlet_state=cold_inlet_state,
+        hot_outlet_state=hot_outlet_state,
+        cold_outlet_state=cold_outlet_state,
+        tube_side_inlet_state=tube_side_inlet_state,
+        tube_side_outlet_state=tube_side_outlet_state,
+        annulus_side_inlet_state=annulus_side_inlet_state,
+        annulus_side_outlet_state=annulus_side_outlet_state,
+        tube_bulk_state=tube_bulk_state,
+        annulus_bulk_state=annulus_bulk_state,
+        tube_selected_correlation_snap=tube_selected_correlation_snap,
+        annulus_selected_correlation_snap=annulus_selected_correlation_snap,
+        tube_applicability_snap=tube_applicability_snap,
+        annulus_applicability_snap=annulus_applicability_snap,
+        core_provenance_digest=core_provenance_digest,
     )
     return sha256_digest(payload)

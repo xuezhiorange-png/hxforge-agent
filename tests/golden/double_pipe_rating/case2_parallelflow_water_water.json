@@ -1,6 +1,6 @@
 {
   "case_id": "case2_parallelflow_water_water",
-  "description": "Same geometry and conditions as Case 1 but with parallel-flow arrangement. Verifies that counter-flow duty is at least as high as parallel-flow duty (thermodynamic expectation).",
+  "description": "Parallel-flow water-water rating. Same geometry and conditions as Case 1 but parallel-flow arrangement.",
   "geometry": {
     "inner_tube_inner_diameter_m": 0.020,
     "inner_tube_outer_diameter_m": 0.025,
@@ -24,15 +24,19 @@
   "flow_arrangement": "parallel",
   "expected": {
     "status": "succeeded",
-    "heat_duty_w_min": 5000,
-    "heat_duty_w_max": 50000,
-    "hot_outlet_temperature_k_max": 350.0,
-    "cold_outlet_temperature_k_min": 300.0,
-    "converged": true
+    "converged": true,
+    "heat_duty_w": 14465.525040358738,
+    "hot_outlet_temperature_k": 343.09846347626075,
+    "cold_outlet_temperature_k": 302.30701100310216,
+    "UA_w_k": 319.75336377144174,
+    "LMTD_k": 45.239633665582296,
+    "energy_residual_w_max": 1e-6
   },
   "tolerances": {
+    "temperature_relative": 0.01,
     "heat_duty_relative": 0.05,
-    "temperature_absolute_k": 2.0,
+    "UA_relative": 0.05,
+    "LMTD_relative": 0.05,
     "energy_residual_relative": 0.05
   }
 }
