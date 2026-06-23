@@ -16,12 +16,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cmp_to_key
-from typing import Any
 
 from hexagent.correlations.applicability import assess_applicability
 from hexagent.correlations.flow import FlowRegime, NusseltBasis, ThermalBoundaryCondition
 from hexagent.correlations.geometry import CircularTubeGeometry, ConcentricAnnulusGeometry
-from hexagent.correlations.hx_result import SelectedCorrelationInfo as _SelectedCorrelationInfo
+from hexagent.correlations.hx_result import SelectedCorrelationInfo
 from hexagent.correlations.models import (
     ApplicabilityAssessment,
     ApplicabilityVariable,
@@ -64,7 +63,7 @@ class SelectionResult:
     # "selected" | "no_match" | "ambiguous" | "blocked" | "implementation_unavailable"
     selection_status: str
     blockers: tuple[EngineeringMessage, ...]
-    identified_correlation: Any = None  # SelectedCorrelationInfo | None
+    identified_correlation: SelectedCorrelationInfo | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -247,9 +246,10 @@ def select_correlation(
             implementation_status=None,
         )
 
-    # Assess all candidates, partitioning into passed/failed
+    # Assess all candidates, partitioning into three lists
     passed: list[tuple[CorrelationDefinition, ApplicabilityAssessment]] = []
     rejected: list[tuple[CorrelationDefinition, ApplicabilityAssessment]] = []
+    unavailable: list[tuple[CorrelationDefinition, ApplicabilityAssessment]] = []
 
     for defn in candidates:
         # Check flow regime compatibility
@@ -260,7 +260,7 @@ def select_correlation(
         if not _is_boundary_compatible(defn, bc_enum):
             continue
 
-        # Check implementation status: metadata_only → blocked without evaluation
+        # Check implementation status: metadata_only → collect into unavailable
         if defn.implementation_status.value == "metadata_only":
             from hexagent.correlations.models import (
                 ApplicabilityIdentitySnapshot,
@@ -334,11 +334,10 @@ def select_correlation(
                 assessment_hash=assessment_hash,
                 identity_snapshot=identity_snapshot,
             )
-            rejected.append((defn, blocked_assessment))
 
             # Build identified correlation info (P0-4)
             source = defn.source
-            identified_info = _SelectedCorrelationInfo(
+            identified_info = SelectedCorrelationInfo(
                 correlation_id=defn.key.correlation_id,
                 version=defn.key.version,
                 priority=_extract_priority(defn),
@@ -355,14 +354,9 @@ def select_correlation(
                 nusselt_basis=_get_nusselt_basis(defn),
             )
 
-            return SelectionResult(
-                selected_definition=defn,
-                selected_assessment=blocked_assessment,
-                rejected_candidates=tuple(rejected),
-                selection_status="implementation_unavailable",
-                blockers=(blocker_msg,),
-                identified_correlation=identified_info,
-            )
+            # Collect into unavailable list — do NOT return early
+            unavailable.append((defn, blocked_assessment))
+            continue
 
         # Build applicability input
         values_list = [
@@ -388,53 +382,113 @@ def select_correlation(
         else:
             rejected.append((defn, assessment))
 
-    # No applicable correlation found
-    if not passed:
-        # Return best rejected candidate's assessment with full context
-        best_rejected_defn = None
-        best_rejected_assessment = None
-        if rejected:
-            # Sort rejected candidates the same way to find the "best" one
-            rejected.sort(key=cmp_to_key(_compare_candidates))
-            best_rejected_defn, best_rejected_assessment = rejected[0]
+    # ------------------------------------------------------------------
+    # Final decision logic
+    # ------------------------------------------------------------------
 
+    # 1. If passed is non-empty: sort with _compare_candidates, select top.
+    if passed:
+        passed.sort(key=cmp_to_key(_compare_candidates))
+
+        # Ambiguity check
+        if len(passed) >= 2 and _compare_candidates(passed[0], passed[1]) == 0:
+            return SelectionResult(
+                selected_definition=None,
+                selected_assessment=None,
+                rejected_candidates=tuple(rejected),
+                selection_status="ambiguous",
+                blockers=(
+                    EngineeringMessage(
+                        code=ErrorCode.CORRELATION_NOT_FOUND,
+                        severity=EngineeringMessageSeverity.BLOCKER,
+                        message=(
+                            "Ambiguous correlation selection: multiple candidates "
+                            "tie on all selection keys (priority, id, version)"
+                        ),
+                        source_module="correlations.selection",
+                    ),
+                ),
+            )
+
+        selected_defn, selected_assessment = passed[0]
         return SelectionResult(
-            selected_definition=best_rejected_defn,
-            selected_assessment=best_rejected_assessment,
+            selected_definition=selected_defn,
+            selected_assessment=selected_assessment,
             rejected_candidates=tuple(rejected),
-            selection_status="no_match",
+            selection_status="selected",
             blockers=(),
         )
 
-    # Deterministic sort: priority desc, correlation_id asc, version desc
-    passed.sort(key=cmp_to_key(_compare_candidates))
+    # 2. If passed is empty and unavailable is non-empty:
+    #    Sort unavailable, select top, return with implementation_unavailable.
+    if unavailable:
+        unavailable.sort(key=cmp_to_key(_compare_candidates))
+        unavail_defn, unavail_assessment = unavailable[0]
 
-    # Check for ambiguity: first two candidates tie on ALL sort keys
-    if len(passed) >= 2 and _compare_candidates(passed[0], passed[1]) == 0:
-        return SelectionResult(
-            selected_definition=None,
-            selected_assessment=None,
-            rejected_candidates=tuple(rejected),
-            selection_status="ambiguous",
-            blockers=(
-                EngineeringMessage(
-                    code=ErrorCode.CORRELATION_NOT_FOUND,
-                    severity=EngineeringMessageSeverity.BLOCKER,
-                    message=(
-                        "Ambiguous correlation selection: multiple candidates "
-                        "tie on all selection keys (priority, id, version)"
+        # Ambiguity check among unavailable candidates
+        if len(unavailable) >= 2 and _compare_candidates(unavailable[0], unavailable[1]) == 0:
+            return SelectionResult(
+                selected_definition=None,
+                selected_assessment=None,
+                rejected_candidates=tuple(rejected),
+                selection_status="ambiguous",
+                blockers=(
+                    EngineeringMessage(
+                        code=ErrorCode.CORRELATION_NOT_FOUND,
+                        severity=EngineeringMessageSeverity.BLOCKER,
+                        message=(
+                            "Ambiguous correlation selection: multiple candidates "
+                            "tie on all selection keys (priority, id, version)"
+                        ),
+                        source_module="correlations.selection",
                     ),
-                    source_module="correlations.selection",
                 ),
-            ),
+            )
+
+        # Build identified correlation info from the top unavailable candidate
+        source = unavail_defn.source
+        identified_info = SelectedCorrelationInfo(
+            correlation_id=unavail_defn.key.correlation_id,
+            version=unavail_defn.key.version,
+            priority=_extract_priority(unavail_defn),
+            source_title=source.title,
+            source_authors=", ".join(source.authors) if source.authors else "",
+            source_year=source.year,
+            source_reference=(f"{source.edition or ''} {source.equation_or_clause or ''}".strip()),
+            source_verification_status=source.verification_status.value,
+            definition_hash=unavail_defn.definition_hash,
+            is_adaptation=False,
+            adaptation_limitation="",
+            nusselt_basis=_get_nusselt_basis(unavail_defn),
         )
 
-    selected_defn, selected_assessment = passed[0]
+        # Gather blockers from all unavailable candidates
+        all_blockers: list[EngineeringMessage] = []
+        for _, ua in unavailable:
+            all_blockers.extend(ua.blockers)
+
+        return SelectionResult(
+            selected_definition=unavail_defn,
+            selected_assessment=unavail_assessment,
+            rejected_candidates=tuple(rejected),
+            selection_status="implementation_unavailable",
+            blockers=tuple(all_blockers),
+            identified_correlation=identified_info,
+        )
+
+    # 3. Both passed and unavailable empty: from rejected, return best
+    #    failed assessment or CORRELATION_NOT_FOUND.
+    best_rejected_defn = None
+    best_rejected_assessment = None
+    if rejected:
+        rejected.sort(key=cmp_to_key(_compare_candidates))
+        best_rejected_defn, best_rejected_assessment = rejected[0]
+
     return SelectionResult(
-        selected_definition=selected_defn,
-        selected_assessment=selected_assessment,
+        selected_definition=best_rejected_defn,
+        selected_assessment=best_rejected_assessment,
         rejected_candidates=tuple(rejected),
-        selection_status="selected",
+        selection_status="no_match",
         blockers=(),
     )
 

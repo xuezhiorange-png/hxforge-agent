@@ -465,6 +465,10 @@ class CorrelationResult(BaseModel):
                         version=selected.version,
                         definition_hash=selected.definition_hash,
                         source_title=selected.source_title,
+                        source_authors=selected.source_authors,
+                        source_year=selected.source_year,
+                        source_reference=selected.source_reference,
+                        source_verification_status=selected.source_verification_status,
                         nusselt_basis=selected.nusselt_basis,
                     )
                 elif node.node_type == ProvenanceNodeType.WARNING:
@@ -584,6 +588,14 @@ class CorrelationResult(BaseModel):
                     return False
                 if corr_meta.get("source_title") != sc.source_title:
                     return False
+                if corr_meta.get("source_authors") != sc.source_authors:
+                    return False
+                if corr_meta.get("source_year") != sc.source_year:
+                    return False
+                if corr_meta.get("source_reference") != sc.source_reference:
+                    return False
+                if corr_meta.get("source_verification_status") != sc.source_verification_status:
+                    return False
                 if corr_meta.get("nusselt_basis") != sc.nusselt_basis:
                     return False
             else:
@@ -604,6 +616,18 @@ class CorrelationResult(BaseModel):
                     if corr_meta.get("version") != sc.version:
                         return False
                     if corr_meta.get("definition_hash") != sc.definition_hash:
+                        return False
+                    if corr_meta.get("source_title") != sc.source_title:
+                        return False
+                    if corr_meta.get("source_authors") != sc.source_authors:
+                        return False
+                    if corr_meta.get("source_year") != sc.source_year:
+                        return False
+                    if corr_meta.get("source_reference") != sc.source_reference:
+                        return False
+                    if corr_meta.get("source_verification_status") != sc.source_verification_status:
+                        return False
+                    if corr_meta.get("nusselt_basis") != sc.nusselt_basis:
                         return False
 
             # 12. WARNING/BLOCKER nodes match result messages
@@ -824,6 +848,10 @@ def _build_correlation_payload(
     version: str,
     definition_hash: str,
     source_title: str,
+    source_authors: str = "",
+    source_year: int = 0,
+    source_reference: str = "",
+    source_verification_status: str = "",
     nusselt_basis: str = "",
 ) -> dict[str, Any]:
     """Rebuild the canonical payload for a CORRELATION node."""
@@ -832,6 +860,10 @@ def _build_correlation_payload(
         "version": version,
         "definition_hash": definition_hash,
         "source_title": source_title,
+        "source_authors": source_authors,
+        "source_year": source_year,
+        "source_reference": source_reference,
+        "source_verification_status": source_verification_status,
         "nusselt_basis": nusselt_basis,
     }
 
@@ -903,6 +935,8 @@ def _build_provenance_graph(
     source_title: str = "",
     source_authors: str = "",
     source_year: int = 0,
+    source_reference: str = "",
+    source_verification_status: str = "",
     nusselt_basis: str = "",
     assessment_hash: str = "",
     reynolds: float,
@@ -983,6 +1017,10 @@ def _build_provenance_graph(
             "version": correlation_version,
             "definition_hash": definition_hash,
             "source_title": source_title,
+            "source_authors": source_authors,
+            "source_year": source_year,
+            "source_reference": source_reference,
+            "source_verification_status": source_verification_status,
             "nusselt_basis": nusselt_basis,
         }
         corr_id = _deterministic_uuid5(corr_payload)
@@ -996,6 +1034,10 @@ def _build_provenance_graph(
                     ("version", correlation_version),
                     ("definition_hash", definition_hash),
                     ("source_title", source_title),
+                    ("source_authors", source_authors),
+                    ("source_year", source_year),
+                    ("source_reference", source_reference),
+                    ("source_verification_status", source_verification_status),
                     ("nusselt_basis", nusselt_basis),
                 ),
                 payload_hash=sha256_digest(corr_payload),

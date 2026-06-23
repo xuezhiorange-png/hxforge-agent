@@ -43,6 +43,7 @@ from hexagent.correlations.hx_result import (
     _build_provenance_graph,
     _provenance_graph_digest,
 )
+from hexagent.correlations.models import ApplicabilityAssessment
 from hexagent.correlations.registry import InMemoryCorrelationRegistry
 from hexagent.correlations.selection import _get_nusselt_basis, select_correlation
 from hexagent.correlations.tube import TUBE_CORRELATIONS
@@ -950,6 +951,8 @@ def evaluate_hx_correlation(
         source_title=source.title,
         source_authors=", ".join(source.authors) if source.authors else "",
         source_year=source.year,
+        source_reference=(f"{source.edition or ''} {source.equation_or_clause or ''}".strip()),
+        source_verification_status=source.verification_status.value,
         nusselt_basis=nusselt_basis,
         assessment_hash=assessment_hash,
         reynolds=reynolds,
@@ -1027,8 +1030,8 @@ def _blocked_result(
     area: float = 0.0,
     dh: float = 0.0,
     regime: str = "",
-    assessment: Any = None,
-    identified_correlation: Any = None,
+    assessment: ApplicabilityAssessment | None = None,
+    identified_correlation: SelectedCorrelationInfo | None = None,
 ) -> CorrelationResult:
     """Build a BLOCKED result, optionally preserving identified correlation identity."""
     assessment_hash = ""
@@ -1042,6 +1045,8 @@ def _blocked_result(
     source_title = ""
     source_authors = ""
     source_year = 0
+    source_reference = ""
+    source_verification_status = ""
     nusselt_basis = ""
     if identified_correlation is not None:
         corr_id = identified_correlation.correlation_id
@@ -1050,6 +1055,8 @@ def _blocked_result(
         source_title = identified_correlation.source_title
         source_authors = identified_correlation.source_authors
         source_year = identified_correlation.source_year
+        source_reference = identified_correlation.source_reference
+        source_verification_status = identified_correlation.source_verification_status
         nusselt_basis = identified_correlation.nusselt_basis
 
     provenance_graph = _build_provenance_graph(
@@ -1060,6 +1067,8 @@ def _blocked_result(
         source_title=source_title,
         source_authors=source_authors,
         source_year=source_year,
+        source_reference=source_reference,
+        source_verification_status=source_verification_status,
         nusselt_basis=nusselt_basis,
         reynolds=reynolds,
         prandtl=prandtl,
