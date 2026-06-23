@@ -19,7 +19,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY`, `BLOCKED`, `PLANNED`.
 | TASK-003 | Implement fluid-property contract and CoolProp provider | READY | TASK-001, TASK-002 |
 | TASK-004 | Implement correlation registry and applicability engine | READY | TASK-001 |
 | TASK-005 | Implement calculation provenance and structured errors | READY | TASK-001 |
-| TASK-006 | Implement heat-balance and specification closure | READY | TASK-002, TASK-003, TASK-005 |
+| TASK-006 | Implement heat-balance and specification closure | DONE | TASK-002, TASK-003, TASK-005 |
 | TASK-011 | Collect and approve the first 20 benchmark cases | PLANNED | TASK-001 |
 | TASK-012 | Define standards rule-pack and license boundary | PLANNED | TASK-001 |
 | TASK-013 | Define material and cost data governance | PLANNED | TASK-001 |

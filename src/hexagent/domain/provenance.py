@@ -216,11 +216,17 @@ class ProvenanceGraph(BaseModel):
         if visited != len(node_set):
             raise ValueError("Provenance graph contains a cycle")
 
-        # --- when nodes exist, must contain CASE_REVISION and CALCULATION_RUN ---
+        # --- when nodes exist, must contain a root node and CALCULATION_RUN ---
         if self.nodes:
             node_types = {n.node_type for n in self.nodes}
-            if ProvenanceNodeType.CASE_REVISION not in node_types:
-                raise ValueError("Provenance graph must contain a CASE_REVISION node")
+            has_root = (
+                ProvenanceNodeType.CASE_REVISION in node_types
+                or ProvenanceNodeType.EXTERNAL in node_types
+            )
+            if not has_root:
+                raise ValueError(
+                    "Provenance graph must contain a CASE_REVISION or EXTERNAL root node"
+                )
             if ProvenanceNodeType.CALCULATION_RUN not in node_types:
                 raise ValueError("Provenance graph must contain a CALCULATION_RUN node")
 

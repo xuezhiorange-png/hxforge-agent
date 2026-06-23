@@ -1,0 +1,31 @@
+{
+  "case_id": "liquid_liquid_known_cold_outlet",
+  "input": {
+    "hot_fluid": "Water",
+    "cold_fluid": "Water",
+    "hot_inlet_t": 350.0,
+    "cold_inlet_t": 290.0,
+    "hot_mass_flow": 1.0,
+    "cold_mass_flow": 0.8,
+    "hot_pressure": 200000.0,
+    "cold_pressure": 150000.0,
+    "cold_outlet_t": 330.0
+  },
+  "expected": {
+    "specification_mode": "known_cold_outlet",
+    "status": "SUCCEEDED",
+    "duty_w": 133791.51,
+    "hot_outlet_t": 318.0365,
+    "cold_outlet_t": 330.0,
+    "q_hot_w": 133791.51,
+    "q_cold_w": 133791.51,
+    "residual_w": 0.0,
+    "relative_imbalance": 0.0,
+    "energy_balance_accepted": true,
+    "solver_converged": true,
+    "result_hash": "sha256:df41219f861ae4a7cbe1c6253f5748070c26ea141492cadba99f2176067f2654"
+  },
+  "tolerances": {
+    "temperature_k": 0.5
+  }
+}

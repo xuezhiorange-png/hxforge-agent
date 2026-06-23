@@ -1,0 +1,31 @@
+{
+  "case_id": "zero_duty",
+  "input": {
+    "hot_fluid": "Water",
+    "cold_fluid": "Water",
+    "hot_inlet_t": 350.0,
+    "cold_inlet_t": 290.0,
+    "hot_mass_flow": 1.0,
+    "cold_mass_flow": 0.8,
+    "hot_pressure": 200000.0,
+    "cold_pressure": 150000.0,
+    "duty_w": 0.0
+  },
+  "expected": {
+    "specification_mode": "known_duty",
+    "status": "SUCCEEDED",
+    "duty_w": 0.0,
+    "hot_outlet_t": 350.0,
+    "cold_outlet_t": 290.0,
+    "q_hot_w": 0.0,
+    "q_cold_w": 0.0,
+    "residual_w": 0.0,
+    "relative_imbalance": 0.0,
+    "energy_balance_accepted": true,
+    "solver_converged": true,
+    "result_hash": "sha256:90d8ada31a2e65f323e4e65e31608f4915b3bf3659f80dffa541a32cba623ffa"
+  },
+  "tolerances": {
+    "temperature_k": 0.001
+  }
+}

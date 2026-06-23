@@ -1,0 +1,31 @@
+{
+  "case_id": "gas_liquid_known_duty",
+  "input": {
+    "hot_fluid": "Air",
+    "cold_fluid": "Water",
+    "hot_inlet_t": 400.0,
+    "cold_inlet_t": 290.0,
+    "hot_mass_flow": 0.5,
+    "cold_mass_flow": 1.0,
+    "hot_pressure": 101325.0,
+    "cold_pressure": 200000.0,
+    "duty_w": 30000.0
+  },
+  "expected": {
+    "specification_mode": "known_duty",
+    "status": "SUCCEEDED",
+    "duty_w": 30000.0,
+    "hot_outlet_t": 340.6579,
+    "cold_outlet_t": 297.1709,
+    "q_hot_w": 30000.0,
+    "q_cold_w": 30000.0,
+    "residual_w": -0.0,
+    "relative_imbalance": 0.0,
+    "energy_balance_accepted": true,
+    "solver_converged": true,
+    "result_hash": "sha256:73f64864ea99ce57d7fc842a5227b5869ee4b157193404872892595c54fecae0"
+  },
+  "tolerances": {
+    "temperature_k": 0.5
+  }
+}
