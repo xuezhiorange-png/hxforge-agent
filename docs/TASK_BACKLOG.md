@@ -2,7 +2,10 @@
 
 This is the project-level work breakdown. Detailed executable cards for the first implementation sequence are in `docs/tasks/`.
 
-Status values: `DONE`, `IN_PROGRESS`, `READY`, `BLOCKED`, `PLANNED`.
+Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `PLANNED`.
+
+- `READY_FOR_REVIEW` = implementation complete, engineering review passed, awaiting PR merge
+- `READY` = approved dependency/task ready to start
 
 ## M0 — Repository and engineering baseline
 

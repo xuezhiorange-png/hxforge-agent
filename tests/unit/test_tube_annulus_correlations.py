@@ -17,6 +17,7 @@ from __future__ import annotations
 import contextlib
 import math
 from copy import deepcopy
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -3363,3 +3364,158 @@ class TestUnavailableCandidatesSemantics:
         d, a = result.unavailable_candidates[0]
         assert d.key.correlation_id == "tube_only"
         assert a.status.value == "implementation_unavailable"
+
+
+# =====================================================================
+# End-to-end source identity sensitivity tests
+# =====================================================================
+
+
+def _build_custom_registry(
+    *, source_year: int = 2011, source_ref: str = "7th Table 8.1"
+) -> InMemoryCorrelationRegistry:
+    """Build a registry with tube_laminar_cwt using custom source fields.
+
+    Everything identical to the default C1 except source_year and
+    source_reference (edition + equation_or_clause).
+    """
+    from hexagent.correlations.models import (
+        ApplicabilityEnvelope,
+        BibliographicSource,
+        CorrelationDefinition,
+        CorrelationImplementationStatus,
+        CorrelationKey,
+        CorrelationPurpose,
+        NumericBound,
+        SourceVerificationStatus,
+        UncertaintySpec,
+    )
+    from hexagent.correlations.models import FlowRegime as ModelsFlowRegime
+
+    reg = InMemoryCorrelationRegistry()
+    defn = CorrelationDefinition.create(
+        key=CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"),
+        name="Tube Laminar CWT",
+        purpose=CorrelationPurpose.nusselt_number,
+        description="Fully developed laminar flow, constant wall temperature. Nu_D = 3.66.",
+        geometry=frozenset({GeometryType.circular_tube}),
+        phase_regimes=frozenset({PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}),
+        envelope=ApplicabilityEnvelope(
+            geometry_types=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset(
+                {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+            ),
+            flow_regimes=frozenset({ModelsFlowRegime.laminar}),
+            bounds=(
+                NumericBound(
+                    variable=ApplicabilityVariable.reynolds,
+                    minimum=0.0,
+                    maximum=2300.0,
+                    minimum_inclusive=False,
+                    maximum_inclusive=False,
+                ),
+                NumericBound(
+                    variable=ApplicabilityVariable.prandtl,
+                    minimum=0.6,
+                    minimum_inclusive=False,
+                ),
+            ),
+            required_inputs=frozenset(
+                {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+            ),
+        ),
+        source=BibliographicSource(
+            source_id="incropera_2011_table_8_1",
+            authors=("Incropera, F.P.", "DeWitt, D.P.", "Bergman, T.L.", "Lavine, A.S."),
+            title="Fundamentals of Heat and Mass Transfer",
+            publication="Wiley",
+            year=source_year,
+            edition="7th",
+            equation_or_clause=source_ref,
+            verification_status=SourceVerificationStatus.primary_source_checked,
+        ),
+        uncertainty=UncertaintySpec(
+            basis="exact analytical solution for fully developed laminar flow"
+        ),
+        implementation_status=CorrelationImplementationStatus.validated,
+        implementation_ref="hexagent.correlations.tube.TubeLaminarCWT",
+        tags=frozenset(
+            {
+                "bc:constant_wall_temperature",
+                "nusselt_basis:inside_diameter",
+                "priority:10",
+            }
+        ),
+    )
+    reg.register(defn)
+    return reg
+
+
+class TestEndToEndSourceIdentitySensitivity:
+    """Full CorrelationResult-level source identity sensitivity.
+
+    Verifies that changing only source metadata (same geometry, flow,
+    correlation ID, version, equation) produces different result_hash
+    and provenance_digest while both results remain self-consistent.
+    """
+
+    def test_source_year_changes_result_hash_and_provenance(self) -> None:
+        """Only source_year differs → different result_hash, different provenance_digest."""
+        flow = _water_flow(mass_flow=0.005)
+        geom = _tube_geom()
+
+        reg1 = _build_custom_registry(source_year=2011, source_ref="7th Table 8.1")
+        with patch("hexagent.correlations.service._get_registry", return_value=reg1):
+            r1 = evaluate_hx_correlation(geom, flow, "constant_wall_temperature")
+
+        reg2 = _build_custom_registry(source_year=2012, source_ref="7th Table 8.1")
+        with patch("hexagent.correlations.service._get_registry", return_value=reg2):
+            r2 = evaluate_hx_correlation(geom, flow, "constant_wall_temperature")
+
+        # Same correlation value (Nu = 3.66, evaluator is identical)
+        assert r1.status == CorrelationStatus.SUCCEEDED
+        assert r2.status == CorrelationStatus.SUCCEEDED
+        assert r1.nusselt_number == r2.nusselt_number == 3.66
+
+        # Different source_year → different hashes
+        assert r1.selected_correlation.source_year == 2011
+        assert r2.selected_correlation.source_year == 2012
+        assert r1.result_hash != r2.result_hash
+        assert r1.provenance_digest != r2.provenance_digest
+
+        # Both self-consistent
+        assert r1.verify_hash() is True
+        assert r2.verify_hash() is True
+        assert r1.verify_provenance() is True
+        assert r2.verify_provenance() is True
+
+    def test_source_reference_changes_result_hash_and_provenance(self) -> None:
+        """Only source_reference differs → different result_hash, different provenance_digest."""
+        flow = _water_flow(mass_flow=0.005)
+        geom = _tube_geom()
+
+        reg1 = _build_custom_registry(source_year=2011, source_ref="Edition 3 Table 9-1")
+        with patch("hexagent.correlations.service._get_registry", return_value=reg1):
+            r1 = evaluate_hx_correlation(geom, flow, "constant_wall_temperature")
+
+        reg2 = _build_custom_registry(source_year=2011, source_ref="Edition 4 Table 9-1")
+        with patch("hexagent.correlations.service._get_registry", return_value=reg2):
+            r2 = evaluate_hx_correlation(geom, flow, "constant_wall_temperature")
+
+        # Same correlation value
+        assert r1.status == CorrelationStatus.SUCCEEDED
+        assert r2.status == CorrelationStatus.SUCCEEDED
+        assert r1.nusselt_number == r2.nusselt_number == 3.66
+
+        # Different source_reference → different hashes
+        # source_reference = f"{edition} {equation_or_clause}".strip()
+        assert r1.selected_correlation.source_reference == "7th Edition 3 Table 9-1"
+        assert r2.selected_correlation.source_reference == "7th Edition 4 Table 9-1"
+        assert r1.result_hash != r2.result_hash
+        assert r1.provenance_digest != r2.provenance_digest
+
+        # Both self-consistent
+        assert r1.verify_hash() is True
+        assert r2.verify_hash() is True
+        assert r1.verify_provenance() is True
+        assert r2.verify_provenance() is True
