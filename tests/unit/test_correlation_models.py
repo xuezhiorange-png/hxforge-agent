@@ -170,7 +170,7 @@ class TestApplicabilityStatus:
         values = [e.value for e in ApplicabilityStatus]
         assert "applicable" in values
         assert "absolute_range_exceeded" in values
-        assert len(values) == 8
+        assert len(values) == 9
 
 
 class TestVariableApplicabilityStatus:

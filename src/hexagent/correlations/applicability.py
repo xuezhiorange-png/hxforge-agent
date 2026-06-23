@@ -545,6 +545,19 @@ def assess_applicability(
         allow_extrapolation=inputs.allow_extrapolation,
     )
 
+    # 9. Build identity snapshot for hash re-verification
+    from hexagent.correlations.models import ApplicabilityIdentitySnapshot
+
+    identity_snapshot = ApplicabilityIdentitySnapshot(
+        definition_hash=definition.definition_hash,
+        geometry=inputs.geometry,
+        phase_regime=inputs.phase_regime,
+        flow_regime=inputs.flow_regime,
+        input_values=inputs.values,
+        policy=policy,
+        allow_extrapolation=inputs.allow_extrapolation,
+    )
+
     return ApplicabilityAssessment(
         correlation_key=key,
         status=overall_status,
@@ -552,6 +565,7 @@ def assess_applicability(
         warnings=tuple(warnings),
         blockers=tuple(blockers),
         assessment_hash=assessment_hash,
+        identity_snapshot=identity_snapshot,
     )
 
 
