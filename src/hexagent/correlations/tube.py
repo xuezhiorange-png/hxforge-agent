@@ -22,6 +22,7 @@ class TubeLaminarCWT:
     Nu_D = 3.66
     Source: Incropera et al., 7th ed., Table 8.1
     Valid for: Re < 2300, Pr > 0.6, fully developed flow and thermal fields.
+    Nu is based on tube inside diameter (= hydraulic diameter).
     """
 
     correlation_id: str = "tube_laminar_cwt"
@@ -39,6 +40,7 @@ class TubeLaminarCWT:
     prandtl_max: float = float("inf")
     requires_wall_viscosity: bool = False
     priority: int = 10
+    nusselt_basis: str = "inside_diameter"
 
     def evaluate(self) -> float:
         """Return Nu_D = 3.66."""
@@ -52,6 +54,7 @@ class TubeLaminarCHF:
     Nu_D = 4.36
     Source: Incropera et al., 7th ed., Table 8.1
     Valid for: Re < 2300, Pr > 0.6, fully developed flow and thermal fields.
+    Nu is based on tube inside diameter (= hydraulic diameter).
     """
 
     correlation_id: str = "tube_laminar_chf"
@@ -69,6 +72,7 @@ class TubeLaminarCHF:
     prandtl_max: float = float("inf")
     requires_wall_viscosity: bool = False
     priority: int = 10
+    nusselt_basis: str = "inside_diameter"
 
     def evaluate(self) -> float:
         """Return Nu_D = 4.36."""
@@ -86,6 +90,7 @@ class TubeTurbulentGnielinski:
 
     Source: Gnielinski, V., Int. Chem. Eng., Vol. 16, No. 2, pp. 359-368, 1976.
     Friction factor source: Petukhov, B.S., Advances in Heat Transfer, Vol. 6, 1970.
+    Nu is based on tube inside diameter (= hydraulic diameter).
     """
 
     correlation_id: str = "tube_turbulent_gnielinski"
@@ -106,6 +111,7 @@ class TubeTurbulentGnielinski:
     prandtl_max: float = 2000.0
     requires_wall_viscosity: bool = False
     priority: int = 10
+    nusselt_basis: str = "inside_diameter"
 
     def petukhov_friction_factor(self, reynolds: float) -> float:
         """Petukhov friction factor: f = (0.790 ln(Re) - 1.64)^{-2}."""

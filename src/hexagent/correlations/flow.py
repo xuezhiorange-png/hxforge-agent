@@ -12,10 +12,8 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, model_validator
 
 # ---------------------------------------------------------------------------
-# Regime thresholds (frozen — must match task card)
+# Enums
 # ---------------------------------------------------------------------------
-LAMINAR_UPPER_RE = 2300.0
-TURBULENT_LOWER_RE = 10000.0
 
 
 class FlowRegime(StrEnum):
@@ -25,6 +23,24 @@ class FlowRegime(StrEnum):
     transitional = "transitional"
     turbulent = "turbulent"
     invalid = "invalid"
+
+
+class NusseltBasis(StrEnum):
+    """Characteristic length basis for Nusselt number.
+
+    Each correlation declares which diameter its Nu is based on.
+    The service uses this to compute h = Nu * k / D_char correctly.
+    """
+
+    hydraulic_diameter = "hydraulic_diameter"
+    inside_diameter = "inside_diameter"
+
+
+# ---------------------------------------------------------------------------
+# Regime thresholds (frozen — must match task card)
+# ---------------------------------------------------------------------------
+LAMINAR_UPPER_RE = 2300.0
+TURBULENT_LOWER_RE = 10000.0
 
 
 def classify_regime(reynolds_number: float) -> FlowRegime:
@@ -40,6 +56,28 @@ def classify_regime(reynolds_number: float) -> FlowRegime:
     if reynolds_number > TURBULENT_LOWER_RE:
         return FlowRegime.turbulent
     return FlowRegime.transitional
+
+
+# ---------------------------------------------------------------------------
+# Flow property input model
+# ---------------------------------------------------------------------------
+
+
+def _validate_positive_finite(value: float, name: str) -> None:
+    """Validate that value is finite and positive."""
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be finite, got {value!r}")
+    if value <= 0:
+        raise ValueError(f"{name} must be positive, got {value!r}")
+
+
+def _validate_optional_positive_finite(value: float | None, name: str) -> None:
+    """Validate that optional value, if provided, is finite and positive."""
+    if value is not None:
+        if not math.isfinite(value):
+            raise ValueError(f"{name} must be finite when provided, got {value!r}")
+        if value <= 0:
+            raise ValueError(f"{name} must be positive when provided, got {value!r}")
 
 
 class FlowPropertiesInput(BaseModel):
@@ -67,46 +105,29 @@ class FlowPropertiesInput(BaseModel):
 
     @model_validator(mode="after")
     def _validate_properties(self) -> FlowPropertiesInput:
+        # Mass flow must be strictly positive (zero handled by service layer)
+        if self.mass_flow_kg_s < 0:
+            raise ValueError(f"mass_flow_kg_s must be non-negative, got {self.mass_flow_kg_s!r}")
+        # Required bulk properties
         for name in (
-            "mass_flow_kg_s",
             "density_kg_m3",
             "dynamic_viscosity_pa_s",
             "thermal_conductivity_w_m_k",
             "specific_heat_j_kg_k",
             "bulk_temperature_k",
         ):
-            val = getattr(self, name)
-            if not math.isfinite(val):
-                raise ValueError(f"{name} must be finite, got {val!r}")
-        # Physical constraints
-        if self.density_kg_m3 <= 0:
-            raise ValueError(f"density_kg_m3 must be positive, got {self.density_kg_m3!r}")
-        if self.dynamic_viscosity_pa_s <= 0:
-            raise ValueError(
-                f"dynamic_viscosity_pa_s must be positive, got {self.dynamic_viscosity_pa_s!r}"
-            )
-        if self.thermal_conductivity_w_m_k <= 0:
-            val = self.thermal_conductivity_w_m_k
-            raise ValueError(f"thermal_conductivity_w_m_k must be positive, got {val!r}")
-        if self.specific_heat_j_kg_k <= 0:
-            raise ValueError(
-                f"specific_heat_j_kg_k must be positive, got {self.specific_heat_j_kg_k!r}"
-            )
-        if self.bulk_temperature_k <= 0:
-            raise ValueError(
-                f"bulk_temperature_k must be positive (absolute), got {self.bulk_temperature_k!r}"
-            )
-        if self.mass_flow_kg_s < 0:
-            raise ValueError(f"mass_flow_kg_s must be non-negative, got {self.mass_flow_kg_s!r}")
-        if self.wall_temperature_k is not None and self.wall_temperature_k <= 0:
-            raise ValueError(
-                f"wall_temperature_k must be positive, got {self.wall_temperature_k!r}"
-            )
-        if self.wall_viscosity_pa_s is not None and self.wall_viscosity_pa_s <= 0:
-            raise ValueError(
-                f"wall_viscosity_pa_s must be positive, got {self.wall_viscosity_pa_s!r}"
-            )
+            _validate_positive_finite(getattr(self, name), name)
+
+        # Optional wall properties: must be finite and positive if provided
+        _validate_optional_positive_finite(self.wall_temperature_k, "wall_temperature_k")
+        _validate_optional_positive_finite(self.wall_viscosity_pa_s, "wall_viscosity_pa_s")
+
         return self
+
+
+# ---------------------------------------------------------------------------
+# Dimensionless number calculations
+# ---------------------------------------------------------------------------
 
 
 def compute_velocity(mass_flow: float, density: float, area: float) -> float:
@@ -139,9 +160,9 @@ def compute_prandtl(cp: float, mu: float, k: float) -> float:
     return cp * mu / k
 
 
-def compute_heat_transfer_coefficient(nu: float, k: float, dh: float) -> float:
+def compute_heat_transfer_coefficient(nu: float, k: float, d_characteristic: float) -> float:
     """Compute local heat-transfer coefficient: h = Nu × k / D_char."""
-    for name, val in [("nu", nu), ("k", k), ("dh", dh)]:
+    for name, val in [("nu", nu), ("k", k), ("d_char", d_characteristic)]:
         if not math.isfinite(val) or val <= 0:
             raise ValueError(f"{name} must be finite positive, got {val!r}")
-    return nu * k / dh
+    return nu * k / d_characteristic

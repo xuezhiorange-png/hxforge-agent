@@ -6,7 +6,7 @@
 **Depends on:** TASK-003, TASK-004, TASK-006
 **GitHub Issue:** #17
 **Branch:** `codex/task-007-tube-annulus-correlations`
-**Draft PR:** pending
+**Draft PR:** pending (to be created with this commit)
 
 ## Objective
 
@@ -110,7 +110,8 @@ Implement a deterministic, source-traceable single-phase convective heat-transfe
 - **Boundary condition:** inner_wall_heated (outer insulated)
 - **Reynolds range:** (0, 2300) based on hydraulic diameter
 - **Prandtl range:** (0.6, ∞)
-- **Diameter ratio range:** (0, 1) exclusive
+- **Characteristic length basis:** D_i (inner tube outer diameter) — h = Nu_i · k / D_i
+- **Diameter ratio range:** [0.1, 0.75] inclusive (verified Kays data only, no extrapolation)
 - **Development length:** Assumes fully developed
 - **Wall property requirements:** None
 - **Heating/cooling:** Both
@@ -131,6 +132,7 @@ Implement a deterministic, source-traceable single-phase convective heat-transfe
 - **Boundary condition:** All (with limitation warning for annulus-specific effects)
 - **Reynolds range:** (10000, 5×10^6) based on D_h
 - **Prandtl range:** (0.5, 2000)
+- **Characteristic length basis:** D_h (hydraulic diameter)
 - **Diameter ratio range:** (0, 1) exclusive
 - **Development length:** Assumes developed
 - **Wall property requirements:** None
@@ -145,9 +147,11 @@ Implement a deterministic, source-traceable single-phase convective heat-transfe
 - **Message:** "Transitional flow (2300 ≤ Re ≤ 10000) is not supported. Specify laminar (Re < 2300) or turbulent (Re > 10000)."
 - **Output:** Actual Re, transition bounds, candidate correlation IDs
 
-### Applicability Handling
+### Applicability Handling (Registry-Backed — Mandatory)
 
-Each correlation goes through the existing `assess_applicability()` engine. The `OutOfRangePolicy` is:
+Each correlation is registered in `InMemoryCorrelationRegistry` and goes through
+`assess_applicability()`. All 5 correlations must be registered with full applicability
+metadata. The `OutOfRangePolicy` is:
 - `absolute_violation`: BLOCKER
 - `recommended_violation`: WARNING
 - `missing_input`: BLOCKER
@@ -159,12 +163,25 @@ Each correlation goes through the existing `assess_applicability()` engine. The 
 
 1. Filter by applicability status (only `applicable` or `recommended_range_exceeded`)
 2. Geometry exact match
-3. Boundary-condition exact match
+3. Boundary-condition exact match (typed validation, not string comparison)
 4. Approved priority (higher = preferred)
 5. Correlation ID (alphabetical tiebreak)
-6. Version (highest wins)
+6. Version (highest wins, parsed via `parse_semver`/`compare_semver`)
 
 If ambiguous after all keys: return structured ambiguity blocker.
+
+### Typed Boundary Condition Validation
+
+All boundary conditions are validated via typed Pydantic models at input time.
+Annulus conditions (inner_wall_heated, outer_wall_heated, both_walls_heated) are
+distinguished from tube conditions (constant_wall_temperature, constant_heat_flux).
+heated_surface vs BC consistency is enforced — no silent fallback to string matching.
+
+### Hash Integrity
+
+- `result_hash` is computed over all public fields **excluding itself** (no self-referential hash).
+- `verify_provenance()` recomputes and validates the hash against the stored digest.
+- Source identity: `SelectedCorrelationInfo` populated from `CorrelationDefinition` metadata.
 
 ### Wall-Property Policy
 
@@ -204,7 +221,7 @@ The result model `CorrelationResult` is a frozen Pydantic model with:
 - WARNING/BLOCKER nodes
 - RESULT node
 - Deterministic UUID5 for each node
-- Full provenance graph verification (same as TASK-006)
+- Full provenance graph verification via `verify_provenance()`: graph digest, node/edge uniqueness, DAG validation, payload hash recomputation
 
 ### Exclusions (out of scope for TASK-007)
 

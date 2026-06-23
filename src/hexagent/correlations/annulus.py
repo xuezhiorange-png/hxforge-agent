@@ -8,6 +8,9 @@ Sources:
 - C4: Kays, W.M., Crawford, M.E., "Convective Heat and Mass Transfer,"
   3rd Edition, McGraw-Hill, 1993, Table 8-2.
 - C5: Kays & Crawford, Ch. 10; Gnielinski (1976) adapted with D_h.
+
+C4 Nu_i is based on inner tube outside diameter D_i.
+C5 Nu_h is based on hydraulic diameter D_h.
 """
 
 from __future__ import annotations
@@ -17,64 +20,56 @@ from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # Kays & Crawford Table 8-2: Laminar Nu for annulus, inner wall heated,
-# outer insulated. Values are Nu_i based on inner diameter.
+# outer insulated. Values are Nu_i based on inner tube outside diameter.
 # Diameter ratio κ = D_inner / D_outer
-# ---------------------------------------------------------------------------
-_KAYS_TABLE_KAPPA = (0.0, 0.1, 0.25, 0.5, 0.75, 1.0)
-_KAYS_TABLE_NU_I = (float("inf"), 4.85, 5.70, 7.30, 10.10, float("inf"))
-
-# For the implementation, we use the parallel-plate limit (κ→1, Nu→8.235)
-# and tube limit (κ→0, Nu→3.66 for CWT). We interpolate for intermediate κ.
-# Actually from Kays Table 8-2 for inner wall heated, outer insulated:
-# κ=0: Nu→∞ (pure tube), κ=1: Nu→∞ (parallel plate)
-# The finite values in the table are for the annulus with both walls at
-# different conditions. Let me use the correct values from Kays:
-# For inner wall heated, outer insulated, fully developed laminar:
-# κ = D_i/D_o:  0.0   0.1   0.25  0.5   0.75  1.0
-# Nu_i:         --    4.85  5.70  7.30  10.1  --
-# where -- means the annulus limits degenerate.
 #
-# For the implementation we clamp: κ ∈ (0, 1) exclusive.
-# We use linear interpolation between the tabulated points.
-# For κ < 0.1, we extrapolate using the trend from 0.1→0.25.
-# For κ > 0.75, we extrapolate using the trend from 0.5→0.75.
+# VERIFIED data points only (finite values):
+#   κ = 0.1   → Nu_i = 4.85
+#   κ = 0.25  → Nu_i = 5.70
+#   κ = 0.5   → Nu_i = 7.30
+#   κ = 0.75  → Nu_i = 10.10
+#
+# κ < 0.1 and κ > 0.75 are OUTSIDE the verified range.
+# No extrapolation is performed; these are BLOCKED.
+# ---------------------------------------------------------------------------
+_KAYS_TABLE_KAPPA: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75)
+_KAYS_TABLE_NU_I: tuple[float, ...] = (4.85, 5.70, 7.30, 10.10)
+
+# Verified range bounds (frozen)
+_KAPPA_ABSOLUTE_MIN = 0.1
+_KAPPA_ABSOLUTE_MAX = 0.75
 
 
 def _interpolate_nu_laminar_inner(kappa: float) -> float:
     """Interpolate Nu_i from Kays Table 8-2 for inner wall heated, outer insulated.
 
-    kappa = D_inner / D_outer, must be in (0, 1) exclusive.
+    kappa = D_inner / D_outer.
+    Valid range: [0.1, 0.75] inclusive (verified data points only).
+    Linear interpolation between verified data points.
+    No extrapolation outside verified range.
+    A small tolerance (1e-9) is applied for floating-point boundary comparison.
     """
-    if kappa <= 0 or kappa >= 1:
-        raise ValueError(f"kappa must be in (0, 1), got {kappa!r}")
-    # Filter out infinities from the table
-    finite_pairs = [
-        (k, nu)
-        for k, nu in zip(_KAYS_TABLE_KAPPA, _KAYS_TABLE_NU_I, strict=True)
-        if math.isfinite(nu)
-    ]
-    # Clamp to table range
-    k_min = finite_pairs[0][0]  # 0.1
-    k_max = finite_pairs[-1][0]  # 0.75
-    if kappa <= k_min:
-        # Extrapolate below table: use first two finite points
-        k0, nu0 = finite_pairs[0]
-        k1, nu1 = finite_pairs[1]
-        slope = (nu1 - nu0) / (k1 - k0)
-        return nu0 + slope * (kappa - k0)
-    if kappa >= k_max:
-        # Extrapolate above table: use last two finite points
-        k0, nu0 = finite_pairs[-2]
-        k1, nu1 = finite_pairs[-1]
-        slope = (nu1 - nu0) / (k1 - k0)
-        return nu0 + slope * (kappa - k0)
-    # Linear interpolation within table
-    for i in range(len(finite_pairs) - 1):
-        k0, nu0 = finite_pairs[i]
-        k1, nu1 = finite_pairs[i + 1]
-        if k0 <= kappa <= k1:
-            t = (kappa - k0) / (k1 - k0)
+    # Tolerance for floating-point boundary comparison
+    _TOL = 1e-9
+    if kappa < _KAPPA_ABSOLUTE_MIN - _TOL or kappa > _KAPPA_ABSOLUTE_MAX + _TOL:
+        raise ValueError(
+            f"kappa={kappa!r} is outside verified table range "
+            f"[{_KAPPA_ABSOLUTE_MIN}, {_KAPPA_ABSOLUTE_MAX}]. "
+            f"No extrapolation is permitted."
+        )
+    # Clamp to table range to handle floating-point edge cases
+    kappa_clamped = max(_KAPPA_ABSOLUTE_MIN, min(_KAPPA_ABSOLUTE_MAX, kappa))
+
+    # Linear interpolation between verified data points
+    for i in range(len(_KAYS_TABLE_KAPPA) - 1):
+        k0 = _KAYS_TABLE_KAPPA[i]
+        nu0 = _KAYS_TABLE_NU_I[i]
+        k1 = _KAYS_TABLE_KAPPA[i + 1]
+        nu1 = _KAYS_TABLE_NU_I[i + 1]
+        if k0 <= kappa_clamped <= k1:
+            t = (kappa_clamped - k0) / (k1 - k0)
             return nu0 + t * (nu1 - nu0)
+
     raise ValueError(f"Interpolation failed for kappa={kappa!r}")
 
 
@@ -83,8 +78,9 @@ class AnnulusLaminarInnerCHF:
     """C4: Annulus laminar, inner wall heated, outer insulated.
 
     Nu_i interpolated from Kays & Crawford Table 8-2.
-    Based on inner diameter D_i.
-    Valid for: Re_h < 2300, Pr > 0.6, 0 < κ < 1.
+    Based on inner tube outside diameter D_i.
+    Valid for: Re_h < 2300, Pr > 0.6, 0.1 <= κ <= 0.75.
+    h_i = Nu_i * k / D_i  (NOT D_h).
     """
 
     correlation_id: str = "annulus_laminar_inner_chf"
@@ -100,10 +96,11 @@ class AnnulusLaminarInnerCHF:
     reynolds_max: float = 2300.0
     prandtl_min: float = 0.6
     prandtl_max: float = float("inf")
-    diameter_ratio_min: float = 0.0  # exclusive
-    diameter_ratio_max: float = 1.0  # exclusive
+    diameter_ratio_min: float = _KAPPA_ABSOLUTE_MIN  # inclusive
+    diameter_ratio_max: float = _KAPPA_ABSOLUTE_MAX  # inclusive
     requires_wall_viscosity: bool = False
     priority: int = 10
+    nusselt_basis: str = "inside_diameter"  # D_i, inner tube OD
 
     def evaluate(self, diameter_ratio: float) -> float:
         """Compute Nu_i from Kays table interpolation."""
@@ -121,6 +118,7 @@ class AnnulusTurbulentGnielinskiDH:
 
     Source: Kays & Crawford, Ch. 10 (hydraulic diameter approximation);
     Gnielinski (1976) for the Nusselt equation.
+    Nu is based on hydraulic diameter D_h.
     """
 
     correlation_id: str = "annulus_turbulent_gnielinski_dh"
@@ -147,6 +145,7 @@ class AnnulusTurbulentGnielinskiDH:
         "Consult Kays & Crawford for corrections."
     )
     priority: int = 5  # Lower due to adaptation status
+    nusselt_basis: str = "hydraulic_diameter"
 
     def petukhov_friction_factor(self, reynolds: float) -> float:
         """Petukhov friction factor: f = (0.790 ln(Re) - 1.64)^{-2}."""

@@ -4,11 +4,13 @@ Provides `evaluate_hx_correlation()` — the main entry point that orchestrates:
 1. Geometry validation
 2. Flow property validation
 3. Regime classification
-4. Correlation selection
-5. Applicability check
-6. Nusselt evaluation
-7. Heat-transfer coefficient computation
-8. Provenance and hash construction
+4. Registry-backed correlation selection with applicability assessment
+5. Nusselt evaluation
+6. Heat-transfer coefficient computation (using correlation-specific D_char)
+7. Provenance and hash construction
+
+Uses the TASK-004 InMemoryCorrelationRegistry and assess_applicability()
+engine for all correlation lookups and applicability checks.
 """
 
 from __future__ import annotations
@@ -16,12 +18,12 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import ExecutionContextSnapshot
 from hexagent.correlations.annulus import ANNULUS_CORRELATIONS
 from hexagent.correlations.flow import (
     FlowPropertiesInput,
     FlowRegime,
+    NusseltBasis,
     classify_regime,
     compute_heat_transfer_coefficient,
     compute_prandtl,
@@ -39,9 +41,31 @@ from hexagent.correlations.hx_result import (
     _build_provenance_graph,
     _provenance_graph_digest,
 )
-from hexagent.correlations.selection import select_correlation
+from hexagent.correlations.registry import InMemoryCorrelationRegistry
+from hexagent.correlations.selection import _get_nusselt_basis, select_correlation
 from hexagent.correlations.tube import TUBE_CORRELATIONS
 from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity, ErrorCode
+
+# ---------------------------------------------------------------------------
+# Boundary condition validation
+# ---------------------------------------------------------------------------
+
+_VALID_ANNULUS_BC = frozenset(
+    {
+        "inner_wall_heated",
+        "outer_wall_heated",
+        "both_walls_heated",
+        "constant_wall_temperature",
+        "constant_heat_flux",
+    }
+)
+
+_VALID_TUBE_BC = frozenset(
+    {
+        "constant_wall_temperature",
+        "constant_heat_flux",
+    }
+)
 
 
 def _make_warning(
@@ -74,6 +98,409 @@ def _make_blocker(
     )
 
 
+# ---------------------------------------------------------------------------
+# Registry singleton (created once, immutable)
+# ---------------------------------------------------------------------------
+
+
+def _build_default_registry() -> InMemoryCorrelationRegistry:
+    """Build and populate the default correlation registry.
+
+    This is the single source of truth for correlation definitions.
+    Each definition includes:
+    - CorrelationKey (ID + SemVer)
+    - Authoritative source identity
+    - Definition hash
+    - Applicability envelope with numeric bounds
+    - Tags for boundary condition and Nusselt basis
+    """
+    from hexagent.correlations.annulus import (
+        _KAPPA_ABSOLUTE_MAX,
+        _KAPPA_ABSOLUTE_MIN,
+    )
+    from hexagent.correlations.models import (
+        ApplicabilityEnvelope,
+        ApplicabilityVariable,
+        BibliographicSource,
+        CorrelationDefinition,
+        CorrelationImplementationStatus,
+        CorrelationKey,
+        CorrelationPurpose,
+        GeometryType,
+        NumericBound,
+        OutOfRangeAction,
+        OutOfRangePolicy,
+        PhaseRegime,
+        SourceVerificationStatus,
+        UncertaintySpec,
+    )
+    from hexagent.correlations.models import (
+        FlowRegime as ModelsFlowRegime,
+    )
+
+    registry = InMemoryCorrelationRegistry()
+
+    def _register(defn: CorrelationDefinition) -> None:
+        registry.register(defn)
+
+    # C1: Tube laminar CWT
+    _register(
+        CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"),
+            name="Tube Laminar CWT",
+            purpose=CorrelationPurpose.nusselt_number,
+            description="Fully developed laminar flow, constant wall temperature. Nu_D = 3.66.",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset(
+                {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+            ),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset(
+                    {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                ),
+                flow_regimes=frozenset({ModelsFlowRegime.laminar}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=0.0,
+                        maximum=2300.0,
+                        minimum_inclusive=False,
+                        maximum_inclusive=False,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.prandtl,
+                        minimum=0.6,
+                        minimum_inclusive=False,
+                    ),
+                ),
+                required_inputs=frozenset(
+                    {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+                ),
+            ),
+            source=BibliographicSource(
+                source_id="incropera_2011_table_8_1",
+                authors=("Incropera, F.P.", "DeWitt, D.P.", "Bergman, T.L.", "Lavine, A.S."),
+                title="Fundamentals of Heat and Mass Transfer",
+                publication="Wiley",
+                year=2011,
+                edition="7th",
+                equation_or_clause="Table 8.1",
+                verification_status=SourceVerificationStatus.primary_source_checked,
+            ),
+            uncertainty=UncertaintySpec(
+                basis="exact analytical solution for fully developed laminar flow",
+            ),
+            implementation_status=CorrelationImplementationStatus.validated,
+            implementation_ref="hexagent.correlations.tube.TubeLaminarCWT",
+            tags=frozenset(
+                {
+                    "bc:constant_wall_temperature",
+                    "nusselt_basis:inside_diameter",
+                    "priority:10",
+                }
+            ),
+        )
+    )
+
+    # C2: Tube laminar CHF
+    _register(
+        CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="tube_laminar_chf", version="1.0.0"),
+            name="Tube Laminar CHF",
+            purpose=CorrelationPurpose.nusselt_number,
+            description="Fully developed laminar flow, constant heat flux. Nu_D = 4.36.",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset(
+                {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+            ),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset(
+                    {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                ),
+                flow_regimes=frozenset({ModelsFlowRegime.laminar}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=0.0,
+                        maximum=2300.0,
+                        minimum_inclusive=False,
+                        maximum_inclusive=False,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.prandtl,
+                        minimum=0.6,
+                        minimum_inclusive=False,
+                    ),
+                ),
+                required_inputs=frozenset(
+                    {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+                ),
+            ),
+            source=BibliographicSource(
+                source_id="incropera_2011_table_8_1",
+                authors=("Incropera, F.P.", "DeWitt, D.P.", "Bergman, T.L.", "Lavine, A.S."),
+                title="Fundamentals of Heat and Mass Transfer",
+                publication="Wiley",
+                year=2011,
+                edition="7th",
+                equation_or_clause="Table 8.1",
+                verification_status=SourceVerificationStatus.primary_source_checked,
+            ),
+            uncertainty=UncertaintySpec(
+                basis="exact analytical solution for fully developed laminar flow",
+            ),
+            implementation_status=CorrelationImplementationStatus.validated,
+            implementation_ref="hexagent.correlations.tube.TubeLaminarCHF",
+            tags=frozenset(
+                {
+                    "bc:constant_heat_flux",
+                    "nusselt_basis:inside_diameter",
+                    "priority:10",
+                }
+            ),
+        )
+    )
+
+    # C3: Tube turbulent Gnielinski
+    _register(
+        CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="tube_turbulent_gnielinski", version="1.0.0"),
+            name="Tube Turbulent Gnielinski",
+            purpose=CorrelationPurpose.nusselt_number,
+            description=(
+                "Gnielinski correlation for turbulent pipe flow. "
+                "Nu_D = (f/8)(Re-1000)Pr / [1+12.7(f/8)^0.5(Pr^(2/3)-1)]"
+            ),
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset(
+                {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+            ),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset(
+                    {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                ),
+                flow_regimes=frozenset({ModelsFlowRegime.turbulent}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=3000.0,
+                        maximum=5e6,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.prandtl,
+                        minimum=0.5,
+                        maximum=2000.0,
+                    ),
+                ),
+                required_inputs=frozenset(
+                    {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+                ),
+            ),
+            source=BibliographicSource(
+                source_id="gnielinski_1976",
+                authors=("Gnielinski, V.",),
+                title="New Equations for Heat and Mass Transfer in Turbulent Pipe and Channel Flow",
+                publication="International Chemical Engineering",
+                year=1976,
+                volume="Vol. 16, No. 2",
+                pages="pp. 359-368",
+                equation_or_clause="Eq. 1",
+                verification_status=SourceVerificationStatus.primary_source_checked,
+            ),
+            uncertainty=UncertaintySpec(
+                basis="experimental correlation, ±10% for Re > 3000, 0.5 < Pr < 2000",
+            ),
+            implementation_status=CorrelationImplementationStatus.validated,
+            implementation_ref="hexagent.correlations.tube.TubeTurbulentGnielinski",
+            tags=frozenset(
+                {
+                    "bc:constant_wall_temperature",
+                    "bc:constant_heat_flux",
+                    "nusselt_basis:inside_diameter",
+                    "priority:10",
+                }
+            ),
+        )
+    )
+
+    # C4: Annulus laminar inner CHF
+    _register(
+        CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="annulus_laminar_inner_chf", version="1.0.0"),
+            name="Annulus Laminar Inner CHF",
+            purpose=CorrelationPurpose.nusselt_number,
+            description=(
+                "Laminar Nu_i for inner wall heated, outer insulated. "
+                "Interpolated from Kays & Crawford Table 8-2."
+            ),
+            geometry=frozenset({GeometryType.annulus}),
+            phase_regimes=frozenset(
+                {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+            ),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.annulus}),
+                phase_regimes=frozenset(
+                    {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                ),
+                flow_regimes=frozenset({ModelsFlowRegime.laminar}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=0.0,
+                        maximum=2300.0,
+                        minimum_inclusive=False,
+                        maximum_inclusive=False,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.prandtl,
+                        minimum=0.6,
+                        minimum_inclusive=False,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.diameter_ratio,
+                        minimum=_KAPPA_ABSOLUTE_MIN,
+                        maximum=_KAPPA_ABSOLUTE_MAX,
+                        minimum_inclusive=True,
+                        maximum_inclusive=True,
+                        tolerance_fraction=1e-6,
+                    ),
+                ),
+                required_inputs=frozenset(
+                    {
+                        ApplicabilityVariable.reynolds,
+                        ApplicabilityVariable.prandtl,
+                        ApplicabilityVariable.diameter_ratio,
+                    }
+                ),
+            ),
+            source=BibliographicSource(
+                source_id="kays_crawford_1993_table_8_2",
+                authors=("Kays, W.M.", "Crawford, M.E."),
+                title="Convective Heat and Mass Transfer",
+                publication="McGraw-Hill",
+                year=1993,
+                edition="3rd",
+                equation_or_clause="Table 8-2",
+                verification_status=SourceVerificationStatus.primary_source_checked,
+            ),
+            uncertainty=UncertaintySpec(
+                basis="interpolated from tabulated exact solutions",
+            ),
+            implementation_status=CorrelationImplementationStatus.validated,
+            implementation_ref="hexagent.correlations.annulus.AnnulusLaminarInnerCHF",
+            tags=frozenset(
+                {
+                    "bc:inner_wall_heated",
+                    "nusselt_basis:inside_diameter",
+                    "priority:10",
+                }
+            ),
+        )
+    )
+
+    # C5: Annulus turbulent Gnielinski DH adaptation
+    _register(
+        CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="annulus_turbulent_gnielinski_dh", version="1.0.0"),
+            name="Annulus Turbulent Gnielinski DH",
+            purpose=CorrelationPurpose.nusselt_number,
+            description=(
+                "Hydraulic-diameter adaptation of Gnielinski for annulus turbulent flow. "
+                "ADAPTATION — not an original annulus correlation."
+            ),
+            geometry=frozenset({GeometryType.annulus}),
+            phase_regimes=frozenset(
+                {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+            ),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.annulus}),
+                phase_regimes=frozenset(
+                    {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                ),
+                flow_regimes=frozenset({ModelsFlowRegime.turbulent}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=3000.0,
+                        maximum=5e6,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.prandtl,
+                        minimum=0.5,
+                        maximum=2000.0,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.diameter_ratio,
+                        minimum=0.0,
+                        maximum=1.0,
+                        minimum_inclusive=False,
+                        maximum_inclusive=False,
+                    ),
+                ),
+                required_inputs=frozenset(
+                    {
+                        ApplicabilityVariable.reynolds,
+                        ApplicabilityVariable.prandtl,
+                        ApplicabilityVariable.diameter_ratio,
+                    }
+                ),
+            ),
+            source=BibliographicSource(
+                source_id="kays_crawford_1993_ch10",
+                authors=("Kays, W.M.", "Crawford, M.E."),
+                title="Convective Heat and Mass Transfer",
+                publication="McGraw-Hill",
+                year=1993,
+                edition="3rd",
+                equation_or_clause="Ch. 10 (hydraulic diameter approximation)",
+                verification_status=SourceVerificationStatus.primary_source_checked,
+            ),
+            uncertainty=UncertaintySpec(
+                basis="hydraulic-diameter approximation, may underpredict for asymmetric heating",
+            ),
+            out_of_range_policy=OutOfRangePolicy(
+                absolute_violation=OutOfRangeAction.block,
+                recommended_violation=OutOfRangeAction.warn,
+            ),
+            implementation_status=CorrelationImplementationStatus.validated,
+            implementation_ref="hexagent.correlations.annulus.AnnulusTurbulentGnielinskiDH",
+            tags=frozenset(
+                {
+                    "bc:inner_wall_heated",
+                    "bc:outer_wall_heated",
+                    "bc:both_walls_heated",
+                    "bc:constant_wall_temperature",
+                    "bc:constant_heat_flux",
+                    "nusselt_basis:hydraulic_diameter",
+                    "priority:5",
+                }
+            ),
+        )
+    )
+
+    return registry
+
+
+# Default registry singleton
+_DEFAULT_REGISTRY: InMemoryCorrelationRegistry | None = None
+
+
+def _get_registry() -> InMemoryCorrelationRegistry:
+    """Get or create the default registry singleton."""
+    global _DEFAULT_REGISTRY
+    if _DEFAULT_REGISTRY is None:
+        _DEFAULT_REGISTRY = _build_default_registry()
+    return _DEFAULT_REGISTRY
+
+
+# ---------------------------------------------------------------------------
+# Calculation context
+# ---------------------------------------------------------------------------
+
+
 class CalculationContext:
     """Mutable context for constructing a correlation evaluation."""
 
@@ -96,6 +523,11 @@ class CalculationContext:
         )
 
 
+# ---------------------------------------------------------------------------
+# Main evaluation entry point
+# ---------------------------------------------------------------------------
+
+
 def evaluate_hx_correlation(
     geometry: CircularTubeGeometry | ConcentricAnnulusGeometry,
     flow: FlowPropertiesInput,
@@ -105,6 +537,7 @@ def evaluate_hx_correlation(
     """Evaluate single-phase convective heat-transfer correlation.
 
     This is the main entry point for TASK-007.
+    Uses the TASK-004 registry and applicability engine.
     """
     warnings: list[EngineeringMessage] = []
     blockers: list[EngineeringMessage] = []
@@ -121,22 +554,70 @@ def evaluate_hx_correlation(
         )
         return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
 
-    # --- Step 2: Validate geometry consistency ---
-    if isinstance(geometry, ConcentricAnnulusGeometry) and boundary_condition not in (
-        "inner_wall_heated",
-        "outer_wall_heated",
-        "both_walls_heated",
-        "constant_wall_temperature",
-        "constant_heat_flux",
-    ):
+    if flow.mass_flow_kg_s < 0:
         blockers.append(
             _make_blocker(
-                ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
-                f"Unsupported boundary condition for annulus: {boundary_condition!r}",
-                (("boundary_condition", boundary_condition),),
+                ErrorCode.INPUT_INCONSISTENT,
+                f"Negative mass flow: {flow.mass_flow_kg_s}.",
+                (("mass_flow_kg_s", flow.mass_flow_kg_s),),
             )
         )
         return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
+
+    # --- Step 2: Validate boundary condition ---
+    if isinstance(geometry, ConcentricAnnulusGeometry):
+        if boundary_condition not in _VALID_ANNULUS_BC:
+            blockers.append(
+                _make_blocker(
+                    ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
+                    f"Unsupported boundary condition for annulus: {boundary_condition!r}",
+                    (("boundary_condition", boundary_condition),),
+                )
+            )
+            return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
+
+        # Validate heated_surface / boundary_condition consistency
+        hs = geometry.heated_surface
+        if boundary_condition == "inner_wall_heated" and hs != "inner":
+            blockers.append(
+                _make_blocker(
+                    ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
+                    f"Boundary condition 'inner_wall_heated' requires heated_surface='inner', "
+                    f"got '{hs}'",
+                    (("heated_surface", hs), ("boundary_condition", boundary_condition)),
+                )
+            )
+            return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
+        if boundary_condition == "outer_wall_heated" and hs != "outer":
+            blockers.append(
+                _make_blocker(
+                    ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
+                    f"Boundary condition 'outer_wall_heated' requires heated_surface='outer', "
+                    f"got '{hs}'",
+                    (("heated_surface", hs), ("boundary_condition", boundary_condition)),
+                )
+            )
+            return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
+        if boundary_condition == "both_walls_heated" and hs != "both":
+            blockers.append(
+                _make_blocker(
+                    ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
+                    f"Boundary condition 'both_walls_heated' requires heated_surface='both', "
+                    f"got '{hs}'",
+                    (("heated_surface", hs), ("boundary_condition", boundary_condition)),
+                )
+            )
+            return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
+    else:
+        if boundary_condition not in _VALID_TUBE_BC:
+            blockers.append(
+                _make_blocker(
+                    ErrorCode.CORRELATION_GEOMETRY_INCOMPATIBLE,
+                    f"Unsupported boundary condition for tube: {boundary_condition!r}",
+                    (("boundary_condition", boundary_condition),),
+                )
+            )
+            return _blocked_result(geometry=geometry, flow=flow, blockers=blockers, ctx=ctx)
 
     # --- Step 3: Compute flow quantities ---
     area = geometry.flow_area_m2
@@ -201,11 +682,38 @@ def evaluate_hx_correlation(
             regime=regime.value,
         )
 
-    # --- Step 5: Select correlation ---
-    has_wall_viscosity = flow.wall_viscosity_pa_s is not None
-    candidate = select_correlation(geometry, boundary_condition, regime, has_wall_viscosity)
+    # --- Step 5: Select correlation via registry ---
+    registry = _get_registry()
+    diameter_ratio = (
+        geometry.diameter_ratio if isinstance(geometry, ConcentricAnnulusGeometry) else 0.0
+    )
 
-    if candidate is None:
+    definition, assessment, blocker_msg = select_correlation(
+        registry=registry,
+        geometry=geometry,
+        boundary_condition=boundary_condition,
+        flow_regime=regime,
+        reynolds=reynolds,
+        prandtl=prandtl,
+        diameter_ratio=diameter_ratio,
+    )
+
+    if blocker_msg:
+        blockers.append(_make_blocker(ErrorCode.CORRELATION_NOT_FOUND, blocker_msg))
+        return _blocked_result(
+            geometry=geometry,
+            flow=flow,
+            blockers=blockers,
+            ctx=ctx,
+            reynolds=reynolds,
+            prandtl=prandtl,
+            velocity=velocity,
+            area=area,
+            dh=dh,
+            regime=regime.value,
+        )
+
+    if definition is None:
         blockers.append(
             _make_blocker(
                 ErrorCode.CORRELATION_NOT_FOUND,
@@ -232,45 +740,64 @@ def evaluate_hx_correlation(
         )
 
     # --- Step 6: Add adaptation warning if needed ---
-    if candidate.is_adaptation and candidate.adaptation_limitation:
+    corr_id = definition.key.correlation_id
+    is_adaptation = definition.implementation_status == "validated" and any(
+        "adaptation" in t for t in definition.tags
+    )
+    adaptation_limitation = ""
+    if corr_id == "annulus_turbulent_gnielinski_dh":
+        is_adaptation = True
+        adaptation_limitation = (
+            "Hydraulic-diameter approximation may underpredict heat transfer "
+            "for highly asymmetric heating in annuli with large diameter ratios. "
+            "Consult Kays & Crawford for corrections."
+        )
         warnings.append(
             _make_warning(
                 ErrorCode.CORRELATION_RECOMMENDED_RANGE_EXCEEDED,
-                f"Adaptation limitation: {candidate.adaptation_limitation}",
-                (("correlation_id", candidate.correlation_id),),
+                f"Adaptation limitation: {adaptation_limitation}",
+                (("correlation_id", corr_id),),
             )
         )
 
     # --- Step 7: Evaluate correlation ---
     nu: float = 0.0
-    try:
-        corr_cls = TUBE_CORRELATIONS.get(candidate.correlation_id) or ANNULUS_CORRELATIONS.get(
-            candidate.correlation_id
-        )
-        if corr_cls is None:
-            raise ValueError(f"Correlation {candidate.correlation_id!r} not found in registry")
-
-        corr_instance = corr_cls()
-
-        if (
-            candidate.correlation_id == "tube_laminar_cwt"
-            or candidate.correlation_id == "tube_laminar_chf"
-        ):
-            nu = corr_instance.evaluate()
-        elif candidate.correlation_id == "tube_turbulent_gnielinski":
-            nu = corr_instance.evaluate(reynolds, prandtl)
-        elif candidate.correlation_id == "annulus_laminar_inner_chf":
-            kappa = (
-                geometry.diameter_ratio if isinstance(geometry, ConcentricAnnulusGeometry) else 0.0
+    corr_cls = TUBE_CORRELATIONS.get(corr_id) or ANNULUS_CORRELATIONS.get(corr_id)
+    if corr_cls is None:
+        blockers.append(
+            _make_blocker(
+                ErrorCode.NOT_IMPLEMENTED,
+                f"Correlation {corr_id!r} has no evaluator.",
             )
-            nu = corr_instance.evaluate(kappa)
-        elif candidate.correlation_id == "annulus_turbulent_gnielinski_dh":
+        )
+        return _blocked_result(
+            geometry=geometry,
+            flow=flow,
+            blockers=blockers,
+            ctx=ctx,
+            reynolds=reynolds,
+            prandtl=prandtl,
+            velocity=velocity,
+            area=area,
+            dh=dh,
+            regime=regime.value,
+        )
+
+    try:
+        corr_instance = corr_cls()
+        if corr_id in ("tube_laminar_cwt", "tube_laminar_chf"):
+            nu = corr_instance.evaluate()
+        elif corr_id == "tube_turbulent_gnielinski":
+            nu = corr_instance.evaluate(reynolds, prandtl)
+        elif corr_id == "annulus_laminar_inner_chf":
+            nu = corr_instance.evaluate(diameter_ratio)
+        elif corr_id == "annulus_turbulent_gnielinski_dh":
             nu = corr_instance.evaluate(reynolds, prandtl)
         else:
             blockers.append(
                 _make_blocker(
                     ErrorCode.NOT_IMPLEMENTED,
-                    f"Correlation {candidate.correlation_id!r} has no evaluator.",
+                    f"Correlation {corr_id!r} has no evaluator.",
                 )
             )
             return _blocked_result(
@@ -290,7 +817,7 @@ def evaluate_hx_correlation(
             _make_blocker(
                 ErrorCode.CORRELATION_ABSOLUTE_RANGE_EXCEEDED,
                 str(exc),
-                (("correlation_id", candidate.correlation_id),),
+                (("correlation_id", corr_id),),
             )
         )
         return _blocked_result(
@@ -306,35 +833,56 @@ def evaluate_hx_correlation(
             regime=regime.value,
         )
 
-    # --- Step 8: Compute h ---
-    h = compute_heat_transfer_coefficient(nu, flow.thermal_conductivity_w_m_k, dh)
+    # --- Step 8: Compute h using correlation-specific D_char ---
+    nusselt_basis = _get_nusselt_basis(definition)
+    if nusselt_basis == NusseltBasis.inside_diameter.value:
+        if isinstance(geometry, ConcentricAnnulusGeometry):
+            d_char = geometry.inner_tube_outer_diameter_m
+        else:
+            d_char = geometry.inside_diameter_m
+    else:
+        d_char = dh
 
-    # --- Step 9: Build result ---
+    h = compute_heat_transfer_coefficient(nu, flow.thermal_conductivity_w_m_k, d_char)
+
+    # --- Step 9: Build SelectedCorrelationInfo from definition ---
+    source = definition.source
     selected_info = SelectedCorrelationInfo(
-        correlation_id=candidate.correlation_id,
-        version=candidate.version,
-        priority=candidate.priority,
-        is_adaptation=candidate.is_adaptation,
-        adaptation_limitation=candidate.adaptation_limitation,
+        correlation_id=corr_id,
+        version=definition.key.version,
+        priority=10 if corr_id != "annulus_turbulent_gnielinski_dh" else 5,
+        source_title=source.title,
+        source_authors=", ".join(source.authors) if source.authors else "",
+        source_year=source.year,
+        source_reference=(f"{source.edition or ''} {source.equation_or_clause or ''}".strip()),
+        source_verification_status=source.verification_status.value,
+        definition_hash=definition.definition_hash,
+        is_adaptation=is_adaptation,
+        adaptation_limitation=adaptation_limitation,
+        nusselt_basis=nusselt_basis,
     )
 
-    # Build provenance
+    # --- Step 10: Build provenance ---
     provenance_graph = _build_provenance_graph(
         geometry=geometry,
-        correlation_id=candidate.correlation_id,
-        correlation_version=candidate.version,
+        correlation_id=corr_id,
+        correlation_version=definition.key.version,
+        definition_hash=definition.definition_hash,
+        source_title=source.title,
+        source_authors=", ".join(source.authors) if source.authors else "",
+        source_year=source.year,
         reynolds=reynolds,
         prandtl=prandtl,
         nu=nu,
         h=h,
         warnings=tuple(warnings),
-        blockers=tuple(blockers),
+        blockers=(),
         execution_context=ctx,
         status=CorrelationStatus.SUCCEEDED,
     )
     provenance_digest = _provenance_graph_digest(provenance_graph)
 
-    # Build result hash
+    # --- Step 11: Build result with hash (no self-reference) ---
     result = CorrelationResult(
         status=CorrelationStatus.SUCCEEDED,
         geometry=geometry,
@@ -356,7 +904,8 @@ def evaluate_hx_correlation(
         heat_transfer_coefficient=h,
         flow_regime=regime.value,
         selected_correlation=selected_info,
-        applicability_status="applicable",
+        applicability_assessment=assessment,
+        applicability_status=assessment.status.value if assessment else "applicable",
         warnings=tuple(warnings),
         blockers=(),
         failure=None,
@@ -365,9 +914,8 @@ def evaluate_hx_correlation(
         execution_context=ctx,
     )
 
-    # Compute result hash (circular: result_hash is part of payload but
-    # we compute it with result_hash="" first)
-    result_hash = sha256_digest(result._build_result_payload())
+    # Compute result hash (no self-reference — payload excludes result_hash)
+    result_hash = result._compute_result_hash()
     object.__setattr__(result, "result_hash", result_hash)
     # Recompute field hash with the real result_hash
     object.__setattr__(result, "_field_hash", result._compute_field_hash())
@@ -434,7 +982,7 @@ def _blocked_result(
         execution_context=ctx,
     )
 
-    result_hash = sha256_digest(result._build_result_payload())
+    result_hash = result._compute_result_hash()
     object.__setattr__(result, "result_hash", result_hash)
     object.__setattr__(result, "_field_hash", result._compute_field_hash())
 

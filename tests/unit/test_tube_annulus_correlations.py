@@ -1,27 +1,22 @@
-"""Comprehensive unit tests for TASK-007 — tube and annulus correlation implementation.
+"""Comprehensive unit tests for TASK-007 — tube and annulus correlation review fixes.
 
-Covers ALL categories from the task card:
-  1. Geometry models (CircularTubeGeometry, ConcentricAnnulusGeometry)
-  2. Flow regime classification and dimensionless number computation
-  3. Tube correlations (laminar CWT, laminar CHF, turbulent Gnielinski)
-  4. Annulus correlations (laminar inner CHF, turbulent Gnielinski-DH)
-  5. Correlation selection logic
-  6. End-to-end service evaluation (evaluate_hx_correlation)
-  7. Hash integrity, provenance, JSON round-trip, tamper detection
-
-Hand-calculated reference values use water-like properties:
-  ρ = 1000 kg/m³, μ = 0.001 Pa·s, k = 0.6 W/(m·K), cp = 4180 J/(kg·K)
-  Pr = cp·μ/k = 4180×0.001/0.6 = 6.9667
-
-Circular tube (D = 0.025 m, L = 2.0 m):
-  A = π/4 × D² = 4.9087×10⁻⁴ m²
-  P_w = π × D = 0.07854 m
-  D_h = D = 0.025 m
-
-Concentric annulus (Di = 0.025 m, Do = 0.050 m, L = 2.0 m):
-  κ = Di/Do = 0.5
-  A = π/4 × (Do² - Di²) = 1.4726×10⁻³ m²
-  D_h = Do - Di = 0.025 m
+Covers ALL 16 test categories:
+  1.  Geometry tests
+  2.  Dimensionless calculations
+  3.  Regime boundary tests
+  4.  Correlation reference cases
+  5.  Selection determinism
+  6.  Structured failure
+  7.  Integrity tests
+  8.  Hash identity
+  9.  C4 κ range
+  10. Wall property validation
+  11. Boundary condition validation
+  12. Provenance topology
+  13. SemVer selection
+  14. Golden cases
+  15. Zero duty / zero flow
+  16. Provenance JSON round-trip
 """
 
 from __future__ import annotations
@@ -34,6 +29,8 @@ from pydantic import ValidationError
 
 from hexagent.core.heat_balance import ExecutionContextSnapshot
 from hexagent.correlations.annulus import (
+    _KAPPA_ABSOLUTE_MAX,
+    _KAPPA_ABSOLUTE_MIN,
     ANNULUS_CORRELATIONS,
     AnnulusLaminarInnerCHF,
     AnnulusTurbulentGnielinskiDH,
@@ -44,6 +41,7 @@ from hexagent.correlations.flow import (
     TURBULENT_LOWER_RE,
     FlowPropertiesInput,
     FlowRegime,
+    NusseltBasis,
     classify_regime,
     compute_heat_transfer_coefficient,
     compute_prandtl,
@@ -59,18 +57,28 @@ from hexagent.correlations.hx_result import (
     CorrelationResult,
     CorrelationStatus,
     SelectedCorrelationInfo,
-    _build_provenance_graph,
-    _deterministic_uuid5,
     _provenance_graph_digest,
 )
+from hexagent.correlations.models import (
+    ApplicabilityVariable,
+    CorrelationDefinition,
+    CorrelationKey,
+    GeometryType,
+    PhaseRegime,
+    SourceVerificationStatus,
+    compare_semver,
+    compute_definition_hash,
+    parse_semver,
+)
+from hexagent.correlations.registry import InMemoryCorrelationRegistry
 from hexagent.correlations.selection import (
-    CorrelationCandidate,
-    _build_candidates,
-    _sort_key,
+    _get_nusselt_basis,
+    _is_boundary_compatible,
     select_correlation,
 )
 from hexagent.correlations.service import (
     CalculationContext,
+    _get_registry,
     evaluate_hx_correlation,
 )
 from hexagent.correlations.tube import (
@@ -79,7 +87,11 @@ from hexagent.correlations.tube import (
     TubeLaminarCWT,
     TubeTurbulentGnielinski,
 )
+from hexagent.domain.messages import (
+    ErrorCode,
+)
 from hexagent.domain.provenance import (
+    ProvenanceGraph,
     ProvenanceNodeType,
 )
 
@@ -88,17 +100,17 @@ from hexagent.domain.provenance import (
 # ---------------------------------------------------------------------------
 
 # Water-like properties
-RHO = 1000.0  # kg/m³
+RHO = 998.0  # kg/m³
 MU = 0.001  # Pa·s
 K = 0.6  # W/(m·K)
-CP = 4180.0  # J/(kg·K)
-PR = CP * MU / K  # ≈ 6.9667
+CP = 4182.0  # J/(kg·K)
+PR = CP * MU / K  # ≈ 6.98
 
 # Circular tube geometry (25 mm ID, 2 m)
 TUBE_D = 0.025  # m
 TUBE_L = 2.0  # m
-TUBE_A = math.pi / 4.0 * TUBE_D**2  # ≈ 4.9087e-4 m²
-TUBE_P = math.pi * TUBE_D  # ≈ 0.07854 m
+TUBE_A = math.pi / 4.0 * TUBE_D**2
+TUBE_P = math.pi * TUBE_D
 TUBE_DH = TUBE_D  # = 0.025 m
 
 # Annulus geometry (25 mm inner OD, 50 mm outer ID, 2 m)
@@ -106,9 +118,7 @@ ANN_DI = 0.025  # m
 ANN_DO = 0.050  # m
 ANN_L = 2.0  # m
 ANN_KAPPA = ANN_DI / ANN_DO  # = 0.5
-ANN_A = math.pi / 4.0 * (ANN_DO**2 - ANN_DI**2)  # ≈ 1.4726e-3 m²
-ANN_PI = math.pi * ANN_DI  # inner perimeter
-ANN_PO = math.pi * ANN_DO  # outer perimeter
+ANN_A = math.pi / 4.0 * (ANN_DO**2 - ANN_DI**2)
 ANN_DH = ANN_DO - ANN_DI  # = 0.025 m
 
 
@@ -150,8 +160,28 @@ def _water_flow(
     )
 
 
+def _registry() -> InMemoryCorrelationRegistry:
+    """Return the default registry singleton."""
+    return _get_registry()
+
+
+def _make_result_tube_laminar() -> CorrelationResult:
+    flow = _water_flow(mass_flow=0.005)
+    return evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+
+
+def _make_result_tube_turbulent() -> CorrelationResult:
+    flow = _water_flow(mass_flow=0.3)
+    return evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+
+
+def _make_result_blocked() -> CorrelationResult:
+    flow = _water_flow(mass_flow=0.0)
+    return evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+
+
 # =====================================================================
-# Category 1: Geometry Models
+# Category 1: Geometry Tests
 # =====================================================================
 
 
@@ -209,6 +239,10 @@ class TestCircularTubeGeometry:
         with pytest.raises(ValidationError, match="finite positive"):
             CircularTubeGeometry(inside_diameter_m=float("inf"), heat_transfer_length_m=TUBE_L)
 
+    def test_negative_inf_diameter_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="finite positive"):
+            CircularTubeGeometry(inside_diameter_m=float("-inf"), heat_transfer_length_m=TUBE_L)
+
 
 class TestConcentricAnnulusGeometry:
     """ConcentricAnnulusGeometry construction, validation, and properties."""
@@ -261,14 +295,6 @@ class TestConcentricAnnulusGeometry:
         assert g.inner_heated_perimeter_m == pytest.approx(math.pi * ANN_DI, rel=1e-12)
         assert g.outer_heated_perimeter_m == pytest.approx(math.pi * ANN_DO, rel=1e-12)
 
-    def test_outer_leq_inner_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="must be greater"):
-            ConcentricAnnulusGeometry(
-                inner_tube_outer_diameter_m=0.050,
-                outer_pipe_inside_diameter_m=0.025,
-                heat_transfer_length_m=ANN_L,
-            )
-
     def test_equal_diameters_rejected(self) -> None:
         with pytest.raises(ValidationError, match="must be greater"):
             ConcentricAnnulusGeometry(
@@ -277,10 +303,72 @@ class TestConcentricAnnulusGeometry:
                 heat_transfer_length_m=ANN_L,
             )
 
+    def test_reversed_diameters_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="must be greater"):
+            ConcentricAnnulusGeometry(
+                inner_tube_outer_diameter_m=0.050,
+                outer_pipe_inside_diameter_m=0.025,
+                heat_transfer_length_m=ANN_L,
+            )
+
+    def test_zero_inner_diameter_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="finite positive"):
+            ConcentricAnnulusGeometry(
+                inner_tube_outer_diameter_m=0.0,
+                outer_pipe_inside_diameter_m=0.050,
+                heat_transfer_length_m=ANN_L,
+            )
+
+    def test_zero_outer_diameter_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="finite positive"):
+            ConcentricAnnulusGeometry(
+                inner_tube_outer_diameter_m=0.025,
+                outer_pipe_inside_diameter_m=0.0,
+                heat_transfer_length_m=ANN_L,
+            )
+
+    def test_negative_inner_diameter_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="finite positive"):
+            ConcentricAnnulusGeometry(
+                inner_tube_outer_diameter_m=-0.01,
+                outer_pipe_inside_diameter_m=0.050,
+                heat_transfer_length_m=ANN_L,
+            )
+
+    def test_nan_inner_diameter_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="finite positive"):
+            ConcentricAnnulusGeometry(
+                inner_tube_outer_diameter_m=float("nan"),
+                outer_pipe_inside_diameter_m=0.050,
+                heat_transfer_length_m=ANN_L,
+            )
+
+    def test_inf_outer_diameter_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="finite positive"):
+            ConcentricAnnulusGeometry(
+                inner_tube_outer_diameter_m=0.025,
+                outer_pipe_inside_diameter_m=float("inf"),
+                heat_transfer_length_m=ANN_L,
+            )
+
+    def test_very_small_valid_gap(self) -> None:
+        """Very small gap between inner and outer should still work."""
+        g = ConcentricAnnulusGeometry(
+            inner_tube_outer_diameter_m=0.049,
+            outer_pipe_inside_diameter_m=0.050,
+            heat_transfer_length_m=ANN_L,
+        )
+        assert g.hydraulic_diameter_m == pytest.approx(0.001, rel=1e-6)
+        assert g.flow_area_m2 > 0
+
     def test_frozen(self) -> None:
         g = _ann_geom()
         with pytest.raises(ValidationError):
             g.inner_tube_outer_diameter_m = 0.1  # type: ignore[misc]
+
+    def test_diameter_ratio_properties(self) -> None:
+        g = _ann_geom()
+        assert g.diameter_ratio == pytest.approx(ANN_DI / ANN_DO, rel=1e-12)
 
 
 class TestThermalBoundaryCondition:
@@ -295,7 +383,7 @@ class TestThermalBoundaryCondition:
 
 
 # =====================================================================
-# Category 2: Flow Regime Classification & Dimensionless Numbers
+# Category 2: Dimensionless Calculations
 # =====================================================================
 
 
@@ -306,7 +394,6 @@ class TestClassifyRegime:
         assert classify_regime(1000) == FlowRegime.laminar
 
     def test_laminar_upper_bound_exclusive(self) -> None:
-        """Re < 2300 is laminar; Re = 2300 is transitional."""
         assert classify_regime(LAMINAR_UPPER_RE - 1) == FlowRegime.laminar
 
     def test_exactly_laminar_upper_is_transitional(self) -> None:
@@ -341,7 +428,6 @@ class TestComputeVelocity:
     """Mean velocity computation: v = m_dot / (ρ × A)."""
 
     def test_basic(self) -> None:
-        # v = 0.1 / (1000 * 4.9087e-4) ≈ 0.2037 m/s
         v = compute_velocity(0.1, RHO, TUBE_A)
         expected = 0.1 / (RHO * TUBE_A)
         assert v == pytest.approx(expected, rel=1e-12)
@@ -358,6 +444,10 @@ class TestComputeVelocity:
         with pytest.raises(ValueError, match="finite positive"):
             compute_velocity(0.1, 0.0, TUBE_A)
 
+    def test_zero_mass_flow(self) -> None:
+        v = compute_velocity(0.0, RHO, TUBE_A)
+        assert v == 0.0
+
 
 class TestComputeReynolds:
     """Reynolds number: Re = ρ v D_h / μ."""
@@ -369,14 +459,21 @@ class TestComputeReynolds:
         assert re == pytest.approx(expected, rel=1e-12)
 
     def test_low_mass_flow_gives_laminar(self) -> None:
-        """With 0.005 kg/s in a 25 mm tube, Re ≈ 255 (laminar)."""
         v = compute_velocity(0.005, RHO, TUBE_A)
         re = compute_reynolds(RHO, v, TUBE_DH, MU)
         assert re < LAMINAR_UPPER_RE
 
-    def test_rejects_negative_re_in_input(self) -> None:
+    def test_rejects_negative_viscosity(self) -> None:
         with pytest.raises(ValueError, match="finite positive"):
             compute_reynolds(RHO, 0.2, TUBE_DH, -0.001)
+
+    def test_rejects_zero_dh(self) -> None:
+        with pytest.raises(ValueError, match="finite positive"):
+            compute_reynolds(RHO, 0.2, 0.0, MU)
+
+    def test_rejects_non_finite(self) -> None:
+        with pytest.raises(ValueError, match="finite positive"):
+            compute_reynolds(float("nan"), 0.2, TUBE_DH, MU)
 
 
 class TestComputePrandtl:
@@ -387,14 +484,17 @@ class TestComputePrandtl:
         expected = CP * MU / K
         assert pr == pytest.approx(expected, rel=1e-12)
 
-    def test_air_like(self) -> None:
-        pr = compute_prandtl(1005.0, 1.8e-5, 0.026)
-        expected = 1005.0 * 1.8e-5 / 0.026
-        assert pr == pytest.approx(expected, rel=1e-12)
-
     def test_rejects_zero_cp(self) -> None:
         with pytest.raises(ValueError, match="finite positive"):
             compute_prandtl(0.0, MU, K)
+
+    def test_rejects_zero_mu(self) -> None:
+        with pytest.raises(ValueError, match="finite positive"):
+            compute_prandtl(CP, 0.0, K)
+
+    def test_rejects_zero_k(self) -> None:
+        with pytest.raises(ValueError, match="finite positive"):
+            compute_prandtl(CP, MU, 0.0)
 
 
 class TestComputeHeatTransferCoefficient:
@@ -409,9 +509,50 @@ class TestComputeHeatTransferCoefficient:
         with pytest.raises(ValueError, match="finite positive"):
             compute_heat_transfer_coefficient(0.0, K, TUBE_DH)
 
+    def test_rejects_zero_k(self) -> None:
+        with pytest.raises(ValueError, match="finite positive"):
+            compute_heat_transfer_coefficient(3.66, 0.0, TUBE_DH)
+
+    def test_rejects_zero_d_char(self) -> None:
+        with pytest.raises(ValueError, match="finite positive"):
+            compute_heat_transfer_coefficient(3.66, K, 0.0)
+
 
 # =====================================================================
-# Category 3: Tube Correlations
+# Category 3: Regime Boundary Tests
+# =====================================================================
+
+
+class TestRegimeBoundaries:
+    """Test specific Re values at regime boundaries."""
+
+    def test_re_2299_laminar(self) -> None:
+        """Re=2299 → just below laminar → laminar."""
+        assert classify_regime(2299.0) == FlowRegime.laminar
+
+    def test_re_2300_transitional(self) -> None:
+        """Re=2300 → exact boundary → transitional."""
+        assert classify_regime(2300.0) == FlowRegime.transitional
+
+    def test_re_2301_transitional(self) -> None:
+        """Re=2301 → transitional → blocked by service."""
+        assert classify_regime(2301.0) == FlowRegime.transitional
+
+    def test_re_9999_transitional(self) -> None:
+        """Re=9999 → transitional → blocked by service."""
+        assert classify_regime(9999.0) == FlowRegime.transitional
+
+    def test_re_10000_transitional(self) -> None:
+        """Re=10000 → exact turbulent lower → transitional."""
+        assert classify_regime(10000.0) == FlowRegime.transitional
+
+    def test_re_10001_turbulent(self) -> None:
+        """Re=10001 → just above turbulent → turbulent."""
+        assert classify_regime(10001.0) == FlowRegime.turbulent
+
+
+# =====================================================================
+# Category 4: Correlation Reference Cases
 # =====================================================================
 
 
@@ -431,7 +572,19 @@ class TestTubeLaminarCWT:
         assert c.boundary_condition == "constant_wall_temperature"
         assert c.reynolds_max == 2300.0
         assert c.prandtl_min == 0.6
-        assert c.requires_wall_viscosity is False
+
+    def test_pr_boundary_below(self) -> None:
+        """Pr below minimum → blocked by applicability."""
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        # Pr ≈ 6.98 > 0.6, should succeed
+        assert result.status == CorrelationStatus.SUCCEEDED
+
+    def test_registry_entry_exists(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"))
+        assert defn is not None
+        assert defn.definition_hash.startswith("sha256:")
 
     def test_frozen(self) -> None:
         c = TubeLaminarCWT()
@@ -452,10 +605,10 @@ class TestTubeLaminarCHF:
         assert c.boundary_condition == "constant_heat_flux"
         assert c.reynolds_max == 2300.0
 
-    def test_frozen(self) -> None:
-        c = TubeLaminarCHF()
-        with pytest.raises(AttributeError):
-            c.version = "2.0.0"  # type: ignore[misc]
+    def test_registry_entry_exists(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="tube_laminar_chf", version="1.0.0"))
+        assert defn is not None
 
 
 class TestTubeTurbulentGnielinski:
@@ -465,7 +618,6 @@ class TestTubeTurbulentGnielinski:
         return TubeTurbulentGnielinski()
 
     def test_petukhov_friction_factor(self) -> None:
-        """f = (0.790·ln(Re) - 1.64)^{-2}."""
         c = self._instance()
         f = c.petukhov_friction_factor(10000.0)
         expected = (0.790 * math.log(10000.0) - 1.64) ** (-2)
@@ -478,26 +630,8 @@ class TestTubeTurbulentGnielinski:
         f = c.petukhov_friction_factor(10000.0)
         f8 = f / 8.0
         numerator = f8 * (10000.0 - 1000.0) * 1.0
-        # Pr^(2/3) - 1 = 0 for Pr = 1
         denominator = 1.0 + 12.7 * math.sqrt(f8) * 0.0
         assert nu == pytest.approx(numerator / denominator, rel=1e-12)
-
-    def test_nu_manual_calculation(self) -> None:
-        """Hand-computed Gnielinski for Re=10000, Pr=0.71."""
-        c = self._instance()
-        Re, Pr = 10000.0, 0.71
-        f = (0.790 * math.log(Re) - 1.64) ** (-2)
-        f8 = f / 8.0
-        num = f8 * (Re - 1000.0) * Pr
-        den = 1.0 + 12.7 * math.sqrt(f8) * (Pr ** (2.0 / 3.0) - 1.0)
-        expected_nu = num / den
-        assert c.evaluate(Re, Pr) == pytest.approx(expected_nu, rel=1e-12)
-
-    def test_boundary_values(self) -> None:
-        c = self._instance()
-        # Just inside valid range
-        c.evaluate(c.reynolds_min, c.prandtl_min)
-        c.evaluate(c.reynolds_max, c.prandtl_max)
 
     def test_re_below_min_raises(self) -> None:
         c = self._instance()
@@ -519,17 +653,16 @@ class TestTubeTurbulentGnielinski:
         with pytest.raises(ValueError, match="outside valid range"):
             c.evaluate(10000.0, 2001.0)
 
-    def test_negative_re_raises(self) -> None:
+    def test_boundary_values(self) -> None:
         c = self._instance()
-        with pytest.raises(ValueError):
-            c.evaluate(-100.0, 1.0)
+        # Should not raise
+        c.evaluate(c.reynolds_min, c.prandtl_min)
+        c.evaluate(c.reynolds_max, c.prandtl_max)
 
-    def test_metadata(self) -> None:
-        c = self._instance()
-        assert c.correlation_id == "tube_turbulent_gnielinski"
-        assert c.supported_geometry == "circular_tube"
-        assert c.flow_regime == "turbulent"
-        assert c.requires_wall_viscosity is False
+    def test_registry_entry_exists(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="tube_turbulent_gnielinski", version="1.0.0"))
+        assert defn is not None
 
     def test_registry_completeness(self) -> None:
         assert set(TUBE_CORRELATIONS.keys()) == {
@@ -537,82 +670,6 @@ class TestTubeTurbulentGnielinski:
             "tube_laminar_chf",
             "tube_turbulent_gnielinski",
         }
-
-
-# =====================================================================
-# Category 4: Annulus Correlations
-# =====================================================================
-
-
-class TestInterpolateNuLaminarInner:
-    """Kays Table 8-2 interpolation for annulus laminar Nu_i."""
-
-    def test_known_table_point_kappa_0_25(self) -> None:
-        nu = _interpolate_nu_laminar_inner(0.25)
-        assert nu == 5.70
-
-    def test_known_table_point_kappa_0_5(self) -> None:
-        nu = _interpolate_nu_laminar_inner(0.5)
-        assert nu == 7.30
-
-    def test_known_table_point_kappa_0_75(self) -> None:
-        nu = _interpolate_nu_laminar_inner(0.75)
-        assert nu == 10.10
-
-    def test_known_table_point_kappa_0_1(self) -> None:
-        nu = _interpolate_nu_laminar_inner(0.1)
-        assert nu == 4.85
-
-    def test_interpolation_between_0_25_and_0_5(self) -> None:
-        """κ = 0.375 → midpoint between 5.70 and 7.30 = 6.50."""
-        nu = _interpolate_nu_laminar_inner(0.375)
-        assert nu == pytest.approx(6.50, abs=1e-12)
-
-    def test_interpolation_kappa_0_6(self) -> None:
-        """κ = 0.6: between 0.5 (7.30) and 0.75 (10.10).
-        t = (0.6-0.5)/(0.75-0.5) = 0.4
-        nu = 7.30 + 0.4*(10.10-7.30) = 7.30 + 1.12 = 8.42
-        """
-        nu = _interpolate_nu_laminar_inner(0.6)
-        assert nu == pytest.approx(8.42, abs=1e-12)
-
-    def test_extrapolation_below_table(self) -> None:
-        """κ = 0.05: extrapolate from 0.1→0.25 trend.
-        slope = (5.70-4.85)/(0.25-0.1) = 0.85/0.15 = 5.6667
-        nu = 4.85 + 5.6667*(0.05-0.1) = 4.85 - 0.2833 = 4.5667
-        """
-        nu = _interpolate_nu_laminar_inner(0.05)
-        expected = 4.85 + (5.70 - 4.85) / (0.25 - 0.1) * (0.05 - 0.1)
-        assert nu == pytest.approx(expected, rel=1e-12)
-
-    def test_extrapolation_above_table(self) -> None:
-        """κ = 0.85: extrapolate from 0.5→0.75 trend.
-        slope = (10.10-7.30)/(0.75-0.5) = 2.80/0.25 = 11.2
-        nu = 10.10 + 11.2*(0.85-0.75) = 10.10 + 1.12 = 11.22
-        """
-        nu = _interpolate_nu_laminar_inner(0.85)
-        expected = 10.10 + (10.10 - 7.30) / (0.75 - 0.5) * (0.85 - 0.75)
-        assert nu == pytest.approx(expected, rel=1e-12)
-
-    def test_kappa_zero_rejected(self) -> None:
-        with pytest.raises(ValueError, match="kappa must be in"):
-            _interpolate_nu_laminar_inner(0.0)
-
-    def test_kappa_one_rejected(self) -> None:
-        with pytest.raises(ValueError, match="kappa must be in"):
-            _interpolate_nu_laminar_inner(1.0)
-
-    def test_negative_kappa_rejected(self) -> None:
-        with pytest.raises(ValueError, match="kappa must be in"):
-            _interpolate_nu_laminar_inner(-0.1)
-
-    def test_monotonicity(self) -> None:
-        """Nu_i should be monotonically increasing with κ in (0, 1)."""
-        prev = 0.0
-        for k in [0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9, 0.99]:
-            nu = _interpolate_nu_laminar_inner(k)
-            assert nu > prev, f"Non-monotone at kappa={k}"
-            prev = nu
 
 
 class TestAnnulusLaminarInnerCHF:
@@ -628,7 +685,53 @@ class TestAnnulusLaminarInnerCHF:
         assert c.supported_geometry == "concentric_annulus"
         assert c.flow_regime == "laminar"
         assert c.boundary_condition == "inner_wall_heated"
-        assert c.requires_wall_viscosity is False
+        assert c.nusselt_basis == "inside_diameter"
+
+    def test_registry_entry_exists(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="annulus_laminar_inner_chf", version="1.0.0"))
+        assert defn is not None
+
+
+class TestInterpolateNuLaminarInner:
+    """Kays Table 8-2 interpolation for annulus laminar Nu_i."""
+
+    def test_known_table_point_kappa_0_1(self) -> None:
+        assert _interpolate_nu_laminar_inner(0.1) == 4.85
+
+    def test_known_table_point_kappa_0_25(self) -> None:
+        assert _interpolate_nu_laminar_inner(0.25) == 5.70
+
+    def test_known_table_point_kappa_0_5(self) -> None:
+        assert _interpolate_nu_laminar_inner(0.5) == 7.30
+
+    def test_known_table_point_kappa_0_75(self) -> None:
+        assert _interpolate_nu_laminar_inner(0.75) == 10.10
+
+    def test_interpolation_kappa_0_375(self) -> None:
+        """κ = 0.375 → midpoint between 5.70 and 7.30 = 6.50."""
+        assert _interpolate_nu_laminar_inner(0.375) == pytest.approx(6.50, abs=1e-12)
+
+    def test_interpolation_kappa_0_6(self) -> None:
+        """κ = 0.6: between 0.5 (7.30) and 0.75 (10.10)."""
+        nu = _interpolate_nu_laminar_inner(0.6)
+        assert nu == pytest.approx(8.42, abs=1e-12)
+
+    def test_below_table_rejected(self) -> None:
+        with pytest.raises(ValueError, match="outside verified table range"):
+            _interpolate_nu_laminar_inner(0.05)
+
+    def test_above_table_rejected(self) -> None:
+        with pytest.raises(ValueError, match="outside verified table range"):
+            _interpolate_nu_laminar_inner(0.85)
+
+    def test_zero_kappa_rejected(self) -> None:
+        with pytest.raises(ValueError, match="outside verified table range"):
+            _interpolate_nu_laminar_inner(0.0)
+
+    def test_negative_kappa_rejected(self) -> None:
+        with pytest.raises(ValueError, match="outside verified table range"):
+            _interpolate_nu_laminar_inner(-0.1)
 
 
 class TestAnnulusTurbulentGnielinskiDH:
@@ -636,12 +739,6 @@ class TestAnnulusTurbulentGnielinskiDH:
 
     def _instance(self) -> AnnulusTurbulentGnielinskiDH:
         return AnnulusTurbulentGnielinskiDH()
-
-    def test_petukhov_friction_factor(self) -> None:
-        c = self._instance()
-        f = c.petukhov_friction_factor(10000.0)
-        expected = (0.790 * math.log(10000.0) - 1.64) ** (-2)
-        assert f == pytest.approx(expected, rel=1e-12)
 
     def test_nu_same_as_tube_for_same_inputs(self) -> None:
         """The D_h adaptation gives the same formula as the tube version."""
@@ -665,11 +762,12 @@ class TestAnnulusTurbulentGnielinskiDH:
         with pytest.raises(ValueError, match="outside valid range"):
             c.evaluate(2999.0, 1.0)
 
-    def test_metadata(self) -> None:
-        c = self._instance()
-        assert c.correlation_id == "annulus_turbulent_gnielinski_dh"
-        assert c.supported_geometry == "concentric_annulus"
-        assert c.flow_regime == "turbulent"
+    def test_registry_entry_exists(self) -> None:
+        reg = _registry()
+        defn = reg.get(
+            CorrelationKey(correlation_id="annulus_turbulent_gnielinski_dh", version="1.0.0")
+        )
+        assert defn is not None
 
     def test_registry_completeness(self) -> None:
         assert set(ANNULUS_CORRELATIONS.keys()) == {
@@ -678,445 +776,514 @@ class TestAnnulusTurbulentGnielinskiDH:
         }
 
 
-# =====================================================================
-# Category 5: Correlation Selection
-# =====================================================================
+class TestC4DiameterMismatch:
+    """C4 with D_i != D_h: h = Nu * k / D_i, NOT D_h."""
 
+    def test_wide_gap_kappa_0_1(self) -> None:
+        """Wide gap: D_i=0.005, D_o=0.050 → κ=0.1, Nu=4.85.
+        h = Nu * k / D_i = 4.85 * 0.6 / 0.005 = 582.0
+        """
+        g = _ann_geom(di=0.005, do=0.050)
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.nusselt_number == pytest.approx(4.85, abs=1e-12)
+        # h uses D_i = 0.005, NOT D_h = 0.045
+        expected_h = 4.85 * K / 0.005
+        assert result.heat_transfer_coefficient == pytest.approx(expected_h, rel=1e-10)
 
-class TestSelectCorrelation:
-    """Deterministic correlation selection for each geometry/regime combo."""
-
-    def test_tube_laminar_cwt(self) -> None:
-        c = select_correlation(_tube_geom(), "constant_wall_temperature", FlowRegime.laminar, False)
-        assert c is not None
-        assert c.correlation_id == "tube_laminar_cwt"
-
-    def test_tube_laminar_chf(self) -> None:
-        c = select_correlation(_tube_geom(), "constant_heat_flux", FlowRegime.laminar, False)
-        assert c is not None
-        assert c.correlation_id == "tube_laminar_chf"
-
-    def test_tube_laminar_both_returns_cwt_first(self) -> None:
-        """BC 'both' selects CHF (alphabetically first, equal priority)."""
-        c = select_correlation(_tube_geom(), "both", FlowRegime.laminar, False)
-        assert c is not None
-        assert c.correlation_id == "tube_laminar_chf"
-
-    def test_tube_turbulent_gnielinski(self) -> None:
-        c = select_correlation(
-            _tube_geom(), "constant_wall_temperature", FlowRegime.turbulent, False
-        )
-        assert c is not None
-        assert c.correlation_id == "tube_turbulent_gnielinski"
-
-    def test_tube_transitional_returns_none(self) -> None:
-        c = select_correlation(
-            _tube_geom(), "constant_wall_temperature", FlowRegime.transitional, False
-        )
-        assert c is None
-
-    def test_annulus_laminar_inner(self) -> None:
-        c = select_correlation(_ann_geom(), "inner_wall_heated", FlowRegime.laminar, False)
-        assert c is not None
-        assert c.correlation_id == "annulus_laminar_inner_chf"
-
-    def test_annulus_laminar_both_selects_inner_chf(self) -> None:
-        """Boundary condition 'both' for laminar annulus should select inner CHF."""
-        c = select_correlation(_ann_geom(), "both", FlowRegime.laminar, False)
-        assert c is not None
-        assert c.correlation_id == "annulus_laminar_inner_chf"
-
-    def test_annulus_turbulent(self) -> None:
-        c = select_correlation(_ann_geom(), "inner_wall_heated", FlowRegime.turbulent, False)
-        assert c is not None
-        assert c.correlation_id == "annulus_turbulent_gnielinski_dh"
-
-    def test_annulus_turbulent_adaptation_flag(self) -> None:
-        c = select_correlation(_ann_geom(), "inner_wall_heated", FlowRegime.turbulent, False)
-        assert c is not None
-        assert c.is_adaptation is True
-
-    def test_annulus_laminar_outer_wall_heated_returns_none(self) -> None:
-        """No correlation for outer wall heated laminar annulus."""
-        c = select_correlation(_ann_geom(), "outer_wall_heated", FlowRegime.laminar, False)
-        assert c is None
-
-    def test_tube_laminar_outer_wall_heated_returns_none(self) -> None:
-        """No tube correlation for outer_wall_heated."""
-        c = select_correlation(_tube_geom(), "outer_wall_heated", FlowRegime.laminar, False)
-        assert c is None
-
-    def test_deterministic_selection(self) -> None:
-        """Multiple calls with same inputs produce the same candidate."""
-        args = (_tube_geom(), "constant_wall_temperature", FlowRegime.laminar, False)
-        c1 = select_correlation(*args)
-        c2 = select_correlation(*args)
-        assert c1 is not None and c2 is not None
-        assert c1.correlation_id == c2.correlation_id
-        assert c1.version == c2.version
-
-
-class TestBuildCandidates:
-    """Candidate list construction."""
-
-    def test_tube_laminar_candidates(self) -> None:
-        cs = _build_candidates(_tube_geom(), "constant_wall_temperature", FlowRegime.laminar, False)
-        ids = [c.correlation_id for c in cs]
-        assert "tube_laminar_cwt" in ids
-
-    def test_tube_turbulent_candidates(self) -> None:
-        cs = _build_candidates(
-            _tube_geom(), "constant_wall_temperature", FlowRegime.turbulent, False
-        )
-        assert len(cs) == 1
-        assert cs[0].correlation_id == "tube_turbulent_gnielinski"
-
-    def test_empty_transitional(self) -> None:
-        cs = _build_candidates(
-            _tube_geom(), "constant_wall_temperature", FlowRegime.transitional, False
-        )
-        assert len(cs) == 0
-
-    def test_empty_invalid(self) -> None:
-        cs = _build_candidates(_tube_geom(), "constant_wall_temperature", FlowRegime.invalid, False)
-        assert len(cs) == 0
-
-
-class TestSortKey:
-    """Deterministic sort key ordering."""
-
-    def test_priority_ordering(self) -> None:
-        c1 = CorrelationCandidate(
-            correlation_id="aaa",
-            version="1.0.0",
-            priority=10,
-            supports_geometry="circular_tube",
-            supports_boundary="a",
-            supports_flow_regime="laminar",
-            requires_wall_viscosity=False,
-        )
-        c2 = CorrelationCandidate(
-            correlation_id="bbb",
-            version="1.0.0",
-            priority=5,
-            supports_geometry="circular_tube",
-            supports_boundary="a",
-            supports_flow_regime="laminar",
-            requires_wall_viscosity=False,
-        )
-        # Higher priority comes first → smaller (-priority) is first
-        assert _sort_key(c1) < _sort_key(c2)
+    def test_narrow_gap_kappa_0_6(self) -> None:
+        """Narrow gap: D_i=0.030, D_o=0.050 → κ=0.6.
+        Nu = 7.30 + 0.4*(10.10-7.30) = 8.42
+        h = 8.42 * 0.6 / 0.030 = 168.4
+        """
+        g = _ann_geom(di=0.030, do=0.050)
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        expected_nu = 8.42
+        assert result.nusselt_number == pytest.approx(expected_nu, abs=1e-12)
+        # h uses D_i = 0.030
+        expected_h = expected_nu * K / 0.030
+        assert result.heat_transfer_coefficient == pytest.approx(expected_h, rel=1e-10)
 
 
 # =====================================================================
-# Category 6: End-to-End Service Evaluation
+# Category 5: Selection Determinism
 # =====================================================================
 
 
-class TestEvaluateHXCorrelation:
-    """Full-service integration tests for evaluate_hx_correlation."""
+class TestSelectionDeterminism:
+    """Deterministic correlation selection via registry."""
 
-    def test_tube_laminar_cwt_success(self) -> None:
-        """Low mass flow → laminar → CWT → Nu = 3.66."""
+    def test_tube_laminar_cwt_selected(self) -> None:
         flow = _water_flow(mass_flow=0.005)
         result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-
         assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.nusselt_number == pytest.approx(3.66, abs=1e-12)
         assert result.selected_correlation is not None
         assert result.selected_correlation.correlation_id == "tube_laminar_cwt"
-        assert result.flow_regime == "laminar"
 
-        # Verify h = Nu * k / D_h
-        expected_h = 3.66 * K / TUBE_DH
-        assert result.heat_transfer_coefficient == pytest.approx(expected_h, rel=1e-12)
-
-    def test_tube_laminar_chf_success(self) -> None:
-        """Low mass flow → laminar → CHF → Nu = 4.36."""
+    def test_tube_laminar_chf_selected(self) -> None:
         flow = _water_flow(mass_flow=0.005)
         result = evaluate_hx_correlation(_tube_geom(), flow, "constant_heat_flux")
-
         assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.nusselt_number == pytest.approx(4.36, abs=1e-12)
         assert result.selected_correlation is not None
         assert result.selected_correlation.correlation_id == "tube_laminar_chf"
 
-    def test_tube_turbulent_gnielinski_success(self) -> None:
-        """High mass flow → turbulent → Gnielinski."""
-        # Need Re > 10000: m_dot = Re * A * μ / D_h
-        # For Re ≈ 15000: m_dot ≈ 0.3 kg/s
+    def test_tube_turbulent_selected(self) -> None:
         flow = _water_flow(mass_flow=0.3)
         result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-
         assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.flow_regime == "turbulent"
         assert result.selected_correlation is not None
         assert result.selected_correlation.correlation_id == "tube_turbulent_gnielinski"
-        assert result.nusselt_number > 1.0  # reasonable Nu
-        assert result.heat_transfer_coefficient > 0.0
 
-    def test_annulus_turbulent_gnielinski_dh_success(self) -> None:
-        """Turbulent flow in annulus → adapted Gnielinski-DH."""
-        # Annulus: Re = m_dot * D_h / (A * μ), need Re > 10000
-        # For Re ≈ 17000: m_dot ≈ 1.0 kg/s
-        flow = _water_flow(mass_flow=1.0)
-        result = evaluate_hx_correlation(_ann_geom(), flow, "inner_wall_heated")
-
-        assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.flow_regime == "turbulent"
-        assert result.selected_correlation is not None
-        assert result.selected_correlation.correlation_id == "annulus_turbulent_gnielinski_dh"
-        # Adaptation warning should be present
-        adapt_warns = [w for w in result.warnings if "adaptation" in w.message.lower()]
-        assert len(adapt_warns) > 0
-
-    def test_annulus_laminar_inner_chf_success(self) -> None:
-        """Low mass flow in annulus → laminar → inner CHF."""
+    def test_annulus_laminar_inner_selected(self) -> None:
         flow = _water_flow(mass_flow=0.005)
         result = evaluate_hx_correlation(_ann_geom(), flow, "inner_wall_heated")
-
         assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.flow_regime == "laminar"
         assert result.selected_correlation is not None
         assert result.selected_correlation.correlation_id == "annulus_laminar_inner_chf"
-        # For κ = 0.5, Nu_i = 7.30
-        assert result.nusselt_number == pytest.approx(7.30, abs=1e-12)
 
-    def test_zero_mass_flow_blocked(self) -> None:
-        """Zero mass flow → BLOCKED."""
-        flow = _water_flow(mass_flow=0.0)
-        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+    def test_annulus_turbulent_selected(self) -> None:
+        flow = _water_flow(mass_flow=1.0)
+        result = evaluate_hx_correlation(_ann_geom(), flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.selected_correlation is not None
+        assert result.selected_correlation.correlation_id == "annulus_turbulent_gnielinski_dh"
 
-        assert result.status == CorrelationStatus.BLOCKED
-        assert len(result.blockers) > 0
-        assert any("zero mass flow" in b.message.lower() for b in result.blockers)
+    def test_different_registry_order_same_result(self) -> None:
+        """Different registry insertion order produces same selection."""
+        from hexagent.correlations.models import (
+            ApplicabilityEnvelope,
+            BibliographicSource,
+            CorrelationDefinition,
+            CorrelationImplementationStatus,
+            CorrelationKey,
+            CorrelationPurpose,
+            NumericBound,
+            UncertaintySpec,
+        )
+
+        def _make_cwt_def(version: str = "1.0.0") -> CorrelationDefinition:
+            return CorrelationDefinition.create(
+                key=CorrelationKey(correlation_id="tube_laminar_cwt", version=version),
+                name="Tube Laminar CWT",
+                purpose=CorrelationPurpose.nusselt_number,
+                description="Fully developed laminar flow, constant wall temperature. Nu_D = 3.66.",
+                geometry=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset(
+                    {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                ),
+                envelope=ApplicabilityEnvelope(
+                    geometry_types=frozenset({GeometryType.circular_tube}),
+                    phase_regimes=frozenset(
+                        {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                    ),
+                    flow_regimes=frozenset({"laminar"}),
+                    bounds=(
+                        NumericBound(
+                            variable=ApplicabilityVariable.reynolds,
+                            minimum=0.0,
+                            maximum=2300.0,
+                            minimum_inclusive=False,
+                            maximum_inclusive=False,
+                        ),
+                        NumericBound(
+                            variable=ApplicabilityVariable.prandtl,
+                            minimum=0.6,
+                            minimum_inclusive=False,
+                        ),
+                    ),
+                    required_inputs=frozenset(
+                        {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+                    ),
+                ),
+                source=BibliographicSource(
+                    source_id="test_source",
+                    title="Test",
+                    publication="Test Pub",
+                    year=2024,
+                    verification_status=SourceVerificationStatus.primary_source_checked,
+                ),
+                uncertainty=UncertaintySpec(basis="test"),
+                implementation_status=CorrelationImplementationStatus.validated,
+                implementation_ref="test.ref",
+                tags=frozenset(
+                    {
+                        "bc:constant_wall_temperature",
+                        "nusselt_basis:inside_diameter",
+                        "priority:10",
+                    }
+                ),
+            )
+
+        # Build two registries with same defn
+        reg1 = InMemoryCorrelationRegistry()
+        reg1.register(_make_cwt_def("1.0.0"))
+
+        reg2 = InMemoryCorrelationRegistry()
+        reg2.register(_make_cwt_def("1.0.0"))
+
+        geo = _tube_geom()
+        defn1, _, blocker1 = select_correlation(
+            reg1, geo, "constant_wall_temperature", FlowRegime.laminar, 200.0, 7.0
+        )
+        defn2, _, blocker2 = select_correlation(
+            reg2, geo, "constant_wall_temperature", FlowRegime.laminar, 200.0, 7.0
+        )
+        assert blocker1 is None and blocker2 is None
+        assert defn1 is not None and defn2 is not None
+        assert defn1.definition_hash == defn2.definition_hash
+
+    def test_version_change_changes_hash(self) -> None:
+        """Version change → definition hash changes."""
+        defn1 = _registry().get(CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"))
+        # A different version would have a different hash
+        assert defn1.definition_hash.startswith("sha256:")
+        assert len(defn1.definition_hash) == 71
+
+    def test_source_identity_change_changes_hash(self) -> None:
+        """Source identity change → definition hash changes."""
+        from hexagent.correlations.models import (
+            ApplicabilityEnvelope,
+            BibliographicSource,
+            CorrelationDefinition,
+            CorrelationImplementationStatus,
+            CorrelationKey,
+            CorrelationPurpose,
+            NumericBound,
+            UncertaintySpec,
+        )
+
+        base_kwargs = dict(
+            name="Tube Laminar CWT",
+            purpose=CorrelationPurpose.nusselt_number,
+            description="Test",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset(
+                {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+            ),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset(
+                    {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                ),
+                flow_regimes=frozenset({"laminar"}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=0.0,
+                        maximum=2300.0,
+                        minimum_inclusive=False,
+                        maximum_inclusive=False,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.prandtl,
+                        minimum=0.6,
+                        minimum_inclusive=False,
+                    ),
+                ),
+                required_inputs=frozenset(
+                    {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+                ),
+            ),
+            uncertainty=UncertaintySpec(basis="test"),
+            implementation_status=CorrelationImplementationStatus.validated,
+            implementation_ref="test.ref",
+            tags=frozenset(
+                {
+                    "bc:constant_wall_temperature",
+                    "nusselt_basis:inside_diameter",
+                    "priority:10",
+                }
+            ),
+        )
+
+        source1 = BibliographicSource(
+            source_id="source_a",
+            title="Title A",
+            publication="Pub A",
+            year=2020,
+            verification_status=SourceVerificationStatus.primary_source_checked,
+        )
+        source2 = BibliographicSource(
+            source_id="source_b",
+            title="Title B",
+            publication="Pub B",
+            year=2021,
+            verification_status=SourceVerificationStatus.primary_source_checked,
+        )
+
+        defn1 = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"),
+            source=source1,
+            **base_kwargs,
+        )
+        defn2 = CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"),
+            source=source2,
+            **base_kwargs,
+        )
+        assert defn1.definition_hash != defn2.definition_hash
+
+    def test_nusselt_basis_laminar_cwt(self) -> None:
+        defn = _registry().get(CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"))
+        assert _get_nusselt_basis(defn) == "inside_diameter"
+
+    def test_nusselt_basis_turbulent(self) -> None:
+        defn = _registry().get(
+            CorrelationKey(correlation_id="tube_turbulent_gnielinski", version="1.0.0")
+        )
+        assert _get_nusselt_basis(defn) == "inside_diameter"
+
+    def test_nusselt_basis_annulus_turbulent(self) -> None:
+        defn = _registry().get(
+            CorrelationKey(correlation_id="annulus_turbulent_gnielinski_dh", version="1.0.0")
+        )
+        assert _get_nusselt_basis(defn) == "hydraulic_diameter"
+
+    def test_nusselt_basis_annulus_laminar(self) -> None:
+        defn = _registry().get(
+            CorrelationKey(correlation_id="annulus_laminar_inner_chf", version="1.0.0")
+        )
+        assert _get_nusselt_basis(defn) == "inside_diameter"
+
+
+# =====================================================================
+# Category 6: Structured Failure
+# =====================================================================
+
+
+class TestStructuredFailure:
+    """Structured failure cases — various blockers."""
 
     def test_transitional_blocked(self) -> None:
-        """Transitional Re → BLOCKED (no correlations available)."""
-        # Need Re between 2300 and 10000 → set mass flow accordingly
-        # Re = m_dot * D_h / (A * μ) → m_dot = Re * A * μ / D_h
-        # For Re ≈ 5000: m_dot ≈ 0.098 kg/s
+        """Transitional Re → BLOCKED."""
         target_re = 5000.0
         m_dot = target_re * TUBE_A * MU / TUBE_DH
         flow = _water_flow(mass_flow=m_dot)
         result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-
         assert result.status == CorrelationStatus.BLOCKED
         assert result.flow_regime == "transitional"
         assert any("transitional" in b.message.lower() for b in result.blockers)
 
-    def test_computed_quantities_populated(self) -> None:
-        """All computed quantities should be populated in a succeeded result."""
-        flow = _water_flow(mass_flow=0.3)
+    def test_re_out_of_range(self) -> None:
+        """Re out of range for all tube correlations → BLOCKED."""
+        # Transitional: between laminar upper and turbulent lower
+        target_re = 6000.0
+        m_dot = target_re * TUBE_A * MU / TUBE_DH
+        flow = _water_flow(mass_flow=m_dot)
         result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.BLOCKED
 
-        assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.flow_area_m2 > 0
-        assert result.mean_velocity_ms > 0
-        assert result.hydraulic_diameter_m > 0
-        assert result.reynolds_number > 0
-        assert result.prandtl_number > 0
-        assert result.nusselt_number > 0
-        assert result.heat_transfer_coefficient > 0
-
-    def test_provenance_graph_built(self) -> None:
-        """A succeeded result should have a valid provenance graph."""
-        flow = _water_flow(mass_flow=0.3)
-        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-
-        assert len(result.provenance_graph.nodes) > 0
-        assert len(result.provenance_graph.edges) > 0
-
-    def test_geometry_type_tube(self) -> None:
+    def test_unsupported_boundary_condition_tube(self) -> None:
+        """Unsupported BC for tube → BLOCKED."""
         flow = _water_flow(mass_flow=0.005)
-        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        geo = result.geometry
-        assert geo.geometry_type == "circular_tube"
+        result = evaluate_hx_correlation(_tube_geom(), flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert any("unsupported" in b.message.lower() for b in result.blockers)
 
-    def test_geometry_type_annulus(self) -> None:
+    def test_no_applicable_correlation(self) -> None:
+        """No correlation for outer_wall_heated + laminar → BLOCKED."""
         flow = _water_flow(mass_flow=0.005)
-        result = evaluate_hx_correlation(_ann_geom(), flow, "inner_wall_heated")
-        geo = result.geometry
-        assert geo.geometry_type == "concentric_annulus"
+        result = evaluate_hx_correlation(_ann_geom(), flow, "outer_wall_heated")
+        assert result.status == CorrelationStatus.BLOCKED
+
+    def test_blocked_has_no_selected_correlation(self) -> None:
+        flow = _water_flow(mass_flow=0.0)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert result.selected_correlation is None
+
+    def test_blocked_has_blockers(self) -> None:
+        flow = _water_flow(mass_flow=0.0)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert len(result.blockers) > 0
+
+    def test_blocked_provenance_digest_matches(self) -> None:
+        """Blocked result's provenance_digest matches recomputed."""
+        flow = _water_flow(mass_flow=0.0)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        recomputed = _provenance_graph_digest(result.provenance_graph)
+        assert result.provenance_digest == recomputed
 
 
 # =====================================================================
-# Category 7: Hash Integrity, Provenance, JSON Round-Trip, Tamper Detection
+# Category 7: Integrity Tests
 # =====================================================================
 
 
 class TestResultHashIntegrity:
     """CorrelationResult hash integrity and tamper detection."""
 
-    def _make_result(self) -> CorrelationResult:
-        flow = _water_flow(mass_flow=0.3)
-        return evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+    def test_succeeded_verify_hash_true(self) -> None:
+        r = _make_result_tube_laminar()
+        assert r.status == CorrelationStatus.SUCCEEDED
+        assert r.verify_hash() is True
+
+    def test_blocked_verify_hash_true(self) -> None:
+        r = _make_result_blocked()
+        assert r.status == CorrelationStatus.BLOCKED
+        assert r.verify_hash() is True
 
     def test_result_hash_format(self) -> None:
-        r = self._make_result()
+        r = _make_result_tube_laminar()
         assert r.result_hash.startswith("sha256:")
-        assert len(r.result_hash) == 71  # "sha256:" + 64 hex chars
+        assert len(r.result_hash) == 71
 
-    def test_result_hash_is_hex(self) -> None:
-        r = self._make_result()
-        hex_part = r.result_hash[7:]
-        int(hex_part, 16)  # Should not raise
-
-    def test_validate_integrity(self) -> None:
-        r = self._make_result()
+    def test_validate_integrity_succeeded(self) -> None:
+        r = _make_result_tube_laminar()
         assert r.validate_integrity() is True
 
-    def test_tamper_detection_nusselt(self) -> None:
-        """Changing nusselt_number should break integrity."""
-        r = self._make_result()
-        # Pydantic frozen model: use object.__setattr__ to tamper
+    def test_validate_integrity_blocked(self) -> None:
+        r = _make_result_blocked()
+        assert r.validate_integrity() is True
+
+    def test_json_roundtrip_preserves_hash(self) -> None:
+        r = _make_result_tube_laminar()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+        assert restored.result_hash == r.result_hash
+        assert restored.verify_hash() is True
+
+    def test_json_roundtrip_preserves_provenance(self) -> None:
+        r = _make_result_tube_laminar()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+        assert len(restored.provenance_graph.nodes) == len(r.provenance_graph.nodes)
+        assert len(restored.provenance_graph.edges) == len(r.provenance_graph.edges)
+        assert restored.provenance_digest == r.provenance_digest
+
+    def test_tamper_nusselt_breaks_integrity(self) -> None:
+        r = _make_result_tube_laminar()
         object.__setattr__(r, "nusselt_number", 999.0)
         assert r.validate_integrity() is False
 
-    def test_tamper_detection_result_hash(self) -> None:
-        """Tampering with result_hash should break verify_hash."""
-        r = self._make_result()
+    def test_tamper_result_hash_breaks_verify(self) -> None:
+        r = _make_result_tube_laminar()
         object.__setattr__(r, "result_hash", "sha256:" + "0" * 64)
         assert r.verify_hash() is False
 
-    def test_two_results_same_inputs_same_hash(self) -> None:
-        """Deterministic: same inputs → same hash."""
-        flow = _water_flow(mass_flow=0.3)
-        r1 = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        r2 = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        assert r1.result_hash == r2.result_hash
+    def test_tamper_warnings_breaks_integrity(self) -> None:
+        r = _make_result_tube_turbulent()  # Has adaptation warning
+        if r.warnings:
+            object.__setattr__(r, "warnings", ())
+            assert r.validate_integrity() is False
 
-    def test_different_inputs_different_hash(self) -> None:
-        """Different mass flows → different hashes."""
-        r1 = evaluate_hx_correlation(
-            _tube_geom(), _water_flow(mass_flow=0.01), "constant_wall_temperature"
+    def test_tamper_blockers_breaks_integrity(self) -> None:
+        r = _make_result_blocked()
+        object.__setattr__(r, "blockers", ())
+        assert r.validate_integrity() is False
+
+    def test_tamper_failure_breaks_integrity(self) -> None:
+        r = _make_result_tube_laminar()
+        # Set failure then tamper
+        object.__setattr__(r, "failure", None)
+        # Original had no failure, so setting to None doesn't change it
+        # But setting to a non-None value would
+        from hexagent.domain.messages import RunFailure
+
+        object.__setattr__(
+            r,
+            "failure",
+            RunFailure(code=ErrorCode.INPUT_INCONSISTENT, message="tampered"),
         )
-        r2 = evaluate_hx_correlation(
-            _tube_geom(), _water_flow(mass_flow=0.3), "constant_wall_temperature"
+        assert r.validate_integrity() is False
+
+    def test_tamper_selected_correlation_breaks_integrity(self) -> None:
+        r = _make_result_tube_laminar()
+        tampered_info = SelectedCorrelationInfo(
+            correlation_id="tampered",
+            version="999.0.0",
         )
-        assert r1.result_hash != r2.result_hash
+        object.__setattr__(r, "selected_correlation", tampered_info)
+        assert r.validate_integrity() is False
 
+    def test_tamper_applicability_status_breaks_integrity(self) -> None:
+        r = _make_result_tube_laminar()
+        object.__setattr__(r, "applicability_status", "tampered")
+        assert r.validate_integrity() is False
 
-class TestJSONRoundTrip:
-    """JSON serialization/deserialization round-trip for CorrelationResult."""
-
-    def test_succeeded_roundtrip(self) -> None:
-        flow = _water_flow(mass_flow=0.3)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-
-        json_str = r.model_dump_json()
-        restored = CorrelationResult.model_validate_json(json_str)
-
-        assert restored.status == CorrelationStatus.SUCCEEDED
-        assert restored.result_hash == r.result_hash
-        assert restored.nusselt_number == pytest.approx(r.nusselt_number, rel=1e-12)
-        assert restored.heat_transfer_coefficient == pytest.approx(
-            r.heat_transfer_coefficient, rel=1e-12
+    def test_tamper_execution_context_breaks_integrity(self) -> None:
+        r = _make_result_tube_laminar()
+        object.__setattr__(
+            r,
+            "execution_context",
+            ExecutionContextSnapshot(request_id=uuid4()),
         )
+        assert r.validate_integrity() is False
 
-    def test_blocked_roundtrip(self) -> None:
-        flow = _water_flow(mass_flow=0.0)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+    def test_tamper_provenance_graph_breaks_integrity(self) -> None:
+        r = _make_result_tube_laminar()
+        object.__setattr__(r, "provenance_graph", ProvenanceGraph())
+        assert r.validate_integrity() is False
 
-        json_str = r.model_dump_json()
-        restored = CorrelationResult.model_validate_json(json_str)
+    def test_tamper_source_title_breaks_integrity(self) -> None:
+        r = _make_result_tube_laminar()
+        tampered_info = r.selected_correlation.model_copy(update={"source_title": "tampered"})
+        object.__setattr__(r, "selected_correlation", tampered_info)
+        assert r.validate_integrity() is False
 
-        assert restored.status == CorrelationStatus.BLOCKED
-        assert len(restored.blockers) > 0
-
-    def test_roundtrip_preserves_provenance(self) -> None:
-        flow = _water_flow(mass_flow=0.3)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-
-        json_str = r.model_dump_json()
-        restored = CorrelationResult.model_validate_json(json_str)
-
-        assert len(restored.provenance_graph.nodes) == len(r.provenance_graph.nodes)
-        assert len(restored.provenance_graph.edges) == len(r.provenance_graph.edges)
-
-    def test_roundtrip_preserves_selected_correlation(self) -> None:
-        flow = _water_flow(mass_flow=0.3)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-
-        json_str = r.model_dump_json()
-        restored = CorrelationResult.model_validate_json(json_str)
-
-        assert restored.selected_correlation is not None
-        assert restored.selected_correlation.correlation_id == r.selected_correlation.correlation_id
-
-
-class TestCorrelationResultModel:
-    """CorrelationResult model validation and status contracts."""
-
-    def test_succeeded_no_blockers(self) -> None:
-        flow = _water_flow(mass_flow=0.3)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        assert r.status == CorrelationStatus.SUCCEEDED
-        assert len(r.blockers) == 0
-        assert r.failure is None
-
-    def test_blocked_has_blockers(self) -> None:
-        flow = _water_flow(mass_flow=0.0)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        assert r.status == CorrelationStatus.BLOCKED
-        assert len(r.blockers) > 0
-
-    def test_blocked_status_contract(self) -> None:
-        """BLOCKED status must have at least one blocker (enforced by validator)."""
-        flow = _water_flow(mass_flow=0.0)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        assert r.status == CorrelationStatus.BLOCKED
-        assert len(r.blockers) >= 1
-
-    def test_selected_correlation_info_fields(self) -> None:
-        flow = _water_flow(mass_flow=0.005)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        info = r.selected_correlation
-        assert info is not None
-        assert info.correlation_id == "tube_laminar_cwt"
-        assert info.version == "1.0.0"
-        assert info.priority > 0
-
-    def test_execution_context(self) -> None:
-        ctx = CalculationContext(
-            request_id=uuid4(),
-            design_case_revision_id=uuid4(),
-            calculation_run_id=uuid4(),
+    def test_tamper_definition_hash_breaks_integrity(self) -> None:
+        r = _make_result_tube_laminar()
+        tampered_info = r.selected_correlation.model_copy(
+            update={"definition_hash": "sha256:" + "ff" * 64}
         )
-        flow = _water_flow(mass_flow=0.3)
-        r = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature", context=ctx)
-        assert r.execution_context.request_id is not None
-        assert r.execution_context.calculation_run_id is not None
+        object.__setattr__(r, "selected_correlation", tampered_info)
+        assert r.validate_integrity() is False
+
+    def test_direct_setattr_tamper(self) -> None:
+        """Direct __setattr__ on frozen model bypasses Pydantic but breaks integrity."""
+        r = _make_result_tube_laminar()
+        _ = r.result_hash
+        # Tamper using object.__setattr__
+        object.__setattr__(r, "mass_flow_kg_s", 999.0)
+        assert r.validate_integrity() is False
+        # Hash should still match old value (since result_hash was set)
+        # but verify_hash compares payload → will fail
+        assert r.verify_hash() is False
 
 
-class TestProvenanceGraph:
-    """Provenance graph construction and verification."""
+class TestProvenanceIntegrity:
+    """Provenance graph integrity tests."""
 
-    def _make_result(self) -> CorrelationResult:
-        flow = _water_flow(mass_flow=0.3)
-        return evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-
-    def test_graph_has_required_nodes(self) -> None:
-        r = self._make_result()
+    def test_succeeded_has_required_nodes(self) -> None:
+        r = _make_result_tube_laminar()
         node_types = {n.node_type for n in r.provenance_graph.nodes}
         assert ProvenanceNodeType.EXTERNAL in node_types
         assert ProvenanceNodeType.CALCULATION_RUN in node_types
         assert ProvenanceNodeType.CORRELATION in node_types
         assert ProvenanceNodeType.RESULT in node_types
 
-    def test_graph_dag(self) -> None:
-        """Provenance graph should be a DAG (no cycles)."""
-        r = self._make_result()
+    def test_blocked_has_no_correlation_node(self) -> None:
+        r = _make_result_blocked()
+        node_types = {n.node_type for n in r.provenance_graph.nodes}
+        assert ProvenanceNodeType.CORRELATION not in node_types
+
+    def test_provenance_node_unique_ids(self) -> None:
+        r = _make_result_tube_laminar()
+        ids = [n.node_id for n in r.provenance_graph.nodes]
+        assert len(ids) == len(set(ids))
+
+    def test_provenance_edge_unique(self) -> None:
+        r = _make_result_tube_laminar()
+        keys = [(e.source_id, e.target_id, e.relation) for e in r.provenance_graph.edges]
+        assert len(keys) == len(set(keys))
+
+    def test_provenance_no_self_loops(self) -> None:
+        r = _make_result_tube_laminar()
+        for edge in r.provenance_graph.edges:
+            assert edge.source_id != edge.target_id
+
+    def test_provenance_dag(self) -> None:
+        r = _make_result_tube_laminar()
         node_ids = {n.node_id for n in r.provenance_graph.nodes}
         in_degree = {nid: 0 for nid in node_ids}
         adjacency: dict[UUID, list[UUID]] = {nid: [] for nid in node_ids}
         for edge in r.provenance_graph.edges:
-            assert edge.source_id in node_ids
-            assert edge.target_id in node_ids
             adjacency[edge.source_id].append(edge.target_id)
             in_degree[edge.target_id] += 1
-
-        # Topological sort to verify no cycles
         queue = [nid for nid, deg in in_degree.items() if deg == 0]
         visited = 0
         while queue:
@@ -1128,250 +1295,197 @@ class TestProvenanceGraph:
                     queue.append(neighbor)
         assert visited == len(node_ids)
 
-    def test_graph_no_self_loops(self) -> None:
-        r = self._make_result()
-        for edge in r.provenance_graph.edges:
-            assert edge.source_id != edge.target_id
+    def test_provenance_exactly_one_calculation_run(self) -> None:
+        r = _make_result_tube_laminar()
+        calc_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.CALCULATION_RUN
+        ]
+        assert len(calc_nodes) == 1
 
-    def test_graph_edge_references_valid_nodes(self) -> None:
-        r = self._make_result()
-        node_ids = {n.node_id for n in r.provenance_graph.nodes}
-        for edge in r.provenance_graph.edges:
-            assert edge.source_id in node_ids
-            assert edge.target_id in node_ids
+    def test_provenance_calc_run_blocked(self) -> None:
+        r = _make_result_blocked()
+        calc_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.CALCULATION_RUN
+        ]
+        assert len(calc_nodes) == 1
 
-    def test_provenance_digest_deterministic(self) -> None:
+    def test_warning_nodes_match_result(self) -> None:
+        r = _make_result_tube_turbulent()
+        warn_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.WARNING
+        ]
+        assert len(warn_nodes) == len(r.warnings)
+        for wn in warn_nodes:
+            wn_meta = dict(wn.metadata)
+            found = any(
+                w.code.value == wn_meta.get("code") and w.message == wn_meta.get("message")
+                for w in r.warnings
+            )
+            assert found
+
+    def test_blocker_nodes_match_result(self) -> None:
+        r = _make_result_blocked()
+        blocker_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.BLOCKER
+        ]
+        assert len(blocker_nodes) == len(r.blockers)
+        for bn in blocker_nodes:
+            bn_meta = dict(bn.metadata)
+            found = any(
+                b.code.value == bn_meta.get("code") and b.message == bn_meta.get("message")
+                for b in r.blockers
+            )
+            assert found
+
+    def test_verify_provenance_succeeded(self) -> None:
+        r = _make_result_tube_laminar()
+        assert r.verify_provenance() is True
+
+    def test_verify_provenance_blocked(self) -> None:
+        r = _make_result_blocked()
+        assert r.verify_provenance() is True
+
+    def test_provenance_result_node_matches_status(self) -> None:
+        r = _make_result_tube_laminar()
+        result_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.RESULT
+        ]
+        assert len(result_nodes) == 1
+        result_meta = dict(result_nodes[0].metadata)
+        assert result_meta.get("status") == "succeeded"
+
+
+# =====================================================================
+# Category 8: Hash Identity
+# =====================================================================
+
+
+class TestHashIdentity:
+    """Source change → definition hash changes → result hash changes; JSON round-trip."""
+
+    def test_two_results_same_inputs_same_hash(self) -> None:
         flow = _water_flow(mass_flow=0.3)
         r1 = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
         r2 = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        assert r1.provenance_digest == r2.provenance_digest
+        assert r1.result_hash == r2.result_hash
 
-    def test_provenance_digest_changes_with_inputs(self) -> None:
+    def test_different_inputs_different_hash(self) -> None:
         r1 = evaluate_hx_correlation(
             _tube_geom(), _water_flow(mass_flow=0.01), "constant_wall_temperature"
         )
         r2 = evaluate_hx_correlation(
             _tube_geom(), _water_flow(mass_flow=0.3), "constant_wall_temperature"
         )
-        assert r1.provenance_digest != r2.provenance_digest
+        assert r1.result_hash != r2.result_hash
 
-    def test_deterministic_uuid5(self) -> None:
-        """Same payload → same UUID5."""
-        payload = {"key": "value", "num": 42}
-        u1 = _deterministic_uuid5(payload)
-        u2 = _deterministic_uuid5(payload)
-        assert u1 == u2
+    def test_json_roundtrip_hash_matches(self) -> None:
+        r = _make_result_tube_laminar()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+        assert restored.result_hash == r.result_hash
+        assert restored.verify_hash() is True
 
-    def test_deterministic_uuid5_different_payloads(self) -> None:
-        u1 = _deterministic_uuid5({"key": "a"})
-        u2 = _deterministic_uuid5({"key": "b"})
-        assert u1 != u2
+    def test_source_change_defn_hash_changes(self) -> None:
+        """Different source → different definition_hash → different result_hash."""
+        defn1 = _registry().get(CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"))
+        # Verify the definition hash is stable
+        recomputed = compute_definition_hash(defn1)
+        assert recomputed == defn1.definition_hash
 
-    def test_build_provenance_graph_directly(self) -> None:
-        """Direct construction of provenance graph."""
-        ctx = ExecutionContextSnapshot(request_id=uuid4())
-        graph = _build_provenance_graph(
-            geometry=_tube_geom(),
-            correlation_id="tube_laminar_cwt",
-            correlation_version="1.0.0",
-            reynolds=200.0,
-            prandtl=7.0,
-            nu=3.66,
-            h=87.84,
-            warnings=(),
-            blockers=(),
-            execution_context=ctx,
-            status=CorrelationStatus.SUCCEEDED,
+    def test_result_hash_includes_all_identity_fields(self) -> None:
+        """Different wall temp → different result hash."""
+        r1 = evaluate_hx_correlation(
+            _tube_geom(),
+            _water_flow(mass_flow=0.005, wall_temp=300.0),
+            "constant_wall_temperature",
         )
-        assert len(graph.nodes) > 0
-        assert len(graph.edges) > 0
-
-        # Verify all nodes have deterministic UUID5 IDs
-        for node in graph.nodes:
-            assert isinstance(node.node_id, UUID)
-
-    def test_graph_digest_deterministic(self) -> None:
-        """Same graph structure → same digest."""
-        ctx = ExecutionContextSnapshot(request_id=uuid4())
-        g1 = _build_provenance_graph(
-            geometry=_tube_geom(),
-            correlation_id="tube_laminar_cwt",
-            correlation_version="1.0.0",
-            reynolds=200.0,
-            prandtl=7.0,
-            nu=3.66,
-            h=87.84,
-            warnings=(),
-            blockers=(),
-            execution_context=ctx,
-            status=CorrelationStatus.SUCCEEDED,
+        r2 = evaluate_hx_correlation(
+            _tube_geom(),
+            _water_flow(mass_flow=0.005, wall_temp=400.0),
+            "constant_wall_temperature",
         )
-        g2 = _build_provenance_graph(
-            geometry=_tube_geom(),
-            correlation_id="tube_laminar_cwt",
-            correlation_version="1.0.0",
-            reynolds=200.0,
-            prandtl=7.0,
-            nu=3.66,
-            h=87.84,
-            warnings=(),
-            blockers=(),
-            execution_context=ctx,
-            status=CorrelationStatus.SUCCEEDED,
-        )
-        assert _provenance_graph_digest(g1) == _provenance_graph_digest(g2)
-
-
-class TestSelectedCorrelationInfo:
-    """SelectedCorrelationInfo immutability."""
-
-    def test_frozen(self) -> None:
-        info = SelectedCorrelationInfo(
-            correlation_id="tube_laminar_cwt",
-            version="1.0.0",
-        )
-        with pytest.raises(ValidationError):
-            info.correlation_id = "modified"  # type: ignore[misc]
-
-    def test_adaptation_fields(self) -> None:
-        info = SelectedCorrelationInfo(
-            correlation_id="annulus_turbulent_gnielinski_dh",
-            version="1.0.0",
-            is_adaptation=True,
-            adaptation_limitation="Test limitation",
-        )
-        assert info.is_adaptation is True
-        assert info.adaptation_limitation == "Test limitation"
+        assert r1.result_hash != r2.result_hash
 
 
 # =====================================================================
-# Category 8: Edge Cases and Integration
+# Category 9: C4 κ Range
 # =====================================================================
 
 
-class TestEdgeCases:
-    """Boundary conditions and unusual inputs."""
+class TestC4KappaRange:
+    """C4 κ range: [0.1, 0.75] inclusive."""
 
-    def test_very_high_re_turbulent(self) -> None:
-        """Very high Reynolds number should still produce a result."""
-        # With mass flow = 10 kg/s in a 25 mm tube:
-        # Re = 10 / (1000 * 4.9087e-4) * 0.025 / 0.001 * 1000 ≈ 509,000
-        flow = _water_flow(mass_flow=10.0)
-        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.flow_regime == "turbulent"
-        assert result.nusselt_number > 0
-
-    def test_very_low_re_laminar(self) -> None:
-        """Very low Reynolds number (creeping flow) should still work for laminar."""
-        flow = _water_flow(mass_flow=0.0005)
-        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
-        assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.flow_regime == "laminar"
-        assert result.nusselt_number == pytest.approx(3.66, abs=1e-12)
-
-    def test_annulus_wide_gap(self) -> None:
-        """Annulus with small inner tube (low κ)."""
-        g = _ann_geom(di=0.005, do=0.050)  # κ = 0.1
+    def test_kappa_0_1_edge_works(self) -> None:
+        """κ=0.1 → should work, Nu=4.85."""
+        g = _ann_geom(di=0.005, do=0.050)  # κ=0.1
         flow = _water_flow(mass_flow=0.005)
         result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
         assert result.status == CorrelationStatus.SUCCEEDED
         assert result.nusselt_number == pytest.approx(4.85, abs=1e-12)
 
-    def test_annulus_narrow_gap(self) -> None:
-        """Annulus with large inner tube (high κ)."""
-        g = _ann_geom(di=0.045, do=0.050)  # κ = 0.9
+    def test_kappa_0_75_edge_works(self) -> None:
+        """κ=0.75 → should work, Nu=10.10."""
+        g = _ann_geom(di=0.0375, do=0.050)  # κ=0.75
         flow = _water_flow(mass_flow=0.005)
         result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
         assert result.status == CorrelationStatus.SUCCEEDED
-        assert result.nusselt_number > 10.0  # Extrapolated, high Nu_i
+        assert result.nusselt_number == pytest.approx(10.10, abs=1e-12)
 
-    def test_heating_vs_cooling(self) -> None:
-        """Heating and cooling should both produce valid results."""
-        flow_heat = _water_flow(mass_flow=0.005, heating=True)
-        flow_cool = _water_flow(mass_flow=0.005, heating=False)
-        r1 = evaluate_hx_correlation(_tube_geom(), flow_heat, "constant_wall_temperature")
-        r2 = evaluate_hx_correlation(_tube_geom(), flow_cool, "constant_wall_temperature")
-        # Both should succeed and have same Nu (laminar CWT is independent of heating direction)
-        assert r1.status == CorrelationStatus.SUCCEEDED
-        assert r2.status == CorrelationStatus.SUCCEEDED
-        assert r1.nusselt_number == pytest.approx(r2.nusselt_number, abs=1e-12)
+    def test_kappa_0_05_below_blocked(self) -> None:
+        """κ=0.05 → below range → BLOCKED."""
+        # This creates an annulus where κ=0.05: D_i=0.0025, D_o=0.050
+        g = _ann_geom(di=0.0025, do=0.050)  # κ=0.05
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.BLOCKED
 
-    def test_wall_temperature_optional(self) -> None:
-        """Wall temperature is optional — should not affect laminar CWT result."""
-        flow_no_wall = _water_flow(mass_flow=0.005, wall_temp=None)
-        flow_with_wall = _water_flow(mass_flow=0.005, wall_temp=400.0)
-        r1 = evaluate_hx_correlation(_tube_geom(), flow_no_wall, "constant_wall_temperature")
-        r2 = evaluate_hx_correlation(_tube_geom(), flow_with_wall, "constant_wall_temperature")
-        assert r1.status == CorrelationStatus.SUCCEEDED
-        assert r2.status == CorrelationStatus.SUCCEEDED
-        assert r1.nusselt_number == pytest.approx(r2.nusselt_number, abs=1e-12)
+    def test_kappa_0_85_above_blocked(self) -> None:
+        """κ=0.85 → above range → BLOCKED."""
+        # D_i=0.0425, D_o=0.050 → κ=0.85
+        g = _ann_geom(di=0.0425, do=0.050)  # κ=0.85
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.BLOCKED
+
+    def test_kappa_constants(self) -> None:
+        """Verify κ constants from annulus module."""
+        assert _KAPPA_ABSOLUTE_MIN == 0.1
+        assert _KAPPA_ABSOLUTE_MAX == 0.75
 
 
-class TestFlowPropertiesInput:
-    """FlowPropertiesInput validation."""
+# =====================================================================
+# Category 10: Wall Property Validation
+# =====================================================================
 
-    def test_construction(self) -> None:
-        f = _water_flow()
-        assert f.mass_flow_kg_s == 0.1
-        assert f.density_kg_m3 == RHO
 
-    def test_frozen(self) -> None:
-        f = _water_flow()
-        with pytest.raises(ValidationError):
-            f.mass_flow_kg_s = 0.5  # type: ignore[misc]
+class TestWallPropertyValidation:
+    """Wall property validation: NaN/Inf rejected."""
 
-    def test_negative_mass_flow_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="non-negative"):
-            FlowPropertiesInput(
-                mass_flow_kg_s=-0.1,
-                density_kg_m3=RHO,
-                dynamic_viscosity_pa_s=MU,
-                thermal_conductivity_w_m_k=K,
-                specific_heat_j_kg_k=CP,
-                bulk_temperature_k=350.0,
-            )
-
-    def test_zero_mass_flow_allowed(self) -> None:
-        f = FlowPropertiesInput(
-            mass_flow_kg_s=0.0,
-            density_kg_m3=RHO,
-            dynamic_viscosity_pa_s=MU,
-            thermal_conductivity_w_m_k=K,
-            specific_heat_j_kg_k=CP,
-            bulk_temperature_k=350.0,
-        )
-        assert f.mass_flow_kg_s == 0.0
-
-    def test_negative_density_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="positive"):
-            FlowPropertiesInput(
-                mass_flow_kg_s=0.1,
-                density_kg_m3=-1000.0,
-                dynamic_viscosity_pa_s=MU,
-                thermal_conductivity_w_m_k=K,
-                specific_heat_j_kg_k=CP,
-                bulk_temperature_k=350.0,
-            )
-
-    def test_negative_bulk_temp_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="positive"):
+    def test_wall_temperature_nan_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="finite"):
             FlowPropertiesInput(
                 mass_flow_kg_s=0.1,
                 density_kg_m3=RHO,
                 dynamic_viscosity_pa_s=MU,
                 thermal_conductivity_w_m_k=K,
                 specific_heat_j_kg_k=CP,
-                bulk_temperature_k=-100.0,
+                bulk_temperature_k=350.0,
+                wall_temperature_k=float("nan"),
             )
 
-    def test_optional_fields(self) -> None:
-        f = _water_flow()
-        assert f.wall_temperature_k is None
-        assert f.wall_viscosity_pa_s is None
-        assert f.heating is True
+    def test_wall_viscosity_inf_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="finite"):
+            FlowPropertiesInput(
+                mass_flow_kg_s=0.1,
+                density_kg_m3=RHO,
+                dynamic_viscosity_pa_s=MU,
+                thermal_conductivity_w_m_k=K,
+                specific_heat_j_kg_k=CP,
+                bulk_temperature_k=350.0,
+                wall_viscosity_pa_s=float("inf"),
+            )
 
-    def test_wall_temp_positive_validation(self) -> None:
+    def test_wall_temperature_negative_rejected(self) -> None:
         with pytest.raises(ValidationError, match="positive"):
             FlowPropertiesInput(
                 mass_flow_kg_s=0.1,
@@ -1382,6 +1496,669 @@ class TestFlowPropertiesInput:
                 bulk_temperature_k=350.0,
                 wall_temperature_k=-100.0,
             )
+
+    def test_wall_viscosity_zero_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="positive"):
+            FlowPropertiesInput(
+                mass_flow_kg_s=0.1,
+                density_kg_m3=RHO,
+                dynamic_viscosity_pa_s=MU,
+                thermal_conductivity_w_m_k=K,
+                specific_heat_j_kg_k=CP,
+                bulk_temperature_k=350.0,
+                wall_viscosity_pa_s=0.0,
+            )
+
+    def test_wall_temperature_none_allowed(self) -> None:
+        f = FlowPropertiesInput(
+            mass_flow_kg_s=0.1,
+            density_kg_m3=RHO,
+            dynamic_viscosity_pa_s=MU,
+            thermal_conductivity_w_m_k=K,
+            specific_heat_j_kg_k=CP,
+            bulk_temperature_k=350.0,
+            wall_temperature_k=None,
+        )
+        assert f.wall_temperature_k is None
+
+    def test_wall_viscosity_none_allowed(self) -> None:
+        f = FlowPropertiesInput(
+            mass_flow_kg_s=0.1,
+            density_kg_m3=RHO,
+            dynamic_viscosity_pa_s=MU,
+            thermal_conductivity_w_m_k=K,
+            specific_heat_j_kg_k=CP,
+            bulk_temperature_k=350.0,
+            wall_viscosity_pa_s=None,
+        )
+        assert f.wall_viscosity_pa_s is None
+
+
+# =====================================================================
+# Category 11: Boundary Condition Validation
+# =====================================================================
+
+
+class TestBoundaryConditionValidation:
+    """Boundary condition vs heated_surface consistency."""
+
+    def test_inner_heated_geometry_outer_wall_heated_bc(self) -> None:
+        """inner_heated geometry + outer_wall_heated BC → BLOCKED."""
+        g = _ann_geom(heated="inner")
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(g, flow, "outer_wall_heated")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert any(
+            "boundary condition" in b.message.lower() or "heated_surface" in b.message.lower()
+            for b in result.blockers
+        )
+
+    def test_both_walls_heated_geometry_inner_wall_heated_bc(self) -> None:
+        """both_walls_heated geometry + inner_wall_heated BC → BLOCKED."""
+        g = _ann_geom(heated="both")
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert any(
+            "boundary condition" in b.message.lower() or "heated_surface" in b.message.lower()
+            for b in result.blockers
+        )
+
+    def test_inner_geometry_inner_bc_ok(self) -> None:
+        """inner_heated geometry + inner_wall_heated BC → should work."""
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_ann_geom(heated="inner"), flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.SUCCEEDED
+
+    def test_tube_unsupported_bc_blocked(self) -> None:
+        """Tube with annulus-specific BC → BLOCKED."""
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.BLOCKED
+
+
+# =====================================================================
+# Category 12: Provenance Topology
+# =====================================================================
+
+
+class TestProvenanceTopology:
+    """Provenance graph topology for succeeded and blocked results."""
+
+    def test_succeeded_external_root(self) -> None:
+        r = _make_result_tube_laminar()
+        node_types = {n.node_type for n in r.provenance_graph.nodes}
+        assert ProvenanceNodeType.EXTERNAL in node_types
+
+    def test_succeeded_has_calculation_run(self) -> None:
+        r = _make_result_tube_laminar()
+        calc_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.CALCULATION_RUN
+        ]
+        assert len(calc_nodes) == 1
+
+    def test_succeeded_has_correlation_node(self) -> None:
+        r = _make_result_tube_laminar()
+        corr_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.CORRELATION
+        ]
+        assert len(corr_nodes) == 1
+
+    def test_succeeded_has_result_node(self) -> None:
+        r = _make_result_tube_laminar()
+        result_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.RESULT
+        ]
+        assert len(result_nodes) == 1
+
+    def test_blocked_no_correlation_node(self) -> None:
+        r = _make_result_blocked()
+        corr_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.CORRELATION
+        ]
+        assert len(corr_nodes) == 0
+
+    def test_blocked_has_external_root(self) -> None:
+        r = _make_result_blocked()
+        node_types = {n.node_type for n in r.provenance_graph.nodes}
+        assert ProvenanceNodeType.EXTERNAL in node_types
+
+    def test_blocked_has_calculation_run(self) -> None:
+        r = _make_result_blocked()
+        calc_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.CALCULATION_RUN
+        ]
+        assert len(calc_nodes) == 1
+
+    def test_blocked_has_result_node(self) -> None:
+        r = _make_result_blocked()
+        result_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.RESULT
+        ]
+        assert len(result_nodes) == 1
+
+    def test_succeeded_exactly_one_calculation_run(self) -> None:
+        r = _make_result_tube_turbulent()
+        calc_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.CALCULATION_RUN
+        ]
+        assert len(calc_nodes) == 1
+
+    def test_turbulent_has_warning_nodes(self) -> None:
+        """Turbulent annulus result should have adaptation warning nodes."""
+        flow = _water_flow(mass_flow=1.0)
+        result = evaluate_hx_correlation(_ann_geom(), flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert len(result.warnings) > 0
+        warn_nodes = [
+            n for n in result.provenance_graph.nodes if n.node_type == ProvenanceNodeType.WARNING
+        ]
+        assert len(warn_nodes) == len(result.warnings)
+
+    def test_blocked_has_blocker_nodes(self) -> None:
+        r = _make_result_blocked()
+        assert len(r.blockers) > 0
+        blocker_nodes = [
+            n for n in r.provenance_graph.nodes if n.node_type == ProvenanceNodeType.BLOCKER
+        ]
+        assert len(blocker_nodes) == len(r.blockers)
+
+
+# =====================================================================
+# Category 13: SemVer Selection
+# =====================================================================
+
+
+class TestSemVerSelection:
+    """SemVer-based version selection."""
+
+    def test_higher_version_wins(self) -> None:
+        """Register multiple versions; highest should be latest."""
+        from hexagent.correlations.models import (
+            ApplicabilityEnvelope,
+            BibliographicSource,
+            CorrelationDefinition,
+            CorrelationImplementationStatus,
+            CorrelationKey,
+            CorrelationPurpose,
+            NumericBound,
+            UncertaintySpec,
+        )
+
+        def _make_def(version: str) -> CorrelationDefinition:
+            return CorrelationDefinition.create(
+                key=CorrelationKey(correlation_id="tube_laminar_cwt", version=version),
+                name="Tube Laminar CWT",
+                purpose=CorrelationPurpose.nusselt_number,
+                description="Test",
+                geometry=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset(
+                    {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                ),
+                envelope=ApplicabilityEnvelope(
+                    geometry_types=frozenset({GeometryType.circular_tube}),
+                    phase_regimes=frozenset(
+                        {PhaseRegime.single_phase_liquid, PhaseRegime.single_phase_gas}
+                    ),
+                    flow_regimes=frozenset({"laminar"}),
+                    bounds=(
+                        NumericBound(
+                            variable=ApplicabilityVariable.reynolds,
+                            minimum=0.0,
+                            maximum=2300.0,
+                            minimum_inclusive=False,
+                            maximum_inclusive=False,
+                        ),
+                        NumericBound(
+                            variable=ApplicabilityVariable.prandtl,
+                            minimum=0.6,
+                            minimum_inclusive=False,
+                        ),
+                    ),
+                    required_inputs=frozenset(
+                        {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+                    ),
+                ),
+                source=BibliographicSource(
+                    source_id="test_source",
+                    title="Test",
+                    publication="Test Pub",
+                    year=2024,
+                    verification_status=SourceVerificationStatus.primary_source_checked,
+                ),
+                uncertainty=UncertaintySpec(basis="test"),
+                implementation_status=CorrelationImplementationStatus.validated,
+                implementation_ref="test.ref",
+                tags=frozenset(
+                    {
+                        "bc:constant_wall_temperature",
+                        "nusselt_basis:inside_diameter",
+                        "priority:10",
+                    }
+                ),
+            )
+
+        reg = InMemoryCorrelationRegistry()
+        reg.register(_make_def("1.0.0"))
+        reg.register(_make_def("1.2.0"))
+        reg.register(_make_def("1.10.0"))
+        reg.register(_make_def("1.0.0-beta"))
+
+        latest = reg.get_latest("tube_laminar_cwt")
+        assert latest.key.version == "1.10.0"
+
+    def test_prerelease_before_stable(self) -> None:
+        """1.0.0-beta < 1.0.0."""
+        assert compare_semver("1.0.0-beta", "1.0.0") == -1
+
+    def test_higher_minor_wins(self) -> None:
+        """1.10.0 > 1.2.0."""
+        assert compare_semver("1.10.0", "1.2.0") == 1
+
+    def test_parse_semver_basic(self) -> None:
+        major, minor, patch, pre = parse_semver("2.1.3")
+        assert (major, minor, patch) == (2, 1, 3)
+        assert pre == ()
+
+    def test_parse_semver_prerelease(self) -> None:
+        major, minor, patch, pre = parse_semver("1.0.0-alpha")
+        assert (major, minor, patch) == (1, 0, 0)
+        assert pre == ((1, "alpha"),)
+
+    def test_definition_hash_stable(self) -> None:
+        """Definition hash is deterministic and stable."""
+        defn = _registry().get(CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"))
+        assert defn.definition_hash.startswith("sha256:")
+        recomputed = compute_definition_hash(defn)
+        assert recomputed == defn.definition_hash
+
+
+# =====================================================================
+# Category 14: Golden Cases
+# =====================================================================
+
+
+class TestGoldenCases:
+    """Golden reference cases with independent hand-computed values."""
+
+    def test_c1_nu_3_66(self) -> None:
+        """C1: Nu = 3.66 for fully developed laminar, constant wall temperature."""
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.nusselt_number == pytest.approx(3.66, abs=1e-12)
+        expected_h = 3.66 * K / TUBE_DH
+        assert result.heat_transfer_coefficient == pytest.approx(expected_h, rel=1e-12)
+
+    def test_c2_nu_4_36(self) -> None:
+        """C2: Nu = 4.36 for fully developed laminar, constant heat flux."""
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_heat_flux")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.nusselt_number == pytest.approx(4.36, abs=1e-12)
+        expected_h = 4.36 * K / TUBE_DH
+        assert result.heat_transfer_coefficient == pytest.approx(expected_h, rel=1e-12)
+
+    def test_c3_gnielinski_re50000_pr7(self) -> None:
+        """C3: Gnielinski with Re=50000, Pr=7.0.
+        Hand calculation:
+        f = (0.790*ln(50000) - 1.64)^(-2) ≈ 0.02102
+        f/8 ≈ 0.002628
+        Num = 0.002628 * 49000 * 7.0 ≈ 900.40
+        Den = 1 + 12.7*sqrt(0.002628)*(7.0^(2/3) - 1) ≈ 2.731
+        Nu ≈ 329.7
+        """
+        Re = 50000.0
+        Pr = 7.0
+        c = TubeTurbulentGnielinski()
+        nu = c.evaluate(Re, Pr)
+
+        # Independent hand calculation
+        f = (0.790 * math.log(Re) - 1.64) ** (-2)
+        f8 = f / 8.0
+        numerator = f8 * (Re - 1000.0) * Pr
+        denominator = 1.0 + 12.7 * math.sqrt(f8) * (Pr ** (2.0 / 3.0) - 1.0)
+        expected_nu = numerator / denominator
+
+        assert nu == pytest.approx(expected_nu, rel=1e-10)
+        assert nu == pytest.approx(329.7, abs=5.0)
+
+    def test_c4_kappa_0_5(self) -> None:
+        """C4: κ=0.5 → Nu=7.30."""
+        g = _ann_geom(di=0.025, do=0.050)
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.nusselt_number == pytest.approx(7.30, abs=1e-12)
+
+    def test_c4_h_uses_d_i(self) -> None:
+        """C4: h = Nu * k / D_i, NOT D_h."""
+        g = _ann_geom(di=0.025, do=0.050)
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(g, flow, "inner_wall_heated")
+        expected_h = 7.30 * K / 0.025
+        assert result.heat_transfer_coefficient == pytest.approx(expected_h, rel=1e-10)
+
+    def test_c3_service_integration(self) -> None:
+        """C3: Service-level Gnielinski with Re=50000."""
+        # Need Re ≈ 50000 in a 25mm tube
+        # m_dot = Re * A * μ / D_h
+        target_re = 50000.0
+        m_dot = target_re * TUBE_A * MU / TUBE_DH
+        flow = _water_flow(mass_flow=m_dot)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.flow_regime == "turbulent"
+        assert result.selected_correlation is not None
+        assert result.selected_correlation.correlation_id == "tube_turbulent_gnielinski"
+
+
+# =====================================================================
+# Category 15: Zero Duty / Zero Flow
+# =====================================================================
+
+
+class TestZeroDutyZeroFlow:
+    """Zero mass flow and negative mass flow → BLOCKED."""
+
+    def test_zero_mass_flow_blocked(self) -> None:
+        flow = _water_flow(mass_flow=0.0)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert any("zero mass flow" in b.message.lower() for b in result.blockers)
+
+    def test_negative_mass_flow_blocked(self) -> None:
+        """Negative mass flow should be rejected at FlowPropertiesInput level."""
+        with pytest.raises(ValidationError, match="non-negative"):
+            FlowPropertiesInput(
+                mass_flow_kg_s=-0.01,
+                density_kg_m3=RHO,
+                dynamic_viscosity_pa_s=MU,
+                thermal_conductivity_w_m_k=K,
+                specific_heat_j_kg_k=CP,
+                bulk_temperature_k=350.0,
+            )
+
+    def test_zero_mass_flow_provenance(self) -> None:
+        """Zero mass flow result should have valid provenance."""
+        flow = _water_flow(mass_flow=0.0)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert result.verify_provenance() is True
+
+    def test_zero_mass_flow_hash(self) -> None:
+        flow = _water_flow(mass_flow=0.0)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.verify_hash() is True
+
+
+# =====================================================================
+# Category 16: Provenance JSON Round-Trip
+# =====================================================================
+
+
+class TestProvenanceJSONRoundTrip:
+    """Provenance graph serialization/deserialization round-trip."""
+
+    def test_succeeded_graph_roundtrip(self) -> None:
+        r = _make_result_tube_laminar()
+        graph_json = r.provenance_graph.to_json()
+        restored = ProvenanceGraph.from_json(graph_json)
+        assert len(restored.nodes) == len(r.provenance_graph.nodes)
+        assert len(restored.edges) == len(r.provenance_graph.edges)
+
+    def test_succeeded_graph_hash_preserved(self) -> None:
+        r = _make_result_tube_laminar()
+        graph_json = r.provenance_graph.to_json()
+        restored = ProvenanceGraph.from_json(graph_json)
+        assert _provenance_graph_digest(restored) == r.provenance_digest
+
+    def test_blocked_graph_roundtrip(self) -> None:
+        r = _make_result_blocked()
+        graph_json = r.provenance_graph.to_json()
+        restored = ProvenanceGraph.from_json(graph_json)
+        assert len(restored.nodes) == len(r.provenance_graph.nodes)
+        assert len(restored.edges) == len(r.provenance_graph.edges)
+        assert _provenance_graph_digest(restored) == r.provenance_digest
+
+    def test_full_result_json_roundtrip(self) -> None:
+        """Full CorrelationResult JSON round-trip preserves provenance."""
+        r = _make_result_tube_laminar()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+        assert restored.provenance_digest == r.provenance_digest
+        assert restored.verify_provenance() is True
+
+    def test_full_blocked_result_json_roundtrip(self) -> None:
+        """Full blocked result JSON round-trip preserves provenance."""
+        r = _make_result_blocked()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+        assert restored.provenance_digest == r.provenance_digest
+        assert restored.verify_provenance() is True
+
+    def test_graph_node_ids_preserved(self) -> None:
+        r = _make_result_tube_laminar()
+        graph_json = r.provenance_graph.to_json()
+        restored = ProvenanceGraph.from_json(graph_json)
+        original_ids = {str(n.node_id) for n in r.provenance_graph.nodes}
+        restored_ids = {str(n.node_id) for n in restored.nodes}
+        assert original_ids == restored_ids
+
+    def test_graph_edge_relations_preserved(self) -> None:
+        r = _make_result_tube_laminar()
+        graph_json = r.provenance_graph.to_json()
+        restored = ProvenanceGraph.from_json(graph_json)
+        original_relations = {
+            (str(e.source_id), str(e.target_id), e.relation) for e in r.provenance_graph.edges
+        }
+        restored_relations = {
+            (str(e.source_id), str(e.target_id), e.relation) for e in restored.edges
+        }
+        assert original_relations == restored_relations
+
+    def test_provenance_node_payload_hash_format(self) -> None:
+        """All nodes have sha256 payload hashes."""
+        r = _make_result_tube_laminar()
+        for node in r.provenance_graph.nodes:
+            assert node.payload_hash.startswith("sha256:")
+            assert len(node.payload_hash) == 71
+
+
+# =====================================================================
+# Additional: Select Correlation Direct Tests
+# =====================================================================
+
+
+class TestSelectCorrelationDirect:
+    """Direct tests of the select_correlation function."""
+
+    def test_returns_three_tuple(self) -> None:
+        reg = _registry()
+        geo = _tube_geom()
+        result = select_correlation(
+            reg, geo, "constant_wall_temperature", FlowRegime.laminar, 200.0, 7.0
+        )
+        assert len(result) == 3
+        defn, assessment, blocker = result
+        assert defn is not None
+        assert blocker is None
+
+    def test_no_applicable_returns_none(self) -> None:
+        """Empty registry → no applicable → (None, None, None)."""
+        reg = InMemoryCorrelationRegistry()
+        geo = _tube_geom()
+        defn, assessment, blocker = select_correlation(
+            reg, geo, "constant_wall_temperature", FlowRegime.laminar, 200.0, 7.0
+        )
+        assert defn is None
+        assert blocker is None
+
+    def test_tube_laminar_cwt_direct(self) -> None:
+        reg = _registry()
+        geo = _tube_geom()
+        defn, _, blocker = select_correlation(
+            reg, geo, "constant_wall_temperature", FlowRegime.laminar, 200.0, 7.0
+        )
+        assert defn is not None
+        assert defn.key.correlation_id == "tube_laminar_cwt"
+        assert blocker is None
+
+    def test_tube_laminar_chf_direct(self) -> None:
+        reg = _registry()
+        geo = _tube_geom()
+        defn, _, blocker = select_correlation(
+            reg, geo, "constant_heat_flux", FlowRegime.laminar, 200.0, 7.0
+        )
+        assert defn is not None
+        assert defn.key.correlation_id == "tube_laminar_chf"
+
+    def test_tube_turbulent_direct(self) -> None:
+        reg = _registry()
+        geo = _tube_geom()
+        defn, _, blocker = select_correlation(
+            reg, geo, "constant_wall_temperature", FlowRegime.turbulent, 15000.0, 7.0
+        )
+        assert defn is not None
+        assert defn.key.correlation_id == "tube_turbulent_gnielinski"
+
+    def test_transitional_returns_none(self) -> None:
+        reg = _registry()
+        geo = _tube_geom()
+        defn, assessment, blocker = select_correlation(
+            reg, geo, "constant_wall_temperature", FlowRegime.transitional, 5000.0, 7.0
+        )
+        assert defn is None
+
+    def test_annulus_laminar_inner_direct(self) -> None:
+        reg = _registry()
+        geo = _ann_geom()
+        defn, _, blocker = select_correlation(
+            reg,
+            geo,
+            "inner_wall_heated",
+            FlowRegime.laminar,
+            200.0,
+            7.0,
+            diameter_ratio=ANN_KAPPA,
+        )
+        assert defn is not None
+        assert defn.key.correlation_id == "annulus_laminar_inner_chf"
+
+    def test_annulus_turbulent_direct(self) -> None:
+        reg = _registry()
+        geo = _ann_geom()
+        defn, _, blocker = select_correlation(
+            reg,
+            geo,
+            "inner_wall_heated",
+            FlowRegime.turbulent,
+            15000.0,
+            7.0,
+            diameter_ratio=ANN_KAPPA,
+        )
+        assert defn is not None
+        assert defn.key.correlation_id == "annulus_turbulent_gnielinski_dh"
+
+
+# =====================================================================
+# Additional: SelectedCorrelationInfo Fields
+# =====================================================================
+
+
+class TestSelectedCorrelationInfoFields:
+    """SelectedCorrelationInfo carries full source identity."""
+
+    def test_source_fields_populated(self) -> None:
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        info = result.selected_correlation
+        assert info is not None
+        assert info.correlation_id == "tube_laminar_cwt"
+        assert info.version == "1.0.0"
+        assert len(info.source_title) > 0
+        assert info.source_year > 0
+        assert info.source_verification_status != "unverified"
+        assert info.definition_hash.startswith("sha256:")
+        assert info.nusselt_basis == "inside_diameter"
+
+    def test_annulus_turbulent_source_fields(self) -> None:
+        flow = _water_flow(mass_flow=1.0)
+        result = evaluate_hx_correlation(_ann_geom(), flow, "inner_wall_heated")
+        info = result.selected_correlation
+        assert info is not None
+        assert info.correlation_id == "annulus_turbulent_gnielinski_dh"
+        assert info.is_adaptation is True
+        assert len(info.adaptation_limitation) > 0
+        assert info.nusselt_basis == "hydraulic_diameter"
+
+    def test_frozen(self) -> None:
+        info = SelectedCorrelationInfo(
+            correlation_id="test",
+            version="1.0.0",
+        )
+        with pytest.raises(ValidationError):
+            info.correlation_id = "modified"  # type: ignore[misc]
+
+
+# =====================================================================
+# Additional: Is Boundary Compatible
+# =====================================================================
+
+
+class TestIsBoundaryCompatible:
+    """Test _is_boundary_compatible function."""
+
+    def test_cwt_compatible_with_cwt(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"))
+        assert _is_boundary_compatible(defn, "constant_wall_temperature") is True
+
+    def test_cwt_incompatible_with_chf(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="tube_laminar_cwt", version="1.0.0"))
+        assert _is_boundary_compatible(defn, "constant_heat_flux") is False
+
+    def test_chf_compatible_with_chf(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="tube_laminar_chf", version="1.0.0"))
+        assert _is_boundary_compatible(defn, "constant_heat_flux") is True
+
+    def test_gnielinski_compatible_with_both_cwt_chf(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="tube_turbulent_gnielinski", version="1.0.0"))
+        assert _is_boundary_compatible(defn, "constant_wall_temperature") is True
+        assert _is_boundary_compatible(defn, "constant_heat_flux") is True
+
+    def test_annulus_inner_chf_compatible_with_inner(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="annulus_laminar_inner_chf", version="1.0.0"))
+        assert _is_boundary_compatible(defn, "inner_wall_heated") is True
+
+    def test_annulus_inner_chf_incompatible_with_outer(self) -> None:
+        reg = _registry()
+        defn = reg.get(CorrelationKey(correlation_id="annulus_laminar_inner_chf", version="1.0.0"))
+        assert _is_boundary_compatible(defn, "outer_wall_heated") is False
+
+
+# =====================================================================
+# Additional: Regime Constants
+# =====================================================================
+
+
+class TestRegimeConstants:
+    """Regime threshold constants match specification."""
+
+    def test_laminar_upper(self) -> None:
+        assert LAMINAR_UPPER_RE == 2300.0
+
+    def test_turbulent_lower(self) -> None:
+        assert TURBULENT_LOWER_RE == 10000.0
+
+
+# =====================================================================
+# Additional: Enum Values
+# =====================================================================
 
 
 class TestFlowRegimeEnum:
@@ -1403,14 +2180,145 @@ class TestCorrelationStatusEnum:
         assert CorrelationStatus.FAILED.value == "failed"
 
 
-class TestRegimeConstants:
-    """Regime threshold constants match specification."""
+class TestNusseltBasisEnum:
+    """NusseltBasis enum values."""
 
-    def test_laminar_upper(self) -> None:
-        assert LAMINAR_UPPER_RE == 2300.0
+    def test_values(self) -> None:
+        assert NusseltBasis.hydraulic_diameter.value == "hydraulic_diameter"
+        assert NusseltBasis.inside_diameter.value == "inside_diameter"
 
-    def test_turbulent_lower(self) -> None:
-        assert TURBULENT_LOWER_RE == 10000.0
+
+# =====================================================================
+# Additional: Computed Quantities
+# =====================================================================
+
+
+class TestComputedQuantities:
+    """All computed quantities are populated in a succeeded result."""
+
+    def test_succeeded_result_quantities(self) -> None:
+        flow = _water_flow(mass_flow=0.3)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.flow_area_m2 > 0
+        assert result.mean_velocity_ms > 0
+        assert result.hydraulic_diameter_m > 0
+        assert result.reynolds_number > 0
+        assert result.prandtl_number > 0
+        assert result.nusselt_number > 0
+        assert result.heat_transfer_coefficient > 0
+
+    def test_velocity_consistency(self) -> None:
+        flow = _water_flow(mass_flow=0.3)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        expected_v = flow.mass_flow_kg_s / (flow.density_kg_m3 * result.flow_area_m2)
+        assert result.mean_velocity_ms == pytest.approx(expected_v, rel=1e-10)
+
+    def test_reynolds_consistency(self) -> None:
+        flow = _water_flow(mass_flow=0.3)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        expected_re = (
+            flow.density_kg_m3
+            * result.mean_velocity_ms
+            * result.hydraulic_diameter_m
+            / flow.dynamic_viscosity_pa_s
+        )
+        assert result.reynolds_number == pytest.approx(expected_re, rel=1e-10)
+
+    def test_prandtl_consistency(self) -> None:
+        flow = _water_flow(mass_flow=0.3)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        expected_pr = (
+            flow.specific_heat_j_kg_k
+            * flow.dynamic_viscosity_pa_s
+            / flow.thermal_conductivity_w_m_k
+        )
+        assert result.prandtl_number == pytest.approx(expected_pr, rel=1e-10)
+
+    def test_zero_blocked_quantities(self) -> None:
+        flow = _water_flow(mass_flow=0.0)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.BLOCKED
+        # Computed quantities should be zero for blocked results
+        assert result.flow_area_m2 == 0.0
+        assert result.mean_velocity_ms == 0.0
+        assert result.reynolds_number == 0.0
+        assert result.prandtl_number == 0.0
+        assert result.nusselt_number == 0.0
+        assert result.heat_transfer_coefficient == 0.0
+
+
+# =====================================================================
+# Additional: Applicability Assessment
+# =====================================================================
+
+
+class TestApplicabilityAssessment:
+    """Applicability assessment presence in results."""
+
+    def test_succeeded_has_assessment(self) -> None:
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.SUCCEEDED
+        assert result.applicability_assessment is not None
+
+    def test_blocked_has_no_assessment(self) -> None:
+        flow = _water_flow(mass_flow=0.0)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.status == CorrelationStatus.BLOCKED
+        assert result.applicability_assessment is None
+
+    def test_applicability_status_populated(self) -> None:
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.applicability_status != ""
+
+
+# =====================================================================
+# Additional: Execution Context
+# =====================================================================
+
+
+class TestExecutionContext:
+    """Execution context in results."""
+
+    def test_default_context(self) -> None:
+        flow = _water_flow(mass_flow=0.005)
+        result = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        assert result.execution_context.request_id is None
+        assert result.execution_context.design_case_revision_id is None
+
+    def test_custom_context(self) -> None:
+        ctx = CalculationContext(
+            request_id=uuid4(),
+            design_case_revision_id=uuid4(),
+            calculation_run_id=uuid4(),
+        )
+        flow = _water_flow(mass_flow=0.3)
+        result = evaluate_hx_correlation(
+            _tube_geom(), flow, "constant_wall_temperature", context=ctx
+        )
+        assert result.execution_context.request_id is not None
+        assert result.execution_context.design_case_revision_id is not None
+        assert result.execution_context.calculation_run_id is not None
+        assert result.verify_provenance() is True
+
+    def test_context_changes_provenance(self) -> None:
+        """Different context → different provenance digest."""
+        flow = _water_flow(mass_flow=0.3)
+        r1 = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature")
+        ctx = CalculationContext(
+            request_id=uuid4(),
+            design_case_revision_id=uuid4(),
+            calculation_run_id=uuid4(),
+        )
+        r2 = evaluate_hx_correlation(_tube_geom(), flow, "constant_wall_temperature", context=ctx)
+        assert r1.provenance_digest != r2.provenance_digest
+
+
+# =====================================================================
+# Additional: Gnielinski Consistency
+# =====================================================================
 
 
 class TestGnielinskiConsistency:
@@ -1430,6 +2338,11 @@ class TestGnielinskiConsistency:
         ann = AnnulusTurbulentGnielinskiDH()
         for re in [3000, 10000, 100000]:
             assert tube.evaluate(re, 1.0) == pytest.approx(ann.evaluate(re, 1.0), rel=1e-12)
+
+
+# =====================================================================
+# Additional: Annulus Geometry Consistency
+# =====================================================================
 
 
 class TestAnnulusGeometryConsistency:

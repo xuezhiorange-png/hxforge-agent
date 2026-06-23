@@ -47,9 +47,16 @@ f = (0.790 ln Re - 1.64)^{-2}
 Nu_i interpolated from Kays & Crawford Table 8-2 for inner wall heated,
 outer insulated, as a function of diameter ratio κ = D_i/D_o.
 
+**Characteristic length basis:** D_i (inner tube outer diameter), NOT D_h.
+Heat-transfer coefficient: h = Nu_i · k / D_i.
+
+**κ range (frozen):** [0.1, 0.75] inclusive — verified data only, no extrapolation.
+
 ### Annulus Turbulent (C5)
 
 Hydraulic-diameter adaptation of Gnielinski. Explicitly marked as adaptation.
+
+**Characteristic length basis:** D_h (hydraulic diameter).
 
 ## Symbols and Units
 
@@ -70,8 +77,8 @@ Hydraulic-diameter adaptation of Gnielinski. Explicitly marked as adaptation.
 | C1 | (0, 2300) | (0.6, ∞) | N/A | Fully developed |
 | C2 | (0, 2300) | (0.6, ∞) | N/A | Fully developed |
 | C3 | (3000, 5×10⁶) | (0.5, 2000) | N/A | |
-| C4 | (0, 2300) | (0.6, ∞) | (0, 1) | Inner wall heated |
-| C5 | (10000, 5×10⁶) | (0.5, 2000) | (0, 1) | DH adaptation |
+| C4 | (0, 2300) | (0.6, ∞) | [0.1, 0.75] | Inner wall heated, D_i basis |
+| C5 | (10000, 5×10⁶) | (0.5, 2000) | (0, 1) | D_h adaptation |
 
 ## Transition Policy
 
@@ -80,11 +87,23 @@ Returns structured blocker with actual Re and transition bounds.
 
 ## Selection Rules
 
-1. Filter by applicability (geometry, regime, boundary condition)
+1. Filter by applicability (geometry, regime, boundary condition) via `InMemoryCorrelationRegistry.assess_applicability()`
 2. Sort by: priority (desc), correlation_id (asc), version (desc)
 3. First candidate wins
 4. If no candidate: BLOCKED with `CORRELATION_NOT_FOUND`
 5. Order-independent: different insertion orders produce same selection
+6. Selection is registry-backed — all 5 correlations registered with applicability metadata
+
+## Boundary Condition Validation
+
+All boundary conditions are **typed** — validated via Pydantic models, not string matching.
+Annulus boundary conditions (inner_wall_heated, outer_wall_heated, both_walls_heated) are
+distinguished from tube conditions. heated_surface vs BC consistency is enforced at input time.
+
+## Hash Integrity
+
+- `result_hash` is computed over all public fields **excluding itself** (no self-referential hash).
+- Hash recomputation via `verify_provenance()` validates against the stored digest.
 
 ## Wall-Property Policy
 
@@ -107,6 +126,7 @@ Returns structured blocker with actual Re and transition bounds.
 - CORRELATION: selected correlation identity
 - WARNING/BLOCKER: any messages
 - RESULT: final result
+- Full graph verification via `verify_provenance()`: graph digest, node/edge uniqueness, DAG validation, payload hash recomputation
 
 ## Unsupported Cases
 
