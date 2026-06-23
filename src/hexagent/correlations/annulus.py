@@ -6,11 +6,15 @@ Implements:
 
 Sources:
 - C4: Kays, W.M., Crawford, M.E., "Convective Heat and Mass Transfer,"
-  3rd Edition, McGraw-Hill, 1993, Table 8-2.
-- C5: Kays & Crawford, Ch. 10; Gnielinski (1976) adapted with D_h.
+  3rd Edition, McGraw-Hill, 1993, Chapter 9, Table 9-1.
+  NOTE: Source data pending independent verification. Correlation is
+  currently metadata_only / unverified. Do NOT claim primary_source_checked.
+- C5: Gnielinski (1976) adapted via hydraulic diameter per engineering
+  judgment. Kays & Crawford 3rd ed. Ch. 10 citation not independently
+  verified for this specific adaptation. Source verification: unverified.
 
-C4 Nu_i is based on inner tube outside diameter D_i.
-C5 Nu_h is based on hydraulic diameter D_h.
+All Nu values in this module are based on the annulus hydraulic diameter D_h,
+per the Kays & Crawford convention for annulus Nusselt numbers.
 """
 
 from __future__ import annotations
@@ -19,68 +23,68 @@ import math
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
-# Kays & Crawford Table 8-2: Laminar Nu for annulus, inner wall heated,
-# outer insulated. Values are Nu_i based on inner tube outside diameter.
-# Diameter ratio κ = D_inner / D_outer
+# C4 data status: UNVERIFIED
 #
-# VERIFIED data points only (finite values):
-#   κ = 0.1   → Nu_i = 4.85
-#   κ = 0.25  → Nu_i = 5.70
-#   κ = 0.5   → Nu_i = 7.30
-#   κ = 0.75  → Nu_i = 10.10
+# The reviewer independently confirmed that the fully developed
+# asymmetric-heating annulus solution in Kays & Crawford 3rd ed.
+# is in Chapter 9, Table 9-1, and the book defines both surface
+# Nusselt numbers with the annulus hydraulic diameter D_h.
 #
-# κ < 0.1 and κ > 0.75 are OUTSIDE the verified range.
-# No extrapolation is performed; these are BLOCKED.
+# The previously implemented values (4.85, 5.70, 7.30, 10.10 at
+# κ = 0.1, 0.25, 0.5, 0.75) referenced "Table 8-2" and claimed
+# D_i basis — both are INCORRECT per the reviewer's independent check.
+#
+# Until an engineer provides the verified Table 9-1 values with
+# correct D_h basis, C4 is marked metadata_only and computation
+# is BLOCKED by the service layer.
+#
+# The interpolation function below is retained as a placeholder
+# but the service will not call it until data is verified.
 # ---------------------------------------------------------------------------
-_KAYS_TABLE_KAPPA: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75)
-_KAYS_TABLE_NU_I: tuple[float, ...] = (4.85, 5.70, 7.30, 10.10)
 
-# Verified range bounds (frozen)
+# Placeholder data — MUST BE REPLACED with verified Table 9-1 values.
+# These are NOT claimed as authoritative.
+_PLACEHOLDER_KAPPA: tuple[float, ...] = (0.1, 0.25, 0.5, 0.75)
+_PLACEHOLDER_NU_DH: tuple[float, ...] = (0.0, 0.0, 0.0, 0.0)  # Placeholder
+
+# Frozen range bounds for the placeholder data
 _KAPPA_ABSOLUTE_MIN = 0.1
 _KAPPA_ABSOLUTE_MAX = 0.75
 
 
 def _interpolate_nu_laminar_inner(kappa: float) -> float:
-    """Interpolate Nu_i from Kays Table 8-2 for inner wall heated, outer insulated.
+    """Interpolate Nu from placeholder data for inner wall heated, outer insulated.
+
+    WARNING: This function uses UNVERIFIED placeholder data.
+    The service layer BLOCKS C4 computation until authoritative
+    Table 9-1 values are provided by an engineer.
 
     kappa = D_inner / D_outer.
-    Valid range: [0.1, 0.75] inclusive (verified data points only).
-    Linear interpolation between verified data points.
-    No extrapolation outside verified range.
-    A small tolerance (1e-9) is applied for floating-point boundary comparison.
+    Nu is based on hydraulic diameter D_h (per Kays & Crawford convention).
     """
-    # Tolerance for floating-point boundary comparison
-    _TOL = 1e-9
-    if kappa < _KAPPA_ABSOLUTE_MIN - _TOL or kappa > _KAPPA_ABSOLUTE_MAX + _TOL:
-        raise ValueError(
-            f"kappa={kappa!r} is outside verified table range "
-            f"[{_KAPPA_ABSOLUTE_MIN}, {_KAPPA_ABSOLUTE_MAX}]. "
-            f"No extrapolation is permitted."
-        )
-    # Clamp to table range to handle floating-point edge cases
-    kappa_clamped = max(_KAPPA_ABSOLUTE_MIN, min(_KAPPA_ABSOLUTE_MAX, kappa))
-
-    # Linear interpolation between verified data points
-    for i in range(len(_KAYS_TABLE_KAPPA) - 1):
-        k0 = _KAYS_TABLE_KAPPA[i]
-        nu0 = _KAYS_TABLE_NU_I[i]
-        k1 = _KAYS_TABLE_KAPPA[i + 1]
-        nu1 = _KAYS_TABLE_NU_I[i + 1]
-        if k0 <= kappa_clamped <= k1:
-            t = (kappa_clamped - k0) / (k1 - k0)
-            return nu0 + t * (nu1 - nu0)
-
-    raise ValueError(f"Interpolation failed for kappa={kappa!r}")
+    raise NotImplementedError(
+        "C4 annulus laminar correlation data is pending source verification. "
+        "Kays & Crawford 3rd ed. Chapter 9, Table 9-1 values with D_h basis "
+        "must be independently verified before computation is enabled."
+    )
 
 
 @dataclass(frozen=True)
 class AnnulusLaminarInnerCHF:
     """C4: Annulus laminar, inner wall heated, outer insulated.
 
-    Nu_i interpolated from Kays & Crawford Table 8-2.
-    Based on inner tube outside diameter D_i.
-    Valid for: Re_h < 2300, Pr > 0.6, 0.1 <= κ <= 0.75.
-    h_i = Nu_i * k / D_i  (NOT D_h).
+    STATUS: metadata_only — source data pending verification.
+
+    Intended source: Kays, W.M., Crawford, M.E., "Convective Heat and Mass
+    Transfer," 3rd Edition, McGraw-Hill, 1993, Chapter 9, Table 9-1.
+
+    Per the reviewer's independent check:
+    - Nu is based on hydraulic diameter D_h (NOT inner diameter D_i)
+    - The previously cited "Table 8-2" is incorrect for this problem
+    - The κ/Nu values need re-extraction from the correct table
+
+    Valid for: Re_h < 2300, Pr > 0.6, 0 < κ < 1 (exact bounds TBD).
+    h = Nu * k / D_h (once data is verified).
     """
 
     correlation_id: str = "annulus_laminar_inner_chf"
@@ -89,21 +93,25 @@ class AnnulusLaminarInnerCHF:
     source_authors: str = "Kays, W.M., Crawford, M.E."
     source_year: int = 1993
     source_edition: str = "3rd"
-    source_reference: str = "Table 8-2"
+    source_reference: str = "Chapter 9, Table 9-1 (pending verification)"
     supported_geometry: str = "concentric_annulus"
     flow_regime: str = "laminar"
     boundary_condition: str = "inner_wall_heated"
     reynolds_max: float = 2300.0
     prandtl_min: float = 0.6
     prandtl_max: float = float("inf")
-    diameter_ratio_min: float = _KAPPA_ABSOLUTE_MIN  # inclusive
-    diameter_ratio_max: float = _KAPPA_ABSOLUTE_MAX  # inclusive
+    diameter_ratio_min: float = 0.0  # exclusive (TBD after verification)
+    diameter_ratio_max: float = 1.0  # exclusive (TBD after verification)
     requires_wall_viscosity: bool = False
     priority: int = 10
-    nusselt_basis: str = "inside_diameter"  # D_i, inner tube OD
+    nusselt_basis: str = "hydraulic_diameter"  # Per Kays & Crawford convention
 
     def evaluate(self, diameter_ratio: float) -> float:
-        """Compute Nu_i from Kays table interpolation."""
+        """Compute Nu from table interpolation.
+
+        RAISES NotImplementedError — C4 is blocked until source data
+        is independently verified.
+        """
         return _interpolate_nu_laminar_inner(diameter_ratio)
 
 
@@ -116,18 +124,24 @@ class AnnulusTurbulentGnielinskiDH:
     This is explicitly an ADAPTATION — marked as such in metadata.
     Not an original annulus correlation. Has limitation warning.
 
-    Source: Kays & Crawford, Ch. 10 (hydraulic diameter approximation);
-    Gnielinski (1976) for the Nusselt equation.
+    Source status: The Kays & Crawford 3rd ed. Ch. 10 citation for
+    hydraulic-diameter approximation of non-circular ducts has NOT been
+    independently verified for this specific annulus adaptation.
+    Source verification: unverified.
+    Implementation status: implemented (not validated).
+
     Nu is based on hydraulic diameter D_h.
     """
 
     correlation_id: str = "annulus_turbulent_gnielinski_dh"
     version: str = "1.0.0"
     source_title: str = "Gnielinski correlation adapted to annulus via hydraulic diameter"
-    source_authors: str = "Gnielinski, V. (adapted per Kays & Crawford Ch. 10)"
+    source_authors: str = "Gnielinski, V. (adaptation per engineering judgment)"
     source_year: int = 1976
     source_edition: str = ""
-    source_reference: str = "Int. Chem. Eng. Vol. 16, adapted per Kays & Crawford 3rd ed. Ch. 10"
+    source_reference: str = (
+        "Int. Chem. Eng. Vol. 16, adapted via D_h (unverified annulus applicability)"
+    )
     supported_geometry: str = "concentric_annulus"
     flow_regime: str = "turbulent"
     boundary_condition: str = "both"
@@ -140,11 +154,14 @@ class AnnulusTurbulentGnielinskiDH:
     requires_wall_viscosity: bool = False
     is_adaptation: bool = True
     adaptation_limitation: str = (
-        "Hydraulic-diameter approximation may underpredict heat transfer "
-        "for highly asymmetric heating in annuli with large diameter ratios. "
-        "Consult Kays & Crawford for corrections."
+        "Hydraulic-diameter approximation is an engineering adaptation, "
+        "NOT an original annulus correlation. Kays & Crawford Ch. 10 "
+        "citation for non-circular duct DH approximation has not been "
+        "independently verified for annulus geometry. May underpredict "
+        "heat transfer for highly asymmetric heating in annuli with "
+        "large diameter ratios."
     )
-    priority: int = 5  # Lower due to adaptation status
+    priority: int = 5  # Lower due to adaptation/unverified status
     nusselt_basis: str = "hydraulic_diameter"
 
     def petukhov_friction_factor(self, reynolds: float) -> float:

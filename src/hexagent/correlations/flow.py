@@ -25,6 +25,20 @@ class FlowRegime(StrEnum):
     invalid = "invalid"
 
 
+class ThermalBoundaryCondition(StrEnum):
+    """Typed thermal boundary conditions for heat-transfer correlations.
+
+    Replaces raw string boundary conditions. Every public API accepts
+    this enum; string deserialization is supported at the call boundary.
+    """
+
+    constant_wall_temperature = "constant_wall_temperature"
+    constant_heat_flux = "constant_heat_flux"
+    inner_wall_heated = "inner_wall_heated"
+    outer_wall_heated = "outer_wall_heated"
+    both_walls_heated = "both_walls_heated"
+
+
 class NusseltBasis(StrEnum):
     """Characteristic length basis for Nusselt number.
 

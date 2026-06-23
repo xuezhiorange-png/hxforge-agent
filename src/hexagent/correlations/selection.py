@@ -4,11 +4,18 @@ Selection uses the TASK-004 InMemoryCorrelationRegistry and
 assess_applicability() engine. Selection is deterministic: same inputs
 always produce the same selected correlation regardless of registry
 insertion order.
+
+Returns a SelectionResult dataclass instead of a raw tuple.
+Boundary condition compatibility is driven by definition metadata
+(tags with "bc:" prefix), NOT by correlation_id string matching.
+Priority is extracted from definition tags (priority:N), NOT from
+a hardcoded map.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from functools import cmp_to_key
 
 from hexagent.correlations.applicability import assess_applicability
 from hexagent.correlations.flow import FlowRegime, NusseltBasis
@@ -24,61 +31,59 @@ from hexagent.correlations.models import (
     compare_semver,
 )
 from hexagent.correlations.registry import InMemoryCorrelationRegistry
+from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity, ErrorCode
+
+# ---------------------------------------------------------------------------
+# Selection result
+# ---------------------------------------------------------------------------
 
 
-def _derive_boundary_condition(
-    geometry: CircularTubeGeometry | ConcentricAnnulusGeometry,
-    boundary_condition: str,
-) -> str:
-    """Derive the effective boundary condition from geometry and user input.
+@dataclass(frozen=True)
+class SelectionResult:
+    """Immutable result of correlation selection.
 
-    For annulus: validates heated_surface compatibility with boundary_condition.
+    Attributes:
+        selected_definition: The best matching correlation definition, or None.
+        selected_assessment: The applicability assessment for the selected
+            (or best rejected) candidate, or None if no candidates.
+        rejected_candidates: Tuple of (CorrelationDefinition, ApplicabilityAssessment)
+            pairs for candidates that failed applicability.  Preserves full
+            context including blockers/warnings.
+        selection_status: One of "selected", "no_match", "ambiguous", "blocked".
+        blockers: Tuple of EngineeringMessage explaining why selection failed.
     """
-    if isinstance(geometry, ConcentricAnnulusGeometry):
-        hs = geometry.heated_surface
-        if boundary_condition == "inner_wall_heated" and hs != "inner":
-            return "__blocker__geometry_mismatch"
-        if boundary_condition == "outer_wall_heated" and hs != "outer":
-            return "__blocker__geometry_mismatch"
-        if boundary_condition == "both_walls_heated" and hs != "both":
-            return "__blocker__geometry_mismatch"
-    return boundary_condition
+
+    selected_definition: CorrelationDefinition | None
+    selected_assessment: ApplicabilityAssessment | None
+    rejected_candidates: tuple[tuple[CorrelationDefinition, ApplicabilityAssessment], ...]
+    selection_status: str  # "selected" | "no_match" | "ambiguous" | "blocked"
+    blockers: tuple[EngineeringMessage, ...]
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _extract_priority(definition: CorrelationDefinition) -> int:
+    """Extract priority from definition tags (priority:N).  Default is 0."""
+    for tag in definition.tags:
+        if tag.startswith("priority:"):
+            try:
+                return int(tag.split(":", 1)[1])
+            except (ValueError, IndexError):
+                pass
+    return 0
 
 
 def _is_boundary_compatible(definition: CorrelationDefinition, boundary_condition: str) -> bool:
     """Check if a correlation definition supports the given boundary condition.
 
-    Uses the correlation's boundary_condition field from its envelope or
-    tags. C3 (tube_turbulent) supports both CWT and CHF.
+    Boundary condition compatibility is driven by definition metadata:
+    tags with ``bc:`` prefix (e.g. ``bc:constant_wall_temperature``).
+    This replaces the previous correlation_id string-matching approach.
     """
-    # Boundary condition compatibility is checked by correlation ID
-    # For C3: boundary_condition is "both" meaning supports both CWT and CHF
-    if definition.key.correlation_id == "tube_turbulent_gnielinski":
-        return boundary_condition in ("constant_wall_temperature", "constant_heat_flux")
-
-    # For C5: supports multiple boundary conditions (adaptation)
-    if definition.key.correlation_id == "annulus_turbulent_gnielinski_dh":
-        return boundary_condition in (
-            "inner_wall_heated",
-            "outer_wall_heated",
-            "both_walls_heated",
-            "constant_wall_temperature",
-            "constant_heat_flux",
-        )
-
-    # For C1: constant_wall_temperature only
-    if definition.key.correlation_id == "tube_laminar_cwt":
-        return boundary_condition == "constant_wall_temperature"
-
-    # For C2: constant_heat_flux only
-    if definition.key.correlation_id == "tube_laminar_chf":
-        return boundary_condition == "constant_heat_flux"
-
-    # For C4: inner_wall_heated only
-    if definition.key.correlation_id == "annulus_laminar_inner_chf":
-        return boundary_condition == "inner_wall_heated"
-
-    return False
+    return f"bc:{boundary_condition}" in definition.tags
 
 
 def _get_nusselt_basis(definition: CorrelationDefinition) -> str:
@@ -86,12 +91,53 @@ def _get_nusselt_basis(definition: CorrelationDefinition) -> str:
     for tag in definition.tags:
         if tag.startswith("nusselt_basis:"):
             return tag.split(":", 1)[1]
-    # Default based on correlation ID
-    if definition.key.correlation_id == "annulus_laminar_inner_chf":
-        return NusseltBasis.inside_diameter.value
-    if definition.key.correlation_id == "annulus_turbulent_gnielinski_dh":
-        return NusseltBasis.hydraulic_diameter.value
     return NusseltBasis.inside_diameter.value
+
+
+# ---------------------------------------------------------------------------
+# Candidate comparison (for deterministic sorting)
+# ---------------------------------------------------------------------------
+
+
+def _compare_candidates(
+    a: tuple[CorrelationDefinition, ApplicabilityAssessment],
+    b: tuple[CorrelationDefinition, ApplicabilityAssessment],
+) -> int:
+    """Compare two candidates for selection.
+
+    Sort order (ascending — first element wins):
+    1. Priority: higher = preferred  (negated for ascending sort)
+    2. Correlation ID: ascending alphabetical
+    3. Version: descending SemVer (highest version first, stable > prerelease)
+
+    Returns negative if *a* is preferred over *b*, positive if *b* is preferred,
+    0 if they tie on all keys (ambiguous).
+    """
+    defn_a, _ = a
+    defn_b, _ = b
+
+    # 1. Priority: higher = preferred
+    prio_a = _extract_priority(defn_a)
+    prio_b = _extract_priority(defn_b)
+    if prio_a != prio_b:
+        return -(prio_a - prio_b)  # higher priority sorts first
+
+    # 2. Correlation ID: ascending alphabetical
+    if defn_a.key.correlation_id != defn_b.key.correlation_id:
+        return -1 if defn_a.key.correlation_id < defn_b.key.correlation_id else 1
+
+    # 3. Version: descending SemVer (highest first, stable > prerelease)
+    semver_cmp = compare_semver(defn_a.key.version, defn_b.key.version)
+    if semver_cmp != 0:
+        return -semver_cmp  # negate for descending
+
+    # All keys identical — tie (ambiguous)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Main selection function
+# ---------------------------------------------------------------------------
 
 
 def select_correlation(
@@ -103,12 +149,12 @@ def select_correlation(
     prandtl: float,
     diameter_ratio: float = 0.0,
     has_wall_viscosity: bool = False,
-) -> tuple[CorrelationDefinition | None, ApplicabilityAssessment | None, str | None]:
+) -> SelectionResult:
     """Select the best correlation candidate deterministically using the registry.
 
-    Returns:
-        (definition, assessment, None) if a single correlation is selected
-        (None, None, blocker_message) if blocked or ambiguous
+    Returns a :class:`SelectionResult` with the selected definition (or None),
+    its applicability assessment, any rejected candidates with full context,
+    a status string, and any blocker messages.
     """
     # Map geometry to GeometryType for the registry
     if isinstance(geometry, CircularTubeGeometry):
@@ -122,10 +168,21 @@ def select_correlation(
     elif flow_regime == FlowRegime.turbulent:
         model_flow_regime = "turbulent"
     else:
-        return None, None, f"Unsupported flow regime: {flow_regime.value}"
+        return SelectionResult(
+            selected_definition=None,
+            selected_assessment=None,
+            rejected_candidates=(),
+            selection_status="blocked",
+            blockers=(
+                EngineeringMessage(
+                    code=ErrorCode.CORRELATION_FLOW_REGIME_INCOMPATIBLE,
+                    severity=EngineeringMessageSeverity.BLOCKER,
+                    message=f"Unsupported flow regime: {flow_regime.value}",
+                    source_module="correlations.selection",
+                ),
+            ),
+        )
 
-    # Search registry for matching definitions
-    # Use the models module's FlowRegime equivalent
     from hexagent.correlations.models import FlowRegime as ModelFlowRegime
 
     model_flow = ModelFlowRegime(model_flow_regime)
@@ -137,22 +194,22 @@ def select_correlation(
     )
 
     if not candidates:
-        # Try heat_transfer_coefficient purpose too
         candidates = registry.search(
             purpose=CorrelationPurpose.heat_transfer_coefficient,
             geometry=geo_type,
             implementation_status=None,
         )
 
-    # Filter by flow regime compatibility
-    filtered: list[tuple[CorrelationDefinition, ApplicabilityAssessment]] = []
+    # Assess all candidates, partitioning into passed/failed
+    passed: list[tuple[CorrelationDefinition, ApplicabilityAssessment]] = []
+    rejected: list[tuple[CorrelationDefinition, ApplicabilityAssessment]] = []
 
     for defn in candidates:
-        # Check flow regime
+        # Check flow regime compatibility
         if model_flow not in defn.envelope.flow_regimes:
             continue
 
-        # Check boundary condition compatibility
+        # Check boundary condition compatibility (tag-driven)
         if not _is_boundary_compatible(defn, boundary_condition):
             continue
 
@@ -161,10 +218,8 @@ def select_correlation(
             (ApplicabilityVariable.reynolds, reynolds),
             (ApplicabilityVariable.prandtl, prandtl),
         ]
-        if (
-            defn.key.correlation_id == "annulus_laminar_inner_chf"
-            or defn.key.correlation_id == "annulus_turbulent_gnielinski_dh"
-        ):
+        # Check if this definition requires diameter_ratio
+        if ApplicabilityVariable.diameter_ratio in defn.envelope.required_inputs:
             values_list.append((ApplicabilityVariable.diameter_ratio, diameter_ratio))
 
         inputs = CorrelationApplicabilityInput(
@@ -178,69 +233,64 @@ def select_correlation(
         assessment = assess_applicability(defn, inputs)
 
         if assessment.allows_evaluation:
-            filtered.append((defn, assessment))
+            passed.append((defn, assessment))
+        else:
+            rejected.append((defn, assessment))
 
-    if not filtered:
-        return None, None, None  # No applicable correlation found
+    # No applicable correlation found
+    if not passed:
+        # Return best rejected candidate's assessment with full context
+        best_rejected_defn = None
+        best_rejected_assessment = None
+        if rejected:
+            # Sort rejected candidates the same way to find the "best" one
+            rejected.sort(key=cmp_to_key(_compare_candidates))
+            best_rejected_defn, best_rejected_assessment = rejected[0]
 
-    # Deterministic sort: priority desc, correlation_id asc, version desc (SemVer)
-    def _sort_key(item: tuple[CorrelationDefinition, ApplicabilityAssessment]) -> tuple[Any, ...]:
-        import contextlib
-
-        defn = item[0]
-        # priority: negative for descending
-        priority = -100  # default
-        for tag in defn.tags:
-            if tag.startswith("priority:"):
-                with contextlib.suppress(ValueError):
-                    priority = -int(tag.split(":")[1])
-        # Use the definition's source priority if available
-        # For now, hardcode based on correlation ID (registry is authoritative)
-        prio_map = {
-            "tube_laminar_cwt": -10,
-            "tube_laminar_chf": -10,
-            "tube_turbulent_gnielinski": -10,
-            "annulus_laminar_inner_chf": -10,
-            "annulus_turbulent_gnielinski_dh": -5,
-        }
-        p = prio_map.get(defn.key.correlation_id, priority)
-
-        # Parse SemVer for version comparison (highest wins → negative for sort)
-        from hexagent.correlations.models import parse_semver
-
-        major, minor, patch, prerelease = parse_semver(defn.key.version)
-        pre_flag = 0 if prerelease else 1  # stable > prerelease
-        version_key = (major, minor, patch, pre_flag, prerelease)
-
-        return (
-            p,
-            defn.key.correlation_id,
-            tuple(-v if isinstance(v, int) else v for v in version_key),
+        return SelectionResult(
+            selected_definition=best_rejected_defn,
+            selected_assessment=best_rejected_assessment,
+            rejected_candidates=tuple(rejected),
+            selection_status="no_match",
+            blockers=(),
         )
 
-    filtered.sort(key=_sort_key)
+    # Deterministic sort: priority desc, correlation_id asc, version desc
+    passed.sort(key=cmp_to_key(_compare_candidates))
 
-    # Check for ambiguity: all selection keys identical
-    first_defn = filtered[0][0]
-    ambiguous = False
-    for defn, _ in filtered[1:]:
-        if (
-            defn.key.correlation_id == first_defn.key.correlation_id
-            and compare_semver(defn.key.version, first_defn.key.version) == 0
-        ):
-            # Same ID and version — should not happen with registry dedup
-            continue
-        # Different correlation — not ambiguous (first wins by sort order)
-        break
-
-    if ambiguous:
-        return (
-            None,
-            None,
-            ("Ambiguous correlation selection: multiple candidates tie on all selection keys"),
+    # Check for ambiguity: first two candidates tie on ALL sort keys
+    if len(passed) >= 2 and _compare_candidates(passed[0], passed[1]) == 0:
+        return SelectionResult(
+            selected_definition=None,
+            selected_assessment=None,
+            rejected_candidates=tuple(rejected),
+            selection_status="ambiguous",
+            blockers=(
+                EngineeringMessage(
+                    code=ErrorCode.CORRELATION_NOT_FOUND,
+                    severity=EngineeringMessageSeverity.BLOCKER,
+                    message=(
+                        "Ambiguous correlation selection: multiple candidates "
+                        "tie on all selection keys (priority, id, version)"
+                    ),
+                    source_module="correlations.selection",
+                ),
+            ),
         )
 
-    return filtered[0][0], filtered[0][1], None
+    selected_defn, selected_assessment = passed[0]
+    return SelectionResult(
+        selected_definition=selected_defn,
+        selected_assessment=selected_assessment,
+        rejected_candidates=tuple(rejected),
+        selection_status="selected",
+        blockers=(),
+    )
 
 
-__all_ = ["select_correlation", "_get_nusselt_basis"]
+__all__ = [
+    "SelectionResult",
+    "select_correlation",
+    "_get_nusselt_basis",
+    "_is_boundary_compatible",
+]

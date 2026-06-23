@@ -20,13 +20,14 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid5
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 from hexagent.core.canonical import sha256_digest
 
 # Reuse ExecutionContextSnapshot from heat_balance module
 from hexagent.core.heat_balance import ExecutionContextSnapshot
 from hexagent.correlations.geometry import CircularTubeGeometry, ConcentricAnnulusGeometry
+from hexagent.correlations.models import ApplicabilityAssessment
 from hexagent.domain.messages import (
     EngineeringMessage,
     RunFailure,
@@ -137,8 +138,16 @@ class CorrelationResult(BaseModel):
     selected_correlation: SelectedCorrelationInfo | None = None
 
     # Applicability
-    applicability_assessment: Any = None  # ApplicabilityAssessment or None
+    applicability_assessment: ApplicabilityAssessment | None = None
     applicability_status: str = ""
+
+    @field_validator("applicability_assessment", mode="before")
+    @classmethod
+    def _strip_allows_evaluation(cls, v: Any) -> Any:
+        """Strip allows_evaluation from dict input for JSON round-trip."""
+        if isinstance(v, dict) and "allows_evaluation" in v:
+            v = {k: val for k, val in v.items() if k != "allows_evaluation"}
+        return v
 
     # Messages
     warnings: tuple[EngineeringMessage, ...] = ()
@@ -244,6 +253,7 @@ class CorrelationResult(BaseModel):
                 if self.selected_correlation
                 else None
             ),
+            "applicability_assessment": _canonicalize_assessment(self.applicability_assessment),
             "applicability_status": self.applicability_status,
             "warnings": [_canonicalize_message(w) for w in self.warnings],
             "blockers": [_canonicalize_message(b) for b in self.blockers],
@@ -300,6 +310,7 @@ class CorrelationResult(BaseModel):
                 if self.selected_correlation
                 else None
             ),
+            "applicability_assessment": _canonicalize_assessment(self.applicability_assessment),
             "applicability_status": self.applicability_status,
             "warnings": [_canonicalize_message(w) for w in self.warnings],
             "blockers": [_canonicalize_message(b) for b in self.blockers],
@@ -418,13 +429,79 @@ class CorrelationResult(BaseModel):
             if visited != len(node_set):
                 return False  # Cycle detected
 
-            # 7 & 8: Verify node payload hashes and UUID5s
+            # 7 & 8: Per-node-type semantic verification
             for node in graph.nodes:
                 if not node.payload_hash.startswith("sha256:"):
                     return False
-                # Recompute UUID5 — we need the original payload.
-                # This requires knowing the payload structure, which varies by node type.
-                # We verify by recomputing the graph digest (step 1 covers this).
+
+                # Rebuild canonical payload based on node type
+                if node.node_type == ProvenanceNodeType.EXTERNAL:
+                    payload = _build_external_root_payload(self.execution_context)
+                elif node.node_type == ProvenanceNodeType.CASE_REVISION:
+                    payload = _build_case_revision_root_payload(self.execution_context)
+                elif node.node_type == ProvenanceNodeType.CALCULATION_RUN:
+                    selected = self.selected_correlation
+                    payload = _build_calculation_run_payload(
+                        correlation_id=selected.correlation_id if selected else "",
+                        version=selected.version if selected else "",
+                        re=self.reynolds_number,
+                        pr=self.prandtl_number,
+                        nu=self.nusselt_number,
+                        h=self.heat_transfer_coefficient,
+                        status=self.status.value,
+                        ctx=self.execution_context,
+                    )
+                elif node.node_type == ProvenanceNodeType.CORRELATION:
+                    selected = self.selected_correlation
+                    if selected is None:
+                        return False
+                    payload = _build_correlation_payload(
+                        correlation_id=selected.correlation_id,
+                        version=selected.version,
+                        definition_hash=selected.definition_hash,
+                        source_title=selected.source_title,
+                        nusselt_basis=selected.nusselt_basis,
+                    )
+                elif node.node_type == ProvenanceNodeType.WARNING:
+                    meta = dict(node.metadata)
+                    code = meta.get("code", "")
+                    message = meta.get("message", "")
+                    source_module = "correlations.service"
+                    payload = _build_warning_payload(code, message, source_module)
+                elif node.node_type == ProvenanceNodeType.BLOCKER:
+                    meta = dict(node.metadata)
+                    code = meta.get("code", "")
+                    message = meta.get("message", "")
+                    source_module = "correlations.service"
+                    payload = _build_blocker_payload(code, message, source_module)
+                elif node.node_type == ProvenanceNodeType.RESULT:
+                    assessment_hash = ""
+                    if self.applicability_assessment is not None:
+                        assessment_hash = self.applicability_assessment.assessment_hash
+                    payload = _build_result_payload_for_provenance(
+                        status=self.status.value,
+                        nu=self.nusselt_number,
+                        h=self.heat_transfer_coefficient,
+                        correlation_id=(
+                            self.selected_correlation.correlation_id
+                            if self.selected_correlation
+                            else ""
+                        ),
+                        assessment_hash=assessment_hash,
+                    )
+                else:
+                    # Unknown node type — skip payload verification
+                    continue
+
+                # Verify payload_hash matches
+                expected_hash = sha256_digest(payload)
+                if expected_hash != node.payload_hash:
+                    return False
+
+                # Verify UUID5 matches
+                expected_id = _deterministic_uuid5(payload)
+                if expected_id != node.node_id:
+                    return False
 
             # 9. Root node type
             ctx = self.execution_context
@@ -433,7 +510,6 @@ class CorrelationResult(BaseModel):
             has_case_rev = ProvenanceNodeType.CASE_REVISION in node_types
             if not (has_external or has_case_rev):
                 return False
-            # If design_case_revision_id is set, should be CASE_REVISION
             if ctx.design_case_revision_id is not None and not has_case_rev:
                 return False
             if ctx.design_case_revision_id is None and not has_external:
@@ -534,6 +610,43 @@ def _canonicalize_message(m: EngineeringMessage) -> dict[str, Any]:
     }
 
 
+def _canonicalize_assessment(assessment: ApplicabilityAssessment | None) -> dict[str, Any] | None:
+    """Canonicalize an ApplicabilityAssessment for hashing.
+
+    Produces a hashable dict that captures all identity-relevant fields.
+    Returns None if assessment is None.
+    """
+    if assessment is None:
+        return None
+    sorted_vrs = sorted(assessment.variable_results, key=lambda vr: vr.variable.value)
+    return {
+        "correlation_key": {
+            "correlation_id": assessment.correlation_key.correlation_id,
+            "version": assessment.correlation_key.version,
+        },
+        "status": assessment.status.value
+        if hasattr(assessment.status, "value")
+        else str(assessment.status),
+        "variable_results": [
+            {
+                "variable": vr.variable.value
+                if hasattr(vr.variable, "value")
+                else str(vr.variable),
+                "supplied_value": vr.supplied_value,
+                "absolute_minimum": vr.absolute_minimum,
+                "absolute_maximum": vr.absolute_maximum,
+                "recommended_minimum": vr.recommended_minimum,
+                "recommended_maximum": vr.recommended_maximum,
+                "status": vr.status.value if hasattr(vr.status, "value") else str(vr.status),
+            }
+            for vr in sorted_vrs
+        ],
+        "warnings": [_canonicalize_message(w) for w in assessment.warnings],
+        "blockers": [_canonicalize_message(b) for b in assessment.blockers],
+        "assessment_hash": assessment.assessment_hash,
+    }
+
+
 def _canonicalize_graph(graph: ProvenanceGraph) -> dict[str, Any]:
     """Canonicalize a ProvenanceGraph for field hash computation."""
     sorted_nodes = sorted(
@@ -545,6 +658,117 @@ def _canonicalize_graph(graph: ProvenanceGraph) -> dict[str, Any]:
         key=lambda x: (str(x.get("source_id", "")), str(x.get("target_id", ""))),
     )
     return {"nodes": sorted_nodes, "edges": sorted_edges}
+
+
+# ---------------------------------------------------------------------------
+# Per-node-type payload builders (for provenance verification)
+# ---------------------------------------------------------------------------
+
+
+def _build_external_root_payload(execution_context: ExecutionContextSnapshot) -> dict[str, Any]:
+    """Rebuild the canonical payload for an EXTERNAL root node."""
+    ctx = execution_context
+    return {
+        "root_type": "EXTERNAL",
+        "request_id": str(ctx.request_id) if ctx.request_id is not None else None,
+    }
+
+
+def _build_case_revision_root_payload(
+    execution_context: ExecutionContextSnapshot,
+) -> dict[str, Any]:
+    """Rebuild the canonical payload for a CASE_REVISION root node."""
+    ctx = execution_context
+    return {
+        "root_type": "CASE_REVISION",
+        "design_case_revision_id": str(ctx.design_case_revision_id),
+        "request_id": str(ctx.request_id) if ctx.request_id is not None else None,
+    }
+
+
+def _build_calculation_run_payload(
+    correlation_id: str,
+    version: str,
+    re: float,
+    pr: float,
+    nu: float,
+    h: float,
+    status: str,
+    ctx: ExecutionContextSnapshot,
+) -> dict[str, Any]:
+    """Rebuild the canonical payload for a CALCULATION_RUN node."""
+    return {
+        "correlation_id": correlation_id,
+        "correlation_version": version,
+        "reynolds": re,
+        "prandtl": pr,
+        "nusselt": nu,
+        "heat_transfer_coefficient": h,
+        "status": status,
+        "software_version": _SOFTWARE_VERSION,
+    }
+
+
+def _build_correlation_payload(
+    correlation_id: str,
+    version: str,
+    definition_hash: str,
+    source_title: str,
+    nusselt_basis: str = "",
+) -> dict[str, Any]:
+    """Rebuild the canonical payload for a CORRELATION node."""
+    return {
+        "correlation_id": correlation_id,
+        "version": version,
+        "definition_hash": definition_hash,
+        "source_title": source_title,
+        "nusselt_basis": nusselt_basis,
+    }
+
+
+def _build_warning_payload(
+    code: str,
+    message: str,
+    source_module: str,
+) -> dict[str, Any]:
+    """Rebuild the canonical payload for a WARNING node."""
+    return {
+        "code": code,
+        "severity": "warning",
+        "message": message,
+        "source_module": source_module,
+    }
+
+
+def _build_blocker_payload(
+    code: str,
+    message: str,
+    source_module: str,
+) -> dict[str, Any]:
+    """Rebuild the canonical payload for a BLOCKER node."""
+    return {
+        "code": code,
+        "severity": "blocker",
+        "message": message,
+        "source_module": source_module,
+    }
+
+
+def _build_result_payload_for_provenance(
+    status: str,
+    nu: float,
+    h: float,
+    correlation_id: str,
+    assessment_hash: str,
+) -> dict[str, Any]:
+    """Rebuild the canonical payload for a RESULT node."""
+    return {
+        "status": status,
+        "nusselt": nu,
+        "heat_transfer_coefficient": h,
+        "correlation_id": correlation_id,
+        "assessment_hash": assessment_hash,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -561,6 +785,8 @@ def _build_provenance_graph(
     source_title: str = "",
     source_authors: str = "",
     source_year: int = 0,
+    nusselt_basis: str = "",
+    assessment_hash: str = "",
     reynolds: float,
     prandtl: float,
     nu: float,
@@ -639,8 +865,7 @@ def _build_provenance_graph(
             "version": correlation_version,
             "definition_hash": definition_hash,
             "source_title": source_title,
-            "source_authors": source_authors,
-            "source_year": source_year,
+            "nusselt_basis": nusselt_basis,
         }
         corr_id = _deterministic_uuid5(corr_payload)
         nodes.append(
@@ -653,6 +878,7 @@ def _build_provenance_graph(
                     ("version", correlation_version),
                     ("definition_hash", definition_hash),
                     ("source_title", source_title),
+                    ("nusselt_basis", nusselt_basis),
                 ),
                 payload_hash=sha256_digest(corr_payload),
             )
@@ -713,6 +939,7 @@ def _build_provenance_graph(
         "nusselt": nu,
         "heat_transfer_coefficient": h,
         "correlation_id": correlation_id,
+        "assessment_hash": assessment_hash,
     }
     result_id = _deterministic_uuid5(result_payload)
     nodes.append(
