@@ -133,7 +133,8 @@ Supported and unsupported combinations must be explicitly enumerated. Under-spec
 | Review-11 | `7d106cb` | #14 | IN_PROGRESS | 2026-06-22 |
 | Review-12 | `0b58f1b` | #14 | IN_PROGRESS | 2026-06-22 |
 | Review-13 | `0fd3e90` | #14 | CHANGES REQUIRED | 2026-06-22 |
-| Review-14 | `3812123` | #14 | IN_PROGRESS | 2026-06-23 |
+| Review-14 | `3beaeb1` | #14 | CHANGES REQUIRED | 2026-06-23 |
+| Review-15 | `d925476` | #14 | IN_PROGRESS | 2026-06-23 |
 
 Review-12 implementation commit: `0b58f1b11bf7e0401c7193f4d28b46f95bdd5c63`
 Implementation CI: `27974294657`
