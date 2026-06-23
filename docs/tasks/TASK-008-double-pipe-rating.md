@@ -6,7 +6,7 @@
 **Depends on:** TASK-003, TASK-005, TASK-006, TASK-007
 **GitHub Issue:** #20
 **Branch:** `codex/task-008-fixed-geometry-double-pipe-rating`
-**Draft PR:** pending
+**Draft PR:** #21
 
 ## Objective
 
