@@ -3090,3 +3090,276 @@ class TestCorrelationProvenanceSourceIdentity:
 
         assert restored.verify_hash() is True
         assert restored.verify_provenance() is True
+
+
+# =====================================================================
+# J. Pure Source Identity Sensitivity
+# =====================================================================
+
+
+class TestPureSourceIdentitySensitivity:
+    """Source field changes alone change the canonical payload hash."""
+
+    def test_correlation_payload_includes_source_fields(self) -> None:
+        """_build_correlation_payload includes all source fields in output."""
+        from hexagent.correlations.hx_result import _build_correlation_payload
+
+        payload = _build_correlation_payload(
+            correlation_id="test",
+            version="1.0.0",
+            definition_hash="sha256:abc",
+            source_title="Test Title",
+            source_authors="Author A",
+            source_year=2020,
+            source_reference="Ed. 1 Clause 2",
+            source_verification_status="primary_source_checked",
+            nusselt_basis="inside_diameter",
+        )
+        assert payload["source_year"] == 2020
+        assert payload["source_authors"] == "Author A"
+        assert payload["source_reference"] == "Ed. 1 Clause 2"
+        assert payload["source_verification_status"] == "primary_source_checked"
+
+    def test_correlation_payload_different_source_year_different_hash(self) -> None:
+        """Different source_year → different payload hash."""
+        from hexagent.core.canonical import sha256_digest
+        from hexagent.correlations.hx_result import _build_correlation_payload
+
+        common = dict(
+            correlation_id="test",
+            version="1.0.0",
+            definition_hash="sha256:abc",
+            source_title="T",
+            source_authors="A",
+            source_reference="R",
+            source_verification_status="unverified",
+            nusselt_basis="inside_diameter",
+        )
+        p1 = _build_correlation_payload(**common, source_year=2011)
+        p2 = _build_correlation_payload(**common, source_year=2012)
+        assert sha256_digest(p1) != sha256_digest(p2)
+
+    def test_correlation_payload_different_reference_different_hash(self) -> None:
+        """Different source_reference → different payload hash."""
+        from hexagent.core.canonical import sha256_digest
+        from hexagent.correlations.hx_result import _build_correlation_payload
+
+        common = dict(
+            correlation_id="test",
+            version="1.0.0",
+            definition_hash="sha256:abc",
+            source_title="T",
+            source_authors="A",
+            source_year=2011,
+            source_verification_status="unverified",
+            nusselt_basis="inside_diameter",
+        )
+        p1 = _build_correlation_payload(**common, source_reference="Ed. 7 Table 8.1")
+        p2 = _build_correlation_payload(**common, source_reference="Ed. 8 Table 9.1")
+        assert sha256_digest(p1) != sha256_digest(p2)
+
+    def test_correlation_payload_different_authors_different_hash(self) -> None:
+        """Different source_authors → different payload hash."""
+        from hexagent.core.canonical import sha256_digest
+        from hexagent.correlations.hx_result import _build_correlation_payload
+
+        common = dict(
+            correlation_id="test",
+            version="1.0.0",
+            definition_hash="sha256:abc",
+            source_title="T",
+            source_year=2011,
+            source_reference="R",
+            source_verification_status="unverified",
+            nusselt_basis="inside_diameter",
+        )
+        p1 = _build_correlation_payload(**common, source_authors="Author A")
+        p2 = _build_correlation_payload(**common, source_authors="Author B")
+        assert sha256_digest(p1) != sha256_digest(p2)
+
+    def test_correlation_payload_different_title_different_hash(self) -> None:
+        """Different source_title → different payload hash."""
+        from hexagent.core.canonical import sha256_digest
+        from hexagent.correlations.hx_result import _build_correlation_payload
+
+        common = dict(
+            correlation_id="test",
+            version="1.0.0",
+            definition_hash="sha256:abc",
+            source_authors="A",
+            source_year=2011,
+            source_reference="R",
+            source_verification_status="unverified",
+            nusselt_basis="inside_diameter",
+        )
+        p1 = _build_correlation_payload(**common, source_title="Title A")
+        p2 = _build_correlation_payload(**common, source_title="Title B")
+        assert sha256_digest(p1) != sha256_digest(p2)
+
+
+# =====================================================================
+# K. Unavailable Candidates Semantics
+# =====================================================================
+
+
+class TestUnavailableCandidatesSemantics:
+    """Multiple unavailable candidates: blockers from selected only,
+    all preserved in unavailable_candidates."""
+
+    def _make_def(
+        self,
+        correlation_id: str,
+        *,
+        priority: int = 10,
+        source_year: int = 2024,
+        authors: tuple[str, ...] = ("Test Author",),
+        source_id: str = "test",
+    ) -> CorrelationDefinition:
+        from hexagent.correlations.models import (
+            ApplicabilityEnvelope,
+            BibliographicSource,
+            CorrelationDefinition,
+            CorrelationImplementationStatus,
+            CorrelationKey,
+            CorrelationPurpose,
+            NumericBound,
+            UncertaintySpec,
+        )
+        from hexagent.correlations.models import FlowRegime as ModelsFlowRegime
+
+        return CorrelationDefinition.create(
+            key=CorrelationKey(correlation_id=correlation_id, version="1.0.0"),
+            name=f"Test {correlation_id}",
+            purpose=CorrelationPurpose.nusselt_number,
+            description="Test",
+            geometry=frozenset({GeometryType.circular_tube}),
+            phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+            envelope=ApplicabilityEnvelope(
+                geometry_types=frozenset({GeometryType.circular_tube}),
+                phase_regimes=frozenset({PhaseRegime.single_phase_liquid}),
+                flow_regimes=frozenset({ModelsFlowRegime.laminar}),
+                bounds=(
+                    NumericBound(
+                        variable=ApplicabilityVariable.reynolds,
+                        minimum=0.0,
+                        maximum=2300.0,
+                        minimum_inclusive=False,
+                        maximum_inclusive=False,
+                    ),
+                    NumericBound(
+                        variable=ApplicabilityVariable.prandtl,
+                        minimum=0.6,
+                        minimum_inclusive=False,
+                    ),
+                ),
+                required_inputs=frozenset(
+                    {ApplicabilityVariable.reynolds, ApplicabilityVariable.prandtl}
+                ),
+            ),
+            source=BibliographicSource(
+                source_id=source_id,
+                authors=authors,
+                title=f"Title for {correlation_id}",
+                publication="Test Pub",
+                year=source_year,
+                verification_status=SourceVerificationStatus.unverified,
+            ),
+            uncertainty=UncertaintySpec(basis="test"),
+            implementation_status=CorrelationImplementationStatus.metadata_only,
+            implementation_ref="test.ref",
+            tags=frozenset(
+                {
+                    "bc:constant_wall_temperature",
+                    "nusselt_basis:inside_diameter",
+                    f"priority:{priority}",
+                }
+            ),
+        )
+
+    def test_two_metadata_only_selects_highest_priority(self) -> None:
+        """Two metadata_only candidates → highest priority selected,
+        blockers from selected only."""
+        reg = InMemoryCorrelationRegistry()
+        reg.register(self._make_def("tube_low", priority=5, source_year=2020))
+        reg.register(self._make_def("tube_high", priority=20, source_year=2021))
+
+        result = select_correlation(
+            registry=reg,
+            geometry=_tube_geom(),
+            boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+            flow_regime=FlowRegime.laminar,
+            reynolds=1000.0,
+            prandtl=PR,
+        )
+
+        assert result.selection_status == "implementation_unavailable"
+        assert result.selected_definition is not None
+        assert result.selected_definition.key.correlation_id == "tube_high"
+        # Blockers only from the selected (high) candidate — 1 blocker
+        assert len(result.blockers) == 1
+        assert "tube_high" in result.blockers[0].message
+        # unavailable_candidates has both
+        assert len(result.unavailable_candidates) == 2
+        ids = {d.key.correlation_id for d, _ in result.unavailable_candidates}
+        assert ids == {"tube_low", "tube_high"}
+
+    def test_insertion_order_independence(self) -> None:
+        """Different insertion order → same selected, same blockers,
+        same unavailable_candidates count."""
+        # Order 1: low first
+        reg1 = InMemoryCorrelationRegistry()
+        reg1.register(self._make_def("tube_low", priority=5))
+        reg1.register(self._make_def("tube_high", priority=20))
+        r1 = select_correlation(
+            reg1,
+            _tube_geom(),
+            "constant_wall_temperature",
+            FlowRegime.laminar,
+            1000.0,
+            PR,
+        )
+
+        # Order 2: high first
+        reg2 = InMemoryCorrelationRegistry()
+        reg2.register(self._make_def("tube_high", priority=20))
+        reg2.register(self._make_def("tube_low", priority=5))
+        r2 = select_correlation(
+            reg2,
+            _tube_geom(),
+            "constant_wall_temperature",
+            FlowRegime.laminar,
+            1000.0,
+            PR,
+        )
+
+        assert r1.selection_status == r2.selection_status == "implementation_unavailable"
+        assert r1.selected_definition is not None
+        assert r2.selected_definition is not None
+        cid1 = r1.selected_definition.key.correlation_id
+        cid2 = r2.selected_definition.key.correlation_id
+        assert cid1 == cid2
+        assert len(r1.blockers) == len(r2.blockers)
+        assert len(r1.unavailable_candidates) == len(r2.unavailable_candidates) == 2
+
+    def test_single_metadata_only_blockers_match_selected(self) -> None:
+        """Single metadata_only → blockers from the one candidate,
+        unavailable_candidates has exactly one."""
+        reg = InMemoryCorrelationRegistry()
+        reg.register(self._make_def("tube_only", priority=10))
+
+        result = select_correlation(
+            reg,
+            _tube_geom(),
+            "constant_wall_temperature",
+            FlowRegime.laminar,
+            1000.0,
+            PR,
+        )
+
+        assert result.selection_status == "implementation_unavailable"
+        assert len(result.blockers) == 1
+        assert "tube_only" in result.blockers[0].message
+        assert len(result.unavailable_candidates) == 1
+        d, a = result.unavailable_candidates[0]
+        assert d.key.correlation_id == "tube_only"
+        assert a.status.value == "implementation_unavailable"

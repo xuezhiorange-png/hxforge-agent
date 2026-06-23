@@ -50,6 +50,10 @@ class SelectionResult:
         rejected_candidates: Tuple of (CorrelationDefinition, ApplicabilityAssessment)
             pairs for candidates that failed applicability.  Preserves full
             context including blockers/warnings.
+        unavailable_candidates: Tuple of (CorrelationDefinition, ApplicabilityAssessment)
+            pairs for candidates that were applicable but metadata_only.  The
+            selected candidate's blockers are in ``blockers``; this tuple
+            preserves the full set of unavailable candidates.
         selection_status: One of "selected", "no_match", "ambiguous", "blocked",
             "implementation_unavailable".
         blockers: Tuple of EngineeringMessage explaining why selection failed.
@@ -63,6 +67,7 @@ class SelectionResult:
     # "selected" | "no_match" | "ambiguous" | "blocked" | "implementation_unavailable"
     selection_status: str
     blockers: tuple[EngineeringMessage, ...]
+    unavailable_candidates: tuple[tuple[CorrelationDefinition, ApplicabilityAssessment], ...] = ()
     identified_correlation: SelectedCorrelationInfo | None = None
 
 
@@ -335,25 +340,6 @@ def select_correlation(
                 identity_snapshot=identity_snapshot,
             )
 
-            # Build identified correlation info (P0-4)
-            source = defn.source
-            identified_info = SelectedCorrelationInfo(
-                correlation_id=defn.key.correlation_id,
-                version=defn.key.version,
-                priority=_extract_priority(defn),
-                source_title=source.title,
-                source_authors=", ".join(source.authors) if source.authors else "",
-                source_year=source.year,
-                source_reference=(
-                    f"{source.edition or ''} {source.equation_or_clause or ''}".strip()
-                ),
-                source_verification_status=source.verification_status.value,
-                definition_hash=defn.definition_hash,
-                is_adaptation=False,
-                adaptation_limitation="",
-                nusselt_basis=_get_nusselt_basis(defn),
-            )
-
             # Collect into unavailable list — do NOT return early
             unavailable.append((defn, blocked_assessment))
             continue
@@ -462,18 +448,14 @@ def select_correlation(
             nusselt_basis=_get_nusselt_basis(unavail_defn),
         )
 
-        # Gather blockers from all unavailable candidates
-        all_blockers: list[EngineeringMessage] = []
-        for _, ua in unavailable:
-            all_blockers.extend(ua.blockers)
-
         return SelectionResult(
             selected_definition=unavail_defn,
             selected_assessment=unavail_assessment,
             rejected_candidates=tuple(rejected),
             selection_status="implementation_unavailable",
-            blockers=tuple(all_blockers),
+            blockers=tuple(unavail_assessment.blockers),
             identified_correlation=identified_info,
+            unavailable_candidates=tuple(unavailable),
         )
 
     # 3. Both passed and unavailable empty: from rejected, return best

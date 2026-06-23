@@ -1,13 +1,13 @@
 # TASK-007 — Single-phase tube and concentric-annulus heat-transfer correlations
 
-**Status:** IN_PROGRESS (C4 deferred — see Issue #19)
+**Status:** READY_FOR_REVIEW (C4 deferred — see Issue #19)
 **Milestone:** M2
 **Priority:** P0
 **Depends on:** TASK-003, TASK-004, TASK-006
 **GitHub Issue:** #17 (scope updated: C4 deferred)
 **C4 Follow-up:** #19
 **Branch:** `codex/task-007-tube-annulus-correlations`
-**Draft PR:** #18 (Draft, not merged)
+**PR:** #18 (Ready for review, not merged)
 
 ## Objective
 
