@@ -832,7 +832,27 @@ def _compute_q_max_counterflow(
     call_idx = 0
     # Hot stream: T_hot_out_min = T_cold_in + minimum_terminal_delta_t
     T_hot_out_min = cold_inlet_temperature_k + minimum_terminal_delta_t
-    hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min, hot_inlet_pressure_pa)
+    try:
+        hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min, hot_inlet_pressure_pa)
+    except PropertyServiceError as exc:
+        property_calls.append(
+            _build_failed_provider_call_record(
+                fluid_name=hot_fluid.name,
+                query_type="TP",
+                inputs=(("temperature_k", T_hot_out_min), ("pressure_pa", hot_inlet_pressure_pa)),
+                provider=provider,
+                stage="q_max",
+                stream_role="hot_limit",
+                sequence_index=seq_idx,
+                error_code=exc.code.value,
+                error_message=str(exc),
+                evaluation_index=eval_index,
+                evaluation_role="q_max_counterflow",
+                call_index_within_evaluation=call_idx,
+                trial_q_w=None,
+            )
+        )
+        raise
     property_calls.append(
         _build_provider_call_record(
             hot_limit_state,
@@ -853,7 +873,27 @@ def _compute_q_max_counterflow(
 
     # Cold stream: T_cold_out_max = T_hot_in - minimum_terminal_delta_t
     T_cold_out_max = hot_inlet_temperature_k - minimum_terminal_delta_t
-    cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max, cold_inlet_pressure_pa)
+    try:
+        cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max, cold_inlet_pressure_pa)
+    except PropertyServiceError as exc:
+        property_calls.append(
+            _build_failed_provider_call_record(
+                fluid_name=cold_fluid.name,
+                query_type="TP",
+                inputs=(("temperature_k", T_cold_out_max), ("pressure_pa", cold_inlet_pressure_pa)),
+                provider=provider,
+                stage="q_max",
+                stream_role="cold_limit",
+                sequence_index=seq_idx,
+                error_code=exc.code.value,
+                error_message=str(exc),
+                evaluation_index=eval_index,
+                evaluation_role="q_max_counterflow",
+                call_index_within_evaluation=call_idx,
+                trial_q_w=None,
+            )
+        )
+        raise
     property_calls.append(
         _build_provider_call_record(
             cold_limit_state,
@@ -907,7 +947,30 @@ def _compute_q_max_parallel(
     call_idx = 0
     # Upper bound: min of independent enthalpy limits
     T_hot_out_min_ind = cold_inlet_temperature_k + minimum_terminal_delta_t
-    hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min_ind, hot_inlet_pressure_pa)
+    try:
+        hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min_ind, hot_inlet_pressure_pa)
+    except PropertyServiceError as exc:
+        property_calls.append(
+            _build_failed_provider_call_record(
+                fluid_name=hot_fluid.name,
+                query_type="TP",
+                inputs=(
+                    ("temperature_k", T_hot_out_min_ind),
+                    ("pressure_pa", hot_inlet_pressure_pa),
+                ),
+                provider=provider,
+                stage="q_max",
+                stream_role="hot_limit",
+                sequence_index=seq_idx,
+                error_code=exc.code.value,
+                error_message=str(exc),
+                evaluation_index=eval_index,
+                evaluation_role="q_max_parallel_pinch",
+                call_index_within_evaluation=call_idx,
+                trial_q_w=None,
+            )
+        )
+        raise
     property_calls.append(
         _build_provider_call_record(
             hot_limit_state,
@@ -927,7 +990,30 @@ def _compute_q_max_parallel(
     call_idx += 1
 
     T_cold_out_max_ind = hot_inlet_temperature_k - minimum_terminal_delta_t
-    cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max_ind, cold_inlet_pressure_pa)
+    try:
+        cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max_ind, cold_inlet_pressure_pa)
+    except PropertyServiceError as exc:
+        property_calls.append(
+            _build_failed_provider_call_record(
+                fluid_name=cold_fluid.name,
+                query_type="TP",
+                inputs=(
+                    ("temperature_k", T_cold_out_max_ind),
+                    ("pressure_pa", cold_inlet_pressure_pa),
+                ),
+                provider=provider,
+                stage="q_max",
+                stream_role="cold_limit",
+                sequence_index=seq_idx,
+                error_code=exc.code.value,
+                error_message=str(exc),
+                evaluation_index=eval_index,
+                evaluation_role="q_max_parallel_pinch",
+                call_index_within_evaluation=call_idx,
+                trial_q_w=None,
+            )
+        )
+        raise
     property_calls.append(
         _build_provider_call_record(
             cold_limit_state,
@@ -1319,9 +1405,7 @@ def rate_double_pipe(
                 stage="inlet",
                 stream_role="hot_inlet",
                 sequence_index=seq_idx,
-                error_code=(
-                    exc.error_code.value if hasattr(exc, "error_code") else "property_unavailable"
-                ),
+                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                 error_message=str(exc),
                 evaluation_index=0,
                 evaluation_role="inlet",
@@ -1380,9 +1464,7 @@ def rate_double_pipe(
                 stage="inlet",
                 stream_role="cold_inlet",
                 sequence_index=seq_idx,
-                error_code=(
-                    exc.error_code.value if hasattr(exc, "error_code") else "property_unavailable"
-                ),
+                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                 error_message=str(exc),
                 evaluation_index=0,
                 evaluation_role="inlet",
@@ -1496,26 +1578,7 @@ def rate_double_pipe(
             seq_idx=seq_idx,
             eval_index=_eval_counter,
         )
-    except Exception as exc:
-        property_calls.append(
-            _build_failed_provider_call_record(
-                fluid_name=hot_fluid.name,
-                query_type="TP",
-                inputs=(),
-                provider=provider,
-                stage="q_max",
-                stream_role="q_max",
-                sequence_index=seq_idx,
-                error_code=(
-                    exc.error_code.value if hasattr(exc, "error_code") else "property_unavailable"
-                ),
-                error_message=str(exc),
-                evaluation_index=_eval_counter,
-                evaluation_role="q_max",
-                call_index_within_evaluation=0,
-                trial_q_w=None,
-            )
-        )
+    except PropertyServiceError as exc:
         blockers.append(
             _make_blocker(
                 ErrorCode.PROPERTY_EVALUATION_FAILED,
@@ -1655,11 +1718,7 @@ def rate_double_pipe(
                     stage="brent_evaluation",
                     stream_role="hot_solver",
                     sequence_index=seq_idx,
-                    error_code=(
-                        exc.error_code.value
-                        if hasattr(exc, "error_code")
-                        else "property_unavailable"
-                    ),
+                    error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                     error_message=str(exc),
                     evaluation_index=eval_index,
                     evaluation_role=eval_role,
@@ -1728,11 +1787,7 @@ def rate_double_pipe(
                     stage="brent_evaluation",
                     stream_role="cold_solver",
                     sequence_index=seq_idx,
-                    error_code=(
-                        exc.error_code.value
-                        if hasattr(exc, "error_code")
-                        else "property_unavailable"
-                    ),
+                    error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                     error_message=str(exc),
                     evaluation_index=eval_index,
                     evaluation_role=eval_role,
@@ -1865,11 +1920,7 @@ def rate_double_pipe(
                     stage="bulk",
                     stream_role="hot_bulk",
                     sequence_index=seq_idx,
-                    error_code=(
-                        exc.error_code.value
-                        if hasattr(exc, "error_code")
-                        else "property_unavailable"
-                    ),
+                    error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                     error_message=str(exc),
                     evaluation_index=eval_index,
                     evaluation_role=eval_role,
@@ -1939,11 +1990,7 @@ def rate_double_pipe(
                     stage="bulk",
                     stream_role="cold_bulk",
                     sequence_index=seq_idx,
-                    error_code=(
-                        exc.error_code.value
-                        if hasattr(exc, "error_code")
-                        else "property_unavailable"
-                    ),
+                    error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                     error_message=str(exc),
                     evaluation_index=eval_index,
                     evaluation_role=eval_role,
@@ -2226,6 +2273,12 @@ def rate_double_pipe(
             blockers=(),
         )
 
+    _solver_phase = "solver_iteration"  # default for bisection
+
+    def _set_probe_phase() -> None:
+        nonlocal _solver_phase
+        _solver_phase = "bracket_probe"
+
     def residual_fn(Q: float) -> float:
         """Evaluate residual Q - UA(Q) x LMTD(Q).
 
@@ -2233,14 +2286,20 @@ def rate_double_pipe(
         at the boundary: successful trials accumulate directly, and
         aborted trials carry their calls via TrialEvaluationAbort.
         This ensures each real provider invocation is recorded exactly once.
+
+        The eval_role is determined by _solver_phase: during bracket
+        probing, on_probe sets it to "bracket_probe"; during bisection-
+        secant iteration it stays at "solver_iteration".
         """
-        nonlocal _eval_counter
+        nonlocal _eval_counter, _solver_phase
         _eval_counter += 1
+        current_phase = _solver_phase
+        _solver_phase = "solver_iteration"  # reset for next call
         trial = _evaluate_trial(
             Q,
             accumulate=False,
             eval_index=_eval_counter,
-            eval_role="solver_iteration",
+            eval_role=current_phase,
         )
         if not trial.feasible or trial.residual_w is None:
             # Accumulate the failed trial's calls at the abort boundary
@@ -2262,6 +2321,7 @@ def rate_double_pipe(
             q_max=q_max,
             params=params,
             c_effective_w_k=C_min,
+            on_probe=_set_probe_phase,
         )
     except TrialEvaluationAbort as abort:
         trial = abort.trial
@@ -2318,7 +2378,7 @@ def rate_double_pipe(
     # Re-evaluate at the solution Q for final diagnostics
     final_trial = _evaluate_trial(
         Q_sol,
-        eval_index=_eval_counter + 10000,
+        eval_index=_eval_counter + 1,
         eval_role="final_evaluation",
     )
 
@@ -2582,17 +2642,224 @@ def rate_double_pipe(
     for w in annulus_result_final.warnings:
         warnings.append(w)
 
-    # --- Check if any blockers were found during final consistency ---
-    if blockers:
-        return _blocked_result(
-            blockers=blockers,
-            warnings=warnings,
+    def _build_postcalculation_blocked_result(
+        blkrs: list[EngineeringMessage],
+        wrns: list[EngineeringMessage],
+    ) -> RatingResult:
+        """Build a BLOCKED RatingResult preserving all computed diagnostics.
+
+        Unlike _blocked_result (which returns zeroed fields), this function
+        preserves solver results, thermal diagnostics, correlation data,
+        state snapshots, and provenance so downstream consumers can still
+        inspect what was computed before the blocker was encountered.
+        """
+        # Correlation snapshots
+        tube_sc = _make_selected_correlation_snapshot(tube_result_final)
+        annulus_sc = _make_selected_correlation_snapshot(annulus_result_final)
+        tube_ap = _make_applicability_snapshot(tube_result_final)
+        annulus_ap = _make_applicability_snapshot(annulus_result_final)
+
+        tube_cid = tube_sc.correlation_id if tube_sc else None
+        tube_cver = tube_sc.version if tube_sc else None
+        tube_ast = tube_result_final.applicability_status or None
+        annulus_cid = annulus_sc.correlation_id if annulus_sc else None
+        annulus_cver = annulus_sc.version if annulus_sc else None
+        annulus_ast = annulus_result_final.applicability_status or None
+
+        # Map tube/annulus sides
+        if tube_in_hot:
+            tsi = hot_inlet_state_snapshot
+            tso = hot_outlet_snapshot
+            tbu = hot_bulk_snapshot
+            asi = cold_inlet_state_snapshot
+            aso = cold_outlet_snapshot
+            abu = cold_bulk_snapshot
+        else:
+            tsi = cold_inlet_state_snapshot
+            tso = cold_outlet_snapshot
+            tbu = cold_bulk_snapshot
+            asi = hot_inlet_state_snapshot
+            aso = hot_outlet_snapshot
+            abu = hot_bulk_snapshot
+
+        solver_details = _make_solver_details(solver_result)
+
+        core_graph, core_nodes, core_edges = build_provenance_core(
+            flow_arrangement=flow_arrangement,
             property_calls=property_calls,
+            iterations=solver_result.iterations,
+            converged=False,
+            warnings=wrns,
+            blockers=blkrs,
+            execution_context=ctx_snapshot,
+            request_identity=request_identity,
+            tube_correlation_info=tube_sc,
+            annulus_correlation_info=annulus_sc,
+            tube_applicability=tube_ap,
+            annulus_applicability=annulus_ap,
+        )
+        core_provenance_digest = _provenance_graph_digest(core_graph)
+
+        result_hash = compute_result_hash(
             request_identity=request_identity,
             provider_identity=provider_identity,
-            execution_context=ctx_snapshot,
             flow_arrangement=flow_arrangement,
+            heat_duty_w=Q_sol,
+            hot_outlet_temperature_k=T_h_out_sol,
+            cold_outlet_temperature_k=T_c_out_sol,
+            tube_reynolds=tube_result_final.reynolds_number,
+            tube_prandtl=tube_result_final.prandtl_number,
+            tube_nusselt=tube_result_final.nusselt_number,
+            tube_h=tube_h_val,
+            tube_selected_correlation_id=tube_cid,
+            tube_selected_correlation_version=tube_cver,
+            tube_applicability_status=tube_ast,
+            annulus_reynolds=annulus_result_final.reynolds_number,
+            annulus_prandtl=annulus_result_final.prandtl_number,
+            annulus_nusselt=annulus_result_final.nusselt_number,
+            annulus_h=annulus_h_val,
+            annulus_selected_correlation_id=annulus_cid,
+            annulus_selected_correlation_version=annulus_cver,
+            annulus_applicability_status=annulus_ast,
+            area_inner_m2=area_inner_m2,
+            area_outer_m2=area_outer_m2,
+            resistance_breakdown=rb_model,
+            U_inner_basis=U_inner,
+            U_outer_basis=U_outer,
+            UA_w_k=UA_final,
+            C_hot_w_k=C_hot,
+            C_cold_w_k=C_cold,
+            C_min_w_k=C_min,
+            C_max_w_k=C_max,
+            capacity_ratio=capacity_ratio,
+            NTU=NTU_final,
+            effectiveness=eps_calc,
+            LMTD_k=lmtd_final,
+            energy_residual_w=energy_residual_w,
+            ua_lmtd_residual_w=ua_lmtd_residual_w,
+            iterations=solver_result.iterations,
+            converged=False,
+            solver_termination_reason=solver_result.termination_reason.value,
+            solver_details=solver_details,
+            property_calls=tuple(property_calls),
+            warnings=tuple(wrns),
+            blockers=tuple(blkrs),
+            status=RatingStatus.BLOCKED,
+            hot_inlet_state=hot_inlet_state_snapshot,
+            cold_inlet_state=cold_inlet_state_snapshot,
+            hot_outlet_state=hot_outlet_snapshot,
+            cold_outlet_state=cold_outlet_snapshot,
+            tube_side_inlet_state=tsi,
+            tube_side_outlet_state=tso,
+            annulus_side_inlet_state=asi,
+            annulus_side_outlet_state=aso,
+            tube_bulk_state=tbu,
+            annulus_bulk_state=abu,
+            tube_selected_correlation_snap=tube_sc,
+            annulus_selected_correlation_snap=annulus_sc,
+            tube_applicability_snap=tube_ap,
+            annulus_applicability_snap=annulus_ap,
+            core_provenance_digest=core_provenance_digest,
+            Q_hot_w=Q_hot_w,
+            Q_cold_w=Q_cold_w,
+            relative_energy_residual=relative_energy_residual,
+            energy_tolerance_w=energy_tolerance_w,
+            relative_ua_lmtd_residual=relative_ua_lmtd_residual,
+            ua_lmtd_tolerance_w=ua_lmtd_tolerance_w_val,
         )
+
+        provenance_graph = build_provenance(
+            flow_arrangement=flow_arrangement,
+            property_calls=property_calls,
+            iterations=solver_result.iterations,
+            converged=False,
+            warnings=wrns,
+            blockers=blkrs,
+            result_hash=result_hash,
+            execution_context=ctx_snapshot,
+            request_identity=request_identity,
+            tube_correlation_info=tube_sc,
+            annulus_correlation_info=annulus_sc,
+            tube_applicability=tube_ap,
+            annulus_applicability=annulus_ap,
+        )
+        provenance_digest = _provenance_graph_digest(provenance_graph)
+
+        return RatingResult(
+            status=RatingStatus.BLOCKED,
+            flow_arrangement=flow_arrangement,
+            heat_duty_w=Q_sol,
+            hot_outlet_temperature_k=T_h_out_sol,
+            cold_outlet_temperature_k=T_c_out_sol,
+            tube_reynolds=tube_result_final.reynolds_number,
+            tube_prandtl=tube_result_final.prandtl_number,
+            tube_nusselt=tube_result_final.nusselt_number,
+            tube_h=tube_h_val,
+            tube_selected_correlation_id=tube_cid,
+            tube_selected_correlation_version=tube_cver,
+            tube_applicability_status=tube_ast,
+            annulus_reynolds=annulus_result_final.reynolds_number,
+            annulus_prandtl=annulus_result_final.prandtl_number,
+            annulus_nusselt=annulus_result_final.nusselt_number,
+            annulus_h=annulus_h_val,
+            annulus_selected_correlation_id=annulus_cid,
+            annulus_selected_correlation_version=annulus_cver,
+            annulus_applicability_status=annulus_ast,
+            area_inner_m2=area_inner_m2,
+            area_outer_m2=area_outer_m2,
+            resistance_breakdown=rb_model,
+            U_inner_basis=U_inner,
+            U_outer_basis=U_outer,
+            UA_w_k=UA_final,
+            C_hot_w_k=C_hot,
+            C_cold_w_k=C_cold,
+            C_min_w_k=C_min,
+            C_max_w_k=C_max,
+            capacity_ratio=capacity_ratio,
+            NTU=NTU_final,
+            effectiveness=eps_calc,
+            LMTD_k=lmtd_final,
+            energy_residual_w=energy_residual_w,
+            ua_lmtd_residual_w=ua_lmtd_residual_w,
+            iterations=solver_result.iterations,
+            converged=False,
+            solver_termination_reason=solver_result.termination_reason.value,
+            solver_details=solver_details,
+            warnings=tuple(wrns),
+            blockers=tuple(blkrs),
+            property_calls=tuple(property_calls),
+            provider_identity=provider_identity,
+            request_identity=request_identity,
+            execution_context=ctx_snapshot,
+            result_hash=result_hash,
+            provenance_graph=provenance_graph,
+            provenance_digest=provenance_digest,
+            core_provenance_digest=core_provenance_digest,
+            hot_inlet_state=hot_inlet_state_snapshot,
+            cold_inlet_state=cold_inlet_state_snapshot,
+            hot_outlet_state=hot_outlet_snapshot,
+            cold_outlet_state=cold_outlet_snapshot,
+            tube_side_inlet_state=tsi,
+            tube_side_outlet_state=tso,
+            annulus_side_inlet_state=asi,
+            annulus_side_outlet_state=aso,
+            tube_bulk_state=tbu,
+            annulus_bulk_state=abu,
+            tube_selected_correlation=tube_sc,
+            annulus_selected_correlation=annulus_sc,
+            tube_applicability=tube_ap,
+            annulus_applicability=annulus_ap,
+            Q_hot_w=Q_hot_w,
+            Q_cold_w=Q_cold_w,
+            relative_energy_residual=relative_energy_residual,
+            energy_tolerance_w=energy_tolerance_w,
+            relative_ua_lmtd_residual=relative_ua_lmtd_residual,
+            ua_lmtd_tolerance_w=ua_lmtd_tolerance_w_val,
+        )
+
+    # --- Check if any blockers were found during final consistency ---
+    if blockers:
+        return _build_postcalculation_blocked_result(blockers, warnings)
 
     # =====================================================================
     # 11. BUILD CORRELATION SNAPSHOTS

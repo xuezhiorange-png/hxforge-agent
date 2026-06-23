@@ -51,13 +51,10 @@ class SolverParams:
 
     absolute_residual_w: float = 1e-3
     """Absolute residual tolerance [W]."""
-
     relative_residual_fraction: float = 1e-8
     """Relative residual fraction (dimensionless)."""
-
     bracket_temperature_tolerance_k: float = 1e-4
     """Maximum bracket width converted to outlet-temperature effect [K]."""
-
     max_iterations: int = 100
     """Maximum Brent iterations."""
 
@@ -248,13 +245,19 @@ def find_bracket(
     residual_fn: Callable[[float], float],
     q_max: float,
     params: SolverParams,
+    on_probe: Callable[[], None] | None = None,
 ) -> tuple[float, float] | None:
     """Find a bracket [q_low, q_high] where residual changes sign.
 
     Starts from Q = 0 and probes upward in 20 equal steps.
     If no sign change is found, returns None.
 
-    Returns None if no valid bracket exists.
+    Parameters
+    ----------
+    on_probe :
+        Optional callback invoked before each residual evaluation during
+        bracket probing.  The caller can use this to set the evaluation
+        role to "bracket_probe" for provenance tracking.
     """
     assert callable(residual_fn)
 
@@ -265,6 +268,8 @@ def find_bracket(
         return None
 
     # Evaluate at Q = 0
+    if on_probe:
+        on_probe()
     r_low = residual_fn(q_low)
 
     if not math.isfinite(r_low):
@@ -283,6 +288,8 @@ def find_bracket(
 
     for i in range(1, n_probes + 1):
         q_try = min(q_low + i * step, q_high)
+        if on_probe:
+            on_probe()
         r_try = residual_fn(q_try)
 
         if not math.isfinite(r_try):
@@ -311,6 +318,7 @@ def solve_rating(
     q_max: float,
     params: SolverParams | None = None,
     c_effective_w_k: float | None = None,
+    on_probe: Callable[[], None] | None = None,
 ) -> SolverResult:
     """Solve for Q using bisection-secant hybrid with dynamic bracket.
 
@@ -326,6 +334,8 @@ def solve_rating(
     c_effective_w_k :
         Effective capacity rate [W/K] for bracket-width-to-temperature
         conversion.  Typically min(C_hot, C_cold).
+    on_probe :
+        Optional callback for bracket-probe provenance tracking.
     """
     if params is None:
         params = SolverParams()
@@ -348,7 +358,7 @@ def solve_rating(
         )
 
     # Find bracket
-    bracket = find_bracket(residual_fn, q_max, params)
+    bracket = find_bracket(residual_fn, q_max, params, on_probe=on_probe)
     if bracket is None:
         return SolverResult(
             converged=False,
