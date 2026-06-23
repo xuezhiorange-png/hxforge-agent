@@ -351,7 +351,6 @@ class TestProvenance:
         assert len(graph.nodes) > 0
         assert len(graph.edges) > 0
 
-    @pytest.mark.xfail(reason="Provenance verification needs alignment", strict=False)
     def test_provenance_verify(self, provider: CoolPropProvider) -> None:
         kwargs = _standard_rating_kwargs(provider=provider)
         result = rate_double_pipe(**kwargs)

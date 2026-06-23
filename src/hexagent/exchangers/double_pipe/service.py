@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from hexagent.core.heat_balance import CalculationContext
+from hexagent.correlations.flow import ThermalBoundaryCondition
 from hexagent.domain.models import DesignCase
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.rating import rate_double_pipe
@@ -42,6 +43,13 @@ class DoublePipeRatingService:
         flow_arrangement: FlowArrangement = FlowArrangement.COUNTERFLOW,
         solver_params: SolverParams | None = None,
         context: CalculationContext | None = None,
+        tube_boundary_condition: ThermalBoundaryCondition = (
+            ThermalBoundaryCondition.constant_wall_temperature
+        ),
+        annulus_boundary_condition: ThermalBoundaryCondition = (
+            ThermalBoundaryCondition.inner_wall_heated
+        ),
+        minimum_terminal_delta_t: float = 0.5,
     ) -> RatingResult:
         """Execute a fixed-geometry double-pipe rating.
 
@@ -59,6 +67,12 @@ class DoublePipeRatingService:
             Solver control parameters (uses defaults if None).
         context :
             Optional calculation context for provenance.
+        tube_boundary_condition :
+            Thermal boundary condition for the tube side.
+        annulus_boundary_condition :
+            Thermal boundary condition for the annulus side.
+        minimum_terminal_delta_t :
+            Minimum terminal temperature difference [K].
         """
         # Extract fluid identifiers
         hot_fluid = FluidIdentifier(
@@ -116,6 +130,9 @@ class DoublePipeRatingService:
             provider=self._provider,
             solver_params=solver_params,
             context=context,
+            tube_boundary_condition=tube_boundary_condition,
+            annulus_boundary_condition=annulus_boundary_condition,
+            minimum_terminal_delta_t=minimum_terminal_delta_t,
         )
 
 

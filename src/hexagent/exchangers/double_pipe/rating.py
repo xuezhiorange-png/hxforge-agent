@@ -121,6 +121,18 @@ class TrialEvaluation:
     blockers: tuple[EngineeringMessage, ...]
 
 
+class TrialEvaluationAbort(Exception):
+    """Raised to abort solver iteration when trial is infeasible.
+
+    Carries the full TrialEvaluation so the solver can terminate
+    gracefully without converting domain errors to numeric residuals.
+    """
+
+    def __init__(self, trial: TrialEvaluation):
+        self.trial = trial
+        super().__init__(f"Trial Q={trial.q_w} is not feasible")
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -173,6 +185,22 @@ def _provider_snapshot(provider: PropertyProvider | None) -> ProviderIdentitySna
 
 def _make_fluid_state_snapshot(state: FluidState) -> FluidStateSnapshot:
     """Build a FluidStateSnapshot from a FluidState."""
+    prov = state.provenance
+    property_provenance = {
+        "fluid_identifier": prov.fluid_identifier
+        if isinstance(prov.fluid_identifier, str)
+        else str(prov.fluid_identifier),
+        "backend_name": prov.backend_name,
+        "backend_version": prov.backend_version,
+        "reference_state_policy": prov.reference_state_policy.value
+        if hasattr(prov.reference_state_policy, "value")
+        else str(prov.reference_state_policy),
+        "configuration_fingerprint": getattr(prov, "configuration_fingerprint", ""),
+        "validation_level": prov.validation_level.value
+        if hasattr(prov.validation_level, "value")
+        else str(prov.validation_level),
+        "cache_policy_version": getattr(prov, "cache_policy_version", ""),
+    }
     return FluidStateSnapshot(
         temperature_k=state.temperature_k,
         pressure_pa=state.pressure_pa,
@@ -182,31 +210,64 @@ def _make_fluid_state_snapshot(state: FluidState) -> FluidStateSnapshot:
         viscosity_pa_s=state.viscosity_pa_s,
         conductivity_w_m_k=state.conductivity_w_m_k,
         phase=state.phase.value,
+        quality=state.quality if state.quality is not None else 0.0,
+        property_provenance=property_provenance,
     )
 
 
 def _make_selected_correlation_snapshot(
     corr_result: CorrelationResult,
 ) -> SelectedCorrelationSnapshot | None:
-    """Build a SelectedCorrelationSnapshot from a CorrelationResult."""
+    """Build a full SelectedCorrelationSnapshot from a CorrelationResult."""
     sc = corr_result.selected_correlation
     if sc is None:
         return None
     return SelectedCorrelationSnapshot(
         correlation_id=sc.correlation_id,
         version=sc.version,
+        definition_hash=sc.definition_hash,
+        source_title=sc.source_title,
+        source_authors=sc.source_authors,
+        source_year=sc.source_year,
+        source_reference=sc.source_reference,
+        source_verification_status=sc.source_verification_status,
+        nusselt_basis=sc.nusselt_basis,
+        is_adaptation=sc.is_adaptation,
+        adaptation_limitation=sc.adaptation_limitation,
     )
 
 
 def _make_applicability_snapshot(
     corr_result: CorrelationResult,
 ) -> ApplicabilitySnapshot | None:
-    """Build an ApplicabilitySnapshot from a CorrelationResult."""
+    """Build a full ApplicabilitySnapshot from a CorrelationResult."""
     aa = corr_result.applicability_assessment
     if aa is None:
-        return None
+        return ApplicabilitySnapshot(status=corr_result.applicability_status or "")
+    # Extract reynolds/prandtl ranges from variable_results if available
+    reyn_min: float | None = None
+    reyn_max: float | None = None
+    pran_min: float | None = None
+    pran_max: float | None = None
+    for vr in aa.variable_results:
+        vr_var = vr.variable.value if hasattr(vr.variable, "value") else str(vr.variable)
+        if vr_var == "reynolds":
+            reyn_min = vr.absolute_minimum
+            reyn_max = vr.absolute_maximum
+        elif vr_var == "prandtl":
+            pran_min = vr.absolute_minimum
+            pran_max = vr.absolute_maximum
+    status_str = aa.status.value if hasattr(aa.status, "value") else str(aa.status)
     return ApplicabilitySnapshot(
-        status=corr_result.applicability_status,
+        status=status_str,
+        assessment_hash=aa.assessment_hash,
+        reynolds_min=reyn_min,
+        reynolds_max=reyn_max,
+        prandtl_min=pran_min,
+        prandtl_max=pran_max,
+        geometry_type=getattr(aa, "geometry_type", ""),
+        notes=getattr(aa, "notes", ""),
+        raw_assessment=aa.model_dump() if hasattr(aa, "model_dump") else None,
     )
 
 
@@ -494,7 +555,6 @@ def _blocked_result(
         warnings=tuple(warnings),
         blockers=tuple(blockers),
         status=RatingStatus.BLOCKED,
-        provenance_digest=core_provenance_digest,
     )
 
     # Rebuild provenance with the real result_hash (adding RESULT node)
@@ -661,7 +721,6 @@ def _failed_result(
         blockers=tuple(blockers),
         failure=failure,
         status=RatingStatus.FAILED,
-        provenance_digest=core_provenance_digest,
     )
 
     provenance_graph = build_provenance(
@@ -709,6 +768,190 @@ def _failed_result(
 # ---------------------------------------------------------------------------
 
 
+def _compute_q_max_counterflow(
+    *,
+    provider: PropertyProvider,
+    hot_fluid: FluidIdentifier,
+    cold_fluid: FluidIdentifier,
+    hot_inlet_temperature_k: float,
+    cold_inlet_temperature_k: float,
+    hot_inlet_pressure_pa: float,
+    cold_inlet_pressure_pa: float,
+    h_hot_in: float,
+    h_cold_in: float,
+    hot_mass_flow_kg_s: float,
+    cold_mass_flow_kg_s: float,
+    minimum_terminal_delta_t: float,
+    property_calls: list[PropertyCallRecord],
+    seq_idx: int,
+) -> tuple[float, int]:
+    """Counter-flow Q_max: independent terminal pinch at each end."""
+    # Hot stream: T_hot_out_min = T_cold_in + minimum_terminal_delta_t
+    T_hot_out_min = cold_inlet_temperature_k + minimum_terminal_delta_t
+    hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min, hot_inlet_pressure_pa)
+    property_calls.append(
+        _build_provider_call_record(
+            hot_limit_state,
+            query_type="TP",
+            inputs=(("temperature_k", T_hot_out_min), ("pressure_pa", hot_inlet_pressure_pa)),
+            provider=provider,
+            stage="q_max",
+            stream_role="hot_limit",
+            sequence_index=seq_idx,
+        )
+    )
+    seq_idx += 1
+
+    # Cold stream: T_cold_out_max = T_hot_in - minimum_terminal_delta_t
+    T_cold_out_max = hot_inlet_temperature_k - minimum_terminal_delta_t
+    cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max, cold_inlet_pressure_pa)
+    property_calls.append(
+        _build_provider_call_record(
+            cold_limit_state,
+            query_type="TP",
+            inputs=(("temperature_k", T_cold_out_max), ("pressure_pa", cold_inlet_pressure_pa)),
+            provider=provider,
+            stage="q_max",
+            stream_role="cold_limit",
+            sequence_index=seq_idx,
+        )
+    )
+    seq_idx += 1
+
+    Q_hot_limit = hot_mass_flow_kg_s * (h_hot_in - hot_limit_state.enthalpy_j_kg)
+    Q_cold_limit = cold_mass_flow_kg_s * (cold_limit_state.enthalpy_j_kg - h_cold_in)
+    q_max = min(Q_hot_limit, Q_cold_limit)
+    return q_max, seq_idx
+
+
+def _compute_q_max_parallel(
+    *,
+    provider: PropertyProvider,
+    hot_fluid: FluidIdentifier,
+    cold_fluid: FluidIdentifier,
+    hot_inlet_temperature_k: float,
+    cold_inlet_temperature_k: float,
+    hot_inlet_pressure_pa: float,
+    cold_inlet_pressure_pa: float,
+    h_hot_in: float,
+    h_cold_in: float,
+    hot_mass_flow_kg_s: float,
+    cold_mass_flow_kg_s: float,
+    minimum_terminal_delta_t: float,
+    property_calls: list[PropertyCallRecord],
+    seq_idx: int,
+) -> tuple[float, int]:
+    """Parallel-flow Q_max: coupled outlet pinch by scalar search.
+
+    For parallel-flow, T_hot_out and T_cold_out approach each other.
+    The exit pinch constraint is:
+        T_hot_out(Q) - T_cold_out(Q) >= minimum_terminal_delta_t
+
+    We use enthalpy back-calculation (no fixed Cp) with bracket search.
+    """
+    # Upper bound: min of independent enthalpy limits
+    T_hot_out_min_ind = cold_inlet_temperature_k + minimum_terminal_delta_t
+    hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min_ind, hot_inlet_pressure_pa)
+    property_calls.append(
+        _build_provider_call_record(
+            hot_limit_state,
+            query_type="TP",
+            inputs=(("temperature_k", T_hot_out_min_ind), ("pressure_pa", hot_inlet_pressure_pa)),
+            provider=provider,
+            stage="q_max",
+            stream_role="hot_limit",
+            sequence_index=seq_idx,
+        )
+    )
+    seq_idx += 1
+
+    T_cold_out_max_ind = hot_inlet_temperature_k - minimum_terminal_delta_t
+    cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max_ind, cold_inlet_pressure_pa)
+    property_calls.append(
+        _build_provider_call_record(
+            cold_limit_state,
+            query_type="TP",
+            inputs=(("temperature_k", T_cold_out_max_ind), ("pressure_pa", cold_inlet_pressure_pa)),
+            provider=provider,
+            stage="q_max",
+            stream_role="cold_limit",
+            sequence_index=seq_idx,
+        )
+    )
+    seq_idx += 1
+
+    Q_hot_limit = hot_mass_flow_kg_s * (h_hot_in - hot_limit_state.enthalpy_j_kg)
+    Q_cold_limit = cold_mass_flow_kg_s * (cold_limit_state.enthalpy_j_kg - h_cold_in)
+    q_upper = min(Q_hot_limit, Q_cold_limit)
+
+    if q_upper <= 0:
+        return 0.0, seq_idx
+
+    # Search for the maximum Q where T_hot_out - T_cold_out >= minimum_terminal_delta_t
+    # Use bisection on Q in [0, q_upper]
+    def _exit_pinch_residual(Q: float) -> float:
+        """Returns T_hot_out - T_cold_out - minimum_terminal_delta_t."""
+        nonlocal seq_idx
+        h_hot_out = h_hot_in - Q / hot_mass_flow_kg_s
+        h_cold_out = h_cold_in + Q / cold_mass_flow_kg_s
+        hot_state = provider.state_ph(
+            hot_fluid,
+            hot_inlet_pressure_pa,
+            h_hot_out,
+            reference_state=provider.reference_state_policy,
+        )
+        property_calls.append(
+            _build_provider_call_record(
+                hot_state,
+                query_type="PH",
+                inputs=(("pressure_pa", hot_inlet_pressure_pa), ("enthalpy_j_kg", h_hot_out)),
+                provider=provider,
+                stage="q_max_pinch",
+                stream_role="hot_solver",
+                sequence_index=seq_idx,
+            )
+        )
+        seq_idx += 1
+        cold_state = provider.state_ph(
+            cold_fluid,
+            cold_inlet_pressure_pa,
+            h_cold_out,
+            reference_state=provider.reference_state_policy,
+        )
+        property_calls.append(
+            _build_provider_call_record(
+                cold_state,
+                query_type="PH",
+                inputs=(("pressure_pa", cold_inlet_pressure_pa), ("enthalpy_j_kg", h_cold_out)),
+                provider=provider,
+                stage="q_max_pinch",
+                stream_role="cold_solver",
+                sequence_index=seq_idx,
+            )
+        )
+        seq_idx += 1
+        return (hot_state.temperature_k - cold_state.temperature_k) - minimum_terminal_delta_t
+
+    # Check if q_upper itself satisfies the pinch
+    pinch_at_upper = _exit_pinch_residual(q_upper)
+    if pinch_at_upper >= 0:
+        return q_upper, seq_idx
+
+    # Bisection to find the Q where pinch = 0
+    q_lo, q_hi = 0.0, q_upper
+    for _ in range(50):
+        q_mid = 0.5 * (q_lo + q_hi)
+        pinch_mid = _exit_pinch_residual(q_mid)
+        if pinch_mid >= 0:
+            q_lo = q_mid
+        else:
+            q_hi = q_mid
+        if q_hi - q_lo < 1e-6:
+            break
+
+    return q_lo, seq_idx
+
+
 def _compute_q_max(
     *,
     provider: PropertyProvider,
@@ -727,65 +970,45 @@ def _compute_q_max(
     property_calls: list[PropertyCallRecord],
     seq_idx: int,
 ) -> tuple[float, int]:
-    """Compute Q_max for the bracket upper bound using PropertyProvider.
+    """Compute Q_max using PropertyProvider enthalpy limits.
 
-    For both counter-flow and parallel-flow, the exit pinch is coupled,
-    but the same enthalpy-based limits apply as an upper bound:
-    - Hot stream: T_hot_out_min = T_cold_in + minimum_terminal_delta_t
-    - Cold stream: T_cold_out_max = T_hot_in - minimum_terminal_delta_t
-
-    Returns (q_max, updated_seq_idx).
+    Counter-flow: independent terminal pinch at each end.
+    Parallel-flow: coupled outlet pinch solved by scalar search.
     """
-    # Hot stream limit: hot cannot cool below T_cold_in + terminal_delta_t
-    T_hot_out_min = cold_inlet_temperature_k + minimum_terminal_delta_t
-    # Cold stream limit: cold cannot heat above T_hot_in - terminal_delta_t
-    T_cold_out_max = hot_inlet_temperature_k - minimum_terminal_delta_t
-
-    # Query hot limit state
-    hot_limit_inputs = (
-        ("temperature_k", T_hot_out_min),
-        ("pressure_pa", hot_inlet_pressure_pa),
-    )
-    hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min, hot_inlet_pressure_pa)
-    property_calls.append(
-        _build_provider_call_record(
-            hot_limit_state,
-            query_type="TP",
-            inputs=hot_limit_inputs,
+    if flow_arrangement == FlowArrangement.COUNTERFLOW:
+        return _compute_q_max_counterflow(
             provider=provider,
-            stage="q_max",
-            stream_role="hot_limit",
-            sequence_index=seq_idx,
+            hot_fluid=hot_fluid,
+            cold_fluid=cold_fluid,
+            hot_inlet_temperature_k=hot_inlet_temperature_k,
+            cold_inlet_temperature_k=cold_inlet_temperature_k,
+            hot_inlet_pressure_pa=hot_inlet_pressure_pa,
+            cold_inlet_pressure_pa=cold_inlet_pressure_pa,
+            h_hot_in=h_hot_in,
+            h_cold_in=h_cold_in,
+            hot_mass_flow_kg_s=hot_mass_flow_kg_s,
+            cold_mass_flow_kg_s=cold_mass_flow_kg_s,
+            minimum_terminal_delta_t=minimum_terminal_delta_t,
+            property_calls=property_calls,
+            seq_idx=seq_idx,
         )
-    )
-    seq_idx += 1
-
-    # Query cold limit state
-    cold_limit_inputs = (
-        ("temperature_k", T_cold_out_max),
-        ("pressure_pa", cold_inlet_pressure_pa),
-    )
-    cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max, cold_inlet_pressure_pa)
-    property_calls.append(
-        _build_provider_call_record(
-            cold_limit_state,
-            query_type="TP",
-            inputs=cold_limit_inputs,
+    else:
+        return _compute_q_max_parallel(
             provider=provider,
-            stage="q_max",
-            stream_role="cold_limit",
-            sequence_index=seq_idx,
+            hot_fluid=hot_fluid,
+            cold_fluid=cold_fluid,
+            hot_inlet_temperature_k=hot_inlet_temperature_k,
+            cold_inlet_temperature_k=cold_inlet_temperature_k,
+            hot_inlet_pressure_pa=hot_inlet_pressure_pa,
+            cold_inlet_pressure_pa=cold_inlet_pressure_pa,
+            h_hot_in=h_hot_in,
+            h_cold_in=h_cold_in,
+            hot_mass_flow_kg_s=hot_mass_flow_kg_s,
+            cold_mass_flow_kg_s=cold_mass_flow_kg_s,
+            minimum_terminal_delta_t=minimum_terminal_delta_t,
+            property_calls=property_calls,
+            seq_idx=seq_idx,
         )
-    )
-    seq_idx += 1
-
-    # Compute enthalpy-based Q limits
-    Q_hot_limit = hot_mass_flow_kg_s * (h_hot_in - hot_limit_state.enthalpy_j_kg)
-    Q_cold_limit = cold_mass_flow_kg_s * (cold_limit_state.enthalpy_j_kg - h_cold_in)
-
-    q_max = min(Q_hot_limit, Q_cold_limit)
-
-    return q_max, seq_idx
 
 
 # ---------------------------------------------------------------------------
@@ -1241,7 +1464,7 @@ def rate_double_pipe(
         heated_surface="inner",
     )
 
-    def _evaluate_trial(Q: float) -> TrialEvaluation:
+    def _evaluate_trial(Q: float, *, accumulate: bool = True) -> TrialEvaluation:
         """Evaluate a single trial Q and return a TrialEvaluation."""
         nonlocal seq_idx
 
@@ -1328,6 +1551,8 @@ def rate_double_pipe(
                 )
             )
             seq_idx += 1
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1389,6 +1614,8 @@ def rate_double_pipe(
                 )
             )
             seq_idx += 1
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1414,6 +1641,8 @@ def rate_double_pipe(
 
         # --- 6c. Validate single-phase outlet states ---
         if hot_outlet_state.phase not in _SINGLE_PHASE:
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1437,6 +1666,8 @@ def rate_double_pipe(
                 ),
             )
         if cold_outlet_state.phase not in _SINGLE_PHASE:
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1510,6 +1741,8 @@ def rate_double_pipe(
                 )
             )
             seq_idx += 1
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1572,6 +1805,8 @@ def rate_double_pipe(
                 )
             )
             seq_idx += 1
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1597,6 +1832,8 @@ def rate_double_pipe(
 
         # --- 6e. Validate bulk phases ---
         if hot_bulk_state.phase not in _SINGLE_PHASE:
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1620,6 +1857,8 @@ def rate_double_pipe(
                 ),
             )
         if cold_bulk_state.phase not in _SINGLE_PHASE:
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1701,6 +1940,8 @@ def rate_double_pipe(
         if tube_result.status.value == "blocked" or tube_result.heat_transfer_coefficient <= 0:
             for b in tube_result.blockers:
                 trial_blockers.append(b)
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1735,6 +1976,8 @@ def rate_double_pipe(
         ):
             for b in annulus_result.blockers:
                 trial_blockers.append(b)
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1789,6 +2032,8 @@ def rate_double_pipe(
             )
 
         if not math.isfinite(lmtd) or lmtd <= 0:
+            if accumulate:
+                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1814,6 +2059,8 @@ def rate_double_pipe(
 
         # --- 6m. Residual ---
         residual = Q - UA * lmtd
+        if accumulate:
+            property_calls.extend(trial_prop_calls)
         return TrialEvaluation(
             q_w=Q,
             residual_w=residual,
@@ -1832,25 +2079,29 @@ def rate_double_pipe(
         )
 
     def residual_fn(Q: float) -> float:
-        """Evaluate residual Q - UA(Q) × LMTD(Q).
+        """Evaluate residual Q - UA(Q) x LMTD(Q).
 
-        The solver calls this; it must return a float.
-        Infeasible trials are handled by returning a large residual
-        that guides bracket construction.
+        Raises TrialEvaluationAbort for infeasible trials instead of
+        returning sentinel residuals. The solver must catch this.
         """
         trial = _evaluate_trial(Q)
         if not trial.feasible or trial.residual_w is None:
-            # For bracket-finding guidance: return a large residual
-            # that signals this Q is not feasible
-            return 1e12
+            raise TrialEvaluationAbort(trial)
         return trial.residual_w
 
     # =====================================================================
     # 7. SOLVE
     # =====================================================================
 
+    # Wrap residual_fn to catch TrialEvaluationAbort
+    def _safe_residual(Q: float) -> float:
+        try:
+            return residual_fn(Q)
+        except TrialEvaluationAbort:
+            return float("nan")
+
     solver_result = solve_rating(
-        residual_fn=residual_fn,
+        residual_fn=_safe_residual,
         q_max=q_max,
         params=params,
         c_effective_w_k=C_min,
@@ -1880,9 +2131,8 @@ def rate_double_pipe(
     # Re-evaluate at the solution Q for final diagnostics
     final_trial = _evaluate_trial(Q_sol)
 
-    # Propagate trial property calls and warnings to global accumulators
-    for pc in final_trial.property_calls:
-        property_calls.append(pc)
+    # Final trial property calls already accumulated via _evaluate_trial(accumulate=True)
+    # Propagate warnings only
     for w in final_trial.warnings:
         warnings.append(w)
 
@@ -1917,10 +2167,6 @@ def rate_double_pipe(
     cold_bulk_final = final_trial.cold_bulk_state
     tube_result_final = final_trial.tube_result
     annulus_result_final = final_trial.annulus_result
-
-    # Compute final outlet states via PH queries (for result snapshot)
-    h_hot_out_sol = h_hot_in - Q_sol / hot_mass_flow_kg_s
-    h_cold_out_sol = h_cold_in + Q_sol / cold_mass_flow_kg_s
 
     # Final property state snapshots
     hot_outlet_snapshot = _make_fluid_state_snapshot(hot_outlet_final)
@@ -1980,32 +2226,40 @@ def rate_double_pipe(
 
     # --- Terminal temperature differences ---
     if flow_arrangement == FlowArrangement.COUNTERFLOW:
-        # Counter-flow: all terminal ΔT must be positive
         dt_hot_in_cold_out = hot_inlet_temperature_k - T_c_out_sol
         dt_hot_out_cold_in = T_h_out_sol - cold_inlet_temperature_k
-        if dt_hot_in_cold_out <= 0 or dt_hot_out_cold_in <= 0:
+        _eps = 1e-12
+        if (
+            dt_hot_in_cold_out < minimum_terminal_delta_t - _eps
+            or dt_hot_out_cold_in < minimum_terminal_delta_t - _eps
+        ):
             blockers.append(
                 _make_blocker(
                     ErrorCode.TEMPERATURE_CROSSING,
-                    f"Terminal temperature differences must be positive for counter-flow "
-                    f"(dt1={dt_hot_in_cold_out}, dt2={dt_hot_out_cold_in})",
+                    f"Terminal temperature differences must be >= minimum_terminal_delta_t "
+                    f"({minimum_terminal_delta_t} K) for counter-flow "
+                    f"(dt1={dt_hot_in_cold_out:.6f}, dt2={dt_hot_out_cold_in:.6f})",
                     (
                         ("dt_hot_in_cold_out", dt_hot_in_cold_out),
                         ("dt_hot_out_cold_in", dt_hot_out_cold_in),
+                        ("minimum_terminal_delta_t", minimum_terminal_delta_t),
                     ),
                 )
             )
     else:
-        # Parallel-flow: hot outlet must be > cold outlet
-        if T_h_out_sol <= T_c_out_sol:
+        # Parallel-flow: T_hot_out - T_cold_out >= minimum_terminal_delta_t
+        exit_dt = T_h_out_sol - T_c_out_sol
+        _eps = 1e-12
+        if exit_dt < minimum_terminal_delta_t - _eps:
             blockers.append(
                 _make_blocker(
                     ErrorCode.TEMPERATURE_CROSSING,
-                    f"Hot outlet ({T_h_out_sol} K) must exceed cold outlet ({T_c_out_sol} K) "
-                    f"for parallel flow",
+                    f"Parallel-flow exit temperature difference must be >= "
+                    f"minimum_terminal_delta_t ({minimum_terminal_delta_t} K), "
+                    f"got {exit_dt:.6f} K",
                     (
-                        ("hot_outlet_k", T_h_out_sol),
-                        ("cold_outlet_k", T_c_out_sol),
+                        ("exit_dt_k", exit_dt),
+                        ("minimum_terminal_delta_t", minimum_terminal_delta_t),
                     ),
                 )
             )
@@ -2077,48 +2331,57 @@ def rate_double_pipe(
     # 10. ENERGY BALANCE CLOSURE
     # =====================================================================
 
-    Q_hot = hot_mass_flow_kg_s * (h_hot_in - h_hot_out_sol)
-    Q_cold = cold_mass_flow_kg_s * (h_cold_out_sol - h_cold_in)
+    # Use final PropertyProvider returned states (not algebraic identity)
+    Q_hot_w = hot_mass_flow_kg_s * (hot_inlet_state.enthalpy_j_kg - hot_outlet_final.enthalpy_j_kg)
+    Q_cold_w = cold_mass_flow_kg_s * (
+        cold_outlet_final.enthalpy_j_kg - cold_inlet_state.enthalpy_j_kg
+    )
 
-    energy_residual_w = abs(Q_hot - Q_cold)
-    max_abs_q = max(abs(Q_hot), abs(Q_cold), 1.0)
-    energy_tolerance = max(_ENERGY_RESIDUAL_ABS_TOL, _ENERGY_RESIDUAL_REL_TOL * max_abs_q)
+    energy_residual_w = abs(Q_hot_w - Q_cold_w)
+    max_abs_q = max(abs(Q_hot_w), abs(Q_cold_w), 1.0)
+    energy_tolerance_w = max(_ENERGY_RESIDUAL_ABS_TOL, _ENERGY_RESIDUAL_REL_TOL * max_abs_q)
+    relative_energy_residual = energy_residual_w / max_abs_q if max_abs_q > 0 else 0.0
 
-    if energy_residual_w > energy_tolerance:
+    if energy_residual_w > energy_tolerance_w:
         blockers.append(
             _make_blocker(
                 ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
-                f"Energy balance not closed: residual={energy_residual_w:.6e} W, "
-                f"tolerance={energy_tolerance:.6e} W",
+                f"Energy balance not closed: Q_hot={Q_hot_w:.6f} W, Q_cold={Q_cold_w:.6f} W, "
+                f"residual={energy_residual_w:.6e} W, tolerance={energy_tolerance_w:.6e} W",
                 (
+                    ("Q_hot_w", Q_hot_w),
+                    ("Q_cold_w", Q_cold_w),
                     ("energy_residual_w", energy_residual_w),
-                    ("energy_tolerance_w", energy_tolerance),
-                    ("Q_hot_w", Q_hot),
-                    ("Q_cold_w", Q_cold),
+                    ("relative_energy_residual", relative_energy_residual),
+                    ("energy_tolerance_w", energy_tolerance_w),
                 ),
             )
         )
 
     # --- UA-LMTD residual ---
-    ua_lmtd_residual = (
-        abs(Q_sol - UA_final * lmtd_final) if UA_final > 0 and lmtd_final > 0 else 0.0
-    )
-    if UA_final > 0 and lmtd_final > 0:
-        ua_lmtd_tolerance = max(
+    if UA_final > 0 and lmtd_final > 0 and math.isfinite(UA_final) and math.isfinite(lmtd_final):
+        ua_lmtd_residual_w = abs(Q_sol - UA_final * lmtd_final)
+        ua_lmtd_tolerance_w = max(
             _ENERGY_RESIDUAL_ABS_TOL, _ENERGY_RESIDUAL_REL_TOL * max(abs(Q_sol), 1.0)
         )
-        if ua_lmtd_residual > ua_lmtd_tolerance:
+        relative_ua_lmtd_residual = ua_lmtd_residual_w / max(
+            abs(Q_sol), abs(UA_final * lmtd_final), 1.0
+        )
+        if ua_lmtd_residual_w > ua_lmtd_tolerance_w:
             blockers.append(
                 _make_blocker(
                     ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
-                    f"UA-LMTD residual not closed: residual={ua_lmtd_residual:.6e} W, "
-                    f"tolerance={ua_lmtd_tolerance:.6e} W",
+                    f"UA-LMTD residual not closed: residual={ua_lmtd_residual_w:.6e} W, "
+                    f"tolerance={ua_lmtd_tolerance_w:.6e} W",
                     (
-                        ("ua_lmtd_residual_w", ua_lmtd_residual),
-                        ("ua_lmtd_tolerance_w", ua_lmtd_tolerance),
+                        ("ua_lmtd_residual_w", ua_lmtd_residual_w),
+                        ("ua_lmtd_tolerance_w", ua_lmtd_tolerance_w),
+                        ("relative_ua_lmtd_residual", relative_ua_lmtd_residual),
                     ),
                 )
             )
+    else:
+        ua_lmtd_residual_w = None
 
     # --- Propagate correlation warnings to global ---
     for w in tube_result_final.warnings:
@@ -2192,12 +2455,18 @@ def rate_double_pipe(
         blockers=[],
         execution_context=ctx_snapshot,
         request_identity=request_identity,
+        tube_correlation_info=tube_sel_corr_snapshot,
+        annulus_correlation_info=annulus_sel_corr_snapshot,
+        tube_applicability=tube_app_snapshot,
+        annulus_applicability=annulus_app_snapshot,
     )
 
     # Step 2: Compute core_provenance_digest
     core_provenance_digest = _provenance_graph_digest(core_graph)
 
     # Step 3: Compute result_hash using core_provenance_digest
+    # IMPORTANT: all snapshot fields MUST be passed here so that the
+    # construction-time hash matches the verification-time recomputation.
     result_hash = compute_result_hash(
         request_identity=request_identity,
         provider_identity=provider_identity,
@@ -2234,7 +2503,7 @@ def rate_double_pipe(
         effectiveness=eps_calc,
         LMTD_k=lmtd_final,
         energy_residual_w=energy_residual_w,
-        ua_lmtd_residual_w=ua_lmtd_residual,
+        ua_lmtd_residual_w=ua_lmtd_residual_w,
         iterations=solver_result.iterations,
         converged=True,
         solver_termination_reason=solver_result.termination_reason.value,
@@ -2243,7 +2512,22 @@ def rate_double_pipe(
         warnings=tuple(warnings),
         blockers=(),
         status=RatingStatus.SUCCEEDED,
-        provenance_digest=core_provenance_digest,
+        # Snapshot fields — must match _recompute_result_hash
+        hot_inlet_state=hot_inlet_state_snapshot,
+        cold_inlet_state=cold_inlet_state_snapshot,
+        hot_outlet_state=hot_outlet_snapshot,
+        cold_outlet_state=cold_outlet_snapshot,
+        tube_side_inlet_state=tube_side_inlet_snapshot,
+        tube_side_outlet_state=tube_side_outlet_snapshot,
+        annulus_side_inlet_state=annulus_side_inlet_snapshot,
+        annulus_side_outlet_state=annulus_side_outlet_snapshot,
+        tube_bulk_state=tube_bulk_snapshot,
+        annulus_bulk_state=annulus_bulk_snapshot,
+        tube_selected_correlation_snap=tube_sel_corr_snapshot,
+        annulus_selected_correlation_snap=annulus_sel_corr_snapshot,
+        tube_applicability_snap=tube_app_snapshot,
+        annulus_applicability_snap=annulus_app_snapshot,
+        core_provenance_digest=core_provenance_digest,
     )
 
     # Step 4: Add RESULT node via build_provenance
@@ -2257,6 +2541,10 @@ def rate_double_pipe(
         result_hash=result_hash,
         execution_context=ctx_snapshot,
         request_identity=request_identity,
+        tube_correlation_info=tube_sel_corr_snapshot,
+        annulus_correlation_info=annulus_sel_corr_snapshot,
+        tube_applicability=tube_app_snapshot,
+        annulus_applicability=annulus_app_snapshot,
     )
 
     # Step 5: Compute final provenance_digest from full graph
@@ -2301,7 +2589,7 @@ def rate_double_pipe(
         effectiveness=eps_calc,
         LMTD_k=lmtd_final,
         energy_residual_w=energy_residual_w,
-        ua_lmtd_residual_w=ua_lmtd_residual,
+        ua_lmtd_residual_w=ua_lmtd_residual_w,
         iterations=solver_result.iterations,
         converged=True,
         solver_termination_reason=solver_result.termination_reason.value,

@@ -80,6 +80,7 @@ class FluidStateSnapshot:
     conductivity_w_m_k: float | None = None
     phase: str = ""
     quality: float = 0.0
+    property_provenance: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,13 @@ class ApplicabilitySnapshot:
 
     status: str = ""
     assessment_hash: str = ""
+    reynolds_min: float | None = None
+    reynolds_max: float | None = None
+    prandtl_min: float | None = None
+    prandtl_max: float | None = None
+    geometry_type: str = ""
+    notes: str = ""
+    raw_assessment: dict[str, object] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +462,6 @@ class RatingResult(BaseModel):
                 if hasattr(self.execution_context, "model_dump")
                 else self.execution_context
             ),
-            "provenance_digest": self.provenance_digest,
             "failure": (
                 {
                     "code": self.failure.code.value,
@@ -607,9 +614,18 @@ class RatingResult(BaseModel):
 
             # 2. RESULT linkage
             result_in_edges = [e for e in graph.edges if e.target_id == result_node.node_id]
-            if len(result_in_edges) != 1:
+            # Expect: 1 produces + N property_call supports + M correlation supports
+            expected_result_in = 1 + len(self.property_calls)
+            if self.tube_selected_correlation is not None:
+                expected_result_in += 1
+            if self.annulus_selected_correlation is not None:
+                expected_result_in += 1
+            if len(result_in_edges) != expected_result_in:
                 return False
-            result_edge = result_in_edges[0]
+            result_produces_edges = [e for e in result_in_edges if e.relation == "produces"]
+            if len(result_produces_edges) != 1:
+                return False
+            result_edge = result_produces_edges[0]
 
             calc_nodes = nodes_by_type.get(ProvenanceNodeType.CALCULATION_RUN, [])
             if len(calc_nodes) != 1:
@@ -874,7 +890,7 @@ class RatingResult(BaseModel):
             if blocker_node_map:
                 return False
 
-            # 8. provenance_digest from core graph
+            # 8. core_provenance_digest from core graph (without RESULT node)
             core_node_ids = {
                 n.node_id for n in graph.nodes if n.node_type != ProvenanceNodeType.RESULT
             }
@@ -888,7 +904,7 @@ class RatingResult(BaseModel):
                 recomputed_digest = _provenance_graph_digest(core_graph)
             except Exception:
                 return False
-            if recomputed_digest != self.provenance_digest:
+            if recomputed_digest != self.core_provenance_digest:
                 return False
 
             # 9. Reject unsupported node types
@@ -926,6 +942,14 @@ class RatingResult(BaseModel):
             expected_edge_counts[
                 (str(calc_node.node_id), str(result_node.node_id), "produces")
             ] += 1
+            # PROPERTY_CALL → RESULT (supports)
+            for pc_n in pc_nodes:
+                expected_edge_counts[(str(pc_n.node_id), str(result_node.node_id), "supports")] += 1
+            # CORRELATION → RESULT (supports)
+            for corr_n in corr_nodes:
+                corr_src = str(corr_n.node_id)
+                corr_tgt = str(result_node.node_id)
+                expected_edge_counts[(corr_src, corr_tgt, "supports")] += 1
 
             actual_edge_counts: Counter[tuple[str, str, str]] = Counter()
             for e in graph.edges:
@@ -1006,7 +1030,6 @@ class RatingResult(BaseModel):
             blockers=self.blockers,
             failure=self.failure,
             status=self.status,
-            provenance_digest=self.provenance_digest,
             # New snapshot fields
             hot_inlet_state=self.hot_inlet_state,
             cold_inlet_state=self.cold_inlet_state,
@@ -1079,7 +1102,6 @@ def _build_identity_payload(
     blockers: tuple[EngineeringMessage, ...],
     failure: RunFailure | None,
     status: RatingStatus,
-    provenance_digest: str,
     # New snapshot fields
     hot_inlet_state: FluidStateSnapshot | None = None,
     cold_inlet_state: FluidStateSnapshot | None = None,
@@ -1207,8 +1229,6 @@ def _build_identity_payload(
         "failure": failure_dict,
         # Software version
         "software_version": _SOFTWARE_VERSION,
-        # Provenance digest
-        "provenance_digest": provenance_digest,
         # Fluid state snapshots
         "hot_inlet_state": (
             dataclasses.asdict(hot_inlet_state) if hot_inlet_state is not None else None
@@ -1747,6 +1767,26 @@ def build_provenance(
             relation="produces",
         )
     )
+    # Add PROPERTY_CALL → RESULT (supports) edges
+    for node in nodes:
+        if node.node_type == ProvenanceNodeType.PROPERTY_CALL:
+            edges.append(
+                ProvenanceEdge(
+                    source_id=node.node_id,
+                    target_id=result_id,
+                    relation="supports",
+                )
+            )
+    # Add CORRELATION → RESULT (supports) edges
+    for node in nodes:
+        if node.node_type == ProvenanceNodeType.CORRELATION:
+            edges.append(
+                ProvenanceEdge(
+                    source_id=node.node_id,
+                    target_id=result_id,
+                    relation="supports",
+                )
+            )
 
     return ProvenanceGraph(
         nodes=tuple(nodes),
@@ -1801,7 +1841,6 @@ def compute_result_hash(
     blockers: tuple[EngineeringMessage, ...],
     failure: RunFailure | None = None,
     status: RatingStatus = RatingStatus.SUCCEEDED,
-    provenance_digest: str = "",
     # New snapshot fields
     hot_inlet_state: FluidStateSnapshot | None = None,
     cold_inlet_state: FluidStateSnapshot | None = None,
@@ -1866,7 +1905,6 @@ def compute_result_hash(
         blockers=blockers,
         failure=failure,
         status=status,
-        provenance_digest=provenance_digest,
         # New snapshot fields
         hot_inlet_state=hot_inlet_state,
         cold_inlet_state=cold_inlet_state,
