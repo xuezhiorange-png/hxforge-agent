@@ -30,7 +30,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY`, `BLOCKED`, `PLANNED`.
 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| TASK-007 | Implement single-phase tube and annulus correlations | READY | TASK-003, TASK-004, TASK-006 |
+| TASK-007 | Implement single-phase tube and annulus correlations | IN_PROGRESS | TASK-003, TASK-004, TASK-006 |
 | TASK-008 | Implement fixed-geometry double-pipe rating | READY | TASK-005, TASK-006, TASK-007 |
 | TASK-009 | Implement manufacturable sizing and candidate optimization | READY | TASK-008 |
 | TASK-010 | Add versioned API and traceable report | READY | TASK-005, TASK-009 |
