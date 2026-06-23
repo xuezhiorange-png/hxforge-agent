@@ -1,6 +1,6 @@
 # TASK-006 — Heat-balance and specification closure
 
-**Status:** IN_PROGRESS  
+**Status:** DONE  
 **Milestone:** M1  
 **Priority:** P0  
 **Depends on:** TASK-002, TASK-003, TASK-005  
@@ -14,7 +14,7 @@ Resolve valid combinations of duty, flow and inlet/outlet states while enforcing
 
 ## Current engineering status
 
-The first implementation is complete and CI is green, but Engineering Review Rounds 1 and 2 identified unresolved domain contracts. TASK-006 remains `IN_PROGRESS` and PR #14 must remain Draft until all review items are closed.
+TASK-006 is **DONE**. All 18 review rounds have been resolved. CI is green on Python 3.11 and 3.12 (943 passed, 1 skipped). Independent technical approval recorded in GitHub Review ID 4549628395. GitHub APPROVE event was unavailable because the connected identity owns the PR.
 
 Authoritative reviews:
 
@@ -137,7 +137,7 @@ Supported and unsupported combinations must be explicitly enumerated. Under-spec
 | Review-15 | `602fda4` | 27994422952 | CHANGES REQUIRED | 2026-06-23 |
 | Review-16 | `8cc210d` | 27995704383 | CHANGES REQUIRED | 2026-06-23 |
 | Review-17 | `d93646e` | 27997396995 | CHANGES REQUIRED | 2026-06-23 |
-| Review-18 | `ae424e8` | 27998095729 | CHANGES REQUIRED | 2026-06-23 |
+| Review-18 | `b793ee0` | 27998540720 | APPROVED | 2026-06-23 |
 
 Review-12 implementation commit: `0b58f1b11bf7e0401c7193f4d28b46f95bdd5c63`
 Implementation CI: `27974294657`
@@ -153,3 +153,6 @@ Review-17 implementation commit: `cb69a8507fe3849b6c674ef853ae9b04b5205032`
 Review-17 CI: `27997396995`
 Review-18 implementation commit: `ae424e86853489fc06f1bdadbf0d907b65354e58`
 Review-18 CI: `27998095729`
+
+Independent technical approval recorded in GitHub Review ID 4549628395.
+GitHub APPROVE event was unavailable because the connected identity owns the PR.
