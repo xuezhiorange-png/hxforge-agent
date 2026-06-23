@@ -19,6 +19,7 @@ from pydantic import ValidationError
 from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import (
     CalculationContext,
+    ExecutionContextSnapshot,
     FlowArrangement,
     HeatBalanceInput,
     HeatBalanceResult,
@@ -4147,14 +4148,15 @@ class TestReview15ProvenanceVerification:
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
-        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        # Use under-specified input to get a BLOCKED result with blockers (emits edges)
+        inp = HeatBalanceInput(hot=hot, cold=cold)  # no duty, no outlet
         result = solve_heat_balance(inp, provider)
         d = result.model_dump(mode="json")
         emits_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "emits"]
-        if emits_edges:
-            d["provenance_graph"]["edges"].remove(emits_edges[0])
-            restored = HeatBalanceResult.model_validate(d)
-            assert restored.verify_provenance() is False
+        assert emits_edges, "Fixture must produce at least one emits edge"
+        d["provenance_graph"]["edges"].remove(emits_edges[0])
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
 
     def test_unsupported_node_type(self):
         """Add unsupported node type → verify_provenance fails."""
@@ -4193,20 +4195,324 @@ class TestReview15ProvenanceVerification:
         """Add extra edge with valid endpoints → verify_provenance fails."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
-        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
-        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        cold = _water_stream(outlet_t=349.9995, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold)
         result = solve_heat_balance(inp, provider)
         d = result.model_dump(mode="json")
         pc_nodes = [n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "PROPERTY_CALL"]
         warn_nodes = [n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "WARNING"]
-        # Add PROPERTY_CALL → WARNING edge (not allowed)
-        if pc_nodes and warn_nodes:
-            d["provenance_graph"]["edges"].append(
-                {
-                    "source_id": pc_nodes[0]["node_id"],
-                    "target_id": warn_nodes[0]["node_id"],
-                    "relation": "spurious",
-                }
-            )
+        assert pc_nodes, "Fixture must have at least one PROPERTY_CALL node"
+        assert warn_nodes, "Fixture must have at least one WARNING node"
+        d["provenance_graph"]["edges"].append(
+            {
+                "source_id": pc_nodes[0]["node_id"],
+                "target_id": warn_nodes[0]["node_id"],
+                "relation": "spurious",
+            }
+        )
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    # --- Counter-based edge deduplication (Review-17 Item 1) ---
+
+    def test_duplicate_triggers_edge(self):
+        """Duplicate identical triggers edge → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        triggers_edges = [
+            e for e in d["provenance_graph"]["edges"] if e.get("relation") == "triggers"
+        ]
+        if triggers_edges:
+            d["provenance_graph"]["edges"].append(dict(triggers_edges[0]))
             restored = HeatBalanceResult.model_validate(d)
             assert restored.verify_provenance() is False
+            assert restored.verify_hash() is False
+
+    def test_duplicate_calls_edge(self):
+        """Duplicate identical calls edge → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        calls_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "calls"]
+        if calls_edges:
+            d["provenance_graph"]["edges"].append(dict(calls_edges[0]))
+            restored = HeatBalanceResult.model_validate(d)
+            assert restored.verify_provenance() is False
+            assert restored.verify_hash() is False
+
+    def test_duplicate_emits_edge(self):
+        """Duplicate identical emits edge → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        emits_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "emits"]
+        if emits_edges:
+            d["provenance_graph"]["edges"].append(dict(emits_edges[0]))
+            restored = HeatBalanceResult.model_validate(d)
+            assert restored.verify_provenance() is False
+            assert restored.verify_hash() is False
+
+    def test_duplicate_produces_edge(self):
+        """Duplicate identical produces edge → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        produces_edges = [
+            e for e in d["provenance_graph"]["edges"] if e.get("relation") == "produces"
+        ]
+        if produces_edges:
+            d["provenance_graph"]["edges"].append(dict(produces_edges[0]))
+            restored = HeatBalanceResult.model_validate(d)
+            assert restored.verify_provenance() is False
+            assert restored.verify_hash() is False
+
+    # --- Non-vacuous edge tests (Review-17 Item 2) ---
+
+    def test_modify_emits_relation(self):
+        """Modify emits edge relation → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        emits_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "emits"]
+        assert emits_edges, "Fixture must produce at least one emits edge"
+        emits_edges[0]["relation"] = "modified_emits"
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    def test_modify_emits_source(self):
+        """Modify emits edge source → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=349.9995, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        emits_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "emits"]
+        assert emits_edges, "Fixture must produce at least one emits edge"
+        pc_nodes = [n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "PROPERTY_CALL"]
+        assert pc_nodes, "Fixture must have at least one PROPERTY_CALL node"
+        emits_edges[0]["source_id"] = pc_nodes[0]["node_id"]
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    def test_duplicate_emits_edge_vacuous_check(self):
+        """Duplicate emits edge → verify_provenance fails (non-vacuous)."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        emits_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "emits"]
+        assert emits_edges, "Fixture must produce at least one emits edge"
+        d["provenance_graph"]["edges"].append(dict(emits_edges[0]))
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    def test_duplicate_calls_edge_vacuous_check(self):
+        """Duplicate calls edge → verify_provenance fails (non-vacuous)."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        calls_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "calls"]
+        assert calls_edges, "Fixture must produce at least one calls edge"
+        d["provenance_graph"]["edges"].append(dict(calls_edges[0]))
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    # --- ExecutionContextSnapshot tests (Review-17 Item 3) ---
+
+    def test_execution_context_stored(self):
+        """ExecutionContextSnapshot is stored in HeatBalanceResult."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        assert hasattr(result, "execution_context")
+        assert isinstance(result.execution_context, ExecutionContextSnapshot)
+
+    def test_context_field_request_id_changes_hash(self):
+        """Different request_id → different provenance_digest and result_hash."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        rid1, rid2 = uuid4(), uuid4()
+        ctx1 = CalculationContext(request_id=rid1)
+        ctx2 = CalculationContext(request_id=rid2)
+        r1 = solve_heat_balance(inp, provider, context=ctx1)
+        r2 = solve_heat_balance(inp, provider, context=ctx2)
+        assert r1.provenance_digest != r2.provenance_digest
+        assert r1.result_hash != r2.result_hash
+        assert r1.verify_provenance() is True
+        assert r2.verify_provenance() is True
+        assert r1.verify_hash() is True
+        assert r2.verify_hash() is True
+
+    def test_context_field_design_case_revision_id_changes_hash(self):
+        """Different design_case_revision_id → different provenance_digest and result_hash."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        dcr1, dcr2 = uuid4(), uuid4()
+        ctx1 = CalculationContext(design_case_revision_id=dcr1)
+        ctx2 = CalculationContext(design_case_revision_id=dcr2)
+        r1 = solve_heat_balance(inp, provider, context=ctx1)
+        r2 = solve_heat_balance(inp, provider, context=ctx2)
+        assert r1.provenance_digest != r2.provenance_digest
+        assert r1.result_hash != r2.result_hash
+        assert r1.verify_provenance() is True
+        assert r2.verify_provenance() is True
+        assert r1.verify_hash() is True
+        assert r2.verify_hash() is True
+
+    def test_context_field_calculation_run_id_changes_hash(self):
+        """Different calculation_run_id → different provenance_digest and result_hash."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        crid1, crid2 = uuid4(), uuid4()
+        ctx1 = CalculationContext(calculation_run_id=crid1)
+        ctx2 = CalculationContext(calculation_run_id=crid2)
+        r1 = solve_heat_balance(inp, provider, context=ctx1)
+        r2 = solve_heat_balance(inp, provider, context=ctx2)
+        assert r1.provenance_digest != r2.provenance_digest
+        assert r1.result_hash != r2.result_hash
+        assert r1.verify_provenance() is True
+        assert r2.verify_provenance() is True
+        assert r1.verify_hash() is True
+        assert r2.verify_hash() is True
+
+    def test_case_revision_request_id_only_changes_hash(self):
+        """Same design/calc IDs, only request_id different → different hash."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        dcr = uuid4()
+        crid = uuid4()
+        rid1, rid2 = uuid4(), uuid4()
+        ctx1 = CalculationContext(
+            design_case_revision_id=dcr, calculation_run_id=crid, request_id=rid1
+        )
+        ctx2 = CalculationContext(
+            design_case_revision_id=dcr, calculation_run_id=crid, request_id=rid2
+        )
+        r1 = solve_heat_balance(inp, provider, context=ctx1)
+        r2 = solve_heat_balance(inp, provider, context=ctx2)
+        # request_id participates in CASE_REVISION root payload
+        assert r1.provenance_digest != r2.provenance_digest
+        assert r1.result_hash != r2.result_hash
+        assert r1.verify_provenance() is True
+        assert r2.verify_provenance() is True
+        assert r1.verify_hash() is True
+        assert r2.verify_hash() is True
+
+    def test_execution_context_tamper_request_id(self):
+        """Tamper execution_context.request_id → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider, context=CalculationContext(request_id=uuid4()))
+        d = result.model_dump(mode="json")
+        d["execution_context"]["request_id"] = str(uuid4())
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
+
+    def test_execution_context_tamper_design_case_revision_id(self):
+        """Tamper execution_context.design_case_revision_id → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(
+            inp, provider, context=CalculationContext(design_case_revision_id=uuid4())
+        )
+        d = result.model_dump(mode="json")
+        d["execution_context"]["design_case_revision_id"] = str(uuid4())
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
+
+    def test_execution_context_tamper_calculation_run_id(self):
+        """Tamper execution_context.calculation_run_id → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(
+            inp, provider, context=CalculationContext(calculation_run_id=uuid4())
+        )
+        d = result.model_dump(mode="json")
+        d["execution_context"]["calculation_run_id"] = str(uuid4())
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
+
+    def test_root_metadata_mismatch_with_snapshot(self):
+        """Root node metadata doesn't match snapshot → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider, context=CalculationContext(request_id=uuid4()))
+        d = result.model_dump(mode="json")
+        # Tamper root node metadata
+        root_nodes = [
+            n
+            for n in d["provenance_graph"]["nodes"]
+            if n["node_type"] in ("EXTERNAL", "CASE_REVISION")
+        ]
+        assert len(root_nodes) == 1
+        root_nodes[0]["metadata"] = [("request_id", str(uuid4()))]
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    def test_calc_run_external_id_mismatch_with_snapshot(self):
+        """CALCULATION_RUN external_calculation_run_id mismatch → verify fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(
+            inp, provider, context=CalculationContext(calculation_run_id=uuid4())
+        )
+        d = result.model_dump(mode="json")
+        calc_nodes = [
+            n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "CALCULATION_RUN"
+        ]
+        assert len(calc_nodes) == 1
+        # Tamper external_calculation_run_id in metadata
+        meta = list(calc_nodes[0]["metadata"])
+        for i, (k, _v) in enumerate(meta):
+            if k == "external_calculation_run_id":
+                meta[i] = (k, str(uuid4()))
+                break
+        calc_nodes[0]["metadata"] = meta
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False

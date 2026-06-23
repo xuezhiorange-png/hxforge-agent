@@ -202,26 +202,26 @@ Edges:
 
 ### Provenance Integrity
 
-The `provenance_digest` field stores a deterministic SHA-256 hash of the core provenance graph (all nodes EXCEPT the RESULT node, all edges EXCEPT the `produces` edge). This breaks the circular dependency between the result hash and the provenance graph:
+The `verify_provenance()` method performs comprehensive graph identity verification:
 
-1. Core provenance is built (without RESULT node)
-2. `provenance_digest = _provenance_graph_digest(core_graph)`
-3. `provenance_digest` is included in the result hash payload
-4. Result hash is computed
-5. RESULT node is added to the graph with the result hash
+1. **Empty graph rejection** — Any `HeatBalanceResult` must contain a valid provenance graph.
+2. **RESULT node identity** — Verifies node_id (deterministic UUID5 from result_hash), label, metadata, and payload_hash.
+3. **RESULT linkage** — Exactly one incoming edge from CALCULATION_RUN with relation="produces", no outgoing edges.
+4. **Root node identity** — Rebuilt from `execution_context` (canonical source):
+   - With `design_case_revision_id`: CASE_REVISION node with `design_case_revision_id` and `request_id` in payload/metadata.
+   - Without: EXTERNAL node with `request_id`, `specification_mode`, `flow_arrangement`.
+   - UUID5, payload_hash, label, and metadata all recomputed from snapshot.
+5. **CALCULATION_RUN node identity** — Full payload recomputation via `_build_calculation_run_payload()`, UUID5 verification, payload_hash verification, all 8 metadata keys verified including `external_calculation_run_id` matching snapshot.
+6. **PROPERTY_CALL nodes** — Full UUID5 recomputation with one-to-one mapping, label, payload_hash, and all 10 metadata fields per node.
+7. **WARNING nodes** — Full UUID5 recomputation with one-to-one mapping, label, payload_hash, and 4 metadata fields.
+8. **BLOCKER nodes** — Full UUID5 recomputation with one-to-one mapping, label, payload_hash, and 4 metadata fields.
+9. **provenance_digest** — Recomputed from core graph (without RESULT node).
+10. **Edge topology** — Counter-based exact multiset comparison of all edges (source, target, relation). Rejects duplicates, missing edges, extra edges, wrong relations.
+11. **Unsupported node types** — Only EXTERNAL, CASE_REVISION, CALCULATION_RUN, PROPERTY_CALL, WARNING, BLOCKER, RESULT are allowed.
+12. **Payload hash format** — All node payload hashes must be valid SHA-256.
+13. **Empty edge metadata** — All edges must have empty metadata.
 
-The `verify_provenance()` method validates:
-1. Recomputable `provenance_digest` from the core graph
-2. DAG validity (enforced by `ProvenanceGraph` validator)
-3. All node payload hashes are valid SHA-256
-4. Exactly one root, one `CALCULATION_RUN`, one `RESULT`
-5. `PROPERTY_CALL` count matches `len(property_calls)`
-6. `WARNING` count matches `len(warnings)`
-7. `BLOCKER` count matches `len(blockers)`
-8. All edge endpoints reference existing nodes
-9. RESULT node's `result_hash` matches the result's own `result_hash`
-
-The `verify_hash()` method verifies both the formal result hash AND provenance integrity.
+`execution_context` (an `ExecutionContextSnapshot`) is the canonical source for context identity. The verifier rebuilds expected root and CALCULATION_RUN metadata from this snapshot, never from the node's own metadata.
 
 ## API
 

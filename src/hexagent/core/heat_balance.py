@@ -381,6 +381,22 @@ class CalculationContext:
     request_id: UUID | None = None
 
 
+class ExecutionContextSnapshot(BaseModel):
+    """Frozen snapshot of calculation context for provenance identity.
+
+    This is the canonical source for context identity in both provenance
+    construction and verification.  Unlike CalculationContext (a mutable
+    dataclass used at construction time), this snapshot is serializable
+    and stored inside HeatBalanceResult.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    request_id: UUID | None = None
+    design_case_revision_id: UUID | None = None
+    calculation_run_id: UUID | None = None
+
+
 # ---------------------------------------------------------------------------
 # Heat-balance input
 # ---------------------------------------------------------------------------
@@ -565,6 +581,7 @@ class HeatBalanceResult(BaseModel):
     provenance_digest: str = ""
     provider_identity: ProviderIdentitySnapshot
     request_identity: RequestIdentity
+    execution_context: ExecutionContextSnapshot = field(default_factory=ExecutionContextSnapshot)
     _field_hash: str = PrivateAttr(default="")
 
     @model_validator(mode="after")
@@ -789,7 +806,6 @@ class HeatBalanceResult(BaseModel):
             result_out_edges = [e for e in graph.edges if e.source_id == result_node.node_id]
             if result_out_edges:
                 return False
-
             # ── 3. EXTERNAL or CASE_REVISION root node ──────────────
             root_nodes = nodes_by_type.get(ProvenanceNodeType.EXTERNAL, []) + nodes_by_type.get(
                 ProvenanceNodeType.CASE_REVISION, []
@@ -798,34 +814,48 @@ class HeatBalanceResult(BaseModel):
                 return False
             root_node = root_nodes[0]
 
-            if root_node.node_type == ProvenanceNodeType.EXTERNAL:
-                root_meta = dict(root_node.metadata)
-                ext_payload: dict[str, Any] = {
-                    "root_type": "EXTERNAL",
-                    "request_id": root_meta.get("request_id"),
-                    "specification_mode": root_meta.get("specification_mode"),
-                    "flow_arrangement": root_meta.get("flow_arrangement"),
+            # Rebuild expected root from execution_context (canonical source)
+            _rid = (
+                str(self.execution_context.request_id)
+                if self.execution_context.request_id is not None
+                else None
+            )
+            if self.execution_context.design_case_revision_id is not None:
+                if root_node.node_type != ProvenanceNodeType.CASE_REVISION:
+                    return False
+                _dcr = str(self.execution_context.design_case_revision_id)
+                expected_payload = {
+                    "design_case_revision_id": _dcr,
+                    "request_id": _rid,
                 }
-                expected_root_id = _deterministic_uuid5(ext_payload)
-                if root_node.node_id != expected_root_id:
-                    return False
-                if root_node.label != "calculation_request":
-                    return False
-                if root_node.payload_hash != sha256_digest(ext_payload):
-                    return False
-            elif root_node.node_type == ProvenanceNodeType.CASE_REVISION:
-                root_meta = dict(root_node.metadata)
-                case_rev_payload: dict[str, Any] = {
-                    "revision_id": root_meta.get("revision_id"),
-                }
-                expected_root_id = _deterministic_uuid5(case_rev_payload)
-                if root_node.node_id != expected_root_id:
-                    return False
-                if root_node.label != "case_revision":
-                    return False
-                if root_node.payload_hash != sha256_digest(case_rev_payload):
-                    return False
+                expected_metadata: tuple[tuple[str, Any], ...] = (
+                    ("design_case_revision_id", _dcr),
+                    ("request_id", _rid),
+                )
+                expected_label = "case_revision"
             else:
+                if root_node.node_type != ProvenanceNodeType.EXTERNAL:
+                    return False
+                expected_payload = {
+                    "root_type": "EXTERNAL",
+                    "request_id": _rid,
+                    "specification_mode": self.specification_mode.value,
+                    "flow_arrangement": self.flow_arrangement.value,
+                }
+                expected_metadata = (
+                    ("request_id", _rid),
+                    ("specification_mode", self.specification_mode.value),
+                    ("flow_arrangement", self.flow_arrangement.value),
+                )
+                expected_label = "calculation_request"
+            expected_root_id = _deterministic_uuid5(expected_payload)
+            if root_node.node_id != expected_root_id:
+                return False
+            if root_node.label != expected_label:
+                return False
+            if root_node.payload_hash != sha256_digest(expected_payload):
+                return False
+            if root_node.metadata != expected_metadata:
                 return False
 
             # ── 4. CALCULATION_RUN node identity ────────────────────
@@ -851,7 +881,7 @@ class HeatBalanceResult(BaseModel):
                 return False
 
             calc_meta = dict(calc_node.metadata)
-            expected_calc_keys = {
+            expected_calc_keys: set[str] = {
                 "specification_mode",
                 "flow_arrangement",
                 "brent_function_evaluation_count",
@@ -877,7 +907,13 @@ class HeatBalanceResult(BaseModel):
                 return False
             if calc_meta["software_version"] != _SOFTWARE_VERSION:
                 return False
-            # external_calculation_run_id is informational; any value is accepted
+            expected_ext_calc_id = (
+                str(self.execution_context.calculation_run_id)
+                if self.execution_context.calculation_run_id is not None
+                else None
+            )
+            if calc_meta.get("external_calculation_run_id") != expected_ext_calc_id:
+                return False
 
             # ── 5. PROPERTY_CALL nodes ──────────────────────────────
             pc_nodes = nodes_by_type.get(ProvenanceNodeType.PROPERTY_CALL, [])
@@ -1016,29 +1052,32 @@ class HeatBalanceResult(BaseModel):
                     return False
 
             # ── 10. Verify complete edge topology ────────────────
-            # Build expected edge set from verified nodes
-            expected_edges: set[tuple[str, str, str]] = set()
+            from collections import Counter
+
+            expected_edge_counts: Counter[tuple[str, str, str]] = Counter()
             # root → CALCULATION_RUN (triggers)
-            expected_edges.add((str(root_node.node_id), str(calc_node.node_id), "triggers"))
+            expected_edge_counts[(str(root_node.node_id), str(calc_node.node_id), "triggers")] += 1
             # CALCULATION_RUN → each PROPERTY_CALL (calls)
             for pc_n in pc_nodes:
-                expected_edges.add((str(calc_node.node_id), str(pc_n.node_id), "calls"))
+                expected_edge_counts[(str(calc_node.node_id), str(pc_n.node_id), "calls")] += 1
             # CALCULATION_RUN → each WARNING (emits)
             for w_n in warn_nodes:
-                expected_edges.add((str(calc_node.node_id), str(w_n.node_id), "emits"))
+                expected_edge_counts[(str(calc_node.node_id), str(w_n.node_id), "emits")] += 1
             # CALCULATION_RUN → each BLOCKER (emits)
             for b_n in blocker_nodes:
-                expected_edges.add((str(calc_node.node_id), str(b_n.node_id), "emits"))
+                expected_edge_counts[(str(calc_node.node_id), str(b_n.node_id), "emits")] += 1
             # CALCULATION_RUN → RESULT (produces)
-            expected_edges.add((str(calc_node.node_id), str(result_node.node_id), "produces"))
+            expected_edge_counts[
+                (str(calc_node.node_id), str(result_node.node_id), "produces")
+            ] += 1
 
-            actual_edges: set[tuple[str, str, str]] = set()
+            actual_edge_counts: Counter[tuple[str, str, str]] = Counter()
             for e in graph.edges:
                 if e.metadata:
                     return False
-                actual_edges.add((str(e.source_id), str(e.target_id), e.relation))
+                actual_edge_counts[(str(e.source_id), str(e.target_id), e.relation)] += 1
 
-            if actual_edges != expected_edges:
+            if actual_edge_counts != expected_edge_counts:
                 return False
 
             # ── 11. All payload hashes are valid SHA-256 ─────────
@@ -2293,6 +2332,17 @@ def _build_calculation_run_payload(
     }
 
 
+def _context_to_snapshot(ctx: CalculationContext | None) -> ExecutionContextSnapshot:
+    """Convert CalculationContext to ExecutionContextSnapshot."""
+    if ctx is None:
+        return ExecutionContextSnapshot()
+    return ExecutionContextSnapshot(
+        request_id=ctx.request_id,
+        design_case_revision_id=ctx.design_case_revision_id,
+        calculation_run_id=ctx.calculation_run_id,
+    )
+
+
 def _build_provenance_core(
     specification_mode: SpecificationMode,
     flow_arrangement: FlowArrangement,
@@ -2308,7 +2358,7 @@ def _build_provenance_core(
     warnings: list[EngineeringMessage],
     blockers: list[EngineeringMessage],
     *,
-    context: CalculationContext | None = None,
+    execution_context: ExecutionContextSnapshot | None = None,
 ) -> tuple[ProvenanceGraph, list[ProvenanceNode], list[ProvenanceEdge]]:
     """Build the core provenance graph WITHOUT the RESULT node.
 
@@ -2317,20 +2367,26 @@ def _build_provenance_core(
     """
     nodes: list[ProvenanceNode] = []
     edges: list[ProvenanceEdge] = []
-    ctx = context or CalculationContext()
+    ctx = execution_context or ExecutionContextSnapshot()
 
     # --- Root node ---
     root_id: UUID
     if ctx.design_case_revision_id is not None:
         # Real case revision node
-        case_rev_payload = {"revision_id": str(ctx.design_case_revision_id)}
+        case_rev_payload: dict[str, Any] = {
+            "design_case_revision_id": str(ctx.design_case_revision_id),
+            "request_id": str(ctx.request_id) if ctx.request_id is not None else None,
+        }
         root_id = _deterministic_uuid5(case_rev_payload)
         nodes.append(
             ProvenanceNode(
                 node_id=root_id,
                 node_type=ProvenanceNodeType.CASE_REVISION,
                 label="case_revision",
-                metadata=(("revision_id", str(ctx.design_case_revision_id)),),
+                metadata=(
+                    ("design_case_revision_id", str(ctx.design_case_revision_id)),
+                    ("request_id", str(ctx.request_id) if ctx.request_id is not None else None),
+                ),
                 payload_hash=sha256_digest(case_rev_payload),
             )
         )
@@ -2558,15 +2614,19 @@ def _compute_provenance_and_hash(
     brent_function_evaluation_count: int = 0,
     brent_algorithm_iteration_count: int = 0,
     solver_converged: bool = False,
-) -> tuple[str, str, ProvenanceGraph, RequestIdentity, ProviderIdentitySnapshot]:
+) -> tuple[
+    str, str, ProvenanceGraph, RequestIdentity, ProviderIdentitySnapshot, ExecutionContextSnapshot
+]:
     """Build provenance core, compute digest, compute result_hash, build provenance.
 
-    Returns (result_hash, provenance_digest, provenance_graph, request_identity, provider_identity).
+    Returns (result_hash, provenance_digest, provenance_graph, request_identity,
+             provider_identity, execution_context).
     """
     request_identity = _build_request_identity(inp)
     provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
 
     # Build core provenance (without RESULT node)
+    exec_ctx = _context_to_snapshot(context)
     core_graph, _nodes, _edges = _build_provenance_core(
         specification_mode=specification_mode,
         flow_arrangement=inp.flow_arrangement,
@@ -2581,7 +2641,7 @@ def _compute_provenance_and_hash(
         solver_converged=solver_converged,
         warnings=warnings,
         blockers=blockers,
-        context=context,
+        execution_context=exec_ctx,
     )
 
     # Compute provenance_digest from core graph
@@ -2632,10 +2692,10 @@ def _compute_provenance_and_hash(
         warnings=warnings,
         blockers=blockers,
         result_hash=result_hash,
-        context=context,
+        execution_context=exec_ctx,
     )
 
-    return result_hash, provenance_digest, provenance, request_identity, provider_identity
+    return result_hash, provenance_digest, provenance, request_identity, provider_identity, exec_ctx
 
 
 def _build_provenance(
@@ -2654,7 +2714,7 @@ def _build_provenance(
     blockers: list[EngineeringMessage],
     result_hash: str,
     *,
-    context: CalculationContext | None = None,
+    execution_context: ExecutionContextSnapshot | None = None,
 ) -> ProvenanceGraph:
     """Build a deterministic provenance graph for the heat-balance calculation.
 
@@ -2677,7 +2737,7 @@ def _build_provenance(
         solver_converged=solver_converged,
         warnings=warnings,
         blockers=blockers,
-        context=context,
+        execution_context=execution_context,
     )
 
     # Find the CALCULATION_RUN node for the RESULT edge
@@ -2843,7 +2903,7 @@ def _handle_zero_duty(
     hot_model = hot_inlet_state.to_model()
     cold_model = cold_inlet_state.to_model()
 
-    result_hash, provenance_digest, provenance, request_identity, provider_identity = (
+    result_hash, provenance_digest, provenance, request_identity, provider_identity, exec_ctx = (
         _compute_provenance_and_hash(
             inp,
             SpecificationMode.KNOWN_DUTY,
@@ -2895,6 +2955,7 @@ def _handle_zero_duty(
         provenance_digest=provenance_digest,
         provider_identity=provider_identity,
         request_identity=request_identity,
+        execution_context=exec_ctx,
     )
 
 
@@ -2962,6 +3023,7 @@ def _make_blocked_result(
         )
 
     # Build core provenance (without RESULT node) to compute provenance_digest
+    exec_ctx = _context_to_snapshot(context)
     core_graph, _core_nodes, _core_edges = _build_provenance_core(
         specification_mode=specification_mode,
         flow_arrangement=inp.flow_arrangement,
@@ -2976,7 +3038,7 @@ def _make_blocked_result(
         solver_converged=False,
         warnings=warnings,
         blockers=blockers,
-        context=context,
+        execution_context=exec_ctx,
     )
     provenance_digest = _provenance_graph_digest(core_graph)
 
@@ -3022,10 +3084,11 @@ def _make_blocked_result(
         warnings=warnings,
         blockers=blockers,
         result_hash=result_hash,
-        context=context,
+        execution_context=exec_ctx,
     )
 
     return HeatBalanceResult(
+        execution_context=exec_ctx,
         status=HeatBalanceStatus.BLOCKED,
         specification_mode=specification_mode,
         flow_arrangement=inp.flow_arrangement,
@@ -3082,6 +3145,8 @@ def _make_failed_result(
 
     Uses structured ``_SolverFailureInfo`` to populate non-zero diagnostics.
     """
+    exec_ctx = _context_to_snapshot(context)
+
     hot_model = hot_inlet_state.to_model() if hot_inlet_state is not None else None
     cold_model = cold_inlet_state.to_model() if cold_inlet_state is not None else None
 
@@ -3202,7 +3267,7 @@ def _make_failed_result(
         solver_converged=False,
         warnings=warnings,
         blockers=[],
-        context=context,
+        execution_context=exec_ctx,
     )
     provenance_digest = _provenance_graph_digest(core_graph)
 
@@ -3248,10 +3313,11 @@ def _make_failed_result(
         warnings=warnings,
         blockers=[],
         result_hash=result_hash,
-        context=context,
+        execution_context=exec_ctx,
     )
 
     return HeatBalanceResult(
+        execution_context=exec_ctx,
         status=HeatBalanceStatus.FAILED,
         specification_mode=specification_mode,
         flow_arrangement=inp.flow_arrangement,
@@ -4428,7 +4494,7 @@ def solve_heat_balance(
     cold_model = cold_inlet_state.to_model()
     cold_outlet_model = cold_outlet_state.to_model()
 
-    result_hash, provenance_digest, provenance, request_identity, provider_identity = (
+    result_hash, provenance_digest, provenance, request_identity, provider_identity, exec_ctx = (
         _compute_provenance_and_hash(
             inp,
             mode,
@@ -4471,6 +4537,7 @@ def solve_heat_balance(
         )
 
     return HeatBalanceResult(
+        execution_context=exec_ctx,
         status=status,
         specification_mode=mode,
         flow_arrangement=inp.flow_arrangement,
@@ -4517,4 +4584,5 @@ __all__ = [
     "StreamState",
     "classify_specification",
     "solve_heat_balance",
+    "ExecutionContextSnapshot",
 ]
