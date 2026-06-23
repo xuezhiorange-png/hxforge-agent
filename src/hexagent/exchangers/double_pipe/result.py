@@ -126,7 +126,7 @@ class ApplicabilitySnapshot:
     prandtl_max: float | None = None
     geometry_type: str = ""
     notes: str = ""
-    raw_assessment: tuple[tuple[str, str], ...] = ()
+    raw_assessment: tuple[tuple[str, Any], ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -796,6 +796,10 @@ class RatingResult(BaseModel):
                     ("error_code", pc.error_code),
                     ("stream_role", pc.stream_role),
                     ("sequence_index", pc.sequence_index),
+                    ("evaluation_index", pc.evaluation_index),
+                    ("evaluation_role", pc.evaluation_role),
+                    ("call_index_within_evaluation", pc.call_index_within_evaluation),
+                    ("trial_q_w", pc.trial_q_w),
                 )
                 if pc_node.metadata != expected_meta:
                     return False
@@ -1380,6 +1384,11 @@ def _property_call_record_to_dict(pc: PropertyCallRecord | dict[str, Any]) -> di
         "validation_level": pc.validation_level,
         "validation_dataset_id": pc.validation_dataset_id,
         "cache_policy_version": pc.cache_policy_version,
+        # Evaluation identity fields
+        "evaluation_index": pc.evaluation_index,
+        "evaluation_role": pc.evaluation_role,
+        "call_index_within_evaluation": pc.call_index_within_evaluation,
+        "trial_q_w": pc.trial_q_w,
     }
 
 
@@ -1636,6 +1645,10 @@ def build_provenance_core(
                     ("error_code", pc.error_code),
                     ("stream_role", pc.stream_role),
                     ("sequence_index", pc.sequence_index),
+                    ("evaluation_index", pc.evaluation_index),
+                    ("evaluation_role", pc.evaluation_role),
+                    ("call_index_within_evaluation", pc.call_index_within_evaluation),
+                    ("trial_q_w", pc.trial_q_w),
                 ),
                 payload_hash=sha256_digest(prop_payload),
             )

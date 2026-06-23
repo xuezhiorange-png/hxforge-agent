@@ -52,8 +52,8 @@ Perform rating analysis for a fixed-geometry double-pipe heat exchanger. Given o
 
 ### Property Evaluation
 
-- **Temperature strategy:** Film temperature T_f = (T_wall + T_bulk) / 2 for property evaluation
-- **Fallback:** Bulk temperature if wall temperature unavailable
+- **Temperature strategy:** T_bulk = (T_in + T_out) / 2 for property evaluation
+- **Pressure:** P_bulk = P_in, P_out = P_in (no pressure drop model)
 
 ### Heat Transfer Coefficients
 

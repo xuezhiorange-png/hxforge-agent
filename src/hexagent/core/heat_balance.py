@@ -360,6 +360,16 @@ class PropertyCallRecord:
     """Validation dataset ID from property provenance, if any."""
     cache_policy_version: str = ""
     """Cache policy version from property provenance."""
+    # Evaluation identity fields
+    evaluation_index: int = 0
+    """Monotonically increasing index of the residual evaluation (trial) that produced this call."""
+    evaluation_role: str = "inlet"
+    """Fixed enum: inlet, q_max_counterflow, q_max_parallel_pinch,
+    bracket_probe, solver_iteration, final_evaluation."""
+    call_index_within_evaluation: int = 0
+    """Zero-based call index within the parent evaluation."""
+    trial_q_w: float | None = None
+    """Trial Q [W] that triggered this evaluation, None for inlet/q_max."""
 
 
 # ---------------------------------------------------------------------------
