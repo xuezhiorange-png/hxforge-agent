@@ -1,0 +1,38 @@
+{
+  "case_id": "case3_variable_property",
+  "description": "Variable-property water-water counter-flow rating with stainless steel geometry (lower k, larger diameters, longer length). Verifies that the solver converges with real CoolProp property variations along the exchanger.",
+  "geometry": {
+    "inner_tube_inner_diameter_m": 0.025,
+    "inner_tube_outer_diameter_m": 0.032,
+    "outer_pipe_inner_diameter_m": 0.050,
+    "effective_length_m": 5.0,
+    "wall_thermal_conductivity_w_m_k": 16.0,
+    "inner_surface_roughness_m": 4.5e-5,
+    "annulus_surface_roughness_m": 4.5e-5,
+    "inner_fouling_resistance_m2k_w": 0.0002,
+    "outer_fouling_resistance_m2k_w": 0.0002
+  },
+  "hot_fluid": "Water",
+  "cold_fluid": "Water",
+  "hot_mass_flow_kg_s": 0.8,
+  "cold_mass_flow_kg_s": 2.0,
+  "hot_inlet_temperature_k": 360.0,
+  "cold_inlet_temperature_k": 290.0,
+  "hot_inlet_pressure_pa": 250000.0,
+  "cold_inlet_pressure_pa": 200000.0,
+  "tube_in_hot": true,
+  "flow_arrangement": "counterflow",
+  "expected": {
+    "status": "succeeded",
+    "heat_duty_w_min": 15000,
+    "heat_duty_w_max": 100000,
+    "hot_outlet_temperature_k_max": 360.0,
+    "cold_outlet_temperature_k_min": 290.0,
+    "converged": true
+  },
+  "tolerances": {
+    "heat_duty_relative": 0.05,
+    "temperature_absolute_k": 3.0,
+    "energy_residual_relative": 0.05
+  }
+}
