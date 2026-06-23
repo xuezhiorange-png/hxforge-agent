@@ -37,6 +37,7 @@ from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.result import (
     ApplicabilitySnapshot,
     FluidStateSnapshot,
+    PropertyProvenanceSnapshot,
     RatingRequestIdentity,
     RatingResult,
     RatingStatus,
@@ -186,21 +187,28 @@ def _provider_snapshot(provider: PropertyProvider | None) -> ProviderIdentitySna
 def _make_fluid_state_snapshot(state: FluidState) -> FluidStateSnapshot:
     """Build a FluidStateSnapshot from a FluidState."""
     prov = state.provenance
-    property_provenance = {
-        "fluid_identifier": prov.fluid_identifier
-        if isinstance(prov.fluid_identifier, str)
-        else str(prov.fluid_identifier),
-        "backend_name": prov.backend_name,
-        "backend_version": prov.backend_version,
-        "reference_state_policy": prov.reference_state_policy.value
-        if hasattr(prov.reference_state_policy, "value")
-        else str(prov.reference_state_policy),
-        "configuration_fingerprint": getattr(prov, "configuration_fingerprint", ""),
-        "validation_level": prov.validation_level.value
-        if hasattr(prov.validation_level, "value")
-        else str(prov.validation_level),
-        "cache_policy_version": getattr(prov, "cache_policy_version", ""),
-    }
+    property_provenance = PropertyProvenanceSnapshot(
+        fluid_identifier=(
+            prov.fluid_identifier
+            if isinstance(prov.fluid_identifier, str)
+            else str(prov.fluid_identifier)
+        ),
+        backend_name=prov.backend_name,
+        backend_version=prov.backend_version,
+        backend_git_revision=getattr(prov, "backend_git_revision", ""),
+        reference_state_policy=(
+            prov.reference_state_policy.value
+            if hasattr(prov.reference_state_policy, "value")
+            else str(prov.reference_state_policy)
+        ),
+        configuration_fingerprint=getattr(prov, "configuration_fingerprint", ""),
+        validation_level=(
+            prov.validation_level.value
+            if hasattr(prov.validation_level, "value")
+            else str(prov.validation_level)
+        ),
+        cache_policy_version=getattr(prov, "cache_policy_version", ""),
+    )
     return FluidStateSnapshot(
         temperature_k=state.temperature_k,
         pressure_pa=state.pressure_pa,
@@ -210,7 +218,7 @@ def _make_fluid_state_snapshot(state: FluidState) -> FluidStateSnapshot:
         viscosity_pa_s=state.viscosity_pa_s,
         conductivity_w_m_k=state.conductivity_w_m_k,
         phase=state.phase.value,
-        quality=state.quality if state.quality is not None else 0.0,
+        quality=state.quality,
         property_provenance=property_provenance,
     )
 
@@ -258,6 +266,9 @@ def _make_applicability_snapshot(
             pran_min = vr.absolute_minimum
             pran_max = vr.absolute_maximum
     status_str = aa.status.value if hasattr(aa.status, "value") else str(aa.status)
+    # Convert dict to frozen tuple-of-tuples for deep immutability
+    raw_dict = aa.model_dump() if hasattr(aa, "model_dump") else {}
+    raw_assessment = tuple((str(k), str(v)) for k, v in sorted(raw_dict.items()))
     return ApplicabilitySnapshot(
         status=status_str,
         assessment_hash=aa.assessment_hash,
@@ -267,7 +278,7 @@ def _make_applicability_snapshot(
         prandtl_max=pran_max,
         geometry_type=getattr(aa, "geometry_type", ""),
         notes=getattr(aa, "notes", ""),
-        raw_assessment=aa.model_dump() if hasattr(aa, "model_dump") else None,
+        raw_assessment=raw_assessment,
     )
 
 
@@ -2082,7 +2093,8 @@ def rate_double_pipe(
         """Evaluate residual Q - UA(Q) x LMTD(Q).
 
         Raises TrialEvaluationAbort for infeasible trials instead of
-        returning sentinel residuals. The solver must catch this.
+        returning sentinel residuals. The abort propagates through the
+        solver and is caught at the rate_double_pipe boundary.
         """
         trial = _evaluate_trial(Q)
         if not trial.feasible or trial.residual_w is None:
@@ -2093,19 +2105,45 @@ def rate_double_pipe(
     # 7. SOLVE
     # =====================================================================
 
-    # Wrap residual_fn to catch TrialEvaluationAbort
-    def _safe_residual(Q: float) -> float:
-        try:
-            return residual_fn(Q)
-        except TrialEvaluationAbort:
-            return float("nan")
-
-    solver_result = solve_rating(
-        residual_fn=_safe_residual,
-        q_max=q_max,
-        params=params,
-        c_effective_w_k=C_min,
-    )
+    # TrialEvaluationAbort propagates through find_bracket / _bisect_secant
+    # and is caught at the rate_double_pipe boundary to build a BLOCKED result.
+    try:
+        solver_result = solve_rating(
+            residual_fn=residual_fn,
+            q_max=q_max,
+            params=params,
+            c_effective_w_k=C_min,
+        )
+    except TrialEvaluationAbort as abort:
+        trial = abort.trial
+        # Propagate ALL property calls from the failed trial
+        property_calls.extend(trial.property_calls)
+        warnings.extend(trial.warnings)
+        blockers.extend(trial.blockers)
+        # Map abort to structured BLOCKED result
+        abort_blockers = list(blockers)
+        if not abort_blockers:
+            # Determine error code from trial context
+            abort_code = ErrorCode.PROPERTY_EVALUATION_FAILED
+            for b in trial.blockers:
+                abort_code = b.code
+                break
+            abort_blockers.append(
+                _make_blocker(
+                    abort_code,
+                    f"Trial evaluation aborted at Q={trial.q_w:.6f} W",
+                    (("q_w", trial.q_w),),
+                )
+            )
+        return _blocked_result(
+            blockers=abort_blockers,
+            warnings=warnings,
+            property_calls=property_calls,
+            request_identity=request_identity,
+            provider_identity=provider_identity,
+            execution_context=ctx_snapshot,
+            flow_arrangement=flow_arrangement,
+        )
 
     # =====================================================================
     # 8. POST-PROCESS
@@ -2359,23 +2397,25 @@ def rate_double_pipe(
         )
 
     # --- UA-LMTD residual ---
+    relative_ua_lmtd_residual: float | None = None
+    ua_lmtd_tolerance_w_val: float | None = None
     if UA_final > 0 and lmtd_final > 0 and math.isfinite(UA_final) and math.isfinite(lmtd_final):
         ua_lmtd_residual_w = abs(Q_sol - UA_final * lmtd_final)
-        ua_lmtd_tolerance_w = max(
+        ua_lmtd_tolerance_w_val = max(
             _ENERGY_RESIDUAL_ABS_TOL, _ENERGY_RESIDUAL_REL_TOL * max(abs(Q_sol), 1.0)
         )
         relative_ua_lmtd_residual = ua_lmtd_residual_w / max(
             abs(Q_sol), abs(UA_final * lmtd_final), 1.0
         )
-        if ua_lmtd_residual_w > ua_lmtd_tolerance_w:
+        if ua_lmtd_residual_w > ua_lmtd_tolerance_w_val:
             blockers.append(
                 _make_blocker(
                     ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
                     f"UA-LMTD residual not closed: residual={ua_lmtd_residual_w:.6e} W, "
-                    f"tolerance={ua_lmtd_tolerance_w:.6e} W",
+                    f"tolerance={ua_lmtd_tolerance_w_val:.6e} W",
                     (
                         ("ua_lmtd_residual_w", ua_lmtd_residual_w),
-                        ("ua_lmtd_tolerance_w", ua_lmtd_tolerance_w),
+                        ("ua_lmtd_tolerance_w", ua_lmtd_tolerance_w_val),
                         ("relative_ua_lmtd_residual", relative_ua_lmtd_residual),
                     ),
                 )
@@ -2528,6 +2568,13 @@ def rate_double_pipe(
         tube_applicability_snap=tube_app_snapshot,
         annulus_applicability_snap=annulus_app_snapshot,
         core_provenance_digest=core_provenance_digest,
+        # Closure diagnostics
+        Q_hot_w=Q_hot_w,
+        Q_cold_w=Q_cold_w,
+        relative_energy_residual=relative_energy_residual,
+        energy_tolerance_w=energy_tolerance_w,
+        relative_ua_lmtd_residual=relative_ua_lmtd_residual,
+        ua_lmtd_tolerance_w=ua_lmtd_tolerance_w_val,
     )
 
     # Step 4: Add RESULT node via build_provenance
@@ -2619,6 +2666,13 @@ def rate_double_pipe(
         annulus_selected_correlation=annulus_sel_corr_snapshot,
         tube_applicability=tube_app_snapshot,
         annulus_applicability=annulus_app_snapshot,
+        # Closure diagnostics
+        Q_hot_w=Q_hot_w,
+        Q_cold_w=Q_cold_w,
+        relative_energy_residual=relative_energy_residual,
+        energy_tolerance_w=energy_tolerance_w,
+        relative_ua_lmtd_residual=relative_ua_lmtd_residual,
+        ua_lmtd_tolerance_w=ua_lmtd_tolerance_w_val,
     )
 
     return result

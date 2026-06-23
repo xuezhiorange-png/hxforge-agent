@@ -276,7 +276,7 @@ def select_correlation(
 
             # Build the blocker message
             blocker_msg = EngineeringMessage(
-                code=ErrorCode.NOT_IMPLEMENTED,
+                code=ErrorCode.CORRELATION_IMPLEMENTATION_UNAVAILABLE,
                 severity=EngineeringMessageSeverity.BLOCKER,
                 message=(
                     f"Correlation {defn.key.correlation_id} v{defn.key.version} "

@@ -311,14 +311,11 @@ class TestC4ImplementationUnavailable:
         )
         # C4 is metadata_only, so it should be blocked
         assert result.status.value == "blocked"
-        # Spec requires CORRELATION_IMPLEMENTATION_UNAVAILABLE for C4.
-        # The correlation service currently returns NOT_IMPLEMENTED for
-        # metadata_only; accept either code to avoid cross-module changes.
+        # Spec requires CORRELATION_IMPLEMENTATION_UNAVAILABLE for C4
         blocker_codes = [b.code for b in result.blockers]
-        assert (
-            ErrorCode.CORRELATION_IMPLEMENTATION_UNAVAILABLE in blocker_codes
-            or ErrorCode.NOT_IMPLEMENTED in blocker_codes
-        ), f"Expected C4 unavailable code, got {blocker_codes}"
+        assert ErrorCode.CORRELATION_IMPLEMENTATION_UNAVAILABLE in blocker_codes, (
+            f"Expected CORRELATION_IMPLEMENTATION_UNAVAILABLE, got {blocker_codes}"
+        )
 
 
 # ---------------------------------------------------------------------------

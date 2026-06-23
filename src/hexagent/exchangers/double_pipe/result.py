@@ -68,6 +68,20 @@ class RatingStatus(StrEnum):
 
 
 @dataclass(frozen=True)
+class PropertyProvenanceSnapshot:
+    """Deeply immutable snapshot of property-provider provenance metadata."""
+
+    fluid_identifier: str = ""
+    backend_name: str = ""
+    backend_version: str = ""
+    backend_git_revision: str = ""
+    reference_state_policy: str = ""
+    configuration_fingerprint: str = ""
+    validation_level: str = ""
+    cache_policy_version: str = ""
+
+
+@dataclass(frozen=True)
 class FluidStateSnapshot:
     """Immutable snapshot of a fluid thermodynamic state point."""
 
@@ -79,8 +93,8 @@ class FluidStateSnapshot:
     viscosity_pa_s: float | None = None
     conductivity_w_m_k: float | None = None
     phase: str = ""
-    quality: float = 0.0
-    property_provenance: dict[str, str] | None = None
+    quality: float | None = None
+    property_provenance: PropertyProvenanceSnapshot | None = None
 
 
 @dataclass(frozen=True)
@@ -112,7 +126,7 @@ class ApplicabilitySnapshot:
     prandtl_max: float | None = None
     geometry_type: str = ""
     notes: str = ""
-    raw_assessment: dict[str, object] | None = None
+    raw_assessment: tuple[tuple[str, str], ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +273,14 @@ class RatingResult(BaseModel):
     # --- Residuals ---
     energy_residual_w: float | None = None
     ua_lmtd_residual_w: float | None = None
+
+    # --- Closure diagnostics ---
+    Q_hot_w: float | None = None
+    Q_cold_w: float | None = None
+    relative_energy_residual: float | None = None
+    energy_tolerance_w: float | None = None
+    relative_ua_lmtd_residual: float | None = None
+    ua_lmtd_tolerance_w: float | None = None
 
     # --- Solver ---
     iterations: int
@@ -1046,6 +1068,13 @@ class RatingResult(BaseModel):
             tube_applicability_snap=self.tube_applicability,
             annulus_applicability_snap=self.annulus_applicability,
             core_provenance_digest=self.core_provenance_digest,
+            # Closure diagnostics
+            Q_hot_w=self.Q_hot_w,
+            Q_cold_w=self.Q_cold_w,
+            relative_energy_residual=self.relative_energy_residual,
+            energy_tolerance_w=self.energy_tolerance_w,
+            relative_ua_lmtd_residual=self.relative_ua_lmtd_residual,
+            ua_lmtd_tolerance_w=self.ua_lmtd_tolerance_w,
         )
         return sha256_digest(payload)
 
@@ -1118,6 +1147,13 @@ def _build_identity_payload(
     tube_applicability_snap: ApplicabilitySnapshot | None = None,
     annulus_applicability_snap: ApplicabilitySnapshot | None = None,
     core_provenance_digest: str = "",
+    # Closure diagnostics
+    Q_hot_w: float | None = None,
+    Q_cold_w: float | None = None,
+    relative_energy_residual: float | None = None,
+    energy_tolerance_w: float | None = None,
+    relative_ua_lmtd_residual: float | None = None,
+    ua_lmtd_tolerance_w: float | None = None,
 ) -> dict[str, Any]:
     """Build the canonical payload dict used for result hashing.
 
@@ -1288,6 +1324,13 @@ def _build_identity_payload(
             if annulus_applicability_snap is not None
             else None
         ),
+        # Closure diagnostics
+        "Q_hot_w": Q_hot_w,
+        "Q_cold_w": Q_cold_w,
+        "relative_energy_residual": relative_energy_residual,
+        "energy_tolerance_w": energy_tolerance_w,
+        "relative_ua_lmtd_residual": relative_ua_lmtd_residual,
+        "ua_lmtd_tolerance_w": ua_lmtd_tolerance_w,
         # Core provenance digest
         "core_provenance_digest": core_provenance_digest,
     }
@@ -1857,6 +1900,13 @@ def compute_result_hash(
     tube_applicability_snap: ApplicabilitySnapshot | None = None,
     annulus_applicability_snap: ApplicabilitySnapshot | None = None,
     core_provenance_digest: str = "",
+    # Closure diagnostics
+    Q_hot_w: float | None = None,
+    Q_cold_w: float | None = None,
+    relative_energy_residual: float | None = None,
+    energy_tolerance_w: float | None = None,
+    relative_ua_lmtd_residual: float | None = None,
+    ua_lmtd_tolerance_w: float | None = None,
 ) -> str:
     """Compute deterministic SHA-256 hash of the result."""
     payload = _build_identity_payload(
@@ -1921,5 +1971,12 @@ def compute_result_hash(
         tube_applicability_snap=tube_applicability_snap,
         annulus_applicability_snap=annulus_applicability_snap,
         core_provenance_digest=core_provenance_digest,
+        # Closure diagnostics
+        Q_hot_w=Q_hot_w,
+        Q_cold_w=Q_cold_w,
+        relative_energy_residual=relative_energy_residual,
+        energy_tolerance_w=energy_tolerance_w,
+        relative_ua_lmtd_residual=relative_ua_lmtd_residual,
+        ua_lmtd_tolerance_w=ua_lmtd_tolerance_w,
     )
     return sha256_digest(payload)
