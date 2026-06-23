@@ -4212,6 +4212,7 @@ class TestReview15ProvenanceVerification:
         )
         restored = HeatBalanceResult.model_validate(d)
         assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     # --- Counter-based edge deduplication (Review-17 Item 1) ---
 
@@ -4226,11 +4227,11 @@ class TestReview15ProvenanceVerification:
         triggers_edges = [
             e for e in d["provenance_graph"]["edges"] if e.get("relation") == "triggers"
         ]
-        if triggers_edges:
-            d["provenance_graph"]["edges"].append(dict(triggers_edges[0]))
-            restored = HeatBalanceResult.model_validate(d)
-            assert restored.verify_provenance() is False
-            assert restored.verify_hash() is False
+        assert triggers_edges, "Fixture must produce a triggers edge"
+        d["provenance_graph"]["edges"].append(dict(triggers_edges[0]))
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     def test_duplicate_calls_edge(self):
         """Duplicate identical calls edge → verify_provenance fails."""
@@ -4241,43 +4242,43 @@ class TestReview15ProvenanceVerification:
         result = solve_heat_balance(inp, provider)
         d = result.model_dump(mode="json")
         calls_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "calls"]
-        if calls_edges:
-            d["provenance_graph"]["edges"].append(dict(calls_edges[0]))
-            restored = HeatBalanceResult.model_validate(d)
-            assert restored.verify_provenance() is False
-            assert restored.verify_hash() is False
+        assert calls_edges, "Fixture must produce a calls edge"
+        d["provenance_graph"]["edges"].append(dict(calls_edges[0]))
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     def test_duplicate_emits_edge(self):
-        """Duplicate identical emits edge → verify_provenance fails."""
+        """Duplicate identical emits edge → verify_provenance fails (non-vacuous)."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
-        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        inp = HeatBalanceInput(hot=hot, cold=cold)
         result = solve_heat_balance(inp, provider)
         d = result.model_dump(mode="json")
         emits_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "emits"]
-        if emits_edges:
-            d["provenance_graph"]["edges"].append(dict(emits_edges[0]))
-            restored = HeatBalanceResult.model_validate(d)
-            assert restored.verify_provenance() is False
-            assert restored.verify_hash() is False
+        assert emits_edges, "Fixture must produce at least one emits edge"
+        d["provenance_graph"]["edges"].append(dict(emits_edges[0]))
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     def test_duplicate_produces_edge(self):
-        """Duplicate identical produces edge → verify_provenance fails."""
+        """Duplicate identical produces edge → verify_provenance fails (non-vacuous)."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
-        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        inp = HeatBalanceInput(hot=hot, cold=cold)
         result = solve_heat_balance(inp, provider)
         d = result.model_dump(mode="json")
         produces_edges = [
             e for e in d["provenance_graph"]["edges"] if e.get("relation") == "produces"
         ]
-        if produces_edges:
-            d["provenance_graph"]["edges"].append(dict(produces_edges[0]))
-            restored = HeatBalanceResult.model_validate(d)
-            assert restored.verify_provenance() is False
-            assert restored.verify_hash() is False
+        assert produces_edges, "Fixture must produce a produces edge"
+        d["provenance_graph"]["edges"].append(dict(produces_edges[0]))
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     # --- Non-vacuous edge tests (Review-17 Item 2) ---
 
@@ -4294,6 +4295,7 @@ class TestReview15ProvenanceVerification:
         emits_edges[0]["relation"] = "modified_emits"
         restored = HeatBalanceResult.model_validate(d)
         assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     def test_modify_emits_source(self):
         """Modify emits edge source → verify_provenance fails."""
@@ -4310,6 +4312,7 @@ class TestReview15ProvenanceVerification:
         emits_edges[0]["source_id"] = pc_nodes[0]["node_id"]
         restored = HeatBalanceResult.model_validate(d)
         assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     def test_duplicate_emits_edge_vacuous_check(self):
         """Duplicate emits edge → verify_provenance fails (non-vacuous)."""
@@ -4324,6 +4327,7 @@ class TestReview15ProvenanceVerification:
         d["provenance_graph"]["edges"].append(dict(emits_edges[0]))
         restored = HeatBalanceResult.model_validate(d)
         assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     def test_duplicate_calls_edge_vacuous_check(self):
         """Duplicate calls edge → verify_provenance fails (non-vacuous)."""
@@ -4338,6 +4342,7 @@ class TestReview15ProvenanceVerification:
         d["provenance_graph"]["edges"].append(dict(calls_edges[0]))
         restored = HeatBalanceResult.model_validate(d)
         assert restored.verify_provenance() is False
+        assert restored.verify_hash() is False
 
     # --- ExecutionContextSnapshot tests (Review-17 Item 3) ---
 
@@ -4516,3 +4521,82 @@ class TestReview15ProvenanceVerification:
         restored = HeatBalanceResult.model_validate(d)
         assert restored.verify_provenance() is False
         assert restored.verify_hash() is False
+
+    # --- Direct post-construction field integrity tamper tests (Review-18) ---
+
+    def test_field_integrity_detects_request_id_tamper(self):
+        """Tamper execution_context.request_id via __setattr__ → integrity fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider, context=CalculationContext(request_id=uuid4()))
+        original_field_hash = result._field_hash
+        # Tamper via __setattr__ — model is frozen but _field_hash is PrivateAttr
+        object.__setattr__(
+            result,
+            "execution_context",
+            ExecutionContextSnapshot(
+                request_id=uuid4(),
+                design_case_revision_id=result.execution_context.design_case_revision_id,
+                calculation_run_id=result.execution_context.calculation_run_id,
+            ),
+        )
+        assert result._field_hash == original_field_hash, "field_hash must not auto-update"
+        assert result.validate_integrity() is False
+        assert result.verify_hash() is False
+
+    def test_field_integrity_detects_design_case_revision_id_tamper(self):
+        """Tamper execution_context.design_case_revision_id → integrity fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider, context=CalculationContext(request_id=uuid4()))
+        original_field_hash = result._field_hash
+        object.__setattr__(
+            result,
+            "execution_context",
+            ExecutionContextSnapshot(
+                request_id=result.execution_context.request_id,
+                design_case_revision_id=uuid4(),
+                calculation_run_id=result.execution_context.calculation_run_id,
+            ),
+        )
+        assert result._field_hash == original_field_hash
+        assert result.validate_integrity() is False
+        assert result.verify_hash() is False
+
+    def test_field_integrity_detects_calculation_run_id_tamper(self):
+        """Tamper execution_context.calculation_run_id → integrity fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider, context=CalculationContext(request_id=uuid4()))
+        original_field_hash = result._field_hash
+        object.__setattr__(
+            result,
+            "execution_context",
+            ExecutionContextSnapshot(
+                request_id=result.execution_context.request_id,
+                design_case_revision_id=result.execution_context.design_case_revision_id,
+                calculation_run_id=uuid4(),
+            ),
+        )
+        assert result._field_hash == original_field_hash
+        assert result.validate_integrity() is False
+        assert result.verify_hash() is False
+
+    def test_field_integrity_detects_provenance_digest_tamper(self):
+        """Tamper provenance_digest via __setattr__ → integrity fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider, context=CalculationContext(request_id=uuid4()))
+        original_field_hash = result._field_hash
+        object.__setattr__(result, "provenance_digest", "tampered_digest_value")
+        assert result._field_hash == original_field_hash
+        assert result.validate_integrity() is False
+        assert result.verify_hash() is False

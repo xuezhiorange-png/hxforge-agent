@@ -664,8 +664,9 @@ class HeatBalanceResult(BaseModel):
         Covers: status, specification_mode, flow_arrangement, duty_w,
         all four fluid states, energy balance fields, solver counts,
         property_calls, warnings, blockers, result_hash,
-        request_identity, provider_identity, failure, and
-        provenance_graph (via deterministic digest).
+        request_identity, provider_identity, execution_context,
+        provenance_digest, failure, and provenance_graph
+        (via deterministic digest).
         """
 
         def _stm(s: FluidStateModel | None) -> dict[str, Any] | None:
@@ -709,6 +710,12 @@ class HeatBalanceResult(BaseModel):
                 if dataclasses.is_dataclass(self.provider_identity)
                 else self.provider_identity
             ),
+            "execution_context": (
+                self.execution_context.model_dump(mode="json")
+                if hasattr(self.execution_context, "model_dump")
+                else self.execution_context
+            ),
+            "provenance_digest": self.provenance_digest,
             "failure": (
                 {
                     "code": self.failure.code.value,
