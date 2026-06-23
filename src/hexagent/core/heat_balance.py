@@ -733,92 +733,285 @@ class HeatBalanceResult(BaseModel):
         return self.verify_provenance()
 
     def verify_provenance(self) -> bool:
-        """Comprehensive provenance graph integrity verification.
+        """Comprehensive provenance graph identity verification.
 
-        Checks:
-        1. Recomputable provenance_digest from core graph.
-        2. DAG validity.
-        3. Each node's payload_hash is valid SHA-256.
-        4. Deterministic UUID5 for each node.
-        5. Exactly one root, one CALCULATION_RUN, one RESULT.
-        6. PROPERTY_CALL count matches property_calls.
-        7. WARNING count matches warnings.
-        8. BLOCKER count matches blockers.
-        9. All edge endpoints exist.
-        10. RESULT node's result_hash matches self.result_hash.
+        Verifies every node's canonical identity (UUID5, label, payload_hash,
+        metadata) and all structural invariants.  Returns ``False`` if any
+        check fails; never raises.
         """
-        graph = self.provenance_graph
-
-        if not graph.nodes:
-            return self.provenance_digest == _provenance_graph_digest(ProvenanceGraph())
-
-        node_ids = {n.node_id for n in graph.nodes}
-
-        # Check 1: Verify provenance_digest by rebuilding core graph (without RESULT)
-        core_nodes = [n for n in graph.nodes if n.node_type != ProvenanceNodeType.RESULT]
-        core_edges = [e for e in graph.edges if e.target_id in {n.node_id for n in core_nodes}]
         try:
-            core_graph = ProvenanceGraph(
-                nodes=tuple(core_nodes),
-                edges=tuple(core_edges),
+            graph = self.provenance_graph
+
+            # ── Reject empty graphs ──────────────────────────────────
+            if not graph.nodes:
+                return False
+
+            # ── Index nodes by type ──────────────────────────────────
+            nodes_by_type: dict[ProvenanceNodeType, list[ProvenanceNode]] = {}
+            for n in graph.nodes:
+                nodes_by_type.setdefault(n.node_type, []).append(n)
+
+            node_ids = {n.node_id for n in graph.nodes}
+
+            # ── 1. RESULT node identity ──────────────────────────────
+            result_nodes = nodes_by_type.get(ProvenanceNodeType.RESULT, [])
+            if len(result_nodes) != 1:
+                return False
+            result_node = result_nodes[0]
+
+            result_payload: dict[str, Any] = {"result_hash": self.result_hash}
+            expected_result_id = _deterministic_uuid5(result_payload)
+            if result_node.node_id != expected_result_id:
+                return False
+            if result_node.label != "heat_balance_result":
+                return False
+            if result_node.metadata != (("result_hash", self.result_hash),):
+                return False
+            if result_node.payload_hash != sha256_digest(result_payload):
+                return False
+
+            # ── 2. RESULT linkage ────────────────────────────────────
+            result_in_edges = [e for e in graph.edges if e.target_id == result_node.node_id]
+            if len(result_in_edges) != 1:
+                return False
+            result_edge = result_in_edges[0]
+
+            calc_nodes = nodes_by_type.get(ProvenanceNodeType.CALCULATION_RUN, [])
+            if len(calc_nodes) != 1:
+                return False
+            calc_node = calc_nodes[0]
+
+            if result_edge.source_id != calc_node.node_id:
+                return False
+            if result_edge.relation != "produces":
+                return False
+            if result_edge.metadata:
+                return False
+            # RESULT must have no outgoing edges
+            result_out_edges = [e for e in graph.edges if e.source_id == result_node.node_id]
+            if result_out_edges:
+                return False
+
+            # ── 3. EXTERNAL or CASE_REVISION root node ──────────────
+            root_nodes = nodes_by_type.get(ProvenanceNodeType.EXTERNAL, []) + nodes_by_type.get(
+                ProvenanceNodeType.CASE_REVISION, []
             )
-            recomputed_digest = _provenance_graph_digest(core_graph)
+            if len(root_nodes) != 1:
+                return False
+            root_node = root_nodes[0]
+
+            if root_node.node_type == ProvenanceNodeType.EXTERNAL:
+                root_meta = dict(root_node.metadata)
+                ext_payload: dict[str, Any] = {
+                    "root_type": "EXTERNAL",
+                    "request_id": root_meta.get("request_id"),
+                    "specification_mode": root_meta.get("specification_mode"),
+                    "flow_arrangement": root_meta.get("flow_arrangement"),
+                }
+                expected_root_id = _deterministic_uuid5(ext_payload)
+                if root_node.node_id != expected_root_id:
+                    return False
+                if root_node.label != "calculation_request":
+                    return False
+                if root_node.payload_hash != sha256_digest(ext_payload):
+                    return False
+            elif root_node.node_type == ProvenanceNodeType.CASE_REVISION:
+                root_meta = dict(root_node.metadata)
+                case_rev_payload: dict[str, Any] = {
+                    "revision_id": root_meta.get("revision_id"),
+                }
+                expected_root_id = _deterministic_uuid5(case_rev_payload)
+                if root_node.node_id != expected_root_id:
+                    return False
+                if root_node.label != "case_revision":
+                    return False
+                if root_node.payload_hash != sha256_digest(case_rev_payload):
+                    return False
+            else:
+                return False
+
+            # ── 4. CALCULATION_RUN node identity ────────────────────
+            if calc_node.node_type != ProvenanceNodeType.CALCULATION_RUN:
+                return False
+            if calc_node.label != "heat_balance_run":
+                return False
+            calc_meta = dict(calc_node.metadata)
+            expected_calc_keys = {
+                "specification_mode",
+                "flow_arrangement",
+                "brent_function_evaluation_count",
+                "bracket_probe_count",
+                "brent_algorithm_iteration_count",
+                "solver_converged",
+                "software_version",
+            }
+            if set(calc_meta.keys()) != expected_calc_keys:
+                return False
+            if calc_meta["specification_mode"] != self.specification_mode.value:
+                return False
+            if calc_meta["flow_arrangement"] != self.flow_arrangement.value:
+                return False
+            if calc_meta["brent_function_evaluation_count"] != self.brent_function_evaluation_count:
+                return False
+            if calc_meta["bracket_probe_count"] != self.bracket_probe_count:
+                return False
+            if calc_meta["brent_algorithm_iteration_count"] != self.brent_algorithm_iteration_count:
+                return False
+            if calc_meta["solver_converged"] != self.solver_converged:
+                return False
+            if calc_meta["software_version"] != _SOFTWARE_VERSION:
+                return False
+
+            # ── 5. PROPERTY_CALL nodes ──────────────────────────────
+            pc_nodes = nodes_by_type.get(ProvenanceNodeType.PROPERTY_CALL, [])
+            if len(pc_nodes) != len(self.property_calls):
+                return False
+
+            # Compute expected UUID5 for each property call and verify
+            # one-to-one mapping plus full identity checks.
+            pc_node_map: dict[UUID, ProvenanceNode] = {n.node_id: n for n in pc_nodes}
+            for idx, pc in enumerate(self.property_calls):
+                prop_payload = _property_call_record_to_dict(pc)
+                prop_payload["occurrence_index"] = idx
+                expected_pc_id = _deterministic_uuid5(prop_payload)
+                pc_node = pc_node_map.pop(expected_pc_id, None)
+                if pc_node is None:
+                    return False
+                expected_label = f"property_{pc.fluid}_{pc.query_type}"
+                if pc_node.label != expected_label:
+                    return False
+                if pc_node.payload_hash != sha256_digest(prop_payload):
+                    return False
+                expected_meta = (
+                    ("fluid", pc.fluid),
+                    ("query_type", pc.query_type),
+                    ("backend_name", pc.backend_name),
+                    ("backend_version", pc.backend_version),
+                    ("reference_state_policy", pc.reference_state_policy),
+                    ("stage", pc.stage),
+                    ("success", pc.success),
+                    ("error_code", pc.error_code),
+                    ("stream_role", pc.stream_role),
+                    ("sequence_index", pc.sequence_index),
+                )
+                if pc_node.metadata != expected_meta:
+                    return False
+            if pc_node_map:
+                return False
+
+            # ── 6. WARNING nodes ────────────────────────────────────
+            warn_nodes = nodes_by_type.get(ProvenanceNodeType.WARNING, [])
+            if len(warn_nodes) != len(self.warnings):
+                return False
+            warn_node_map: dict[UUID, ProvenanceNode] = {n.node_id: n for n in warn_nodes}
+            for idx, w in enumerate(self.warnings):
+                warn_payload: dict[str, Any] = {
+                    "code": w.code.value,
+                    "severity": w.severity.value,
+                    "message": w.message,
+                    "source_module": w.source_module,
+                    "context": dict(w.context) if w.context else {},
+                    "occurrence_index": idx,
+                }
+                expected_warn_id = _deterministic_uuid5(warn_payload)
+                warn_node = warn_node_map.pop(expected_warn_id, None)
+                if warn_node is None:
+                    return False
+                expected_label = f"warning_{w.code.value}"
+                if warn_node.label != expected_label:
+                    return False
+                if warn_node.payload_hash != sha256_digest(warn_payload):
+                    return False
+                expected_warn_meta = (
+                    ("code", w.code.value),
+                    ("severity", w.severity.value),
+                    ("message", w.message),
+                    ("source_module", w.source_module),
+                )
+                if warn_node.metadata != expected_warn_meta:
+                    return False
+            if warn_node_map:
+                return False
+
+            # ── 7. BLOCKER nodes ────────────────────────────────────
+            blocker_nodes = nodes_by_type.get(ProvenanceNodeType.BLOCKER, [])
+            if len(blocker_nodes) != len(self.blockers):
+                return False
+            blocker_node_map: dict[UUID, ProvenanceNode] = {n.node_id: n for n in blocker_nodes}
+            for idx, b in enumerate(self.blockers):
+                block_payload: dict[str, Any] = {
+                    "code": b.code.value,
+                    "severity": b.severity.value,
+                    "message": b.message,
+                    "source_module": b.source_module,
+                    "context": dict(b.context) if b.context else {},
+                    "occurrence_index": idx,
+                }
+                expected_block_id = _deterministic_uuid5(block_payload)
+                blocker_node = blocker_node_map.pop(expected_block_id, None)
+                if blocker_node is None:
+                    return False
+                expected_label = f"blocker_{b.code.value}"
+                if blocker_node.label != expected_label:
+                    return False
+                if blocker_node.payload_hash != sha256_digest(block_payload):
+                    return False
+                expected_block_meta = (
+                    ("code", b.code.value),
+                    ("severity", b.severity.value),
+                    ("message", b.message),
+                    ("source_module", b.source_module),
+                )
+                if blocker_node.metadata != expected_block_meta:
+                    return False
+            if blocker_node_map:
+                return False
+
+            # ── 8. provenance_digest from core graph ────────────────
+            core_node_ids = {
+                n.node_id for n in graph.nodes if n.node_type != ProvenanceNodeType.RESULT
+            }
+            core_nodes = [n for n in graph.nodes if n.node_type != ProvenanceNodeType.RESULT]
+            core_edges = [e for e in graph.edges if e.target_id in core_node_ids]
+            try:
+                core_graph = ProvenanceGraph(
+                    nodes=tuple(core_nodes),
+                    edges=tuple(core_edges),
+                )
+                recomputed_digest = _provenance_graph_digest(core_graph)
+            except Exception:
+                return False
+            if recomputed_digest != self.provenance_digest:
+                return False
+
+            # ── 9. All edges have empty metadata ────────────────────
+            for edge in graph.edges:
+                if edge.metadata:
+                    return False
+
+            # ── 10. All payload hashes are valid SHA-256 ───────────
+            for node in graph.nodes:
+                if not node.payload_hash.startswith("sha256:"):
+                    return False
+                hex_part = node.payload_hash[7:]
+                if len(hex_part) != 64:
+                    return False
+                try:
+                    int(hex_part, 16)
+                except ValueError:
+                    return False
+
+            # ── 11. All edge endpoints exist ────────────────────────
+            for edge in graph.edges:
+                if edge.source_id not in node_ids:
+                    return False
+                if edge.target_id not in node_ids:
+                    return False
+
+            return True
+
         except Exception:
             return False
-        if recomputed_digest != self.provenance_digest:
-            return False
-
-        # Check 2: All payload hashes are valid
-        for node in graph.nodes:
-            if not node.payload_hash.startswith("sha256:"):
-                return False
-            hex_part = node.payload_hash[7:]
-            if len(hex_part) != 64:
-                return False
-            try:
-                int(hex_part, 16)
-            except ValueError:
-                return False
-
-        # Check 3: All edge endpoints exist
-        for edge in graph.edges:
-            if edge.source_id not in node_ids:
-                return False
-            if edge.target_id not in node_ids:
-                return False
-
-        # Check 4: Verify node counts by type
-        type_counts: dict[str, int] = {}
-        for node in graph.nodes:
-            type_counts[node.node_type.value] = type_counts.get(node.node_type.value, 0) + 1
-
-        # Exactly one root
-        root_count = type_counts.get("CASE_REVISION", 0) + type_counts.get("EXTERNAL", 0)
-        if root_count != 1:
-            return False
-        # Exactly one CALCULATION_RUN
-        if type_counts.get("CALCULATION_RUN", 0) != 1:
-            return False
-        # Exactly one RESULT
-        if type_counts.get("RESULT", 0) != 1:
-            return False
-        # PROPERTY_CALL count matches
-        if type_counts.get("PROPERTY_CALL", 0) != len(self.property_calls):
-            return False
-        # WARNING count matches
-        if type_counts.get("WARNING", 0) != len(self.warnings):
-            return False
-        # BLOCKER count matches
-        if type_counts.get("BLOCKER", 0) != len(self.blockers):
-            return False
-
-        # Check 5: RESULT node's result_hash matches self.result_hash
-        result_nodes = [n for n in graph.nodes if n.node_type.value == "RESULT"]
-        if len(result_nodes) != 1:
-            return False
-        result_meta = dict(result_nodes[0].metadata)
-        stored_result_hash = result_meta.get("result_hash")
-        return stored_result_hash == self.result_hash
 
     def _recompute_result_hash(self) -> str:
         """Recompute result_hash from the stored field values.
