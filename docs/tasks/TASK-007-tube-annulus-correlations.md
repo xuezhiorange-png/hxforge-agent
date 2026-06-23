@@ -1,16 +1,19 @@
 # TASK-007 — Single-phase tube and concentric-annulus heat-transfer correlations
 
-**Status:** IN_PROGRESS
+**Status:** IN_PROGRESS (C4 deferred — see Issue #19)
 **Milestone:** M2
 **Priority:** P0
 **Depends on:** TASK-003, TASK-004, TASK-006
-**GitHub Issue:** #17
+**GitHub Issue:** #17 (scope updated: C4 deferred)
+**C4 Follow-up:** #19
 **Branch:** `codex/task-007-tube-annulus-correlations`
-**Draft PR:** pending (to be created with this commit)
+**Draft PR:** #18 (Draft, not merged)
 
 ## Objective
 
 Implement a deterministic, source-traceable single-phase convective heat-transfer correlation kernel for circular tubes and concentric annuli. Provide laminar and turbulent Nusselt correlations with full applicability envelopes, provenance, and deterministic hashing.
+
+**C4 scope note:** C4 (annulus laminar inner CHF) is deferred from TASK-007 per engineering review. C4 is delivered as metadata_only with structured maturity blocker. Full numerical implementation is tracked in Issue #19.
 
 ## Frozen Correlation Matrix
 

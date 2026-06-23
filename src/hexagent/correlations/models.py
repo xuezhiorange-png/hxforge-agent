@@ -129,6 +129,7 @@ class ApplicabilityStatus(StrEnum):
     incompatible_phase = "incompatible_phase"
     incompatible_flow_regime = "incompatible_flow_regime"
     explicit_extrapolation = "explicit_extrapolation"
+    implementation_unavailable = "implementation_unavailable"
 
 
 class VariableApplicabilityStatus(StrEnum):

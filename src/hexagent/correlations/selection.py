@@ -16,10 +16,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cmp_to_key
+from typing import Any
 
 from hexagent.correlations.applicability import assess_applicability
 from hexagent.correlations.flow import FlowRegime, NusseltBasis, ThermalBoundaryCondition
 from hexagent.correlations.geometry import CircularTubeGeometry, ConcentricAnnulusGeometry
+from hexagent.correlations.hx_result import SelectedCorrelationInfo as _SelectedCorrelationInfo
 from hexagent.correlations.models import (
     ApplicabilityAssessment,
     ApplicabilityVariable,
@@ -49,15 +51,20 @@ class SelectionResult:
         rejected_candidates: Tuple of (CorrelationDefinition, ApplicabilityAssessment)
             pairs for candidates that failed applicability.  Preserves full
             context including blockers/warnings.
-        selection_status: One of "selected", "no_match", "ambiguous", "blocked".
+        selection_status: One of "selected", "no_match", "ambiguous", "blocked",
+            "implementation_unavailable".
         blockers: Tuple of EngineeringMessage explaining why selection failed.
+        identified_correlation: SelectedCorrelationInfo if a specific correlation
+            was identified but could not be executed (e.g. metadata_only), or None.
     """
 
     selected_definition: CorrelationDefinition | None
     selected_assessment: ApplicabilityAssessment | None
     rejected_candidates: tuple[tuple[CorrelationDefinition, ApplicabilityAssessment], ...]
-    selection_status: str  # "selected" | "no_match" | "ambiguous" | "blocked"
+    # "selected" | "no_match" | "ambiguous" | "blocked" | "implementation_unavailable"
+    selection_status: str
     blockers: tuple[EngineeringMessage, ...]
+    identified_correlation: Any = None  # SelectedCorrelationInfo | None
 
 
 # ---------------------------------------------------------------------------
@@ -278,35 +285,38 @@ def select_correlation(
                     ("version", defn.key.version),
                     ("implementation_status", "metadata_only"),
                     ("source_verification_status", defn.source.verification_status.value),
+                    ("definition_hash", defn.definition_hash),
                 ),
             )
 
-            # Build identity snapshot
+            # Collect ALL input values including diameter_ratio (P0-3)
+            all_input_values = [
+                (ApplicabilityVariable.reynolds, reynolds),
+                (ApplicabilityVariable.prandtl, prandtl),
+            ]
+            if ApplicabilityVariable.diameter_ratio in defn.envelope.required_inputs:
+                all_input_values.append((ApplicabilityVariable.diameter_ratio, diameter_ratio))
+
+            # Build identity snapshot with ALL inputs
             identity_snapshot = ApplicabilityIdentitySnapshot(
                 definition_hash=defn.definition_hash,
                 geometry=geo_type,
                 phase_regime=PhaseRegime.single_phase_liquid,
                 flow_regime=model_flow,
-                input_values=(
-                    (ApplicabilityVariable.reynolds, reynolds),
-                    (ApplicabilityVariable.prandtl, prandtl),
-                ),
+                input_values=tuple(all_input_values),
                 policy=OutOfRangePolicy(),
                 allow_extrapolation=False,
             )
 
-            # Compute assessment hash before constructing (hash must not be empty)
+            # Compute assessment hash before constructing
             assessment_hash = compute_assessment_hash(
                 definition_hash=defn.definition_hash,
                 correlation_key=defn.key,
                 geometry=geo_type,
                 phase_regime=PhaseRegime.single_phase_liquid,
                 flow_regime=model_flow,
-                input_values=(
-                    (ApplicabilityVariable.reynolds, reynolds),
-                    (ApplicabilityVariable.prandtl, prandtl),
-                ),
-                status=ApplicabilityStatus.incompatible_phase,
+                input_values=tuple(all_input_values),
+                status=ApplicabilityStatus.implementation_unavailable,
                 variable_results=(),
                 warnings=(),
                 blockers=(blocker_msg,),
@@ -314,10 +324,10 @@ def select_correlation(
                 allow_extrapolation=False,
             )
 
-            # Construct the blocked assessment with hash
+            # Construct the blocked assessment with correct status
             blocked_assessment = ApplicabilityAssessment(
                 correlation_key=defn.key,
-                status=ApplicabilityStatus.incompatible_phase,
+                status=ApplicabilityStatus.implementation_unavailable,
                 variable_results=(),
                 warnings=(),
                 blockers=(blocker_msg,),
@@ -325,7 +335,34 @@ def select_correlation(
                 identity_snapshot=identity_snapshot,
             )
             rejected.append((defn, blocked_assessment))
-            continue
+
+            # Build identified correlation info (P0-4)
+            source = defn.source
+            identified_info = _SelectedCorrelationInfo(
+                correlation_id=defn.key.correlation_id,
+                version=defn.key.version,
+                priority=_extract_priority(defn),
+                source_title=source.title,
+                source_authors=", ".join(source.authors) if source.authors else "",
+                source_year=source.year,
+                source_reference=(
+                    f"{source.edition or ''} {source.equation_or_clause or ''}".strip()
+                ),
+                source_verification_status=source.verification_status.value,
+                definition_hash=defn.definition_hash,
+                is_adaptation=False,
+                adaptation_limitation="",
+                nusselt_basis=_get_nusselt_basis(defn),
+            )
+
+            return SelectionResult(
+                selected_definition=defn,
+                selected_assessment=blocked_assessment,
+                rejected_candidates=tuple(rejected),
+                selection_status="implementation_unavailable",
+                blockers=(blocker_msg,),
+                identified_correlation=identified_info,
+            )
 
         # Build applicability input
         values_list = [

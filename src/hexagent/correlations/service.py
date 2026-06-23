@@ -741,6 +741,25 @@ def evaluate_hx_correlation(
             assessment=selection_result.selected_assessment,
         )
 
+    # Handle implementation_unavailable (C4 metadata_only)
+    if selection_result.selection_status == "implementation_unavailable":
+        blockers.extend(selection_result.blockers)
+        identified = selection_result.identified_correlation
+        return _blocked_result(
+            geometry=geometry,
+            flow=flow,
+            blockers=blockers,
+            ctx=ctx,
+            reynolds=reynolds,
+            prandtl=prandtl,
+            velocity=velocity,
+            area=area,
+            dh=dh,
+            regime=regime.value,
+            assessment=selection_result.selected_assessment,
+            identified_correlation=identified,
+        )
+
     # Handle no_match: all candidates rejected by applicability
     if selection_result.selection_status == "no_match":
         # Use best rejected candidate's assessment and blockers
@@ -1009,16 +1028,39 @@ def _blocked_result(
     dh: float = 0.0,
     regime: str = "",
     assessment: Any = None,
+    identified_correlation: Any = None,
 ) -> CorrelationResult:
-    """Build a BLOCKED result with no correlation selected."""
+    """Build a BLOCKED result, optionally preserving identified correlation identity."""
     assessment_hash = ""
     if assessment is not None and hasattr(assessment, "assessment_hash"):
         assessment_hash = assessment.assessment_hash
 
+    # If a specific correlation was identified but unavailable, preserve its identity
+    corr_id = ""
+    corr_version = ""
+    definition_hash = ""
+    source_title = ""
+    source_authors = ""
+    source_year = 0
+    nusselt_basis = ""
+    if identified_correlation is not None:
+        corr_id = identified_correlation.correlation_id
+        corr_version = identified_correlation.version
+        definition_hash = identified_correlation.definition_hash
+        source_title = identified_correlation.source_title
+        source_authors = identified_correlation.source_authors
+        source_year = identified_correlation.source_year
+        nusselt_basis = identified_correlation.nusselt_basis
+
     provenance_graph = _build_provenance_graph(
         geometry=geometry,
-        correlation_id="",
-        correlation_version="",
+        correlation_id=corr_id,
+        correlation_version=corr_version,
+        definition_hash=definition_hash,
+        source_title=source_title,
+        source_authors=source_authors,
+        source_year=source_year,
+        nusselt_basis=nusselt_basis,
         reynolds=reynolds,
         prandtl=prandtl,
         nu=0.0,
@@ -1051,7 +1093,7 @@ def _blocked_result(
         nusselt_number=0.0,
         heat_transfer_coefficient=0.0,
         flow_regime=regime,
-        selected_correlation=None,
+        selected_correlation=identified_correlation,
         applicability_assessment=assessment,
         applicability_status="blocked",
         warnings=(),

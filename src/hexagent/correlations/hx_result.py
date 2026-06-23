@@ -487,6 +487,7 @@ class CorrelationResult(BaseModel):
                         message_text,
                         matched_msg.source_module,
                         matched_msg.allows_continuation,
+                        matched_msg.context,
                     )
                 elif node.node_type == ProvenanceNodeType.BLOCKER:
                     meta = dict(node.metadata)
@@ -508,6 +509,7 @@ class CorrelationResult(BaseModel):
                         message_text,
                         matched_msg.source_module,
                         matched_msg.allows_continuation,
+                        matched_msg.context,
                     )
                 elif node.node_type == ProvenanceNodeType.RESULT:
                     assessment_hash = ""
@@ -585,11 +587,24 @@ class CorrelationResult(BaseModel):
                 if corr_meta.get("nusselt_basis") != sc.nusselt_basis:
                     return False
             else:
-                # BLOCKED: no correlation should be selected, no CORRELATION node
-                if self.selected_correlation is not None:
-                    return False
-                if len(corr_nodes) != 0:
-                    return False
+                # BLOCKED: either no correlation or identified-but-unavailable
+                if self.selected_correlation is None:
+                    # True no-match: no CORRELATION node expected
+                    if len(corr_nodes) != 0:
+                        return False
+                else:
+                    # Identified but unavailable (e.g. metadata_only):
+                    # CORRELATION node expected with full identity
+                    if len(corr_nodes) != 1:
+                        return False
+                    corr_meta = dict(corr_nodes[0].metadata)
+                    sc = self.selected_correlation
+                    if corr_meta.get("correlation_id") != sc.correlation_id:
+                        return False
+                    if corr_meta.get("version") != sc.version:
+                        return False
+                    if corr_meta.get("definition_hash") != sc.definition_hash:
+                        return False
 
             # 12. WARNING/BLOCKER nodes match result messages
             warn_nodes = [n for n in graph.nodes if n.node_type == ProvenanceNodeType.WARNING]
@@ -632,7 +647,7 @@ class CorrelationResult(BaseModel):
                 else ProvenanceNodeType.EXTERNAL
             )
             expected_node_types = [expected_root_type, ProvenanceNodeType.CALCULATION_RUN]
-            if self.status == CorrelationStatus.SUCCEEDED and self.selected_correlation is not None:
+            if self.selected_correlation is not None:
                 expected_node_types.append(ProvenanceNodeType.CORRELATION)
             expected_node_types.extend([ProvenanceNodeType.WARNING] * len(self.warnings))
             expected_node_types.extend([ProvenanceNodeType.BLOCKER] * len(self.blockers))
@@ -826,6 +841,7 @@ def _build_warning_payload(
     message: str,
     source_module: str,
     allows_continuation: bool = True,
+    context: tuple[tuple[str, Any], ...] = (),
 ) -> dict[str, Any]:
     """Rebuild the canonical payload for a WARNING node."""
     return {
@@ -833,6 +849,7 @@ def _build_warning_payload(
         "severity": "warning",
         "message": message,
         "source_module": source_module,
+        "context": [(k, v) for k, v in context],
         "allows_continuation": allows_continuation,
     }
 
@@ -842,6 +859,7 @@ def _build_blocker_payload(
     message: str,
     source_module: str,
     allows_continuation: bool = False,
+    context: tuple[tuple[str, Any], ...] = (),
 ) -> dict[str, Any]:
     """Rebuild the canonical payload for a BLOCKER node."""
     return {
@@ -849,6 +867,7 @@ def _build_blocker_payload(
         "severity": "blocker",
         "message": message,
         "source_module": source_module,
+        "context": [(k, v) for k, v in context],
         "allows_continuation": allows_continuation,
     }
 
@@ -991,6 +1010,7 @@ def _build_provenance_graph(
             "severity": w.severity.value,
             "message": w.message,
             "source_module": w.source_module,
+            "context": [(k, v) for k, v in w.context],
             "allows_continuation": w.allows_continuation,
         }
         warn_id = _deterministic_uuid5(warn_payload)
@@ -1016,6 +1036,7 @@ def _build_provenance_graph(
             "severity": b.severity.value,
             "message": b.message,
             "source_module": b.source_module,
+            "context": [(k, v) for k, v in b.context],
             "allows_continuation": b.allows_continuation,
         }
         block_id = _deterministic_uuid5(block_payload)

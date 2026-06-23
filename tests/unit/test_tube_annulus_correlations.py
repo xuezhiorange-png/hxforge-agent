@@ -2065,7 +2065,7 @@ class TestC4MaturityBlockedAllKappa:
         assert r.applicability_assessment is not None
         assert any(b.code == ErrorCode.NOT_IMPLEMENTED for b in r.blockers)
         assert any("metadata_only" in b.message for b in r.blockers)
-        assert r.applicability_assessment.status.value == "incompatible_phase"
+        assert r.applicability_assessment.status.value == "implementation_unavailable"
 
     def test_all_kappa_same_blocker_type(self) -> None:
         """All three kappa values produce the same blocker code."""
@@ -2084,21 +2084,26 @@ class TestC4MaturityBlockedAllKappa:
 class TestC4MetadataOnlyNotInEvaluator:
     """J3: C4 metadata_only never enters the evaluator — assessment from selection layer."""
 
-    def test_assessment_status_incompatible_phase(self) -> None:
+    def test_assessment_status_implementation_unavailable(self) -> None:
         r = _make_c4_maturity_blocked()
         assert r.status == CorrelationStatus.BLOCKED
         assert r.applicability_assessment is not None
-        assert r.applicability_assessment.status.value == "incompatible_phase"
+        assert r.applicability_assessment.status.value == "implementation_unavailable"
 
     def test_blocker_code_not_implemented(self) -> None:
         r = _make_c4_maturity_blocked()
         assert any(b.code == ErrorCode.NOT_IMPLEMENTED for b in r.blockers)
-        assert r.selected_correlation is None
+        # C4 metadata_only preserves identified correlation identity (P0-4)
+        assert r.selected_correlation is not None
+        assert r.selected_correlation.correlation_id == "annulus_laminar_inner_chf"
+        assert r.selected_correlation.version == "1.0.0"
 
     def test_no_correlation_selected(self) -> None:
-        """C4 metadata_only → selected_correlation is None."""
+        """C4 metadata_only → selected_correlation preserves identified identity."""
         r = _make_c4_maturity_blocked()
-        assert r.selected_correlation is None
+        # Identified but unavailable: correlation identity is preserved
+        assert r.selected_correlation is not None
+        assert r.selected_correlation.correlation_id == "annulus_laminar_inner_chf"
         assert (
             r.applicability_assessment is not None
             and r.applicability_assessment.correlation_key.correlation_id
@@ -2517,3 +2522,165 @@ class TestAssessmentIdentitySnapshotRoundTrip:
         assert restored.verify_assessment_hash() is True
         assert restored.identity_snapshot is not None
         assert restored.identity_snapshot.geometry == GeometryType.circular_tube
+
+
+# ===========================================================================
+# Fourth-round review tests
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# Test K1: Different κ → Different Identity
+# ---------------------------------------------------------------------------
+
+
+class TestDifferentKappaDifferentIdentity:
+    """K1: Two C4 requests with same Re/Pr but different κ produce different hashes."""
+
+    def test_different_kappa_different_hashes(self) -> None:
+        # C4 with Re=1000, Pr≈7.0, κ=0.3  (di=0.015, do=0.05)
+        r1 = _make_c4_maturity_blocked(di=0.015, do=0.05)
+        # C4 with Re=1000, Pr≈7.0, κ=0.6  (di=0.030, do=0.05)
+        r2 = _make_c4_maturity_blocked(di=0.030, do=0.05)
+
+        # Both should be BLOCKED (metadata_only)
+        assert r1.status == CorrelationStatus.BLOCKED
+        assert r2.status == CorrelationStatus.BLOCKED
+        assert r1.applicability_assessment is not None
+        assert r2.applicability_assessment is not None
+
+        # Verify identity_snapshot.input_values differ
+        snap1 = r1.applicability_assessment.identity_snapshot
+        snap2 = r2.applicability_assessment.identity_snapshot
+        assert snap1 is not None
+        assert snap2 is not None
+        assert snap1.input_values != snap2.input_values
+
+        # assessment_hash differs
+        assert (
+            r1.applicability_assessment.assessment_hash
+            != r2.applicability_assessment.assessment_hash
+        )
+
+        # result_hash differs
+        assert r1.result_hash != r2.result_hash
+
+        # provenance_digest differs
+        assert r1.provenance_digest != r2.provenance_digest
+
+        # Both still verify correctly
+        assert r1.verify_hash() is True
+        assert r1.verify_provenance() is True
+        assert r2.verify_hash() is True
+        assert r2.verify_provenance() is True
+
+
+# ---------------------------------------------------------------------------
+# Test K2: Context Tamper Detection
+# ---------------------------------------------------------------------------
+
+
+class TestContextTamperDetection:
+    """K2: Tampering only the context in a blocker breaks provenance verification."""
+
+    def test_context_only_tamper_fails_provenance(self) -> None:
+        r = _make_c4_maturity_blocked()
+        assert r.verify_provenance() is True
+        assert len(r.blockers) > 0
+
+        # Tamper: add a fake context entry to the first blocker
+        r2 = deepcopy(r)
+        b0 = r2.blockers[0]
+        new_context = b0.context + (("fake_key", "fake_value"),)
+        new_blocker = b0.model_copy(update={"context": new_context})
+        object.__setattr__(r2, "blockers", (new_blocker,) + r2.blockers[1:])
+
+        # Provenance verification must fail (context is part of BLOCKER payload hash)
+        assert r2.verify_provenance() is False
+        # Original still passes
+        assert r.verify_provenance() is True
+
+    def test_json_roundtrip_preserves_full_context(self) -> None:
+        """JSON round-trip preserves blocker context, so provenance still verifies."""
+        r = _make_c4_maturity_blocked()
+        json_str = r.model_dump_json()
+        restored = CorrelationResult.model_validate_json(json_str)
+
+        # Context preserved
+        for orig_b, rest_b in zip(r.blockers, restored.blockers, strict=True):
+            assert orig_b.context == rest_b.context
+
+        assert restored.verify_provenance() is True
+
+
+# ---------------------------------------------------------------------------
+# Test K3: Maturity-Blocked Provenance Has CORRELATION Node
+# ---------------------------------------------------------------------------
+
+
+class TestMaturityBlockedProvenanceHasCorrelation:
+    """K3: C4 maturity-blocked result has exactly one CORRELATION node in provenance."""
+
+    def test_has_correlation_node(self) -> None:
+        r = _make_c4_maturity_blocked()
+        assert r.status == CorrelationStatus.BLOCKED
+        assert r.verify_provenance() is True
+
+        graph = r.provenance_graph
+        corr_nodes = [n for n in graph.nodes if n.node_type == ProvenanceNodeType.CORRELATION]
+
+        # Exactly 1 CORRELATION node
+        assert len(corr_nodes) == 1
+
+        # CORRELATION node metadata has correlation_id, version, definition_hash
+        corr_meta = dict(corr_nodes[0].metadata)
+        assert "correlation_id" in corr_meta
+        assert "version" in corr_meta
+        assert "definition_hash" in corr_meta
+        assert corr_meta["correlation_id"] == "annulus_laminar_inner_chf"
+        assert corr_meta["version"] == "1.0.0"
+
+        # selected_correlation is populated
+        assert r.selected_correlation is not None
+        assert r.selected_correlation.correlation_id == "annulus_laminar_inner_chf"
+
+
+# ---------------------------------------------------------------------------
+# Test K4: True No-Match vs Implementation-Unavailable
+# ---------------------------------------------------------------------------
+
+
+class TestTrueNoMatchVsImplementationUnavailable:
+    """K4: Zero-flow (no correlation) vs C4 metadata_only (identified but unavailable)."""
+
+    def test_zero_flow_no_correlation(self) -> None:
+        """Zero mass flow → BLOCKED, no correlation identified, no CORRELATION node."""
+        r = _make_zero_flow_blocked()
+        assert r.status == CorrelationStatus.BLOCKED
+
+        # selected_correlation is None (true no-match)
+        assert r.selected_correlation is None
+
+        # No CORRELATION node in provenance
+        graph = r.provenance_graph
+        corr_nodes = [n for n in graph.nodes if n.node_type == ProvenanceNodeType.CORRELATION]
+        assert len(corr_nodes) == 0
+
+        # verify_provenance passes (0 CORRELATION nodes is correct for no-match)
+        assert r.verify_provenance() is True
+
+    def test_c4_identified_correlation(self) -> None:
+        """C4 metadata_only → BLOCKED, correlation identified but unavailable."""
+        r = _make_c4_maturity_blocked()
+        assert r.status == CorrelationStatus.BLOCKED
+
+        # selected_correlation is not None (identified but unavailable)
+        assert r.selected_correlation is not None
+        assert r.selected_correlation.correlation_id == "annulus_laminar_inner_chf"
+
+        # Has CORRELATION node in provenance
+        graph = r.provenance_graph
+        corr_nodes = [n for n in graph.nodes if n.node_type == ProvenanceNodeType.CORRELATION]
+        assert len(corr_nodes) == 1
+
+        assert r.verify_provenance() is True
