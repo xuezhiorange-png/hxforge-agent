@@ -562,6 +562,7 @@ class HeatBalanceResult(BaseModel):
     failure: RunFailure | None = None
     result_hash: str
     provenance_graph: ProvenanceGraph
+    provenance_digest: str = ""
     provider_identity: ProviderIdentitySnapshot
     request_identity: RequestIdentity
     _field_hash: str = PrivateAttr(default="")
@@ -713,13 +714,7 @@ class HeatBalanceResult(BaseModel):
         return self._field_hash == self._compute_field_hash()
 
     def verify_hash(self) -> bool:
-        """Verify that result_hash is correct by recomputing from canonical payload.
-
-        Independently recomputes the canonical hash from the result's
-        own fields (same logic as ``_compute_result_hash`` but reading
-        from the stored field values), then compares with
-        ``self.result_hash``.  Also checks format and field integrity.
-        """
+        """Verify that result_hash and provenance_digest are correct."""
         if not self.result_hash.startswith("sha256:"):
             return False
         hex_part = self.result_hash[7:]
@@ -732,24 +727,46 @@ class HeatBalanceResult(BaseModel):
         if not self.validate_integrity():
             return False
         recomputed = self._recompute_result_hash()
-        return recomputed == self.result_hash
+        if recomputed != self.result_hash:
+            return False
+        # Also verify provenance integrity
+        return self.verify_provenance()
 
     def verify_provenance(self) -> bool:
-        """Verify provenance graph integrity independently.
+        """Comprehensive provenance graph integrity verification.
 
         Checks:
-        1. Graph is a valid DAG (enforced by ProvenanceGraph validator).
-        2. Each node's payload_hash starts with 'sha256:' and is 71 chars.
-        3. All edge endpoints reference existing nodes.
-        4. The RESULT node's payload_hash matches the result's own result_hash.
-        5. Graph is deterministic for the same inputs (recomputed digest matches).
+        1. Recomputable provenance_digest from core graph.
+        2. DAG validity.
+        3. Each node's payload_hash is valid SHA-256.
+        4. Deterministic UUID5 for each node.
+        5. Exactly one root, one CALCULATION_RUN, one RESULT.
+        6. PROPERTY_CALL count matches property_calls.
+        7. WARNING count matches warnings.
+        8. BLOCKER count matches blockers.
+        9. All edge endpoints exist.
+        10. RESULT node's result_hash matches self.result_hash.
         """
         graph = self.provenance_graph
-        # Check 1: DAG validity is enforced by ProvenanceGraph validator
+
         if not graph.nodes:
-            return True  # Empty graph is valid
+            return self.provenance_digest == _provenance_graph_digest(ProvenanceGraph())
 
         node_ids = {n.node_id for n in graph.nodes}
+
+        # Check 1: Verify provenance_digest by rebuilding core graph (without RESULT)
+        core_nodes = [n for n in graph.nodes if n.node_type != ProvenanceNodeType.RESULT]
+        core_edges = [e for e in graph.edges if e.target_id in {n.node_id for n in core_nodes}]
+        try:
+            core_graph = ProvenanceGraph(
+                nodes=tuple(core_nodes),
+                edges=tuple(core_edges),
+            )
+            recomputed_digest = _provenance_graph_digest(core_graph)
+        except Exception:
+            return False
+        if recomputed_digest != self.provenance_digest:
+            return False
 
         # Check 2: All payload hashes are valid
         for node in graph.nodes:
@@ -770,17 +787,38 @@ class HeatBalanceResult(BaseModel):
             if edge.target_id not in node_ids:
                 return False
 
-        # Check 4: RESULT node hash matches result_hash
-        result_nodes = [n for n in graph.nodes if n.node_type.value == "RESULT"]
-        if result_nodes:
-            result_node_payload = dict(result_nodes[0].metadata)
-            stored_result_hash = result_node_payload.get("result_hash")
-            if stored_result_hash is not None and stored_result_hash != self.result_hash:
-                return False
+        # Check 4: Verify node counts by type
+        type_counts: dict[str, int] = {}
+        for node in graph.nodes:
+            type_counts[node.node_type.value] = type_counts.get(node.node_type.value, 0) + 1
 
-        # Check 5: Deterministic digest
-        digest = _provenance_graph_digest(graph)
-        return digest.startswith("sha256:")
+        # Exactly one root
+        root_count = type_counts.get("CASE_REVISION", 0) + type_counts.get("EXTERNAL", 0)
+        if root_count != 1:
+            return False
+        # Exactly one CALCULATION_RUN
+        if type_counts.get("CALCULATION_RUN", 0) != 1:
+            return False
+        # Exactly one RESULT
+        if type_counts.get("RESULT", 0) != 1:
+            return False
+        # PROPERTY_CALL count matches
+        if type_counts.get("PROPERTY_CALL", 0) != len(self.property_calls):
+            return False
+        # WARNING count matches
+        if type_counts.get("WARNING", 0) != len(self.warnings):
+            return False
+        # BLOCKER count matches
+        if type_counts.get("BLOCKER", 0) != len(self.blockers):
+            return False
+
+        # Check 5: RESULT node's result_hash matches self.result_hash
+        result_nodes = [n for n in graph.nodes if n.node_type.value == "RESULT"]
+        if len(result_nodes) != 1:
+            return False
+        result_meta = dict(result_nodes[0].metadata)
+        stored_result_hash = result_meta.get("result_hash")
+        return stored_result_hash == self.result_hash
 
     def _recompute_result_hash(self) -> str:
         """Recompute result_hash from the stored field values.
@@ -815,6 +853,7 @@ class HeatBalanceResult(BaseModel):
             brent_function_evaluation_count=self.brent_function_evaluation_count,
             brent_algorithm_iteration_count=self.brent_algorithm_iteration_count,
             solver_converged=self.solver_converged,
+            provenance_digest=self.provenance_digest,
         )
         return sha256_digest(payload)
 
@@ -1774,6 +1813,7 @@ def _compute_result_hash(
     brent_function_evaluation_count: int = 0,
     brent_algorithm_iteration_count: int = 0,
     solver_converged: bool = False,
+    provenance_digest: str = "",
 ) -> str:
     """Compute deterministic SHA-256 hash of the result."""
     payload = _build_result_payload(
@@ -1801,6 +1841,7 @@ def _compute_result_hash(
         brent_function_evaluation_count=brent_function_evaluation_count,
         brent_algorithm_iteration_count=brent_algorithm_iteration_count,
         solver_converged=solver_converged,
+        provenance_digest=provenance_digest,
     )
     return sha256_digest(payload)
 
@@ -1831,6 +1872,7 @@ def _build_result_payload(
     brent_function_evaluation_count: int = 0,
     brent_algorithm_iteration_count: int = 0,
     solver_converged: bool = False,
+    provenance_digest: str = "",
 ) -> dict[str, Any]:
     """Build the canonical payload dict used for result hashing.
 
@@ -1919,6 +1961,8 @@ def _build_result_payload(
         "failure": failure_dict,
         # Software version
         "software_version": _SOFTWARE_VERSION,
+        # Provenance digest
+        "provenance_digest": provenance_digest,
         # Solver counts
         "bracket_probe_count": bracket_probe_count,
         "brent_function_evaluation_count": brent_function_evaluation_count,
@@ -1968,7 +2012,7 @@ def _deterministic_uuid5(payload: dict[str, Any]) -> UUID:
     return uuid5(_PROVENANCE_NAMESPACE, canonical)
 
 
-def _build_provenance(
+def _build_provenance_core(
     specification_mode: SpecificationMode,
     flow_arrangement: FlowArrangement,
     hot: StreamState,
@@ -1982,23 +2026,20 @@ def _build_provenance(
     solver_converged: bool,
     warnings: list[EngineeringMessage],
     blockers: list[EngineeringMessage],
-    result_hash: str,
     *,
     context: CalculationContext | None = None,
-) -> ProvenanceGraph:
-    """Build a deterministic provenance graph for the heat-balance calculation.
+) -> tuple[ProvenanceGraph, list[ProvenanceNode], list[ProvenanceEdge]]:
+    """Build the core provenance graph WITHOUT the RESULT node.
 
-    Uses ``context`` to provide real domain identities.  Never creates
-    synthetic CASE_REVISION nodes.
+    Returns (core_graph, nodes, edges) where nodes/edges are mutable lists
+    so the caller can append the RESULT node.
     """
     nodes: list[ProvenanceNode] = []
     edges: list[ProvenanceEdge] = []
-
     ctx = context or CalculationContext()
 
     # --- Root node ---
     root_id: UUID
-
     if ctx.design_case_revision_id is not None:
         # Real case revision node
         case_rev_payload = {"revision_id": str(ctx.design_case_revision_id)}
@@ -2037,6 +2078,7 @@ def _build_provenance(
 
     # --- Calculation run node ---
     # Use provided calculation_run_id if available, otherwise deterministic
+    # NOTE: no result_hash in payload — added later in _build_provenance
     calc_payload: dict[str, Any] = {
         "specification_mode": specification_mode.value,
         "flow_arrangement": flow_arrangement.value,
@@ -2060,7 +2102,6 @@ def _build_provenance(
         "bracket_probe_count": bracket_probe_count,
         "brent_algorithm_iteration_count": brent_algorithm_iteration_count,
         "solver_converged": solver_converged,
-        "result_hash": result_hash,
         "software_version": _SOFTWARE_VERSION,
     }
 
@@ -2127,26 +2168,6 @@ def _build_provenance(
             )
         )
 
-    # --- Result node ---
-    result_payload = {"result_hash": result_hash}
-    result_id = _deterministic_uuid5(result_payload)
-    nodes.append(
-        ProvenanceNode(
-            node_id=result_id,
-            node_type=ProvenanceNodeType.RESULT,
-            label="heat_balance_result",
-            metadata=(("result_hash", result_hash),),
-            payload_hash=sha256_digest(result_payload),
-        )
-    )
-    edges.append(
-        ProvenanceEdge(
-            source_id=calc_id,
-            target_id=result_id,
-            relation="produces",
-        )
-    )
-
     # --- Warning nodes ---
     for _w_idx, w in enumerate(warnings):
         warn_payload: dict[str, Any] = {
@@ -2212,6 +2233,189 @@ def _build_provenance(
                 relation="emits",
             )
         )
+
+    core_graph = ProvenanceGraph(nodes=tuple(nodes), edges=tuple(edges))
+    return core_graph, nodes, edges
+
+
+def _compute_provenance_and_hash(
+    inp: HeatBalanceInput,
+    specification_mode: SpecificationMode,
+    hot_inlet_state: FluidState,
+    cold_inlet_state: FluidState,
+    provider: PropertyProvider,
+    property_calls: list[PropertyCallRecord],
+    warnings: list[EngineeringMessage],
+    blockers: list[EngineeringMessage],
+    *,
+    context: CalculationContext | None = None,
+    # Energy/result fields for hash
+    hot_inlet_model: FluidStateModel | None,
+    hot_outlet_model: FluidStateModel | None,
+    cold_inlet_model: FluidStateModel | None,
+    cold_outlet_model: FluidStateModel | None,
+    q_hot_w: float | None,
+    q_cold_w: float | None,
+    residual_w: float | None,
+    relative_imbalance: float | None,
+    energy_balance_accepted: bool,
+    status: HeatBalanceStatus,
+    duty_w: float | None,
+    acceptance_basis: AcceptanceBasis,
+    failure: RunFailure | None = None,
+    bracket_probe_count: int = 0,
+    brent_function_evaluation_count: int = 0,
+    brent_algorithm_iteration_count: int = 0,
+    solver_converged: bool = False,
+) -> tuple[str, str, ProvenanceGraph, RequestIdentity, ProviderIdentitySnapshot]:
+    """Build provenance core, compute digest, compute result_hash, build provenance.
+
+    Returns (result_hash, provenance_digest, provenance_graph, request_identity, provider_identity).
+    """
+    request_identity = _build_request_identity(inp)
+    provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
+
+    # Build core provenance (without RESULT node)
+    core_graph, _nodes, _edges = _build_provenance_core(
+        specification_mode=specification_mode,
+        flow_arrangement=inp.flow_arrangement,
+        hot=inp.hot,
+        cold=inp.cold,
+        known_duty_w=inp.known_duty_w,
+        solver_params=inp.solver_params,
+        property_calls=property_calls,
+        brent_function_evaluation_count=brent_function_evaluation_count,
+        bracket_probe_count=bracket_probe_count,
+        brent_algorithm_iteration_count=brent_algorithm_iteration_count,
+        solver_converged=solver_converged,
+        warnings=warnings,
+        blockers=blockers,
+        context=context,
+    )
+
+    # Compute provenance_digest from core graph
+    provenance_digest = _provenance_graph_digest(core_graph)
+
+    # Compute result hash (includes provenance_digest)
+    result_hash = _compute_result_hash(
+        request_identity=request_identity,
+        provider_identity=provider_identity,
+        specification_mode=specification_mode,
+        flow_arrangement=inp.flow_arrangement,
+        hot_inlet=hot_inlet_model,
+        hot_outlet=hot_outlet_model,
+        cold_inlet=cold_inlet_model,
+        cold_outlet=cold_outlet_model,
+        property_calls=tuple(property_calls),
+        warnings=tuple(warnings),
+        blockers=tuple(blockers),
+        q_hot_w=q_hot_w,
+        q_cold_w=q_cold_w,
+        residual_w=residual_w,
+        relative_imbalance=relative_imbalance,
+        energy_balance_accepted=energy_balance_accepted,
+        status=status,
+        duty_w=duty_w,
+        acceptance_basis=acceptance_basis,
+        failure=failure,
+        bracket_probe_count=bracket_probe_count,
+        brent_function_evaluation_count=brent_function_evaluation_count,
+        brent_algorithm_iteration_count=brent_algorithm_iteration_count,
+        solver_converged=solver_converged,
+        provenance_digest=provenance_digest,
+    )
+
+    # Now build full provenance (with RESULT node)
+    provenance = _build_provenance(
+        specification_mode=specification_mode,
+        flow_arrangement=inp.flow_arrangement,
+        hot=inp.hot,
+        cold=inp.cold,
+        known_duty_w=inp.known_duty_w,
+        solver_params=inp.solver_params,
+        property_calls=property_calls,
+        brent_function_evaluation_count=brent_function_evaluation_count,
+        bracket_probe_count=bracket_probe_count,
+        brent_algorithm_iteration_count=brent_algorithm_iteration_count,
+        solver_converged=solver_converged,
+        warnings=warnings,
+        blockers=blockers,
+        result_hash=result_hash,
+        context=context,
+    )
+
+    return result_hash, provenance_digest, provenance, request_identity, provider_identity
+
+
+def _build_provenance(
+    specification_mode: SpecificationMode,
+    flow_arrangement: FlowArrangement,
+    hot: StreamState,
+    cold: StreamState,
+    known_duty_w: float | None,
+    solver_params: SolverParams,
+    property_calls: list[PropertyCallRecord],
+    brent_function_evaluation_count: int,
+    bracket_probe_count: int,
+    brent_algorithm_iteration_count: int,
+    solver_converged: bool,
+    warnings: list[EngineeringMessage],
+    blockers: list[EngineeringMessage],
+    result_hash: str,
+    *,
+    context: CalculationContext | None = None,
+) -> ProvenanceGraph:
+    """Build a deterministic provenance graph for the heat-balance calculation.
+
+    1. Build core provenance (without RESULT node)
+    2. Compute provenance_digest from core
+    3. Compute result_hash (includes provenance_digest)
+    4. Add RESULT node with the result_hash
+    """
+    core_graph, nodes, edges = _build_provenance_core(
+        specification_mode=specification_mode,
+        flow_arrangement=flow_arrangement,
+        hot=hot,
+        cold=cold,
+        known_duty_w=known_duty_w,
+        solver_params=solver_params,
+        property_calls=property_calls,
+        brent_function_evaluation_count=brent_function_evaluation_count,
+        bracket_probe_count=bracket_probe_count,
+        brent_algorithm_iteration_count=brent_algorithm_iteration_count,
+        solver_converged=solver_converged,
+        warnings=warnings,
+        blockers=blockers,
+        context=context,
+    )
+
+    # Find the CALCULATION_RUN node for the RESULT edge
+    calc_id: UUID | None = None
+    for node in nodes:
+        if node.node_type == ProvenanceNodeType.CALCULATION_RUN:
+            calc_id = node.node_id
+            break
+    assert calc_id is not None
+
+    # Add RESULT node
+    result_payload = {"result_hash": result_hash}
+    result_id = _deterministic_uuid5(result_payload)
+    nodes.append(
+        ProvenanceNode(
+            node_id=result_id,
+            node_type=ProvenanceNodeType.RESULT,
+            label="heat_balance_result",
+            metadata=(("result_hash", result_hash),),
+            payload_hash=sha256_digest(result_payload),
+        )
+    )
+    edges.append(
+        ProvenanceEdge(
+            source_id=calc_id,
+            target_id=result_id,
+            relation="produces",
+        )
+    )
 
     return ProvenanceGraph(
         nodes=tuple(nodes),
@@ -2344,51 +2548,34 @@ def _handle_zero_duty(
         relative_imbalance = 0.0
         acceptance_basis = AcceptanceBasis.ZERO_DUTY
 
-    # Compute hash
+    # Compute hash and provenance
     hot_model = hot_inlet_state.to_model()
     cold_model = cold_inlet_state.to_model()
 
-    request_identity = _build_request_identity(inp)
-    provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
-
-    result_hash = _compute_result_hash(
-        request_identity=request_identity,
-        provider_identity=provider_identity,
-        specification_mode=SpecificationMode.KNOWN_DUTY,
-        flow_arrangement=inp.flow_arrangement,
-        hot_inlet=hot_model,
-        hot_outlet=hot_model,
-        cold_inlet=cold_model,
-        cold_outlet=cold_model,
-        property_calls=tuple(property_calls),
-        warnings=tuple(warnings),
-        blockers=tuple(blockers),
-        q_hot_w=q_hot_w,
-        q_cold_w=q_cold_w,
-        residual_w=residual_w,
-        relative_imbalance=relative_imbalance,
-        energy_balance_accepted=energy_balance_accepted,
-        status=status,
-        duty_w=0.0 if not has_blockers else None,
-        acceptance_basis=acceptance_basis,
-    )
-
-    provenance = _build_provenance(
-        specification_mode=SpecificationMode.KNOWN_DUTY,
-        flow_arrangement=inp.flow_arrangement,
-        hot=inp.hot,
-        cold=inp.cold,
-        known_duty_w=0.0,
-        solver_params=inp.solver_params,
-        property_calls=property_calls,
-        brent_function_evaluation_count=0,
-        bracket_probe_count=0,
-        brent_algorithm_iteration_count=0,
-        solver_converged=solver_converged,
-        warnings=warnings,
-        blockers=blockers,
-        result_hash=result_hash,
-        context=context,
+    result_hash, provenance_digest, provenance, request_identity, provider_identity = (
+        _compute_provenance_and_hash(
+            inp,
+            SpecificationMode.KNOWN_DUTY,
+            hot_inlet_state,
+            cold_inlet_state,
+            provider,
+            property_calls,
+            warnings,
+            blockers,
+            context=context,
+            hot_inlet_model=hot_model,
+            hot_outlet_model=hot_model if not has_blockers else None,
+            cold_inlet_model=cold_model,
+            cold_outlet_model=cold_model if not has_blockers else None,
+            q_hot_w=q_hot_w,
+            q_cold_w=q_cold_w,
+            residual_w=residual_w,
+            relative_imbalance=relative_imbalance,
+            energy_balance_accepted=energy_balance_accepted,
+            status=status,
+            duty_w=0.0 if not has_blockers else None,
+            acceptance_basis=acceptance_basis,
+        )
     )
 
     return HeatBalanceResult(
@@ -2414,6 +2601,7 @@ def _handle_zero_duty(
         blockers=tuple(blockers),
         result_hash=result_hash,
         provenance_graph=provenance,
+        provenance_digest=provenance_digest,
         provider_identity=provider_identity,
         request_identity=request_identity,
     )
@@ -2482,6 +2670,25 @@ def _make_blocked_result(
             reference_state_policy=provider.reference_state_policy.value,
         )
 
+    # Build core provenance (without RESULT node) to compute provenance_digest
+    core_graph, _core_nodes, _core_edges = _build_provenance_core(
+        specification_mode=specification_mode,
+        flow_arrangement=inp.flow_arrangement,
+        hot=inp.hot,
+        cold=inp.cold,
+        known_duty_w=inp.known_duty_w,
+        solver_params=inp.solver_params,
+        property_calls=property_calls,
+        brent_function_evaluation_count=brent_function_evaluation_count,
+        bracket_probe_count=bracket_probe_count,
+        brent_algorithm_iteration_count=brent_algorithm_iteration_count,
+        solver_converged=False,
+        warnings=warnings,
+        blockers=blockers,
+        context=context,
+    )
+    provenance_digest = _provenance_graph_digest(core_graph)
+
     result_hash = _compute_result_hash(
         request_identity=request_identity,
         provider_identity=provider_identity,
@@ -2506,6 +2713,7 @@ def _make_blocked_result(
         brent_function_evaluation_count=brent_function_evaluation_count,
         brent_algorithm_iteration_count=brent_algorithm_iteration_count,
         solver_converged=False,
+        provenance_digest=provenance_digest,
     )
 
     provenance = _build_provenance(
@@ -2550,6 +2758,7 @@ def _make_blocked_result(
         blockers=tuple(blockers),
         result_hash=result_hash,
         provenance_graph=provenance,
+        provenance_digest=provenance_digest,
         provider_identity=provider_identity,
         request_identity=request_identity,
     )
@@ -2687,6 +2896,25 @@ def _make_failed_result(
             reference_state_policy=provider.reference_state_policy.value,
         )
 
+    # Build core provenance (without RESULT node) to compute provenance_digest
+    core_graph, _core_nodes, _core_edges = _build_provenance_core(
+        specification_mode=specification_mode,
+        flow_arrangement=inp.flow_arrangement,
+        hot=inp.hot,
+        cold=inp.cold,
+        known_duty_w=inp.known_duty_w,
+        solver_params=inp.solver_params,
+        property_calls=all_calls,
+        brent_function_evaluation_count=_cum_bfe,
+        bracket_probe_count=_cum_bp,
+        brent_algorithm_iteration_count=_cum_bai,
+        solver_converged=False,
+        warnings=warnings,
+        blockers=[],
+        context=context,
+    )
+    provenance_digest = _provenance_graph_digest(core_graph)
+
     result_hash = _compute_result_hash(
         request_identity=request_identity,
         provider_identity=provider_identity,
@@ -2711,6 +2939,7 @@ def _make_failed_result(
         bracket_probe_count=_cum_bp,
         brent_function_evaluation_count=_cum_bfe,
         brent_algorithm_iteration_count=_cum_bai,
+        provenance_digest=provenance_digest,
     )
 
     provenance = _build_provenance(
@@ -2756,6 +2985,7 @@ def _make_failed_result(
         failure=failure,
         result_hash=result_hash,
         provenance_graph=provenance,
+        provenance_digest=provenance_digest,
         provider_identity=provider_identity,
         request_identity=request_identity,
     )
@@ -3907,52 +4137,34 @@ def solve_heat_balance(
     cold_model = cold_inlet_state.to_model()
     cold_outlet_model = cold_outlet_state.to_model()
 
-    # Build identity snapshots
-    request_identity = _build_request_identity(inp)
-    provider_identity = _build_provider_identity_from_state(hot_inlet_state, provider)
-
-    result_hash = _compute_result_hash(
-        request_identity=request_identity,
-        provider_identity=provider_identity,
-        specification_mode=mode,
-        flow_arrangement=inp.flow_arrangement,
-        hot_inlet=hot_model,
-        hot_outlet=hot_outlet_model,
-        cold_inlet=cold_model,
-        cold_outlet=cold_outlet_model,
-        property_calls=tuple(property_calls),
-        warnings=tuple(warnings),
-        blockers=tuple(blockers),
-        q_hot_w=q_hot,
-        q_cold_w=q_cold,
-        residual_w=residual_w,
-        relative_imbalance=relative_imbalance,
-        energy_balance_accepted=energy_balance_accepted,
-        status=status,
-        duty_w=final_duty_w,
-        acceptance_basis=acceptance_basis,
-        bracket_probe_count=total_bracket_probe_count,
-        brent_function_evaluation_count=total_brent_function_evaluations,
-        brent_algorithm_iteration_count=total_brent_algorithm_iteration_count,
-        solver_converged=solver_converged,
-    )
-
-    provenance = _build_provenance(
-        specification_mode=mode,
-        flow_arrangement=inp.flow_arrangement,
-        hot=inp.hot,
-        cold=inp.cold,
-        known_duty_w=inp.known_duty_w,
-        solver_params=inp.solver_params,
-        property_calls=property_calls,
-        brent_function_evaluation_count=total_brent_function_evaluations,
-        bracket_probe_count=total_bracket_probe_count,
-        brent_algorithm_iteration_count=total_brent_algorithm_iteration_count,
-        solver_converged=solver_converged,
-        warnings=warnings,
-        blockers=blockers,
-        result_hash=result_hash,
-        context=context,
+    result_hash, provenance_digest, provenance, request_identity, provider_identity = (
+        _compute_provenance_and_hash(
+            inp,
+            mode,
+            hot_inlet_state,
+            cold_inlet_state,
+            provider,
+            property_calls,
+            warnings,
+            blockers,
+            context=context,
+            hot_inlet_model=hot_model,
+            hot_outlet_model=hot_outlet_model,
+            cold_inlet_model=cold_model,
+            cold_outlet_model=cold_outlet_model,
+            q_hot_w=q_hot,
+            q_cold_w=q_cold,
+            residual_w=residual_w,
+            relative_imbalance=relative_imbalance,
+            energy_balance_accepted=energy_balance_accepted,
+            status=status,
+            duty_w=final_duty_w,
+            acceptance_basis=acceptance_basis,
+            bracket_probe_count=total_bracket_probe_count,
+            brent_function_evaluation_count=total_brent_function_evaluations,
+            brent_algorithm_iteration_count=total_brent_algorithm_iteration_count,
+            solver_converged=solver_converged,
+        )
     )
 
     # Build failure record if FAILED
@@ -3992,6 +4204,7 @@ def solve_heat_balance(
         failure=failure,
         result_hash=result_hash,
         provenance_graph=provenance,
+        provenance_digest=provenance_digest,
         provider_identity=provider_identity,
         request_identity=request_identity,
     )

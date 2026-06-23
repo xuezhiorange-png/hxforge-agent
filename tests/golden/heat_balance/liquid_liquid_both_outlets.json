@@ -23,7 +23,7 @@
     "relative_imbalance": 0.000605,
     "energy_balance_accepted": true,
     "solver_converged": true,
-    "result_hash": "sha256:0031e99e79c819570e0b393505498dc1af546d41957492921b52949c31038d34"
+    "result_hash": "sha256:9a1a1012839e5273ca30b8242e50e145b81e28aab7e82c059d1fc5746a33d342"
   },
   "tolerances": {
     "temperature_k": 0.5

@@ -130,7 +130,7 @@ Supported and unsupported combinations must be explicitly enumerated. Under-spec
 | Review-08 | `4c0ea24` | #14 | CHANGES REQUIRED | 2026-06-22 |
 | Review-09 | `7745663` | #14 | IN_PROGRESS | 2026-06-22 |
 | Review-10 | `3b5eada` | #14 | IN_PROGRESS | 2026-06-22 |
-|| Review-11 | `7d106cb` | #14 | IN_PROGRESS | 2026-06-22 |
+| Review-11 | `7d106cb` | #14 | IN_PROGRESS | 2026-06-22 |
 | Review-12 | `0b58f1b` | #14 | IN_PROGRESS | 2026-06-22 |
 | Review-13 | *pending* | #14 | IN_PROGRESS | 2026-06-22 |
 

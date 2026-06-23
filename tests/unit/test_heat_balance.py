@@ -2581,6 +2581,8 @@ class TestBlockedHashCounts:
         json_str = result.model_dump_json()
         restored = HeatBalanceResult.model_validate_json(json_str)
         assert restored.verify_hash() is True
+        assert result.verify_provenance() is True
+        assert restored.verify_provenance() is True
 
     def test_blocked_hash_tamper_count_fails(self) -> None:
         """Tamper a solver count in BLOCKED result → verify_hash fails."""
@@ -2747,15 +2749,16 @@ class TestCumulativeCounts:
 
     def test_phase_rejection_after_one_side_cumulative(self) -> None:
         """KNOWN_DUTY: hot side succeeds, cold side PropertyServiceError.
-        Cumulative counts must include hot side's bracket probes and brent evals."""
+        Cumulative counts must include hot side's bracket probes and brent evals.
+        bracket_probe_count must exactly equal all bracket_probe stage calls.
+        brent_function_evaluation_count must exactly equal all brent_evaluation stage calls.
+        """
         provider = MockPropertyProvider()
         original_state_tp = provider.state_tp
         call_count = [0]
 
         def patched(fluid, t, p):
             call_count[0] += 1
-            # Allow inlet evaluations and hot-side solver to succeed
-            # Fail cold side after hot side completes (~10 calls)
             if call_count[0] > 10:
                 raise PropertyServiceError(
                     PropertyErrorCode.STATE_OUT_OF_RANGE,
@@ -2769,6 +2772,7 @@ class TestCumulativeCounts:
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
         result = solve_heat_balance(inp, provider)
         assert result.status == HeatBalanceStatus.FAILED
+
         # Hot side succeeded → must have bracket probes from hot side
         hot_bracket_calls = [
             pc
@@ -2776,28 +2780,57 @@ class TestCumulativeCounts:
             if pc.stream_role == "hot_solver" and pc.stage == "bracket_probe"
         ]
         assert len(hot_bracket_calls) > 0, "Expected hot-side bracket_probe calls"
+
         # Cold side failed → must have failed calls
         failed_calls = [pc for pc in result.property_calls if not pc.success]
         assert len(failed_calls) > 0, "Expected cold-side failed calls"
-        # Cumulative bracket_probe_count must equal total bracket_probe calls
-        cold_bracket_calls = [
+
+        # Exact bracket_probe_count match
+        bracket_probe_calls = [
             pc
             for pc in result.property_calls
-            if pc.stream_role == "cold_solver" and pc.stage == "bracket_probe"
+            if pc.stage == "bracket_probe" and pc.stream_role in ("hot_solver", "cold_solver")
         ]
-        total_bracket_calls = len(hot_bracket_calls) + len(cold_bracket_calls)
-        # bracket_probe_count may be slightly higher than recorded calls
-        # due to counter increment timing relative to failed call recording
-        assert result.bracket_probe_count >= total_bracket_calls
-        # brent_function_evaluation_count from hot side only (cold side didn't reach brent)
-        assert result.brent_function_evaluation_count > 0
+        assert result.bracket_probe_count == len(bracket_probe_calls), (
+            f"bracket_probe_count ({result.bracket_probe_count}) "
+            f"!= actual bracket_probe calls ({len(bracket_probe_calls)})"
+        )
+
+        # Exact brent_function_evaluation_count match
+        brent_eval_calls = [
+            pc
+            for pc in result.property_calls
+            if pc.stage == "brent_evaluation" and pc.stream_role in ("hot_solver", "cold_solver")
+        ]
+        assert result.brent_function_evaluation_count == len(brent_eval_calls), (
+            f"brent_function_evaluation_count ({result.brent_function_evaluation_count}) "
+            f"!= actual brent_evaluation calls ({len(brent_eval_calls)})"
+        )
+
         # failure.context must match top-level counts
         assert result.failure is not None
         ctx = dict(result.failure.context)
         assert ctx["bracket_probe_count"] == result.bracket_probe_count
         assert ctx["brent_function_evaluation_count"] == result.brent_function_evaluation_count
-        # verify_hash
+        assert ctx["brent_algorithm_iteration_count"] == result.brent_algorithm_iteration_count
+
+        # Provenance must match
+        calc_nodes = [
+            n for n in result.provenance_graph.nodes if n.node_type.value == "CALCULATION_RUN"
+        ]
+        assert len(calc_nodes) == 1
+        calc_meta = dict(calc_nodes[0].metadata)
+        assert calc_meta["bracket_probe_count"] == result.bracket_probe_count
+        bfe_count = calc_meta["brent_function_evaluation_count"]
+        assert bfe_count == result.brent_function_evaluation_count
+        bai_count = calc_meta["brent_algorithm_iteration_count"]
+        assert bai_count == result.brent_algorithm_iteration_count
+
+        # verify_hash and JSON roundtrip
         assert result.verify_hash() is True
+        json_str = result.model_dump_json()
+        restored = HeatBalanceResult.model_validate_json(json_str)
+        assert restored.verify_hash() is True
 
 
 class TestEndpointSemantics:
@@ -2990,7 +3023,7 @@ class TestRequestIdentityNoProvider:
 
 
 # ======================================================================
-# Review-13: Strict cumulative counts, provenance tamper, upper endpoint
+# Review-14: Strict cumulative counts, provenance digest, tamper tests
 # ======================================================================
 
 
@@ -3139,7 +3172,7 @@ class TestStrictCumulativeCounts:
 
 
 class TestProvenanceIntegrity:
-    """Provenance graph tamper detection."""
+    """Comprehensive provenance graph integrity verification tests."""
 
     def test_verify_provenance_normal(self) -> None:
         """Normal result passes verify_provenance."""
@@ -3149,37 +3182,129 @@ class TestProvenanceIntegrity:
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
         result = solve_heat_balance(inp, provider)
         assert result.verify_provenance() is True
+        assert result.verify_hash() is True
 
     def test_tamper_node_metadata(self) -> None:
-        """Tamper node metadata → field hash fails."""
+        """Tamper CALCULATION_RUN node metadata → verify_provenance fails."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
         result = solve_heat_balance(inp, provider)
-        # Tamper a node's metadata
         d = result.model_dump(mode="json")
         calc_nodes = [
             n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "CALCULATION_RUN"
         ]
         assert len(calc_nodes) == 1
-        calc_nodes[0]["metadata"] = [("tampered", "yes")]
-        # Reconstruct — field hash will detect the change
+        calc_nodes[0]["metadata"] = [("tampered_key", "tampered_value")]
         restored = HeatBalanceResult.model_validate(d)
-        object.__setattr__(restored, "_field_hash", restored._compute_field_hash())
-        # The field hash includes provenance_graph_digest, so tampering
-        # the graph changes the digest and invalidates the field hash
-        # (but verify_hash also recomputes and would detect it)
+        assert restored.verify_provenance() is False
 
-    def test_tamper_edge(self) -> None:
-        """Tamper edge → field hash detects via graph digest."""
+    def test_tamper_node_label(self) -> None:
+        """Tamper node label → verify_provenance fails."""
         provider = MockPropertyProvider()
         hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
         cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
         inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
         result = solve_heat_balance(inp, provider)
         d = result.model_dump(mode="json")
-        # Add a spurious edge
+        d["provenance_graph"]["nodes"][0]["label"] = "tampered_label"
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    def test_tamper_node_type(self) -> None:
+        """Tamper node type → verify_provenance fails (type counts wrong)."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        # Change a PROPERTY_CALL to WARNING → count mismatch
+        prop_nodes = [
+            n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "PROPERTY_CALL"
+        ]
+        if prop_nodes:
+            prop_nodes[0]["node_type"] = "WARNING"
+            restored = HeatBalanceResult.model_validate(d)
+            assert restored.verify_provenance() is False
+
+    def test_tamper_payload_hash(self) -> None:
+        """Tamper a non-RESULT node's payload_hash → verify_provenance fails (digest mismatch)."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        # Tamper a non-RESULT node's payload_hash to change the core graph digest
+        non_result_nodes = [n for n in d["provenance_graph"]["nodes"] if n["node_type"] != "RESULT"]
+        assert len(non_result_nodes) > 0, "Need at least one non-RESULT node"
+        non_result_nodes[0]["payload_hash"] = "sha256:" + "a" * 64
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    def test_delete_result_node(self) -> None:
+        """Delete RESULT node → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        d["provenance_graph"]["nodes"] = [
+            n for n in d["provenance_graph"]["nodes"] if n["node_type"] != "RESULT"
+        ]
+        # Edges reference deleted RESULT node → dangling edges
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            HeatBalanceResult.model_validate(d)
+
+    def test_duplicate_result_node(self) -> None:
+        """Duplicate RESULT node → verify_provenance fails (count check)."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        result_nodes = [n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "RESULT"]
+        assert len(result_nodes) == 1
+        # Duplicate: change a PROPERTY_CALL node to RESULT
+        prop_nodes = [
+            n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "PROPERTY_CALL"
+        ]
+        if prop_nodes:
+            prop_nodes[0]["node_type"] = "RESULT"
+            restored = HeatBalanceResult.model_validate(d)
+            assert restored.verify_provenance() is False
+
+    def test_delete_edge(self) -> None:
+        """Delete a 'calls' edge → verify_provenance fails (core graph digest changes)."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        # Remove a 'calls' edge (calculation_run → property_call)
+        # This is a core edge whose target is a non-RESULT node,
+        # so removing it changes the core graph digest
+        calls_edges = [e for e in d["provenance_graph"]["edges"] if e.get("relation") == "calls"]
+        if calls_edges:
+            d["provenance_graph"]["edges"].remove(calls_edges[0])
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    def test_add_spurious_edge(self) -> None:
+        """Add edge referencing non-existent node → ValidationError at construction."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
         d["provenance_graph"]["edges"].append(
             {
                 "source_id": "00000000-0000-0000-0000-000000000000",
@@ -3187,13 +3312,41 @@ class TestProvenanceIntegrity:
                 "relation": "tampered",
             }
         )
-        # Edge references non-existent node → ValidationError
-        import contextlib
-
-        from pydantic import ValidationError
-
-        with contextlib.suppress(ValidationError):
+        with pytest.raises(ValidationError):
             HeatBalanceResult.model_validate(d)
+
+    def test_modify_edge_relation(self) -> None:
+        """Modify edge relation → verify_provenance fails (core graph digest changes)."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        # Modify a 'calls' edge relation
+        for e in d["provenance_graph"]["edges"]:
+            if e.get("relation") == "calls":
+                e["relation"] = "tampered_calls"
+                break
+        restored = HeatBalanceResult.model_validate(d)
+        assert restored.verify_provenance() is False
+
+    def test_replace_result_node_hash(self) -> None:
+        """Replace RESULT node's result_hash → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        result_nodes = [n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "RESULT"]
+        assert len(result_nodes) == 1
+        # Tamper the result_hash in RESULT node metadata
+        # Do NOT update d["result_hash"] so stored_result_hash != self.result_hash
+        result_nodes[0]["metadata"] = [("result_hash", "sha256:" + "a" * 64)]
+        restored = HeatBalanceResult.model_validate(d)
+        # verify_provenance Check 5 detects mismatch: stored result_hash != self.result_hash
+        assert restored.verify_provenance() is False
 
     def test_json_roundtrip_provenance(self) -> None:
         """JSON roundtrip preserves provenance graph integrity."""
@@ -3209,3 +3362,189 @@ class TestProvenanceIntegrity:
         # Graph structure preserved
         assert len(restored.provenance_graph.nodes) == len(result.provenance_graph.nodes)
         assert len(restored.provenance_graph.edges) == len(result.provenance_graph.edges)
+        assert restored.provenance_digest == result.provenance_digest
+
+    def test_json_roundtrip_then_tamper_graph(self) -> None:
+        """JSON roundtrip then tamper graph → verify fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        json_str = result.model_dump_json()
+        restored = HeatBalanceResult.model_validate_json(json_str)
+        # Tamper a node in the restored graph
+        d = restored.model_dump(mode="json")
+        calc_nodes = [
+            n for n in d["provenance_graph"]["nodes"] if n["node_type"] == "CALCULATION_RUN"
+        ]
+        assert len(calc_nodes) == 1
+        calc_nodes[0]["metadata"] = [("tampered", "yes")]
+        tampered = HeatBalanceResult.model_validate(d)
+        assert tampered.verify_provenance() is False
+
+    def test_missing_calculation_run(self) -> None:
+        """Missing CALCULATION_RUN node → verify_provenance fails."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        d = result.model_dump(mode="json")
+        d["provenance_graph"]["nodes"] = [
+            n for n in d["provenance_graph"]["nodes"] if n["node_type"] != "CALCULATION_RUN"
+        ]
+        # Dangling edges → ValidationError
+        with pytest.raises(ValidationError):
+            HeatBalanceResult.model_validate(d)
+
+    def test_calculation_run_counter_metadata(self) -> None:
+        """CALCULATION_RUN metadata counters must match result counters."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        calc_nodes = [
+            n for n in result.provenance_graph.nodes if n.node_type.value == "CALCULATION_RUN"
+        ]
+        assert len(calc_nodes) == 1
+        meta = dict(calc_nodes[0].metadata)
+        assert meta["bracket_probe_count"] == result.bracket_probe_count
+        assert meta["brent_function_evaluation_count"] == result.brent_function_evaluation_count
+        assert meta["brent_algorithm_iteration_count"] == result.brent_algorithm_iteration_count
+        assert meta["solver_converged"] == result.solver_converged
+
+    def test_property_call_node_count_matches(self) -> None:
+        """PROPERTY_CALL node count must match len(result.property_calls)."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        prop_nodes = [
+            n for n in result.provenance_graph.nodes if n.node_type.value == "PROPERTY_CALL"
+        ]
+        assert len(prop_nodes) == len(result.property_calls)
+
+    def test_provenance_digest_binding(self) -> None:
+        """provenance_digest is included in result hash; changing it changes the hash."""
+        provider = MockPropertyProvider()
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        original_hash = result.result_hash
+        original_digest = result.provenance_digest
+        assert original_digest.startswith("sha256:")
+        # Tamper provenance_digest → hash must change
+        d = result.model_dump(mode="json")
+        d["provenance_digest"] = "sha256:" + "b" * 64
+        d["result_hash"] = original_hash  # keep old hash
+        tampered = HeatBalanceResult.model_validate(d)
+        assert tampered.verify_hash() is False
+
+
+class TestSecondSidePhaseRejectionBlocked:
+    """Real second-side phase-rejection BLOCKED test.
+
+    Hot side succeeds completely (bracket probes + brentq + final_state).
+    Cold side bracket probes succeed but return GAS phase (wrong family for water/liquid).
+    This triggers _BracketExhausted(..., phase_rejected=True) → BLOCKED + UNSUPPORTED_SERVICE.
+    """
+
+    def test_cold_side_phase_rejection_blocked(self) -> None:
+        """KNOWN_DUTY: hot succeeds, cold bracket probes return GAS → BLOCKED."""
+        provider = MockPropertyProvider()
+        original_state_tp = provider.state_tp
+
+        def patched(fluid, t, p):
+            state = original_state_tp(fluid, t, p)
+            # After inlet evaluations, return GAS phase for cold-side solver calls
+            # Inlets are at index 0,1; hot solver starts at index 2
+            # Cold solver starts after hot solver completes
+            # We detect cold solver by checking if the temperature is near cold inlet range
+            # Water inlet is at 290K, solver probes upward
+            if t > 290.0 + 0.1 and "Water" in str(fluid):
+                return FluidState(
+                    temperature_k=state.temperature_k,
+                    pressure_pa=state.pressure_pa,
+                    density_kg_m3=state.density_kg_m3,
+                    cp_j_kg_k=state.cp_j_kg_k,
+                    viscosity_pa_s=state.viscosity_pa_s,
+                    conductivity_w_m_k=state.conductivity_w_m_k,
+                    enthalpy_j_kg=state.enthalpy_j_kg,
+                    entropy_j_kg_k=state.entropy_j_kg_k,
+                    phase=PhaseRegion.GAS,
+                    quality=1.0,
+                    provenance=state.provenance,
+                )
+            return state
+
+        provider.state_tp = patched  # type: ignore[assignment]
+        hot = _water_stream(outlet_t=None, inlet_t=350.0, mass_flow=1.0)
+        cold = _water_stream(outlet_t=None, inlet_t=290.0, mass_flow=0.8)
+        inp = HeatBalanceInput(hot=hot, cold=cold, known_duty_w=80000.0)
+        result = solve_heat_balance(inp, provider)
+        assert result.status == HeatBalanceStatus.BLOCKED
+
+        # Must have UNSUPPORTED_SERVICE blocker
+        assert len(result.blockers) > 0
+        assert any(b.code.value == "unsupported_service" for b in result.blockers)
+
+        # Must contain both hot and cold PropertyCalls
+        hot_calls = [
+            pc for pc in result.property_calls if pc.stream_role in ("hot_inlet", "hot_solver")
+        ]
+        cold_calls = [
+            pc for pc in result.property_calls if pc.stream_role in ("cold_inlet", "cold_solver")
+        ]
+        assert len(hot_calls) > 0, "Expected hot-side property calls"
+        assert len(cold_calls) > 0, "Expected cold-side property calls"
+
+        # bracket_probe_count must exactly equal all bracket_probe stage calls
+        bracket_probe_calls = [
+            pc
+            for pc in result.property_calls
+            if pc.stage == "bracket_probe" and pc.stream_role in ("hot_solver", "cold_solver")
+        ]
+        assert result.bracket_probe_count == len(bracket_probe_calls), (
+            f"bracket_probe_count ({result.bracket_probe_count}) "
+            f"!= actual bracket_probe calls ({len(bracket_probe_calls)})"
+        )
+
+        # brent_function_evaluation_count must exactly equal all brent_evaluation stage calls
+        brent_eval_calls = [
+            pc
+            for pc in result.property_calls
+            if pc.stage == "brent_evaluation" and pc.stream_role in ("hot_solver", "cold_solver")
+        ]
+        assert result.brent_function_evaluation_count == len(brent_eval_calls), (
+            f"brent_function_evaluation_count ({result.brent_function_evaluation_count}) "
+            f"!= actual brent_evaluation calls ({len(brent_eval_calls)})"
+        )
+
+        # Hot side completed → algorithm iterations from hot side preserved
+        assert result.brent_algorithm_iteration_count > 0
+
+        # Provenance counts must match result
+        calc_nodes = [
+            n for n in result.provenance_graph.nodes if n.node_type.value == "CALCULATION_RUN"
+        ]
+        assert len(calc_nodes) == 1
+        calc_meta = dict(calc_nodes[0].metadata)
+        assert calc_meta["bracket_probe_count"] == result.bracket_probe_count
+        bfe = calc_meta["brent_function_evaluation_count"]
+        assert bfe == result.brent_function_evaluation_count
+        bai = calc_meta["brent_algorithm_iteration_count"]
+        assert bai == result.brent_algorithm_iteration_count
+
+        # verify_provenance and verify_hash
+        assert result.verify_provenance() is True
+        assert result.verify_hash() is True
+
+        # JSON roundtrip
+        json_str = result.model_dump_json()
+        restored = HeatBalanceResult.model_validate_json(json_str)
+        assert restored.verify_provenance() is True
+        assert restored.verify_hash() is True

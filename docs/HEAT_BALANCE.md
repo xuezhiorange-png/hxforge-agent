@@ -191,14 +191,26 @@ Edges:
 
 ### Provenance Integrity
 
-The `verify_provenance()` method validates the provenance graph independently:
-1. DAG validity (enforced by `ProvenanceGraph` validator)
-2. All node payload hashes are valid SHA-256
-3. All edge endpoints reference existing nodes
-4. RESULT node's payload_hash matches the result's own `result_hash`
-5. Graph is deterministic (recomputed digest matches)
+The `provenance_digest` field stores a deterministic SHA-256 hash of the core provenance graph (all nodes EXCEPT the RESULT node, all edges EXCEPT the `produces` edge). This breaks the circular dependency between the result hash and the provenance graph:
 
-The `_compute_field_hash()` (used by `validate_integrity()`) includes a deterministic digest of the provenance graph, ensuring tamper detection covers the full graph structure.
+1. Core provenance is built (without RESULT node)
+2. `provenance_digest = _provenance_graph_digest(core_graph)`
+3. `provenance_digest` is included in the result hash payload
+4. Result hash is computed
+5. RESULT node is added to the graph with the result hash
+
+The `verify_provenance()` method validates:
+1. Recomputable `provenance_digest` from the core graph
+2. DAG validity (enforced by `ProvenanceGraph` validator)
+3. All node payload hashes are valid SHA-256
+4. Exactly one root, one `CALCULATION_RUN`, one `RESULT`
+5. `PROPERTY_CALL` count matches `len(property_calls)`
+6. `WARNING` count matches `len(warnings)`
+7. `BLOCKER` count matches `len(blockers)`
+8. All edge endpoints reference existing nodes
+9. RESULT node's `result_hash` matches the result's own `result_hash`
+
+The `verify_hash()` method verifies both the formal result hash AND provenance integrity.
 
 ## API
 
