@@ -5,6 +5,7 @@ containing input, expected output, and tolerances.  The test replays
 the rating calculation with real CoolProp and asserts the results match
 within documented tolerances.
 """
+
 from __future__ import annotations
 
 import json
@@ -88,31 +89,30 @@ def test_golden_case(golden_file: str, provider: CoolPropProvider) -> None:
     # Assert heat duty bounds
     if expected.get("heat_duty_w_min") is not None:
         assert result.heat_duty_w is not None
-        assert result.heat_duty_w >= expected["heat_duty_w_min"] * (
-            1 - tols["heat_duty_relative"]
-        )
+        assert result.heat_duty_w >= expected["heat_duty_w_min"] * (1 - tols["heat_duty_relative"])
     if expected.get("heat_duty_w_max") is not None:
         assert result.heat_duty_w is not None
-        assert result.heat_duty_w <= expected["heat_duty_w_max"] * (
-            1 + tols["heat_duty_relative"]
-        )
+        assert result.heat_duty_w <= expected["heat_duty_w_max"] * (1 + tols["heat_duty_relative"])
 
     # Assert outlet temperature bounds
     if expected.get("hot_outlet_temperature_k_max") is not None:
         assert result.hot_outlet_temperature_k is not None
-        assert result.hot_outlet_temperature_k <= expected["hot_outlet_temperature_k_max"] + tols[
-            "temperature_absolute_k"
-        ]
+        assert (
+            result.hot_outlet_temperature_k
+            <= expected["hot_outlet_temperature_k_max"] + tols["temperature_absolute_k"]
+        )
     if expected.get("cold_outlet_temperature_k_min") is not None:
         assert result.cold_outlet_temperature_k is not None
-        assert result.cold_outlet_temperature_k >= expected["cold_outlet_temperature_k_min"] - tols[
-            "temperature_absolute_k"
-        ]
+        assert (
+            result.cold_outlet_temperature_k
+            >= expected["cold_outlet_temperature_k_min"] - tols["temperature_absolute_k"]
+        )
 
     # Energy balance check
-    if result.heat_duty_w and result.heat_duty_w > 1.0:
-        if result.energy_residual_w is not None:
-            assert abs(result.energy_residual_w) < tols["energy_residual_relative"] * result.heat_duty_w
+    if result.heat_duty_w and result.heat_duty_w > 1.0 and result.energy_residual_w is not None:
+        assert abs(result.energy_residual_w) < (
+            tols["energy_residual_relative"] * result.heat_duty_w
+        )
 
 
 def _load_golden_case(case_id: str) -> dict:

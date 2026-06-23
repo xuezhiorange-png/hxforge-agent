@@ -1,15 +1,11 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from hexagent.domain.models import CalculationResult, DesignCase
-
 """Double-pipe heat-exchanger domain service.
 
 Bridges the DesignCase domain model to the pure rating kernel.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from hexagent.core.heat_balance import CalculationContext
 from hexagent.domain.models import DesignCase
@@ -19,6 +15,9 @@ from hexagent.exchangers.double_pipe.result import RatingResult
 from hexagent.exchangers.double_pipe.solver import SolverParams
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 from hexagent.properties.base import FluidIdentifier, PropertyProvider
+
+if TYPE_CHECKING:
+    from hexagent.domain.models import CalculationResult
 
 
 class DoublePipeRatingService:
