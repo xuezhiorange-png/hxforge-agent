@@ -34,7 +34,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | ID | Task | Status | Depends on |
 |---|---|---|---|
 | TASK-007 | Implement single-phase tube and annulus correlations | DONE | TASK-003, TASK-004, TASK-006 |
-| TASK-008 | Implement fixed-geometry double-pipe rating | READY | TASK-005, TASK-006, TASK-007 |
+|| TASK-008 | Implement fixed-geometry double-pipe rating | IN_PROGRESS | TASK-005, TASK-006, TASK-007 |
 | TASK-009 | Implement manufacturable sizing and candidate optimization | READY | TASK-008 |
 | TASK-010 | Add versioned API and traceable report | READY | TASK-005, TASK-009 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |

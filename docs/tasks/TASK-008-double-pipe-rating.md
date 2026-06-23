@@ -65,12 +65,37 @@ Perform rating analysis for a fixed-geometry double-pipe heat exchanger. Given o
 - **ε-NTU:** Standard effectiveness relations for counter/parallel flow
 - **LMTD:** Log-mean temperature difference with correction factor F=1 for pure counter/parallel
 
-### Solver Strategy
+### Solver Contract
 
-- **Outlet temperature:** Iterative solver using energy balance + heat transfer equations
-- **Convergence tolerance:** ΔT < 1e-6 K for outlet temperatures
-- **Maximum iterations:** 100
-- **Method:** Bounded root-finding (Brent's method)
+**Primary unknown:** Heat duty Q (scalar root variable)
+- Q > 0: energy transfers from designated hot side to designated cold side
+- For trial Q:
+  - h_hot,out = h_hot,in - Q / m_hot
+  - h_cold,out = h_cold,in + Q / m_cold
+- Outlet temperatures MUST be back-calculated from PropertyProvider enthalpy inversion, NOT linear Cp
+
+**Primary residual:**
+- residual(Q) = Q - UA(Q) × LMTD(Q)
+- UA(Q) updates with trial outlet state, properties, and both-side heat transfer coefficients
+- Counter-flow and parallel-flow use correct terminal temperature differences
+- LMTD near-equal ΔT uses stable limit expression (no 0/0)
+- Any terminal ΔT ≤ 0 is a pinch/temperature-crossing blocker (no abs value masking)
+- ε-NTU used as post-convergence diagnostic and independent cross-check, NOT as conflicting second outlet temperature result
+
+**Convergence conditions (all must be satisfied):**
+- |residual_Q| <= max(1e-3 W, 1e-8 × max(|Q|, 1 W))
+- bracket width converted to outlet-temperature effect <= 1e-4 K
+- iterations <= 100
+
+**Dynamic bracket:**
+- Start from Q=0, construct Q_max from enthalpy reach limits, minimum allowable terminal ΔT, and temperature feasibility
+- Counter-flow: both terminal ΔT must be positive
+- Parallel-flow: hot outlet must be above cold outlet at exit
+- If no sign change at bracket endpoints: deterministic interval probing
+- If still no bracket: return SOLVER_BRACKET_NOT_FOUND blocker
+- No infeasible endpoints sent to property library relying on exception escape
+
+**Result must record:** converged, iterations, final residual, final bracket, tolerance configuration, termination reason
 
 ### Blockers
 
@@ -92,6 +117,93 @@ If operating conditions require C4 (annulus laminar inner CHF):
 - Return `implementation_unavailable` blocker from correlation selection
 - Do NOT silently substitute other correlations
 - Do NOT implement or guess C4 table data
+
+## Geometry Request Model
+
+Immutable, JSON round-trip capable. Fields:
+- `inner_tube_inner_diameter` (m)
+- `inner_tube_outer_diameter` (m)
+- `outer_pipe_inner_diameter` (m)
+- `effective_length` (m)
+- `wall_thermal_conductivity` (W/m·K)
+- `inner_surface_roughness` (m, default 0)
+- `annulus_surface_roughness` (m, default 0)
+- `inner_fouling_resistance` (m²·K/W, default 0)
+- `outer_fouling_resistance` (m²·K/W, default 0)
+
+Validation:
+- 0 < D_i < D_o < D_outer
+- L > 0
+- k_wall > 0
+- fouling >= 0
+
+## Flow Side Mapping
+
+Explicitly specify:
+- Which fluid in inner tube
+- Which fluid in annulus
+- Which is designated hot side
+- Which is designated cold side
+- Flow arrangement: parallel or counter
+
+No silent exchange based on inlet temperatures. If T_hot,in <= T_cold,in: return input blocker.
+
+## Thermal Boundary Condition
+
+- Both sides must carry explicit boundary-condition policy for laminar correlations
+- No silent selection between tube laminar CWT/CHF
+- No substitution when annulus laminar C4 unavailable
+- Any C4 scenario returns implementation_unavailable (Issue #19)
+
+## Thermal Resistance Model
+
+- A_i = π × D_i × L, A_o = π × D_o × L
+- R_conv_i = 1 / (h_i × A_i)
+- R_foul_i = Rf_i / A_i
+- R_wall = ln(D_o / D_i) / (2π k_wall L)
+- R_foul_o = Rf_o / A_o
+- R_conv_o = 1 / (h_o × A_o)
+- 1/UA = R_conv_i + R_foul_i + R_wall + R_foul_o + R_conv_o
+- Output: UA, U_i = UA / A_i, U_o = UA / A_o
+- Complete resistance breakdown with sum(components) == 1/UA
+- All fouling resistance in m²·K/W with explicit area basis per side
+
+## Iterative Property & Correlation Calls
+
+Each residual evaluation:
+1. Compute trial outlet enthalpies from Q
+2. PropertyProvider: back-calculate outlet states from enthalpies
+3. Establish representative bulk states for both sides
+4. Call TASK-007 correlation service
+5. Obtain: Re, Pr, Nu, h, selected correlation, applicability assessment, warnings/blockers
+6. Recompute thermal resistance and UA
+7. Compute LMTD and residual
+
+Representative bulk temperature: deterministic inlet/outlet bulk mean. All PropertyProvider calls and correlation selection enter provenance.
+
+## Complete Result Model Fields
+
+status, heat_duty, hot_outlet_state, cold_outlet_state, tube_side_outlet_state, annulus_side_outlet_state, tube_reynolds, tube_prandtl, tube_nusselt, tube_h, tube_selected_correlation, tube_applicability, annulus_reynolds, annulus_prandtl, annulus_nusselt, annulus_h, annulus_selected_correlation, annulus_applicability, area_inner, area_outer, resistance_breakdown, U_inner_basis, U_outer_basis, UA, C_hot, C_cold, C_min, C_max, capacity_ratio, NTU, effectiveness, LMTD, energy_residual, ua_lmtd_residual, iterations, converged, solver_termination_reason, warnings, blockers, property_provenance, provenance_graph, provenance_digest, result_hash
+
+Must be immutable, deterministic, JSON round-trip, verify_hash(), verify_provenance().
+
+## Structured Failure Paths
+
+ErrorCode values:
+- INVALID_DOUBLE_PIPE_GEOMETRY
+- INVALID_FLOW_SIDE_ASSIGNMENT
+- NON_POSITIVE_MASS_FLOW
+- PROPERTY_EVALUATION_FAILED
+- PHASE_NOT_SUPPORTED
+- CORRELATION_NOT_FOUND
+- CORRELATION_IMPLEMENTATION_UNAVAILABLE
+- TEMPERATURE_CROSSING
+- INVALID_LMTD
+- SOLVER_BRACKET_NOT_FOUND
+- SOLVER_NON_CONVERGENCE
+- ENERGY_BALANCE_NOT_CLOSED
+
+Reuse existing ErrorCode when available; no synonymous duplicates. Failed results also get deterministic hash and valid provenance.
 
 ## Test Matrix
 
@@ -123,4 +235,4 @@ If operating conditions require C4 (annulus laminar inner CHF):
 - Two-phase flow
 - Shell-and-tube, plate, air-cooled exchangers
 - Mechanical design, material strength, cost
-- Pressure drop models not confirmed by this task card
+- Pressure drop models explicitly out of scope for TASK-008; see TASK-009 for sizing integration
