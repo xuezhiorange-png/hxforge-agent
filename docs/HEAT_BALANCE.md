@@ -168,8 +168,19 @@ The result hash is computed via `_build_result_payload()` — the single source 
 
 `RequestIdentity` contains only request-side fields (fluid identity, stream inputs, solver params, flow arrangement). Provider configuration fields were removed to eliminate duplication — `ProviderIdentitySnapshot` is the sole canonical source for provider identity.
 
-Same inputs + same property results + same software identity = same hash.
-Any change to request identity, provider identity, or result fields changes the hash.
+The same engineering inputs, property results, software identity, and provenance context produce the same result hash.
+Changing the execution or lineage context changes provenance_digest and therefore changes result_hash.
+
+`result_hash` represents the identity of a complete execution result. The identity includes:
+- Engineering request (fluid, streams, solver params)
+- Provider identity (backend, version, config)
+- Computed result (states, energy balance, solver diagnostics)
+- Property-call trace
+- Warnings, blockers, failure
+- Provenance lineage/context (request_id, design_case_revision_id, calculation_run_id)
+
+The same engineering inputs and property results, under different `CalculationContext`, may produce different `result_hash` values because the provenance digest is included in the hash payload.
+
 `verify_hash()` rebuilds the canonical payload from stored fields and compares.
 
 ## Provenance

@@ -423,10 +423,10 @@ def _build_request_identity(
     ``ProviderIdentitySnapshot``.
     """
     return RequestIdentity(
-        hot_fluid_name=str(inp.hot.fluid_identifier),
+        hot_fluid_name=inp.hot.fluid_identifier.name,
         hot_fluid_backend=inp.hot.fluid_identifier.equation_of_state_backend,
         hot_fluid_components=inp.hot.fluid_identifier.components,
-        cold_fluid_name=str(inp.cold.fluid_identifier),
+        cold_fluid_name=inp.cold.fluid_identifier.name,
         cold_fluid_backend=inp.cold.fluid_identifier.equation_of_state_backend,
         cold_fluid_components=inp.cold.fluid_identifier.components,
         hot_mass_flow_kg_s=inp.hot.mass_flow_kg_s,
@@ -751,8 +751,6 @@ class HeatBalanceResult(BaseModel):
             for n in graph.nodes:
                 nodes_by_type.setdefault(n.node_type, []).append(n)
 
-            node_ids = {n.node_id for n in graph.nodes}
-
             # ── 1. RESULT node identity ──────────────────────────────
             result_nodes = nodes_by_type.get(ProvenanceNodeType.RESULT, [])
             if len(result_nodes) != 1:
@@ -835,6 +833,23 @@ class HeatBalanceResult(BaseModel):
                 return False
             if calc_node.label != "heat_balance_run":
                 return False
+
+            # Rebuild expected payload via single source of truth
+            expected_calc_payload = _build_calculation_run_payload(
+                specification_mode=self.specification_mode,
+                flow_arrangement=self.flow_arrangement,
+                request_identity=self.request_identity,
+                brent_function_evaluation_count=self.brent_function_evaluation_count,
+                bracket_probe_count=self.bracket_probe_count,
+                brent_algorithm_iteration_count=self.brent_algorithm_iteration_count,
+                solver_converged=self.solver_converged,
+            )
+            expected_calc_id = _deterministic_uuid5(expected_calc_payload)
+            if calc_node.node_id != expected_calc_id:
+                return False
+            if calc_node.payload_hash != sha256_digest(expected_calc_payload):
+                return False
+
             calc_meta = dict(calc_node.metadata)
             expected_calc_keys = {
                 "specification_mode",
@@ -844,6 +859,7 @@ class HeatBalanceResult(BaseModel):
                 "brent_algorithm_iteration_count",
                 "solver_converged",
                 "software_version",
+                "external_calculation_run_id",
             }
             if set(calc_meta.keys()) != expected_calc_keys:
                 return False
@@ -861,6 +877,7 @@ class HeatBalanceResult(BaseModel):
                 return False
             if calc_meta["software_version"] != _SOFTWARE_VERSION:
                 return False
+            # external_calculation_run_id is informational; any value is accepted
 
             # ── 5. PROPERTY_CALL nodes ──────────────────────────────
             pc_nodes = nodes_by_type.get(ProvenanceNodeType.PROPERTY_CALL, [])
@@ -984,12 +1001,47 @@ class HeatBalanceResult(BaseModel):
             if recomputed_digest != self.provenance_digest:
                 return False
 
-            # ── 9. All edges have empty metadata ────────────────────
-            for edge in graph.edges:
-                if edge.metadata:
+            # ── 9. Reject unsupported node types ─────────────────
+            allowed_types = {
+                ProvenanceNodeType.EXTERNAL,
+                ProvenanceNodeType.CASE_REVISION,
+                ProvenanceNodeType.CALCULATION_RUN,
+                ProvenanceNodeType.PROPERTY_CALL,
+                ProvenanceNodeType.WARNING,
+                ProvenanceNodeType.BLOCKER,
+                ProvenanceNodeType.RESULT,
+            }
+            for n in graph.nodes:
+                if n.node_type not in allowed_types:
                     return False
 
-            # ── 10. All payload hashes are valid SHA-256 ───────────
+            # ── 10. Verify complete edge topology ────────────────
+            # Build expected edge set from verified nodes
+            expected_edges: set[tuple[str, str, str]] = set()
+            # root → CALCULATION_RUN (triggers)
+            expected_edges.add((str(root_node.node_id), str(calc_node.node_id), "triggers"))
+            # CALCULATION_RUN → each PROPERTY_CALL (calls)
+            for pc_n in pc_nodes:
+                expected_edges.add((str(calc_node.node_id), str(pc_n.node_id), "calls"))
+            # CALCULATION_RUN → each WARNING (emits)
+            for w_n in warn_nodes:
+                expected_edges.add((str(calc_node.node_id), str(w_n.node_id), "emits"))
+            # CALCULATION_RUN → each BLOCKER (emits)
+            for b_n in blocker_nodes:
+                expected_edges.add((str(calc_node.node_id), str(b_n.node_id), "emits"))
+            # CALCULATION_RUN → RESULT (produces)
+            expected_edges.add((str(calc_node.node_id), str(result_node.node_id), "produces"))
+
+            actual_edges: set[tuple[str, str, str]] = set()
+            for e in graph.edges:
+                if e.metadata:
+                    return False
+                actual_edges.add((str(e.source_id), str(e.target_id), e.relation))
+
+            if actual_edges != expected_edges:
+                return False
+
+            # ── 11. All payload hashes are valid SHA-256 ─────────
             for node in graph.nodes:
                 if not node.payload_hash.startswith("sha256:"):
                     return False
@@ -999,13 +1051,6 @@ class HeatBalanceResult(BaseModel):
                 try:
                     int(hex_part, 16)
                 except ValueError:
-                    return False
-
-            # ── 11. All edge endpoints exist ────────────────────────
-            for edge in graph.edges:
-                if edge.source_id not in node_ids:
-                    return False
-                if edge.target_id not in node_ids:
                     return False
 
             return True
@@ -2205,6 +2250,49 @@ def _deterministic_uuid5(payload: dict[str, Any]) -> UUID:
     return uuid5(_PROVENANCE_NAMESPACE, canonical)
 
 
+def _build_calculation_run_payload(
+    *,
+    specification_mode: SpecificationMode,
+    flow_arrangement: FlowArrangement,
+    request_identity: RequestIdentity,
+    brent_function_evaluation_count: int,
+    bracket_probe_count: int,
+    brent_algorithm_iteration_count: int,
+    solver_converged: bool,
+) -> dict[str, Any]:
+    """Build the canonical CALCULATION_RUN payload dict.
+
+    Single source of truth for the CALCULATION_RUN node payload,
+    used by both _build_provenance_core (construction) and
+    HeatBalanceResult.verify_provenance (verification).
+    """
+    return {
+        "specification_mode": specification_mode.value,
+        "flow_arrangement": flow_arrangement.value,
+        "hot_fluid_name": request_identity.hot_fluid_name,
+        "hot_fluid_backend": request_identity.hot_fluid_backend,
+        "cold_fluid_name": request_identity.cold_fluid_name,
+        "cold_fluid_backend": request_identity.cold_fluid_backend,
+        "hot_mass_flow_kg_s": request_identity.hot_mass_flow_kg_s,
+        "cold_mass_flow_kg_s": request_identity.cold_mass_flow_kg_s,
+        "hot_inlet_pressure_pa": request_identity.hot_inlet_pressure_pa,
+        "cold_inlet_pressure_pa": request_identity.cold_inlet_pressure_pa,
+        "hot_inlet_temperature_k": request_identity.hot_inlet_temperature_k,
+        "cold_inlet_temperature_k": request_identity.cold_inlet_temperature_k,
+        "known_duty_w": request_identity.known_duty_w,
+        "solver_temperature_tolerance": request_identity.solver_temperature_tolerance,
+        "solver_energy_tolerance": request_identity.solver_energy_tolerance,
+        "solver_max_iterations": request_identity.solver_max_iterations,
+        "solver_bracket_step_k": request_identity.solver_bracket_step_k,
+        "solver_max_bracket_span_k": request_identity.solver_max_bracket_span_k,
+        "brent_function_evaluation_count": brent_function_evaluation_count,
+        "bracket_probe_count": bracket_probe_count,
+        "brent_algorithm_iteration_count": brent_algorithm_iteration_count,
+        "solver_converged": solver_converged,
+        "software_version": _SOFTWARE_VERSION,
+    }
+
+
 def _build_provenance_core(
     specification_mode: SpecificationMode,
     flow_arrangement: FlowArrangement,
@@ -2270,38 +2358,44 @@ def _build_provenance_core(
         )
 
     # --- Calculation run node ---
-    # Use provided calculation_run_id if available, otherwise deterministic
     # NOTE: no result_hash in payload — added later in _build_provenance
-    calc_payload: dict[str, Any] = {
-        "specification_mode": specification_mode.value,
-        "flow_arrangement": flow_arrangement.value,
-        "hot_fluid_name": hot.fluid_identifier.name,
-        "hot_fluid_backend": hot.fluid_identifier.equation_of_state_backend,
-        "cold_fluid_name": cold.fluid_identifier.name,
-        "cold_fluid_backend": cold.fluid_identifier.equation_of_state_backend,
-        "hot_mass_flow_kg_s": hot.mass_flow_kg_s,
-        "cold_mass_flow_kg_s": cold.mass_flow_kg_s,
-        "hot_inlet_pressure_pa": hot.inlet_pressure_pa,
-        "cold_inlet_pressure_pa": cold.inlet_pressure_pa,
-        "hot_inlet_temperature_k": hot.inlet_temperature_k,
-        "cold_inlet_temperature_k": cold.inlet_temperature_k,
-        "known_duty_w": known_duty_w,
-        "solver_temperature_tolerance": solver_params.temperature_tolerance,
-        "solver_energy_tolerance": solver_params.energy_tolerance,
-        "solver_max_iterations": solver_params.max_iterations,
-        "solver_bracket_step_k": solver_params.bracket_step_k,
-        "solver_max_bracket_span_k": solver_params.max_bracket_span_k,
-        "brent_function_evaluation_count": brent_function_evaluation_count,
-        "bracket_probe_count": bracket_probe_count,
-        "brent_algorithm_iteration_count": brent_algorithm_iteration_count,
-        "solver_converged": solver_converged,
-        "software_version": _SOFTWARE_VERSION,
-    }
+    _calc_ri = RequestIdentity(
+        hot_fluid_name=hot.fluid_identifier.name,
+        hot_fluid_backend=hot.fluid_identifier.equation_of_state_backend,
+        hot_fluid_components=hot.fluid_identifier.components,
+        cold_fluid_name=cold.fluid_identifier.name,
+        cold_fluid_backend=cold.fluid_identifier.equation_of_state_backend,
+        cold_fluid_components=cold.fluid_identifier.components,
+        hot_mass_flow_kg_s=hot.mass_flow_kg_s,
+        cold_mass_flow_kg_s=cold.mass_flow_kg_s,
+        hot_inlet_pressure_pa=hot.inlet_pressure_pa,
+        cold_inlet_pressure_pa=cold.inlet_pressure_pa,
+        hot_inlet_temperature_k=hot.inlet_temperature_k,
+        cold_inlet_temperature_k=cold.inlet_temperature_k,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        known_duty_w=known_duty_w,
+        flow_arrangement=flow_arrangement.value,
+        solver_temperature_tolerance=solver_params.temperature_tolerance,
+        solver_energy_tolerance=solver_params.energy_tolerance,
+        solver_max_iterations=solver_params.max_iterations,
+        solver_bracket_step_k=solver_params.bracket_step_k,
+        solver_max_bracket_span_k=solver_params.max_bracket_span_k,
+        solver_absolute_energy_tolerance_w=solver_params.absolute_energy_tolerance_w,
+        solver_near_zero_duty_threshold_w=solver_params.near_zero_duty_threshold_w,
+    )
+    calc_payload = _build_calculation_run_payload(
+        specification_mode=specification_mode,
+        flow_arrangement=flow_arrangement,
+        request_identity=_calc_ri,
+        brent_function_evaluation_count=brent_function_evaluation_count,
+        bracket_probe_count=bracket_probe_count,
+        brent_algorithm_iteration_count=brent_algorithm_iteration_count,
+        solver_converged=solver_converged,
+    )
 
-    if ctx.calculation_run_id is not None:
-        calc_id = ctx.calculation_run_id
-    else:
-        calc_id = _deterministic_uuid5(calc_payload)
+    # Node ID is always deterministic; external ID stored in metadata
+    calc_id = _deterministic_uuid5(calc_payload)
 
     nodes.append(
         ProvenanceNode(
@@ -2316,6 +2410,10 @@ def _build_provenance_core(
                 ("brent_algorithm_iteration_count", brent_algorithm_iteration_count),
                 ("solver_converged", solver_converged),
                 ("software_version", _SOFTWARE_VERSION),
+                (
+                    "external_calculation_run_id",
+                    str(ctx.calculation_run_id) if ctx.calculation_run_id is not None else None,
+                ),
             ),
             payload_hash=sha256_digest(calc_payload),
         )
