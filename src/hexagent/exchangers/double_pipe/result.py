@@ -2315,6 +2315,38 @@ def _verify_property_call_identity(
         ):
             return False
 
+        # Counterflow Q_max call prefix contract
+        counterflow_evals = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.Q_MAX_COUNTERFLOW.value
+        ]
+        for ce in counterflow_evals:
+            ce_calls = sorted(
+                by_eval[ce],
+                key=lambda c: c.call_index_within_evaluation,
+            )
+            if len(ce_calls) == 2:
+                # Both calls present: hot succeeded, cold present
+                if ce_calls[0].stream_role != "hot_limit" or ce_calls[0].query_type != "TP":
+                    return False
+                if ce_calls[1].stream_role != "cold_limit" or ce_calls[1].query_type != "TP":
+                    return False
+                # If hot failed, cold should not exist
+                if not ce_calls[0].success:
+                    return False
+            elif len(ce_calls) == 1:
+                # Single counterflow call (hot failure prefix):
+                # must be call 0 = hot_limit/TP, failed
+                if ce_calls[0].call_index_within_evaluation != 0:
+                    return False
+                if ce_calls[0].stream_role != "hot_limit" or ce_calls[0].query_type != "TP":
+                    return False
+                if ce_calls[0].success:
+                    return False
+            else:
+                return False
+
         # Collect limits and pinch evaluations (used by both parallel
         # state machine below and Q_max diagnostics binding after).
         limits_evals = [
@@ -2624,9 +2656,58 @@ def _verify_property_call_identity(
             ):
                 return False
 
-            # (l) zero_upper_bound → limits-only path, no pinch/solver/final
-            if reason == "zero_upper_bound" and (not has_limits or has_pinch or has_solver_path):
-                return False
+            # (l) zero_upper_bound → limits-only, exactly one successful
+            # limits evaluation with exactly 2 calls (hot+limit both success).
+            if reason == "zero_upper_bound":
+                if not has_limits or has_pinch or has_solver_path:
+                    return False
+                # Exactly one limits evaluation
+                if len(limits_evals) != 1:
+                    return False
+                # Exactly two successful calls in the limits eval
+                le = limits_evals[0]
+                le_calls = sorted(by_eval[le], key=lambda c: c.call_index_within_evaluation)
+                if len(le_calls) != 2:
+                    return False
+                if not all(c.success for c in le_calls):
+                    return False
+                if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                    return False
+                if le_calls[1].stream_role != "cold_limit" or le_calls[1].query_type != "TP":
+                    return False
+
+            # (m) iteration_limit → exactly one successful limits + one or
+            # more successful pinch evaluations; no bracket/solver/final
+            # after Q_max; final Q_max phase must be a pinch evaluation.
+            if reason == "iteration_limit":
+                if not has_limits or not has_pinch:
+                    return False
+                # All limits calls must succeed
+                if any(
+                    not c.success
+                    for cs in by_eval.values()
+                    if cs[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
+                    for c in cs
+                ):
+                    return False
+                # All pinch calls must succeed
+                if any(
+                    not c.success
+                    for cs in by_eval.values()
+                    if cs[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_PINCH.value
+                    for c in cs
+                ):
+                    return False
+                # No bracket/solver/final after Q_max
+                if has_solver_path:
+                    return False
+                # Final evaluation must be a pinch evaluation
+                max_eval = max(eval_indices)
+                if (
+                    by_eval[max_eval][0].evaluation_role
+                    != EvaluationRole.Q_MAX_PARALLEL_PINCH.value
+                ):
+                    return False
 
         # ---- (3) Failed Q_max call stops the state machine ----------------
         #
@@ -2634,6 +2715,7 @@ def _verify_property_call_identity(
         # evaluation must be the last one.  No later evaluations
         # (bracket, solver, pinch, or final) are allowed.
         qmax_roles = {
+            EvaluationRole.Q_MAX_COUNTERFLOW.value,
             EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
             EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
         }
