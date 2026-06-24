@@ -1,0 +1,84 @@
+{
+  "case": "case1_counterflow",
+  "description": "Counterflow water-water double-pipe heat exchanger",
+  "geometry": {
+    "D_i_m": 0.02,
+    "D_o_m": 0.025,
+    "D_outer_m": 0.04,
+    "L_m": 3.0,
+    "k_wall_W_m_K": 50.0,
+    "area_inner_m2": 0.1884955592153876,
+    "area_outer_m2": 0.23561944901923448,
+    "flow_area_tube_m2": 0.0003141592653589793,
+    "flow_area_annulus_m2": 0.000765763209312512,
+    "dh_tube_m": 0.02,
+    "dh_annulus_m": 0.015,
+    "R_wall_K_W": 0.00023676266140490988
+  },
+  "fluids": {
+    "fluid": "Water",
+    "hot": {
+      "side": "tube",
+      "m_dot_kg_s": 0.5,
+      "T_in_K": 350.0,
+      "P_in_Pa": 200000.0,
+      "h_in_J_kg": 321918.3569311111
+    },
+    "cold": {
+      "side": "annulus",
+      "m_dot_kg_s": 1.5,
+      "T_in_K": 300.0,
+      "P_in_Pa": 150000.0,
+      "h_in_J_kg": 112699.71527445214
+    }
+  },
+  "flow_arrangement": "counterflow",
+  "tube_in_hot": true,
+  "results": {
+    "Q_W": 32318.302969016044,
+    "T_hot_out_K": 334.5717732563536,
+    "T_cold_out_K": 305.1546219334104,
+    "UA_W_K": 818.4734199985951,
+    "LMTD_K": 39.48607514844964,
+    "ua_lmtd_residual_W": -5.70689735468477e-08,
+    "energy_residual_W": 1.3697717804461718e-07,
+    "h_inner_W_m2_K": 10076.63065084555,
+    "h_outer_W_m2_K": 9255.70802558372,
+    "Re_inner": 77940.23869198082,
+    "Re_outer": 36407.764722516884,
+    "Pr_inner": 2.595815719249548,
+    "Pr_outer": 5.4979703718864466,
+    "Nu_inner": 305.7624824006518,
+    "Nu_outer": 226.2836729489825,
+    "R_conv_inner_K_W": 0.0005264820110564117,
+    "R_foul_inner_K_W": 0.0,
+    "R_wall_K_W": 0.00023676266140490988,
+    "R_foul_outer_K_W": 0.0,
+    "R_conv_outer_K_W": 0.0004585421022414128,
+    "R_total_K_W": 0.0012217867747027344
+  },
+  "reference": {
+    "method": "Gnielinski correlation (Petukhov friction factor), bisection Q-solver",
+    "source": "Independent derivation, independent of production kernel",
+    "source_references": [
+      "Gnielinski, V., Int. Chem. Eng., Vol. 16, No. 2, pp. 359-368, 1976",
+      "Petukhov, B.S., Advances in Heat Transfer, Vol. 6, 1970"
+    ],
+    "derivation_file": "case1_counterflow_reference.py",
+    "independent_from_production_kernel": true,
+    "reference_result_hash": "1a25412baa7d529511db1521e9924808c5fcba810ccb5f508fd8e32a4b45748b"
+  },
+  "input_parameters": {
+    "D_i_m": 0.02,
+    "D_o_m": 0.025,
+    "D_outer_m": 0.04,
+    "L_m": 3.0,
+    "k_wall_W_m_K": 50.0,
+    "m_hot_kg_s": 0.5,
+    "T_hot_in_K": 350.0,
+    "P_hot_in_Pa": 200000.0,
+    "m_cold_kg_s": 1.5,
+    "T_cold_in_K": 300.0,
+    "P_cold_in_Pa": 150000.0
+  }
+}
