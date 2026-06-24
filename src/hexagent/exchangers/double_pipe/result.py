@@ -278,7 +278,7 @@ class RatingResult(BaseModel):
     area_outer_m2: float
 
     # --- Resistance breakdown ---
-    resistance_breakdown: ResistanceBreakdownModel
+    resistance_breakdown: ResistanceBreakdownModel | None = None
 
     # --- Overall heat transfer coefficients ---
     U_inner_basis: float | None = None
@@ -518,7 +518,11 @@ class RatingResult(BaseModel):
             "annulus_applicability_status": self.annulus_applicability_status,
             "area_inner_m2": self.area_inner_m2,
             "area_outer_m2": self.area_outer_m2,
-            "resistance_breakdown": self.resistance_breakdown.model_dump(),
+            "resistance_breakdown": (
+                self.resistance_breakdown.model_dump()
+                if self.resistance_breakdown is not None
+                else None
+            ),
             "U_inner_basis": self.U_inner_basis,
             "U_outer_basis": self.U_outer_basis,
             "UA_w_k": self.UA_w_k,
@@ -1233,7 +1237,7 @@ def _build_identity_payload(
     annulus_applicability_status: str | None,
     area_inner_m2: float,
     area_outer_m2: float,
-    resistance_breakdown: ResistanceBreakdownModel,
+    resistance_breakdown: ResistanceBreakdownModel | None,
     U_inner_basis: float | None,
     U_outer_basis: float | None,
     UA_w_k: float | None,
@@ -1353,7 +1357,9 @@ def _build_identity_payload(
         "area_inner_m2": area_inner_m2,
         "area_outer_m2": area_outer_m2,
         # Resistance breakdown
-        "resistance_breakdown": resistance_breakdown.model_dump(),
+        "resistance_breakdown": (
+            resistance_breakdown.model_dump() if resistance_breakdown is not None else None
+        ),
         # Overall coefficients
         "U_inner_basis": U_inner_basis,
         "U_outer_basis": U_outer_basis,
@@ -2231,7 +2237,7 @@ def compute_result_hash(
     annulus_applicability_status: str | None,
     area_inner_m2: float,
     area_outer_m2: float,
-    resistance_breakdown: ResistanceBreakdownModel,
+    resistance_breakdown: ResistanceBreakdownModel | None,
     U_inner_basis: float | None,
     U_outer_basis: float | None,
     UA_w_k: float | None,

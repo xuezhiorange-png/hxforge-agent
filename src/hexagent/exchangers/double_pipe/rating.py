@@ -1229,7 +1229,7 @@ def _build_final_evaluation_blocked_result(
         U_outer = UA_final / area_outer_m2 if area_outer_m2 > 0 else None
     else:
         UA_final = None
-        rb_model = _build_empty_resistance()
+        rb_model = None
         U_inner = None
         U_outer = None
 
@@ -1596,7 +1596,7 @@ def _blocked_result(
         annulus_applicability_status=None,
         area_inner_m2=0.0,
         area_outer_m2=0.0,
-        resistance_breakdown=_build_empty_resistance(),
+        resistance_breakdown=None,
         U_inner_basis=None,
         U_outer_basis=None,
         UA_w_k=None,
@@ -1645,7 +1645,7 @@ def _blocked_result(
         cold_outlet_temperature_k=None,
         area_inner_m2=0.0,
         area_outer_m2=0.0,
-        resistance_breakdown=_build_empty_resistance(),
+        resistance_breakdown=None,
         iterations=0,
         converged=False,
         solver_termination_reason="blocked",
@@ -1767,7 +1767,7 @@ def _failed_result(
         annulus_applicability_status=None,
         area_inner_m2=0.0,
         area_outer_m2=0.0,
-        resistance_breakdown=_build_empty_resistance(),
+        resistance_breakdown=None,
         U_inner_basis=None,
         U_outer_basis=None,
         UA_w_k=None,
@@ -1816,7 +1816,7 @@ def _failed_result(
         cold_outlet_temperature_k=None,
         area_inner_m2=0.0,
         area_outer_m2=0.0,
-        resistance_breakdown=_build_empty_resistance(),
+        resistance_breakdown=None,
         iterations=solver_result.iterations,
         converged=False,
         solver_termination_reason=solver_result.termination_reason.value,
@@ -2128,34 +2128,34 @@ def _compute_q_max_parallel(
 
     # Bisection to find the Q where pinch = 0
     q_lo, q_hi = 0.0, q_upper
+    # pinch at Q=0: feasible end (hot in > cold in + min_dt)
+    pinch_lo = hot_inlet_temperature_k - cold_inlet_temperature_k - minimum_terminal_delta_t
+    pinch_hi = pinch_at_upper  # infeasible end (Q=q_upper)
     iterations = 0
 
     for _ in range(Q_MAX_MAX_ITERATIONS):
         iterations += 1
         q_mid = 0.5 * (q_lo + q_hi)
         pinch_mid = _exit_pinch_residual(q_mid)
-        if pinch_mid >= 0:
+        if pinch_mid >= 0.0:
             q_lo = q_mid
+            pinch_lo = pinch_mid
         else:
             q_hi = q_mid
+            pinch_hi = pinch_mid  # noqa: F841
 
-        # Check dual tolerance
-        final_q_width = q_hi - q_lo
-        q_width_ok = final_q_width <= Q_MAX_Q_TOLERANCE_W
-        pinch_ok = abs(pinch_mid) <= Q_MAX_PINCH_TOLERANCE_K
-        if q_width_ok and pinch_ok:
+        # Check dual tolerance using tracked endpoint residuals
+        if q_hi - q_lo <= Q_MAX_Q_TOLERANCE_W and abs(pinch_lo) <= Q_MAX_PINCH_TOLERANCE_K:
             break
     else:
         # Max iterations reached without convergence
-        final_q_width = q_hi - q_lo
-        pinch_at_final_q = _exit_pinch_residual(q_lo)
         return QMaxResult(
             q_max_w=q_lo,
             iterations=iterations,
             final_q_low_w=q_lo,
             final_q_high_w=q_hi,
-            final_q_width_w=final_q_width,
-            final_pinch_residual_k=pinch_at_final_q,
+            final_q_width_w=q_hi - q_lo,
+            final_pinch_residual_k=pinch_lo,
             termination_reason="iteration_limit",
             q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
             pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
@@ -2164,16 +2164,13 @@ def _compute_q_max_parallel(
             limiting_side=_parallel_limiting_side,
         )
 
-    # Converged: recompute pinch at q_lo to get final residual
-    pinch_at_q_lo = _exit_pinch_residual(q_lo)
-
     return QMaxResult(
         q_max_w=q_lo,
         iterations=iterations,
         final_q_low_w=q_lo,
         final_q_high_w=q_hi,
         final_q_width_w=q_hi - q_lo,
-        final_pinch_residual_k=pinch_at_q_lo,
+        final_pinch_residual_k=pinch_lo,
         termination_reason="bisection_converged",
         q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
         pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
@@ -2983,7 +2980,7 @@ def rate_double_pipe(
         rb_model = _make_resistance_breakdown(R_breakdown_final)
     else:
         UA_final = None
-        rb_model = _build_empty_resistance()
+        rb_model = None
 
     # --- Check UA ---
     if UA_final is None or not math.isfinite(UA_final) or UA_final <= 0:
