@@ -23,6 +23,7 @@ from hexagent.correlations.flow import ThermalBoundaryCondition
 from hexagent.domain.messages import ErrorCode
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.rating import rate_double_pipe
+from hexagent.exchangers.double_pipe.recorder import EvaluationRecorder
 from hexagent.exchangers.double_pipe.result import RatingResult, RatingStatus
 from hexagent.exchangers.double_pipe.service import DoublePipeRatingService
 from hexagent.exchangers.double_pipe.solver import SolverParams
@@ -509,8 +510,8 @@ class TestQMaxNumerical:
         h_hot_in = hot_in_state.enthalpy_j_kg
         h_cold_in = cold_in_state.enthalpy_j_kg
 
-        property_calls: list = []
-        q_max_cf, _ = _compute_q_max(
+        recorder = EvaluationRecorder()
+        q_max_result = _compute_q_max(
             provider=provider,
             hot_fluid=hot_fluid,
             cold_fluid=cold_fluid,
@@ -524,9 +525,10 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=property_calls,
-            seq_idx=0,
+            property_calls=[],
+            recorder=recorder,
         )
+        q_max_cf = q_max_result.q_max_w
 
         # Compute independent limits
         T_hot_out_min = T_cold_in + min_dt
@@ -559,8 +561,8 @@ class TestQMaxNumerical:
         h_hot_in = hot_in_state.enthalpy_j_kg
         h_cold_in = cold_in_state.enthalpy_j_kg
 
-        property_calls: list = []
-        q_max_pf, _ = _compute_q_max(
+        recorder = EvaluationRecorder()
+        q_max_result = _compute_q_max(
             provider=provider,
             hot_fluid=hot_fluid,
             cold_fluid=cold_fluid,
@@ -574,9 +576,10 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.PARALLEL,
-            property_calls=property_calls,
-            seq_idx=0,
+            property_calls=[],
+            recorder=recorder,
         )
+        q_max_pf = q_max_result.q_max_w
 
         # Verify exit pinch at Q_max
         h_hot_out = h_hot_in - q_max_pf / m_hot
@@ -618,8 +621,8 @@ class TestQMaxNumerical:
         # Water-water
         hot_in_w = provider.state_tp(WATER, T_hot_in, P_hot)
         cold_in_w = provider.state_tp(WATER, T_cold_in, P_cold)
-        pc_w: list = []
-        q_max_w, _ = _compute_q_max(
+        rec_w = EvaluationRecorder()
+        res_w = _compute_q_max(
             provider=provider,
             hot_fluid=WATER,
             cold_fluid=WATER,
@@ -633,15 +636,16 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=pc_w,
-            seq_idx=0,
+            property_calls=[],
+            recorder=rec_w,
         )
+        q_max_w = res_w.q_max_w
 
         # Water-Air (air has lower Cp, different Q_max)
         hot_in_a = provider.state_tp(WATER, T_hot_in, P_hot)
         cold_in_a = provider.state_tp(AIR, T_cold_in, P_cold)
-        pc_a: list = []
-        q_max_a, _ = _compute_q_max(
+        rec_a = EvaluationRecorder()
+        res_a = _compute_q_max(
             provider=provider,
             hot_fluid=WATER,
             cold_fluid=AIR,
@@ -655,9 +659,10 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=pc_a,
-            seq_idx=0,
+            property_calls=[],
+            recorder=rec_a,
         )
+        q_max_a = res_a.q_max_w
 
         assert q_max_w != q_max_a, (
             f"Q_max should differ for water vs air: water={q_max_w}, air={q_max_a}"
@@ -680,8 +685,8 @@ class TestQMaxNumerical:
         h_hot_in = hot_in_state.enthalpy_j_kg
         h_cold_in = cold_in_state.enthalpy_j_kg
 
-        pc1: list = []
-        q1, _ = _compute_q_max(
+        rec1 = EvaluationRecorder()
+        res1 = _compute_q_max(
             provider=provider,
             hot_fluid=WATER,
             cold_fluid=WATER,
@@ -695,12 +700,13 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=pc1,
-            seq_idx=0,
+            property_calls=[],
+            recorder=rec1,
         )
+        q1 = res1.q_max_w
 
-        pc2: list = []
-        q2, _ = _compute_q_max(
+        rec2 = EvaluationRecorder()
+        res2 = _compute_q_max(
             provider=provider,
             hot_fluid=WATER,
             cold_fluid=WATER,
@@ -714,9 +720,10 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=pc2,
-            seq_idx=0,
+            property_calls=[],
+            recorder=rec2,
         )
+        q2 = res2.q_max_w
 
         assert q1 == pytest.approx(q2, rel=1e-12)
 

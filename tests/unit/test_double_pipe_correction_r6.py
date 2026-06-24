@@ -316,7 +316,7 @@ class TestQMaxPerCallError:
         assert fc.fluid == "Water"
         assert fc.query_type == "TP"
         assert fc.stream_role == "hot_limit"
-        assert fc.evaluation_role == "q_max_parallel_pinch"
+        assert fc.evaluation_role == "q_max_parallel_limits"
 
     def test_parallel_cold_limit_failure(self, provider: CoolPropProvider) -> None:
         """Parallel q_max cold_limit state_tp failure → BLOCKED."""
@@ -354,7 +354,7 @@ class TestQMaxPerCallError:
         assert fc.fluid == "Water"
         assert fc.query_type == "TP"
         assert fc.stream_role == "cold_limit"
-        assert fc.evaluation_role == "q_max_parallel_pinch"
+        assert fc.evaluation_role == "q_max_parallel_limits"
 
 
 # =========================================================================
