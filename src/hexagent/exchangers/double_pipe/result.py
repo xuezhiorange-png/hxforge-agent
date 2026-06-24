@@ -131,6 +131,31 @@ class ApplicabilitySnapshot:
     raw_assessment: tuple[tuple[str, Any], ...] = ()
 
 
+@dataclass(frozen=True)
+class QMaxDiagnosticsSnapshot:
+    """Immutable snapshot of Q_max computation diagnostics.
+
+    Captures the outcome of the upper-bracket search so it can be
+    embedded in ``RatingResult`` for provenance and debugging.
+    """
+
+    q_max_w: float
+    iterations: int
+    final_pinch_residual_k: float
+    termination_reason: str
+    # Bracket state (parallel-flow bisection)
+    final_q_low_w: float | None = None
+    final_q_high_w: float | None = None
+    final_q_width_w: float | None = None
+    # Counter-flow: explicit limit fields
+    hot_limit_w: float | None = None
+    cold_limit_w: float | None = None
+    limiting_side: str | None = None
+    # Parallel-flow: bracket and pinch diagnostics
+    q_tolerance_w: float | None = None
+    pinch_temperature_tolerance_k: float | None = None
+
+
 # ---------------------------------------------------------------------------
 # Local helper models
 # ---------------------------------------------------------------------------
@@ -326,6 +351,9 @@ class RatingResult(BaseModel):
 
     # --- Core provenance digest ---
     core_provenance_digest: str = ""
+
+    # --- Q_max diagnostics ---
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None
 
     # --- Private field hash for tamper detection ---
     _field_hash: str = PrivateAttr(default="")
@@ -615,6 +643,12 @@ class RatingResult(BaseModel):
             ),
             # Core provenance digest
             "core_provenance_digest": self.core_provenance_digest,
+            # Q_max diagnostics
+            "q_max_diagnostics": (
+                dataclasses.asdict(self.q_max_diagnostics)
+                if self.q_max_diagnostics is not None
+                else None
+            ),
         }
         return sha256_digest(payload)
 
@@ -659,7 +693,13 @@ class RatingResult(BaseModel):
                 return False
 
             # Verify evaluation identity of property calls
-            if not _verify_property_call_identity(self.property_calls, self.flow_arrangement):
+            if not _verify_property_call_identity(
+                self.property_calls,
+                self.flow_arrangement,
+                status=self.status,
+                converged=self.converged,
+                solver_termination_reason=self.solver_termination_reason,
+            ):
                 return False
 
             # Index nodes by type
@@ -1129,6 +1169,7 @@ class RatingResult(BaseModel):
             energy_tolerance_w=self.energy_tolerance_w,
             relative_ua_lmtd_residual=self.relative_ua_lmtd_residual,
             ua_lmtd_tolerance_w=self.ua_lmtd_tolerance_w,
+            q_max_diagnostics=self.q_max_diagnostics,
         )
         return sha256_digest(payload)
 
@@ -1208,6 +1249,7 @@ def _build_identity_payload(
     energy_tolerance_w: float | None = None,
     relative_ua_lmtd_residual: float | None = None,
     ua_lmtd_tolerance_w: float | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
 ) -> dict[str, Any]:
     """Build the canonical payload dict used for result hashing.
 
@@ -1387,6 +1429,10 @@ def _build_identity_payload(
         "ua_lmtd_tolerance_w": ua_lmtd_tolerance_w,
         # Core provenance digest
         "core_provenance_digest": core_provenance_digest,
+        # Q_max diagnostics
+        "q_max_diagnostics": (
+            dataclasses.asdict(q_max_diagnostics) if q_max_diagnostics is not None else None
+        ),
     }
 
 
@@ -1571,6 +1617,9 @@ def _build_correlation_payload(
 def _verify_property_call_identity(
     property_calls: tuple[PropertyCallRecord, ...] | list[PropertyCallRecord],
     flow_arrangement: FlowArrangement,
+    status: RatingStatus | None = None,
+    converged: bool | None = None,
+    solver_termination_reason: str | None = None,
 ) -> bool:
     """Verify the evaluation identity invariants of property calls.
 
@@ -1584,6 +1633,12 @@ def _verify_property_call_identity(
     try:
         if not property_calls:
             return True
+
+        # a) Role validity - each evaluation_role must be one of the 7 EvaluationRole values
+        valid_roles = {r.value for r in EvaluationRole}
+        for pc in property_calls:
+            if pc.evaluation_role not in valid_roles:
+                return False
 
         n = len(property_calls)
 
@@ -1614,6 +1669,28 @@ def _verify_property_call_identity(
                 return False
             trial_q_w_values = {pc.trial_q_w for pc in eval_calls}
             if len(trial_q_w_values) != 1:
+                return False
+
+        # b) Trial Q rules: static roles must have trial_q_w=None,
+        #    dynamic roles must have a finite trial_q_w.
+        static_roles = {
+            EvaluationRole.INLET.value,
+            EvaluationRole.Q_MAX_COUNTERFLOW.value,
+            EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+        }
+        dynamic_roles = {
+            EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+            EvaluationRole.BRACKET_PROBE.value,
+            EvaluationRole.SOLVER_ITERATION.value,
+            EvaluationRole.FINAL_EVALUATION.value,
+        }
+        for pc in property_calls:
+            if pc.evaluation_role in static_roles:
+                if pc.trial_q_w is not None:
+                    return False
+            elif pc.evaluation_role in dynamic_roles and (
+                pc.trial_q_w is None or not math.isfinite(pc.trial_q_w)
+            ):
                 return False
 
         # 4. Each evaluation's call_index == 0..n-1 (consecutive within eval)
@@ -1662,42 +1739,59 @@ def _verify_property_call_identity(
 
         all_roles = {pc.evaluation_role for pc in property_calls}
 
-        # 8. Counter-flow: no parallel roles allowed (if Q_max was computed)
+        # c) Parallel limits early failure - if q_max_parallel_limits is present
+        #    but q_max_parallel_pinch is NOT, check that limits evaluation had
+        #    a failure (not all succeeded).  This is valid only if limits
+        #    evaluation had a failure (partial limits trace is allowed).
+        if (
+            EvaluationRole.Q_MAX_PARALLEL_LIMITS.value in all_roles
+            and EvaluationRole.Q_MAX_PARALLEL_PINCH.value not in all_roles
+        ):
+            pass  # allowed — partial limits trace from early failure
+
+        # f) Q_max role vs flow arrangement
         if flow_arrangement == FlowArrangement.COUNTERFLOW:
-            parallel_roles = {
-                EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
-                EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
-            }
-            if all_roles & parallel_roles:
+            if EvaluationRole.Q_MAX_PARALLEL_LIMITS.value in all_roles:
                 return False
+            if EvaluationRole.Q_MAX_PARALLEL_PINCH.value in all_roles:
+                return False
+        if (
+            flow_arrangement == FlowArrangement.PARALLEL
+            and EvaluationRole.Q_MAX_COUNTERFLOW.value in all_roles
+        ):
+            return False
 
-        # 9. Parallel-flow: q_max_parallel_limits and q_max_parallel_pinch
-        #    present (only if Q_max was computed — early BLOCKED may skip it)
-        if flow_arrangement == FlowArrangement.PARALLEL:
-            q_max_roles = {
-                EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
-                EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
-            }
-            if q_max_roles & all_roles:  # noqa: SIM102
-                # If any parallel Q_max role is present, both must be
-                if not q_max_roles.issubset(all_roles):
-                    return False
-
-        # 10. final_evaluation exactly one, last evaluation
-        #     (not required for BLOCKED results that were blocked before
-        #      the solver ran — they may have no final_evaluation)
-        final_evaluations = [
+        # d) Final evaluation rules (status-aware)
+        final_evals = [
             ei
             for ei, calls in by_eval.items()
             if calls[0].evaluation_role == EvaluationRole.FINAL_EVALUATION.value
         ]
-        if final_evaluations:
-            if len(final_evaluations) != 1:
-                return False
-            max_eval_index = max(eval_indices)
-            if final_evaluations[0] != max_eval_index:
-                return False
-        # If no final_evaluation, that's allowed for early BLOCKED results
+        if status is not None:
+            if status == RatingStatus.SUCCEEDED:
+                if len(final_evals) != 1:
+                    return False
+                if final_evals[0] != max(eval_indices):
+                    return False
+            elif converged is True and status == RatingStatus.BLOCKED:
+                # converged BLOCKED should have final evaluation
+                if len(final_evals) != 1:
+                    return False
+                if final_evals[0] != max(eval_indices):
+                    return False
+            elif converged is False or status == RatingStatus.FAILED:
+                # FAILED must NOT have final evaluation
+                if final_evals:
+                    return False
+
+        # e) Order rule - final_evaluation must come after all other roles
+        if final_evals:
+            final_idx = final_evals[0]
+            for ei, calls in by_eval.items():
+                if ei < final_idx:
+                    role = calls[0].evaluation_role
+                    if role == EvaluationRole.FINAL_EVALUATION.value:
+                        return False  # final not at end
 
         # 11. bracket_probe before solver_iteration
         bracket_evaluations = [
@@ -2127,6 +2221,7 @@ def compute_result_hash(
     energy_tolerance_w: float | None = None,
     relative_ua_lmtd_residual: float | None = None,
     ua_lmtd_tolerance_w: float | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
 ) -> str:
     """Compute deterministic SHA-256 hash of the result."""
     payload = _build_identity_payload(
@@ -2198,5 +2293,6 @@ def compute_result_hash(
         energy_tolerance_w=energy_tolerance_w,
         relative_ua_lmtd_residual=relative_ua_lmtd_residual,
         ua_lmtd_tolerance_w=ua_lmtd_tolerance_w,
+        q_max_diagnostics=q_max_diagnostics,
     )
     return sha256_digest(payload)

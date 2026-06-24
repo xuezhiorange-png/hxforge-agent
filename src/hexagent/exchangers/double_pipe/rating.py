@@ -44,6 +44,7 @@ from hexagent.exchangers.double_pipe.result import (
     ApplicabilitySnapshot,
     FluidStateSnapshot,
     PropertyProvenanceSnapshot,
+    QMaxDiagnosticsSnapshot,
     RatingRequestIdentity,
     RatingResult,
     RatingStatus,
@@ -143,6 +144,586 @@ class TrialEvaluationAbort(Exception):
     def __init__(self, trial: TrialEvaluation):
         self.trial = trial
         super().__init__(f"Trial Q={trial.q_w} is not feasible")
+
+
+# ---------------------------------------------------------------------------
+# Trial evaluator class
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TrialEvaluator:
+    """Encapsulates trial Q evaluation logic for double-pipe rating.
+
+    Extracted from the nested ``_evaluate_trial`` closure inside
+    ``rate_double_pipe`` so that the evaluation logic is reusable and
+    testable in isolation.  All dependencies are injected at
+    construction time; ``evaluate()`` is the only mutable entry point
+    (via the recorder).
+    """
+
+    provider: PropertyProvider
+    recorder: EvaluationRecorder
+    hot_fluid: FluidIdentifier
+    cold_fluid: FluidIdentifier
+    hot_mass_flow_kg_s: float
+    cold_mass_flow_kg_s: float
+    hot_inlet_pressure_pa: float
+    cold_inlet_pressure_pa: float
+    hot_inlet_temperature_k: float
+    cold_inlet_temperature_k: float
+    h_hot_in: float
+    h_cold_in: float
+    tube_in_hot: bool
+    flow_arrangement: FlowArrangement
+    tube_geom: CircularTubeGeometry
+    annulus_geom: ConcentricAnnulusGeometry
+    tube_boundary_condition: ThermalBoundaryCondition
+    annulus_boundary_condition: ThermalBoundaryCondition
+    area_inner_m2: float
+    area_outer_m2: float
+    wall_resistance: float
+    geometry: DoublePipeGeometry
+
+    def evaluate(
+        self,
+        Q: float,
+        *,
+        ctx: EvaluationContext,
+    ) -> TrialEvaluation:
+        """Evaluate a single trial Q and return a TrialEvaluation."""
+        trial_warnings: list[EngineeringMessage] = []
+        trial_blockers: list[EngineeringMessage] = []
+
+        if Q < 0:
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=None,
+                cold_outlet_state=None,
+                hot_bulk_state=None,
+                cold_bulk_state=None,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.INPUT_INCONSISTENT,
+                        f"Negative Q trial: {Q}",
+                        (("q_w", Q),),
+                    ),
+                ),
+            )
+
+        # --- 6a. Trial outlet enthalpies ---
+        h_hot_out = self.h_hot_in - Q / self.hot_mass_flow_kg_s
+        h_cold_out = self.h_cold_in + Q / self.cold_mass_flow_kg_s
+
+        # --- 6b. Back-calculate outlet states via PH query ---
+        hot_outlet_inputs = (
+            ("pressure_pa", self.hot_inlet_pressure_pa),
+            ("enthalpy_j_kg", h_hot_out),
+        )
+        cold_outlet_inputs = (
+            ("pressure_pa", self.cold_inlet_pressure_pa),
+            ("enthalpy_j_kg", h_cold_out),
+        )
+
+        hot_outlet_state: FluidState | None = None
+        cold_outlet_state: FluidState | None = None
+
+        try:
+            hot_outlet_state = self.provider.state_ph(
+                self.hot_fluid,
+                self.hot_inlet_pressure_pa,
+                h_hot_out,
+                reference_state=self.provider.reference_state_policy,
+            )
+            self.recorder.record_success(
+                ctx,
+                hot_outlet_state,
+                query_type="PH",
+                inputs=hot_outlet_inputs,
+                provider=self.provider,
+                stage="brent_evaluation",
+                stream_role="hot_solver",
+            )
+        except PropertyServiceError as exc:
+            self.recorder.record_failure(
+                ctx,
+                fluid_name=self.hot_fluid.name,
+                query_type="PH",
+                inputs=hot_outlet_inputs,
+                provider=self.provider,
+                stage="brent_evaluation",
+                stream_role="hot_solver",
+                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
+                error_message=str(exc),
+            )
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=None,
+                cold_outlet_state=None,
+                hot_bulk_state=None,
+                cold_bulk_state=None,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.PROPERTY_EVALUATION_FAILED,
+                        f"Hot-side outlet property evaluation failed: {exc}",
+                        (("fluid", self.hot_fluid.name), ("stage", "brent_evaluation")),
+                    ),
+                ),
+            )
+
+        try:
+            cold_outlet_state = self.provider.state_ph(
+                self.cold_fluid,
+                self.cold_inlet_pressure_pa,
+                h_cold_out,
+                reference_state=self.provider.reference_state_policy,
+            )
+            self.recorder.record_success(
+                ctx,
+                cold_outlet_state,
+                query_type="PH",
+                inputs=cold_outlet_inputs,
+                provider=self.provider,
+                stage="brent_evaluation",
+                stream_role="cold_solver",
+            )
+        except PropertyServiceError as exc:
+            self.recorder.record_failure(
+                ctx,
+                fluid_name=self.cold_fluid.name,
+                query_type="PH",
+                inputs=cold_outlet_inputs,
+                provider=self.provider,
+                stage="brent_evaluation",
+                stream_role="cold_solver",
+                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
+                error_message=str(exc),
+            )
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=None,
+                hot_bulk_state=None,
+                cold_bulk_state=None,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.PROPERTY_EVALUATION_FAILED,
+                        f"Cold-side outlet property evaluation failed: {exc}",
+                        (("fluid", self.cold_fluid.name), ("stage", "brent_evaluation")),
+                    ),
+                ),
+            )
+
+        # --- 6c. Validate single-phase outlet states ---
+        if hot_outlet_state.phase not in _SINGLE_PHASE:
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=None,
+                cold_bulk_state=None,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.PHASE_NOT_SUPPORTED,
+                        f"Hot-side outlet phase {hot_outlet_state.phase.value} is not single-phase",
+                        (("phase", hot_outlet_state.phase.value), ("fluid", self.hot_fluid.name)),
+                    ),
+                ),
+            )
+        if cold_outlet_state.phase not in _SINGLE_PHASE:
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=None,
+                cold_bulk_state=None,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.PHASE_NOT_SUPPORTED,
+                        f"Cold-side outlet phase {cold_outlet_state.phase.value}"
+                        " is not single-phase",
+                        (("phase", cold_outlet_state.phase.value), ("fluid", self.cold_fluid.name)),
+                    ),
+                ),
+            )
+
+        # --- 6d. Bulk temperatures and PropertyProvider queries ---
+        T_bulk_hot = (self.hot_inlet_temperature_k + hot_outlet_state.temperature_k) / 2.0
+        T_bulk_cold = (self.cold_inlet_temperature_k + cold_outlet_state.temperature_k) / 2.0
+        P_bulk_hot = self.hot_inlet_pressure_pa  # no pressure drop
+        P_bulk_cold = self.cold_inlet_pressure_pa  # no pressure drop
+
+        # Query bulk states via PropertyProvider at T_bulk
+        hot_bulk_state: FluidState | None = None
+        cold_bulk_state: FluidState | None = None
+
+        try:
+            hot_bulk_state = self.provider.state_tp(self.hot_fluid, T_bulk_hot, P_bulk_hot)
+            self.recorder.record_success(
+                ctx,
+                hot_bulk_state,
+                query_type="TP",
+                inputs=(("temperature_k", T_bulk_hot), ("pressure_pa", P_bulk_hot)),
+                provider=self.provider,
+                stage="bulk",
+                stream_role="hot_bulk",
+            )
+        except PropertyServiceError as exc:
+            self.recorder.record_failure(
+                ctx,
+                fluid_name=self.hot_fluid.name,
+                query_type="TP",
+                inputs=(("temperature_k", T_bulk_hot), ("pressure_pa", P_bulk_hot)),
+                provider=self.provider,
+                stage="bulk",
+                stream_role="hot_bulk",
+                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
+                error_message=str(exc),
+            )
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=None,
+                cold_bulk_state=None,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.PROPERTY_EVALUATION_FAILED,
+                        f"Hot-side bulk property evaluation failed: {exc}",
+                        (("fluid", self.hot_fluid.name), ("stage", "bulk")),
+                    ),
+                ),
+            )
+
+        try:
+            cold_bulk_state = self.provider.state_tp(self.cold_fluid, T_bulk_cold, P_bulk_cold)
+            self.recorder.record_success(
+                ctx,
+                cold_bulk_state,
+                query_type="TP",
+                inputs=(("temperature_k", T_bulk_cold), ("pressure_pa", P_bulk_cold)),
+                provider=self.provider,
+                stage="bulk",
+                stream_role="cold_bulk",
+            )
+        except PropertyServiceError as exc:
+            self.recorder.record_failure(
+                ctx,
+                fluid_name=self.cold_fluid.name,
+                query_type="TP",
+                inputs=(("temperature_k", T_bulk_cold), ("pressure_pa", P_bulk_cold)),
+                provider=self.provider,
+                stage="bulk",
+                stream_role="cold_bulk",
+                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
+                error_message=str(exc),
+            )
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=hot_bulk_state,
+                cold_bulk_state=None,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.PROPERTY_EVALUATION_FAILED,
+                        f"Cold-side bulk property evaluation failed: {exc}",
+                        (("fluid", self.cold_fluid.name), ("stage", "bulk")),
+                    ),
+                ),
+            )
+
+        # --- 6e. Validate bulk phases ---
+        if hot_bulk_state.phase not in _SINGLE_PHASE:
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=hot_bulk_state,
+                cold_bulk_state=cold_bulk_state,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.PHASE_NOT_SUPPORTED,
+                        f"Hot-side bulk phase {hot_bulk_state.phase.value} is not single-phase",
+                        (("phase", hot_bulk_state.phase.value), ("fluid", self.hot_fluid.name)),
+                    ),
+                ),
+            )
+        if cold_bulk_state.phase not in _SINGLE_PHASE:
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=hot_bulk_state,
+                cold_bulk_state=cold_bulk_state,
+                tube_flow_input=None,
+                annulus_flow_input=None,
+                tube_result=None,
+                annulus_result=None,
+                property_calls=(),
+                warnings=(),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.PHASE_NOT_SUPPORTED,
+                        f"Cold-side bulk phase {cold_bulk_state.phase.value} is not single-phase",
+                        (("phase", cold_bulk_state.phase.value), ("fluid", self.cold_fluid.name)),
+                    ),
+                ),
+            )
+
+        # --- 6f. Assign tube and annulus flows based on tube_in_hot ---
+        # Hot stream: heating=False (being cooled)
+        # Cold stream: heating=True (being heated)
+        if self.tube_in_hot:
+            tube_flow = FlowPropertiesInput(
+                mass_flow_kg_s=self.hot_mass_flow_kg_s,
+                density_kg_m3=hot_bulk_state.density_kg_m3,
+                dynamic_viscosity_pa_s=hot_bulk_state.viscosity_pa_s,
+                thermal_conductivity_w_m_k=hot_bulk_state.conductivity_w_m_k,
+                specific_heat_j_kg_k=hot_bulk_state.cp_j_kg_k,
+                bulk_temperature_k=T_bulk_hot,
+                heating=False,  # hot stream is being cooled
+            )
+            annulus_flow = FlowPropertiesInput(
+                mass_flow_kg_s=self.cold_mass_flow_kg_s,
+                density_kg_m3=cold_bulk_state.density_kg_m3,
+                dynamic_viscosity_pa_s=cold_bulk_state.viscosity_pa_s,
+                thermal_conductivity_w_m_k=cold_bulk_state.conductivity_w_m_k,
+                specific_heat_j_kg_k=cold_bulk_state.cp_j_kg_k,
+                bulk_temperature_k=T_bulk_cold,
+                heating=True,  # cold stream is being heated
+            )
+        else:
+            tube_flow = FlowPropertiesInput(
+                mass_flow_kg_s=self.cold_mass_flow_kg_s,
+                density_kg_m3=cold_bulk_state.density_kg_m3,
+                dynamic_viscosity_pa_s=cold_bulk_state.viscosity_pa_s,
+                thermal_conductivity_w_m_k=cold_bulk_state.conductivity_w_m_k,
+                specific_heat_j_kg_k=cold_bulk_state.cp_j_kg_k,
+                bulk_temperature_k=T_bulk_cold,
+                heating=True,  # cold stream is being heated
+            )
+            annulus_flow = FlowPropertiesInput(
+                mass_flow_kg_s=self.hot_mass_flow_kg_s,
+                density_kg_m3=hot_bulk_state.density_kg_m3,
+                dynamic_viscosity_pa_s=hot_bulk_state.viscosity_pa_s,
+                thermal_conductivity_w_m_k=hot_bulk_state.conductivity_w_m_k,
+                specific_heat_j_kg_k=hot_bulk_state.cp_j_kg_k,
+                bulk_temperature_k=T_bulk_hot,
+                heating=False,  # hot stream is being cooled
+            )
+
+        # --- 6g. Evaluate tube correlation ---
+        corr_ctx = CorrCalculationContext()
+
+        tube_result = evaluate_hx_correlation(
+            geometry=self.tube_geom,
+            flow=tube_flow,
+            boundary_condition=self.tube_boundary_condition,
+            context=corr_ctx,
+        )
+        # Propagate correlation warnings
+        for w in tube_result.warnings:
+            trial_warnings.append(w)
+
+        if tube_result.status.value == "blocked" or tube_result.heat_transfer_coefficient <= 0:
+            for b in tube_result.blockers:
+                trial_blockers.append(b)
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=hot_bulk_state,
+                cold_bulk_state=cold_bulk_state,
+                tube_flow_input=tube_flow,
+                annulus_flow_input=annulus_flow,
+                tube_result=tube_result,
+                annulus_result=None,
+                property_calls=(),
+                warnings=tuple(trial_warnings),
+                blockers=tuple(trial_blockers),
+            )
+
+        # --- 6h. Evaluate annulus correlation ---
+        annulus_result = evaluate_hx_correlation(
+            geometry=self.annulus_geom,
+            flow=annulus_flow,
+            boundary_condition=self.annulus_boundary_condition,
+            context=corr_ctx,
+        )
+        # Propagate correlation warnings
+        for w in annulus_result.warnings:
+            trial_warnings.append(w)
+
+        if (
+            annulus_result.status.value == "blocked"
+            or annulus_result.heat_transfer_coefficient <= 0
+        ):
+            for b in annulus_result.blockers:
+                trial_blockers.append(b)
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=hot_bulk_state,
+                cold_bulk_state=cold_bulk_state,
+                tube_flow_input=tube_flow,
+                annulus_flow_input=annulus_flow,
+                tube_result=tube_result,
+                annulus_result=annulus_result,
+                property_calls=(),
+                warnings=tuple(trial_warnings),
+                blockers=tuple(trial_blockers),
+            )
+
+        # --- 6i. Extract h values ---
+        h_tube = tube_result.heat_transfer_coefficient
+        h_annulus = annulus_result.heat_transfer_coefficient
+
+        # --- 6j. Build thermal resistance ---
+        R_breakdown = build_thermal_resistance(
+            h_inner=h_tube,
+            h_outer=h_annulus,
+            area_inner_m2=self.area_inner_m2,
+            area_outer_m2=self.area_outer_m2,
+            wall_resistance_kw=self.wall_resistance,
+            fouling_inner_m2k_w=self.geometry.inner_fouling_resistance_m2k_w,
+            fouling_outer_m2k_w=self.geometry.outer_fouling_resistance_m2k_w,
+        )
+        UA = R_breakdown.ua_w_k
+
+        # --- 6k. Compute outlet temperatures ---
+        T_h_out = hot_outlet_state.temperature_k
+        T_c_out = cold_outlet_state.temperature_k
+
+        # --- 6l. Compute LMTD ---
+        if self.flow_arrangement == FlowArrangement.COUNTERFLOW:
+            lmtd = lmtd_counterflow(
+                self.hot_inlet_temperature_k,
+                T_h_out,
+                self.cold_inlet_temperature_k,
+                T_c_out,
+            )
+        else:
+            lmtd = lmtd_parallel(
+                self.hot_inlet_temperature_k,
+                T_h_out,
+                self.cold_inlet_temperature_k,
+                T_c_out,
+            )
+
+        if not math.isfinite(lmtd) or lmtd <= 0:
+            return TrialEvaluation(
+                q_w=Q,
+                residual_w=None,
+                feasible=False,
+                hot_outlet_state=hot_outlet_state,
+                cold_outlet_state=cold_outlet_state,
+                hot_bulk_state=hot_bulk_state,
+                cold_bulk_state=cold_bulk_state,
+                tube_flow_input=tube_flow,
+                annulus_flow_input=annulus_flow,
+                tube_result=tube_result,
+                annulus_result=annulus_result,
+                property_calls=(),
+                warnings=tuple(trial_warnings),
+                blockers=(
+                    _make_blocker(
+                        ErrorCode.TEMPERATURE_CROSSING,
+                        f"LMTD is not finite and > 0: {lmtd}",
+                        (("lmtd_k", lmtd),),
+                    ),
+                ),
+            )
+
+        # --- 6m. Residual ---
+        residual = Q - UA * lmtd
+        return TrialEvaluation(
+            q_w=Q,
+            residual_w=residual,
+            feasible=True,
+            hot_outlet_state=hot_outlet_state,
+            cold_outlet_state=cold_outlet_state,
+            hot_bulk_state=hot_bulk_state,
+            cold_bulk_state=cold_bulk_state,
+            tube_flow_input=tube_flow,
+            annulus_flow_input=annulus_flow,
+            tube_result=tube_result,
+            annulus_result=annulus_result,
+            property_calls=(),
+            warnings=tuple(trial_warnings),
+            blockers=(),
+        )
 
 
 @dataclass(frozen=True)
@@ -527,6 +1108,384 @@ def _build_empty_solver_details() -> SolverDetailsModel:
     )
 
 
+def _build_final_evaluation_blocked_result(
+    *,
+    final_trial: TrialEvaluation,
+    solver_result: SolverResult,
+    blockers: list[EngineeringMessage],
+    warnings: list[EngineeringMessage],
+    recorder: EvaluationRecorder,
+    request_identity: RatingRequestIdentity,
+    provider_identity: ProviderIdentitySnapshot,
+    ctx_snapshot: ExecutionContextSnapshot,
+    flow_arrangement: FlowArrangement,
+    area_inner_m2: float,
+    area_outer_m2: float,
+    hot_inlet_state_snapshot: FluidStateSnapshot,
+    cold_inlet_state_snapshot: FluidStateSnapshot,
+    hot_inlet_temperature_k: float,
+    cold_inlet_temperature_k: float,
+    tube_in_hot: bool,
+    geometry: DoublePipeGeometry,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
+) -> RatingResult:
+    """Build a BLOCKED result when the final evaluation at Q_sol is infeasible.
+
+    Unlike ``_blocked_result`` (which zeros all thermal quantities), this
+    function preserves whatever diagnostics were computed during the
+    partially-completed final trial evaluation — solver results, available
+    state snapshots, correlation data, and provenance — so downstream
+    consumers can inspect what was computed before the blocker was hit.
+    """
+    # Extract whatever partial data is available from the final trial
+    tube_result_final = final_trial.tube_result
+    annulus_result_final = final_trial.annulus_result
+
+    # Build state snapshots from whatever the trial provided
+    hot_outlet_snapshot = (
+        _make_fluid_state_snapshot(final_trial.hot_outlet_state)
+        if final_trial.hot_outlet_state is not None
+        else None
+    )
+    cold_outlet_snapshot = (
+        _make_fluid_state_snapshot(final_trial.cold_outlet_state)
+        if final_trial.cold_outlet_state is not None
+        else None
+    )
+    hot_bulk_snapshot = (
+        _make_fluid_state_snapshot(final_trial.hot_bulk_state)
+        if final_trial.hot_bulk_state is not None
+        else None
+    )
+    cold_bulk_snapshot = (
+        _make_fluid_state_snapshot(final_trial.cold_bulk_state)
+        if final_trial.cold_bulk_state is not None
+        else None
+    )
+
+    # Correlation snapshots (may be None if trial didn't reach correlation step)
+    tube_sc = (
+        _make_selected_correlation_snapshot(tube_result_final)
+        if tube_result_final is not None
+        else None
+    )
+    annulus_sc = (
+        _make_selected_correlation_snapshot(annulus_result_final)
+        if annulus_result_final is not None
+        else None
+    )
+    tube_ap = (
+        _make_applicability_snapshot(tube_result_final) if tube_result_final is not None else None
+    )
+    annulus_ap = (
+        _make_applicability_snapshot(annulus_result_final)
+        if annulus_result_final is not None
+        else None
+    )
+
+    tube_cid = tube_sc.correlation_id if tube_sc else None
+    tube_cver = tube_sc.version if tube_sc else None
+    tube_ast = (tube_result_final.applicability_status or None) if tube_result_final else None
+    annulus_cid = annulus_sc.correlation_id if annulus_sc else None
+    annulus_cver = annulus_sc.version if annulus_sc else None
+    annulus_ast = (
+        (annulus_result_final.applicability_status or None) if annulus_result_final else None
+    )
+
+    # Extract h values if available
+    tube_h_val = (
+        tube_result_final.heat_transfer_coefficient if tube_result_final is not None else None
+    )
+    annulus_h_val = (
+        annulus_result_final.heat_transfer_coefficient if annulus_result_final is not None else None
+    )
+
+    # Build thermal resistance if both h values are available
+    if (
+        tube_h_val is not None
+        and annulus_h_val is not None
+        and tube_h_val > 0
+        and annulus_h_val > 0
+    ):
+        R_breakdown_final = build_thermal_resistance(
+            h_inner=tube_h_val,
+            h_outer=annulus_h_val,
+            area_inner_m2=area_inner_m2,
+            area_outer_m2=area_outer_m2,
+            wall_resistance_kw=compute_wall_resistance(
+                geometry.inner_tube_inner_diameter_m,
+                geometry.inner_tube_outer_diameter_m,
+                geometry.effective_length_m,
+                geometry.wall_thermal_conductivity_w_m_k,
+            ),
+            fouling_inner_m2k_w=geometry.inner_fouling_resistance_m2k_w,
+            fouling_outer_m2k_w=geometry.outer_fouling_resistance_m2k_w,
+        )
+        UA_final = R_breakdown_final.ua_w_k
+        rb_model = _make_resistance_breakdown(R_breakdown_final)
+        U_inner = UA_final / area_inner_m2 if area_inner_m2 > 0 else 0.0
+        U_outer = UA_final / area_outer_m2 if area_outer_m2 > 0 else 0.0
+    else:
+        UA_final = 0.0
+        rb_model = _build_empty_resistance()
+        U_inner = 0.0
+        U_outer = 0.0
+
+    # Outlet temperatures (may be None)
+    T_h_out_sol = (
+        final_trial.hot_outlet_state.temperature_k
+        if final_trial.hot_outlet_state is not None
+        else None
+    )
+    T_c_out_sol = (
+        final_trial.cold_outlet_state.temperature_k
+        if final_trial.cold_outlet_state is not None
+        else None
+    )
+
+    # Capacity rates from inlet states (always available since we passed validation)
+    C_hot = 0.0  # Cannot compute without cp; use 0 for BLOCKED
+    C_cold = 0.0
+    C_min = 0.0
+    C_max = 0.0
+    capacity_ratio = 0.0
+
+    # ε-NTU diagnostics
+    NTU_final = 0.0
+    eps_calc = 0.0
+
+    # LMTD (may be None)
+    lmtd_final = None
+    if T_h_out_sol is not None and T_c_out_sol is not None:
+        if flow_arrangement == FlowArrangement.COUNTERFLOW:
+            lmtd_val = lmtd_counterflow(
+                hot_inlet_temperature_k,
+                T_h_out_sol,
+                cold_inlet_temperature_k,
+                T_c_out_sol,
+            )
+        else:
+            lmtd_val = lmtd_parallel(
+                hot_inlet_temperature_k,
+                T_h_out_sol,
+                cold_inlet_temperature_k,
+                T_c_out_sol,
+            )
+        if math.isfinite(lmtd_val):
+            lmtd_final = lmtd_val
+
+    # Map tube/annulus sides
+    if tube_in_hot:
+        tsi = hot_inlet_state_snapshot
+        tso = hot_outlet_snapshot
+        tbu = hot_bulk_snapshot
+        asi = cold_inlet_state_snapshot
+        aso = cold_outlet_snapshot
+        abu = cold_bulk_snapshot
+    else:
+        tsi = cold_inlet_state_snapshot
+        tso = cold_outlet_snapshot
+        tbu = cold_bulk_snapshot
+        asi = hot_inlet_state_snapshot
+        aso = hot_outlet_snapshot
+        abu = hot_bulk_snapshot
+
+    solver_details = _make_solver_details(solver_result)
+
+    core_graph, core_nodes, core_edges = build_provenance_core(
+        flow_arrangement=flow_arrangement,
+        property_calls=recorder.records,
+        iterations=solver_result.iterations,
+        converged=solver_result.converged,
+        warnings=warnings,
+        blockers=blockers,
+        execution_context=ctx_snapshot,
+        request_identity=request_identity,
+        tube_correlation_info=tube_sc,
+        annulus_correlation_info=annulus_sc,
+        tube_applicability=tube_ap,
+        annulus_applicability=annulus_ap,
+    )
+    core_provenance_digest = _provenance_graph_digest(core_graph)
+
+    result_hash = compute_result_hash(
+        request_identity=request_identity,
+        provider_identity=provider_identity,
+        flow_arrangement=flow_arrangement,
+        heat_duty_w=final_trial.q_w,
+        hot_outlet_temperature_k=T_h_out_sol,
+        cold_outlet_temperature_k=T_c_out_sol,
+        tube_reynolds=(tube_result_final.reynolds_number if tube_result_final else None),
+        tube_prandtl=(tube_result_final.prandtl_number if tube_result_final else None),
+        tube_nusselt=(tube_result_final.nusselt_number if tube_result_final else None),
+        tube_h=tube_h_val,
+        tube_selected_correlation_id=tube_cid,
+        tube_selected_correlation_version=tube_cver,
+        tube_applicability_status=tube_ast,
+        annulus_reynolds=(annulus_result_final.reynolds_number if annulus_result_final else None),
+        annulus_prandtl=(annulus_result_final.prandtl_number if annulus_result_final else None),
+        annulus_nusselt=(annulus_result_final.nusselt_number if annulus_result_final else None),
+        annulus_h=annulus_h_val,
+        annulus_selected_correlation_id=annulus_cid,
+        annulus_selected_correlation_version=annulus_cver,
+        annulus_applicability_status=annulus_ast,
+        area_inner_m2=area_inner_m2,
+        area_outer_m2=area_outer_m2,
+        resistance_breakdown=rb_model,
+        U_inner_basis=U_inner,
+        U_outer_basis=U_outer,
+        UA_w_k=UA_final,
+        C_hot_w_k=C_hot,
+        C_cold_w_k=C_cold,
+        C_min_w_k=C_min,
+        C_max_w_k=C_max,
+        capacity_ratio=capacity_ratio,
+        NTU=NTU_final,
+        effectiveness=eps_calc,
+        LMTD_k=lmtd_final if lmtd_final is not None else 0.0,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=solver_result.iterations,
+        converged=solver_result.converged,
+        solver_termination_reason=solver_result.termination_reason.value,
+        solver_details=solver_details,
+        property_calls=recorder.records,
+        warnings=tuple(warnings),
+        blockers=tuple(blockers),
+        status=RatingStatus.BLOCKED,
+        hot_inlet_state=hot_inlet_state_snapshot,
+        cold_inlet_state=cold_inlet_state_snapshot,
+        hot_outlet_state=hot_outlet_snapshot,
+        cold_outlet_state=cold_outlet_snapshot,
+        tube_side_inlet_state=tsi,
+        tube_side_outlet_state=tso,
+        annulus_side_inlet_state=asi,
+        annulus_side_outlet_state=aso,
+        tube_bulk_state=tbu,
+        annulus_bulk_state=abu,
+        tube_selected_correlation_snap=tube_sc,
+        annulus_selected_correlation_snap=annulus_sc,
+        tube_applicability_snap=tube_ap,
+        annulus_applicability_snap=annulus_ap,
+        core_provenance_digest=core_provenance_digest,
+        Q_hot_w=None,
+        Q_cold_w=None,
+        relative_energy_residual=None,
+        energy_tolerance_w=None,
+        relative_ua_lmtd_residual=None,
+        ua_lmtd_tolerance_w=None,
+        q_max_diagnostics=q_max_diagnostics,
+    )
+
+    provenance_graph = build_provenance(
+        flow_arrangement=flow_arrangement,
+        property_calls=recorder.records,
+        iterations=solver_result.iterations,
+        converged=solver_result.converged,
+        warnings=warnings,
+        blockers=blockers,
+        result_hash=result_hash,
+        execution_context=ctx_snapshot,
+        request_identity=request_identity,
+        tube_correlation_info=tube_sc,
+        annulus_correlation_info=annulus_sc,
+        tube_applicability=tube_ap,
+        annulus_applicability=annulus_ap,
+    )
+    provenance_digest = _provenance_graph_digest(provenance_graph)
+
+    return RatingResult(
+        status=RatingStatus.BLOCKED,
+        flow_arrangement=flow_arrangement,
+        heat_duty_w=final_trial.q_w,
+        hot_outlet_temperature_k=T_h_out_sol,
+        cold_outlet_temperature_k=T_c_out_sol,
+        tube_reynolds=(tube_result_final.reynolds_number if tube_result_final else None),
+        tube_prandtl=(tube_result_final.prandtl_number if tube_result_final else None),
+        tube_nusselt=(tube_result_final.nusselt_number if tube_result_final else None),
+        tube_h=tube_h_val,
+        tube_selected_correlation_id=tube_cid,
+        tube_selected_correlation_version=tube_cver,
+        tube_applicability_status=tube_ast,
+        annulus_reynolds=(annulus_result_final.reynolds_number if annulus_result_final else None),
+        annulus_prandtl=(annulus_result_final.prandtl_number if annulus_result_final else None),
+        annulus_nusselt=(annulus_result_final.nusselt_number if annulus_result_final else None),
+        annulus_h=annulus_h_val,
+        annulus_selected_correlation_id=annulus_cid,
+        annulus_selected_correlation_version=annulus_cver,
+        annulus_applicability_status=annulus_ast,
+        area_inner_m2=area_inner_m2,
+        area_outer_m2=area_outer_m2,
+        resistance_breakdown=rb_model,
+        U_inner_basis=U_inner,
+        U_outer_basis=U_outer,
+        UA_w_k=UA_final,
+        C_hot_w_k=C_hot,
+        C_cold_w_k=C_cold,
+        C_min_w_k=C_min,
+        C_max_w_k=C_max,
+        capacity_ratio=capacity_ratio,
+        NTU=NTU_final,
+        effectiveness=eps_calc,
+        LMTD_k=lmtd_final if lmtd_final is not None else 0.0,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=solver_result.iterations,
+        converged=solver_result.converged,
+        solver_termination_reason=solver_result.termination_reason.value,
+        solver_details=solver_details,
+        warnings=tuple(warnings),
+        blockers=tuple(blockers),
+        property_calls=recorder.records,
+        provider_identity=provider_identity,
+        request_identity=request_identity,
+        execution_context=ctx_snapshot,
+        result_hash=result_hash,
+        provenance_graph=provenance_graph,
+        provenance_digest=provenance_digest,
+        core_provenance_digest=core_provenance_digest,
+        hot_inlet_state=hot_inlet_state_snapshot,
+        cold_inlet_state=cold_inlet_state_snapshot,
+        hot_outlet_state=hot_outlet_snapshot,
+        cold_outlet_state=cold_outlet_snapshot,
+        tube_side_inlet_state=tsi,
+        tube_side_outlet_state=tso,
+        annulus_side_inlet_state=asi,
+        annulus_side_outlet_state=aso,
+        tube_bulk_state=tbu,
+        annulus_bulk_state=abu,
+        tube_selected_correlation=tube_sc,
+        annulus_selected_correlation=annulus_sc,
+        tube_applicability=tube_ap,
+        annulus_applicability=annulus_ap,
+        Q_hot_w=None,
+        Q_cold_w=None,
+        relative_energy_residual=None,
+        energy_tolerance_w=None,
+        relative_ua_lmtd_residual=None,
+        ua_lmtd_tolerance_w=None,
+        q_max_diagnostics=q_max_diagnostics,
+    )
+
+
+def _qmax_diagnostics_snapshot(qmax: QMaxResult) -> QMaxDiagnosticsSnapshot:
+    """Build a QMaxDiagnosticsSnapshot from a QMaxResult."""
+    return QMaxDiagnosticsSnapshot(
+        q_max_w=qmax.q_max_w,
+        iterations=qmax.iterations,
+        final_pinch_residual_k=qmax.final_pinch_residual_k,
+        termination_reason=qmax.termination_reason,
+        final_q_low_w=qmax.final_q_low_w,
+        final_q_high_w=qmax.final_q_high_w,
+        final_q_width_w=qmax.final_q_width_w,
+        hot_limit_w=qmax.hot_limit_w,
+        cold_limit_w=qmax.cold_limit_w,
+        limiting_side=qmax.limiting_side,
+        q_tolerance_w=qmax.q_tolerance_w,
+        pinch_temperature_tolerance_k=qmax.pinch_temperature_tolerance_k,
+    )
+
+
 def _blocked_result(
     *,
     blockers: list[EngineeringMessage],
@@ -536,6 +1495,7 @@ def _blocked_result(
     provider_identity: ProviderIdentitySnapshot | None = None,
     execution_context: ExecutionContextSnapshot | None = None,
     flow_arrangement: FlowArrangement = FlowArrangement.COUNTERFLOW,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
 ) -> RatingResult:
     """Build a BLOCKED RatingResult with full provenance."""
     ctx = execution_context or ExecutionContextSnapshot()
@@ -631,6 +1591,7 @@ def _blocked_result(
         blockers=tuple(blockers),
         status=RatingStatus.BLOCKED,
         core_provenance_digest=core_provenance_digest,
+        q_max_diagnostics=q_max_diagnostics,
     )
 
     # Rebuild provenance with the real result_hash (adding RESULT node)
@@ -670,6 +1631,7 @@ def _blocked_result(
         provenance_graph=provenance_graph,
         provenance_digest=provenance_digest,
         core_provenance_digest=core_provenance_digest,
+        q_max_diagnostics=q_max_diagnostics,
     )
 
 
@@ -1026,6 +1988,8 @@ def _compute_q_max_parallel(
     Q_cold_limit = cold_mass_flow_kg_s * (cold_limit_state.enthalpy_j_kg - h_cold_in)
     q_upper = min(Q_hot_limit, Q_cold_limit)
 
+    _parallel_limiting_side = "hot_limit" if Q_hot_limit <= Q_cold_limit else "cold_limit"
+
     if q_upper <= 0:
         return QMaxResult(
             q_max_w=0.0,
@@ -1035,6 +1999,9 @@ def _compute_q_max_parallel(
             final_q_width_w=None,
             final_pinch_residual_k=0.0,
             termination_reason="zero_upper_bound",
+            hot_limit_w=Q_hot_limit,
+            cold_limit_w=Q_cold_limit,
+            limiting_side=_parallel_limiting_side,
         )
 
     def _exit_pinch_residual(Q: float) -> float:
@@ -1120,6 +2087,9 @@ def _compute_q_max_parallel(
             termination_reason="pinch_satisfied_at_upper",
             q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
             pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
+            hot_limit_w=Q_hot_limit,
+            cold_limit_w=Q_cold_limit,
+            limiting_side=_parallel_limiting_side,
         )
 
     # Bisection to find the Q where pinch = 0
@@ -1155,6 +2125,9 @@ def _compute_q_max_parallel(
             termination_reason="iteration_limit",
             q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
             pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
+            hot_limit_w=Q_hot_limit,
+            cold_limit_w=Q_cold_limit,
+            limiting_side=_parallel_limiting_side,
         )
 
     # Converged: recompute pinch at q_lo to get final residual
@@ -1170,6 +2143,9 @@ def _compute_q_max_parallel(
         termination_reason="bisection_converged",
         q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
         pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
+        hot_limit_w=Q_hot_limit,
+        cold_limit_w=Q_cold_limit,
+        limiting_side=_parallel_limiting_side,
     )
 
 
@@ -1600,6 +2576,8 @@ def rate_double_pipe(
         )
         q_max = q_max_result.q_max_w
 
+        q_max_diag = _qmax_diagnostics_snapshot(q_max_result)
+
         # Handle Q_max non-convergence
         if q_max_result.termination_reason == "iteration_limit":
             blockers.append(
@@ -1621,6 +2599,7 @@ def rate_double_pipe(
                 provider_identity=provider_identity,
                 execution_context=ctx_snapshot,
                 flow_arrangement=flow_arrangement,
+                q_max_diagnostics=q_max_diag,
             )
     except PropertyServiceError as exc:
         blockers.append(
@@ -1654,6 +2633,7 @@ def rate_double_pipe(
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
             flow_arrangement=flow_arrangement,
+            q_max_diagnostics=q_max_diag,
         )
 
     # =====================================================================
@@ -1672,544 +2652,31 @@ def rate_double_pipe(
         heated_surface="inner",
     )
 
-    def _evaluate_trial(
-        Q: float,
-        *,
-        ctx: EvaluationContext,
-    ) -> TrialEvaluation:
-        """Evaluate a single trial Q and return a TrialEvaluation."""
-        trial_warnings: list[EngineeringMessage] = []
-        trial_blockers: list[EngineeringMessage] = []
-
-        if Q < 0:
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=None,
-                cold_outlet_state=None,
-                hot_bulk_state=None,
-                cold_bulk_state=None,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.INPUT_INCONSISTENT,
-                        f"Negative Q trial: {Q}",
-                        (("q_w", Q),),
-                    ),
-                ),
-            )
-
-        # --- 6a. Trial outlet enthalpies ---
-        h_hot_out = h_hot_in - Q / hot_mass_flow_kg_s
-        h_cold_out = h_cold_in + Q / cold_mass_flow_kg_s
-
-        # --- 6b. Back-calculate outlet states via PH query ---
-        hot_outlet_inputs = (
-            ("pressure_pa", hot_inlet_pressure_pa),
-            ("enthalpy_j_kg", h_hot_out),
-        )
-        cold_outlet_inputs = (
-            ("pressure_pa", cold_inlet_pressure_pa),
-            ("enthalpy_j_kg", h_cold_out),
-        )
-
-        hot_outlet_state: FluidState | None = None
-        cold_outlet_state: FluidState | None = None
-
-        try:
-            hot_outlet_state = provider.state_ph(
-                hot_fluid,
-                hot_inlet_pressure_pa,
-                h_hot_out,
-                reference_state=provider.reference_state_policy,
-            )
-            recorder.record_success(
-                ctx,
-                hot_outlet_state,
-                query_type="PH",
-                inputs=hot_outlet_inputs,
-                provider=provider,
-                stage="brent_evaluation",
-                stream_role="hot_solver",
-            )
-        except PropertyServiceError as exc:
-            recorder.record_failure(
-                ctx,
-                fluid_name=hot_fluid.name,
-                query_type="PH",
-                inputs=hot_outlet_inputs,
-                provider=provider,
-                stage="brent_evaluation",
-                stream_role="hot_solver",
-                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
-                error_message=str(exc),
-            )
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=None,
-                cold_outlet_state=None,
-                hot_bulk_state=None,
-                cold_bulk_state=None,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.PROPERTY_EVALUATION_FAILED,
-                        f"Hot-side outlet property evaluation failed: {exc}",
-                        (("fluid", hot_fluid.name), ("stage", "brent_evaluation")),
-                    ),
-                ),
-            )
-
-        try:
-            cold_outlet_state = provider.state_ph(
-                cold_fluid,
-                cold_inlet_pressure_pa,
-                h_cold_out,
-                reference_state=provider.reference_state_policy,
-            )
-            recorder.record_success(
-                ctx,
-                cold_outlet_state,
-                query_type="PH",
-                inputs=cold_outlet_inputs,
-                provider=provider,
-                stage="brent_evaluation",
-                stream_role="cold_solver",
-            )
-        except PropertyServiceError as exc:
-            recorder.record_failure(
-                ctx,
-                fluid_name=cold_fluid.name,
-                query_type="PH",
-                inputs=cold_outlet_inputs,
-                provider=provider,
-                stage="brent_evaluation",
-                stream_role="cold_solver",
-                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
-                error_message=str(exc),
-            )
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=None,
-                hot_bulk_state=None,
-                cold_bulk_state=None,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.PROPERTY_EVALUATION_FAILED,
-                        f"Cold-side outlet property evaluation failed: {exc}",
-                        (("fluid", cold_fluid.name), ("stage", "brent_evaluation")),
-                    ),
-                ),
-            )
-
-        # --- 6c. Validate single-phase outlet states ---
-        if hot_outlet_state.phase not in _SINGLE_PHASE:
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=None,
-                cold_bulk_state=None,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.PHASE_NOT_SUPPORTED,
-                        f"Hot-side outlet phase {hot_outlet_state.phase.value} is not single-phase",
-                        (("phase", hot_outlet_state.phase.value), ("fluid", hot_fluid.name)),
-                    ),
-                ),
-            )
-        if cold_outlet_state.phase not in _SINGLE_PHASE:
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=None,
-                cold_bulk_state=None,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.PHASE_NOT_SUPPORTED,
-                        f"Cold-side outlet phase {cold_outlet_state.phase.value}"
-                        " is not single-phase",
-                        (("phase", cold_outlet_state.phase.value), ("fluid", cold_fluid.name)),
-                    ),
-                ),
-            )
-
-        # --- 6d. Bulk temperatures and PropertyProvider queries ---
-        T_bulk_hot = (hot_inlet_temperature_k + hot_outlet_state.temperature_k) / 2.0
-        T_bulk_cold = (cold_inlet_temperature_k + cold_outlet_state.temperature_k) / 2.0
-        P_bulk_hot = hot_inlet_pressure_pa  # no pressure drop
-        P_bulk_cold = cold_inlet_pressure_pa  # no pressure drop
-
-        # Query bulk states via PropertyProvider at T_bulk
-        hot_bulk_state: FluidState | None = None
-        cold_bulk_state: FluidState | None = None
-
-        try:
-            hot_bulk_state = provider.state_tp(hot_fluid, T_bulk_hot, P_bulk_hot)
-            recorder.record_success(
-                ctx,
-                hot_bulk_state,
-                query_type="TP",
-                inputs=(("temperature_k", T_bulk_hot), ("pressure_pa", P_bulk_hot)),
-                provider=provider,
-                stage="bulk",
-                stream_role="hot_bulk",
-            )
-        except PropertyServiceError as exc:
-            recorder.record_failure(
-                ctx,
-                fluid_name=hot_fluid.name,
-                query_type="TP",
-                inputs=(("temperature_k", T_bulk_hot), ("pressure_pa", P_bulk_hot)),
-                provider=provider,
-                stage="bulk",
-                stream_role="hot_bulk",
-                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
-                error_message=str(exc),
-            )
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=None,
-                cold_bulk_state=None,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.PROPERTY_EVALUATION_FAILED,
-                        f"Hot-side bulk property evaluation failed: {exc}",
-                        (("fluid", hot_fluid.name), ("stage", "bulk")),
-                    ),
-                ),
-            )
-
-        try:
-            cold_bulk_state = provider.state_tp(cold_fluid, T_bulk_cold, P_bulk_cold)
-            recorder.record_success(
-                ctx,
-                cold_bulk_state,
-                query_type="TP",
-                inputs=(("temperature_k", T_bulk_cold), ("pressure_pa", P_bulk_cold)),
-                provider=provider,
-                stage="bulk",
-                stream_role="cold_bulk",
-            )
-        except PropertyServiceError as exc:
-            recorder.record_failure(
-                ctx,
-                fluid_name=cold_fluid.name,
-                query_type="TP",
-                inputs=(("temperature_k", T_bulk_cold), ("pressure_pa", P_bulk_cold)),
-                provider=provider,
-                stage="bulk",
-                stream_role="cold_bulk",
-                error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
-                error_message=str(exc),
-            )
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=hot_bulk_state,
-                cold_bulk_state=None,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.PROPERTY_EVALUATION_FAILED,
-                        f"Cold-side bulk property evaluation failed: {exc}",
-                        (("fluid", cold_fluid.name), ("stage", "bulk")),
-                    ),
-                ),
-            )
-
-        # --- 6e. Validate bulk phases ---
-        if hot_bulk_state.phase not in _SINGLE_PHASE:
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=hot_bulk_state,
-                cold_bulk_state=cold_bulk_state,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.PHASE_NOT_SUPPORTED,
-                        f"Hot-side bulk phase {hot_bulk_state.phase.value} is not single-phase",
-                        (("phase", hot_bulk_state.phase.value), ("fluid", hot_fluid.name)),
-                    ),
-                ),
-            )
-        if cold_bulk_state.phase not in _SINGLE_PHASE:
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=hot_bulk_state,
-                cold_bulk_state=cold_bulk_state,
-                tube_flow_input=None,
-                annulus_flow_input=None,
-                tube_result=None,
-                annulus_result=None,
-                property_calls=(),
-                warnings=(),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.PHASE_NOT_SUPPORTED,
-                        f"Cold-side bulk phase {cold_bulk_state.phase.value} is not single-phase",
-                        (("phase", cold_bulk_state.phase.value), ("fluid", cold_fluid.name)),
-                    ),
-                ),
-            )
-
-        # --- 6f. Assign tube and annulus flows based on tube_in_hot ---
-        # Hot stream: heating=False (being cooled)
-        # Cold stream: heating=True (being heated)
-        if tube_in_hot:
-            tube_flow = FlowPropertiesInput(
-                mass_flow_kg_s=hot_mass_flow_kg_s,
-                density_kg_m3=hot_bulk_state.density_kg_m3,
-                dynamic_viscosity_pa_s=hot_bulk_state.viscosity_pa_s,
-                thermal_conductivity_w_m_k=hot_bulk_state.conductivity_w_m_k,
-                specific_heat_j_kg_k=hot_bulk_state.cp_j_kg_k,
-                bulk_temperature_k=T_bulk_hot,
-                heating=False,  # hot stream is being cooled
-            )
-            annulus_flow = FlowPropertiesInput(
-                mass_flow_kg_s=cold_mass_flow_kg_s,
-                density_kg_m3=cold_bulk_state.density_kg_m3,
-                dynamic_viscosity_pa_s=cold_bulk_state.viscosity_pa_s,
-                thermal_conductivity_w_m_k=cold_bulk_state.conductivity_w_m_k,
-                specific_heat_j_kg_k=cold_bulk_state.cp_j_kg_k,
-                bulk_temperature_k=T_bulk_cold,
-                heating=True,  # cold stream is being heated
-            )
-        else:
-            tube_flow = FlowPropertiesInput(
-                mass_flow_kg_s=cold_mass_flow_kg_s,
-                density_kg_m3=cold_bulk_state.density_kg_m3,
-                dynamic_viscosity_pa_s=cold_bulk_state.viscosity_pa_s,
-                thermal_conductivity_w_m_k=cold_bulk_state.conductivity_w_m_k,
-                specific_heat_j_kg_k=cold_bulk_state.cp_j_kg_k,
-                bulk_temperature_k=T_bulk_cold,
-                heating=True,  # cold stream is being heated
-            )
-            annulus_flow = FlowPropertiesInput(
-                mass_flow_kg_s=hot_mass_flow_kg_s,
-                density_kg_m3=hot_bulk_state.density_kg_m3,
-                dynamic_viscosity_pa_s=hot_bulk_state.viscosity_pa_s,
-                thermal_conductivity_w_m_k=hot_bulk_state.conductivity_w_m_k,
-                specific_heat_j_kg_k=hot_bulk_state.cp_j_kg_k,
-                bulk_temperature_k=T_bulk_hot,
-                heating=False,  # hot stream is being cooled
-            )
-
-        # --- 6g. Evaluate tube correlation ---
-        corr_ctx = CorrCalculationContext()
-
-        tube_result = evaluate_hx_correlation(
-            geometry=tube_geom,
-            flow=tube_flow,
-            boundary_condition=tube_boundary_condition,
-            context=corr_ctx,
-        )
-        # Propagate correlation warnings
-        for w in tube_result.warnings:
-            trial_warnings.append(w)
-
-        if tube_result.status.value == "blocked" or tube_result.heat_transfer_coefficient <= 0:
-            for b in tube_result.blockers:
-                trial_blockers.append(b)
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=hot_bulk_state,
-                cold_bulk_state=cold_bulk_state,
-                tube_flow_input=tube_flow,
-                annulus_flow_input=annulus_flow,
-                tube_result=tube_result,
-                annulus_result=None,
-                property_calls=(),
-                warnings=tuple(trial_warnings),
-                blockers=tuple(trial_blockers),
-            )
-
-        # --- 6h. Evaluate annulus correlation ---
-        annulus_result = evaluate_hx_correlation(
-            geometry=annulus_geom,
-            flow=annulus_flow,
-            boundary_condition=annulus_boundary_condition,
-            context=corr_ctx,
-        )
-        # Propagate correlation warnings
-        for w in annulus_result.warnings:
-            trial_warnings.append(w)
-
-        if (
-            annulus_result.status.value == "blocked"
-            or annulus_result.heat_transfer_coefficient <= 0
-        ):
-            for b in annulus_result.blockers:
-                trial_blockers.append(b)
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=hot_bulk_state,
-                cold_bulk_state=cold_bulk_state,
-                tube_flow_input=tube_flow,
-                annulus_flow_input=annulus_flow,
-                tube_result=tube_result,
-                annulus_result=annulus_result,
-                property_calls=(),
-                warnings=tuple(trial_warnings),
-                blockers=tuple(trial_blockers),
-            )
-
-        # --- 6i. Extract h values ---
-        h_tube = tube_result.heat_transfer_coefficient
-        h_annulus = annulus_result.heat_transfer_coefficient
-
-        # --- 6j. Build thermal resistance ---
-        R_breakdown = build_thermal_resistance(
-            h_inner=h_tube,
-            h_outer=h_annulus,
-            area_inner_m2=area_inner_m2,
-            area_outer_m2=area_outer_m2,
-            wall_resistance_kw=wall_resistance,
-            fouling_inner_m2k_w=geometry.inner_fouling_resistance_m2k_w,
-            fouling_outer_m2k_w=geometry.outer_fouling_resistance_m2k_w,
-        )
-        UA = R_breakdown.ua_w_k
-
-        # --- 6k. Compute outlet temperatures ---
-        T_h_out = hot_outlet_state.temperature_k
-        T_c_out = cold_outlet_state.temperature_k
-
-        # --- 6l. Compute LMTD ---
-        if flow_arrangement == FlowArrangement.COUNTERFLOW:
-            lmtd = lmtd_counterflow(
-                hot_inlet_temperature_k,
-                T_h_out,
-                cold_inlet_temperature_k,
-                T_c_out,
-            )
-        else:
-            lmtd = lmtd_parallel(
-                hot_inlet_temperature_k,
-                T_h_out,
-                cold_inlet_temperature_k,
-                T_c_out,
-            )
-
-        if not math.isfinite(lmtd) or lmtd <= 0:
-            return TrialEvaluation(
-                q_w=Q,
-                residual_w=None,
-                feasible=False,
-                hot_outlet_state=hot_outlet_state,
-                cold_outlet_state=cold_outlet_state,
-                hot_bulk_state=hot_bulk_state,
-                cold_bulk_state=cold_bulk_state,
-                tube_flow_input=tube_flow,
-                annulus_flow_input=annulus_flow,
-                tube_result=tube_result,
-                annulus_result=annulus_result,
-                property_calls=(),
-                warnings=tuple(trial_warnings),
-                blockers=(
-                    _make_blocker(
-                        ErrorCode.TEMPERATURE_CROSSING,
-                        f"LMTD is not finite and > 0: {lmtd}",
-                        (("lmtd_k", lmtd),),
-                    ),
-                ),
-            )
-
-        # --- 6m. Residual ---
-        residual = Q - UA * lmtd
-        return TrialEvaluation(
-            q_w=Q,
-            residual_w=residual,
-            feasible=True,
-            hot_outlet_state=hot_outlet_state,
-            cold_outlet_state=cold_outlet_state,
-            hot_bulk_state=hot_bulk_state,
-            cold_bulk_state=cold_bulk_state,
-            tube_flow_input=tube_flow,
-            annulus_flow_input=annulus_flow,
-            tube_result=tube_result,
-            annulus_result=annulus_result,
-            property_calls=(),
-            warnings=tuple(trial_warnings),
-            blockers=(),
-        )
+    # Build the trial evaluator (extracted class replacing the nested closure)
+    trial_evaluator = TrialEvaluator(
+        provider=provider,
+        recorder=recorder,
+        hot_fluid=hot_fluid,
+        cold_fluid=cold_fluid,
+        hot_mass_flow_kg_s=hot_mass_flow_kg_s,
+        cold_mass_flow_kg_s=cold_mass_flow_kg_s,
+        hot_inlet_pressure_pa=hot_inlet_pressure_pa,
+        cold_inlet_pressure_pa=cold_inlet_pressure_pa,
+        hot_inlet_temperature_k=hot_inlet_temperature_k,
+        cold_inlet_temperature_k=cold_inlet_temperature_k,
+        h_hot_in=h_hot_in,
+        h_cold_in=h_cold_in,
+        tube_in_hot=tube_in_hot,
+        flow_arrangement=flow_arrangement,
+        tube_geom=tube_geom,
+        annulus_geom=annulus_geom,
+        tube_boundary_condition=tube_boundary_condition,
+        annulus_boundary_condition=annulus_boundary_condition,
+        area_inner_m2=area_inner_m2,
+        area_outer_m2=area_outer_m2,
+        wall_resistance=wall_resistance,
+        geometry=geometry,
+    )
 
     def residual_fn(Q: float, phase: SolverEvaluationPhase) -> float:
         """Evaluate residual Q - UA(Q) x LMTD(Q).
@@ -2217,7 +2684,7 @@ def rate_double_pipe(
         The evaluation role is determined by the solver's phase parameter.
         """
         ctx = recorder.begin(phase, trial_q_w=Q)
-        trial = _evaluate_trial(
+        trial = trial_evaluator.evaluate(
             Q,
             ctx=ctx,
         )
@@ -2291,7 +2758,7 @@ def rate_double_pipe(
 
     # Re-evaluate at the solution Q for final diagnostics
     final_ctx = recorder.begin(EvaluationRole.FINAL_EVALUATION, trial_q_w=Q_sol)
-    final_trial = _evaluate_trial(
+    final_trial = trial_evaluator.evaluate(
         Q_sol,
         ctx=final_ctx,
     )
@@ -2314,14 +2781,25 @@ def rate_double_pipe(
     ):
         for b in final_trial.blockers:
             blockers.append(b)
-        return _blocked_result(
+        return _build_final_evaluation_blocked_result(
+            final_trial=final_trial,
+            solver_result=solver_result,
             blockers=blockers,
             warnings=warnings,
-            property_calls=recorder.records,
+            recorder=recorder,
             request_identity=request_identity,
             provider_identity=provider_identity,
-            execution_context=ctx_snapshot,
+            ctx_snapshot=ctx_snapshot,
             flow_arrangement=flow_arrangement,
+            area_inner_m2=area_inner_m2,
+            area_outer_m2=area_outer_m2,
+            hot_inlet_state_snapshot=hot_inlet_state_snapshot,
+            cold_inlet_state_snapshot=cold_inlet_state_snapshot,
+            hot_inlet_temperature_k=hot_inlet_temperature_k,
+            cold_inlet_temperature_k=cold_inlet_temperature_k,
+            tube_in_hot=tube_in_hot,
+            geometry=geometry,
+            q_max_diagnostics=q_max_diag,
         )
 
     # Extract final states
@@ -2679,6 +3157,7 @@ def rate_double_pipe(
             energy_tolerance_w=energy_tolerance_w,
             relative_ua_lmtd_residual=relative_ua_lmtd_residual,
             ua_lmtd_tolerance_w=ua_lmtd_tolerance_w_val,
+            q_max_diagnostics=q_max_diag,
         )
 
         provenance_graph = build_provenance(
@@ -2768,6 +3247,7 @@ def rate_double_pipe(
             energy_tolerance_w=energy_tolerance_w,
             relative_ua_lmtd_residual=relative_ua_lmtd_residual,
             ua_lmtd_tolerance_w=ua_lmtd_tolerance_w_val,
+            q_max_diagnostics=q_max_diag,
         )
 
     # --- Check if any blockers were found during final consistency ---
@@ -2908,6 +3388,7 @@ def rate_double_pipe(
         energy_tolerance_w=energy_tolerance_w,
         relative_ua_lmtd_residual=relative_ua_lmtd_residual,
         ua_lmtd_tolerance_w=ua_lmtd_tolerance_w_val,
+        q_max_diagnostics=q_max_diag,
     )
 
     # Step 4: Add RESULT node via build_provenance
@@ -3006,6 +3487,7 @@ def rate_double_pipe(
         energy_tolerance_w=energy_tolerance_w,
         relative_ua_lmtd_residual=relative_ua_lmtd_residual,
         ua_lmtd_tolerance_w=ua_lmtd_tolerance_w_val,
+        q_max_diagnostics=q_max_diag,
     )
 
     return result
