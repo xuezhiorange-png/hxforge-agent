@@ -155,6 +155,202 @@ class QMaxDiagnosticsSnapshot:
     q_tolerance_w: float | None = None
     pinch_temperature_tolerance_k: float | None = None
 
+    # -- Valid termination reasons ------------------------------------------
+    _VALID_REASONS: frozenset[str] = frozenset(
+        {
+            "bisection_converged",
+            "pinch_satisfied_at_upper",
+            "independent_limits",
+            "iteration_limit",
+            "zero_upper_bound",
+        }
+    )
+
+    def __post_init__(self) -> None:
+        """Validate termination_reason semantics and bracket invariants."""
+        reason = self.termination_reason
+
+        if reason not in self._VALID_REASONS:
+            raise ValueError(
+                f"Unknown termination_reason: {reason!r}. "
+                f"Expected one of {sorted(self._VALID_REASONS)}"
+            )
+
+        if reason == "bisection_converged":
+            self._validate_bisection_converged()
+        elif reason == "pinch_satisfied_at_upper":
+            self._validate_pinch_satisfied_at_upper()
+        elif reason == "independent_limits":
+            self._validate_independent_limits()
+        elif reason == "iteration_limit":
+            self._validate_iteration_limit()
+        elif reason == "zero_upper_bound":
+            self._validate_zero_upper_bound()
+
+    def _validate_bisection_converged(self) -> None:
+        """bisection_converged: iterations>0, bracket present & finite,
+        width<=tolerance, pinch within tolerance."""
+        if self.iterations <= 0:
+            raise ValueError(f"bisection_converged requires iterations > 0, got {self.iterations}")
+
+        # All bracket fields present and finite
+        for fld in ("final_q_low_w", "final_q_high_w", "final_q_width_w"):
+            val = getattr(self, fld)
+            if val is None:
+                raise ValueError(f"bisection_converged requires {fld} to be present")
+            if not math.isfinite(val):
+                raise ValueError(f"bisection_converged requires {fld} to be finite, got {val!r}")
+
+        # Narrow types for mypy (above checks guarantee non-None)
+        assert self.final_q_low_w is not None
+        assert self.final_q_high_w is not None
+        assert self.final_q_width_w is not None
+
+        # Tolerances present and > 0
+        if self.q_tolerance_w is None or self.q_tolerance_w <= 0:
+            raise ValueError(
+                f"bisection_converged requires q_tolerance_w > 0, got {self.q_tolerance_w!r}"
+            )
+        if self.pinch_temperature_tolerance_k is None or self.pinch_temperature_tolerance_k <= 0:
+            raise ValueError(
+                "bisection_converged requires "
+                "pinch_temperature_tolerance_k > 0, "
+                f"got {self.pinch_temperature_tolerance_k!r}"
+            )
+
+        # q_max_w == final_q_low_w
+        if self.q_max_w != self.final_q_low_w:
+            raise ValueError(
+                f"bisection_converged requires q_max_w == final_q_low_w, "
+                f"got {self.q_max_w!r} != {self.final_q_low_w!r}"
+            )
+
+        # Ordered bracket
+        if self.final_q_high_w < self.final_q_low_w:
+            raise ValueError(
+                "bisection_converged requires "
+                f"final_q_high_w ({self.final_q_high_w!r}) >= "
+                f"final_q_low_w ({self.final_q_low_w!r})"
+            )
+
+        # Width ≈ high - low
+        expected_width = self.final_q_high_w - self.final_q_low_w
+        if not math.isclose(self.final_q_width_w, expected_width, rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError(
+                f"bisection_converged final_q_width_w "
+                f"({self.final_q_width_w!r}) != "
+                f"high - low ({expected_width!r})"
+            )
+
+        # Width within tolerance
+        if self.final_q_width_w > self.q_tolerance_w:
+            raise ValueError(
+                f"bisection_converged final_q_width_w "
+                f"({self.final_q_width_w!r}) > q_tolerance_w "
+                f"({self.q_tolerance_w!r})"
+            )
+
+        # Pinch within tolerance
+        if abs(self.final_pinch_residual_k) > self.pinch_temperature_tolerance_k:
+            raise ValueError(
+                f"bisection_converged |final_pinch_residual_k| "
+                f"({abs(self.final_pinch_residual_k)!r}) > "
+                "pinch_temperature_tolerance_k "
+                f"({self.pinch_temperature_tolerance_k!r})"
+            )
+
+    def _validate_pinch_satisfied_at_upper(self) -> None:
+        """pinch_satisfied_at_upper: iterations==0, Q=low=high, width=0."""
+        if self.iterations != 0:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires iterations == 0, got {self.iterations}"
+            )
+        if self.final_q_low_w is None or self.final_q_high_w is None:
+            raise ValueError("pinch_satisfied_at_upper requires bracket fields to be present")
+        if self.q_max_w != self.final_q_low_w:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires q_max_w == "
+                f"final_q_low_w, got {self.q_max_w!r} != "
+                f"{self.final_q_low_w!r}"
+            )
+        if self.q_max_w != self.final_q_high_w:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires q_max_w == "
+                f"final_q_high_w, got {self.q_max_w!r} != "
+                f"{self.final_q_high_w!r}"
+            )
+        if self.final_q_width_w != 0.0:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires "
+                f"final_q_width_w == 0.0, got {self.final_q_width_w!r}"
+            )
+
+    def _validate_independent_limits(self) -> None:
+        """independent_limits: iterations==0, no bracket, tolerances absent,
+        q_max_w == min(hot_limit_w, cold_limit_w)."""
+        if self.iterations != 0:
+            raise ValueError(f"independent_limits requires iterations == 0, got {self.iterations}")
+        if (
+            self.final_q_low_w is not None
+            or self.final_q_high_w is not None
+            or self.final_q_width_w is not None
+        ):
+            raise ValueError(
+                "independent_limits requires bracket fields "
+                "(final_q_low_w, final_q_high_w, final_q_width_w) "
+                "to be None"
+            )
+        if self.q_tolerance_w is not None or self.pinch_temperature_tolerance_k is not None:
+            raise ValueError(
+                "independent_limits requires tolerances "
+                "(q_tolerance_w, pinch_temperature_tolerance_k) to be None"
+            )
+        if self.hot_limit_w is None or self.cold_limit_w is None:
+            raise ValueError(
+                "independent_limits requires hot_limit_w and cold_limit_w to be present"
+            )
+        expected = min(self.hot_limit_w, self.cold_limit_w)
+        if self.q_max_w != expected:
+            raise ValueError(
+                f"independent_limits requires q_max_w == "
+                f"min(hot_limit_w, cold_limit_w) == {expected!r}, "
+                f"got {self.q_max_w!r}"
+            )
+
+    def _validate_iteration_limit(self) -> None:
+        """iteration_limit: iterations>0, bracket present & finite,
+        tolerances present and > 0."""
+        if self.iterations <= 0:
+            raise ValueError(f"iteration_limit requires iterations > 0, got {self.iterations}")
+        for fld in ("final_q_low_w", "final_q_high_w", "final_q_width_w"):
+            val = getattr(self, fld)
+            if val is None:
+                raise ValueError(f"iteration_limit requires {fld} to be present")
+            if not math.isfinite(val):
+                raise ValueError(f"iteration_limit requires {fld} to be finite, got {val!r}")
+        if self.q_tolerance_w is None or self.q_tolerance_w <= 0:
+            raise ValueError(
+                f"iteration_limit requires q_tolerance_w > 0, got {self.q_tolerance_w!r}"
+            )
+        if self.pinch_temperature_tolerance_k is None or self.pinch_temperature_tolerance_k <= 0:
+            raise ValueError(
+                "iteration_limit requires "
+                "pinch_temperature_tolerance_k > 0, "
+                f"got {self.pinch_temperature_tolerance_k!r}"
+            )
+
+    def _validate_zero_upper_bound(self) -> None:
+        """zero_upper_bound: iterations==0, q_max_w==0, tolerances absent."""
+        if self.iterations != 0:
+            raise ValueError(f"zero_upper_bound requires iterations == 0, got {self.iterations}")
+        if self.q_max_w != 0.0:
+            raise ValueError(f"zero_upper_bound requires q_max_w == 0, got {self.q_max_w!r}")
+        if self.q_tolerance_w is not None or self.pinch_temperature_tolerance_k is not None:
+            raise ValueError(
+                "zero_upper_bound requires tolerances "
+                "(q_tolerance_w, pinch_temperature_tolerance_k) to be None"
+            )
+
 
 # ---------------------------------------------------------------------------
 # Local helper models
@@ -486,6 +682,147 @@ class RatingResult(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _validate_resistance_breakdown(self) -> RatingResult:
+        """Cross-field validation of resistance_breakdown vs UA / U fields.
+
+        Rules:
+        * SUCCEEDED ⇒ resistance_breakdown must exist, UA / U must be
+          finite and positive.
+        * If resistance_breakdown is None ⇒ UA_w_k, U_inner_basis,
+          U_outer_basis must all be None.
+        * If resistance_breakdown exists ⇒ all resistance components
+          finite non-negative, total_resistance > 0, ua_w_k > 0,
+          total_resistance ≈ sum of five components,
+          ua_w_k ≈ 1 / total_resistance, UA_w_k ≈ ua_w_k.
+        * When areas are positive ⇒ U_inner_basis ≈ UA_w_k / area_inner_m2
+          and U_outer_basis ≈ UA_w_k / area_outer_m2.
+        """
+        rb = self.resistance_breakdown
+
+        # -- Null-breakdown consistency ------------------------------------
+        if rb is None:
+            if self.UA_w_k is not None:
+                raise ValueError("resistance_breakdown is None but UA_w_k is set")
+            if self.U_inner_basis is not None:
+                raise ValueError("resistance_breakdown is None but U_inner_basis is set")
+            if self.U_outer_basis is not None:
+                raise ValueError("resistance_breakdown is None but U_outer_basis is set")
+            return self
+
+        # -- Breakdown exists: SUCCEEDED must have UA / U ------------------
+        if self.status != RatingStatus.SUCCEEDED:
+            return self
+
+        if self.UA_w_k is None or not math.isfinite(self.UA_w_k) or self.UA_w_k <= 0:
+            raise ValueError(
+                f"SUCCEEDED result requires finite positive UA_w_k, got {self.UA_w_k!r}"
+            )
+        if (
+            self.U_inner_basis is None
+            or not math.isfinite(self.U_inner_basis)
+            or self.U_inner_basis <= 0
+        ):
+            raise ValueError(
+                f"SUCCEEDED result requires finite positive "
+                f"U_inner_basis, got {self.U_inner_basis!r}"
+            )
+        if (
+            self.U_outer_basis is None
+            or not math.isfinite(self.U_outer_basis)
+            or self.U_outer_basis <= 0
+        ):
+            raise ValueError(
+                f"SUCCEEDED result requires finite positive "
+                f"U_outer_basis, got {self.U_outer_basis!r}"
+            )
+
+        # -- Resistance components: finite non-negative --------------------
+        for comp in (
+            "r_conv_inner",
+            "r_foul_inner",
+            "r_wall",
+            "r_foul_outer",
+            "r_conv_outer",
+        ):
+            val = getattr(rb, comp)
+            if not math.isfinite(val) or val < 0:
+                raise ValueError(
+                    f"resistance_breakdown.{comp} must be finite non-negative, got {val!r}"
+                )
+
+        # -- total_resistance > 0, ua_w_k > 0 ----------------------------
+        if not math.isfinite(rb.total_resistance) or rb.total_resistance <= 0:
+            raise ValueError(
+                f"resistance_breakdown.total_resistance must be finite "
+                f"positive, got {rb.total_resistance!r}"
+            )
+        if not math.isfinite(rb.ua_w_k) or rb.ua_w_k <= 0:
+            raise ValueError(
+                f"resistance_breakdown.ua_w_k must be finite positive, got {rb.ua_w_k!r}"
+            )
+
+        # -- total_resistance ≈ sum of five components --------------------
+        components_sum = (
+            rb.r_conv_inner + rb.r_foul_inner + rb.r_wall + rb.r_foul_outer + rb.r_conv_outer
+        )
+        if not math.isclose(
+            rb.total_resistance,
+            components_sum,
+            rel_tol=1e-9,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(
+                f"resistance_breakdown.total_resistance "
+                f"({rb.total_resistance!r}) != "
+                f"sum of components ({components_sum!r})"
+            )
+
+        # -- ua_w_k ≈ 1 / total_resistance --------------------------------
+        expected_ua = 1.0 / rb.total_resistance
+        if not math.isclose(rb.ua_w_k, expected_ua, rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError(
+                f"resistance_breakdown.ua_w_k ({rb.ua_w_k!r}) != "
+                f"1 / total_resistance ({expected_ua!r})"
+            )
+
+        # -- UA_w_k ≈ ua_w_k ----------------------------------------------
+        if self.UA_w_k is not None and not math.isclose(
+            self.UA_w_k, rb.ua_w_k, rel_tol=1e-9, abs_tol=1e-12
+        ):
+            raise ValueError(
+                f"UA_w_k ({self.UA_w_k!r}) != resistance_breakdown.ua_w_k ({rb.ua_w_k!r})"
+            )
+
+        # -- U ≈ UA / area when areas positive ----------------------------
+        if self.UA_w_k is not None:
+            if self.area_inner_m2 > 0:
+                expected_u_inner = self.UA_w_k / self.area_inner_m2
+                if self.U_inner_basis is not None and not math.isclose(
+                    self.U_inner_basis,
+                    expected_u_inner,
+                    rel_tol=1e-9,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        f"U_inner_basis ({self.U_inner_basis!r}) != "
+                        f"UA_w_k / area_inner_m2 ({expected_u_inner!r})"
+                    )
+            if self.area_outer_m2 > 0:
+                expected_u_outer = self.UA_w_k / self.area_outer_m2
+                if self.U_outer_basis is not None and not math.isclose(
+                    self.U_outer_basis,
+                    expected_u_outer,
+                    rel_tol=1e-9,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        f"U_outer_basis ({self.U_outer_basis!r}) != "
+                        f"UA_w_k / area_outer_m2 ({expected_u_outer!r})"
+                    )
+
+        return self
+
     # ------------------------------------------------------------------
     # Post-init
     # ------------------------------------------------------------------
@@ -703,6 +1040,7 @@ class RatingResult(BaseModel):
                 status=self.status,
                 converged=self.converged,
                 solver_termination_reason=self.solver_termination_reason,
+                q_max_diagnostics=self.q_max_diagnostics,
             ):
                 return False
 
@@ -1656,6 +1994,7 @@ def _verify_property_call_identity(
     status: RatingStatus | None = None,
     converged: bool | None = None,
     solver_termination_reason: str | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
 ) -> bool:
     """Verify the evaluation identity invariants of property calls.
 
@@ -1677,7 +2016,9 @@ def _verify_property_call_identity(
                     return False
                 if solver_termination_reason is not None and solver_termination_reason != "blocked":
                     return False
-            return True
+            # When status is None, reject if q_max_diagnostics is present
+            # (Q_max computed but no property calls to verify)
+            return q_max_diagnostics is None
 
         # a) Role validity - each evaluation_role must be one of the 7 EvaluationRole values
         valid_roles = {r.value for r in EvaluationRole}
@@ -1784,64 +2125,6 @@ def _verify_property_call_identity(
 
         all_roles = {pc.evaluation_role for pc in property_calls}
 
-        # c) Parallel limits without pinch
-        if (
-            EvaluationRole.Q_MAX_PARALLEL_LIMITS.value in all_roles
-            and EvaluationRole.Q_MAX_PARALLEL_PINCH.value not in all_roles
-        ):
-            # Limits present but no pinch: only valid if limits call failed
-            # and limits is the last evaluation (no bracket/solver/final follows)
-            limits_evals = [
-                ei
-                for ei, calls in by_eval.items()
-                if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
-            ]
-            if not limits_evals:
-                return False
-            limits_last_eval = max(limits_evals)
-            limits_calls_list = by_eval[limits_last_eval]
-            # At least one limits call must have failed
-            has_failure = any(not c.success for c in limits_calls_list)
-            if not has_failure:
-                return False
-            # Limits must be last evaluation — no bracket/solver/final after
-            if limits_last_eval != max(eval_indices):
-                return False
-            # Enforce exact limits calls: call 0 = hot_limit/TP, call 1 = cold_limit/TP
-            # (only for completed limits evaluations with 2 calls)
-            for le in limits_evals:
-                le_calls = sorted(by_eval[le], key=lambda c: c.call_index_within_evaluation)
-                if len(le_calls) == 2:
-                    if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
-                        return False
-                    if le_calls[1].stream_role != "cold_limit" or le_calls[1].query_type != "TP":
-                        return False
-                elif len(le_calls) == 1:
-                    # Single limits call (first call failed): must be call 0 = hot_limit/TP
-                    if le_calls[0].call_index_within_evaluation != 0:
-                        return False
-                    if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
-                        return False
-                else:
-                    return False
-
-        # For PARALLEL, if limits both succeed without pinch → reject
-        if (
-            EvaluationRole.Q_MAX_PARALLEL_LIMITS.value in all_roles
-            and EvaluationRole.Q_MAX_PARALLEL_PINCH.value not in all_roles
-        ):
-            limits_evals_all = [
-                ei
-                for ei, calls in by_eval.items()
-                if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
-            ]
-            for le in limits_evals_all:
-                le_calls = by_eval[le]
-                all_success = all(c.success for c in le_calls)
-                if all_success and len(le_calls) == 2:
-                    # Both limits succeeded but no pinch → invalid
-                    return False
-
         # f) Q_max role vs flow arrangement
         if flow_arrangement == FlowArrangement.COUNTERFLOW:
             if EvaluationRole.Q_MAX_PARALLEL_LIMITS.value in all_roles:
@@ -1854,7 +2137,7 @@ def _verify_property_call_identity(
         ):
             return False
 
-        # For PARALLEL, enforce role order: inlet → limits → pinch → bracket → solver → final
+        # ---- PARALLEL flow arrangement: strict state machine checks ----
         if flow_arrangement == FlowArrangement.PARALLEL:
             _role_order = [
                 EvaluationRole.INLET.value,
@@ -1864,16 +2147,139 @@ def _verify_property_call_identity(
                 EvaluationRole.SOLVER_ITERATION.value,
                 EvaluationRole.FINAL_EVALUATION.value,
             ]
-            _seen_order: list[str] = []
-            for ei_s in range(len(eval_indices)):
-                calls_s = by_eval[ei_s]
-                role_s = calls_s[0].evaluation_role
-                if role_s not in _seen_order:
-                    _seen_order.append(role_s)
-            # Each role must appear in non-decreasing order
-            for i in range(len(_seen_order) - 1):
-                if _role_order.index(_seen_order[i]) > _role_order.index(_seen_order[i + 1]):
+
+            # Strict ordering: every evaluation's role rank must be
+            # non-decreasing.  This ensures each phase is contiguous
+            # (no de-duplication of roles before comparing).
+            prev_rank = -1
+            for ei in range(len(eval_indices)):
+                calls = by_eval[ei]
+                role = calls[0].evaluation_role
+                rank = _role_order.index(role)
+                if rank < prev_rank:
                     return False
+                prev_rank = rank
+
+            # Collect limits and pinch evaluations
+            limits_evals = [
+                ei
+                for ei, calls in by_eval.items()
+                if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
+            ]
+            pinch_evals = [
+                ei
+                for ei, calls in by_eval.items()
+                if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_PINCH.value
+            ]
+            has_limits = len(limits_evals) > 0
+            has_pinch = len(pinch_evals) > 0
+
+            # A normal parallel path cannot contain pinch without limits
+            if has_pinch and not has_limits:
+                return False
+
+            if has_limits:
+                # Exact limits call contract: call 0 = hot_limit/TP,
+                # call 1 = cold_limit/TP.  Applies on ALL paths (success
+                # and early-failure).
+                for le in limits_evals:
+                    le_calls = sorted(
+                        by_eval[le],
+                        key=lambda c: c.call_index_within_evaluation,
+                    )
+                    if len(le_calls) == 2:
+                        if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                            return False
+                        if (
+                            le_calls[1].stream_role != "cold_limit"
+                            or le_calls[1].query_type != "TP"
+                        ):
+                            return False
+                    elif len(le_calls) == 1:
+                        # Single limits call (first call failed):
+                        # must be call 0 = hot_limit/TP
+                        if le_calls[0].call_index_within_evaluation != 0:
+                            return False
+                        if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                            return False
+                    else:
+                        return False
+
+                if has_pinch:
+                    # --- Normal path: limits + pinch + solver ---
+
+                    # Exactly one parallel-limits evaluation
+                    if len(limits_evals) != 1:
+                        return False
+
+                    # Limits must precede every pinch evaluation
+                    limits_max = max(limits_evals)
+                    pinch_min = min(pinch_evals)
+                    if limits_max >= pinch_min:
+                        return False
+
+                    # Pinch call contract: each successful pinch eval
+                    # must be exactly call 0 hot_solver/PH and
+                    # call 1 cold_solver/PH
+                    for pe in pinch_evals:
+                        pe_calls = sorted(
+                            by_eval[pe],
+                            key=lambda c: c.call_index_within_evaluation,
+                        )
+                        all_success = all(c.success for c in pe_calls)
+                        if all_success:
+                            if len(pe_calls) != 2:
+                                return False
+                            if (
+                                pe_calls[0].stream_role != "hot_solver"
+                                or pe_calls[0].query_type != "PH"
+                            ):
+                                return False
+                            if (
+                                pe_calls[1].stream_role != "cold_solver"
+                                or pe_calls[1].query_type != "PH"
+                            ):
+                                return False
+                else:
+                    # --- Limits-without-pinch early failure path ---
+
+                    # Must have at least one failed limits call
+                    limits_all_calls: list[PropertyCallRecord] = []
+                    for le in limits_evals:
+                        limits_all_calls.extend(by_eval[le])
+                    has_failure = any(not c.success for c in limits_all_calls)
+
+                    # Zero upper bound no-pinch path: when all limits
+                    # succeed but no pinch follows, only valid when
+                    # q_max_diagnostics is present (indicating a
+                    # zero-upper-bound termination).
+                    if not has_failure and q_max_diagnostics is None:
+                        return False
+
+                    # Limits must be the last evaluation — no
+                    # bracket/solver/final after
+                    limits_last = max(limits_evals)
+                    if limits_last != max(eval_indices):
+                        return False
+
+                    # Limits-without-pinch early failure is valid only
+                    # for status=BLOCKED, converged=False,
+                    # termination='blocked'.  Reject FAILED or
+                    # non_convergence.
+                    if status is not None:
+                        if status != RatingStatus.BLOCKED:
+                            return False
+                        if converged is not False:
+                            return False
+                        if (
+                            solver_termination_reason is not None
+                            and solver_termination_reason != "blocked"
+                        ):
+                            return False
+                    elif q_max_diagnostics is not None:
+                        # Diagnostics present but no status context
+                        # → fail closed
+                        return False
 
         # d) Final evaluation rules (status-aware)
         final_evals = [

@@ -230,21 +230,16 @@ class TestQMaxDiagnosticsTamper:
     """Verify tamper detection for Q_max diagnostics fields."""
 
     def test_tamper_q_max_w(self, provider: CoolPropProvider) -> None:
-        """Tamper q_max_diagnostics.q_max_w → verify_hash and verify_provenance fail."""
+        """Tamper q_max_diagnostics.q_max_w → construction fails (invariant enforced at init)."""
         result = _run_rating(provider, flow_arrangement=FlowArrangement.PARALLEL)
         assert result.q_max_diagnostics is not None
         assert result.verify_hash() is True
         assert result.verify_provenance() is True
 
-        # Tamper q_max_diagnostics.q_max_w
+        # Tamper q_max_diagnostics.q_max_w — now caught at construction
         original_qmax_w = result.q_max_diagnostics.q_max_w
-        tampered_diag = dataclasses.replace(result.q_max_diagnostics, q_max_w=original_qmax_w + 1.0)
-        tampered = result.model_copy(update={"q_max_diagnostics": tampered_diag})
-
-        # verify_hash should fail because field hash was recomputed
-        assert tampered.verify_hash() is False
-        # verify_provenance should fail because calc node metadata doesn't match
-        assert tampered.verify_provenance() is False
+        with pytest.raises(ValueError, match="q_max_w == final_q_low_w"):
+            dataclasses.replace(result.q_max_diagnostics, q_max_w=original_qmax_w + 1.0)
 
     def test_tamper_provenance_graph_metadata(self, provider: CoolPropProvider) -> None:
         """Add extra field to q_max_diagnostics in provenance graph → False."""

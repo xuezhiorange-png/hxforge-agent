@@ -874,59 +874,45 @@ class TestQMaxDiagnosticsInvariants:
         assert qmax.iterations == 0
         assert qmax.q_max_w == min(qmax.hot_limit_w, qmax.cold_limit_w)
 
-    def test_bisection_converged_wrong_q_rejected(self, provider: CoolPropProvider) -> None:
-        """bisection_converged with Q != low endpoint → invariant violation."""
-        result = _run_rating(provider, flow_arrangement=FlowArrangement.PARALLEL)
-        qmax = result.q_max_diagnostics
-        assert qmax is not None
-        assert qmax.termination_reason == "bisection_converged"
-
-        # Tamper: set q_max_w to a different value
+    def test_bisection_converged_wrong_q_rejected(self) -> None:
+        """bisection_converged with Q != low endpoint → construction fails."""
         from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
 
-        tampered_snapshot = QMaxDiagnosticsSnapshot(
-            q_max_w=qmax.final_q_high_w + 1000.0,  # wrong: should be == low
-            iterations=qmax.iterations,
-            termination_reason=qmax.termination_reason,
-            hot_limit_w=qmax.hot_limit_w,
-            cold_limit_w=qmax.cold_limit_w,
-            limiting_side=qmax.limiting_side,
-            final_q_low_w=qmax.final_q_low_w,
-            final_q_high_w=qmax.final_q_high_w,
-            final_q_width_w=qmax.final_q_width_w,
-            final_pinch_residual_k=qmax.final_pinch_residual_k,
-            q_tolerance_w=qmax.q_tolerance_w,
-            pinch_temperature_tolerance_k=qmax.pinch_temperature_tolerance_k,
-        )
-        tampered = result.model_copy(update={"q_max_diagnostics": tampered_snapshot})
-        # hash should fail because q_max_diagnostics changed
-        assert tampered.verify_hash() is False
-
-    def test_bisection_width_exceeds_tolerance(self, provider: CoolPropProvider) -> None:
-        """bisection_converged with width > tolerance → invariant violation."""
-        result = _run_rating(provider, flow_arrangement=FlowArrangement.PARALLEL)
-        qmax = result.q_max_diagnostics
-        assert qmax is not None
-
-        if qmax.final_q_width_w is not None:
-            from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
-
-            tampered_snapshot = QMaxDiagnosticsSnapshot(
-                q_max_w=qmax.q_max_w,
-                iterations=qmax.iterations,
-                termination_reason=qmax.termination_reason,
-                hot_limit_w=qmax.hot_limit_w,
-                cold_limit_w=qmax.cold_limit_w,
-                limiting_side=qmax.limiting_side,
-                final_q_low_w=qmax.final_q_low_w,
-                final_q_high_w=qmax.final_q_high_w,
-                final_q_width_w=qmax.final_q_width_w + 1000.0,  # exceeds tolerance
-                final_pinch_residual_k=qmax.final_pinch_residual_k,
-                q_tolerance_w=qmax.q_tolerance_w,
-                pinch_temperature_tolerance_k=qmax.pinch_temperature_tolerance_k,
+        with pytest.raises(ValueError, match="q_max_w == final_q_low_w"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=78000.0,
+                iterations=37,
+                termination_reason="bisection_converged",
+                hot_limit_w=103541.0,
+                cold_limit_w=310622.0,
+                limiting_side="hot_limit",
+                final_q_low_w=77656.0,
+                final_q_high_w=77657.0,
+                final_q_width_w=1.0,
+                final_pinch_residual_k=1e-10,
+                q_tolerance_w=1e-6,
+                pinch_temperature_tolerance_k=1e-6,
             )
-            tampered = result.model_copy(update={"q_max_diagnostics": tampered_snapshot})
-            assert tampered.verify_hash() is False
+
+    def test_bisection_width_exceeds_tolerance(self) -> None:
+        """bisection_converged with width > tolerance → construction fails."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+
+        with pytest.raises(ValueError, match="width.*tolerance"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=77656.0,
+                iterations=37,
+                termination_reason="bisection_converged",
+                hot_limit_w=103541.0,
+                cold_limit_w=310622.0,
+                limiting_side="hot_limit",
+                final_q_low_w=77656.0,
+                final_q_high_w=78657.0,
+                final_q_width_w=1001.0,
+                final_pinch_residual_k=1e-10,
+                q_tolerance_w=1e-6,
+                pinch_temperature_tolerance_k=1e-6,
+            )
 
 
 # =========================================================================
