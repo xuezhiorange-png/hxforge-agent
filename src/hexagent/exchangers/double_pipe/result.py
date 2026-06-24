@@ -1663,11 +1663,20 @@ def _verify_property_call_identity(
     sequence_index, role ordering and completeness of property calls.
     Returns False if any check fails; never raises.
 
-    Empty property_calls are allowed (structural BLOCKED results may have
-    no property evaluations).
+    Empty property_calls are allowed only for pre-property structural
+    BLOCKED results: status=BLOCKED, converged=False, termination 'blocked',
+    with no Q_max/solver/final semantics.
     """
     try:
         if not property_calls:
+            # Empty calls: only valid for structural BLOCKED
+            if status is not None:
+                if status != RatingStatus.BLOCKED:
+                    return False
+                if converged is not False:
+                    return False
+                if solver_termination_reason is not None and solver_termination_reason != "blocked":
+                    return False
             return True
 
         # a) Role validity - each evaluation_role must be one of the 7 EvaluationRole values
@@ -1775,15 +1784,63 @@ def _verify_property_call_identity(
 
         all_roles = {pc.evaluation_role for pc in property_calls}
 
-        # c) Parallel limits early failure - if q_max_parallel_limits is present
-        #    but q_max_parallel_pinch is NOT, check that limits evaluation had
-        #    a failure (not all succeeded).  This is valid only if limits
-        #    evaluation had a failure (partial limits trace is allowed).
+        # c) Parallel limits without pinch
         if (
             EvaluationRole.Q_MAX_PARALLEL_LIMITS.value in all_roles
             and EvaluationRole.Q_MAX_PARALLEL_PINCH.value not in all_roles
         ):
-            pass  # allowed — partial limits trace from early failure
+            # Limits present but no pinch: only valid if limits call failed
+            # and limits is the last evaluation (no bracket/solver/final follows)
+            limits_evals = [
+                ei
+                for ei, calls in by_eval.items()
+                if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
+            ]
+            if not limits_evals:
+                return False
+            limits_last_eval = max(limits_evals)
+            limits_calls_list = by_eval[limits_last_eval]
+            # At least one limits call must have failed
+            has_failure = any(not c.success for c in limits_calls_list)
+            if not has_failure:
+                return False
+            # Limits must be last evaluation — no bracket/solver/final after
+            if limits_last_eval != max(eval_indices):
+                return False
+            # Enforce exact limits calls: call 0 = hot_limit/TP, call 1 = cold_limit/TP
+            # (only for completed limits evaluations with 2 calls)
+            for le in limits_evals:
+                le_calls = sorted(by_eval[le], key=lambda c: c.call_index_within_evaluation)
+                if len(le_calls) == 2:
+                    if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                        return False
+                    if le_calls[1].stream_role != "cold_limit" or le_calls[1].query_type != "TP":
+                        return False
+                elif len(le_calls) == 1:
+                    # Single limits call (first call failed): must be call 0 = hot_limit/TP
+                    if le_calls[0].call_index_within_evaluation != 0:
+                        return False
+                    if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                        return False
+                else:
+                    return False
+
+        # For PARALLEL, if limits both succeed without pinch → reject
+        if (
+            EvaluationRole.Q_MAX_PARALLEL_LIMITS.value in all_roles
+            and EvaluationRole.Q_MAX_PARALLEL_PINCH.value not in all_roles
+        ):
+            limits_evals_all = [
+                ei
+                for ei, calls in by_eval.items()
+                if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
+            ]
+            for le in limits_evals_all:
+                le_calls = by_eval[le]
+                all_success = all(c.success for c in le_calls)
+                if all_success and len(le_calls) == 2:
+                    # Both limits succeeded but no pinch → invalid
+                    return False
 
         # f) Q_max role vs flow arrangement
         if flow_arrangement == FlowArrangement.COUNTERFLOW:
@@ -1796,6 +1853,27 @@ def _verify_property_call_identity(
             and EvaluationRole.Q_MAX_COUNTERFLOW.value in all_roles
         ):
             return False
+
+        # For PARALLEL, enforce role order: inlet → limits → pinch → bracket → solver → final
+        if flow_arrangement == FlowArrangement.PARALLEL:
+            _role_order = [
+                EvaluationRole.INLET.value,
+                EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                EvaluationRole.BRACKET_PROBE.value,
+                EvaluationRole.SOLVER_ITERATION.value,
+                EvaluationRole.FINAL_EVALUATION.value,
+            ]
+            _seen_order: list[str] = []
+            for ei_s in range(len(eval_indices)):
+                calls_s = by_eval[ei_s]
+                role_s = calls_s[0].evaluation_role
+                if role_s not in _seen_order:
+                    _seen_order.append(role_s)
+            # Each role must appear in non-decreasing order
+            for i in range(len(_seen_order) - 1):
+                if _role_order.index(_seen_order[i]) > _role_order.index(_seen_order[i + 1]):
+                    return False
 
         # d) Final evaluation rules (status-aware)
         final_evals = [

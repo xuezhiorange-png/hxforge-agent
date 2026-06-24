@@ -1960,9 +1960,16 @@ def _compute_q_max_parallel(
         T_hot_out(Q) - T_cold_out(Q) >= minimum_terminal_delta_t
 
     We use enthalpy back-calculation (no fixed Cp) with bracket search.
-
     All property calls are recorded atomically by the EvaluationRecorder.
+
+    The pinch_temperature_tolerance_k argument must be finite and > 0.
     """
+    if not math.isfinite(pinch_temperature_tolerance_k) or pinch_temperature_tolerance_k <= 0:
+        raise ValueError(
+            "pinch_temperature_tolerance_k must be finite and > 0, "
+            f"got {pinch_temperature_tolerance_k}"
+        )
+
     # Upper bound: min of independent enthalpy limits
     ctx_limits = recorder.begin(EvaluationRole.Q_MAX_PARALLEL_LIMITS)
 
@@ -2120,7 +2127,7 @@ def _compute_q_max_parallel(
             final_pinch_residual_k=pinch_at_upper,
             termination_reason="pinch_satisfied_at_upper",
             q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
-            pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
+            pinch_temperature_tolerance_k=pinch_temperature_tolerance_k,
             hot_limit_w=Q_hot_limit,
             cold_limit_w=Q_cold_limit,
             limiting_side=_parallel_limiting_side,
@@ -2145,7 +2152,7 @@ def _compute_q_max_parallel(
             pinch_hi = pinch_mid  # noqa: F841
 
         # Check dual tolerance using tracked endpoint residuals
-        if q_hi - q_lo <= Q_MAX_Q_TOLERANCE_W and abs(pinch_lo) <= Q_MAX_PINCH_TOLERANCE_K:
+        if q_hi - q_lo <= Q_MAX_Q_TOLERANCE_W and abs(pinch_lo) <= pinch_temperature_tolerance_k:
             break
     else:
         # Max iterations reached without convergence
@@ -2158,7 +2165,7 @@ def _compute_q_max_parallel(
             final_pinch_residual_k=pinch_lo,
             termination_reason="iteration_limit",
             q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
-            pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
+            pinch_temperature_tolerance_k=pinch_temperature_tolerance_k,
             hot_limit_w=Q_hot_limit,
             cold_limit_w=Q_cold_limit,
             limiting_side=_parallel_limiting_side,
@@ -2173,7 +2180,7 @@ def _compute_q_max_parallel(
         final_pinch_residual_k=pinch_lo,
         termination_reason="bisection_converged",
         q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
-        pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
+        pinch_temperature_tolerance_k=pinch_temperature_tolerance_k,
         hot_limit_w=Q_hot_limit,
         cold_limit_w=Q_cold_limit,
         limiting_side=_parallel_limiting_side,
