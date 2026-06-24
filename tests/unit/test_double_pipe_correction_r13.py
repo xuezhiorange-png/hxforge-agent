@@ -179,8 +179,8 @@ class TestVerifierIdentity:
         )
         assert result is True
 
-    def test_empty_calls_no_status_accepted(self) -> None:
-        """Empty calls with no status → True (structural fallback)."""
+    def test_empty_calls_no_status_rejected(self) -> None:
+        """Empty calls with no status → False (fail-closed)."""
         result = _verify_property_call_identity(
             (),
             FlowArrangement.COUNTERFLOW,
@@ -188,7 +188,7 @@ class TestVerifierIdentity:
             converged=None,
             solver_termination_reason=None,
         )
-        assert result is True
+        assert result is False
 
     def test_parallel_both_limits_succeed_no_pinch_rejected(self) -> None:
         """PARALLEL: both limits succeed, no pinch → False."""

@@ -176,6 +176,37 @@ class QMaxDiagnosticsSnapshot:
                 f"Expected one of {sorted(self._VALID_REASONS)}"
             )
 
+        # -- Global finite validation for all numeric fields ---------------
+        if not math.isfinite(self.q_max_w):
+            raise ValueError(f"q_max_w must be finite, got {self.q_max_w!r}")
+        if not isinstance(self.iterations, int) or self.iterations < 0:
+            raise ValueError(f"iterations must be non-negative int, got {self.iterations!r}")
+
+        # Bracket fields: if present, must be finite
+        for fld in ("final_q_low_w", "final_q_high_w", "final_q_width_w"):
+            val = getattr(self, fld)
+            if val is not None and not math.isfinite(val):
+                raise ValueError(f"{fld} must be finite when present, got {val!r}")
+
+        # Limit fields: if present, must be finite
+        for fld in ("hot_limit_w", "cold_limit_w"):
+            val = getattr(self, fld)
+            if val is not None and not math.isfinite(val):
+                raise ValueError(f"{fld} must be finite when present, got {val!r}")
+
+        # Tolerances: if present, must be finite and > 0
+        for fld in ("q_tolerance_w", "pinch_temperature_tolerance_k"):
+            val = getattr(self, fld)
+            if val is not None and (not math.isfinite(val) or val <= 0):
+                raise ValueError(f"{fld} must be finite and > 0 when present, got {val!r}")
+
+        # Pinch residual: must be finite
+        if not math.isfinite(self.final_pinch_residual_k):
+            raise ValueError(
+                f"final_pinch_residual_k must be finite, got {self.final_pinch_residual_k!r}"
+            )
+
+        # -- Termination-specific contracts --------------------------------
         if reason == "bisection_converged":
             self._validate_bisection_converged()
         elif reason == "pinch_satisfied_at_upper":
@@ -687,18 +718,21 @@ class RatingResult(BaseModel):
         """Cross-field validation of resistance_breakdown vs UA / U fields.
 
         Rules:
-        * SUCCEEDED ⇒ resistance_breakdown must exist, UA / U must be
-          finite and positive.
+        * SUCCEEDED ⇒ resistance_breakdown must exist.
         * If resistance_breakdown is None ⇒ UA_w_k, U_inner_basis,
           U_outer_basis must all be None.
         * If resistance_breakdown exists ⇒ all resistance components
           finite non-negative, total_resistance > 0, ua_w_k > 0,
           total_resistance ≈ sum of five components,
-          ua_w_k ≈ 1 / total_resistance, UA_w_k ≈ ua_w_k.
-        * When areas are positive ⇒ U_inner_basis ≈ UA_w_k / area_inner_m2
-          and U_outer_basis ≈ UA_w_k / area_outer_m2.
+          ua_w_k ≈ 1 / total_resistance.
+        * For SUCCEEDED with breakdown: UA_w_k ≈ ua_w_k,
+          U_inner_basis ≈ UA / area_inner, U_outer_basis ≈ UA / area_outer.
         """
         rb = self.resistance_breakdown
+
+        # -- SUCCEEDED must have breakdown --------------------------------
+        if self.status == RatingStatus.SUCCEEDED and rb is None:
+            raise ValueError("SUCCEEDED result must have a non-null resistance_breakdown")
 
         # -- Null-breakdown consistency ------------------------------------
         if rb is None:
@@ -710,33 +744,7 @@ class RatingResult(BaseModel):
                 raise ValueError("resistance_breakdown is None but U_outer_basis is set")
             return self
 
-        # -- Breakdown exists: SUCCEEDED must have UA / U ------------------
-        if self.status != RatingStatus.SUCCEEDED:
-            return self
-
-        if self.UA_w_k is None or not math.isfinite(self.UA_w_k) or self.UA_w_k <= 0:
-            raise ValueError(
-                f"SUCCEEDED result requires finite positive UA_w_k, got {self.UA_w_k!r}"
-            )
-        if (
-            self.U_inner_basis is None
-            or not math.isfinite(self.U_inner_basis)
-            or self.U_inner_basis <= 0
-        ):
-            raise ValueError(
-                f"SUCCEEDED result requires finite positive "
-                f"U_inner_basis, got {self.U_inner_basis!r}"
-            )
-        if (
-            self.U_outer_basis is None
-            or not math.isfinite(self.U_outer_basis)
-            or self.U_outer_basis <= 0
-        ):
-            raise ValueError(
-                f"SUCCEEDED result requires finite positive "
-                f"U_outer_basis, got {self.U_outer_basis!r}"
-            )
-
+        # -- Breakdown exists: validate components (any status) -----------
         # -- Resistance components: finite non-negative --------------------
         for comp in (
             "r_conv_inner",
@@ -785,6 +793,31 @@ class RatingResult(BaseModel):
                 f"resistance_breakdown.ua_w_k ({rb.ua_w_k!r}) != "
                 f"1 / total_resistance ({expected_ua!r})"
             )
+
+        # -- SUCCEEDED-specific: UA / U must be finite and positive -------
+        if self.status == RatingStatus.SUCCEEDED:
+            if self.UA_w_k is None or not math.isfinite(self.UA_w_k) or self.UA_w_k <= 0:
+                raise ValueError(
+                    f"SUCCEEDED result requires finite positive UA_w_k, got {self.UA_w_k!r}"
+                )
+            if (
+                self.U_inner_basis is None
+                or not math.isfinite(self.U_inner_basis)
+                or self.U_inner_basis <= 0
+            ):
+                raise ValueError(
+                    f"SUCCEEDED result requires finite positive "
+                    f"U_inner_basis, got {self.U_inner_basis!r}"
+                )
+            if (
+                self.U_outer_basis is None
+                or not math.isfinite(self.U_outer_basis)
+                or self.U_outer_basis <= 0
+            ):
+                raise ValueError(
+                    f"SUCCEEDED result requires finite positive "
+                    f"U_outer_basis, got {self.U_outer_basis!r}"
+                )
 
         # -- UA_w_k ≈ ua_w_k ----------------------------------------------
         if self.UA_w_k is not None and not math.isclose(
@@ -2008,16 +2041,16 @@ def _verify_property_call_identity(
     """
     try:
         if not property_calls:
-            # Empty calls: only valid for structural BLOCKED
-            if status is not None:
-                if status != RatingStatus.BLOCKED:
-                    return False
-                if converged is not False:
-                    return False
-                if solver_termination_reason is not None and solver_termination_reason != "blocked":
-                    return False
-            # When status is None, reject if q_max_diagnostics is present
-            # (Q_max computed but no property calls to verify)
+            # Empty calls: require all context explicitly for structural BLOCKED.
+            # Fail closed when any context is missing.
+            if status is None or converged is None or solver_termination_reason is None:
+                return False
+            if status != RatingStatus.BLOCKED:
+                return False
+            if converged is not False:
+                return False
+            if solver_termination_reason != "blocked":
+                return False
             return q_max_diagnostics is None
 
         # a) Role validity - each evaluation_role must be one of the 7 EvaluationRole values
@@ -2178,6 +2211,29 @@ def _verify_property_call_identity(
             if has_pinch and not has_limits:
                 return False
 
+            # Determine if this is a solver-based path (has bracket/solver/final)
+            has_bracket = any(
+                by_eval[ei][0].evaluation_role == EvaluationRole.BRACKET_PROBE.value
+                for ei in eval_indices
+            )
+            has_solver = any(
+                by_eval[ei][0].evaluation_role == EvaluationRole.SOLVER_ITERATION.value
+                for ei in eval_indices
+            )
+            _parallel_final_evals = [
+                ei
+                for ei, cs in by_eval.items()
+                if cs[0].evaluation_role == EvaluationRole.FINAL_EVALUATION.value
+            ]
+            has_final = len(_parallel_final_evals) > 0
+            has_solver_path = has_bracket or has_solver or has_final
+
+            # A solver-based parallel path must have limits and pinch
+            if has_solver_path and not has_limits:
+                return False
+            if has_solver_path and not has_pinch:
+                return False
+
             if has_limits:
                 # Exact limits call contract: call 0 = hot_limit/TP,
                 # call 1 = cold_limit/TP.  Applies on ALL paths (success
@@ -2188,6 +2244,7 @@ def _verify_property_call_identity(
                         key=lambda c: c.call_index_within_evaluation,
                     )
                     if len(le_calls) == 2:
+                        # Both calls present: hot succeeded, cold present
                         if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
                             return False
                         if (
@@ -2195,12 +2252,17 @@ def _verify_property_call_identity(
                             or le_calls[1].query_type != "TP"
                         ):
                             return False
+                        # If hot failed, cold should not exist
+                        if not le_calls[0].success:
+                            return False
                     elif len(le_calls) == 1:
-                        # Single limits call (first call failed):
-                        # must be call 0 = hot_limit/TP
+                        # Single limits call (hot failure prefix):
+                        # must be call 0 = hot_limit/TP, failed
                         if le_calls[0].call_index_within_evaluation != 0:
                             return False
                         if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                            return False
+                        if le_calls[0].success:
                             return False
                     else:
                         return False
@@ -2218,18 +2280,17 @@ def _verify_property_call_identity(
                     if limits_max >= pinch_min:
                         return False
 
-                    # Pinch call contract: each successful pinch eval
-                    # must be exactly call 0 hot_solver/PH and
-                    # call 1 cold_solver/PH
+                    # Pinch call contract: each pinch eval must be
+                    # exactly call 0 hot_solver/PH and call 1
+                    # cold_solver/PH for success; failure prefixes
+                    # must be exactly the executed prefix.
                     for pe in pinch_evals:
                         pe_calls = sorted(
                             by_eval[pe],
                             key=lambda c: c.call_index_within_evaluation,
                         )
-                        all_success = all(c.success for c in pe_calls)
-                        if all_success:
-                            if len(pe_calls) != 2:
-                                return False
+                        if len(pe_calls) == 2:
+                            # Both calls present
                             if (
                                 pe_calls[0].stream_role != "hot_solver"
                                 or pe_calls[0].query_type != "PH"
@@ -2240,6 +2301,23 @@ def _verify_property_call_identity(
                                 or pe_calls[1].query_type != "PH"
                             ):
                                 return False
+                            # If hot failed, cold should not exist
+                            if not pe_calls[0].success:
+                                return False
+                        elif len(pe_calls) == 1:
+                            # Single pinch call (hot failure prefix):
+                            # must be call 0 = hot_solver/PH, failed
+                            if pe_calls[0].call_index_within_evaluation != 0:
+                                return False
+                            if (
+                                pe_calls[0].stream_role != "hot_solver"
+                                or pe_calls[0].query_type != "PH"
+                            ):
+                                return False
+                            if pe_calls[0].success:
+                                return False
+                        else:
+                            return False
                 else:
                     # --- Limits-without-pinch early failure path ---
 
@@ -2264,21 +2342,15 @@ def _verify_property_call_identity(
 
                     # Limits-without-pinch early failure is valid only
                     # for status=BLOCKED, converged=False,
-                    # termination='blocked'.  Reject FAILED or
-                    # non_convergence.
-                    if status is not None:
-                        if status != RatingStatus.BLOCKED:
-                            return False
-                        if converged is not False:
-                            return False
-                        if (
-                            solver_termination_reason is not None
-                            and solver_termination_reason != "blocked"
-                        ):
-                            return False
-                    elif q_max_diagnostics is not None:
-                        # Diagnostics present but no status context
-                        # → fail closed
+                    # termination='blocked'.  Require all context
+                    # explicitly; fail closed when any is missing.
+                    if status is None or converged is None or solver_termination_reason is None:
+                        return False
+                    if status != RatingStatus.BLOCKED:
+                        return False
+                    if converged is not False:
+                        return False
+                    if solver_termination_reason != "blocked":
                         return False
 
         # d) Final evaluation rules (status-aware)

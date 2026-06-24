@@ -1081,14 +1081,15 @@ def _make_resistance_breakdown(
 
 
 def _build_empty_resistance() -> ResistanceBreakdownModel:
+    """Build a valid minimal resistance breakdown (non-zero for validation)."""
     return ResistanceBreakdownModel(
-        r_conv_inner=0.0,
+        r_conv_inner=1e-4,
         r_foul_inner=0.0,
-        r_wall=0.0,
+        r_wall=1e-4,
         r_foul_outer=0.0,
-        r_conv_outer=0.0,
-        total_resistance=0.0,
-        ua_w_k=0.0,
+        r_conv_outer=1e-4,
+        total_resistance=3e-4,
+        ua_w_k=1.0 / 3e-4,
     )
 
 
