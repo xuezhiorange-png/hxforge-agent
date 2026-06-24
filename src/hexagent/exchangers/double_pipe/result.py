@@ -1575,6 +1575,8 @@ def _verify_property_call_identity(
             by_eval.setdefault(pc.evaluation_index, []).append(pc)
 
         # 3. Each evaluation has exactly one role and one trial_q_w
+        #    (but may have multiple calls per evaluation, e.g. solver
+        #    iteration evaluates hot+cold outlets + bulks = 4 calls)
         for ei in range(len(eval_indices)):
             eval_calls = by_eval.get(ei, [])
             if not eval_calls:
@@ -1648,9 +1650,10 @@ def _verify_property_call_identity(
                 EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
                 EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
             }
-            if q_max_roles & all_roles:
+            if q_max_roles & all_roles:  # noqa: SIM102
                 # If any parallel Q_max role is present, both must be
-                return not q_max_roles.issubset(all_roles)
+                if not q_max_roles.issubset(all_roles):
+                    return False
 
         # 10. final_evaluation exactly one, last evaluation
         #     (not required for BLOCKED results that were blocked before
