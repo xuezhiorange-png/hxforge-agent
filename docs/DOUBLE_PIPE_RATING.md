@@ -18,8 +18,7 @@ The entry point is the pure function `rate_double_pipe()` in
 `RatingResult`; domain errors are expressed as `BLOCKED`/`FAILED` status
 rather than raised exceptions.
 
-**Supported flow arrangements:** Counter-flow, parallel-flow (counter-flow
-default).
+**Supported flow arrangements:** Counter-flow, parallel-flow.
 
 **Scope limitations (out of scope):** Sizing/optimization (TASK-009),
 API/reports (TASK-010), C4 numerical implementation (Issue #19), two-phase
@@ -179,7 +178,8 @@ Each residual evaluation:
 
 Property or correlation failures raise a typed `TrialEvaluationAbort` which
 the solver catches; the evaluation is recorded via `EvaluationRecorder` and
-the iteration proceeds with diagnostic preservation.
+the iteration is **blocked** (not continued). The solver emits `BLOCKED`
+status preserving all diagnostic data collected so far.
 
 ### Dynamic bracket and QMaxResult
 
@@ -187,19 +187,25 @@ the iteration proceeds with diagnostic preservation.
 feasible Q, the terminal ΔT state (pinch/temperature-cross check), and
 whether a valid bracket was established.
 
-- **Q_max** derived from `C_min × (T_h,in − T_c,in) × max_q_fraction`
-  (default 99%)
+- **Counterflow Q_max:** derived from enthalpy limits — both terminal ΔT
+  must remain positive (hot outlet above cold inlet, cold outlet below hot inlet).
+- **Parallel Q_max:** derived from coupled outlet pinch — hot outlet must
+  remain above cold outlet at exit.
+- **Dual tolerance bracket:** Q_max search uses two tolerances that must
+  both be satisfied:
+  - Q-width tolerance: `Q_MAX_Q_TOLERANCE_W = 1e-6` W (absolute width of Q bracket)
+  - Pinch residual tolerance: `Q_MAX_PINCH_TOLERANCE_K = 1e-6` K (minimum terminal ΔT)
+- **Iteration limit:** `Q_MAX_MAX_ITERATIONS = 100` — if the bracket
+  search exceeds this, returns `SOLVER_BRACKET_NOT_FOUND`.
 - Start from Q = 0, probe upward in 20 equal steps to find sign change
-- Counter-flow: both terminal ΔT must remain positive
-- Parallel-flow: hot outlet must exceed cold outlet at exit
 - If no sign change → `SOLVER_BRACKET_NOT_FOUND` blocker
+- No infeasible endpoints sent to property library relying on exception escape
 
 ### Solver method
 A bounded Q-based root-finder with dual tolerance convergence: absolute
 residual and relative bracket-to-C_min temperature-effect tolerance. The
-`SolverEvaluationPhase` enum tracks evaluation stages (ENTHALPY, PROPERTY,
-CORRELATION, THERMAL_RESISTANCE, LMTD, RESIDUAL, POST_CALC) so each
-iteration step is independently verifiable.
+`SolverEvaluationPhase` enum tracks evaluation stages (`bracket_probe`,
+`solver_iteration`) so each step is independently verifiable.
 
 ---
 
@@ -216,7 +222,7 @@ silent convergence to a physically infeasible solution.
 | Criterion | Formula | Default |
 |-----------|---------|---------|
 | Absolute residual | `|residual_Q| ≤ max(abs_tol, rel_tol × max(|Q|, 1))` | 1e-3 W, 1e-8 |
-| Bracket temperature effect | `bracket_width / C_hot ≤ bracket_tol` | 1e-4 K |
+|| Bracket temperature effect | `bracket_width / C_min ≤ bracket_tol` | 1e-4 K |
 | Iteration limit | `iterations ≤ max_iterations` | 100 |
 
 ---
@@ -243,8 +249,9 @@ T_bulk = (T_inlet + T_outlet) / 2
 Every PropertyProvider call is recorded by the `EvaluationRecorder` with:
 - Fluid, query type (TP/PH), inputs, backend identity, stage, stream role
 - Continuous evaluation identity (monotonic counter + phase tag)
-- 7 `EvaluationRole` categories: INLET_STATE, OUTLET_STATE, BULK_EVAL,
-  CORRELATION_CALL, THERMAL_RESISTANCE, LMTD_EVAL, POST_CONVERGENCE
+- 7 `EvaluationRole` categories: `inlet`, `q_max_counterflow`,
+  `q_max_parallel_limits`, `q_max_parallel_pinch`, `bracket_probe`,
+  `solver_iteration`, `final_evaluation`
 - Evaluation identity verifier confirms replay integrity
 
 ---
@@ -260,6 +267,11 @@ service (`hexagent.correlations.service`) for each side:
 | Annulus | `ConcentricAnnulusGeometry(inner_tube_outer_diameter_m=D_o, outer_pipe_inside_diameter_m=D_outer, ...)` | **explicit, required** |
 
 The `tube_in_hot` flag determines which fluid flows in the tube vs. annulus.
+
+**Required parameters (no defaults):**
+- `minimum_terminal_delta_t` — minimum allowable terminal ΔT for bracket feasibility (K)
+- `tube_boundary_condition` — explicit laminar boundary condition policy for tube side
+- `annulus_boundary_condition` — explicit laminar boundary condition policy for annulus side
 
 From each correlation call:
 - `Re`, `Pr`, `Nu`, `h` (heat transfer coefficient)
@@ -337,11 +349,20 @@ If operating conditions require C4 (annulus laminar inner constant-heat-flux):
 - `provenance_graph` (`ProvenanceGraph`)
 - `provenance_digest`
 
-**Post-calculation BLOCKED:** When a property or correlation evaluation fails
-after partial convergence progress, the solver emits `BLOCKED` status that
-**preserves all diagnostic data collected so far** (evaluations, partial
-residuals, correlation applicability warnings). Debugging context is never
-lost even when the rating cannot complete.
+**Post-calculation BLOCKED with `converged=True`:** When a property or
+correlation evaluation fails after the solver has already converged (Q
+root-finding succeeded), the result emits `BLOCKED` status with
+`converged=True` and **preserves all diagnostic data collected so far**
+(evaluations, partial residuals, correlation applicability warnings).
+Debugging context is never lost even when the rating cannot complete.
+
+**Solver convergence vs engineering BLOCKED distinction:**
+- `converged=True, BLOCKED`: The solver found a valid Q root, but a
+  post-convergence property/correlation evaluation failed. The Q value and
+  outlet enthalpies are valid; transport properties are incomplete.
+- `converged=False, BLOCKED`: The solver itself could not converge (bracket
+  not found, max iterations exceeded, or terminal ΔT violation).
+- `converged=False, FAILED`: An unrecoverable runtime error occurred.
 
 **Invariants:**
 - BLOCKED requires ≥1 blocker; SUCCEEDED requires convergence and no blockers

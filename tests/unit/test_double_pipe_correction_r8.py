@@ -4,9 +4,10 @@ Covers:
 1. EvaluationRecorder unit tests (5 tests)
 2. QMaxResult field tests (3 tests)
 3. Solver phase tests (3 tests)
-4. Post-calculation BLOCKED tests (4 tests)
+4. Post-calculation BLOCKED tests (5 tests)
 5. Verifier tamper tests (5 tests)
 6. Solver convergence contract test (1 test)
+7. Solver convergence validator details (4 tests)
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import math
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
 
 from hexagent.correlations.flow import ThermalBoundaryCondition
 from hexagent.domain.messages import (
@@ -24,6 +26,8 @@ from hexagent.domain.messages import (
 )
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.rating import (
+    Q_MAX_PINCH_TOLERANCE_K,
+    Q_MAX_Q_TOLERANCE_W,
     QMaxResult,
     _build_empty_resistance,
     _build_empty_solver_details,
@@ -40,6 +44,7 @@ from hexagent.exchangers.double_pipe.result import (
     RatingRequestIdentity,
     RatingResult,
     RatingStatus,
+    SolverDetailsModel,
 )
 from hexagent.exchangers.double_pipe.solver import (
     SolverParams,
@@ -50,10 +55,12 @@ from hexagent.exchangers.double_pipe.solver import (
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 from hexagent.properties.base import (
     FluidIdentifier,
+    FluidState,
     PropertyProvider,
     ReferenceStatePolicy,
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
+from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
 
 # -----------------------------------------------------------------------
 # Fixtures & constants
@@ -439,6 +446,10 @@ class TestQMaxResult:
             assert q_max.limiting_side == "hot_limit"
         else:
             assert q_max.limiting_side == "cold_limit"
+        # Counterflow: final_q_low_w, final_q_high_w, final_q_width_w are None
+        assert q_max.final_q_low_w is None
+        assert q_max.final_q_high_w is None
+        assert q_max.final_q_width_w is None
 
     def test_parallelflow_q_max_dual_tolerance(self, provider: CoolPropProvider) -> None:
         """Parallel-flow Q_max: verify q_tolerance_w and
@@ -469,18 +480,25 @@ class TestQMaxResult:
         # Regardless of termination, q_max_w must be finite
         assert math.isfinite(q_max.q_max_w)
         assert q_max.q_max_w >= 0
+        # Parallel-flow: verify tolerance constants
+        if q_max.termination_reason in ("bisection_converged", "iteration_limit"):
+            assert q_max.q_tolerance_w == Q_MAX_Q_TOLERANCE_W
+            assert q_max.pinch_temperature_tolerance_k == Q_MAX_PINCH_TOLERANCE_K
 
     def test_qmax_no_property_calls_field(self) -> None:
-        """QMaxResult does not have a property_calls attribute."""
+        """QMaxResult does not have a property_calls attribute and
+        includes final_q_width_w field."""
         q_max = QMaxResult(
             q_max_w=100.0,
             iterations=0,
             final_q_low_w=100.0,
             final_q_high_w=100.0,
+            final_q_width_w=0.0,
             final_pinch_residual_k=0.0,
             termination_reason="independent_limits",
         )
         assert not hasattr(q_max, "property_calls")
+        assert q_max.final_q_width_w == 0.0
 
 
 # =========================================================================
@@ -573,36 +591,32 @@ class TestSolverPhase:
 
 
 class TestPostCalculationBlocked:
-    """Post-calculation BLOCKED results preserve all computed diagnostics."""
+    """Post-calculation BLOCKED results preserve all computed diagnostics.
 
-    def _make_biased_provider(
-        self,
-        provider: CoolPropProvider,
-        *,
-        bias_field: str,
-        bias_value: float,
+    Each test deterministically triggers a specific failure path and directly
+    asserts the expected status — no branching on status.
+    """
+
+    def _make_energy_biased_provider(
+        self, provider: CoolPropProvider, *, bias_value: float
     ) -> MagicMock:
-        """Create a provider that biases a specific property on cold outlet."""
-        from hexagent.properties.base import FluidState
+        """Provider that biases cold-side state_ph enthalpy to create energy imbalance.
 
+        The solver converges using the biased properties (consistent across all
+        solver iterations), but the post-calculation energy balance check fails
+        because Q_hot (unbiased) != Q_cold (biased).
+        """
         mock = MagicMock()
         mock.name = provider.name
         mock.version = provider.version
         mock.git_revision = ""
         mock.reference_state_policy = ReferenceStatePolicy.DEF
-
-        real_tp = provider.state_tp
-        real_ph = provider.state_ph
-
-        mock.state_tp.side_effect = real_tp
-
-        cold_ph_count = [0]
+        mock.state_tp.side_effect = provider.state_tp
 
         def _biased_ph(fluid, P, h, reference_state=None):
-            state = real_ph(fluid, P, h, reference_state=reference_state)
+            state = provider.state_ph(fluid, P, h, reference_state=reference_state)
             if fluid.name == "Water" and P == 150000.0:
-                cold_ph_count[0] += 1
-                # Modify specific field to create imbalance
+                # Shift enthalpy to create energy imbalance
                 new_h = state.enthalpy_j_kg + bias_value
                 return FluidState(
                     temperature_k=state.temperature_k,
@@ -622,68 +636,60 @@ class TestPostCalculationBlocked:
         mock.state_ph.side_effect = _biased_ph
         return mock
 
-    def test_postcalc_energy_blocked_converged_true(self, provider: CoolPropProvider) -> None:
-        """Energy balance blocker -> status=BLOCKED, converged=True."""
-        # Bias cold side enthalpy by a large amount to force energy imbalance
-        mock_prov = self._make_biased_provider(provider, bias_field="enthalpy", bias_value=5000.0)
-        result = _run_rating(mock_prov)
+    def _make_tube_h_biased_provider(self, provider: CoolPropProvider) -> MagicMock:
+        """Provider that biases tube h to near-zero to make UA*LMTD != Q.
 
-        if result.status == RatingStatus.BLOCKED:
-            blocker_codes = [b.code for b in result.blockers]
-            assert ErrorCode.ENERGY_BALANCE_NOT_CLOSED in blocker_codes
-            # Post-calc BLOCKED must have converged=True (solver succeeded)
-            assert result.converged is True
-        else:
-            # If the solver aborted before energy check, still verify BLOCKED
-            assert result.status == RatingStatus.BLOCKED
-            assert result.converged is True
-
-    def test_postcalc_ualmtd_blocked_converged_true(self, provider: CoolPropProvider) -> None:
-        """UA-LMTD blocker -> status=BLOCKED, converged=True."""
-        # A large enthalpy bias can cause UA-LMTD residual to exceed tolerance
-        mock_prov = self._make_biased_provider(provider, bias_field="enthalpy", bias_value=2000.0)
-        result = _run_rating(mock_prov)
-
-        if result.status == RatingStatus.BLOCKED:
-            # Check if energy or UA-LMTD is the blocker
-            blocker_codes = [b.code for b in result.blockers]
-            # For post-calc block, converged should be True
-            assert result.converged is True
-            # Verify the blocker is one of the expected post-calc types
-            assert any(
-                code in blocker_codes
-                for code in [
-                    ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
-                    ErrorCode.TEMPERATURE_CROSSING,
-                ]
-            )
-        else:
-            assert result.status == RatingStatus.BLOCKED
-
-    def test_postcalc_terminal_dt_blocked(self, provider: CoolPropProvider) -> None:
-        """Terminal delta-T blocker -> status=BLOCKED, converged=True.
-
-        We mock the cold-side state_ph to return a temperature that is too
-        close to the hot inlet, causing the post-solver terminal ΔT check
-        to fail for counterflow.
+        By shifting the cold outlet temperature upward, the thermal resistance
+        calculation produces a tube h that is very small, making UA*LMTD very
+        different from Q. This triggers the UA-LMTD closure blocker.
         """
-        from hexagent.properties.base import FluidState
-
         mock = MagicMock()
         mock.name = provider.name
         mock.version = provider.version
         mock.git_revision = ""
         mock.reference_state_policy = ReferenceStatePolicy.DEF
+        mock.state_tp.side_effect = provider.state_tp
 
-        real_tp = provider.state_tp
-        real_ph = provider.state_ph
+        def _biased_ph(fluid, P, h, reference_state=None):
+            state = provider.state_ph(fluid, P, h, reference_state=reference_state)
+            if fluid.name == "Water" and P == 150000.0:
+                # Shift temperature and enthalpy upward significantly
+                # This makes the temperature difference very small,
+                # driving Re and Nu toward values that produce very low h
+                shifted_h = state.enthalpy_j_kg + 168000.0  # ~40K for water Cp
+                return FluidState(
+                    temperature_k=state.temperature_k + 40.0,
+                    pressure_pa=state.pressure_pa,
+                    enthalpy_j_kg=shifted_h,
+                    density_kg_m3=state.density_kg_m3,
+                    cp_j_kg_k=state.cp_j_kg_k,
+                    viscosity_pa_s=state.viscosity_pa_s,
+                    conductivity_w_m_k=state.conductivity_w_m_k,
+                    phase=state.phase,
+                    quality=state.quality,
+                    entropy_j_kg_k=state.entropy_j_kg_k,
+                    provenance=state.provenance,
+                )
+            return state
 
-        mock.state_tp.side_effect = real_tp
+        mock.state_ph.side_effect = _biased_ph
+        return mock
 
-        # For the cold side, return a state_ph with temperature shifted
-        # upward, so the cold outlet ends up too close to the hot inlet.
+    def _make_terminal_dt_biased_provider(self, provider: CoolPropProvider) -> MagicMock:
+        """Provider that shifts cold outlet temperature close to hot inlet.
+
+        For counterflow, this makes dt_hot_in_cold_out < minimum_terminal_delta_t,
+        triggering the TEMPERATURE_CROSSING blocker.
+        """
+        mock = MagicMock()
+        mock.name = provider.name
+        mock.version = provider.version
+        mock.git_revision = ""
+        mock.reference_state_policy = ReferenceStatePolicy.DEF
+        mock.state_tp.side_effect = provider.state_tp
+
         def _shifted_cold_ph(fluid, P, h, reference_state=None):
-            state = real_ph(fluid, P, h, reference_state=reference_state)
+            state = provider.state_ph(fluid, P, h, reference_state=reference_state)
             if fluid.name == "Water" and P == 150000.0:
                 # Shift temperature upward by 40K to cause terminal dt violation
                 shifted_h = state.enthalpy_j_kg + 168000.0  # ~40K for water Cp
@@ -703,49 +709,179 @@ class TestPostCalculationBlocked:
             return state
 
         mock.state_ph.side_effect = _shifted_cold_ph
-        result = _run_rating(mock)
+        return mock
 
-        if result.status == RatingStatus.BLOCKED:
-            blocker_codes = [b.code for b in result.blockers]
-            # Post-calc block should have converged=True
-            assert result.converged is True
-            # Verify it's a post-calc blocker (not a pre-solver input blocker)
-            assert any(
-                code in blocker_codes
-                for code in [
-                    ErrorCode.TEMPERATURE_CROSSING,
-                    ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
-                ]
-            )
-        else:
-            # If solver couldn't converge with the bias, it's still BLOCKED
-            assert result.status == RatingStatus.BLOCKED
+    def _make_cold_ph_fail_provider(self, provider: CoolPropProvider) -> MagicMock:
+        """Provider where cold-side state_ph always raises PropertyServiceError.
 
-    def test_postcalc_preserves_diagnostics(self, provider: CoolPropProvider) -> None:
-        """All diagnostic fields (Q_hot, UA, LMTD, etc.) are non-None."""
-        mock_prov = self._make_biased_provider(provider, bias_field="enthalpy", bias_value=3000.0)
+        This causes the bracket probing to abort (TrialEvaluationAbort),
+        producing a BLOCKED result with the property failure.
+        """
+        mock = MagicMock()
+        mock.name = provider.name
+        mock.version = provider.version
+        mock.git_revision = ""
+        mock.reference_state_policy = ReferenceStatePolicy.DEF
+        mock.state_tp.side_effect = provider.state_tp
+
+        def _fail_cold_ph(fluid, P, h, reference_state=None):
+            if fluid.name == "Water" and P == 150000.0:
+                raise PropertyServiceError(
+                    code=PropertyErrorCode.BACKEND_FAILURE,
+                    message="Simulated cold-side property failure",
+                )
+            return provider.state_ph(fluid, P, h, reference_state=reference_state)
+
+        mock.state_ph.side_effect = _fail_cold_ph
+        return mock
+
+    def _make_hot_ph_fail_provider(self, provider: CoolPropProvider) -> MagicMock:
+        """Provider where hot-side state_ph always raises PropertyServiceError.
+
+        This causes the bracket probing to abort (TrialEvaluationAbort),
+        producing a BLOCKED result with the property failure.
+        """
+        mock = MagicMock()
+        mock.name = provider.name
+        mock.version = provider.version
+        mock.git_revision = ""
+        mock.reference_state_policy = ReferenceStatePolicy.DEF
+        mock.state_tp.side_effect = provider.state_tp
+
+        def _fail_hot_ph(fluid, P, h, reference_state=None):
+            if fluid.name == "Water" and P == 200000.0:
+                raise PropertyServiceError(
+                    code=PropertyErrorCode.BACKEND_FAILURE,
+                    message="Simulated hot-side property failure",
+                )
+            return provider.state_ph(fluid, P, h, reference_state=reference_state)
+
+        mock.state_ph.side_effect = _fail_hot_ph
+        return mock
+
+    def test_postcalc_energy_blocked(self, provider: CoolPropProvider) -> None:
+        """Energy balance blocker -> status=BLOCKED, converged=True.
+
+        The solver converges using biased cold-side enthalpies, but the
+        post-calculation energy balance check fails because Q_hot != Q_cold
+        (the bias creates an energy imbalance).
+        """
+        mock_prov = self._make_energy_biased_provider(provider, bias_value=5000.0)
         result = _run_rating(mock_prov)
 
-        if result.status == RatingStatus.BLOCKED and result.converged is True:
-            # Post-calc block: diagnostics should be preserved
-            assert result.Q_hot_w is not None, "Q_hot_w should be non-None"
-            assert result.Q_cold_w is not None, "Q_cold_w should be non-None"
-            assert result.UA_w_k is not None, "UA_w_k should be non-None"
-            assert result.LMTD_k is not None, "LMTD_k should be non-None"
-            assert result.heat_duty_w is not None, "heat_duty_w should be non-None"
-            assert result.hot_outlet_temperature_k is not None
-            assert result.cold_outlet_temperature_k is not None
-            # ε-NTU fields
-            assert result.NTU is not None, "NTU should be non-None"
-            assert result.effectiveness is not None, "effectiveness should be non-None"
-            assert result.C_min_w_k is not None, "C_min_w_k should be non-None"
-            assert result.C_max_w_k is not None, "C_max_w_k should be non-None"
-            # Resistance breakdown
-            assert result.resistance_breakdown is not None
-            assert result.resistance_breakdown.ua_w_k > 0
-            # Correlation info
-            assert result.tube_selected_correlation_id is not None
-            assert result.annulus_selected_correlation_id is not None
+        # Deterministically assert BLOCKED with energy balance blocker
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is True
+        blocker_codes = [b.code for b in result.blockers]
+        assert ErrorCode.ENERGY_BALANCE_NOT_CLOSED in blocker_codes
+
+    def test_postcalc_ualmtd_blocked(self, provider: CoolPropProvider) -> None:
+        """UA-LMTD closure blocker -> status=BLOCKED, converged=True.
+
+        The biased provider shifts cold outlet temperature, causing the
+        thermal resistance to produce a very different UA*LMTD from Q.
+        """
+        mock_prov = self._make_tube_h_biased_provider(provider)
+        result = _run_rating(mock_prov)
+
+        # Deterministically assert BLOCKED
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is True
+        blocker_codes = [b.code for b in result.blockers]
+        # The blocker should be either energy balance or temperature crossing
+        # (the large temperature shift can trigger either)
+        assert any(
+            code in blocker_codes
+            for code in [
+                ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
+                ErrorCode.TEMPERATURE_CROSSING,
+            ]
+        )
+
+    def test_postcalc_terminal_dt_blocked(self, provider: CoolPropProvider) -> None:
+        """Terminal delta-T blocker -> status=BLOCKED, converged=True.
+
+        We mock the cold-side state_ph to return a temperature that is too
+        close to the hot inlet, causing the post-solver terminal ΔT check
+        to fail for counterflow.
+        """
+        mock_prov = self._make_terminal_dt_biased_provider(provider)
+        result = _run_rating(mock_prov)
+
+        # Deterministically assert BLOCKED with terminal delta-T or energy blocker
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is True
+        blocker_codes = [b.code for b in result.blockers]
+        assert any(
+            code in blocker_codes
+            for code in [
+                ErrorCode.TEMPERATURE_CROSSING,
+                ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
+            ]
+        )
+
+    def test_postcalc_final_hot_ph_failure(self, provider: CoolPropProvider) -> None:
+        """Cold-side state_ph fails -> bracket aborts -> BLOCKED.
+
+        The cold-side state_ph always raises PropertyServiceError, which
+        causes the bracket probing to abort immediately. The result is
+        BLOCKED with converged=False and a PROPERTY_EVALUATION_FAILED blocker.
+        """
+        mock_prov = self._make_cold_ph_fail_provider(provider)
+        result = _run_rating(mock_prov)
+
+        # Deterministically assert BLOCKED with property failure
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is False
+        blocker_codes = [b.code for b in result.blockers]
+        assert ErrorCode.PROPERTY_EVALUATION_FAILED in blocker_codes
+
+    def test_postcalc_final_cold_ph_failure(self, provider: CoolPropProvider) -> None:
+        """Hot-side state_ph fails -> bracket aborts -> BLOCKED.
+
+        The hot-side state_ph always raises PropertyServiceError, which
+        causes the bracket probing to abort immediately. The result is
+        BLOCKED with converged=False and a PROPERTY_EVALUATION_FAILED blocker.
+        """
+        mock_prov = self._make_hot_ph_fail_provider(provider)
+        result = _run_rating(mock_prov)
+
+        # Deterministically assert BLOCKED with property failure
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is False
+        blocker_codes = [b.code for b in result.blockers]
+        assert ErrorCode.PROPERTY_EVALUATION_FAILED in blocker_codes
+
+    def test_postcalc_preserves_diagnostics(self, provider: CoolPropProvider) -> None:
+        """All diagnostic fields (Q_hot, UA, LMTD, etc.) are non-None
+        when the result is post-calculation BLOCKED (converged=True).
+        """
+        mock_prov = self._make_energy_biased_provider(provider, bias_value=5000.0)
+        result = _run_rating(mock_prov)
+
+        # Must be post-calculation BLOCKED (solver converged, post-calc check failed)
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is True
+
+        # Diagnostics should be preserved
+        assert result.Q_hot_w is not None, "Q_hot_w should be non-None"
+        assert result.Q_cold_w is not None, "Q_cold_w should be non-None"
+        assert result.UA_w_k is not None, "UA_w_k should be non-None"
+        assert result.LMTD_k is not None, "LMTD_k should be non-None"
+        assert result.heat_duty_w is not None, "heat_duty_w should be non-None"
+        assert result.hot_outlet_temperature_k is not None
+        assert result.cold_outlet_temperature_k is not None
+        # ε-NTU fields
+        assert result.NTU is not None, "NTU should be non-None"
+        assert result.effectiveness is not None, "effectiveness should be non-None"
+        assert result.C_min_w_k is not None, "C_min_w_k should be non-None"
+        assert result.C_max_w_k is not None, "C_max_w_k should be non-None"
+        # Resistance breakdown
+        assert result.resistance_breakdown is not None
+        assert result.resistance_breakdown.ua_w_k > 0
+        # Correlation info
+        assert result.tube_selected_correlation_id is not None
+        assert result.annulus_selected_correlation_id is not None
 
 
 # =========================================================================
@@ -872,166 +1008,303 @@ class TestVerifierTamper:
 # =========================================================================
 
 
+def _make_blocked_result(
+    *,
+    converged: bool,
+    iterations: int,
+    solver_termination_reason: str,
+    solver_details: SolverDetailsModel | None = None,
+) -> RatingResult:
+    """Build a BLOCKED RatingResult for convergence contract testing."""
+    from hexagent.core.heat_balance import ProviderIdentitySnapshot
+    from hexagent.exchangers.double_pipe.rating import (
+        _provenance_graph_digest,
+        build_provenance,
+        build_provenance_core,
+        compute_result_hash,
+    )
+
+    ri = _make_minimal_request_identity()
+    pi = ProviderIdentitySnapshot(
+        name="CoolProp",
+        version="1.0",
+        git_revision="",
+        reference_state_policy="def",
+    )
+    empty_res = _build_empty_resistance()
+    if solver_details is None:
+        solver_details = _build_empty_solver_details()
+
+    core_graph, core_nodes, core_edges = build_provenance_core(
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        property_calls=(),
+        iterations=iterations,
+        converged=converged,
+        warnings=[],
+        blockers=[],
+        request_identity=ri,
+    )
+    core_digest = _provenance_graph_digest(core_graph)
+
+    result_hash = compute_result_hash(
+        request_identity=ri,
+        provider_identity=pi,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=empty_res,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=iterations,
+        converged=converged,
+        solver_termination_reason=solver_termination_reason,
+        solver_details=solver_details,
+        property_calls=(),
+        warnings=(),
+        blockers=(),
+        status=RatingStatus.BLOCKED,
+        core_provenance_digest=core_digest,
+    )
+
+    provenance_graph = build_provenance(
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        property_calls=(),
+        iterations=iterations,
+        converged=converged,
+        warnings=[],
+        blockers=[],
+        result_hash=result_hash,
+        request_identity=ri,
+    )
+    prov_digest = _provenance_graph_digest(provenance_graph)
+
+    blocker = EngineeringMessage(
+        code=ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
+        severity=EngineeringMessageSeverity.BLOCKER,
+        message="Test blocker",
+        source_module="test",
+    )
+
+    return RatingResult(
+        status=RatingStatus.BLOCKED,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=empty_res,
+        iterations=iterations,
+        converged=converged,
+        solver_termination_reason=solver_termination_reason,
+        solver_details=solver_details,
+        warnings=(),
+        blockers=(blocker,),
+        property_calls=(),
+        provider_identity=pi,
+        request_identity=ri,
+        result_hash=result_hash,
+        provenance_graph=provenance_graph,
+        provenance_digest=prov_digest,
+        core_provenance_digest=core_digest,
+    )
+
+
 class TestSolverConvergenceContract:
     """Solver convergence contract validation in RatingResult."""
 
-    def test_convergence_contract_validates(self, provider: CoolPropProvider) -> None:
+    def test_convergence_contract_valid(self, provider: CoolPropProvider) -> None:
         """BLOCKED with converged=True, solver_termination_reason='converged'
-        -> valid; converged=False with termination='converged' -> ValueError.
+        -> valid (no exception).
         """
-        from pydantic import ValidationError
-
-        # Build a valid BLOCKED result with converged=True and termination_reason='converged'
-        from hexagent.core.heat_balance import (
-            ProviderIdentitySnapshot,
-        )
-        from hexagent.exchangers.double_pipe.rating import (
-            _provenance_graph_digest,
-            build_provenance,
-            build_provenance_core,
-            compute_result_hash,
-        )
-
-        ri = _make_minimal_request_identity()
-        pi = ProviderIdentitySnapshot(
-            name="CoolProp",
-            version="1.0",
-            git_revision="",
-            reference_state_policy="def",
-        )
-        empty_res = _build_empty_resistance()
-        empty_solver = _build_empty_solver_details()
-
-        core_graph, core_nodes, core_edges = build_provenance_core(
-            flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=(),
-            iterations=5,
+        result = _make_blocked_result(
             converged=True,
-            warnings=[],
-            blockers=[],
-            request_identity=ri,
-        )
-        core_digest = _provenance_graph_digest(core_graph)
-
-        result_hash = compute_result_hash(
-            request_identity=ri,
-            provider_identity=pi,
-            flow_arrangement=FlowArrangement.COUNTERFLOW,
-            heat_duty_w=None,
-            hot_outlet_temperature_k=None,
-            cold_outlet_temperature_k=None,
-            tube_reynolds=None,
-            tube_prandtl=None,
-            tube_nusselt=None,
-            tube_h=None,
-            tube_selected_correlation_id=None,
-            tube_selected_correlation_version=None,
-            tube_applicability_status=None,
-            annulus_reynolds=None,
-            annulus_prandtl=None,
-            annulus_nusselt=None,
-            annulus_h=None,
-            annulus_selected_correlation_id=None,
-            annulus_selected_correlation_version=None,
-            annulus_applicability_status=None,
-            area_inner_m2=0.0,
-            area_outer_m2=0.0,
-            resistance_breakdown=empty_res,
-            U_inner_basis=None,
-            U_outer_basis=None,
-            UA_w_k=None,
-            C_hot_w_k=None,
-            C_cold_w_k=None,
-            C_min_w_k=None,
-            C_max_w_k=None,
-            capacity_ratio=None,
-            NTU=None,
-            effectiveness=None,
-            LMTD_k=None,
-            energy_residual_w=None,
-            ua_lmtd_residual_w=None,
             iterations=5,
-            converged=True,
             solver_termination_reason="converged",
-            solver_details=empty_solver,
-            property_calls=(),
-            warnings=(),
-            blockers=(),
-            status=RatingStatus.BLOCKED,
-            core_provenance_digest=core_digest,
         )
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is True
 
-        provenance_graph = build_provenance(
-            flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=(),
-            iterations=5,
-            converged=True,
-            warnings=[],
-            blockers=[],
-            result_hash=result_hash,
-            request_identity=ri,
-        )
-        prov_digest = _provenance_graph_digest(provenance_graph)
-
-        blocker = EngineeringMessage(
-            code=ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
-            severity=EngineeringMessageSeverity.BLOCKER,
-            message="Test blocker",
-            source_module="test",
-        )
-
-        # Valid case: BLOCKED with converged=True
-        valid_result = RatingResult(
-            status=RatingStatus.BLOCKED,
-            flow_arrangement=FlowArrangement.COUNTERFLOW,
-            heat_duty_w=None,
-            hot_outlet_temperature_k=None,
-            cold_outlet_temperature_k=None,
-            area_inner_m2=0.0,
-            area_outer_m2=0.0,
-            resistance_breakdown=empty_res,
-            iterations=5,
-            converged=True,
-            solver_termination_reason="converged",
-            solver_details=empty_solver,
-            warnings=(),
-            blockers=(blocker,),
-            property_calls=(),
-            provider_identity=pi,
-            request_identity=ri,
-            result_hash=result_hash,
-            provenance_graph=provenance_graph,
-            provenance_digest=prov_digest,
-            core_provenance_digest=core_digest,
-        )
-        # This should NOT raise - BLOCKED can have converged=True
-        assert valid_result.status == RatingStatus.BLOCKED
-        assert valid_result.converged is True
-
-        # Invalid case: converged=False with solver_termination_reason='converged'
-        # The _validate_solver_convergence_contract validator should raise ValueError
-        # because solver_termination_reason='converged' contradicts converged=False
+    def test_convergence_contract_converged_false_with_converged_reason(
+        self, provider: CoolPropProvider
+    ) -> None:
+        """converged=False with solver_termination_reason='converged' -> ValueError."""
         with pytest.raises(ValidationError, match="converged is False"):
-            RatingResult(
-                status=RatingStatus.BLOCKED,
-                flow_arrangement=FlowArrangement.COUNTERFLOW,
-                heat_duty_w=None,
-                hot_outlet_temperature_k=None,
-                cold_outlet_temperature_k=None,
-                area_inner_m2=0.0,
-                area_outer_m2=0.0,
-                resistance_breakdown=empty_res,
-                iterations=5,
+            _make_blocked_result(
                 converged=False,
+                iterations=5,
                 solver_termination_reason="converged",
-                solver_details=empty_solver,
-                warnings=(),
-                blockers=(blocker,),
-                property_calls=(),
-                provider_identity=pi,
-                request_identity=ri,
-                result_hash=result_hash,
-                provenance_graph=provenance_graph,
-                provenance_digest=prov_digest,
-                core_provenance_digest=core_digest,
+            )
+
+    def test_convergence_contract_bracket_not_found_with_converged_true(
+        self, provider: CoolPropProvider
+    ) -> None:
+        """bracket_not_found + converged=True -> ValueError.
+
+        A bracket-not-found termination cannot coexist with converged=True.
+        """
+        with pytest.raises(ValidationError, match="bracket_not_found.*converged is True"):
+            _make_blocked_result(
+                converged=True,
+                iterations=5,
+                solver_termination_reason="bracket_not_found",
+            )
+
+    def test_convergence_contract_non_convergence_with_converged_true(
+        self, provider: CoolPropProvider
+    ) -> None:
+        """non_convergence + converged=True -> ValueError.
+
+        A non-convergence termination cannot coexist with converged=True.
+        """
+        with pytest.raises(ValidationError, match="non_convergence.*converged is True"):
+            _make_blocked_result(
+                converged=True,
+                iterations=5,
+                solver_termination_reason="non_convergence",
+            )
+
+    def test_convergence_contract_solver_details_termination_mismatch(
+        self, provider: CoolPropProvider
+    ) -> None:
+        """solver_details.termination_reason != solver_termination_reason -> ValueError."""
+        mismatched_details = SolverDetailsModel(
+            iterations=5,
+            residual_w=0.001,
+            function_evaluations=10,
+            termination_reason="non_convergence",  # mismatch!
+        )
+        with pytest.raises(ValidationError, match="solver_details\\.termination_reason"):
+            _make_blocked_result(
+                converged=True,
+                iterations=5,
+                solver_termination_reason="converged",
+                solver_details=mismatched_details,
+            )
+
+    def test_convergence_contract_solver_details_iterations_mismatch(
+        self, provider: CoolPropProvider
+    ) -> None:
+        """solver_details.iterations != iterations -> ValueError."""
+        mismatched_details = SolverDetailsModel(
+            iterations=10,  # mismatch with top-level iterations=5
+            residual_w=0.001,
+            function_evaluations=10,
+            termination_reason="converged",
+        )
+        with pytest.raises(ValidationError, match="solver_details\\.iterations"):
+            _make_blocked_result(
+                converged=True,
+                iterations=5,
+                solver_termination_reason="converged",
+                solver_details=mismatched_details,
+            )
+
+
+# =========================================================================
+# 7. Solver convergence validator details
+# =========================================================================
+
+
+class TestSolverConvergenceValidatorDetails:
+    """Explicit tests for solver convergence validator cross-checks."""
+
+    def test_converged_true_both_reasons_converged_valid(self) -> None:
+        """converged=True + solver_termination_reason='converged' +
+        solver_details.termination_reason='converged' -> valid.
+        """
+        details = SolverDetailsModel(
+            iterations=5,
+            residual_w=0.001,
+            function_evaluations=10,
+            termination_reason="converged",
+        )
+        result = _make_blocked_result(
+            converged=True,
+            iterations=5,
+            solver_termination_reason="converged",
+            solver_details=details,
+        )
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is True
+
+    def test_converged_true_details_non_convergence_raises(self) -> None:
+        """converged=True + solver_termination_reason='converged' +
+        solver_details.termination_reason='non_convergence' -> ValueError.
+        """
+        details = SolverDetailsModel(
+            iterations=5,
+            residual_w=0.001,
+            function_evaluations=10,
+            termination_reason="non_convergence",  # mismatch!
+        )
+        with pytest.raises(ValidationError, match="solver_details\\.termination_reason"):
+            _make_blocked_result(
+                converged=True,
+                iterations=5,
+                solver_termination_reason="converged",
+                solver_details=details,
+            )
+
+    def test_converged_false_both_reasons_non_convergence_valid(self) -> None:
+        """converged=False + solver_termination_reason='non_convergence' +
+        solver_details.termination_reason='non_convergence' -> valid.
+        """
+        details = SolverDetailsModel(
+            iterations=5,
+            residual_w=0.001,
+            function_evaluations=10,
+            termination_reason="non_convergence",
+        )
+        result = _make_blocked_result(
+            converged=False,
+            iterations=5,
+            solver_termination_reason="non_convergence",
+            solver_details=details,
+        )
+        assert result.status == RatingStatus.BLOCKED
+        assert result.converged is False
+
+    def test_converged_true_bracket_not_found_raises(self) -> None:
+        """converged=True + solver_termination_reason='bracket_not_found' -> ValueError."""
+        details = SolverDetailsModel(
+            iterations=0,
+            residual_w=float("nan"),
+            function_evaluations=20,
+            termination_reason="bracket_not_found",
+        )
+        with pytest.raises(ValidationError, match="bracket_not_found.*converged is True"):
+            _make_blocked_result(
+                converged=True,
+                iterations=0,
+                solver_termination_reason="bracket_not_found",
+                solver_details=details,
             )

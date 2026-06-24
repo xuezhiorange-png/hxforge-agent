@@ -102,6 +102,11 @@ _DEFAULT_MINIMUM_TERMINAL_DELTA_T = 0.5
 _ENERGY_RESIDUAL_ABS_TOL = 1e-3
 _ENERGY_RESIDUAL_REL_TOL = 1e-8
 
+# Q_max dual tolerance (parallel-flow pinch search)
+Q_MAX_Q_TOLERANCE_W = 1e-6
+Q_MAX_PINCH_TOLERANCE_K = 1e-6
+Q_MAX_MAX_ITERATIONS = 100
+
 
 # ---------------------------------------------------------------------------
 # Trial evaluation dataclass
@@ -150,10 +155,11 @@ class QMaxResult:
 
     q_max_w: float
     iterations: int
-    final_q_low_w: float
-    final_q_high_w: float
     final_pinch_residual_k: float
     termination_reason: str
+    final_q_low_w: float | None = None
+    final_q_high_w: float | None = None
+    final_q_width_w: float | None = None
     # Counter-flow: explicit limit fields
     hot_limit_w: float | None = None
     cold_limit_w: float | None = None
@@ -923,8 +929,9 @@ def _compute_q_max_counterflow(
     return QMaxResult(
         q_max_w=q_max,
         iterations=0,
-        final_q_low_w=q_max,
-        final_q_high_w=max(Q_hot_limit, Q_cold_limit),
+        final_q_low_w=None,
+        final_q_high_w=None,
+        final_q_width_w=None,
         final_pinch_residual_k=0.0,
         termination_reason="independent_limits",
         hot_limit_w=Q_hot_limit,
@@ -1023,8 +1030,9 @@ def _compute_q_max_parallel(
         return QMaxResult(
             q_max_w=0.0,
             iterations=0,
-            final_q_low_w=0.0,
-            final_q_high_w=q_upper,
+            final_q_low_w=None,
+            final_q_high_w=None,
+            final_q_width_w=None,
             final_pinch_residual_k=0.0,
             termination_reason="zero_upper_bound",
         )
@@ -1105,37 +1113,63 @@ def _compute_q_max_parallel(
         return QMaxResult(
             q_max_w=q_upper,
             iterations=0,
-            final_q_low_w=0.0,
+            final_q_low_w=q_upper,
             final_q_high_w=q_upper,
+            final_q_width_w=0.0,
             final_pinch_residual_k=pinch_at_upper,
             termination_reason="pinch_satisfied_at_upper",
+            q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
+            pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
         )
 
     # Bisection to find the Q where pinch = 0
     q_lo, q_hi = 0.0, q_upper
     iterations = 0
-    final_residual = pinch_at_upper
-    for _ in range(50):
+
+    for _ in range(Q_MAX_MAX_ITERATIONS):
         iterations += 1
         q_mid = 0.5 * (q_lo + q_hi)
         pinch_mid = _exit_pinch_residual(q_mid)
-        final_residual = pinch_mid
         if pinch_mid >= 0:
             q_lo = q_mid
         else:
             q_hi = q_mid
-        if q_hi - q_lo < pinch_temperature_tolerance_k:
+
+        # Check dual tolerance
+        final_q_width = q_hi - q_lo
+        q_width_ok = final_q_width <= Q_MAX_Q_TOLERANCE_W
+        pinch_ok = abs(pinch_mid) <= Q_MAX_PINCH_TOLERANCE_K
+        if q_width_ok and pinch_ok:
             break
+    else:
+        # Max iterations reached without convergence
+        final_q_width = q_hi - q_lo
+        pinch_at_final_q = _exit_pinch_residual(q_lo)
+        return QMaxResult(
+            q_max_w=q_lo,
+            iterations=iterations,
+            final_q_low_w=q_lo,
+            final_q_high_w=q_hi,
+            final_q_width_w=final_q_width,
+            final_pinch_residual_k=pinch_at_final_q,
+            termination_reason="iteration_limit",
+            q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
+            pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
+        )
+
+    # Converged: recompute pinch at q_lo to get final residual
+    pinch_at_q_lo = _exit_pinch_residual(q_lo)
 
     return QMaxResult(
         q_max_w=q_lo,
         iterations=iterations,
         final_q_low_w=q_lo,
         final_q_high_w=q_hi,
-        final_pinch_residual_k=final_residual,
+        final_q_width_w=q_hi - q_lo,
+        final_pinch_residual_k=pinch_at_q_lo,
         termination_reason="bisection_converged",
-        q_tolerance_w=q_hi - q_lo,
-        pinch_temperature_tolerance_k=pinch_temperature_tolerance_k,
+        q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
+        pinch_temperature_tolerance_k=Q_MAX_PINCH_TOLERANCE_K,
     )
 
 
@@ -1565,6 +1599,29 @@ def rate_double_pipe(
             recorder=recorder,
         )
         q_max = q_max_result.q_max_w
+
+        # Handle Q_max non-convergence
+        if q_max_result.termination_reason == "iteration_limit":
+            blockers.append(
+                _make_blocker(
+                    ErrorCode.SOLVER_NON_CONVERGENCE,
+                    f"Parallel-flow Q_max pinch search did not converge after "
+                    f"{q_max_result.iterations} iterations",
+                    (
+                        ("iterations", q_max_result.iterations),
+                        ("final_q_width_w", q_max_result.final_q_width_w),
+                        ("final_pinch_residual_k", q_max_result.final_pinch_residual_k),
+                    ),
+                )
+            )
+            return _blocked_result(
+                blockers=blockers,
+                property_calls=recorder.records,
+                request_identity=request_identity,
+                provider_identity=provider_identity,
+                execution_context=ctx_snapshot,
+                flow_arrangement=flow_arrangement,
+            )
     except PropertyServiceError as exc:
         blockers.append(
             _make_blocker(

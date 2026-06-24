@@ -11,7 +11,7 @@ Geometry (same as Case 1):
   D_outer  = 0.040 m  (outer pipe inner diameter)
   L        = 3.0 m
   k_wall   = 50.0 W/(m·K)
-  fouling  = 0 on both sides
+  fouling  = 0.0002 m²K/W on both sides
 
 Fluids (same as Case 1):
   Hot:  Water, m = 0.5 kg/s, T_in = 350 K, P_in = 200000 Pa (in tube)
@@ -122,8 +122,8 @@ def compute_thermal_resistance(
     area_inner_m2: float,
     area_outer_m2: float,
     R_wall_kw: float,
-    fouling_inner_m2kw: float = 0.0,
-    fouling_outer_m2kw: float = 0.0,
+    fouling_inner_m2kw: float = 0.0002,
+    fouling_outer_m2kw: float = 0.0002,
 ) -> dict:
     """Build thermal resistance network."""
     r_conv_inner = 1.0 / (h_inner * area_inner_m2)
@@ -224,6 +224,8 @@ def evaluate_residual(
         area_inner_m2=area_inner,
         area_outer_m2=area_outer,
         R_wall_kw=R_wall,
+        fouling_inner_m2kw=0.0002,
+        fouling_outer_m2kw=0.0002,
     )
     UA = R["ua_w_k"]
 

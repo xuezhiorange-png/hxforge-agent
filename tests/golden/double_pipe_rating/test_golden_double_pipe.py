@@ -107,7 +107,7 @@ def test_golden_case(golden_file: str, provider: CoolPropProvider) -> None:
         assert result.hot_outlet_temperature_k is not None
         assert result.hot_outlet_temperature_k == pytest.approx(
             expected["hot_outlet_temperature_k"],
-            rel=tols["temperature_relative"],
+            abs=tols["temperature_absolute"],
         )
 
     # Assert cold outlet temperature
@@ -115,7 +115,7 @@ def test_golden_case(golden_file: str, provider: CoolPropProvider) -> None:
         assert result.cold_outlet_temperature_k is not None
         assert result.cold_outlet_temperature_k == pytest.approx(
             expected["cold_outlet_temperature_k"],
-            rel=tols["temperature_relative"],
+            abs=tols["temperature_absolute"],
         )
 
     # Assert UA

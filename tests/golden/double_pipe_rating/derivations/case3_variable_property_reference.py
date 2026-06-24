@@ -5,17 +5,17 @@ Case 3: Variable-property counterflow water-water double-pipe rating.
 Independent reference derivation — does NOT import any hexagent modules.
 Uses only CoolProp and standard library.
 
-Geometry (same as Case 1):
-  D_i      = 0.020 m  (inner tube inner diameter)
-  D_o      = 0.025 m  (inner tube outer diameter)
-  D_outer  = 0.040 m  (outer pipe inner diameter)
-  L        = 3.0 m
-  k_wall   = 50.0 W/(m·K)
-  fouling  = 0 on both sides
+Geometry:
+  D_i      = 0.025 m  (inner tube inner diameter)
+  D_o      = 0.032 m  (inner tube outer diameter)
+  D_outer  = 0.050 m  (outer pipe inner diameter)
+  L        = 5.0 m
+  k_wall   = 16.0 W/(m·K)
+  fouling  = 0.0002 m²K/W on both sides
 
 Fluids (different temperatures and flows):
-  Hot:  Water, m = 0.8 kg/s, T_in = 400 K, P_in = 300000 Pa (in tube)
-  Cold: Water, m = 2.0 kg/s, T_in = 280 K, P_in = 200000 Pa (in annulus)
+  Hot:  Water, m = 0.8 kg/s, T_in = 360 K, P_in = 250000 Pa (in tube)
+  Cold: Water, m = 2.0 kg/s, T_in = 290 K, P_in = 200000 Pa (in annulus)
 
 Flow arrangement: Counterflow
 """
@@ -33,11 +33,11 @@ import CoolProp.CoolProp as CP
 # Geometry (matching production DoublePipeGeometry)
 # ====================================================================
 
-D_i = 0.020  # inner tube inner diameter [m]
-D_o = 0.025  # inner tube outer diameter [m]
-D_outer = 0.040  # outer pipe inner diameter [m]
-L = 3.0  # effective length [m]
-k_wall = 50.0  # wall thermal conductivity [W/(m·K)]
+D_i = 0.025  # inner tube inner diameter [m]
+D_o = 0.032  # inner tube outer diameter [m]
+D_outer = 0.050  # outer pipe inner diameter [m]
+L = 5.0  # effective length [m]
+k_wall = 16.0  # wall thermal conductivity [W/(m·K)]
 
 # Surface areas (production formulas)
 area_inner = math.pi * D_i * L  # π × D_i × L
@@ -63,12 +63,12 @@ FLUID = "Water"
 
 # Hot side (in tube)
 m_hot = 0.8  # mass flow rate [kg/s]
-T_hot_in = 400.0  # inlet temperature [K]
-P_hot_in = 300000.0  # inlet pressure [Pa]
+T_hot_in = 360.0  # inlet temperature [K]
+P_hot_in = 250000.0  # inlet pressure [Pa]
 
 # Cold side (in annulus)
 m_cold = 2.0
-T_cold_in = 280.0
+T_cold_in = 290.0
 P_cold_in = 200000.0
 
 
@@ -122,8 +122,8 @@ def compute_thermal_resistance(
     area_inner_m2: float,
     area_outer_m2: float,
     R_wall_kw: float,
-    fouling_inner_m2kw: float = 0.0,
-    fouling_outer_m2kw: float = 0.0,
+    fouling_inner_m2kw: float = 0.0002,
+    fouling_outer_m2kw: float = 0.0002,
 ) -> dict:
     """Build thermal resistance network."""
     r_conv_inner = 1.0 / (h_inner * area_inner_m2)
@@ -224,6 +224,8 @@ def evaluate_residual(
         area_inner_m2=area_inner,
         area_outer_m2=area_outer,
         R_wall_kw=R_wall,
+        fouling_inner_m2kw=0.0002,
+        fouling_outer_m2kw=0.0002,
     )
     UA = R["ua_w_k"]
 

@@ -398,6 +398,20 @@ class RatingResult(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _validate_solver_details_iterations(self) -> RatingResult:
+        """Ensure solver_details.iterations matches top-level iterations."""
+        if (
+            self.solver_details
+            and self.solver_details.termination_reason not in ("not_started", "")
+            and self.solver_details.iterations != self.iterations
+        ):
+            raise ValueError(
+                f"solver_details.iterations ({self.solver_details.iterations}) "
+                f"!= iterations ({self.iterations})"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_flow_arrangement_consistency(self) -> RatingResult:
         """Ensure top-level flow_arrangement matches request_identity."""
         if self.flow_arrangement.value != self.request_identity.flow_arrangement:
@@ -428,6 +442,20 @@ class RatingResult(BaseModel):
             raise ValueError("solver_termination_reason is 'converged' but converged is False")
         if self.solver_termination_reason == "non_convergence" and self.converged:
             raise ValueError("solver_termination_reason is 'non_convergence' but converged is True")
+        if self.solver_termination_reason == "bracket_not_found" and self.converged:
+            raise ValueError(
+                "solver_termination_reason is 'bracket_not_found' but converged is True"
+            )
+        # Also check solver_details.termination_reason if present
+        if (
+            self.solver_details
+            and self.solver_details.termination_reason not in ("not_started", "")
+            and self.solver_details.termination_reason != self.solver_termination_reason
+        ):
+            raise ValueError(
+                f"solver_details.termination_reason ({self.solver_details.termination_reason!r}) "
+                f"!= solver_termination_reason ({self.solver_termination_reason!r})"
+            )
         return self
 
     # ------------------------------------------------------------------

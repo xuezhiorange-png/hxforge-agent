@@ -33,10 +33,10 @@
     "energy_residual_w_max": 1e-6
   },
   "tolerances": {
-    "temperature_relative": 0.01,
-    "heat_duty_relative": 0.05,
-    "UA_relative": 0.05,
-    "LMTD_relative": 0.05,
+    "temperature_absolute": 1e-5,
+    "heat_duty_relative": 1e-5,
+    "UA_relative": 1e-5,
+    "LMTD_relative": 1e-5,
     "energy_residual_relative": 0.05
   }
 }

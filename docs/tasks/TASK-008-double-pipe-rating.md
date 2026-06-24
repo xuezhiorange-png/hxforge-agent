@@ -17,7 +17,6 @@ Perform rating analysis for a fixed-geometry double-pipe heat exchanger. Given o
 ### Flow Arrangements
 
 - **Supported:** Counter-flow, parallel-flow
-- **Default assumption:** Counter-flow unless explicitly specified
 
 ### Sign Convention
 
@@ -107,11 +106,17 @@ enabling deterministic replay and the evaluation identity verifier to
 confirm no steps were skipped or duplicated.
 
 ### Blockers
-- **Partial post-calculation BLOCKED:** When a property or correlation
-  evaluation fails after partial convergence progress, the result emits
-  `BLOCKED` status that **preserves all diagnostic data collected so far**
+- **Partial post-calculation BLOCKED with `converged=True`:** When a property
+  or correlation evaluation fails after the solver has already converged (Q
+  root-finding succeeded), the result emits `BLOCKED` status with
+  `converged=True` that **preserves all diagnostic data collected so far**
   (evaluations, partial residuals, correlation applicability warnings).
   Debugging context is never lost even when the rating cannot complete.
+- **Solver convergence vs engineering BLOCKED distinction:**
+  - `converged=True, BLOCKED`: Solver found valid Q root; post-convergence
+    property/correlation evaluation failed.
+  - `converged=False, BLOCKED`: Solver itself could not converge.
+  - `converged=False, FAILED`: Unrecoverable runtime error.
 - Temperature crossover (hot outlet < cold outlet in counter-flow)
 - Invalid property values (NaN, Infinity, negative)
 - Correlation unavailable (including C4 implementation_unavailable)
@@ -134,15 +139,18 @@ If operating conditions require C4 (annulus laminar inner CHF):
 ## Geometry Request Model
 
 Immutable, JSON round-trip capable. Fields:
-- `inner_tube_inner_diameter` (m)
-- `inner_tube_outer_diameter` (m)
-- `outer_pipe_inner_diameter` (m)
-- `effective_length` (m)
+- `inner_tube_inner_diameter_m` (m)
+- `inner_tube_outer_diameter_m` (m)
+- `outer_pipe_inside_diameter_m` (m)
+- `heat_transfer_length_m` (m)
 - `wall_thermal_conductivity` (W/m·K)
-- `inner_surface_roughness` (m, default 0)
-- `annulus_surface_roughness` (m, default 0)
+- `inner_roughness_m` (m, default 0)
+- `outer_roughness_m` (m, default 0)
 - `inner_fouling_resistance` (m²·K/W, default 0)
 - `outer_fouling_resistance` (m²·K/W, default 0)
+- `minimum_terminal_delta_t` (K, **required, no default**)
+- `tube_boundary_condition` (str, **required, no default**)
+- `annulus_boundary_condition` (str, **required, no default**)
 
 Validation:
 - 0 < D_i < D_o < D_outer
@@ -192,7 +200,9 @@ Each residual evaluation:
 7. Compute LMTD and residual
 Each evaluation is recorded by the `EvaluationRecorder` with a continuous
 evaluation identity (monotonic counter + `SolverEvaluationPhase` tag) and
-one of 7 `EvaluationRole` categories. The evaluation identity verifier
+one of 7 `EvaluationRole` categories: `inlet`, `q_max_counterflow`,
+`q_max_parallel_limits`, `q_max_parallel_pinch`, `bracket_probe`,
+`solver_iteration`, `final_evaluation`. The evaluation identity verifier
 confirms replay integrity. All PropertyProvider calls and correlation
 selection enter provenance.
 
