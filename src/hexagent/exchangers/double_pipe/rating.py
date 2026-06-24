@@ -38,6 +38,7 @@ from hexagent.exchangers.double_pipe.recorder import (
     EvaluationContext,
     EvaluationRecorder,
     EvaluationRole,
+    SolverEvaluationPhase,
 )
 from hexagent.exchangers.double_pipe.result import (
     ApplicabilitySnapshot,
@@ -141,7 +142,11 @@ class TrialEvaluationAbort(Exception):
 
 @dataclass(frozen=True)
 class QMaxResult:
-    """Structured result from Q_max computation."""
+    """Structured result from Q_max computation.
+
+    Property calls are owned by the EvaluationRecorder; the recorder
+    is the single source of truth for all property call records.
+    """
 
     q_max_w: float
     iterations: int
@@ -149,7 +154,13 @@ class QMaxResult:
     final_q_high_w: float
     final_pinch_residual_k: float
     termination_reason: str
-    property_calls: tuple[PropertyCallRecord, ...]
+    # Counter-flow: explicit limit fields
+    hot_limit_w: float | None = None
+    cold_limit_w: float | None = None
+    limiting_side: str | None = None
+    # Parallel-flow: bracket and pinch diagnostics
+    q_tolerance_w: float | None = None
+    pinch_temperature_tolerance_k: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -514,7 +525,7 @@ def _blocked_result(
     *,
     blockers: list[EngineeringMessage],
     warnings: list[EngineeringMessage] | None = None,
-    property_calls: list[PropertyCallRecord] | None = None,
+    property_calls: list[PropertyCallRecord] | tuple[PropertyCallRecord, ...] | None = None,
     request_identity: RatingRequestIdentity | None = None,
     provider_identity: ProviderIdentitySnapshot | None = None,
     execution_context: ExecutionContextSnapshot | None = None,
@@ -523,7 +534,7 @@ def _blocked_result(
     """Build a BLOCKED RatingResult with full provenance."""
     ctx = execution_context or ExecutionContextSnapshot()
     warnings = warnings or []
-    property_calls = property_calls or []
+    property_calls = list(property_calls) if property_calls else []
     provider_identity = provider_identity or ProviderIdentitySnapshot(
         name="",
         version="",
@@ -660,7 +671,7 @@ def _failed_result(
     *,
     solver_result: SolverResult,
     warnings: list[EngineeringMessage] | None = None,
-    property_calls: list[PropertyCallRecord] | None = None,
+    property_calls: list[PropertyCallRecord] | tuple[PropertyCallRecord, ...] | None = None,
     request_identity: RatingRequestIdentity | None = None,
     provider_identity: ProviderIdentitySnapshot | None = None,
     execution_context: ExecutionContextSnapshot | None = None,
@@ -671,7 +682,7 @@ def _failed_result(
 
     ctx = execution_context or ExecutionContextSnapshot()
     warnings = warnings or []
-    property_calls = property_calls or []
+    property_calls = list(property_calls) if property_calls else []
     provider_identity = provider_identity or ProviderIdentitySnapshot(
         name="",
         version="",
@@ -842,37 +853,32 @@ def _compute_q_max_counterflow(
     hot_mass_flow_kg_s: float,
     cold_mass_flow_kg_s: float,
     minimum_terminal_delta_t: float,
-    property_calls: list[PropertyCallRecord],
     recorder: EvaluationRecorder,
 ) -> QMaxResult:
     """Counter-flow Q_max: independent terminal pinch at each end.
 
-    Success records go into local_calls (returned in QMaxResult).
-    Failure records are appended to the passed property_calls list
-    so they survive the re-raise.
+    All property calls are recorded atomically by the EvaluationRecorder.
     """
     ctx = recorder.begin(EvaluationRole.Q_MAX_COUNTERFLOW)
-    local_calls: list[PropertyCallRecord] = []
 
     # Hot stream: T_hot_out_min = T_cold_in + minimum_terminal_delta_t
     T_hot_out_min = cold_inlet_temperature_k + minimum_terminal_delta_t
     try:
         hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min, hot_inlet_pressure_pa)
     except PropertyServiceError as exc:
-        record = recorder.record_failure(
+        recorder.record_failure(
             ctx,
             fluid_name=hot_fluid.name,
             query_type="TP",
-            inputs=(("temperature_k", T_hot_out_min), ("pressure_pa", hot_inlet_pressure_pa)),
+            inputs=((("temperature_k", T_hot_out_min), ("pressure_pa", hot_inlet_pressure_pa))),
             provider=provider,
             stage="q_max",
             stream_role="hot_limit",
             error_code=exc.code.value,
             error_message=str(exc),
         )
-        property_calls.append(record)
         raise
-    hot_record = recorder.record_success(
+    recorder.record_success(
         ctx,
         hot_limit_state,
         query_type="TP",
@@ -881,14 +887,13 @@ def _compute_q_max_counterflow(
         stage="q_max",
         stream_role="hot_limit",
     )
-    local_calls.append(hot_record)
 
     # Cold stream: T_cold_out_max = T_hot_in - minimum_terminal_delta_t
     T_cold_out_max = hot_inlet_temperature_k - minimum_terminal_delta_t
     try:
         cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max, cold_inlet_pressure_pa)
     except PropertyServiceError as exc:
-        record = recorder.record_failure(
+        recorder.record_failure(
             ctx,
             fluid_name=cold_fluid.name,
             query_type="TP",
@@ -899,9 +904,8 @@ def _compute_q_max_counterflow(
             error_code=exc.code.value,
             error_message=str(exc),
         )
-        property_calls.append(record)
         raise
-    cold_record = recorder.record_success(
+    recorder.record_success(
         ctx,
         cold_limit_state,
         query_type="TP",
@@ -910,22 +914,22 @@ def _compute_q_max_counterflow(
         stage="q_max",
         stream_role="cold_limit",
     )
-    local_calls.append(cold_record)
 
     Q_hot_limit = hot_mass_flow_kg_s * (h_hot_in - hot_limit_state.enthalpy_j_kg)
     Q_cold_limit = cold_mass_flow_kg_s * (cold_limit_state.enthalpy_j_kg - h_cold_in)
     q_max = min(Q_hot_limit, Q_cold_limit)
+    limiting_side = "hot_limit" if Q_hot_limit <= Q_cold_limit else "cold_limit"
 
-    final_q_low_w = min(Q_hot_limit, Q_cold_limit)
-    final_q_high_w = max(Q_hot_limit, Q_cold_limit)
     return QMaxResult(
         q_max_w=q_max,
         iterations=0,
-        final_q_low_w=final_q_low_w,
-        final_q_high_w=final_q_high_w,
+        final_q_low_w=q_max,
+        final_q_high_w=max(Q_hot_limit, Q_cold_limit),
         final_pinch_residual_k=0.0,
         termination_reason="independent_limits",
-        property_calls=tuple(local_calls),
+        hot_limit_w=Q_hot_limit,
+        cold_limit_w=Q_cold_limit,
+        limiting_side=limiting_side,
     )
 
 
@@ -943,7 +947,6 @@ def _compute_q_max_parallel(
     hot_mass_flow_kg_s: float,
     cold_mass_flow_kg_s: float,
     minimum_terminal_delta_t: float,
-    property_calls: list[PropertyCallRecord],
     recorder: EvaluationRecorder,
     pinch_temperature_tolerance_k: float = 1e-6,
 ) -> QMaxResult:
@@ -955,11 +958,8 @@ def _compute_q_max_parallel(
 
     We use enthalpy back-calculation (no fixed Cp) with bracket search.
 
-    Success records go into local_calls (returned in QMaxResult).
-    Failure records are appended to the passed property_calls list
-    so they survive the re-raise.
+    All property calls are recorded atomically by the EvaluationRecorder.
     """
-    local_calls: list[PropertyCallRecord] = []
     # Upper bound: min of independent enthalpy limits
     ctx_limits = recorder.begin(EvaluationRole.Q_MAX_PARALLEL_LIMITS)
 
@@ -967,7 +967,7 @@ def _compute_q_max_parallel(
     try:
         hot_limit_state = provider.state_tp(hot_fluid, T_hot_out_min_ind, hot_inlet_pressure_pa)
     except PropertyServiceError as exc:
-        record = recorder.record_failure(
+        recorder.record_failure(
             ctx_limits,
             fluid_name=hot_fluid.name,
             query_type="TP",
@@ -978,9 +978,8 @@ def _compute_q_max_parallel(
             error_code=exc.code.value,
             error_message=str(exc),
         )
-        property_calls.append(record)
         raise
-    hot_record = recorder.record_success(
+    recorder.record_success(
         ctx_limits,
         hot_limit_state,
         query_type="TP",
@@ -989,13 +988,12 @@ def _compute_q_max_parallel(
         stage="q_max",
         stream_role="hot_limit",
     )
-    local_calls.append(hot_record)
 
     T_cold_out_max_ind = hot_inlet_temperature_k - minimum_terminal_delta_t
     try:
         cold_limit_state = provider.state_tp(cold_fluid, T_cold_out_max_ind, cold_inlet_pressure_pa)
     except PropertyServiceError as exc:
-        record = recorder.record_failure(
+        recorder.record_failure(
             ctx_limits,
             fluid_name=cold_fluid.name,
             query_type="TP",
@@ -1006,9 +1004,8 @@ def _compute_q_max_parallel(
             error_code=exc.code.value,
             error_message=str(exc),
         )
-        property_calls.append(record)
         raise
-    cold_record = recorder.record_success(
+    recorder.record_success(
         ctx_limits,
         cold_limit_state,
         query_type="TP",
@@ -1017,7 +1014,6 @@ def _compute_q_max_parallel(
         stage="q_max",
         stream_role="cold_limit",
     )
-    local_calls.append(cold_record)
 
     Q_hot_limit = hot_mass_flow_kg_s * (h_hot_in - hot_limit_state.enthalpy_j_kg)
     Q_cold_limit = cold_mass_flow_kg_s * (cold_limit_state.enthalpy_j_kg - h_cold_in)
@@ -1031,7 +1027,6 @@ def _compute_q_max_parallel(
             final_q_high_w=q_upper,
             final_pinch_residual_k=0.0,
             termination_reason="zero_upper_bound",
-            property_calls=tuple(local_calls),
         )
 
     def _exit_pinch_residual(Q: float) -> float:
@@ -1049,7 +1044,7 @@ def _compute_q_max_parallel(
                 reference_state=provider.reference_state_policy,
             )
         except PropertyServiceError as exc:
-            record = recorder.record_failure(
+            recorder.record_failure(
                 pinch_ctx,
                 fluid_name=hot_fluid.name,
                 query_type="PH",
@@ -1060,9 +1055,8 @@ def _compute_q_max_parallel(
                 error_code=exc.code.value,
                 error_message=str(exc),
             )
-            property_calls.append(record)
             raise
-        hot_rec = recorder.record_success(
+        recorder.record_success(
             pinch_ctx,
             hot_state,
             query_type="PH",
@@ -1071,7 +1065,6 @@ def _compute_q_max_parallel(
             stage="q_max_pinch",
             stream_role="hot_solver",
         )
-        local_calls.append(hot_rec)
 
         # Cold PH call (call_index=1)
         try:
@@ -1082,7 +1075,7 @@ def _compute_q_max_parallel(
                 reference_state=provider.reference_state_policy,
             )
         except PropertyServiceError as exc:
-            record = recorder.record_failure(
+            recorder.record_failure(
                 pinch_ctx,
                 fluid_name=cold_fluid.name,
                 query_type="PH",
@@ -1093,9 +1086,8 @@ def _compute_q_max_parallel(
                 error_code=exc.code.value,
                 error_message=str(exc),
             )
-            property_calls.append(record)
             raise
-        cold_rec = recorder.record_success(
+        recorder.record_success(
             pinch_ctx,
             cold_state,
             query_type="PH",
@@ -1104,7 +1096,6 @@ def _compute_q_max_parallel(
             stage="q_max_pinch",
             stream_role="cold_solver",
         )
-        local_calls.append(cold_rec)
 
         return (hot_state.temperature_k - cold_state.temperature_k) - minimum_terminal_delta_t
 
@@ -1118,7 +1109,6 @@ def _compute_q_max_parallel(
             final_q_high_w=q_upper,
             final_pinch_residual_k=pinch_at_upper,
             termination_reason="pinch_satisfied_at_upper",
-            property_calls=tuple(local_calls),
         )
 
     # Bisection to find the Q where pinch = 0
@@ -1144,7 +1134,8 @@ def _compute_q_max_parallel(
         final_q_high_w=q_hi,
         final_pinch_residual_k=final_residual,
         termination_reason="bisection_converged",
-        property_calls=tuple(local_calls),
+        q_tolerance_w=q_hi - q_lo,
+        pinch_temperature_tolerance_k=pinch_temperature_tolerance_k,
     )
 
 
@@ -1163,7 +1154,6 @@ def _compute_q_max(
     cold_mass_flow_kg_s: float,
     minimum_terminal_delta_t: float,
     flow_arrangement: FlowArrangement,
-    property_calls: list[PropertyCallRecord],
     recorder: EvaluationRecorder,
 ) -> QMaxResult:
     """Compute Q_max using PropertyProvider enthalpy limits.
@@ -1185,7 +1175,6 @@ def _compute_q_max(
             hot_mass_flow_kg_s=hot_mass_flow_kg_s,
             cold_mass_flow_kg_s=cold_mass_flow_kg_s,
             minimum_terminal_delta_t=minimum_terminal_delta_t,
-            property_calls=property_calls,
             recorder=recorder,
         )
     else:
@@ -1202,7 +1191,6 @@ def _compute_q_max(
             hot_mass_flow_kg_s=hot_mass_flow_kg_s,
             cold_mass_flow_kg_s=cold_mass_flow_kg_s,
             minimum_terminal_delta_t=minimum_terminal_delta_t,
-            property_calls=property_calls,
             recorder=recorder,
         )
 
@@ -1228,13 +1216,9 @@ def rate_double_pipe(
     provider: PropertyProvider,
     solver_params: SolverParams | None = None,
     context: CalculationContext | None = None,
-    minimum_terminal_delta_t: float = _DEFAULT_MINIMUM_TERMINAL_DELTA_T,
-    tube_boundary_condition: ThermalBoundaryCondition = (
-        ThermalBoundaryCondition.constant_wall_temperature
-    ),
-    annulus_boundary_condition: ThermalBoundaryCondition = (
-        ThermalBoundaryCondition.inner_wall_heated
-    ),
+    minimum_terminal_delta_t: float,
+    tube_boundary_condition: ThermalBoundaryCondition,
+    annulus_boundary_condition: ThermalBoundaryCondition,
 ) -> RatingResult:
     """Rate a fixed-geometry double-pipe heat exchanger.
 
@@ -1282,7 +1266,6 @@ def rate_double_pipe(
     )
 
     # Mutable accumulators for provenance
-    property_calls: list[PropertyCallRecord] = []
     warnings: list[EngineeringMessage] = []
     blockers: list[EngineeringMessage] = []
 
@@ -1410,7 +1393,7 @@ def rate_double_pipe(
         hot_inlet_state = provider.state_tp(
             hot_fluid, hot_inlet_temperature_k, hot_inlet_pressure_pa
         )
-        hot_inlet_record = recorder.record_success(
+        recorder.record_success(
             inlet_ctx,
             hot_inlet_state,
             query_type="TP",
@@ -1419,9 +1402,8 @@ def rate_double_pipe(
             stage="inlet",
             stream_role="hot_inlet",
         )
-        property_calls.append(hot_inlet_record)
     except PropertyServiceError as exc:
-        record = recorder.record_failure(
+        recorder.record_failure(
             inlet_ctx,
             fluid_name=hot_fluid.name,
             query_type="TP",
@@ -1432,7 +1414,6 @@ def rate_double_pipe(
             error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
             error_message=str(exc),
         )
-        property_calls.append(record)
         blockers.append(
             _make_blocker(
                 ErrorCode.PROPERTY_EVALUATION_FAILED,
@@ -1442,7 +1423,7 @@ def rate_double_pipe(
         )
         return _blocked_result(
             blockers=blockers,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -1458,7 +1439,7 @@ def rate_double_pipe(
         cold_inlet_state = provider.state_tp(
             cold_fluid, cold_inlet_temperature_k, cold_inlet_pressure_pa
         )
-        cold_inlet_record = recorder.record_success(
+        recorder.record_success(
             inlet_ctx,
             cold_inlet_state,
             query_type="TP",
@@ -1467,9 +1448,8 @@ def rate_double_pipe(
             stage="inlet",
             stream_role="cold_inlet",
         )
-        property_calls.append(cold_inlet_record)
     except PropertyServiceError as exc:
-        record = recorder.record_failure(
+        recorder.record_failure(
             inlet_ctx,
             fluid_name=cold_fluid.name,
             query_type="TP",
@@ -1480,7 +1460,6 @@ def rate_double_pipe(
             error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
             error_message=str(exc),
         )
-        property_calls.append(record)
         blockers.append(
             _make_blocker(
                 ErrorCode.PROPERTY_EVALUATION_FAILED,
@@ -1490,7 +1469,7 @@ def rate_double_pipe(
         )
         return _blocked_result(
             blockers=blockers,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -1508,7 +1487,7 @@ def rate_double_pipe(
         )
         return _blocked_result(
             blockers=blockers,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -1525,7 +1504,7 @@ def rate_double_pipe(
         )
         return _blocked_result(
             blockers=blockers,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -1583,10 +1562,8 @@ def rate_double_pipe(
             cold_mass_flow_kg_s=cold_mass_flow_kg_s,
             minimum_terminal_delta_t=minimum_terminal_delta_t,
             flow_arrangement=flow_arrangement,
-            property_calls=property_calls,
             recorder=recorder,
         )
-        property_calls.extend(q_max_result.property_calls)
         q_max = q_max_result.q_max_w
     except PropertyServiceError as exc:
         blockers.append(
@@ -1598,7 +1575,7 @@ def rate_double_pipe(
         )
         return _blocked_result(
             blockers=blockers,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -1615,7 +1592,7 @@ def rate_double_pipe(
         )
         return _blocked_result(
             blockers=blockers,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -1641,11 +1618,9 @@ def rate_double_pipe(
     def _evaluate_trial(
         Q: float,
         *,
-        accumulate: bool = True,
         ctx: EvaluationContext,
     ) -> TrialEvaluation:
         """Evaluate a single trial Q and return a TrialEvaluation."""
-        trial_prop_calls: list[PropertyCallRecord] = []
         trial_warnings: list[EngineeringMessage] = []
         trial_blockers: list[EngineeringMessage] = []
 
@@ -1697,7 +1672,7 @@ def rate_double_pipe(
                 h_hot_out,
                 reference_state=provider.reference_state_policy,
             )
-            record = recorder.record_success(
+            recorder.record_success(
                 ctx,
                 hot_outlet_state,
                 query_type="PH",
@@ -1706,9 +1681,8 @@ def rate_double_pipe(
                 stage="brent_evaluation",
                 stream_role="hot_solver",
             )
-            trial_prop_calls.append(record)
         except PropertyServiceError as exc:
-            record = recorder.record_failure(
+            recorder.record_failure(
                 ctx,
                 fluid_name=hot_fluid.name,
                 query_type="PH",
@@ -1719,9 +1693,6 @@ def rate_double_pipe(
                 error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                 error_message=str(exc),
             )
-            trial_prop_calls.append(record)
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1734,7 +1705,7 @@ def rate_double_pipe(
                 annulus_flow_input=None,
                 tube_result=None,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=(),
                 blockers=(
                     _make_blocker(
@@ -1752,7 +1723,7 @@ def rate_double_pipe(
                 h_cold_out,
                 reference_state=provider.reference_state_policy,
             )
-            record = recorder.record_success(
+            recorder.record_success(
                 ctx,
                 cold_outlet_state,
                 query_type="PH",
@@ -1761,9 +1732,8 @@ def rate_double_pipe(
                 stage="brent_evaluation",
                 stream_role="cold_solver",
             )
-            trial_prop_calls.append(record)
         except PropertyServiceError as exc:
-            record = recorder.record_failure(
+            recorder.record_failure(
                 ctx,
                 fluid_name=cold_fluid.name,
                 query_type="PH",
@@ -1774,9 +1744,6 @@ def rate_double_pipe(
                 error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                 error_message=str(exc),
             )
-            trial_prop_calls.append(record)
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1789,7 +1756,7 @@ def rate_double_pipe(
                 annulus_flow_input=None,
                 tube_result=None,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=(),
                 blockers=(
                     _make_blocker(
@@ -1802,8 +1769,6 @@ def rate_double_pipe(
 
         # --- 6c. Validate single-phase outlet states ---
         if hot_outlet_state.phase not in _SINGLE_PHASE:
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1816,7 +1781,7 @@ def rate_double_pipe(
                 annulus_flow_input=None,
                 tube_result=None,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=(),
                 blockers=(
                     _make_blocker(
@@ -1827,8 +1792,6 @@ def rate_double_pipe(
                 ),
             )
         if cold_outlet_state.phase not in _SINGLE_PHASE:
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1841,7 +1804,7 @@ def rate_double_pipe(
                 annulus_flow_input=None,
                 tube_result=None,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=(),
                 blockers=(
                     _make_blocker(
@@ -1865,7 +1828,7 @@ def rate_double_pipe(
 
         try:
             hot_bulk_state = provider.state_tp(hot_fluid, T_bulk_hot, P_bulk_hot)
-            record = recorder.record_success(
+            recorder.record_success(
                 ctx,
                 hot_bulk_state,
                 query_type="TP",
@@ -1874,9 +1837,8 @@ def rate_double_pipe(
                 stage="bulk",
                 stream_role="hot_bulk",
             )
-            trial_prop_calls.append(record)
         except PropertyServiceError as exc:
-            record = recorder.record_failure(
+            recorder.record_failure(
                 ctx,
                 fluid_name=hot_fluid.name,
                 query_type="TP",
@@ -1887,9 +1849,6 @@ def rate_double_pipe(
                 error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                 error_message=str(exc),
             )
-            trial_prop_calls.append(record)
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1902,7 +1861,7 @@ def rate_double_pipe(
                 annulus_flow_input=None,
                 tube_result=None,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=(),
                 blockers=(
                     _make_blocker(
@@ -1915,7 +1874,7 @@ def rate_double_pipe(
 
         try:
             cold_bulk_state = provider.state_tp(cold_fluid, T_bulk_cold, P_bulk_cold)
-            record = recorder.record_success(
+            recorder.record_success(
                 ctx,
                 cold_bulk_state,
                 query_type="TP",
@@ -1924,9 +1883,8 @@ def rate_double_pipe(
                 stage="bulk",
                 stream_role="cold_bulk",
             )
-            trial_prop_calls.append(record)
         except PropertyServiceError as exc:
-            record = recorder.record_failure(
+            recorder.record_failure(
                 ctx,
                 fluid_name=cold_fluid.name,
                 query_type="TP",
@@ -1937,9 +1895,6 @@ def rate_double_pipe(
                 error_code=(exc.code.value if hasattr(exc, "code") else "property_unavailable"),
                 error_message=str(exc),
             )
-            trial_prop_calls.append(record)
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1952,7 +1907,7 @@ def rate_double_pipe(
                 annulus_flow_input=None,
                 tube_result=None,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=(),
                 blockers=(
                     _make_blocker(
@@ -1965,8 +1920,6 @@ def rate_double_pipe(
 
         # --- 6e. Validate bulk phases ---
         if hot_bulk_state.phase not in _SINGLE_PHASE:
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -1979,7 +1932,7 @@ def rate_double_pipe(
                 annulus_flow_input=None,
                 tube_result=None,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=(),
                 blockers=(
                     _make_blocker(
@@ -1990,8 +1943,6 @@ def rate_double_pipe(
                 ),
             )
         if cold_bulk_state.phase not in _SINGLE_PHASE:
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -2004,7 +1955,7 @@ def rate_double_pipe(
                 annulus_flow_input=None,
                 tube_result=None,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=(),
                 blockers=(
                     _make_blocker(
@@ -2073,8 +2024,6 @@ def rate_double_pipe(
         if tube_result.status.value == "blocked" or tube_result.heat_transfer_coefficient <= 0:
             for b in tube_result.blockers:
                 trial_blockers.append(b)
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -2087,7 +2036,7 @@ def rate_double_pipe(
                 annulus_flow_input=annulus_flow,
                 tube_result=tube_result,
                 annulus_result=None,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=tuple(trial_warnings),
                 blockers=tuple(trial_blockers),
             )
@@ -2109,8 +2058,6 @@ def rate_double_pipe(
         ):
             for b in annulus_result.blockers:
                 trial_blockers.append(b)
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -2123,7 +2070,7 @@ def rate_double_pipe(
                 annulus_flow_input=annulus_flow,
                 tube_result=tube_result,
                 annulus_result=annulus_result,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=tuple(trial_warnings),
                 blockers=tuple(trial_blockers),
             )
@@ -2165,8 +2112,6 @@ def rate_double_pipe(
             )
 
         if not math.isfinite(lmtd) or lmtd <= 0:
-            if accumulate:
-                property_calls.extend(trial_prop_calls)
             return TrialEvaluation(
                 q_w=Q,
                 residual_w=None,
@@ -2179,7 +2124,7 @@ def rate_double_pipe(
                 annulus_flow_input=annulus_flow,
                 tube_result=tube_result,
                 annulus_result=annulus_result,
-                property_calls=tuple(trial_prop_calls),
+                property_calls=(),
                 warnings=tuple(trial_warnings),
                 blockers=(
                     _make_blocker(
@@ -2192,8 +2137,6 @@ def rate_double_pipe(
 
         # --- 6m. Residual ---
         residual = Q - UA * lmtd
-        if accumulate:
-            property_calls.extend(trial_prop_calls)
         return TrialEvaluation(
             q_w=Q,
             residual_w=residual,
@@ -2206,44 +2149,23 @@ def rate_double_pipe(
             annulus_flow_input=annulus_flow,
             tube_result=tube_result,
             annulus_result=annulus_result,
-            property_calls=tuple(trial_prop_calls),
+            property_calls=(),
             warnings=tuple(trial_warnings),
             blockers=(),
         )
 
-    _solver_phase = EvaluationRole.SOLVER_ITERATION  # default for bisection
-
-    def _set_probe_phase() -> None:
-        nonlocal _solver_phase
-        _solver_phase = EvaluationRole.BRACKET_PROBE
-
-    def residual_fn(Q: float) -> float:
+    def residual_fn(Q: float, phase: SolverEvaluationPhase) -> float:
         """Evaluate residual Q - UA(Q) x LMTD(Q).
 
-        Uses accumulate=False so that property calls are only recorded
-        at the boundary: successful trials accumulate directly, and
-        aborted trials carry their calls via TrialEvaluationAbort.
-        This ensures each real provider invocation is recorded exactly once.
-
-        The evaluation role is determined by _solver_phase: during bracket
-        probing, on_probe sets it to BRACKET_PROBE; during bisection-
-        secant iteration it stays at SOLVER_ITERATION.
+        The evaluation role is determined by the solver's phase parameter.
         """
-        nonlocal _solver_phase
-        current_phase = _solver_phase
-        _solver_phase = EvaluationRole.SOLVER_ITERATION  # reset for next call
-        ctx = recorder.begin(current_phase, trial_q_w=Q)
+        ctx = recorder.begin(phase, trial_q_w=Q)
         trial = _evaluate_trial(
             Q,
-            accumulate=False,
             ctx=ctx,
         )
         if not trial.feasible or trial.residual_w is None:
-            # Accumulate the failed trial's calls at the abort boundary
-            property_calls.extend(trial.property_calls)
             raise TrialEvaluationAbort(trial)
-        # Accumulate successful trial's calls
-        property_calls.extend(trial.property_calls)
         return trial.residual_w
 
     # =====================================================================
@@ -2258,11 +2180,9 @@ def rate_double_pipe(
             q_max=q_max,
             params=params,
             c_effective_w_k=C_min,
-            on_probe=_set_probe_phase,
         )
     except TrialEvaluationAbort as abort:
         trial = abort.trial
-        # Property calls already accumulated in residual_fn's failure branch.
         # Only propagate warnings and blockers from the abort trial.
         warnings.extend(trial.warnings)
         blockers.extend(trial.blockers)
@@ -2284,7 +2204,7 @@ def rate_double_pipe(
         return _blocked_result(
             blockers=abort_blockers,
             warnings=warnings,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -2299,7 +2219,7 @@ def rate_double_pipe(
         return _failed_result(
             solver_result=solver_result,
             warnings=warnings,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -2316,11 +2236,9 @@ def rate_double_pipe(
     final_ctx = recorder.begin(EvaluationRole.FINAL_EVALUATION, trial_q_w=Q_sol)
     final_trial = _evaluate_trial(
         Q_sol,
-        accumulate=True,
         ctx=final_ctx,
     )
 
-    # Final trial property calls already accumulated via _evaluate_trial(accumulate=True)
     # Propagate warnings only
     for w in final_trial.warnings:
         warnings.append(w)
@@ -2342,7 +2260,7 @@ def rate_double_pipe(
         return _blocked_result(
             blockers=blockers,
             warnings=warnings,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             request_identity=request_identity,
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
@@ -2624,9 +2542,9 @@ def rate_double_pipe(
 
         core_graph, core_nodes, core_edges = build_provenance_core(
             flow_arrangement=flow_arrangement,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             iterations=solver_result.iterations,
-            converged=False,
+            converged=solver_result.converged,
             warnings=wrns,
             blockers=blkrs,
             execution_context=ctx_snapshot,
@@ -2676,10 +2594,10 @@ def rate_double_pipe(
             energy_residual_w=energy_residual_w,
             ua_lmtd_residual_w=ua_lmtd_residual_w,
             iterations=solver_result.iterations,
-            converged=False,
+            converged=solver_result.converged,
             solver_termination_reason=solver_result.termination_reason.value,
             solver_details=solver_details,
-            property_calls=tuple(property_calls),
+            property_calls=recorder.records,
             warnings=tuple(wrns),
             blockers=tuple(blkrs),
             status=RatingStatus.BLOCKED,
@@ -2708,9 +2626,9 @@ def rate_double_pipe(
 
         provenance_graph = build_provenance(
             flow_arrangement=flow_arrangement,
-            property_calls=property_calls,
+            property_calls=recorder.records,
             iterations=solver_result.iterations,
-            converged=False,
+            converged=solver_result.converged,
             warnings=wrns,
             blockers=blkrs,
             result_hash=result_hash,
@@ -2760,12 +2678,12 @@ def rate_double_pipe(
             energy_residual_w=energy_residual_w,
             ua_lmtd_residual_w=ua_lmtd_residual_w,
             iterations=solver_result.iterations,
-            converged=False,
+            converged=solver_result.converged,
             solver_termination_reason=solver_result.termination_reason.value,
             solver_details=solver_details,
             warnings=tuple(wrns),
             blockers=tuple(blkrs),
-            property_calls=tuple(property_calls),
+            property_calls=recorder.records,
             provider_identity=provider_identity,
             request_identity=request_identity,
             execution_context=ctx_snapshot,
@@ -2846,7 +2764,7 @@ def rate_double_pipe(
     # Step 1: Build core provenance (without RESULT node)
     core_graph, core_nodes, core_edges = build_provenance_core(
         flow_arrangement=flow_arrangement,
-        property_calls=property_calls,
+        property_calls=recorder.records,
         iterations=solver_result.iterations,
         converged=True,
         warnings=warnings,
@@ -2906,7 +2824,7 @@ def rate_double_pipe(
         converged=True,
         solver_termination_reason=solver_result.termination_reason.value,
         solver_details=solver_details,
-        property_calls=tuple(property_calls),
+        property_calls=recorder.records,
         warnings=tuple(warnings),
         blockers=(),
         status=RatingStatus.SUCCEEDED,
@@ -2938,7 +2856,7 @@ def rate_double_pipe(
     # Step 4: Add RESULT node via build_provenance
     provenance_graph = build_provenance(
         flow_arrangement=flow_arrangement,
-        property_calls=property_calls,
+        property_calls=recorder.records,
         iterations=solver_result.iterations,
         converged=True,
         warnings=warnings,
@@ -3001,7 +2919,7 @@ def rate_double_pipe(
         solver_details=solver_details,
         warnings=tuple(warnings),
         blockers=(),
-        property_calls=tuple(property_calls),
+        property_calls=recorder.records,
         provider_identity=provider_identity,
         request_identity=request_identity,
         execution_context=ctx_snapshot,

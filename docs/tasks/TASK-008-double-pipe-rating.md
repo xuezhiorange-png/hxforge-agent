@@ -97,8 +97,21 @@ Perform rating analysis for a fixed-geometry double-pipe heat exchanger. Given o
 
 **Result must record:** converged, iterations, final residual, final bracket, tolerance configuration, termination reason
 
-### Blockers
+### Solver convergence contract
 
+The solver enforces a formal convergence contract: all three conditions
+(absolute residual, bracket temperature-effect, iteration limit) must be
+satisfied simultaneously. The `EvaluationRecorder` captures every trial
+evaluation with a continuous identity (monotonic counter + phase tag),
+enabling deterministic replay and the evaluation identity verifier to
+confirm no steps were skipped or duplicated.
+
+### Blockers
+- **Partial post-calculation BLOCKED:** When a property or correlation
+  evaluation fails after partial convergence progress, the result emits
+  `BLOCKED` status that **preserves all diagnostic data collected so far**
+  (evaluations, partial residuals, correlation applicability warnings).
+  Debugging context is never lost even when the rating cannot complete.
 - Temperature crossover (hot outlet < cold outlet in counter-flow)
 - Invalid property values (NaN, Infinity, negative)
 - Correlation unavailable (including C4 implementation_unavailable)
@@ -149,8 +162,7 @@ Explicitly specify:
 No silent exchange based on inlet temperatures. If T_hot,in <= T_cold,in: return input blocker.
 
 ## Thermal Boundary Condition
-
-- Both sides must carry explicit boundary-condition policy for laminar correlations
+- Both sides **must carry explicit boundary-condition policy** for laminar correlations — no silent defaults
 - No silent selection between tube laminar CWT/CHF
 - No substitution when annulus laminar C4 unavailable
 - Any C4 scenario returns implementation_unavailable (Issue #19)
@@ -178,8 +190,13 @@ Each residual evaluation:
 5. Obtain: Re, Pr, Nu, h, selected correlation, applicability assessment, warnings/blockers
 6. Recompute thermal resistance and UA
 7. Compute LMTD and residual
+Each evaluation is recorded by the `EvaluationRecorder` with a continuous
+evaluation identity (monotonic counter + `SolverEvaluationPhase` tag) and
+one of 7 `EvaluationRole` categories. The evaluation identity verifier
+confirms replay integrity. All PropertyProvider calls and correlation
+selection enter provenance.
 
-Representative bulk temperature: deterministic inlet/outlet bulk mean. All PropertyProvider calls and correlation selection enter provenance.
+Representative bulk temperature: deterministic inlet/outlet bulk mean.
 
 ## Complete Result Model Fields
 

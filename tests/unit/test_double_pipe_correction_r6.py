@@ -18,6 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from hexagent.correlations.flow import ThermalBoundaryCondition
 from hexagent.domain.messages import ErrorCode
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.rating import rate_double_pipe
@@ -62,6 +63,9 @@ _BASE_KWARGS = dict(
     cold_inlet_temperature_k=300.0,
     hot_inlet_pressure_pa=200_000.0,
     cold_inlet_pressure_pa=150_000.0,
+    minimum_terminal_delta_t=0.5,
+    tube_boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+    annulus_boundary_condition=ThermalBoundaryCondition.inner_wall_heated,
 )
 
 _GOLDEN_DIR = Path(__file__).resolve().parent.parent / "golden" / "double_pipe_rating"
@@ -693,6 +697,9 @@ class TestGoldenIndependentDerivation:
             tube_in_hot=golden["tube_in_hot"],
             flow_arrangement=FlowArrangement(golden["flow_arrangement"]),
             provider=provider,
+            minimum_terminal_delta_t=0.5,
+            tube_boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+            annulus_boundary_condition=ThermalBoundaryCondition.inner_wall_heated,
         )
 
         expected = golden["expected"]
@@ -733,6 +740,9 @@ class TestGoldenIndependentDerivation:
             tube_in_hot=golden["tube_in_hot"],
             flow_arrangement=FlowArrangement(golden["flow_arrangement"]),
             provider=provider,
+            minimum_terminal_delta_t=0.5,
+            tube_boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+            annulus_boundary_condition=ThermalBoundaryCondition.inner_wall_heated,
         )
 
         expected = golden["expected"]
@@ -766,6 +776,9 @@ class TestGoldenIndependentDerivation:
             tube_in_hot=golden["tube_in_hot"],
             flow_arrangement=FlowArrangement(golden["flow_arrangement"]),
             provider=provider,
+            minimum_terminal_delta_t=0.5,
+            tube_boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+            annulus_boundary_condition=ThermalBoundaryCondition.inner_wall_heated,
         )
 
         expected = golden["expected"]

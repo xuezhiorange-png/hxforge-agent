@@ -11,6 +11,7 @@ import math
 
 import pytest
 
+from hexagent.correlations.flow import ThermalBoundaryCondition
 from hexagent.domain.messages import ErrorCode
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.rating import rate_double_pipe
@@ -67,6 +68,13 @@ def _standard_rating_kwargs(
     flow_arrangement: FlowArrangement = FlowArrangement.COUNTERFLOW,
     provider: CoolPropProvider | None = None,
     solver_params: SolverParams | None = None,
+    minimum_terminal_delta_t: float = 0.5,
+    tube_boundary_condition: ThermalBoundaryCondition = (
+        ThermalBoundaryCondition.constant_wall_temperature
+    ),
+    annulus_boundary_condition: ThermalBoundaryCondition = (
+        ThermalBoundaryCondition.inner_wall_heated
+    ),
 ) -> dict:
     """Return keyword arguments for rate_double_pipe with sensible defaults."""
     return dict(
@@ -83,6 +91,9 @@ def _standard_rating_kwargs(
         flow_arrangement=flow_arrangement,
         provider=provider,
         solver_params=solver_params,
+        minimum_terminal_delta_t=minimum_terminal_delta_t,
+        tube_boundary_condition=tube_boundary_condition,
+        annulus_boundary_condition=annulus_boundary_condition,
     )
 
 
@@ -220,6 +231,9 @@ class TestCounterflowHigherDuty:
             hot_inlet_pressure_pa=200_000.0,
             cold_inlet_pressure_pa=150_000.0,
             tube_in_hot=True,
+            minimum_terminal_delta_t=0.5,
+            tube_boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+            annulus_boundary_condition=ThermalBoundaryCondition.inner_wall_heated,
         )
 
         cf_result = rate_double_pipe(**common, flow_arrangement=FlowArrangement.COUNTERFLOW)

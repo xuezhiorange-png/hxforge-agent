@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import math
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -30,6 +31,7 @@ from hexagent.domain.provenance import (
     ProvenanceNode,
     ProvenanceNodeType,
 )
+from hexagent.exchangers.double_pipe.recorder import EvaluationRole
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 
 # ---------------------------------------------------------------------------
@@ -419,6 +421,15 @@ class RatingResult(BaseModel):
             raise ValueError(f"result_hash contains invalid hex: {self.result_hash!r}") from None
         return self
 
+    @model_validator(mode="after")
+    def _validate_solver_convergence_contract(self) -> RatingResult:
+        """Ensure solver_termination_reason is consistent with converged flag."""
+        if self.solver_termination_reason == "converged" and not self.converged:
+            raise ValueError("solver_termination_reason is 'converged' but converged is False")
+        if self.solver_termination_reason == "non_convergence" and self.converged:
+            raise ValueError("solver_termination_reason is 'non_convergence' but converged is True")
+        return self
+
     # ------------------------------------------------------------------
     # Post-init
     # ------------------------------------------------------------------
@@ -617,6 +628,10 @@ class RatingResult(BaseModel):
 
             # Reject empty graphs
             if not graph.nodes:
+                return False
+
+            # Verify evaluation identity of property calls
+            if not _verify_property_call_identity(self.property_calls, self.flow_arrangement):
                 return False
 
             # Index nodes by type
@@ -1521,13 +1536,167 @@ def _build_correlation_payload(
 
 
 # ---------------------------------------------------------------------------
+# Evaluation identity verification
+# ---------------------------------------------------------------------------
+
+
+def _verify_property_call_identity(
+    property_calls: tuple[PropertyCallRecord, ...] | list[PropertyCallRecord],
+    flow_arrangement: FlowArrangement,
+) -> bool:
+    """Verify the evaluation identity invariants of property calls.
+
+    Checks structural invariants about the evaluation_index, call_index,
+    sequence_index, role ordering and completeness of property calls.
+    Returns False if any check fails; never raises.
+
+    Empty property_calls are allowed (structural BLOCKED results may have
+    no property evaluations).
+    """
+    try:
+        if not property_calls:
+            return True
+
+        n = len(property_calls)
+
+        # 1. sequence_index == list(range(n))
+        seq_indices = [pc.sequence_index for pc in property_calls]
+        if seq_indices != list(range(n)):
+            return False
+
+        # 2. evaluation_index from 0..N-1 with no gaps
+        eval_indices = sorted({pc.evaluation_index for pc in property_calls})
+        if eval_indices != list(range(len(eval_indices))):
+            return False
+
+        # Group calls by evaluation_index
+        by_eval: dict[int, list[PropertyCallRecord]] = {}
+        for pc in property_calls:
+            by_eval.setdefault(pc.evaluation_index, []).append(pc)
+
+        # 3. Each evaluation has exactly one role and one trial_q_w
+        for ei in range(len(eval_indices)):
+            eval_calls = by_eval.get(ei, [])
+            if not eval_calls:
+                return False
+            roles = {pc.evaluation_role for pc in eval_calls}
+            if len(roles) != 1:
+                return False
+            trial_q_w_values = {pc.trial_q_w for pc in eval_calls}
+            if len(trial_q_w_values) != 1:
+                return False
+
+        # 4. Each evaluation's call_index == 0..n-1 (consecutive within eval)
+        for ei in range(len(eval_indices)):
+            eval_calls = by_eval[ei]
+            call_indices = sorted(pc.call_index_within_evaluation for pc in eval_calls)
+            if call_indices != list(range(len(call_indices))):
+                return False
+
+        # 5. (evaluation_index, call_index) globally unique
+        seen_pairs: set[tuple[int, int]] = set()
+        for pc in property_calls:
+            pair = (pc.evaluation_index, pc.call_index_within_evaluation)
+            if pair in seen_pairs:
+                return False
+            seen_pairs.add(pair)
+
+        # 6. Inlet evaluation exactly one, index 0
+        inlet_evaluations = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.INLET.value
+        ]
+        if len(inlet_evaluations) != 1:
+            return False
+        if inlet_evaluations[0] != 0:
+            return False
+
+        # 7. Inlet calls: on success path hot=0, cold=1; on failure path
+        #    partial inlet is allowed (e.g. hot fails before cold is attempted)
+        inlet_calls = by_eval[0]
+        if len(inlet_calls) >= 2:
+            inlet_hot = [pc for pc in inlet_calls if pc.stream_role in ("hot_inlet",)]
+            inlet_cold = [pc for pc in inlet_calls if pc.stream_role in ("cold_inlet",)]
+            if len(inlet_hot) != 1 or len(inlet_cold) != 1:
+                return False
+            if inlet_hot[0].call_index_within_evaluation != 0:
+                return False
+            if inlet_cold[0].call_index_within_evaluation != 1:
+                return False
+        elif len(inlet_calls) == 1:
+            # Single inlet call (failure before second attempt) is allowed
+            pass
+        else:
+            return False
+
+        all_roles = {pc.evaluation_role for pc in property_calls}
+
+        # 8. Counter-flow: no parallel roles allowed (if Q_max was computed)
+        if flow_arrangement == FlowArrangement.COUNTERFLOW:
+            parallel_roles = {
+                EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+            }
+            if all_roles & parallel_roles:
+                return False
+
+        # 9. Parallel-flow: q_max_parallel_limits and q_max_parallel_pinch
+        #    present (only if Q_max was computed — early BLOCKED may skip it)
+        if flow_arrangement == FlowArrangement.PARALLEL:
+            q_max_roles = {
+                EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+            }
+            if q_max_roles & all_roles:
+                # If any parallel Q_max role is present, both must be
+                return not q_max_roles.issubset(all_roles)
+
+        # 10. final_evaluation exactly one, last evaluation
+        #     (not required for BLOCKED results that were blocked before
+        #      the solver ran — they may have no final_evaluation)
+        final_evaluations = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.FINAL_EVALUATION.value
+        ]
+        if final_evaluations:
+            if len(final_evaluations) != 1:
+                return False
+            max_eval_index = max(eval_indices)
+            if final_evaluations[0] != max_eval_index:
+                return False
+        # If no final_evaluation, that's allowed for early BLOCKED results
+
+        # 11. bracket_probe before solver_iteration
+        bracket_evaluations = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.BRACKET_PROBE.value
+        ]
+        solver_evaluations = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.SOLVER_ITERATION.value
+        ]
+        return not (
+            bracket_evaluations
+            and solver_evaluations
+            and max(bracket_evaluations) >= min(solver_evaluations)
+        )
+
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Provenance graph construction
 # ---------------------------------------------------------------------------
 
 
 def build_provenance_core(
     flow_arrangement: FlowArrangement,
-    property_calls: list[PropertyCallRecord],
+    property_calls: Sequence[PropertyCallRecord],
     iterations: int,
     converged: bool,
     warnings: list[EngineeringMessage],
@@ -1767,7 +1936,7 @@ def build_provenance_core(
 
 def build_provenance(
     flow_arrangement: FlowArrangement,
-    property_calls: list[PropertyCallRecord],
+    property_calls: Sequence[PropertyCallRecord],
     iterations: int,
     converged: bool,
     warnings: list[EngineeringMessage],

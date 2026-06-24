@@ -65,6 +65,9 @@ _BASE_KWARGS = dict(
     cold_inlet_temperature_k=300.0,
     hot_inlet_pressure_pa=200_000.0,
     cold_inlet_pressure_pa=150_000.0,
+    minimum_terminal_delta_t=0.5,
+    tube_boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+    annulus_boundary_condition=ThermalBoundaryCondition.inner_wall_heated,
 )
 
 
@@ -76,12 +79,12 @@ def _run_rating(
     **extra,
 ) -> RatingResult:
     """Helper to run rate_double_pipe with standard conditions."""
+    merged = {**_BASE_KWARGS, **extra}
     return rate_double_pipe(
-        **_BASE_KWARGS,
+        **merged,
         tube_in_hot=tube_in_hot,
         flow_arrangement=flow_arrangement,
         provider=provider,
-        **extra,
     )
 
 

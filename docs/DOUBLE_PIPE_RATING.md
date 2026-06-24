@@ -1,6 +1,6 @@
 # Double-Pipe Heat-Exchanger Rating — TASK-008
 
-**Status:** IMPLEMENTED
+**Status:** IN_PROGRESS / Draft
 **Milestone:** M2
 **Task card:** [docs/tasks/TASK-008-double-pipe-rating.md](tasks/TASK-008-double-pipe-rating.md)
 
@@ -36,7 +36,7 @@ rate_double_pipe()          ← Main entry point (rating kernel)
   │
   ├─ thermal.py             ← Thermal resistance network, LMTD, ε-NTU
   │
-  ├─ solver.py              ← Q-based Brent root-finding with dynamic bracket
+  ├─ solver.py              ← Q-based root-finding with dynamic bracket, EvaluationRecorder
   │
   ├─ result.py              ← RatingResult (Pydantic, immutable, hash-verified)
   │
@@ -51,7 +51,7 @@ All source lives under `src/hexagent/exchangers/double_pipe/`.
 |------|---------|
 | `geometry.py` | `DoublePipeGeometry` frozen dataclass with validation |
 | `thermal.py` | `ThermalResistanceBreakdown`, LMTD, ε-NTU pure functions |
-| `solver.py` | `solve_rating()` — Brent's method with dynamic bracket |
+| `solver.py` | `solve_rating()` — Q-based root-finding with dynamic bracket, EvaluationRecorder, SolverEvaluationPhase |
 | `rating.py` | `rate_double_pipe()` — the rating kernel |
 | `result.py` | `RatingResult` Pydantic model, provenance, hash |
 | `service.py` | `DoublePipeRatingService` — DesignCase bridge |
@@ -151,7 +151,7 @@ Special case `C_r = 1`: `ε = NTU / (1 + NTU)`
 ```
 
 ε-NTU is a **diagnostic cross-check**, not a conflicting outlet temperature
-source. The outlet temperatures come exclusively from the Q-based Brent solver.
+source. The outlet temperatures come exclusively from the Q-based root-finding solver.
 
 ---
 
@@ -177,10 +177,15 @@ Each residual evaluation:
 6. Build thermal resistance → compute UA
 7. Compute LMTD (counter or parallel) and return residual
 
-A sentinel residual (`1e12`) is returned for property/correlation failures,
-keeping the solver bracketing robust.
+Property or correlation failures raise a typed `TrialEvaluationAbort` which
+the solver catches; the evaluation is recorded via `EvaluationRecorder` and
+the iteration proceeds with diagnostic preservation.
 
-### Dynamic bracket
+### Dynamic bracket and QMaxResult
+
+`QMaxResult` captures the outcome of the upper-bracket search: the maximum
+feasible Q, the terminal ΔT state (pinch/temperature-cross check), and
+whether a valid bracket was established.
 
 - **Q_max** derived from `C_min × (T_h,in − T_c,in) × max_q_fraction`
   (default 99%)
@@ -189,17 +194,24 @@ keeping the solver bracketing robust.
 - Parallel-flow: hot outlet must exceed cold outlet at exit
 - If no sign change → `SOLVER_BRACKET_NOT_FOUND` blocker
 
-### Brent method
-
-Uses `scipy.optimize.brentq` with tight internal tolerances
-(`xtol=1e-12`, `rtol=1e-12`); the engineering convergence check is applied
-separately.
+### Solver method
+A bounded Q-based root-finder with dual tolerance convergence: absolute
+residual and relative bracket-to-C_min temperature-effect tolerance. The
+`SolverEvaluationPhase` enum tracks evaluation stages (ENTHALPY, PROPERTY,
+CORRELATION, THERMAL_RESISTANCE, LMTD, RESIDUAL, POST_CALC) so each
+iteration step is independently verifiable.
 
 ---
 
 ## 8. Convergence Criteria
 
-**All three** conditions must be satisfied:
+**All conditions** must be satisfied (dual tolerance convergence):
+
+The solver enforces **dual tolerance** convergence: absolute residual and
+relative bracket-to-C_min temperature-effect tolerance. For parallel-flow,
+an additional **parallel pinch check** verifies that the hot outlet remains
+above the cold outlet at exit across the full bracket range, preventing
+silent convergence to a physically infeasible solution.
 
 | Criterion | Formula | Default |
 |-----------|---------|---------|
@@ -219,7 +231,8 @@ separately.
 **Outlet states** — `state_ph(fluid, P, h)`:
 - Called inside the residual function for each trial Q
 - Returns outlet temperature, density, transport properties
-- Property failures return sentinel residual (large positive value)
+- Property failures raise typed `TrialEvaluationAbort`; the evaluation is
+captured by `EvaluationRecorder` with the appropriate `EvaluationRole`
 - All calls are recorded as `PropertyCallRecord` for provenance
 
 **Representative bulk temperature:**
@@ -227,9 +240,12 @@ separately.
 T_bulk = (T_inlet + T_outlet) / 2
 ```
 
-Every PropertyProvider call is logged with:
+Every PropertyProvider call is recorded by the `EvaluationRecorder` with:
 - Fluid, query type (TP/PH), inputs, backend identity, stage, stream role
-- Sequence index for ordering
+- Continuous evaluation identity (monotonic counter + phase tag)
+- 7 `EvaluationRole` categories: INLET_STATE, OUTLET_STATE, BULK_EVAL,
+  CORRELATION_CALL, THERMAL_RESISTANCE, LMTD_EVAL, POST_CONVERGENCE
+- Evaluation identity verifier confirms replay integrity
 
 ---
 
@@ -240,8 +256,8 @@ service (`hexagent.correlations.service`) for each side:
 
 | Side | Geometry type | Boundary condition |
 |------|--------------|-------------------|
-| Tube | `CircularTubeGeometry(inside_diameter_m=D_i, heat_transfer_length_m=L)` | `constant_wall_temperature` |
-| Annulus | `ConcentricAnnulusGeometry(inner_tube_outer_diameter_m=D_o, outer_pipe_inside_diameter_m=D_outer, ...)` | `inner_wall_heated` |
+| Tube | `CircularTubeGeometry(inside_diameter_m=D_i, heat_transfer_length_m=L)` | **explicit, required** |
+| Annulus | `ConcentricAnnulusGeometry(inner_tube_outer_diameter_m=D_o, outer_pipe_inside_diameter_m=D_outer, ...)` | **explicit, required** |
 
 The `tube_in_hot` flag determines which fluid flows in the tube vs. annulus.
 
@@ -321,6 +337,12 @@ If operating conditions require C4 (annulus laminar inner constant-heat-flux):
 - `provenance_graph` (`ProvenanceGraph`)
 - `provenance_digest`
 
+**Post-calculation BLOCKED:** When a property or correlation evaluation fails
+after partial convergence progress, the solver emits `BLOCKED` status that
+**preserves all diagnostic data collected so far** (evaluations, partial
+residuals, correlation applicability warnings). Debugging context is never
+lost even when the rating cannot complete.
+
 **Invariants:**
 - BLOCKED requires ≥1 blocker; SUCCEEDED requires convergence and no blockers
 - FAILED requires a `RunFailure` record
@@ -331,9 +353,18 @@ If operating conditions require C4 (annulus laminar inner constant-heat-flux):
 
 ## 13. Provenance and Hash
 
-### Result hash
+### Two-layer hash and provenance
 
-Deterministic SHA-256 computed over all engineering-relevant fields:
+The result uses a **two-layer** provenance and identity model:
+
+**Layer 1 — Evaluation identity:** Each solver evaluation receives a
+continuous identity (monotonic counter + `SolverEvaluationPhase` tag) via
+the `EvaluationRecorder`. The evaluation identity verifier confirms that
+recorded evaluations are replay-consistent and no steps were skipped or
+duplicated.
+
+**Layer 2 — Result hash:** Deterministic SHA-256 computed over all
+engineering-relevant fields:
 - Request identity (geometry, fluids, operating conditions, solver params)
 - Provider identity (name, version, reference state policy)
 - All computed quantities (Q, outlet temperatures, Re, Pr, Nu, h, UA, etc.)
@@ -391,7 +422,7 @@ Failed results still receive a deterministic hash and valid provenance.
 |-----------|------|------------|-------|
 | `tests/unit/test_double_pipe_geometry.py` | Unit | 48 | Geometry construction, validation, derived quantities, immutability, serialization |
 | `tests/unit/test_double_pipe_thermal.py` | Unit | 45 | Thermal resistance, LMTD (counter + parallel), ε-NTU, wall/convective/fouling resistance |
-| `tests/unit/test_double_pipe_solver.py` | Unit | 64 | Bracket finding, Brent solver, convergence criteria, edge cases |
+| `tests/unit/test_double_pipe_solver.py` | Unit | 64 | Bracket finding, Q-based root-finding solver, convergence criteria, edge cases |
 | `tests/integration/test_double_pipe_rating.py` | Integration | 20 | End-to-end rating with CoolProp: counterflow, parallel-flow, energy balance, zero/negative flows, temperature crossing, hash determinism, provenance, JSON round-trip |
 | **Total** | | **177** | |
 

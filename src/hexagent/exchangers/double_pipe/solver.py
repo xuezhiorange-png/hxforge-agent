@@ -7,6 +7,10 @@ cannot converge to infeasible states.
 
 Implements a bisection-secant hybrid that tracks the final bracket
 for rigorous convergence verification.
+
+Phase tracking is explicit: the residual function receives a
+SolverEvaluationPhase argument on every call, eliminating shared
+mutable state in the closure.
 """
 
 from __future__ import annotations
@@ -15,6 +19,8 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+
+from hexagent.exchangers.double_pipe.recorder import SolverEvaluationPhase
 
 # ---------------------------------------------------------------------------
 # Solver status
@@ -208,7 +214,6 @@ def _bisect_secant(
 
         # Try secant acceleration: extrapolate from a and b
         if abs(fa) > 0 and abs(fb) > 0 and a != b:
-            fb / fa
             # Secant step: x_new = b - fb * (b - a) / (fb - fa)
             denom = fb - fa
             if abs(denom) > 1e-30:
@@ -242,7 +247,7 @@ def _bisect_secant(
 
 
 def find_bracket(
-    residual_fn: Callable[[float], float],
+    residual_fn: Callable[[float, SolverEvaluationPhase], float],
     q_max: float,
     params: SolverParams,
     on_probe: Callable[[], None] | None = None,
@@ -254,10 +259,13 @@ def find_bracket(
 
     Parameters
     ----------
+    residual_fn :
+        Function ``f(Q, phase) -> residual_w``.  The phase argument
+        is SolverEvaluationPhase.BRACKET_PROBE for all calls in this
+        function.
     on_probe :
         Optional callback invoked before each residual evaluation during
-        bracket probing.  The caller can use this to set the evaluation
-        role to "bracket_probe" for provenance tracking.
+        bracket probing (after the explicit phase is set).
     """
     assert callable(residual_fn)
 
@@ -270,7 +278,7 @@ def find_bracket(
     # Evaluate at Q = 0
     if on_probe:
         on_probe()
-    r_low = residual_fn(q_low)
+    r_low = residual_fn(q_low, SolverEvaluationPhase.BRACKET_PROBE)
 
     if not math.isfinite(r_low):
         return None
@@ -290,7 +298,7 @@ def find_bracket(
         q_try = min(q_low + i * step, q_high)
         if on_probe:
             on_probe()
-        r_try = residual_fn(q_try)
+        r_try = residual_fn(q_try, SolverEvaluationPhase.BRACKET_PROBE)
 
         if not math.isfinite(r_try):
             continue
@@ -314,7 +322,7 @@ def find_bracket(
 
 
 def solve_rating(
-    residual_fn: Callable[[float], float],
+    residual_fn: Callable[[float, SolverEvaluationPhase], float],
     q_max: float,
     params: SolverParams | None = None,
     c_effective_w_k: float | None = None,
@@ -325,8 +333,9 @@ def solve_rating(
     Parameters
     ----------
     residual_fn :
-        Function ``f(Q) -> residual_w``.  Must be finite at the bracket
-        endpoints.
+        Function ``f(Q, phase) -> residual_w``.  Must be finite at the
+        bracket endpoints.  ``phase`` is BRACKET_PROBE during bracket
+        construction and SOLVER_ITERATION during bisection-secant.
     q_max :
         Maximum feasible duty from enthalpy reach limits [W].
     params :
@@ -357,7 +366,7 @@ def solve_rating(
             solver_params=params,
         )
 
-    # Find bracket
+    # Find bracket — all calls use BRACKET_PROBE phase
     bracket = find_bracket(residual_fn, q_max, params, on_probe=on_probe)
     if bracket is None:
         return SolverResult(
@@ -382,7 +391,7 @@ def solve_rating(
 
     # Handle zero-duty case
     if q_low == 0.0 and q_high == 0.0:
-        r = residual_fn(0.0)
+        r = residual_fn(0.0, SolverEvaluationPhase.SOLVER_ITERATION)
         return SolverResult(
             converged=True,
             q_solution_w=0.0,
@@ -399,10 +408,13 @@ def solve_rating(
             solver_params=params,
         )
 
-    # Run bisection-secant hybrid
+    # Run bisection-secant hybrid — all calls use SOLVER_ITERATION phase
+    def _iteration_residual(Q: float) -> float:
+        return residual_fn(Q, SolverEvaluationPhase.SOLVER_ITERATION)
+
     try:
         q_sol, r_sol, n_iter, n_func, final_a, final_b = _bisect_secant(
-            residual_fn,
+            _iteration_residual,
             q_low,
             q_high,
             xtol=1e-12,

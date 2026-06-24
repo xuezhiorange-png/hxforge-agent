@@ -68,6 +68,9 @@ _BASE_KWARGS = dict(
     cold_inlet_temperature_k=300.0,
     hot_inlet_pressure_pa=200_000.0,
     cold_inlet_pressure_pa=150_000.0,
+    minimum_terminal_delta_t=0.5,
+    tube_boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+    annulus_boundary_condition=ThermalBoundaryCondition.inner_wall_heated,
 )
 
 
@@ -525,7 +528,6 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=[],
             recorder=recorder,
         )
         q_max_cf = q_max_result.q_max_w
@@ -576,7 +578,6 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.PARALLEL,
-            property_calls=[],
             recorder=recorder,
         )
         q_max_pf = q_max_result.q_max_w
@@ -636,7 +637,6 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=[],
             recorder=rec_w,
         )
         q_max_w = res_w.q_max_w
@@ -659,7 +659,6 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=[],
             recorder=rec_a,
         )
         q_max_a = res_a.q_max_w
@@ -700,7 +699,6 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=[],
             recorder=rec1,
         )
         q1 = res1.q_max_w
@@ -720,7 +718,6 @@ class TestQMaxNumerical:
             cold_mass_flow_kg_s=m_cold,
             minimum_terminal_delta_t=min_dt,
             flow_arrangement=FlowArrangement.COUNTERFLOW,
-            property_calls=[],
             recorder=rec2,
         )
         q2 = res2.q_max_w

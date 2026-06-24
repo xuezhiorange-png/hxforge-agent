@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from hexagent.correlations.flow import ThermalBoundaryCondition
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.rating import rate_double_pipe
 from hexagent.exchangers.double_pipe.result import RatingResult, RatingStatus
@@ -66,6 +67,9 @@ def _run_golden(golden: dict, provider: CoolPropProvider) -> RatingResult:
         flow_arrangement=flow_arrangement,
         provider=provider,
         solver_params=SolverParams(),
+        minimum_terminal_delta_t=0.5,
+        tube_boundary_condition=ThermalBoundaryCondition.constant_wall_temperature,
+        annulus_boundary_condition=ThermalBoundaryCondition.inner_wall_heated,
     )
     return result
 
