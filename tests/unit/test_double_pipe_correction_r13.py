@@ -32,6 +32,7 @@ from hexagent.exchangers.double_pipe.result import (
     _verify_property_call_identity,
 )
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+from pydantic import ValidationError
 from hexagent.properties.base import FluidIdentifier
 from hexagent.properties.coolprop_provider import CoolPropProvider
 
@@ -553,17 +554,16 @@ class TestResistanceBreakdownValidation:
         return _run_rating(provider)
 
     def test_succeeded_requires_nonnull_breakdown(self, provider: CoolPropProvider) -> None:
-        """SUCCEEDED with resistance_breakdown=None → validation fails."""
+        """SUCCEEDED with resistance_breakdown=None → ValidationError."""
         result = self._make_succeeded_result(provider)
         assert result.status == RatingStatus.SUCCEEDED
         assert result.resistance_breakdown is not None
 
-        # Tamper: set resistance_breakdown to None
-        tampered = result.model_copy(update={"resistance_breakdown": None})
-        assert tampered.resistance_breakdown is None
-        assert tampered.UA_w_k is not None  # was non-null
-        # verify_hash should still pass (hash doesn't depend on runtime validation)
-        # But the cross-field invariant is violated
+        # Build a dict with resistance_breakdown=None and UA/U still set
+        data = result.model_dump()
+        data["resistance_breakdown"] = None
+        with pytest.raises(ValidationError, match="resistance_breakdown"):
+            RatingResult.model_validate(data)
 
     def test_succeeded_breakdown_has_finite_ua(self, provider: CoolPropProvider) -> None:
         """SUCCEEDED result has finite positive UA_w_k in breakdown."""
@@ -830,36 +830,66 @@ class TestQMaxDiagnosticsInvariants:
         # Iterations > 0
         assert qmax.iterations > 0
 
-    def test_pinch_satisfied_at_upper_invariants(self, provider: CoolPropProvider) -> None:
-        """pinch_satisfied_at_upper: Q=low=high, width=0, iterations=0."""
-        # Create conditions where pinch is satisfied at upper bound
-        # This requires very small Q or very large terminal delta T
-        recorder = EvaluationRecorder()
-        # Use very high minimum_terminal_delta_t to trigger pinch_satisfied_at_upper
-        try:
-            result = _compute_q_max_parallel(
-                provider=provider,
-                hot_fluid=WATER,
-                cold_fluid=WATER,
-                hot_inlet_temperature_k=350.0,
-                cold_inlet_temperature_k=300.0,
-                hot_inlet_pressure_pa=200000.0,
-                cold_inlet_pressure_pa=150000.0,
-                h_hot_in=provider.state_tp(WATER, 350.0, 200000.0).enthalpy_j_kg,
-                h_cold_in=provider.state_tp(WATER, 300.0, 150000.0).enthalpy_j_kg,
-                hot_mass_flow_kg_s=0.5,
-                cold_mass_flow_kg_s=1.5,
-                minimum_terminal_delta_t=49.0,  # Very high → pinch satisfied at upper
-                recorder=recorder,
-            )
-        except Exception:
-            pytest.skip("Could not trigger pinch_satisfied_at_upper")
+    def test_pinch_satisfied_at_upper_direct_snapshot(self) -> None:
+        """pinch_satisfied_at_upper: direct deterministic snapshot."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        snap = QMaxDiagnosticsSnapshot(
+            q_max_w=80000.0,
+            iterations=0,
+            final_pinch_residual_k=1e-8,
+            termination_reason="pinch_satisfied_at_upper",
+            final_q_low_w=80000.0,
+            final_q_high_w=80000.0,
+            final_q_width_w=0.0,
+            hot_limit_w=80000.0,
+            cold_limit_w=310000.0,
+            limiting_side="hot_limit",
+            q_tolerance_w=1e-6,
+            pinch_temperature_tolerance_k=1e-6,
+        )
+        assert snap.q_max_w == snap.final_q_low_w
+        assert snap.q_max_w == snap.final_q_high_w
+        assert snap.final_q_width_w == 0.0
+        assert snap.iterations == 0
+        assert snap.limiting_side == "hot_limit"
 
-        if result.termination_reason == "pinch_satisfied_at_upper":
-            assert result.q_max_w == result.final_q_low_w
-            assert result.q_max_w == result.final_q_high_w
-            assert result.final_q_width_w == 0.0
-            assert result.iterations == 0
+    def test_pinch_satisfied_at_upper_invalid_no_limits(self) -> None:
+        """pinch_satisfied_at_upper without hot/cold limits → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="hot_limit_w and cold_limit_w"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=80000.0,
+                iterations=0,
+                final_pinch_residual_k=1e-8,
+                termination_reason="pinch_satisfied_at_upper",
+                final_q_low_w=80000.0,
+                final_q_high_w=80000.0,
+                final_q_width_w=0.0,
+                hot_limit_w=None,
+                cold_limit_w=None,
+                limiting_side=None,
+                q_tolerance_w=1e-6,
+                pinch_temperature_tolerance_k=1e-6,
+            )
+
+    def test_pinch_satisfied_at_upper_negative_residual(self) -> None:
+        """pinch_satisfied_at_upper with negative residual → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="final_pinch_residual_k >= 0"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=80000.0,
+                iterations=0,
+                final_pinch_residual_k=-1e-8,
+                termination_reason="pinch_satisfied_at_upper",
+                final_q_low_w=80000.0,
+                final_q_high_w=80000.0,
+                final_q_width_w=0.0,
+                hot_limit_w=80000.0,
+                cold_limit_w=310000.0,
+                limiting_side="hot_limit",
+                q_tolerance_w=1e-6,
+                pinch_temperature_tolerance_k=1e-6,
+            )
 
     def test_counterflow_independent_limits_invariants(self, provider: CoolPropProvider) -> None:
         """independent_limits: low/high/width are None, iterations=0."""
@@ -952,3 +982,244 @@ class TestParallelFlowFullTrace:
         assert EvaluationRole.Q_MAX_COUNTERFLOW.value in roles
         assert EvaluationRole.Q_MAX_PARALLEL_LIMITS.value not in roles
         assert EvaluationRole.Q_MAX_PARALLEL_PINCH.value not in roles
+
+
+# =========================================================================
+# 7. Synthetic verifier tests for R15 review items
+# =========================================================================
+
+
+class TestSyntheticVerifierDiagnosticsBinding:
+    """Synthetic tests for diagnostics binding and trace contracts."""
+
+    def test_counterflow_success_missing_qmax_counterflow(self) -> None:
+        """Counterflow SUCCEEDED without q_max_counterflow eval → False."""
+        calls = [
+            _make_call(seq_idx=0, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=0, query_type="TP", stream_role="hot_inlet", stage="inlet"),
+            _make_call(seq_idx=1, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=1, query_type="TP", stream_role="cold_inlet", stage="inlet"),
+            # bracket/solver/final but NO q_max_counterflow
+            _make_call(seq_idx=2, eval_idx=1, role=EvaluationRole.BRACKET_PROBE.value,
+                       call_idx=0, query_type="PH", stream_role="hot_solver",
+                       stage="bracket", trial_q_w=50000.0),
+            _make_call(seq_idx=3, eval_idx=2, role=EvaluationRole.SOLVER_ITERATION.value,
+                       call_idx=0, query_type="PH", stream_role="hot_solver",
+                       stage="solver", trial_q_w=50000.0),
+            _make_call(seq_idx=4, eval_idx=3, role=EvaluationRole.FINAL_EVALUATION.value,
+                       call_idx=0, query_type="PH", stream_role="hot_solver",
+                       stage="final", trial_q_w=50000.0),
+        ]
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        diag = QMaxDiagnosticsSnapshot(
+            q_max_w=100000.0, iterations=0, final_pinch_residual_k=0.0,
+            termination_reason="independent_limits",
+            hot_limit_w=100000.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+        )
+        result = _verify_property_call_identity(
+            tuple(calls), FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.SUCCEEDED, converged=True,
+            solver_termination_reason="converged", q_max_diagnostics=diag,
+        )
+        assert result is False, "counterflow without q_max_counterflow should be rejected"
+
+    def test_parallel_success_no_diagnostics(self) -> None:
+        """Parallel SUCCEEDED without q_max_diagnostics → False."""
+        calls = [
+            _make_call(seq_idx=0, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=0, query_type="TP", stream_role="hot_inlet", stage="inlet"),
+            _make_call(seq_idx=1, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=1, query_type="TP", stream_role="cold_inlet", stage="inlet"),
+            _make_call(seq_idx=2, eval_idx=1, role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                       call_idx=0, query_type="TP", stream_role="hot_limit", stage="q_max"),
+            _make_call(seq_idx=3, eval_idx=1, role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                       call_idx=1, query_type="TP", stream_role="cold_limit", stage="q_max"),
+            _make_call(seq_idx=4, eval_idx=2, role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                       call_idx=0, query_type="PH", stream_role="hot_solver",
+                       stage="pinch", trial_q_w=50000.0),
+            _make_call(seq_idx=5, eval_idx=2, role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                       call_idx=1, query_type="PH", stream_role="cold_solver",
+                       stage="pinch", trial_q_w=50000.0),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls), FlowArrangement.PARALLEL,
+            status=RatingStatus.SUCCEEDED, converged=True,
+            solver_termination_reason="converged", q_max_diagnostics=None,
+        )
+        assert result is False, "SUCCEEDED without q_max_diagnostics should be rejected"
+
+    def test_parallel_zero_upper_bound_trace_mismatch(self) -> None:
+        """zero_upper_bound diagnostics with pinch+solver trace → False."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        diag = QMaxDiagnosticsSnapshot(
+            q_max_w=0.0, iterations=0, final_pinch_residual_k=0.0,
+            termination_reason="zero_upper_bound",
+            hot_limit_w=-100.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+        )
+        # Trace has limits + pinch + solver — incompatible with zero_upper_bound
+        calls = [
+            _make_call(seq_idx=0, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=0, query_type="TP", stream_role="hot_inlet", stage="inlet"),
+            _make_call(seq_idx=1, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=1, query_type="TP", stream_role="cold_inlet", stage="inlet"),
+            _make_call(seq_idx=2, eval_idx=1, role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                       call_idx=0, query_type="TP", stream_role="hot_limit", stage="q_max"),
+            _make_call(seq_idx=3, eval_idx=1, role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                       call_idx=1, query_type="TP", stream_role="cold_limit", stage="q_max"),
+            _make_call(seq_idx=4, eval_idx=2, role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                       call_idx=0, query_type="PH", stream_role="hot_solver",
+                       stage="pinch", trial_q_w=50000.0),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls), FlowArrangement.PARALLEL,
+            q_max_diagnostics=diag,
+        )
+        assert result is False, "zero_upper_bound with pinch trace should be rejected"
+
+    def test_cold_limit_fail_followed_by_pinch_rejected(self) -> None:
+        """PARALLEL: cold limit fails, then pinch follows → False (state machine stop)."""
+        calls = [
+            _make_call(seq_idx=0, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=0, query_type="TP", stream_role="hot_inlet", stage="inlet"),
+            _make_call(seq_idx=1, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=1, query_type="TP", stream_role="cold_inlet", stage="inlet"),
+            # eval 1: limits (hot succeeds, cold fails)
+            _make_call(seq_idx=2, eval_idx=1, role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                       call_idx=0, query_type="TP", stream_role="hot_limit", stage="q_max"),
+            _make_call(seq_idx=3, eval_idx=1, role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                       call_idx=1, query_type="TP", stream_role="cold_limit", stage="q_max",
+                       success=False, error_code="BACKEND_FAILURE", error_message="TP failed"),
+            # eval 2: pinch — should NOT be here after limits failure
+            _make_call(seq_idx=4, eval_idx=2, role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                       call_idx=0, query_type="PH", stream_role="hot_solver",
+                       stage="pinch", trial_q_w=50000.0),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls), FlowArrangement.PARALLEL,
+            status=RatingStatus.BLOCKED, converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "cold limit fail with later pinch should be rejected"
+
+    def test_cold_pinch_fail_followed_by_solver_rejected(self) -> None:
+        """PARALLEL: cold pinch fails, then solver/final follows → False."""
+        calls = [
+            _make_call(seq_idx=0, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=0, query_type="TP", stream_role="hot_inlet", stage="inlet"),
+            _make_call(seq_idx=1, eval_idx=0, role=EvaluationRole.INLET.value,
+                       call_idx=1, query_type="TP", stream_role="cold_inlet", stage="inlet"),
+            # eval 1: limits (both succeed)
+            _make_call(seq_idx=2, eval_idx=1, role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                       call_idx=0, query_type="TP", stream_role="hot_limit", stage="q_max"),
+            _make_call(seq_idx=3, eval_idx=1, role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                       call_idx=1, query_type="TP", stream_role="cold_limit", stage="q_max"),
+            # eval 2: pinch (hot succeeds, cold fails)
+            _make_call(seq_idx=4, eval_idx=2, role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                       call_idx=0, query_type="PH", stream_role="hot_solver",
+                       stage="pinch", trial_q_w=50000.0),
+            _make_call(seq_idx=5, eval_idx=2, role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                       call_idx=1, query_type="PH", stream_role="cold_solver",
+                       stage="pinch", trial_q_w=50000.0,
+                       success=False, error_code="BACKEND_FAILURE", error_message="PH failed"),
+            # eval 3: bracket/solver — should NOT be here after pinch failure
+            _make_call(seq_idx=6, eval_idx=3, role=EvaluationRole.BRACKET_PROBE.value,
+                       call_idx=0, query_type="PH", stream_role="hot_solver",
+                       stage="bracket", trial_q_w=50000.0),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls), FlowArrangement.PARALLEL,
+            status=RatingStatus.BLOCKED, converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "cold pinch fail with later bracket should be rejected"
+
+
+class TestQMaxDiagnosticsInvalidSnapshots:
+    """Direct construction tests for invalid QMax diagnostics snapshots."""
+
+    def test_iteration_limit_both_criteria_met(self) -> None:
+        """iteration_limit but both criteria satisfied → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="Use bisection_converged instead"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=80000.0, iterations=37,
+                final_pinch_residual_k=1e-10,
+                termination_reason="iteration_limit",
+                final_q_low_w=80000.0, final_q_high_w=80000.0, final_q_width_w=0.0,
+                q_tolerance_w=1e-6, pinch_temperature_tolerance_k=1e-6,
+                hot_limit_w=100000.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+            )
+
+    def test_iteration_limit_q_not_low(self) -> None:
+        """iteration_limit with q_max_w != low → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="q_max_w == final_q_low_w"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=80001.0, iterations=37,
+                final_pinch_residual_k=1e-6,
+                termination_reason="iteration_limit",
+                final_q_low_w=80000.0, final_q_high_w=81000.0, final_q_width_w=1000.0,
+                q_tolerance_w=1e-6, pinch_temperature_tolerance_k=1e-6,
+                hot_limit_w=100000.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+            )
+
+    def test_zero_upper_bound_q_not_zero(self) -> None:
+        """zero_upper_bound with q_max_w != 0 → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="q_max_w == 0"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=100.0, iterations=0, final_pinch_residual_k=0.0,
+                termination_reason="zero_upper_bound",
+                hot_limit_w=-100.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+            )
+
+    def test_zero_upper_bound_bracket_fields_not_none(self) -> None:
+        """zero_upper_bound with bracket fields present → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="final_q_low_w"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=0.0, iterations=0, final_pinch_residual_k=0.0,
+                termination_reason="zero_upper_bound",
+                final_q_low_w=0.0,  # should be None
+                hot_limit_w=-100.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+            )
+
+    def test_zero_upper_bound_residual_not_zero(self) -> None:
+        """zero_upper_bound with residual != 0 → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="final_pinch_residual_k == 0"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=0.0, iterations=0, final_pinch_residual_k=1.0,
+                termination_reason="zero_upper_bound",
+                hot_limit_w=-100.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+            )
+
+    def test_zero_upper_bound_min_limit_positive(self) -> None:
+        """zero_upper_bound with min(hot, cold) > 0 → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="min.hot_limit_w"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=0.0, iterations=0, final_pinch_residual_k=0.0,
+                termination_reason="zero_upper_bound",
+                hot_limit_w=100.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+            )
+
+    def test_independent_limits_wrong_limiting_side(self) -> None:
+        """independent_limits with wrong limiting_side → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="limiting_side"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=100000.0, iterations=0, final_pinch_residual_k=0.0,
+                termination_reason="independent_limits",
+                hot_limit_w=100000.0, cold_limit_w=300000.0, limiting_side="cold_limit",
+            )
+
+    def test_independent_limits_residual_not_zero(self) -> None:
+        """independent_limits with residual != 0 → ValueError."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+        with pytest.raises(ValueError, match="final_pinch_residual_k == 0"):
+            QMaxDiagnosticsSnapshot(
+                q_max_w=100000.0, iterations=0, final_pinch_residual_k=1.0,
+                termination_reason="independent_limits",
+                hot_limit_w=100000.0, cold_limit_w=300000.0, limiting_side="hot_limit",
+            )

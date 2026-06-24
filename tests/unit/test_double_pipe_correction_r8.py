@@ -29,7 +29,7 @@ from hexagent.exchangers.double_pipe.rating import (
     Q_MAX_PINCH_TOLERANCE_K,
     Q_MAX_Q_TOLERANCE_W,
     QMaxResult,
-    _build_empty_resistance,
+    # _build_empty_resistance removed per review R15-5
     _build_empty_solver_details,
     _compute_q_max_counterflow,
     _compute_q_max_parallel,
@@ -1031,7 +1031,8 @@ def _make_blocked_result(
         git_revision="",
         reference_state_policy="def",
     )
-    empty_res = _build_empty_resistance()
+    # None breakdown per review R15-5 (no engineering placeholder)
+    empty_res = None
     if solver_details is None:
         solver_details = _build_empty_solver_details()
 
