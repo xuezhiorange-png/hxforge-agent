@@ -832,6 +832,8 @@ class RatingResult(BaseModel):
                 "software_version",
                 "external_calculation_run_id",
             }
+            if self.q_max_diagnostics is not None:
+                expected_calc_keys.add("q_max_diagnostics")
             if set(calc_meta.keys()) != expected_calc_keys:
                 return False
             if calc_meta["flow_arrangement"] != self.flow_arrangement.value:
@@ -848,6 +850,34 @@ class RatingResult(BaseModel):
                 else None
             )
             if calc_meta.get("external_calculation_run_id") != expected_ext_calc_id:
+                return False
+
+            # 4b. Q_max diagnostics metadata verification
+            if self.q_max_diagnostics is not None:
+                q_max_meta = calc_meta.get("q_max_diagnostics")
+                if q_max_meta is None:
+                    return False
+                q_max_dict = dict(q_max_meta)
+                expected_q_max_fields: dict[str, Any] = {
+                    "q_max_w": self.q_max_diagnostics.q_max_w,
+                    "iterations": self.q_max_diagnostics.iterations,
+                    "termination_reason": self.q_max_diagnostics.termination_reason,
+                    "hot_limit_w": self.q_max_diagnostics.hot_limit_w,
+                    "cold_limit_w": self.q_max_diagnostics.cold_limit_w,
+                    "limiting_side": self.q_max_diagnostics.limiting_side,
+                    "final_q_low_w": self.q_max_diagnostics.final_q_low_w,
+                    "final_q_high_w": self.q_max_diagnostics.final_q_high_w,
+                    "final_q_width_w": self.q_max_diagnostics.final_q_width_w,
+                    "final_pinch_residual_k": self.q_max_diagnostics.final_pinch_residual_k,
+                    "q_tolerance_w": self.q_max_diagnostics.q_tolerance_w,
+                    "pinch_temperature_tolerance_k": (
+                        self.q_max_diagnostics.pinch_temperature_tolerance_k
+                    ),
+                }
+                if q_max_dict != expected_q_max_fields:
+                    return False
+            elif "q_max_diagnostics" in calc_meta:
+                # q_max_diagnostics is None on the result but present in provenance
                 return False
 
             # 5. PROPERTY_CALL nodes
@@ -1833,6 +1863,7 @@ def build_provenance_core(
     annulus_correlation_info: SelectedCorrelationSnapshot | None = None,
     tube_applicability: ApplicabilitySnapshot | None = None,
     annulus_applicability: ApplicabilitySnapshot | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
 ) -> tuple[ProvenanceGraph, list[ProvenanceNode], list[ProvenanceEdge]]:
     """Build the core provenance graph WITHOUT the RESULT node.
 
@@ -1892,21 +1923,44 @@ def build_provenance_core(
         converged=converged,
     )
     calc_id = _deterministic_uuid5(calc_payload)
+
+    # Build Q_max diagnostics metadata
+    q_max_meta: tuple[tuple[str, Any], ...] | None = None
+    if q_max_diagnostics is not None:
+        q_max_meta = (
+            ("q_max_w", q_max_diagnostics.q_max_w),
+            ("iterations", q_max_diagnostics.iterations),
+            ("termination_reason", q_max_diagnostics.termination_reason),
+            ("hot_limit_w", q_max_diagnostics.hot_limit_w),
+            ("cold_limit_w", q_max_diagnostics.cold_limit_w),
+            ("limiting_side", q_max_diagnostics.limiting_side),
+            ("final_q_low_w", q_max_diagnostics.final_q_low_w),
+            ("final_q_high_w", q_max_diagnostics.final_q_high_w),
+            ("final_q_width_w", q_max_diagnostics.final_q_width_w),
+            ("final_pinch_residual_k", q_max_diagnostics.final_pinch_residual_k),
+            ("q_tolerance_w", q_max_diagnostics.q_tolerance_w),
+            ("pinch_temperature_tolerance_k", q_max_diagnostics.pinch_temperature_tolerance_k),
+        )
+
+    calc_metadata: list[tuple[str, Any]] = [
+        ("flow_arrangement", flow_arrangement.value),
+        ("iterations", iterations),
+        ("converged", converged),
+        ("software_version", _SOFTWARE_VERSION),
+        (
+            "external_calculation_run_id",
+            str(ctx.calculation_run_id) if ctx.calculation_run_id is not None else None,
+        ),
+    ]
+    if q_max_meta is not None:
+        calc_metadata.append(("q_max_diagnostics", q_max_meta))
+
     nodes.append(
         ProvenanceNode(
             node_id=calc_id,
             node_type=ProvenanceNodeType.CALCULATION_RUN,
             label="double_pipe_rating_run",
-            metadata=(
-                ("flow_arrangement", flow_arrangement.value),
-                ("iterations", iterations),
-                ("converged", converged),
-                ("software_version", _SOFTWARE_VERSION),
-                (
-                    "external_calculation_run_id",
-                    str(ctx.calculation_run_id) if ctx.calculation_run_id is not None else None,
-                ),
-            ),
+            metadata=tuple(calc_metadata),
             payload_hash=sha256_digest(calc_payload),
         )
     )
@@ -2074,6 +2128,7 @@ def build_provenance(
     annulus_correlation_info: SelectedCorrelationSnapshot | None = None,
     tube_applicability: ApplicabilitySnapshot | None = None,
     annulus_applicability: ApplicabilitySnapshot | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
 ) -> ProvenanceGraph:
     """Build a deterministic provenance graph for the double-pipe rating.
 
@@ -2095,6 +2150,7 @@ def build_provenance(
         annulus_correlation_info=annulus_correlation_info,
         tube_applicability=tube_applicability,
         annulus_applicability=annulus_applicability,
+        q_max_diagnostics=q_max_diagnostics,
     )
 
     # Find the CALCULATION_RUN node for the RESULT edge

@@ -1127,6 +1127,8 @@ def _build_final_evaluation_blocked_result(
     cold_inlet_temperature_k: float,
     tube_in_hot: bool,
     geometry: DoublePipeGeometry,
+    hot_mass_flow_kg_s: float,
+    cold_mass_flow_kg_s: float,
     q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
 ) -> RatingResult:
     """Build a BLOCKED result when the final evaluation at Q_sol is infeasible.
@@ -1223,13 +1225,13 @@ def _build_final_evaluation_blocked_result(
         )
         UA_final = R_breakdown_final.ua_w_k
         rb_model = _make_resistance_breakdown(R_breakdown_final)
-        U_inner = UA_final / area_inner_m2 if area_inner_m2 > 0 else 0.0
-        U_outer = UA_final / area_outer_m2 if area_outer_m2 > 0 else 0.0
+        U_inner = UA_final / area_inner_m2 if area_inner_m2 > 0 else None
+        U_outer = UA_final / area_outer_m2 if area_outer_m2 > 0 else None
     else:
-        UA_final = 0.0
+        UA_final = None
         rb_model = _build_empty_resistance()
-        U_inner = 0.0
-        U_outer = 0.0
+        U_inner = None
+        U_outer = None
 
     # Outlet temperatures (may be None)
     T_h_out_sol = (
@@ -1244,15 +1246,38 @@ def _build_final_evaluation_blocked_result(
     )
 
     # Capacity rates from inlet states (always available since we passed validation)
-    C_hot = 0.0  # Cannot compute without cp; use 0 for BLOCKED
-    C_cold = 0.0
-    C_min = 0.0
-    C_max = 0.0
-    capacity_ratio = 0.0
+    C_hot = (
+        hot_mass_flow_kg_s * hot_inlet_state_snapshot.cp_j_kg_k
+        if hot_inlet_state_snapshot and hot_inlet_state_snapshot.cp_j_kg_k is not None
+        else None
+    )
+    C_cold = (
+        cold_mass_flow_kg_s * cold_inlet_state_snapshot.cp_j_kg_k
+        if cold_inlet_state_snapshot and cold_inlet_state_snapshot.cp_j_kg_k is not None
+        else None
+    )
+    C_min = min(C_hot, C_cold) if C_hot is not None and C_cold is not None else None
+    C_max = max(C_hot, C_cold) if C_hot is not None and C_cold is not None else None
+    capacity_ratio = (
+        C_min / C_max if C_min is not None and C_max is not None and C_max > 0 else None
+    )
 
     # ε-NTU diagnostics
-    NTU_final = 0.0
-    eps_calc = 0.0
+    if (
+        UA_final is not None
+        and UA_final > 0
+        and C_min is not None
+        and C_min > 0
+        and capacity_ratio is not None
+    ):
+        NTU_final = UA_final / C_min
+        if flow_arrangement == FlowArrangement.COUNTERFLOW:
+            eps_calc = effectiveness_counterflow(NTU_final, capacity_ratio)
+        else:
+            eps_calc = effectiveness_parallel(NTU_final, capacity_ratio)
+    else:
+        NTU_final = None
+        eps_calc = None
 
     # LMTD (may be None)
     lmtd_final = None
@@ -1305,6 +1330,7 @@ def _build_final_evaluation_blocked_result(
         annulus_correlation_info=annulus_sc,
         tube_applicability=tube_ap,
         annulus_applicability=annulus_ap,
+        q_max_diagnostics=q_max_diagnostics,
     )
     core_provenance_digest = _provenance_graph_digest(core_graph)
 
@@ -1342,7 +1368,7 @@ def _build_final_evaluation_blocked_result(
         capacity_ratio=capacity_ratio,
         NTU=NTU_final,
         effectiveness=eps_calc,
-        LMTD_k=lmtd_final if lmtd_final is not None else 0.0,
+        LMTD_k=lmtd_final,
         energy_residual_w=None,
         ua_lmtd_residual_w=None,
         iterations=solver_result.iterations,
@@ -1391,6 +1417,7 @@ def _build_final_evaluation_blocked_result(
         annulus_correlation_info=annulus_sc,
         tube_applicability=tube_ap,
         annulus_applicability=annulus_ap,
+        q_max_diagnostics=q_max_diagnostics,
     )
     provenance_digest = _provenance_graph_digest(provenance_graph)
 
@@ -1427,7 +1454,7 @@ def _build_final_evaluation_blocked_result(
         capacity_ratio=capacity_ratio,
         NTU=NTU_final,
         effectiveness=eps_calc,
-        LMTD_k=lmtd_final if lmtd_final is not None else 0.0,
+        LMTD_k=lmtd_final,
         energy_residual_w=None,
         ua_lmtd_residual_w=None,
         iterations=solver_result.iterations,
@@ -1541,6 +1568,7 @@ def _blocked_result(
         blockers=blockers,
         execution_context=ctx,
         request_identity=ri,
+        q_max_diagnostics=q_max_diagnostics,
     )
     core_provenance_digest = _provenance_graph_digest(core_graph)
 
@@ -1605,6 +1633,7 @@ def _blocked_result(
         result_hash=result_hash,
         execution_context=ctx,
         request_identity=ri,
+        q_max_diagnostics=q_max_diagnostics,
     )
     provenance_digest = _provenance_graph_digest(provenance_graph)
 
@@ -1644,6 +1673,7 @@ def _failed_result(
     provider_identity: ProviderIdentitySnapshot | None = None,
     execution_context: ExecutionContextSnapshot | None = None,
     flow_arrangement: FlowArrangement = FlowArrangement.COUNTERFLOW,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
 ) -> RatingResult:
     """Build a FAILED RatingResult with full provenance."""
     from hexagent.domain.messages import RunFailure
@@ -1710,6 +1740,7 @@ def _failed_result(
         blockers=blockers,
         execution_context=ctx,
         request_identity=ri,
+        q_max_diagnostics=q_max_diagnostics,
     )
     core_provenance_digest = _provenance_graph_digest(core_graph)
 
@@ -1760,6 +1791,7 @@ def _failed_result(
         failure=failure,
         status=RatingStatus.FAILED,
         core_provenance_digest=core_provenance_digest,
+        q_max_diagnostics=q_max_diagnostics,
     )
 
     provenance_graph = build_provenance(
@@ -1772,6 +1804,7 @@ def _failed_result(
         result_hash=result_hash,
         execution_context=ctx,
         request_identity=ri,
+        q_max_diagnostics=q_max_diagnostics,
     )
     provenance_digest = _provenance_graph_digest(provenance_graph)
 
@@ -1799,6 +1832,7 @@ def _failed_result(
         provenance_graph=provenance_graph,
         provenance_digest=provenance_digest,
         core_provenance_digest=core_provenance_digest,
+        q_max_diagnostics=q_max_diagnostics,
     )
 
 
@@ -2536,7 +2570,7 @@ def rate_double_pipe(
     C_cold = cold_mass_flow_kg_s * cold_inlet_state.cp_j_kg_k
     C_min = min(C_hot, C_cold)
     C_max = max(C_hot, C_cold)
-    capacity_ratio = C_min / C_max if C_max > 0 else 0.0
+    capacity_ratio = C_min / C_max if C_max > 0 else None
 
     # =====================================================================
     # 4. BUILD GEOMETRY QUANTITIES
@@ -2748,6 +2782,7 @@ def rate_double_pipe(
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
             flow_arrangement=flow_arrangement,
+            q_max_diagnostics=q_max_diag,
         )
 
     Q_sol = solver_result.q_solution_w
@@ -2799,6 +2834,8 @@ def rate_double_pipe(
             cold_inlet_temperature_k=cold_inlet_temperature_k,
             tube_in_hot=tube_in_hot,
             geometry=geometry,
+            hot_mass_flow_kg_s=hot_mass_flow_kg_s,
+            cold_mass_flow_kg_s=cold_mass_flow_kg_s,
             q_max_diagnostics=q_max_diag,
         )
 
@@ -2945,11 +2982,11 @@ def rate_double_pipe(
         UA_final = R_breakdown_final.ua_w_k
         rb_model = _make_resistance_breakdown(R_breakdown_final)
     else:
-        UA_final = 0.0
+        UA_final = None
         rb_model = _build_empty_resistance()
 
     # --- Check UA ---
-    if not math.isfinite(UA_final) or UA_final <= 0:
+    if UA_final is None or not math.isfinite(UA_final) or UA_final <= 0:
         blockers.append(
             _make_blocker(
                 ErrorCode.ENERGY_BALANCE_NOT_CLOSED,
@@ -2959,15 +2996,29 @@ def rate_double_pipe(
         )
 
     # --- ε-NTU diagnostics ---
-    NTU_final = UA_final / C_min if C_min > 0 else 0.0
-    if flow_arrangement == FlowArrangement.COUNTERFLOW:
-        eps_calc = effectiveness_counterflow(NTU_final, capacity_ratio)
+    if (
+        UA_final is not None
+        and UA_final > 0
+        and C_min is not None
+        and C_min > 0
+        and capacity_ratio is not None
+    ):
+        NTU_final = UA_final / C_min
+        if flow_arrangement == FlowArrangement.COUNTERFLOW:
+            eps_calc = effectiveness_counterflow(NTU_final, capacity_ratio)
+        else:
+            eps_calc = effectiveness_parallel(NTU_final, capacity_ratio)
     else:
-        eps_calc = effectiveness_parallel(NTU_final, capacity_ratio)
+        NTU_final = None
+        eps_calc = None
 
     # --- Overall U values ---
-    U_inner = UA_final / area_inner_m2 if area_inner_m2 > 0 else 0.0
-    U_outer = UA_final / area_outer_m2 if area_outer_m2 > 0 else 0.0
+    if UA_final is not None and UA_final > 0:
+        U_inner = UA_final / area_inner_m2 if area_inner_m2 > 0 else None
+        U_outer = UA_final / area_outer_m2 if area_outer_m2 > 0 else None
+    else:
+        U_inner = None
+        U_outer = None
 
     # =====================================================================
     # 10. ENERGY BALANCE CLOSURE
@@ -3003,7 +3054,14 @@ def rate_double_pipe(
     # --- UA-LMTD residual ---
     relative_ua_lmtd_residual: float | None = None
     ua_lmtd_tolerance_w_val: float | None = None
-    if UA_final > 0 and lmtd_final > 0 and math.isfinite(UA_final) and math.isfinite(lmtd_final):
+    if (
+        UA_final is not None
+        and lmtd_final is not None
+        and UA_final > 0
+        and lmtd_final > 0
+        and math.isfinite(UA_final)
+        and math.isfinite(lmtd_final)
+    ):
         ua_lmtd_residual_w = abs(Q_sol - UA_final * lmtd_final)
         # Frozen tolerance: max(abs(Q), abs(UA*LMTD), 1.0) as base
         _ua_lmtd_base = max(abs(Q_sol), abs(UA_final * lmtd_final), 1.0)
@@ -3088,6 +3146,7 @@ def rate_double_pipe(
             annulus_correlation_info=annulus_sc,
             tube_applicability=tube_ap,
             annulus_applicability=annulus_ap,
+            q_max_diagnostics=q_max_diag,
         )
         core_provenance_digest = _provenance_graph_digest(core_graph)
 
@@ -3174,6 +3233,7 @@ def rate_double_pipe(
             annulus_correlation_info=annulus_sc,
             tube_applicability=tube_ap,
             annulus_applicability=annulus_ap,
+            q_max_diagnostics=q_max_diag,
         )
         provenance_digest = _provenance_graph_digest(provenance_graph)
 
@@ -3312,6 +3372,7 @@ def rate_double_pipe(
         annulus_correlation_info=annulus_sel_corr_snapshot,
         tube_applicability=tube_app_snapshot,
         annulus_applicability=annulus_app_snapshot,
+        q_max_diagnostics=q_max_diag,
     )
 
     # Step 2: Compute core_provenance_digest
@@ -3406,6 +3467,7 @@ def rate_double_pipe(
         annulus_correlation_info=annulus_sel_corr_snapshot,
         tube_applicability=tube_app_snapshot,
         annulus_applicability=annulus_app_snapshot,
+        q_max_diagnostics=q_max_diag,
     )
 
     # Step 5: Compute final provenance_digest from full graph
