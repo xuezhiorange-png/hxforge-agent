@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 30 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 31 Engineering Design Review passes.
 
 ---
 
@@ -62,6 +62,8 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 26 | 4802228027 | CHANGES REQUIRED |
 | 27 | 4802328600 | CHANGES REQUIRED |
 | 28 | 4802483910 | CHANGES REQUIRED |
+| 29 | 4802701831 | CHANGES REQUIRED |
+| 30 | 4802836532 | CHANGES REQUIRED |
 
 |---|
 
@@ -1278,11 +1280,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
+from inspect import getattr_static
 import math
-from typing import Literal, TypeAlias
+from typing import (
+    Literal,
+    Protocol,
+    TypeAlias,
+    cast,
+)
 from uuid import UUID
 
+from pydantic import BaseModel
 
+
+_MISSING_ATTRIBUTE = object()
 RUN_FAILURE_SCHEMA_VERSION = "1"
 CONTEXT_CANONICALIZATION_FAILURE_MESSAGE = "Trusted context canonicalization failed."
 NON_STRING_CONTEXT_KEY_MARKER = "<non-string-context-key>"
@@ -1338,11 +1349,41 @@ def qualified_type_name(value: object) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class QuantityKindProtocol:
+    value: str
+
+
+@dataclass(frozen=True, slots=True)
+class QuantitySIResultProtocol:
+    value: object
+
+
+class QuantityToSIProtocol(Protocol):
+    def __call__(self) -> QuantitySIResultProtocol: ...
+
+
+_REQUIRED_QUANTITY_ATTRIBUTES = (
+    "value",
+    "unit",
+    "kind",
+    "to_si",
+)
+
+
+def has_all_repository_quantity_attributes(value: object) -> bool:
+    return all(
+        getattr_static(value, attribute_name, _MISSING_ATTRIBUTE)
+        is not _MISSING_ATTRIBUTE
+        for attribute_name in _REQUIRED_QUANTITY_ATTRIBUTES
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class RepositoryQuantityAdapter:
     raw_value: object
     unit: object
-    kind: object
-    to_si: object
+    kind: QuantityKindProtocol | None
+    to_si: QuantityToSIProtocol
 
 
 def try_read_repository_quantity_adapter(
@@ -1352,12 +1393,23 @@ def try_read_repository_quantity_adapter(
     context_path: tuple[str, ...],
 ) -> RepositoryQuantityAdapter | None:
     try:
+        has_required_attributes = has_all_repository_quantity_attributes(value)
+    except ContextCanonicalizationError:
+        raise
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind="canonicalization_exception",
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+    if not has_required_attributes:
+        return None
+    try:
         raw_value = getattr(value, "value")
         unit = getattr(value, "unit")
         kind = getattr(value, "kind")
         to_si = getattr(value, "to_si")
-    except AttributeError:
-        return None
     except ContextCanonicalizationError:
         raise
     except Exception as exc:
@@ -1369,21 +1421,29 @@ def try_read_repository_quantity_adapter(
         ) from exc
     if not callable(to_si):
         return None
+    typed_kind = cast(QuantityKindProtocol | None, kind)
+    typed_to_si = cast(QuantityToSIProtocol, to_si)
     return RepositoryQuantityAdapter(
-        raw_value=raw_value, unit=unit, kind=kind, to_si=to_si,
+        raw_value=raw_value, unit=unit, kind=typed_kind, to_si=typed_to_si,
     )
 
 
-def is_pydantic_model(
+@dataclass(frozen=True, slots=True)
+class PydanticModelAdapter:
+    model: BaseModel
+    model_fields: Mapping[str, object]
+
+
+def try_read_pydantic_model_adapter(
     value: object,
     *,
     context_key: str,
     context_path: tuple[str, ...],
-) -> bool:
+) -> PydanticModelAdapter | None:
+    if not isinstance(value, BaseModel):
+        return None
     try:
-        model_fields = getattr(type(value), "model_fields")
-    except AttributeError:
-        return False
+        model_fields = type(value).model_fields
     except ContextCanonicalizationError:
         raise
     except Exception as exc:
@@ -1393,7 +1453,17 @@ def is_pydantic_model(
             context_path=context_path,
             offending_type=qualified_type_name(value),
         ) from exc
-    return isinstance(model_fields, Mapping)
+    if not isinstance(model_fields, Mapping):
+        raise ContextCanonicalizationError(
+            failure_kind="canonicalization_exception",
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        )
+    return PydanticModelAdapter(
+        model=value,
+        model_fields=model_fields,
+    )
 
 
 def canonicalize_trusted_context_value(
@@ -1517,25 +1587,24 @@ def canonicalize_trusted_context_value(
         # Mapping → recursive (str keys only)
         if isinstance(value, Mapping):
             try:
-                raw_items: object = value.items()
+                items = value.items()
                 updated_ancestors = ancestor_ids | {id(value)}
                 result: dict[str, CanonicalValue] = {}
-                for k, v in value.items():
-                    if type(k) is not str:
+                for key, item in items:
+                    if type(key) is not str:
                         raise ContextCanonicalizationError(
                             failure_kind="non_string_key",
                             context_key=context_key,
                             context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
-                            offending_type=qualified_type_name(k),
+                            offending_type=qualified_type_name(key),
                         )
-                    child_path = context_path + (k,)
-                    canonical_v = canonicalize_trusted_context_value(
-                        v,
+                    child_path = context_path + (key,)
+                    result[key] = canonicalize_trusted_context_value(
+                        item,
                         context_key=context_key,
                         context_path=child_path,
                         ancestor_ids=updated_ancestors,
                     )
-                    result[k] = canonical_v
                 return result
             except ContextCanonicalizationError:
                 raise
@@ -1578,26 +1647,17 @@ def canonicalize_trusted_context_value(
                 ) from exc
 
         # Pydantic model - field-level traversal
-        if is_pydantic_model(
+        pydantic_adapter = try_read_pydantic_model_adapter(
             value, context_key=context_key, context_path=context_path,
-        ):
-            model_type = type(value)
-            try:
-                model_fields = model_type.model_fields
-            except ContextCanonicalizationError:
-                raise
-            except Exception as exc:
-                raise ContextCanonicalizationError(
-                    failure_kind="canonicalization_exception",
-                    context_key=context_key,
-                    context_path=context_path,
-                    offending_type=qualified_type_name(value),
-                ) from exc
+        )
+        if pydantic_adapter is not None:
             updated_ancestors = ancestor_ids | {id(value)}
             result: dict[str, CanonicalValue] = {}
-            for field_name in model_fields:
+            for field_name in pydantic_adapter.model_fields:
                 try:
-                    field_value = getattr(value, field_name)
+                    field_value = getattr(
+                        pydantic_adapter.model, field_name,
+                    )
                 except ContextCanonicalizationError:
                     raise
                 except Exception as exc:
@@ -5639,53 +5699,53 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 29 Contract Tests (501–540)
+### 27.21 Round 30 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 29 changes. **Expected output**: Round 29 row exists with Comment ID `4802701831` and decision `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 29 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 29 row in review history. **Expected output**: Appears immediately after Round 28 row. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 30 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
-505. **Input**: Actual NO_FEASIBLE registry `counter_invariants`. **Expected output**: Contains `invariant_evaluated_eq_unique_eq_verified`. **Exception**: N/A — registry contract: registry contains required equality invariant.
-506. **Input**: Valid NO_FEASIBLE counters: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=0`. **Expected output**: `invariant_evaluated_eq_unique_eq_verified` passes. **Exception**: N/A — valid fixture: all counters equal.
-507. **Input**: NO_FEASIBLE: `unique=10, evaluated=2, verified=2, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised with `"evaluated (2) != unique (10)"`. **Exception**: `ValueError` — evaluated < unique rejected.
-508. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=8, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised with `"verified (8) != unique (10)"`. **Exception**: `ValueError` — verified < unique rejected.
-509. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=10, feasible=1, result=1, failure=0`. **Expected output**: `ValueError` raised by `invariant_no_feasible_candidate`. **Exception**: `ValueError` — feasible > 0 rejected.
-510. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=10, feasible=0, result=0, failure=0`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present` with `"sizing_result_count=1"`. **Exception**: `ValueError` — result count != 1 rejected.
-511. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=10, feasible=0, result=2, failure=0`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present`. **Exception**: `ValueError` — result count=2 rejected.
-512. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=1`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present` with `"sizing_run_failure_result must be absent"`. **Exception**: `ValueError` — failure result present rejected.
-513. **Input**: Actual SUCCEEDED registry `counter_invariants`. **Expected output**: Contains `invariant_evaluated_eq_unique_eq_verified` and does NOT contain `invariant_verified_rating_eq_unique` or `invariant_all_candidates_verified`. **Exception**: N/A — registry contract: replaced with stronger equality invariant.
-514. **Input**: Valid SUCCEEDED counters: `unique=10, evaluated=10, verified=10, feasible=3, result=1, failure=0`. **Expected output**: `invariant_evaluated_eq_unique_eq_verified` passes. **Exception**: N/A — valid fixture: all counters equal.
-515. **Input**: SUCCEEDED: `unique=10, evaluated=3, verified=10, feasible=3, result=1, failure=0`. **Expected output**: `ValueError` raised with `"evaluated (3) != unique (10)"`. **Exception**: `ValueError` — evaluated < unique rejected.
-516. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=8, feasible=3, result=1, failure=0`. **Expected output**: `ValueError` raised with `"verified (8) != unique (10)"`. **Exception**: `ValueError` — verified < unique rejected.
-517. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised by `invariant_feasible_candidate_present`. **Exception**: `ValueError` — feasible=0 rejected.
-518. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: `ValueError` raised by `invariant_feasible_le_verified`. **Exception**: `ValueError` — feasible > verified rejected.
-519. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=3, result=0, failure=0`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present`. **Exception**: `ValueError` — result count != 1 rejected.
-520. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=3, result=1, failure=1`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present` with `"sizing_run_failure_result must be absent"`. **Exception**: `ValueError` — failure result present rejected.
-521. **Input**: `invariant_standard_result_node_present` with `result=1, failure=0`. **Expected output**: passes. **Exception**: N/A — valid standard-result topology.
-522. **Input**: `invariant_standard_result_node_present` with `result=1, failure=1`. **Expected output**: `ValueError` with `"sizing_run_failure_result must be absent"`. **Exception**: `ValueError` — failure-result rejected in standard topology.
-523. **Input**: datetime.utcoffset() raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged — outer boundary does not rewrite to `canonicalization_exception`. **Exception**: `ContextCanonicalizationError` — typed error propagates through nested boundary.
-524. **Input**: Mapping.items() raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
-525. **Input**: `try_read_repository_quantity_adapter` passes detected object, then `adapter.to_si()` raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
-526. **Input**: `adapter.to_si()` raises `RuntimeError`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — ordinary exception converted.
-527. **Input**: `getattr(type(value), "model_fields")` raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates in Pydantic detection.
-528. **Input**: Pydantic field getter `getattr(value, field_name)` raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
-529. **Input**: Pydantic field getter raises `RuntimeError("probe")`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — ordinary exception converted.
-530. **Input**: A real Pydantic `BaseModel` instance. **Expected output**: `is_pydantic_model` returns `True`. **Exception**: N/A — class-level Pydantic detection recognizes `BaseModel` subclass.
-531. **Input**: A plain object with `model_fields` set on the instance only (not on the class). **Expected output**: `is_pydantic_model` returns `False`; canonicalizer treats it as `unsupported_type`. **Exception**: `ContextCanonicalizationError` with `failure_kind="unsupported_type"`.
-532. **Input**: Quantity canonicalization uses `try_read_repository_quantity_adapter`. **Expected output**: No `is_repository_quantity_like` or `safe_has_attribute` call exists in the normative dispatch path. **Exception**: N/A — single authoritative mechanism.
-533. **Input**: Check for `safe_has_attribute` in normative block. **Expected output**: `safe_has_attribute` is not defined in the canonicalization normative code block. **Exception**: N/A — unused helper removed.
-534. **Input**: Nested Quantity within a Pydantic model. **Expected output**: Quantity is canonicalized via adapter, producing `{"si_value": ..., "kind": ...}` dictionary. **Exception**: N/A — nested Quantity retains SI payload.
-535. **Input**: Two `Quantity` objects with equivalent SI values but different original units (e.g. 1 m and 100 cm). **Expected output**: Both produce identical `si_value` and `kind` after canonicalization. **Exception**: N/A — unit-equivalent values hash identically.
-536. **Input**: Same sizing request digest and same candidate ID. **Expected output**: `uuid5(TASK009_CONTEXT_NAMESPACE, f"{sizing_request_identity_digest}:{source_qualified_candidate_id}")` produces the same UUID across repeated calls. **Exception**: N/A — deterministic request ID contract.
-537. **Input**: Same sizing request digest but different candidate IDs. **Expected output**: Each candidate produces a different deterministic UUID. **Exception**: N/A — per-candidate uniqueness without randomness.
-538. **Input**: Three candidates inserted in order A, B, C vs. order C, A, B. **Expected output**: Each candidate receives the same UUID in both orderings. **Exception**: N/A — insertion-order independence.
-539. **Input**: Repeated sizing run with identical inputs. **Expected output**: Every candidate's `request_id` and execution-context digest are identical to the first run. **Exception**: N/A — fully deterministic execution-context digest.
-540. **Input**: zero-root and dual-root rejection, tests 1–540 continuity, Frozen SHA and Round 30 gate synchronization. **Expected output**: 540 tests continuous, Issue frozen SHA equals new commit, gate references Round 30. **Exception**: N/A — structural sync check.
+501. **Input**: Review history table after Round 30 changes. **Expected output**: Round 29 row exists with Comment ID `4802701831`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Review history table after Round 30 changes. **Expected output**: Round 30 row exists with Comment ID `4802836532`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 29 and Round 30 rows in review history. **Expected output**: Round 29 immediately follows Round 28; Round 30 immediately follows Round 29. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 31 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+505. **Input**: `CountingMapping` with call counter. **Expected output**: `items()` is called exactly once during canonicalization. **Exception**: N/A — single-read invariant: items acquired exactly once.
+506. **Input**: Captured Mapping items iterable is used for iteration. **Expected output**: Canonicalizer iterates the captured items, does not re-read the original Mapping. **Exception**: N/A — single-read invariant: captured iterable is consumed.
+507. **Input**: Mapping whose second `items()` call raises `RuntimeError`. **Expected output**: Canonicalization succeeds because the second call is never made. **Exception**: N/A — single-read invariant: second call not triggered.
+508. **Input**: `value.items()` raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
+509. **Input**: `value.items()` raises `RuntimeError("probe")`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — ordinary exception converted.
+510. **Input**: Mapping iterable iteration raises `RuntimeError("probe")`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — iteration error converted.
+511. **Input**: A real Pydantic `BaseModel` instance. **Expected output**: `try_read_pydantic_model_adapter` returns a valid `PydanticModelAdapter` with the `model` reference. **Exception**: N/A — `BaseModel` recognised.
+512. **Input**: A `BaseModel` subclass instance. **Expected output**: `try_read_pydantic_model_adapter` returns a valid `PydanticModelAdapter`. **Exception**: N/A — subclass recognised.
+513. **Input**: A plain object with `model_fields` set on the instance only. **Expected output**: `try_read_pydantic_model_adapter` returns `None`; canonicalizer treats it as `unsupported_type`. **Exception**: `ContextCanonicalizationError` with `failure_kind="unsupported_type"`.
+514. **Input**: A plain class with class-level `model_fields = {"x": "y"}`. **Expected output**: `try_read_pydantic_model_adapter` returns `None`; canonicalizer rejects as `unsupported_type`. **Exception**: `ContextCanonicalizationError` with `failure_kind="unsupported_type"`.
+515. **Input**: Pydantic `BaseModel` with instrumented `type(model).model_fields`. **Expected output**: `model_fields` is read exactly once during `try_read_pydantic_model_adapter`. **Exception**: N/A — single-read invariant.
+516. **Input**: Captured `PydanticModelAdapter.model_fields` is iterated for field traversal. **Expected output**: The canonicalizer iterates the captured field mapping; `type(value).model_fields` is not re-read. **Exception**: N/A — single-read invariant.
+517. **Input**: Pydantic field getter raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
+518. **Input**: Pydantic field getter raises `RuntimeError("probe")`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — ordinary exception converted.
+519. **Input**: Object missing one of the four required Quantity static attributes (value, unit, kind, to_si). **Expected output**: `try_read_repository_quantity_adapter` returns `None`. **Exception**: N/A — missing static attribute returns None.
+520. **Input**: Quantity-like object with `value` property that raises `AttributeError` internally. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — getter failure is not None.
+521. **Input**: Quantity-like object with `value` property that raises `RuntimeError("probe")`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — getter failure converted.
+522. **Input**: Quantity-like object with `value` property that raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
+523. **Input**: Quantity-like object with `to_si` that raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
+524. **Input**: Quantity-like object with `to_si` that raises `RuntimeError("probe")`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — ordinary exception converted.
+525. **Input**: Quantity-like object with non-callable `to_si`. **Expected output**: `try_read_repository_quantity_adapter` returns `None`. **Exception**: N/A — non-callable to_si means adapter returns None.
+526. **Input**: Quantity adapter uses typed `QuantityKindProtocol` and `QuantityToSIProtocol`. **Expected output**: `adapter.kind` type reveals `value: str`; `adapter.to_si` is callable returning SI result. **Exception**: N/A — typed protocol guarantees.
+527. **Input**: Quantity adapter `kind` field type. **Expected output**: `adapter.kind` is typed as `QuantityKindProtocol | None`; no `Any` or `object` escapes. **Exception**: N/A — typed protocol.
+528. **Input**: Normative canonicalization block. **Expected output**: Contains zero `# type: ignore` comments. **Exception**: N/A — strict mypy compliance.
+529. **Input**: Python 3.11 environment with `mypy --strict`. **Expected output**: Normative extracted canonicalization block passes. **Exception**: N/A — type-safe contract.
+530. **Input**: Python 3.12 environment with `mypy --strict`. **Expected output**: Normative extracted canonicalization block passes. **Exception**: N/A — type-safe contract.
+531. **Input**: Valid NO_FEASIBLE counters: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=0`. **Expected output**: All top-level invariants pass. **Exception**: N/A — regression: valid fixture unchanged.
+532. **Input**: NO_FEASIBLE: `unique=10, evaluated=2, verified=2, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised with `"evaluated"`. **Exception**: `ValueError` — regression: partial evaluation still rejected.
+533. **Input**: Valid SUCCEEDED counters: `unique=10, evaluated=10, verified=10, feasible=3, result=1, failure=0`. **Expected output**: All top-level invariants pass. **Exception**: N/A — regression: valid fixture unchanged.
+534. **Input**: SUCCEEDED: `unique=10, evaluated=3, verified=10, feasible=3, result=1, failure=0`. **Expected output**: `ValueError` raised with `"evaluated"`. **Exception**: `ValueError` — regression: partial evaluation still rejected.
+535. **Input**: Standard-result topology: `result=1, failure=0` vs `result=1, failure=1`. **Expected output**: `result=1, failure=0` passes; `result=1, failure=1` raises `ValueError` with `"sizing_run_failure_result"`. **Exception**: `ValueError` — regression: failure-result rejected.
+536. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: Rejected by `invariant_feasible_count_range` because `feasible > unique`. **Exception**: `ValueError` — feasible range invariant fires before feasible_le_verified.
+537. **Input**: Standalone `invariant_feasible_le_verified` helper with `unique=10, verified=8, feasible=9`. **Expected output**: `ValueError` raised because `feasible > verified`. **Exception**: `ValueError` — unit contract for feasible_le_verified independent of registry ordering.
+538. **Input**: Deterministic candidate UUID5: same request+candidate → same UUID; different candidate → different UUID; insertion-order independent. **Expected output**: All three UUID5 invariants satisfied. **Exception**: N/A — regression: deterministic IDs unchanged.
+539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 31; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
+540. **Input**: Tests 1–540 continuous, zero/dual roots rejected, Frozen SHA and Round 31 gate synchronized. **Expected output**: Global numbering continuous, Issue frozen SHA matches new commit, gate at Round 31. **Exception**: N/A — structural sync check.
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 30 Engineering Design Review.
+1. Complete Round 31 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5699,7 +5759,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 30 Engineering Design Review passes before implementation starts
+- [ ] Round 31 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -5718,6 +5778,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 28 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 30 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
