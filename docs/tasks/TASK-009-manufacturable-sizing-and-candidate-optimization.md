@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 4 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 5 Engineering Design Review passes.
 
 ---
 
@@ -26,17 +26,18 @@ TASK-009 returns to READY only after Round 4 Engineering Design Review passes.
 
 ## 2. Objective
 
-From a caller-supplied, structurally validated, hash-verified set of complete double-pipe assembly options, generate deterministic discrete candidates, evaluate each through the TASK-008 `rate_double_pipe()` kernel, apply explicit feasibility and manufacturability contracts, and return a deterministic ranked result with complete hash, provenance, and JSON round-trip integrity.
+From a caller-supplied, structurally validated, hash-verified set of complete double-pipe assembly options, generate deterministic discrete candidates, evaluate each through the TASK-008 `rate_double_pipe()` kernel, apply explicit feasibility and manufacturability contracts, and return a deterministic ranked result with complete identity digests, hash, provenance, and JSON round-trip integrity.
 
 ---
 
 ## 3. Design Review History
 
-| Round | Review Comment ID | Decision |
-|-------|-------------------|----------|
+| Round | Comment ID | Decision |
+|-------|-----------|----------|
 | 1 | 4797079477 | CHANGES REQUIRED |
 | 2 | 4797175254 | CHANGES REQUIRED |
 | 3 | 4797267787 | CHANGES REQUIRED |
+| 4 | 4797374705 | CHANGES REQUIRED |
 
 ---
 
@@ -46,7 +47,6 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 
 ```text
 SizingRequest
-  └── CatalogSnapshotRef[]
   └── CompleteDoublePipeCatalogSnapshot[]
         └── CompleteDoublePipeAssemblyOption[]
               └── LengthSource
@@ -62,6 +62,8 @@ source_identity: str
 schema_version: str
 ```
 
+`CatalogSnapshotRef` is derived from each `CompleteDoublePipeCatalogSnapshot` and appears in `SizingRequestIdentity`. Caller-supplied full snapshots are the runtime input; refs are constructed from them. If both are caller-supplied, exact one-to-one equality is enforced.
+
 ### 4.3 CompleteDoublePipeCatalogSnapshot
 
 ```text
@@ -73,7 +75,7 @@ assembly_options: tuple[CompleteDoublePipeAssemblyOption, ...]
 catalog_content_hash: str
 ```
 
-`catalog_content_hash` is `sha256:<64 lowercase hex>`. Computed over the canonical JSON payload of all fields **except itself**. Payload field order: `catalog_id`, `catalog_version`, `source_identity`, `schema_version`, `assembly_options`. Assembly options sorted by `assembly_option_id` ASCII ascending. JSON serialized via `canonical_json()` — sorted keys, no whitespace, no trailing newline.
+`catalog_content_hash`: `sha256:...`. Computed via `sha256_digest()` over canonical JSON of all fields **except itself**. Field order: `catalog_id`, `catalog_version`, `source_identity`, `schema_version`, `assembly_options`. Assembly options sorted by `assembly_option_id` ASCII ascending after duplicate ID validation. JSON via `canonical_json()` — sorted keys, no whitespace, no trailing newline.
 
 ### 4.4 CompleteDoublePipeAssemblyOption
 
@@ -92,34 +94,41 @@ manufacturing_option_identity: str
 manufacturing_metadata: tuple[tuple[str, str], ...]
 ```
 
-Fouling resistances are physical design properties of the assembly option. They enter `SourceQualifiedCandidateIdentity` and the TASK-008 `RatingRequestIdentity` (via geometry).
+Fouling resistances are physical design properties. They enter `SourceQualifiedCandidateIdentity` and the geometry passed to `rate_double_pipe()`.
 
-`manufacturing_metadata`: unordered at input, stored as sorted tuple of `(key, value)` pairs — keys unique, keys ASCII ascending, values str. Deep-frozen on construction.
+`manufacturing_metadata`: input may be dict → stored as sorted `(key, value)` tuples — keys unique, keys ASCII ascending, values str. Deep-frozen on construction.
 
-### 4.5 LengthSource
+### 4.5 LengthSource (with Quantum)
 
-Exactly one of:
-
-**Mode A — Explicit Lengths**
+Both modes carry `length_quantum_m`.
 
 ```text
-allowed_effective_lengths_m: tuple[float, ...]
+class LengthSource:
+    length_quantum_m: str
+    # exactly one of the following:
+    allowed_effective_lengths_m: tuple[float, ...] | None = None  # Mode A
+    grid: LengthGridSpec | None = None                            # Mode B
 ```
 
-Each value finite and > 0. All values canonicalized through the unified power-of-10 length quantum, sorted ascending, deduplicated. Empty after canonicalization → `CATALOG_INVALID`.
+No assembly option may provide both `allowed_effective_lengths_m` and `grid`.
 
-**Mode B — Length Grid**
+### 4.6 LengthGridSpec
 
 ```text
-LengthGridSpec:
-  minimum_length_m: float
-  maximum_length_m: float
-  increment_m: float
-  endpoint_policy: LengthEndpointPolicy
-  length_quantum_m: str
+class LengthGridSpec:
+    minimum_length_m: float
+    maximum_length_m: float
+    increment_m: float
+    endpoint_policy: LengthEndpointPolicy
 ```
 
-No assembly option may provide both modes.
+`LengthEndpointPolicy`:
+
+```text
+class LengthEndpointPolicy(StrEnum):
+    INCLUDE_MAX_IF_ALIGNED = "include_max_if_aligned"
+    EXCLUDE_MAX = "exclude_max"
+```
 
 ---
 
@@ -127,27 +136,24 @@ No assembly option may provide both modes.
 
 ### 5.1 Power-of-10 Quantum
 
-All lengths are canonicalized through a single **power-of-10 quantum** per length source.
+`length_quantum_m`: must be constructable as `Decimal`, finite, positive, and equal to `1E-N` where `N >= 0`.
 
-```text
-length_quantum_m: str  — must be constructable as Decimal and equal to 1E−N for integer N >= 0
-```
-
-Valid examples: `"1"`, `"0.1"`, `"0.01"`, `"0.001"`. Invalid: `"0.025"`, `"0.333"`.
-
-Validation:
+Valid: `"1"`, `"0.1"`, `"0.01"`, `"0.001"`. Invalid: `"0.025"`, `"0.333"`, `"10"`, `"100"`.
 
 ```python
 from decimal import Decimal
 quantum = Decimal(length_quantum_m)
 if not quantum.is_finite() or quantum <= 0:
-    raise Invalid
-normalized = quantum.normalize()
-digits = normalized.as_tuple().digits
-# A power-of-10 Decimal has exactly one digit (1) after normalize
-if digits != (1,):
-    raise Invalid
+    raise InvalidLengthQuantum()
+norm = quantum.normalize()
+# A power-of-10 canonic Decimal has exactly one digit (1) and exponent <= 0
+digit_tuple = norm.as_tuple().digits
+exponent = norm.as_tuple().exponent
+if digit_tuple != (1,) or exponent > 0:
+    raise InvalidLengthQuantum()
 ```
+
+Freeze canonical quantum string: `str(quantum.normalize())` (e.g. `"0.001"` rather than `"0.0010"`). Use this canonical form in identity and hash payloads.
 
 ### 5.2 Integer Tick Conversion
 
@@ -155,55 +161,40 @@ if digits != (1,):
 def to_tick(value_m: float, quantum: Decimal) -> int:
     raw = Decimal(str(value_m))
     if not raw.is_finite() or raw <= 0:
-        raise InvalidLength()
+        raise InvalidLengthError(...)   # structured, not assert
     qty = raw.quantize(quantum, rounding=ROUND_HALF_EVEN)
     tick = int((qty / quantum).to_integral_exact())
+    if tick <= 0:
+        raise InvalidLengthError(...)   # positive sub-quantum → rejected
     return tick
 
 def from_tick(tick: int, quantum: Decimal) -> Decimal:
     return Decimal(tick) * quantum
 ```
 
-Length output for identity and hash uses the **canonical Decimal string**:
-
-```text
-effective_length_m_canonical: str  — e.g. "12.350"
-```
+Output for identity/hash: canonical Decimal string — e.g. `"12.350"`.
 
 ### 5.3 Explicit Lengths Canonicalization
 
 ```python
+quantum = Decimal(length_quantum_m)
 ticks = sorted({to_tick(v, quantum) for v in allowed_effective_lengths_m})
 canonical_lengths = [str(from_tick(t, quantum)) for t in ticks]
 if not canonical_lengths:
-    raise CatalogInvalid()
+    raise CatalogInvalid(...)
 ```
 
-`raw_combination_count` uses the deduplicated canonical length set for each option, intersected with request bounds.
-
----
-
-## 6. Length Grid Algorithm
-
-### 6.1 Validation
+### 5.4 Grid Count-Only Algorithm (Pre-Cap)
 
 ```python
-from decimal import Decimal, ROUND_HALF_EVEN
-
 quantum = Decimal(length_quantum_m)
 lo_tick = to_tick(minimum_length_m, quantum)
 hi_tick = to_tick(maximum_length_m, quantum)
 step_tick = to_tick(increment_m, quantum)
 
-assert lo_tick > 0
-assert hi_tick >= lo_tick
-assert step_tick > 0
-# increment_m < length_quantum_m causes step_tick == 0 → CatalogInvalid
-```
+if step_tick <= 0:
+    raise CatalogInvalid(...)  # increment < quantum
 
-### 6.2 Count-Only Algorithm (Before Materialization)
-
-```python
 delta = hi_tick - lo_tick
 quotient, remainder = divmod(delta, step_tick)
 ```
@@ -212,10 +203,9 @@ quotient, remainder = divmod(delta, step_tick)
 
 ```python
 catalog_count = delta // step_tick + 1
-# same as: quotient + (1 if remainder != 0 or True else ...)
-# Corrected: all points lo + i*step <= hi are included.
-# The aligned hi is included if it lands exactly.
 ```
+
+Includes every point `lo_tick + i * step_tick <= hi_tick`. When aligned, `hi_tick` is included.
 
 #### EXCLUDE_MAX
 
@@ -223,113 +213,102 @@ catalog_count = delta // step_tick + 1
 catalog_count = delta // step_tick + 1
 if remainder == 0:
     catalog_count -= 1
-# When minimum_length_m == maximum_length_m, delta=0, quotient=0, remainder=0
-# catalog_count = 1 - 1 = 0
 ```
 
-No value generated exceeds `hi_tick`.
+When `minimum_length_m == maximum_length_m`: `delta=0`, `catalog_count = 1 - 1 = 0`.
 
-### 6.3 Materialization (After Cap Passes)
+### 5.5 Request Bounds Intersection (Count-Only, Ceiling/Floor)
 
-```python
-ticks = [lo_tick + step_tick * i for i in range(catalog_count)]
-canonical_lengths = [str(from_tick(t, quantum)) for t in ticks]
-```
-
-### 6.4 Request Bounds Intersection (Count-Only)
+Request bounds **must not widen** the catalog interval. Convert min by ceiling (round up), max by floor (round down).
 
 ```python
-request_min_tick: int | None = None if minimum_effective_length_m is None
-    else to_tick(minimum_effective_length_m, quantum)
-request_max_tick: int | None = None if maximum_effective_length_m is None
-    else to_tick(maximum_effective_length_m, quantum)
-```
+def to_tick_ceil(value_m: float, quantum: Decimal) -> int:
+    """Ceiling tick — candidate must be >= request_min."""
+    raw = Decimal(str(value_m))
+    if not raw.is_finite() or raw <= 0:
+        raise InvalidRequestBounds(...)
+    qty = raw.quantize(quantum, rounding=ROUND_UP)
+    return int((qty / quantum).to_integral_exact())
 
-Closed interval: `request_min_tick <= tick <= request_max_tick`.
+def to_tick_floor(value_m: float, quantum: Decimal) -> int:
+    """Floor tick — candidate must be <= request_max."""
+    raw = Decimal(str(value_m))
+    if not raw.is_finite() or raw <= 0:
+        raise InvalidRequestBounds(...)
+    qty = raw.quantize(quantum, rounding=ROUND_DOWN)
+    return int((qty / quantum).to_integral_exact())
 
-```python
 first_idx = 0
 if request_min_tick is not None:
-    # ceil division: smallest i such that lo + i*step >= request_min_tick
-    first_idx = max(first_idx, -((- (request_min_tick - lo_tick)) // step_tick))
+    # ceil division: smallest i with lo + i*step >= request_min_tick_ceil
+    first_idx = max(first_idx,
+                    -((- (request_min_tick_ceil - lo_tick)) // step_tick))
 
 last_idx = catalog_count - 1
 if request_max_tick is not None:
-    # floor division: largest i such that lo + i*step <= request_max_tick
-    last_idx = min(last_idx, (request_max_tick - lo_tick) // step_tick)
+    # floor division: largest i with lo + i*step <= request_max_tick_floor
+    last_idx = min(last_idx,
+                   (request_max_tick_floor - lo_tick) // step_tick)
 
 intersection_count = max(0, last_idx - first_idx + 1)
 ```
 
-An option with `intersection_count == 0` contributes 0 to `raw_combination_count`. If all options yield 0, return `NO_MANUFACTURABLE_CANDIDATE`.
+### 5.6 Materialization (After Cap Passes)
 
----
+```python
+ticks = [lo_tick + step_tick * i for i in range(first_idx, last_idx + 1)]
+canonical_lengths = [str(from_tick(t, quantum)) for t in ticks]
+```
 
-## 7. Pre-Evaluation Pipeline
-
-### 7.1 Pipeline Order
+### 5.7 Pipeline Order
 
 ```text
  1. SizingRequest schema validation
  2. Catalog schema validation
- 3. Duplicate assembly_option_id validation (before hash verification)
- 4. Duplicate catalog_id + catalog_version references validation
+ 3. Duplicate assembly_option_id validation
+ 4. Duplicate catalog_id + catalog_version refs validation
  5. Catalog canonical hash verification
  6. Assembly option validation
  7. Length source validation and count-only request intersection
  8. raw_combination_count summation
- 9. Hard/request raw-cap check
-10. Length materialization (only if cap passes)
+ 9. Hard/request cap check (before any materialization or rating)
+10. Length materialization
 11. Candidate identity materialization
 12. Deduplication by SourceQualifiedCandidateIdentity
-13. TASK-008 evaluation (in canonical order)
+13. TASK-008 evaluation in canonical order
 ```
 
-### 7.2 Sequence Constraints
-
-- Cap check (step 9) occurs **before** any length tuple, candidate object, or TASK-008 call.
-- `raw_combination_count` is computed by integer arithmetic only — no oversized list allocation.
-- Cap exceeded: `status=BLOCKED`, `unique=0`, `evaluated=0`, `selected=None`, `top_candidates=()`.
-
-### 7.3 Raw Combination Count
-
-```text
-raw_combination_count = sum over all eligible assembly options of
-    intersection_count (after request bounds filtering,
-    on canonicalized, deduplicated catalog lengths)
-```
-
-### 7.4 Cap
+### 5.8 Cap
 
 ```text
 HARD_RAW_COMBINATION_CAP = 10_000
-request_raw_combination_cap (optional; if set, must be int, 1..HARD_RAW_COMBINATION_CAP)
+request_raw_combination_cap (optional int, 1..HARD_RAW_COMBINATION_CAP, reject bool)
 effective_cap = min(request_raw_combination_cap, HARD_RAW_COMBINATION_CAP)
 ```
 
+Cap exceeded: `status=BLOCKED`, `raw=computed`, `unique=0`, `evaluated=0`, `selected=None`, `top_candidates=()`.
+
 ---
 
-## 8. Candidate Identity
+## 6. Candidate Identity
 
-### 8.1 PhysicalCandidateIdentity
+### 6.1 PhysicalCandidateIdentity
 
 Pure geometry + length — no catalog source.
 
 ```text
-inner_tube_inner_diameter_m: float
-inner_tube_outer_diameter_m: float
-outer_pipe_inner_diameter_m: float
+inner_tube_inner_diameter_m
+inner_tube_outer_diameter_m
+outer_pipe_inner_diameter_m
 effective_length_m_canonical: str
-wall_thermal_conductivity_w_m_k: float
-inner_surface_roughness_m: float
-annulus_surface_roughness_m: float
-inner_fouling_resistance_m2k_w: float
-outer_fouling_resistance_m2k_w: float
+wall_thermal_conductivity_w_m_k
+inner_surface_roughness_m
+annulus_surface_roughness_m
+inner_fouling_resistance_m2k_w
+outer_fouling_resistance_m2k_w
 ```
 
-Two options with identical geometry and length (after canonicalization) produce the same `PhysicalCandidateIdentity`, regardless of catalog source.
-
-### 8.2 SourceQualifiedCandidateIdentity
+### 6.2 SourceQualifiedCandidateIdentity
 
 ```text
 physical_candidate_identity_digest: str
@@ -340,41 +319,23 @@ assembly_option_id: str
 manufacturing_option_identity: str
 ```
 
-### 8.3 Deduplication
+### 6.3 Deduplication
 
-`unique_candidate_count` is after deduplication by `SourceQualifiedCandidateIdentity`. Different catalog source, version, content hash, `assembly_option_id`, or manufacturing option yields distinct candidates, even if geometry is identical.
+By `SourceQualifiedCandidateIdentity`. Different catalog or manufacturing option → distinct.
 
-### 8.4 Canonical Evaluation Order
+### 6.4 Canonical Evaluation Order
 
-After deduplication, candidates are evaluated in ascending `source_qualified_candidate_id` (string, ASCII). This order determines:
-
-- `evaluated_candidate_count`
-- TASK-008 call sequence
-- property call trace order
-- partial audit cutoff point
-- integrity stop position
-- result hash input order
-- provenance topology
+After deduplication, ascending `source_qualified_candidate_id` (ASCII string).
 
 ---
 
-## 9. Rating Entry Point
+## 7. TASK-008 Exact Boundary
 
-### 9.1 Exact Callable
+### 7.1 Exact Public Callable
 
 ```python
-rate_double_pipe(
-    geometry=DoublePipeGeometry(
-        inner_tube_inner_diameter_m=...,
-        inner_tube_outer_diameter_m=...,
-        outer_pipe_inner_diameter_m=...,
-        effective_length_m=float(from_tick(tick, quantum)),
-        wall_thermal_conductivity_w_m_k=...,
-        inner_surface_roughness_m=...,
-        annulus_surface_roughness_m=...,
-        inner_fouling_resistance_m2k_w=...,
-        outer_fouling_resistance_m2k_w=...,
-    ),
+hexagent.exchangers.double_pipe.rating.rate_double_pipe(
+    geometry=DoublePipeGeometry(...),
     hot_fluid=FluidIdentifier,
     cold_fluid=FluidIdentifier,
     hot_mass_flow_kg_s=float,
@@ -386,68 +347,54 @@ rate_double_pipe(
     tube_in_hot=bool,
     flow_arrangement=FlowArrangement,
     provider=PropertyProvider,
-    solver_params=SolverParams(...),
-    context=CalculationContext(...),
+    solver_params=SolverParams,
+    context=CalculationContext,
     minimum_terminal_delta_t=float,
     tube_boundary_condition=ThermalBoundaryCondition,
     annulus_boundary_condition=ThermalBoundaryCondition,
 )
 ```
 
-Fouling enters via geometry (not overridden by any service layer). TASK-009 calls the pure function directly, not `DoublePipeRatingService.rate()`.
+### 7.2 SolverParams (Exact Merged TASK-008 Fields)
 
-### 9.2 SolverParams
+`hexagent.exchangers.double_pipe.solver.SolverParams` has exactly four fields:
 
-Mapped directly from request fields:
+```text
+absolute_residual_w: float
+relative_residual_fraction: float
+bracket_temperature_tolerance_k: float
+max_iterations: int
+```
+
+Rating request fields in `SizingRequestIdentity` map to:
 
 ```python
 SolverParams(
-    temperature_tolerance=rating_solver_temperature_tolerance_k,
-    energy_tolerance=rating_solver_energy_tolerance_fraction,
+    absolute_residual_w=rating_solver_absolute_residual_w,
+    relative_residual_fraction=rating_solver_relative_residual_fraction,
+    bracket_temperature_tolerance_k=rating_solver_bracket_temperature_tolerance_k,
     max_iterations=rating_solver_max_iterations,
-    bracket_step_k=rating_solver_bracket_step_k,
-    max_bracket_span_k=rating_solver_max_bracket_span_k,
-    absolute_energy_tolerance_w=rating_solver_absolute_energy_tolerance_w,
-    near_zero_duty_threshold_w=rating_solver_near_zero_duty_threshold_w,
 )
 ```
 
-All solver params are uniform across every candidate in a single sizing run and enter `RatingRequestIdentity`.
+All params uniform across candidates in a single sizing run.
 
-### 9.3 Per-Candidate CalculationContext
+### 7.3 TASK-008 RatingRequestIdentity Boundary
 
-Derived deterministically via UUID5:
+Current merged `RatingRequestIdentity` contains:
 
-```python
-TASK009_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # example; frozen once
-name = f"sizing-eval:{sizing_request_identity_digest}:{source_qualified_candidate_id}"
-context_id = uuid5(TASK009_NAMESPACE, name)
-```
-
-No random UUIDs.
-
----
-
-## 10. Identity Boundaries
-
-### 10.1 RatingRequestIdentity (TASK-008)
-
-Contains only:
-
-- fluids (hot/cold identifiers)
-- flow rates (hot/cold mass flow)
+- fluid identities (name + equation-of-state backend + normalized components)
 - inlet temperatures and pressures
+- hot and cold mass flow rates
 - `DoublePipeGeometry` (including fouling)
-- `tube_in_hot`
 - `FlowArrangement`
-- `SolverParams` (all 7 fields)
+- `SolverParams` (4 fields)
 - `minimum_terminal_delta_t`
-- `tube_boundary_condition`
-- `annulus_boundary_condition`
+- `tube_boundary_condition`, `annulus_boundary_condition`
 
-Does **not** contain: provider identity, execution context, required duty, sizing objective, top-N, tolerances.
+Does **not** contain `tube_in_hot`. TASK-009 forwards `tube_in_hot` to `rate_double_pipe()` and binds it in `SizingRequestIdentity` / `CandidateEvaluationIdentity`, but the current TASK-008 `RatingRequestIdentity` does not include it. TASK-009 does not modify TASK-008's identity schema.
 
-### 10.2 ProviderIdentitySnapshot
+### 7.4 ProviderIdentitySnapshot
 
 ```text
 name: str
@@ -458,35 +405,52 @@ configuration_fingerprint: str
 cache_policy_version: str
 ```
 
-Captured from the first successful TASK-008 call (or caller-pre-declared).
+Captured from the first successful TASK-008 property call. `configuration_fingerprint` and `cache_policy_version` may be empty/unavailable before any property call. The caller-declared expected identity must match the actual snapshot name/version/git_revision/reference_state_policy (fields that are always available). Configuration/cache fields are recorded but not required for pre-call matching.
 
-### 10.3 ExecutionContextSnapshot
+If the first successful TASK-008 call returns a provider snapshot whose mandatory fields do not match the declared expected identity → BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH`.
 
-```text
-request_id: str
-design_case_revision_id: str
-calculation_run_id: str
-```
+Identity data extracted from an integrity-invalid `RatingResult` must not be used as verified evidence.
 
-### 10.4 CandidateEvaluationIdentity
+### 7.5 Per-Candidate CalculationContext
+
+Three fields:
 
 ```text
-source_qualified_candidate_identity_digest: str
-sizing_request_identity_digest: str
-rating_request_identity_digest: str
-provider_identity_digest: str
-execution_context_identity_digest: str
-rating_result_hash: str
-rating_provenance_digest: str
+request_id: str | None
+design_case_revision_id: str | None
+calculation_run_id: str | None
 ```
 
-All fields are `sha256:<64 hex>` digests. Canonical payload: fields in declaration order, each on its own line, key=value, no extra whitespace.
+Fixed namespace (frozen once, never changed):
 
-### 10.5 SizingRequestIdentity
+```python
+TASK009_CONTEXT_NAMESPACE = UUID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")
+```
+
+Derivation rules:
+
+- `design_case_revision_id`: preserved from caller input; `None` if not supplied.
+- `calculation_run_id`: preserved from caller input; `None` if not supplied.
+- `request_id`: derived deterministically per candidate:
+
+```python
+name = f"{sizing_request_identity_digest}:{source_qualified_candidate_id}"
+request_id = str(uuid5(TASK009_CONTEXT_NAMESPACE, name))
+```
+
+No random UUIDs. No synthetic domain identities for missing design-case or run IDs.
+
+---
+
+## 8. SizingRequestIdentity
 
 ```text
 hot_fluid_name: str
 cold_fluid_name: str
+hot_fluid_equation_of_state: str
+cold_fluid_equation_of_state: str
+hot_fluid_normalized_components: tuple[str, ...]
+cold_fluid_normalized_components: tuple[str, ...]
 hot_inlet_temperature_k: float
 cold_inlet_temperature_k: float
 hot_inlet_pressure_pa: float
@@ -507,65 +471,60 @@ request_raw_combination_cap: int | None
 catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...]
 minimum_effective_length_m: float | None
 maximum_effective_length_m: float | None
-rating_solver_temperature_tolerance_k: float
-rating_solver_energy_tolerance_fraction: float
+rating_solver_absolute_residual_w: float
+rating_solver_relative_residual_fraction: float
+rating_solver_bracket_temperature_tolerance_k: float
 rating_solver_max_iterations: int
-rating_solver_bracket_step_k: float
-rating_solver_max_bracket_span_k: float
-rating_solver_absolute_energy_tolerance_w: float
-rating_solver_near_zero_duty_threshold_w: float
 property_provider_name: str
 property_provider_version: str
 property_provider_git_revision: str
 property_provider_reference_state_policy: str
 property_provider_cache_policy_version: str
+design_case_revision_id: str | None
+calculation_run_id: str | None
 rating_software_version: str
 execution_context_policy_version: str
 ```
 
 `required_duty_w` is a sizing feasibility input only. It does **not** enter TASK-008 `RatingRequestIdentity` and must not derive `SolverParams`.
 
+All digests computed via `sha256_digest()` (returns `sha256:<64hex>`).
+
 ---
 
-## 11. Request Validation
+## 9. Request Validation
 
 | Field | Rule |
 |-------|------|
 | `required_duty_w` | finite, > 0 |
 | `minimum_effective_length_m` | None or finite, > 0 |
-| `maximum_effective_length_m` | None or finite, > 0; if both present: min <= max |
-| `top_n` | `type(value) is int`, `value >= 1` — reject `bool` (Python `bool` is a subclass of `int`) |
-| `request_raw_combination_cap` | None → defaults to `HARD_RAW_COMBINATION_CAP`; if set, `type(value) is int`, `1..HARD_RAW_COMBINATION_CAP` — reject `bool` |
-| Duplicate catalog refs | No two `CatalogSnapshotRef` may share `(catalog_id, catalog_version)` |
-| Provider identity | Caller-declared identity fields must match actual `ProviderIdentitySnapshot` from first TASK-008 call. Mismatch → BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH` |
+| `maximum_effective_length_m` | None or finite, > 0; if both: min <= max |
+| `top_n` | `type(value) is int`, `>= 1` — reject `bool` |
+| `request_raw_combination_cap` | None → `HARD_RAW_COMBINATION_CAP`; else `type is int`, `1..HARD_RAW_COMBINATION_CAP` — reject `bool` |
+| Duplicate catalog refs | No two refs share `(catalog_id, catalog_version)` |
+| Provider identity | Declared name/version/git_revision/reference_state_policy must match first successful TASK-008 call |
 
 ---
 
-## 12. Duty Feasibility
+## 10. Duty Feasibility
 
-### 12.1 Tolerance Fields
-
-```text
-duty_absolute_tolerance_w: float  (finite, >= 0)
-duty_relative_tolerance: float    (finite, >= 0)
-```
-
-### 12.2 Effective Tolerance
+### 10.1 Tolerance
 
 ```text
-effective_duty_tolerance_w = max(
-    duty_absolute_tolerance_w,
-    duty_relative_tolerance * max(required_duty_w, 1.0)
-)
+effective_duty_tolerance_w = max(duty_absolute_tolerance_w, duty_relative_tolerance * max(required_duty_w, 1.0))
 ```
 
-### 12.3 Feasibility Condition
+Both tolerances: finite, `>= 0`.
+
+### 10.2 Feasibility Condition
 
 ```text
 rated_duty_w + effective_duty_tolerance_w >= required_duty_w
 ```
 
-### 12.4 Derived Fields
+Feasibility may only be computed from a verified TASK-008 `SUCCEEDED` result with non-None `heat_duty_w`. Verified TASK-008 `BLOCKED` / `FAILED` results are non-feasible audit entries.
+
+### 10.3 Derived Fields
 
 ```text
 duty_margin_w = rated_duty_w - required_duty_w
@@ -577,9 +536,9 @@ target_satisfaction_rank = 0 if meets_target_without_tolerance else 1
 
 ---
 
-## 13. Optimization Objectives
+## 11. Optimization Objectives
 
-### 13.1 Enum
+### 11.1 Enum
 
 ```text
 class OptimizationObjective(StrEnum):
@@ -587,11 +546,9 @@ class OptimizationObjective(StrEnum):
     MINIMUM_EFFECTIVE_LENGTH = "minimum_effective_length"
 ```
 
-Area objective uses TASK-008 `RatingResult.area_outer_m2` (consistent with frozen inner-tube outer-surface U basis). May **not** use `area_inner_m2`, `UA_w_k`, `U_w_m2_k`, custom equivalent area, or implicit area basis. Area basis enters request identity, result identity, and provenance.
+Area objective uses `RatingResult.area_outer_m2`.
 
-### 13.2 Feasible Ranking (Target Satisfaction First)
-
-**Actual target satisfaction dominates objective value.** A candidate meeting `required_duty_w` without tolerance always ranks above one accepted only by tolerance, regardless of objective metric.
+### 11.2 Feasible Ranking (Target Satisfaction First)
 
 #### MINIMUM_OUTER_HEAT_TRANSFER_AREA
 
@@ -619,11 +576,11 @@ Area objective uses TASK-008 `RatingResult.area_outer_m2` (consistent with froze
 )
 ```
 
-All ascending. Only feasible candidates participate. No weighted composite score. `selected_candidate == top_candidates[0]`. Identical engineering metrics resolved by canonical candidate ID ascending. Input insertion order does not affect ranking.
+All ascending. No weighted score. `selected_candidate == top_candidates[0]`.
 
 ---
 
-## 14. SizingStatus and Invariants
+## 12. SizingStatus and Invariants
 
 ```text
 class SizingStatus(StrEnum):
@@ -632,120 +589,56 @@ class SizingStatus(StrEnum):
     FAILED = "failed"
 ```
 
-### 14.1 SUCCEEDED
+### 12.1 SUCCEEDED
 
-- at least one feasible candidate
-- `selected_candidate is not None` and `selected_candidate.feasible is True`
+- `>=1` feasible candidate
+- `selected_candidate is not None`, `feasible is True`
 - `top_candidates` non-empty
-- `blockers` empty
-- `failure` empty
-- `verify_hash()` True
-- `verify_provenance()` True
+- `blockers` empty, `failure` empty
+- `verify_hash()` True, `verify_provenance()` True
 
-### 14.2 BLOCKED
+### 12.2 BLOCKED
 
-Deterministic non-executability or no solution. Includes: invalid request, invalid catalog, hash mismatch, cap exceeded, no manufacturable candidate, no feasible candidate, unsupported constraint, rating integrity failure, provider identity mismatch.
+Invalid request, invalid catalog, hash mismatch, cap exceeded, no manufacturable candidate, no feasible candidate, unsupported constraint, rating integrity failure, provider identity mismatch.
 
-- at least one blocker
-- `selected_candidate is None`
-- `failure` empty
-- result hash and provenance remain valid
+- `>=1` blocker, `selected_candidate is None`, `failure` empty
 
-`NO_FEASIBLE_CANDIDATE` → BLOCKED.
+### 12.3 FAILED
 
-### 14.3 FAILED
-
-Unexpected runtime failures only.
-
-- `failure` is not None
-- `selected_candidate is None`
-- result hash and provenance remain valid
+Unexpected runtime. `failure is not None`, `selected_candidate is None`.
 
 ---
 
-## 15. Top-N Contract
+## 13. Top-N Contract
 
-```text
-top_n: int  (>= 1)
-```
-
-`top_candidates` contains only feasible candidates, ranked by objective-specific sort key (§13.2).
-
-- `top_n <= feasible_candidate_count`: return exactly top `top_n`
-- `top_n > feasible_candidate_count > 0`: return all feasible candidates, add `TOP_N_REDUCED_TO_FEASIBLE_COUNT` warning
-- `feasible_candidate_count == 0`: `status = BLOCKED`, `selected_candidate = None`, `top_candidates = ()`, `blocker = NO_FEASIBLE_CANDIDATE`
+- `top_n <= feasible_candidate_count`: return top `top_n`
+- `top_n > feasible_candidate_count > 0`: return all feasible + `TOP_N_REDUCED_TO_FEASIBLE_COUNT` warning
+- `feasible_candidate_count == 0`: BLOCKED, `NO_FEASIBLE_CANDIDATE`
 
 ---
 
-## 16. Non-Feasible Candidate Ordering
-
-Non-feasible candidates appear in audit output only, not in `top_candidates`.
-
-### 16.1 Feasibility Status Severity
+## 14. Candidate Evaluation States
 
 ```text
-INFEASIBLE < RATING_BLOCKED < RATING_FAILED < INTEGRITY_INVALID
+class CandidateEvaluationState(StrEnum):
+    UNEVALUATED = "unevaluated"
+    VERIFIED = "verified"
+    INTEGRITY_INVALID = "integrity_invalid"
+    RUNTIME_FAILED = "runtime_failed"
 ```
 
-### 16.2 Rating Status Rank
+### 14.1 Evidence Invariants by State
 
-```text
-SUCCEEDED < BLOCKED < FAILED
-```
+| State | verified_rating_evidence | invalid_rating_evidence | feasible |
+|-------|------------------------|------------------------|----------|
+| UNEVALUATED | None | None | False |
+| VERIFIED | not None | None | per duty check |
+| INTEGRITY_INVALID | None | not None | False |
+| RUNTIME_FAILED | None | None | False |
 
-### 16.3 Full Non-Feasible Sort Key
+### 14.2 VerifiedRatingEvidenceSnapshot
 
-```text
-(
-    feasibility_status_rank,
-    rating_status_rank,
-    primary_diagnostic.diagnostic_class_rank,
-    primary_diagnostic.error_code,
-    primary_diagnostic.source_module,
-    primary_diagnostic.affected_paths,
-    primary_diagnostic.message,
-    source_qualified_candidate_id,
-)
-```
-
-### 16.4 CandidateDiagnosticKey
-
-```text
-class CandidateDiagnosticKey:
-    diagnostic_class_rank: int     # BLOCKER=0, ERROR=1, WARNING=2, INFO=3, RUNTIME_FAILURE=4
-    error_code: str
-    source_module: str
-    affected_paths: tuple[str, ...]
-    message: str
-```
-
-Sentinel when none present: `(999, "", "", (), "")`.
-
-**From EngineeringMessage:** map directly.
-
-**From RunFailure:** `diagnostic_class_rank=4`, `error_code` = failure code, `source_module=""`, `affected_paths=()`, `message` = failure message.
-
-**From pure duty infeasibility (SUCCEEDED rating, not meeting duty):** `diagnostic_class_rank=0`, `error_code="required_duty_not_met"`, `source_module="sizing"`, `affected_paths=()`, `message` = formatted string.
-
-### 16.5 Primary Diagnostic Selection
-
-When multiple diagnostics exist, select by (ascending):
-
-1. `diagnostic_class_rank`
-2. `error_code` string
-3. `source_module` string
-4. `affected_paths` canonical tuple
-5. `message` string
-
-Must not rely on insertion order.
-
----
-
-## 17. Rating Evidence
-
-### 17.1 VerifiedRatingEvidenceSnapshot
-
-Constructed only when `rating.verify_hash() is True and rating.verify_provenance() is True`.
+Constructed only when `verify_hash() and verify_provenance() is True`.
 
 ```text
 rating_status: str
@@ -760,13 +653,14 @@ energy_residual_w: float | None
 ua_lmtd_residual_w: float | None
 tube_inlet_density_kg_m3: float | None
 annulus_inlet_density_kg_m3: float | None
-tube_flow_area_m2: float        (derived deterministically from candidate geometry)
-annulus_flow_area_m2: float     (derived deterministically from candidate geometry)
+tube_flow_area_m2: float     (geometry-derived)
+annulus_flow_area_m2: float  (geometry-derived)
 warnings: tuple[EngineeringMessage, ...]
 blockers: tuple[EngineeringMessage, ...]
 failure: RunFailure | None
 provider_identity: ProviderIdentitySnapshot
-selected_correlation_identities: tuple[str, ...]
+tube_correlation_identity: CorrelationIdentitySnapshot
+annulus_correlation_identity: CorrelationIdentitySnapshot
 rating_result_hash: str
 rating_provenance_digest: str
 rating_verify_hash_result: bool
@@ -775,11 +669,16 @@ rating_request_identity_digest: str
 rating_execution_context_identity: str
 ```
 
-Heat duty and temperatures may be `None` for verified BLOCKED/FAILED rating results. Flow areas are geometry-derived and enter the evidence hash.
+`CorrelationIdentitySnapshot`:
 
-### 17.2 InvalidRatingEvidenceRecord
+```text
+correlation_id: str
+correlation_version: str
+source: str
+validity_envelope: str
+```
 
-Constructed when `verify_hash()` or `verify_provenance()` fails.
+### 14.3 InvalidRatingEvidenceRecord
 
 ```text
 candidate_id: str
@@ -793,182 +692,30 @@ provider_identity: ProviderIdentitySnapshot
 failure_reason: str
 ```
 
-Must **not** copy or expose trusted thermal metrics from an unverified `RatingResult`.
+Must not copy trusted thermal metrics from an unverified `RatingResult`.
 
-### 17.3 Integrity-Failure Policy
+### 14.4 Integrity-Failure Policy
 
-Candidates are evaluated in canonical order (§8.4). If any candidate's TASK-008 `verify_hash()` or `verify_provenance()` fails:
+Candidates evaluated in canonical order (§6.4). If any candidate's `verify_hash()` or `verify_provenance()` returns `False`:
 
-1. Record `InvalidRatingEvidenceRecord` for this candidate
-2. This candidate increments `evaluated_candidate_count`
-3. **Stop immediately** — no remaining candidates are evaluated
-4. `status = BLOCKED`, `termination_reason = "rating_result_integrity_failed"`
-5. `selected_candidate = None`, `top_candidates = ()`
-6. `partial_audit = True`
-7. Previously evaluated (trusted) candidates remain in audit with `partial_audit` field
+1. Record `InvalidRatingEvidenceRecord`
+2. This candidate counted in `evaluated_candidate_count`
+3. **Stop immediately** — remaining candidates unevaluated
+4. `status = BLOCKED`, `termination = "rating_result_integrity_failed"`
+5. `selected_candidate = None`, `top_candidates = ()`, `partial_audit = True`
+6. Evaluate `remaining_unevaluated_candidate_count = unique - evaluated`
 
-`remaining_unevaluated_candidate_count = unique_candidate_count - evaluated_candidate_count`.
-
-If `verify_hash()` or `verify_provenance()` themselves raise an exception (not return False), treat as `FAILED` (runtime error), not integrity invalid.
-
-### 17.4 Replay
-
-The complete TASK-008 rating request is reconstructable from frozen sizing evidence. Replay is deterministic only when the same software version, property-provider implementation, provider configuration, source data, and execution policy are available.
+If `verify_hash()` or `verify_provenance()` raises an exception → `FAILED`.
 
 ---
 
-## 18. Provenance
-
-### 18.1 Node Type Mapping
-
-| Business Concept | ProvenanceNodeType | Label |
-|-----------------|-------------------|-------|
-| SIZING_RUN | `CALCULATION_RUN` | `"sizing_run_{identity_digest}"` |
-| SIZING_OPTIMIZER | `OPTIMIZER` | `"sizing_optimizer"` |
-| CATALOG_SNAPSHOT | `INTERMEDIATE` | `"catalog_{catalog_id}"` |
-| MANUFACTURABLE_CANDIDATE | `INTERMEDIATE` | `"candidate_{candidate_id}"` |
-| TASK008_RATING_RESULT | `RESULT` | `"rating_{result_hash}"` |
-| SIZING_RESULT | `RESULT` | `"sizing_result"` |
-| WARNING | `WARNING` | per message |
-| BLOCKER | `BLOCKER` | per message |
-| ROOT | `CASE_REVISION` or `EXTERNAL` | as appropriate |
-
-### 18.2 UUID5 Namespace
-
-```python
-TASK009_PROVENANCE_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-```
-
-### 18.3 UUID5 Name Payload Formats
+## 15. CandidateEvaluation
 
 ```text
-sizing-run:{sizing_request_identity_digest}
-catalog:{catalog_id}:{catalog_version}:{catalog_content_hash}
-candidate:{source_qualified_candidate_id}
-rating-result:{rating_result_hash}
-optimizer:{sizing_request_identity_digest}
-sizing-result:{result_hash}
-warning:{error_code}:{canonical_affected_paths}:{message_hash}
-blocker:{error_code}:{canonical_affected_paths}:{message_hash}
-```
-
-### 18.4 Status-Specific Topologies
-
-#### Invalid Request
-
-```text
-ROOT -> SIZING_RUN       "initiates"
-BLOCKER -> SIZING_RESULT "blocks"
-SIZING_RUN -> SIZING_RESULT "produces"
-```
-
-No catalog, candidate, or rating nodes required.
-
-#### Invalid Catalog / Hash Mismatch
-
-```text
-ROOT -> SIZING_RUN          "initiates"
-SIZING_RUN -> CATALOG       "consumes"
-BLOCKER -> SIZING_RESULT    "blocks"
-SIZING_RUN -> SIZING_RESULT "produces"
-```
-
-#### Cap Exceeded / No Manufacturable Candidate
-
-May include catalog nodes. No candidate or rating nodes required.
-
-#### Evaluated, No Feasible Candidate
-
-Full topology: catalog, candidate, rating result, optimizer, sizing result, blocker.
-
-#### Integrity Invalid
-
-Verified rating result nodes + invalid evidence node + blocker + partial audit marker.
-
-#### SUCCEEDED
-
-Full topology (§18.5).
-
-#### FAILED
-
-May include partial catalog/candidate/rating nodes. Failure node mapped to `BLOCKER` or `WARNING` as appropriate.
-
-### 18.5 Required Edges (Full Topology)
-
-| From | To | Label |
-|------|----|-------|
-| ROOT | SIZING_RUN | `"initiates"` |
-| SIZING_RUN | CATALOG_SNAPSHOT | `"consumes"` |
-| CATALOG_SNAPSHOT | CANDIDATE | `"generates"` |
-| SIZING_RUN | OPTIMIZER | `"executes"` |
-| CANDIDATE | TASK008_RATING_RESULT | `"rated_as"` |
-| TASK008_RATING_RESULT | OPTIMIZER | `"evaluated_by"` |
-| OPTIMIZER | SIZING_RESULT | `"produces"` |
-| WARNING | SIZING_RESULT | `"annotates"` |
-| BLOCKER | SIZING_RESULT | `"blocks"` |
-
-### 18.6 Two-Stage Provenance Construction
-
-1. Build core provenance (all nodes except SIZING_RESULT and associated WARNING/BLOCKER)
-2. Compute `core_provenance_digest`
-3. Build `SizingResultIdentity` payload (includes `core_provenance_digest`)
-4. Compute `result_hash` (does **not** include final provenance digest — avoids circular dependency)
-5. Add SIZING_RESULT node, associated WARNING and BLOCKER nodes
-6. Build final provenance graph
-7. Compute `final_provenance_digest`
-
-### 18.7 Edge Tamper Detection
-
-`ProvenanceEdge` has no per-edge hash field. Edge tampering is detected through the canonical graph digest — the serialized graph topology (nodes, edges, payload hashes) is hashed via `sha256_digest()`. Any edge insertion, removal, or modification changes the graph digest.
-
-### 18.8 verify_provenance() Checks
-
-- Required node multiplicity (exactly one `CALCULATION_RUN`, at least one `RESULT`)
-- Required edge existence per status topology
-- DAG consistency
-- Payload hash integrity per node
-- Graph digest integrity
-
----
-
-## 19. Canonical Hash Contract
-
-### 19.1 Shared Utilities
-
-All TASK-009 hashing uses:
-
-```text
-hexagent.core.canonical.canonical_json
-hexagent.core.canonical.sha256_digest
-```
-
-`sha256_digest()` returns `sha256:<64 lowercase hex>`.
-
-### 19.2 Catalog Hash
-
-`catalog_content_hash` must be `sha256:<64 lowercase hex>`. Computed over sorted-key canonical JSON of `(catalog_id, catalog_version, source_identity, schema_version, assembly_options)` where options are sorted by `assembly_option_id` ASCII ascending.
-
-Duplicate `assembly_option_id` validation must occur **before** sorting for hash verification. If duplicates exist, the run is BLOCKED with `CATALOG_INVALID` — no hash verification is performed.
-
-### 19.3 Numeric Normalization
-
-- Float fields (diameters, roughness, fouling, tolerances): serialized via `canonical_json` default float representation.
-- Length fields: canonicalized through integer tick conversion (§5.2); stored in identity/hash as canonical Decimal string (e.g. `"12.350"`).
-- The same canonical form is used for catalog hash, candidate identity, and JSON round-trip.
-
-### 19.4 Identity/Hash Payload Format
-
-Each identity's canonical payload is a `canonical_json` object with fields in declared order, sorted keys, no whitespace, no trailing newline.
-
----
-
-## 20. CandidateEvaluation
-
-```text
-candidate_identity: SourceQualifiedCandidateIdentity
+source_qualified_candidate_identity: SourceQualifiedCandidateIdentity
+candidate_evaluation_state: CandidateEvaluationState
 candidate_evaluation_identity: CandidateEvaluationIdentity
-rating_status: str | None
-feasibility_status: str | None
+evaluation_order_index: int
 feasible: bool
 verified_rating_evidence: VerifiedRatingEvidenceSnapshot | None
 invalid_rating_evidence: InvalidRatingEvidenceRecord | None
@@ -981,60 +728,84 @@ meets_target_without_tolerance: bool | None
 partial_audit: bool
 ```
 
-### Invariants
+---
 
-- `verified_rating_evidence is not None` ⇔ `invalid_rating_evidence is None`
-- `invalid_rating_evidence is not None` ⇒ `feasible == False`
-- `partial_audit == True` ⇒ candidate is in audit set but no subsequent candidate was evaluated
+## 16. CandidateEvaluationIdentity
+
+```python
+{
+    "source_qualified_candidate_identity_digest": ...,
+    "sizing_request_identity_digest": ...,
+    "rating_request_identity_digest": ...,
+    "provider_identity_digest": ...,
+    "execution_context_identity_digest": ...,
+    "rating_result_hash": ...,
+    "rating_provenance_digest": ...,
+}
+```
+
+Computed via `sha256_digest(canonical_json(payload))`. All values are `sha256:...`.
 
 ---
 
-## 21. CandidateRankingRecord
+## 17. CandidateRankingRecord
 
 ```text
 source_qualified_candidate_id: str
 objective: str
-sort_key: tuple[float | int | str, ...]
+sort_key: tuple  # serialized as canonical JSON array — supports nesting (e.g. affected_paths)
 rank: int
 feasible: bool
 ```
 
-`sort_key` is the full serialized comparison tuple (§13.2, §16.3), not only the final rank.
+`sort_key` is the full comparison tuple serialized as a JSON array via `canonical_json`. For non-feasible sort key containing `affected_paths` (a tuple of strings), the nested tuple becomes a JSON array of strings.
 
 ---
 
-## 22. SizingResultIdentity
+## 18. SizingResultIdentity
 
-```text
-sizing_request_identity_digest: str
-catalog_snapshot_digests: tuple[str, ...]
-canonical_candidate_evaluation_digests: tuple[str, ...]
-canonical_ranking_record_digests: tuple[str, ...]
-selected_candidate_id: str | None
-top_candidate_ids: tuple[str, ...]
-raw_combination_count: int
-unique_candidate_count: int
-evaluated_candidate_count: int
-feasible_candidate_count: int
-non_feasible_candidate_count: int
-termination_reason: str
-core_provenance_digest: str
+```python
+{
+    "sizing_request_identity_digest": ...,
+    "catalog_snapshot_digests": [...],
+    "status": ...,
+    "termination_reason": ...,
+    "partial_audit": ...,
+    "raw_combination_count": ...,
+    "unique_candidate_count": ...,
+    "evaluated_candidate_count": ...,
+    "feasible_candidate_count": ...,
+    "non_feasible_candidate_count": ...,
+    "remaining_unevaluated_candidate_count": ...,
+    "canonical_evaluation_digests": [...],
+    "canonical_ranking_digests": [...],
+    "warning_digests": [...],
+    "blocker_digests": [...],
+    "failure_digest": ... | None,
+    "verified_evidence_digests": [...],
+    "invalid_evidence_digests": [...],
+    "selected_candidate_id": ... | None,
+    "top_candidate_ids": [...],
+    "core_provenance_digest": ...,
+}
 ```
 
-All digests are `sha256:<64 hex>`. Computed via `canonical_json` over the fields in declaration order.
+All digests `sha256:...`. Computed via `sha256_digest(canonical_json(payload))`.
 
 ---
 
-## 23. SizingOptimizationResult
+## 19. SizingOptimizationResult
 
 ```text
 status: SizingStatus
-request_identity: SizingRequestIdentity
+request_identity: SizingRequestIdentity | InvalidSizingRequestSnapshot
 catalog_snapshots: tuple[CompleteDoublePipeCatalogSnapshot, ...]
 raw_combination_count: int
 unique_candidate_count: int
 evaluated_candidate_count: int
 feasible_candidate_count: int
+non_feasible_candidate_count: int
+remaining_unevaluated_candidate_count: int
 candidate_evaluations: tuple[CandidateEvaluation, ...]
 ranking_records: tuple[CandidateRankingRecord, ...]
 selected_candidate: CandidateEvaluation | None
@@ -1050,37 +821,221 @@ provenance: ProvenanceGraph
 provenance_digest: str
 ```
 
-- `result_hash` = `sha256_digest(canonical_json(SizingResultIdentity payload))`
-- `selected_candidate` references the first entry in `top_candidates`
-- JSON round-trip must preserve all fields, hashes, and provenance
+For invalid-request BLOCKED results, `request_identity` is an `InvalidSizingRequestSnapshot` (raw request payload + validation error details). All other fields populated per status invariants.
+
+`result_hash = sha256_digest(canonical_json(SizingResultIdentity payload))`.
+
+JSON round-trip must preserve all fields, hashes, and provenance.
 
 ---
 
-## 24. Frozen ErrorCode Values
+## 20. Non-Feasible Ordering and Diagnostics
 
-### 24.1 Existing Reused Codes
-
-```text
-INPUT_MISSING              — missing required field in SizingRequest
-INPUT_INCONSISTENT         — conflicting fields in SizingRequest
-UNIT_INVALID               — unit/quantity contract violation
-HASH_MISMATCH              — tamper verification of already-built sizing identity/result
-PROVENANCE_INCOMPLETE      — provenance graph missing required nodes/edges
-UNSUPPORTED_SERVICE        — unsupported feature requested
-CALCULATION_BLOCKED        — generic calculation blocked
-CORRELATION_IMPLEMENTATION_UNAVAILABLE — propagated from C4, unchanged
-```
-
-### 24.2 ErrorCode Ownership Distinction
+### 20.1 Feasibility Status Severity
 
 ```text
-CATALOG_IDENTITY_MISMATCH  — caller-supplied catalog_content_hash differs from computed hash
-HASH_MISMATCH              — verify_hash() on an already-constructed sizing identity/result fails
+INFEASIBLE < RATING_BLOCKED < RATING_FAILED < INTEGRITY_INVALID
 ```
 
-These are not synonymous.
+### 20.2 Rating Status Rank
 
-### 24.3 New TASK-009 ErrorCode Strings
+```text
+SUCCEEDED < BLOCKED < FAILED
+```
+
+### 20.3 Full Non-Feasible Sort Key
+
+```text
+(
+    feasibility_status_rank,
+    rating_status_rank,
+    primary_diagnostic.diagnostic_class_rank,
+    primary_diagnostic.error_code,
+    primary_diagnostic.source_module,
+    primary_diagnostic.affected_paths,
+    primary_diagnostic.message,
+    source_qualified_candidate_id,
+)
+```
+
+### 20.4 CandidateDiagnosticKey
+
+```text
+diagnostic_class_rank: int   # BLOCKER=0, ERROR=1, WARNING=2, INFO=3, RUNTIME_FAILURE=4
+error_code: str
+source_module: str
+affected_paths: tuple[str, ...]
+message: str
+```
+
+Sentinel when `None`: `(999, "", "", (), "")`.
+
+From EngineeringMessage: direct. From RunFailure: class_rank=4. From pure duty-infeasible: class_rank=0, code=`REQUIRED_DUTY_NOT_MET`.
+
+### 20.5 Primary Diagnostic Selection
+
+Ascending: class_rank → error_code → source_module → affected_paths → message.
+
+---
+
+## 21. Provenance
+
+### 21.1 Node Type Mapping
+
+| Concept | ProvenanceNodeType | Label |
+|---------|-------------------|-------|
+| SIZING_RUN | `CALCULATION_RUN` | `"sizing_run_{digest}"` |
+| SIZING_OPTIMIZER | `OPTIMIZER` | `"sizing_optimizer"` |
+| CATALOG_SNAPSHOT | `INTERMEDIATE` | `"catalog_{catalog_id}"` |
+| CANDIDATE | `INTERMEDIATE` | `"candidate_{id}"` |
+| TASK008_RATING_RESULT | `RESULT` | `"rating_{result_hash}"` |
+| SIZING_RESULT | `RESULT` | `"sizing_result"` |
+| INVALID_EVIDENCE | `INTERMEDIATE` | `"invalid_evidence_{candidate_id}"` |
+| WARNING | `WARNING` | per message |
+| BLOCKER | `BLOCKER` | per message |
+| ROOT | `CASE_REVISION` | `"revision_{design_case_revision_id}"` |
+| ROOT (no revision) | `EXTERNAL` | `"external_request"` |
+
+### 21.2 UUID5 Namespace
+
+```python
+TASK009_PROVENANCE_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+```
+
+### 21.3 UUID5 Name Payloads
+
+```text
+sizing-run:{sizing_request_identity_digest}
+catalog:{catalog_id}:{catalog_version}:{catalog_content_hash}
+candidate:{source_qualified_candidate_id}
+rating-result:{rating_result_hash}
+invalid-evidence:{source_qualified_candidate_id}:{rating_result_hash}
+optimizer:{sizing_request_identity_digest}
+sizing-result:{result_hash}
+warning:{error_code}:{message_digest}
+blocker:{error_code}:{message_digest}
+```
+
+### 21.4 Termination-Class Topologies (All Deterministic)
+
+#### INVALID_REQUEST
+
+```text
+ROOT(CASE_REVISION or EXTERNAL) -> SIZING_RUN         "initiates"
+BLOCKER -> SIZING_RESULT                               "blocks"
+SIZING_RUN -> SIZING_RESULT                            "produces"
+```
+
+No catalog/candidate/rating nodes.
+
+#### INVALID_CATALOG / HASH_MISMATCH
+
+```text
+ROOT -> SIZING_RUN         "initiates"
+SIZING_RUN -> CATALOG      "consumes"
+BLOCKER -> SIZING_RESULT   "blocks"
+SIZING_RUN -> SIZING_RESULT "produces"
+```
+
+#### CAP_EXCEEDED / NO_MANUFACTURABLE_CANDIDATE
+
+```text
+ROOT -> SIZING_RUN         "initiates"
+SIZING_RUN -> CATALOG_SNAPSHOT(s)  "consumes"
+BLOCKER -> SIZING_RESULT   "blocks"
+SIZING_RUN -> SIZING_RESULT "produces"
+```
+
+#### EVALUATED_NO_FEASIBLE
+
+Full: catalog → candidate → rating result → optimizer → sizing result + blocker.
+
+#### INTEGRITY_INVALID
+
+Verified rating result nodes + INVALID_EVIDENCE node + BLOCKER + partial_audit marker.
+
+#### SUCCEEDED
+
+Full topology (§21.5).
+
+#### FAILED
+
+Partial catalog/candidate/rating nodes present as available. Failure node mapped to BLOCKER with label `"runtime_failure"`.
+
+### 21.5 Required Edges (Full Topology)
+
+| From | To | Label |
+|------|----|-------|
+| ROOT | SIZING_RUN | `"initiates"` |
+| SIZING_RUN | CATALOG_SNAPSHOT | `"consumes"` |
+| CATALOG_SNAPSHOT | CANDIDATE | `"generates"` |
+| SIZING_RUN | OPTIMIZER | `"executes"` |
+| CANDIDATE | TASK008_RATING_RESULT | `"rated_as"` |
+| TASK008_RATING_RESULT | OPTIMIZER | `"evaluated_by"` |
+| OPTIMIZER | SIZING_RESULT | `"produces"` |
+| WARNING | SIZING_RESULT | `"annotates"` |
+| BLOCKER | SIZING_RESULT | `"blocks"` |
+| INVALID_EVIDENCE | SIZING_RESULT | `"attached_to"` |
+
+### 21.6 Two-Stage Construction
+
+1. Build core provenance (all nodes except SIZING_RESULT and its WARNING/BLOCKER)
+2. Compute `core_provenance_digest`
+3. Build `SizingResultIdentity` (includes `core_provenance_digest`)
+4. Compute `result_hash = sha256_digest(canonical_json(SizingResultIdentity))`
+5. Add SIZING_RESULT node, its WARNING/BLOCKER/INVALID_EVIDENCE nodes
+6. Build final provenance graph
+7. Compute `final_provenance_digest`
+
+### 21.7 Edge Tamper Detection
+
+Detected through the canonical graph digest (serialized topology: nodes, edges, payload hashes). No per-edge hash field.
+
+---
+
+## 22. Hash Canonical Contract
+
+- All hashing uses `hexagent.core.canonical.sha256_digest()` (returns `sha256:<64hex>`).
+- All identity payloads use `hexagent.core.canonical.canonical_json()` (sorted keys, no whitespace, no trailing newline).
+- `result_hash = sha256_digest(canonical_json(SizingResultIdentity payload))` — single call, no double-serialization.
+- `sha256_digest()` canonicalizes its input, so the caller passes the raw payload dict → canonical_json is the serialization contract.
+
+### 22.1 Catalog Hash
+
+`catalog_content_hash`: `sha256_digest(canonical_json(payload))` over non-self fields. Duplicate `assembly_option_id` validated **before** sorting for hash.
+
+### 22.2 Numeric Normalization
+
+- Float fields: serialized by `canonical_json` default.
+- Length fields: canonical Decimal string (`"12.350"`).
+- Same canonical form for catalog hash, candidate identity, JSON round-trip.
+
+### 22.3 Candidate Evaluation Hash
+
+Each `CandidateEvaluation` has a digest: `sha256_digest(canonical_json(evaluation_fields))`.
+
+---
+
+## 23. Frozen ErrorCode Values
+
+### 23.1 Reused
+
+```text
+INPUT_MISSING, INPUT_INCONSISTENT, UNIT_INVALID
+HASH_MISMATCH               — tamper verification of built sizing identity/result
+PROVENANCE_INCOMPLETE       — provenance graph missing required nodes/edges
+UNSUPPORTED_SERVICE, CALCULATION_BLOCKED
+CORRELATION_IMPLEMENTATION_UNAVAILABLE  — C4, unchanged
+```
+
+### 23.2 Non-Overlapping Catalog/Identity Codes
+
+```text
+CATALOG_IDENTITY_MISMATCH   — caller-supplied hash differs from computed hash
+HASH_MISMATCH               — verify_hash() on already-built identity/result fails tamper
+```
+
+### 23.3 New TASK-009 Codes (14)
 
 ```text
 INVALID_SIZING_REQUEST = "invalid_sizing_request"
@@ -1099,187 +1054,179 @@ REQUIRED_DUTY_NOT_MET = "required_duty_not_met"
 PROPERTY_PROVIDER_IDENTITY_MISMATCH = "property_provider_identity_mismatch"
 ```
 
-Total: 14 new codes. No synonymous duplicates.
+No synonymous duplicates.
 
 ---
 
-## 25. Terminology
-
-TASK-009 does not claim organizational source approval.
+## 24. Terminology
 
 | Imprecise | Precise |
 |-----------|---------|
 | "approved catalog snapshots" | "caller-supplied, structurally validated, hash-verified catalog snapshots" |
-| "approved candidates" | "structurally valid, hash-verified candidates" |
 | "organization-approved master catalogs" | reserved for TASK-016 |
 
 ---
 
-## 26. Exclusions
+## 25. Exclusions
 
-- pressure-drop formulas or constraints
-- continuous nonlinear optimization
-- stochastic, genetic, Bayesian, or ML optimization
-- velocity envelope constraints (deferred to future review)
-- cost and life-cycle economics
-- material selection
-- mechanical strength or code compliance
-- API endpoints, reports, UI
-- C4 numerical implementation
-- two-phase, shell-and-tube, plate, air-cooled exchanger sizing
-- independent Cartesian product of inner-tube and outer-pipe options
+Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materials, API, C4, multi-phase.
 
 ---
 
-## 27. Required Test Matrix
+## 26. Required Test Matrix
 
-### 27.1 Length and Catalog (1–22)
+### 26.1 Length and Catalog (1–25)
 
-1. Power-of-10 quantum — rejects non-1E-N quantum
-2. Explicit lengths use unified quantum
-3. Explicit duplicates after quantization — deduplicated
-4. Grid `INCLUDE_MAX_IF_ALIGNED` — aligned endpoint included
-5. Grid non-aligned — floor applied, no value > maximum
-6. Grid `EXCLUDE_MAX` — aligned endpoint excluded
-7. Grid `EXCLUDE_MAX` — non-aligned (no hi generated)
-8. No value generated > `maximum_length_m`
-9. `minimum == maximum`, `INCLUDE_MAX_IF_ALIGNED` — count = 1
-10. `minimum == maximum`, `EXCLUDE_MAX` — count = 0
-11. `increment_m < length_quantum_m` → `CATALOG_INVALID`
-12. Request `minimum_effective_length_m` closed-boundary intersection
-13. Request `maximum_effective_length_m` closed-boundary intersection
-14. Request bounds quantization matches catalog quantum
-15. Count-only grid algorithm — no list allocated before cap check
-16. Count-only request intersection — no list allocated
-17. Cap blocks before length materialization
-18. Cap blocks before candidate materialization
-19. Cap blocks before any TASK-008 call
-20. Exact `raw_combination_count`, `unique_candidate_count`, `evaluated_candidate_count`
-21. Catalog hash uses `sha256:` format
-22. Duplicate `assembly_option_id` detected before hash verification
+1. Power-of-10 quantum — rejects non-1E-N
+2. Quantum rejects canonical forms `10`, `100` (exponent > 0)
+3. Canonical quantum string frozen
+4. Explicit lengths use quantum
+5. Explicit duplicates after quantization — deduplicated
+6. Grid `INCLUDE_MAX_IF_ALIGNED` aligned
+7. Grid non-aligned — floor applied, no value > max
+8. Grid `EXCLUDE_MAX` aligned — excluded
+9. Grid `EXCLUDE_MAX` non-aligned — no hi
+10. No value generated > `maximum_length_m`
+11. `minimum == maximum` + INCLUDE → count=1
+12. `minimum == maximum` + EXCLUDE → count=0
+13. `increment_m < quantum` → CATALOG_INVALID
+14. `to_tick()` rejects positive sub-quantum → 0 tick
+15. Request min ceiling (does not widen)
+16. Request max floor (does not widen)
+17. Count-only grid — no list pre-cap
+18. Count-only intersection — no list pre-cap
+19. Cap before materialization
+20. Cap before candidate materialization
+21. Cap before TASK-008 call
+22. Exact raw/unique/evaluated counts
+23. Catalog hash `sha256:` format
+24. Duplicate `assembly_option_id` before hash verification
+25. `CatalogSnapshotRef` one-to-one with full snapshots
 
-### 27.2 Identity and Evaluation (23–34)
+### 26.2 Identity and Evaluation (26–39)
 
-23. `PhysicalCandidateIdentity` stability across catalog sources
-24. `SourceQualifiedCandidateIdentity` — different catalog → distinct
-25. `CandidateEvaluationIdentity` changes with request
-26. Corrected ranking — target satisfaction first
-27. `MINIMUM_OUTER_HEAT_TRANSFER_AREA` ranking key
-28. `MINIMUM_EFFECTIVE_LENGTH` ranking key
-29. Objectives select different candidates in Golden case
-30. Exact feasible tie resolved by canonical candidate ID
-31. `CandidateEvaluation` JSON round-trip
-32. `SizingOptimizationResult` hash payload
-33. Canonical evaluation order (`source_qualified_candidate_id` ascending)
-34. `SizingRequestIdentity` includes all required fields
+26. `PhysicalCandidateIdentity` stable across sources
+27. `SourceQualifiedCandidateIdentity` distinct per source
+28. `CandidateEvaluationIdentity` changes with request
+29. Target-satisfaction-first ranking
+30. `MINIMUM_OUTER_HEAT_TRANSFER_AREA` sort key
+31. `MINIMUM_EFFECTIVE_LENGTH` sort key
+32. Objectives select different Golden candidates
+33. Exact tie resolved by candidate ID
+34. `CandidateEvaluation` JSON round-trip
+35. `SizingOptimizationResult` hash payload
+36. Canonical evaluation order (ID ascending)
+37. `SizingRequestIdentity` full fields
+38. `FluidIdentifier` identity includes EOS + components
+39. `tube_in_hot` in sizing identity, not in rating identity
 
-### 27.3 Integrity and Evidence (35–43)
+### 26.3 Evidence and Integrity (40–48)
 
-35. Mixed SUCCEEDED/BLOCKED/FAILED candidates audited
-36. `VerifiedRatingEvidenceSnapshot` vs `InvalidRatingEvidenceRecord` — distinct
-37. Integrity invalid — immediate stop, remaining count reported
-38. Verification routine exception → `FAILED` (not BLOCKED)
-39. `VerifiedRatingEvidenceSnapshot` — permitted null thermal fields
-40. Flow areas marked as geometry-derived
-41. C4 (`CORRELATION_IMPLEMENTATION_UNAVAILABLE`) propagated unchanged
-42. `InvalidRatingEvidenceRecord` does not expose trusted metrics
-43. `partial_audit` field semantics
+40. `CandidateEvaluationState` enum (4 states)
+41. `VERIFIED` state invariants
+42. `INTEGRITY_INVALID` state invariants
+43. `UNEVALUATED` state invariants
+44. `RUNTIME_FAILED` state invariants
+45. Integrity invalid — immediate stop, remaining count
+46. Verification exception → `FAILED`
+47. `VerifiedRatingEvidenceSnapshot` null thermal fields permitted
+48. Feasibility only from verified SUCCEEDED + non-None duty
 
-### 27.4 Provenance (44–49)
+### 26.4 Provenance (49–60)
 
-44. SUCCEEDED provenance topology
-45. Invalid request provenance topology
-46. Invalid catalog provenance topology
-47. Cap exceeded / no candidate provenance topology
-48. Integrity invalid provenance topology
-49. FAILED provenance topology
+49. INVALID_REQUEST topology (no catalog/candidate/rating)
+50. INVALID_CATALOG topology
+51. CAP_EXCEEDED topology
+52. EVALUATED_NO_FEASIBLE topology
+53. INTEGRITY_INVALID topology (with INVALID_EVIDENCE node)
+54. SUCCEEDED topology (full)
+55. FAILED topology
+56. Two-stage core/final construction
+57. `result_hash` excludes final digest
+58. Edge tamper via graph digest
+59. UUID5 deterministic node IDs
+60. INVALID_EVIDENCE node type/label/payload
 
-### 27.5 Two-Stage Provenance (50–53)
+### 26.5 Validation and ErrorCodes (61–71)
 
-50. Two-stage core/final provenance
-51. `result_hash` excludes final provenance digest
-52. Edge tamper detected via graph digest
-53. UUID5 deterministic node IDs
+61. `required_duty_w > 0`
+62. `top_n` rejects `bool`
+63. Cap rejects `bool`
+64. Duplicate `(catalog_id, catalog_version)` refs
+65. `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH`
+66. Provider mandatory field mismatch → BLOCKED
+67. Exact callable forwards 4-field `SolverParams`
+68. `CalculationContext` 3 fields derived correctly
+69. `required_duty_w` not in rating identity
+70. `PROPERTY_PROVIDER_IDENTITY_MISMATCH` code
+71. `FluidIdentifier` identity in request
 
-### 27.6 Validation and ErrorCodes (54–63)
+### 26.6 Diagnostics and Ordering (72–76)
 
-54. `required_duty_w > 0` enforced
-55. `top_n` rejects `bool`
-56. `request_raw_combination_cap` rejects `bool`
-57. Duplicate `(catalog_id, catalog_version)` references rejected
-58. `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
-59. Provider identity mismatch → BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH`
-60. Exact callable forwards `SolverParams` (7 fields)
-61. Exact callable forwards `CalculationContext`
-62. `required_duty_w` does **not** enter `RatingRequestIdentity`
-63. `PROPERTY_PROVIDER_IDENTITY_MISMATCH` ErrorCode
+72. Full non-feasible sort key (8 fields, nested `affected_paths`)
+73. Sentinel when no diagnostic
+74. `REQUIRED_DUTY_NOT_MET` for pure duty-infeasible
+75. Deterministic primary diagnostic selection
+76. `sort_key` serialized as canonical JSON array
 
-### 27.7 Diagnostics and Ordering (64–67)
+### 26.7 Tamper (77–83)
 
-64. Full non-feasible sort key (8 fields)
-65. `CandidateDiagnosticKey` sentinel when no diagnostic
-66. Pure duty-infeasible diagnostic (`REQUIRED_DUTY_NOT_MET`)
-67. Deterministic primary diagnostic selection
+77. Catalog tamper
+78. Candidate tamper
+79. Ranking tamper
+80. Selected-candidate tamper
+81. Solver param change → identity change
+82. Fouling change → identity change
+83. Repeated-run determinism
 
-### 27.8 Tamper Detection (68–74)
+### 26.8 Golden Cases (84–85)
 
-68. Catalog tamper
-69. Candidate tamper
-70. Ranking tamper
-71. Selected-candidate tamper
-72. Solver parameter change changes identity
-73. Fouling change changes identity
-74. Repeated-run determinism
+84. Independent smallest-outer-area Golden
+85. Independent shortest-effective-length Golden
 
-### 27.9 Golden Cases and Documentation (75–78)
+### 26.9 Documentation and Quality (86–88)
 
-75. Independent smallest-outer-area Golden case
-76. Independent shortest-effective-length Golden case
-77. Issue #23 references canonical task card and frozen commit SHA
-78. JSON round-trip preserves all fields, hashes, provenance
-
-### 27.10 Quality Gates (79–80)
-
-79. Ruff, format check, mypy, pytest with coverage pass
-80. pip-audit, Python 3.11 and 3.12
+86. Issue #23 references canonical commit SHA
+87. JSON round-trip preserves all fields/hashes/provenance
+88. Ruff, format, mypy, pytest+coverage, pip-audit, Python 3.11/3.12
 
 ---
 
-## 28. Delivery Sequence
+## 27. Delivery Sequence
 
-1. Complete Round 4 Engineering Design Review.
+1. Complete Round 5 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
-5. Integrate TASK-008 `rate_double_pipe()` evaluation.
+5. Integrate TASK-008 `rate_double_pipe()` with exact 4-field `SolverParams`.
 6. Implement feasibility and ranking.
-7. Implement result hash, provenance, JSON round-trip, and tamper verification.
+7. Implement result hash, provenance, JSON round-trip, tamper detection.
 8. Add direct, Golden, and integration tests.
 9. Keep PR Draft through engineering review and CI pass.
 
 ---
 
-## 29. Acceptance Criteria
+## 28. Acceptance Criteria
 
-- [ ] Round 4 Design Review passes before implementation starts
-- [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates are generated
+- [ ] Round 5 Design Review passes before implementation starts
+- [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
-- [ ] TASK-008 `rate_double_pipe()` is the sole thermal evaluator
-- [ ] Candidate generation and ranking are insertion-order independent
-- [ ] Objective is explicit and typed; no weighted composite score
-- [ ] `NO_FEASIBLE_CANDIDATE` is `BLOCKED`, not `FAILED`
-- [ ] Target satisfaction dominates objective value in feasible ranking
-- [ ] Top-N contains feasible candidates only; truncation adds a warning
+- [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
+- [ ] `SolverParams` uses exact 4-field TASK-008 contract
+- [ ] `tube_in_hot` bound in sizing identity, not rating identity
+- [ ] `CalculationContext` preserves caller revision/run IDs; only `request_id` derived per candidate
+- [ ] Candidate generation and ranking insertion-order independent
+- [ ] Target satisfaction dominates objective value
+- [ ] Top-N feasible-only; truncation adds warning
 - [ ] Non-feasible ordering uses full `CandidateDiagnosticKey` sort key
-- [ ] `VerifiedRatingEvidenceSnapshot` vs `InvalidRatingEvidenceRecord` are distinct
-- [ ] Single integrity-invalid candidate stops evaluation immediately and blocks the run
-- [ ] Provenance topology is status-specific; two-stage core/final construction
-- [ ] All identity/hash uses `sha256:<64hex>` and `canonical_json` from shared utilities
-- [ ] Exact 14 TASK-009 ErrorCode strings are used; `CATALOG_IDENTITY_MISMATCH` and `HASH_MISMATCH` are non-overlapping
-- [ ] No pressure-drop or velocity constraint is introduced
-- [ ] Blocked and failed candidates remain auditable
-- [ ] Candidate and result hashes are deterministic
-- [ ] JSON round-trip and tamper detection pass
-- [ ] Required 78 test items + 2 Golden cases are covered
-- [ ] Ruff, format check, mypy, pytest with coverage, and pip-audit pass on Python 3.11 and 3.12
+- [ ] Four candidate evaluation states with exact evidence invariants
+- [ ] Single integrity-invalid candidate stops immediately, blocks run
+- [ ] Provenance topology deterministic per termination class
+- [ ] Two-stage core/final provenance; edge tamper via graph digest
+- [ ] Invalid-request BLOCKED uses `InvalidSizingRequestSnapshot`
+- [ ] All identity/hash uses `sha256:...` + `canonical_json`
+- [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
+- [ ] No pressure-drop or velocity constraint
+- [ ] 88 test items + 2 Golden cases covered
+- [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
