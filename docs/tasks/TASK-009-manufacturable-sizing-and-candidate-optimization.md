@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 32 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 33 Engineering Design Review passes.
 
 ---
 
@@ -65,6 +65,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 29 | 4802701831 | CHANGES REQUIRED |
 | 30 | 4802836532 | CHANGES REQUIRED |
 | 31 | 4802985042 | CHANGES REQUIRED |
+| 32 | 4803145772 | CHANGES REQUIRED |
 
 ## 4. Data Model
 
@@ -1268,7 +1269,21 @@ selected_correlation_payload = {
 selected_correlation_digest = sha256_digest(selected_correlation_payload)
 ```
 
-### 14.7.2 Shared canonical context normalization (merged block)
+### 14.7.2 Canonicalization core and integration contracts
+
+### 14.7.2.1 Block manifest
+
+| Block ID | Marker | Status | Python execution | strict mypy |
+|----------|--------|--------|------------------|-------------|
+| `TASK009_CANONICALIZATION_CORE_PY` | `BEGIN/END TASK009_CANONICALIZATION_CORE_PY` | executable normative contract | required on 3.11 and 3.12 | required on 3.11 and 3.12 |
+| `TASK009_CANONICALIZATION_INTEGRATION_PSEUDOCODE` | `BEGIN/END TASK009_CANONICALIZATION_INTEGRATION_PSEUDOCODE` | normative typed design pseudocode | not claimed | not claimed |
+
+Only blocks with status `executable normative contract` enter the mechanical Python/mypy gate.
+The pseudocode block is a design reference and must not be extracted or verified as executable code.
+
+---
+
+
 
 <!-- BEGIN TASK009_CANONICALIZATION_CORE_PY -->
 ```python
@@ -1700,13 +1715,13 @@ class CanonicalContextEntry:
 ```
 <!-- END TASK009_CANONICALIZATION_CORE_PY -->
 
-The core block above is self-contained: it defines all its own types, imports only from stdlib and `pydantic`, and requires no project-specific dependencies. It can be extracted by the byte-preserving algorithm in §14.7.2.x and verified with `python3.11` / `mypy --strict`.
+The core block above is self-contained: it defines all its own types, imports only from stdlib and `pydantic`, and requires no project-specific dependencies. It can be extracted by the byte-preserving algorithm in §14.7.2.4 and verified with `python3.11` / `mypy --strict`.
 
 ### 14.7.2.1 Integration Block
 
 The following block depends on project domain types (`ErrorCode`, `RunFailure`, `FailureStage`, `MessageOwnerKind`, `CanonicalPayload`, `sha256_digest`) and is marked as **typed design pseudocode** — its symbols are resolvable only once TASK-009 implementation adds the domain model. Mechanical extraction and mypy verification are not claimed for this block.
 
-<!-- BEGIN TASK009_CANONICALIZATION_INTEGRATION_PY -->
+<!-- BEGIN TASK009_CANONICALIZATION_INTEGRATION_PSEUDOCODE -->
 ```python
 def build_canonical_context_entries(
     context: tuple[tuple[str, object], ...],
@@ -1791,8 +1806,144 @@ def build_context_canonicalization_fallback(
         context=fallback_failure_context,
     )
 ```
-<!-- END TASK009_CANONICALIZATION_INTEGRATION_PY -->
+<!-- END TASK009_CANONICALIZATION_INTEGRATION_PSEUDOCODE -->
 
+
+
+### 14.7.2.4 Mechanical extraction and verification contract
+
+#### Extraction rules (byte-preserving)
+
+1. The document is read as UTF-8 bytes. No text normalisation is applied before extraction.
+2. Each `BEGIN` marker and its corresponding `END` marker must each appear exactly once in the document.
+3. The `BEGIN` marker must be immediately followed by `\n` and a ````python` fence.
+4. The `END` marker must be immediately preceded by a closing `\`\`\`` fence.
+5. The marked region must contain exactly two backtick-fence tokens (opening and closing).
+6. Only the raw bytes between the opening and closing fences are extracted.
+7. No `.strip()`, `.lstrip()`, `.rstrip()`, `.replace()`, `.format()` or newline conversion is applied.
+8. No imports, stubs, `from __future__` or aliases are prepended.
+9. No helpers, fixtures or definitions are appended.
+10. After writing to `/tmp`, the file is re-read and bytes are verified to be identical.
+11. The SHA-256 digest of the extracted bytes is recorded and reused for all verification steps.
+12. Python execution and mypy must use the same file with the same SHA-256.
+
+#### Authoritative extraction script
+
+The following script is the sole authority for extracting the executable core block.
+It must be copied byte-for-byte to `/tmp/extract_task009_core.py` before each verification run.
+
+```python
+from __future__ import annotations
+
+from hashlib import sha256
+from pathlib import Path
+
+
+DOCUMENT_PATH = Path(
+    "docs/tasks/"
+    "TASK-009-manufacturable-sizing-and-candidate-optimization.md"
+)
+BLOCK_ID = b"TASK009_CANONICALIZATION_CORE_PY"
+BEGIN_MARKER = b"<!-- BEGIN " + BLOCK_ID + b" -->\\n"
+END_MARKER = b"<!-- END " + BLOCK_ID + b" -->"
+OPENING_FENCE = b"```python\\n"
+CLOSING_FENCE = b"```\\n"
+OUTPUT_PATH = Path("/tmp/task009_canonicalization_core.py")
+
+
+def extract_exact_block(document_bytes: bytes) -> bytes:
+    if document_bytes.count(BEGIN_MARKER) != 1:
+        raise RuntimeError(
+            "core BEGIN marker count must equal 1"
+        )
+    if document_bytes.count(END_MARKER) != 1:
+        raise RuntimeError(
+            "core END marker count must equal 1"
+        )
+    begin_index = (
+        document_bytes.index(BEGIN_MARKER)
+        + len(BEGIN_MARKER)
+    )
+    end_index = document_bytes.index(
+        END_MARKER,
+        begin_index,
+    )
+    region = document_bytes[begin_index:end_index]
+    if not region.startswith(OPENING_FENCE):
+        raise RuntimeError(
+            "BEGIN marker must be followed immediately "
+            "by a python fence"
+        )
+    if not region.endswith(CLOSING_FENCE):
+        raise RuntimeError(
+            "END marker must be preceded immediately "
+            "by a closing fence"
+        )
+    if region.count(b"\`\`\`") != 2:
+        raise RuntimeError(
+            "marked core region must contain exactly "
+            "one python code fence"
+        )
+    code = region[len(OPENING_FENCE):-len(CLOSING_FENCE)]
+    if not code:
+        raise RuntimeError(
+            "extracted core block must not be empty"
+        )
+    return code
+
+
+document_bytes = DOCUMENT_PATH.read_bytes()
+extracted_bytes = extract_exact_block(document_bytes)
+OUTPUT_PATH.write_bytes(extracted_bytes)
+written_bytes = OUTPUT_PATH.read_bytes()
+if written_bytes != extracted_bytes:
+    raise RuntimeError(
+        "written extraction differs from source bytes"
+    )
+digest = sha256(extracted_bytes).hexdigest()
+print(f"path={OUTPUT_PATH}")
+print(f"size={len(extracted_bytes)}")
+print(f"sha256={digest}")
+```
+
+#### No-rewrite verification contract
+
+Before every Python execution and mypy invocation:
+
+```text
+sha256sum /tmp/task009_canonicalization_core.py
+```
+
+The digest must be identical across all four checks:
+
+1. Before `python3.11 /tmp/task009_canonicalization_core.py`
+2. Before `python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py`
+3. Before `python3.12 /tmp/task009_canonicalization_core.py` (if available)
+4. Before `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py` (if available)
+
+Any digest mismatch is a verification failure.
+
+#### Full verification commands (from repository root)
+
+```text
+# 9.1 Extract
+python3.11 /tmp/extract_task009_core.py
+sha256sum /tmp/task009_canonicalization_core.py
+
+# 9.2 Python 3.11
+sha256sum /tmp/task009_canonicalization_core.py
+python3.11 /tmp/task009_canonicalization_core.py
+sha256sum /tmp/task009_canonicalization_core.py
+python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py
+
+# 9.3 Python 3.12 (if available)
+sha256sum /tmp/task009_canonicalization_core.py
+python3.12 /tmp/task009_canonicalization_core.py
+sha256sum /tmp/task009_canonicalization_core.py
+python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py
+```
+
+If Python 3.12 is not available, the corresponding tests must report SKIP — not PASS.
 
 
 Usage:
@@ -5714,10 +5865,10 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ### 27.21 Round 30 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 31 changes. **Expected output**: Round 31 row exists with Comment ID `4802985042`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 31 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 31 row in review history. **Expected output**: Round 31 immediately follows Round 30. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 32 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+501. **Input**: Review history table after Round 32 changes. **Expected output**: Round 32 row exists with Comment ID `4803145772`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 32 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 32 row in review history. **Expected output**: Round 32 immediately follows Round 31. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 33 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
 505. **Input**: `CountingMapping` with call counter. **Expected output**: `items()` is called exactly once during canonicalization. **Exception**: N/A — single-read invariant: items acquired exactly once.
 506. **Input**: Captured Mapping items iterable is used for iteration. **Expected output**: Canonicalizer iterates the captured items, does not re-read the original Mapping. **Exception**: N/A — single-read invariant: captured iterable is consumed.
 507. **Input**: Mapping whose second `items()` call raises `RuntimeError`. **Expected output**: Canonicalization succeeds because the second call is never made. **Exception**: N/A — single-read invariant: second call not triggered.
@@ -5741,9 +5892,9 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 525. **Input**: Quantity-like object with non-callable `to_si`. **Expected output**: `try_read_repository_quantity_adapter` returns `None`. **Exception**: N/A — non-callable to_si means adapter returns None.
 526. **Input**: Source code of `QuantityKindProtocol`. **Expected output**: `QuantityKindProtocol` is a `typing.Protocol` subclass (not a `dataclass`), with `@property(value) -> str`. **Exception**: N/A — typed Protocol contract.
 527. **Input**: Source code of `QuantitySIResultProtocol`. **Expected output**: `QuantitySIResultProtocol` is a `typing.Protocol` subclass (not a `dataclass`), with `@property(value) -> object`. **Exception**: N/A — typed Protocol contract.
-528. **Input**: Source code of `QuantityToSIProtocol`. **Expected output**: `QuantityToSIProtocol` is a `typing.Protocol` that defines `__call__` returning `QuantitySIResultProtocol`. **Exception**: N/A — typed Protocol contract.
-529. **Input**: Exact extracted core canonicalization block via byte-preserving extraction. **Expected output**: `python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found in 1 source file`. **Exception**: N/A — strict mypy passes.
-530. **Input**: Exact extracted core canonicalization block via byte-preserving extraction. **Expected output**: `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found in 1 source file`. **Exception**: N/A — strict mypy passes.
+528. **Input**: Integration block marker name. **Expected output**: Integration marker is `TASK009_CANONICALIZATION_INTEGRATION_PSEUDOCODE` (not `_PY`). **Exception**: N/A — psuedocode naming contract.
+529. **Input**: Exact extracted core block via byte-preserving extraction. **Expected output**: `python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found in 1 source file`. **Exception**: N/A — strict mypy passes on 3.11.
+530. **Input**: Exact extracted core block via byte-preserving extraction. **Expected output**: `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found in 1 source file`. **Exception**: N/A — strict mypy passes on 3.12.
 531. **Input**: Valid NO_FEASIBLE counters: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=0`. **Expected output**: All top-level invariants pass. **Exception**: N/A — regression: valid fixture unchanged.
 532. **Input**: NO_FEASIBLE: `unique=10, evaluated=2, verified=2, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised with `"evaluated"`. **Exception**: `ValueError` — regression: partial evaluation still rejected.
 533. **Input**: Valid SUCCEEDED counters: `unique=10, evaluated=10, verified=10, feasible=3, result=1, failure=0`. **Expected output**: All top-level invariants pass. **Exception**: N/A — regression: valid fixture unchanged.
@@ -5752,13 +5903,13 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 536. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: Rejected by `invariant_feasible_count_range` because `feasible > unique`. **Exception**: `ValueError` — feasible range invariant fires before feasible_le_verified.
 537. **Input**: Standalone `invariant_feasible_le_verified` helper with `unique=10, verified=8, feasible=9`. **Expected output**: `ValueError` raised because `feasible > verified`. **Exception**: `ValueError` — unit contract for feasible_le_verified independent of registry ordering.
 538. **Input**: Deterministic candidate UUID5: same request+candidate → same UUID; different candidate → different UUID; insertion-order independent. **Expected output**: All three UUID5 invariants satisfied. **Exception**: N/A — regression: deterministic IDs unchanged.
-539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 32; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
-540. **Input**: Tests 1–540 continuous, zero/dual roots rejected, Frozen SHA and Round 32 gate synchronized. **Expected output**: Global numbering continuous, Issue frozen SHA matches new commit, gate at Round 32. **Exception**: N/A — structural sync check.
+539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 33; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
+540. **Input**: Tests 1–540 continuous, zero/dual roots rejected, Frozen SHA and Round 33 gate synchronized. **Expected output**: Global numbering continuous, Issue frozen SHA matches new commit, gate at Round 33. **Exception**: N/A — structural sync check.
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 32 Engineering Design Review.
+1. Complete Round 33 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5772,7 +5923,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 32 Engineering Design Review passes before implementation starts
+- [ ] Round 33 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
