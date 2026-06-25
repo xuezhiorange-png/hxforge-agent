@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 11 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 12 Engineering Design Review passes.
 
 ---
 
@@ -44,6 +44,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 8 | — | CHANGES REQUIRED — review delivered without GitHub comment |
 | 9 | 4798128591 | CHANGES REQUIRED |
 | 10 | 4798318702 | CHANGES REQUIRED |
+| 11 | 4798512240 | CHANGES REQUIRED |
 
 ---
 
@@ -715,9 +716,17 @@ class CandidateEvaluationState(StrEnum):
 |-------|------------------------------|------------------------|------------------------|-------------------|----------|
 | UNEVALUATED | None | None | None | None | False |
 | VERIFIED | not None | not None | None | None | per duty check |
-| PROVIDER_IDENTITY_MISMATCH | not None | not None | None | None | False |
 | INTEGRITY_INVALID | None | None | not None | None | False |
 | RUNTIME_FAILED | None | None | None | not None | False |
+
+**VERIFIED subtypes:**
+
+| Subtype | feasible | feasibility_status | rating_status | duty fields |
+|---------|----------|-------------------|---------------|-------------|
+| VERIFIED+SUCCEEDED | per duty check | FEASIBLE or INFEASIBLE | SUCCEEDED | populated when heat_duty_w not None |
+| VERIFIED+BLOCKED | False | RATING_BLOCKED | BLOCKED | all None |
+| VERIFIED+FAILED | False | RATING_FAILED | FAILED | all None |
+| VERIFIED+PROVIDER_IDENTITY_MISMATCH | False | PROVIDER_IDENTITY_MISMATCH | actual TASK-008 status | all None |
 
 ### 14.2 VerifiedRatingEvidenceSnapshot
 
@@ -844,7 +853,7 @@ invalid_evidence_digest = sha256_digest({
 - The provenance node payload hash reuses this same payload.
 - UUID5 name and node payload are both constructable even when result hash is damaged/unreadable.
 
-### 14.6 ClaimedRatingResultAuditSnapshot
+### 14.5 ClaimedRatingResultAuditSnapshot
 
 When verification raises an exception (not returns False), a `ClaimedRatingResultAuditSnapshot` is constructed instead of `InvalidRatingEvidenceRecord`. This provides deterministic audit evidence without trusting the unverified result.
 
@@ -873,6 +882,39 @@ ClaimedRatingResultAuditSnapshot
 ```
 
 All unreadable fields must be explicitly `None`.
+
+**safely_readable_field_digests whitelist:**
+
+Only the following field names may be read from the unverified result:
+
+```text
+rating_status
+result_hash
+provenance_digest
+request_identity_digest
+execution_context_digest
+provider_identity_digest
+```
+
+Each entry:
+
+```python
+field_digest = sha256_digest({
+    "field_name": field_name,
+    "canonical_value": safe_canonical_value,
+})
+```
+
+`safely_readable_field_digests` is `tuple[(field_name, field_digest), ...]` sorted by field_name ASCII ascending.
+
+Rules:
+- If a whitelist field doesn't exist on the result object → skip (do not include in tuple)
+- If reading the field raises an exception → skip (record as unavailable)
+- If the field value cannot be safely canonicalized → skip
+- No alias detection (field_name must match exactly 1:1)
+- Duplicate with snapshot-level claimed fields is expected (the field digest is the same canonicalized value used independently)
+- `UNREADABLE` = all whitelist fields are unavailable (no object, damaged object)
+- Never read `__dict__`, internal properties, or call arbitrary methods
 
 **Digest payload:**
 
@@ -916,7 +958,7 @@ uuid5(TASK009_PROVENANCE_NAMESPACE,
 
 Payload hash: `sha256_digest(claimed_audit_payload)`.
 
-### 14.7 Integrity-Failure Policy
+### 14.6 Integrity-Failure Policy
 
 Candidates evaluated in canonical order (§6.4, §18.1.5 strict pipeline). Each candidate's verification outcomes drive the next state:
 
@@ -941,7 +983,7 @@ Candidates evaluated in canonical order (§6.4, §18.1.5 strict pipeline). Each 
 
 The error path does NOT construct a trusted `InvalidRatingEvidenceRecord` (the verification process failed, not the integrity check). If a claimed audit record is needed, use `CLAIMED_TASK008_RATING_RESULT` (§21.4 RATING_VERIFICATION).
 
-## 14.8 VerifiedRatingEvidenceDigest
+### 14.7 VerifiedRatingEvidenceDigest
 
 Full deterministic digest payload for `VerifiedRatingEvidenceSnapshot`:
 
@@ -987,18 +1029,93 @@ Requirements:
 - Any evidence field tamper changes the digest
 - This digest enters CandidateEvaluation, SizingResultIdentity, and failure audit records
 
-### 14.8.1 Nested Identity Digests
+### 14.7.1 Nested Identity Digests
 
-```text
-provider_identity_digest = sha256_digest(ProviderIdentitySnapshot payload)
-rating_request_identity_digest = sha256_digest(RatingRequestIdentity payload)
-rating_execution_context_digest = sha256_digest(ExecutionContextSnapshot payload)
-selected_correlation_digest = sha256_digest(SelectedCorrelationSnapshot payload)
-engineering_message_digest = sha256_digest(EngineeringMessage payload)
-run_failure_digest = sha256_digest(RunFailure payload)
+Each nested type has an exact digest payload:
+
+```python
+# ProviderIdentitySnapshot
+provider_identity_payload = {
+    "name": ...,
+    "version": ...,
+    "git_revision": ...,
+    "reference_state_policy": ...,
+    "configuration_fingerprint": ...,
+    "cache_policy_version": ...,
+}
+provider_identity_digest = sha256_digest(provider_identity_payload)
 ```
 
-All computed via the standard `sha256_digest(payload)` contract.
+```python
+# RatingRequestIdentity
+rating_request_identity_payload = {
+    "source_qualified_candidate_id": ...,
+    "sizing_request_identity_digest": ...,
+    "rating_request_identity_digest": ...,
+    "provider_identity_digest": ...,
+    "execution_context_identity_digest": ...,
+    "rating_result_hash": ...,
+    "rating_provenance_digest": ...,
+}
+rating_request_identity_digest = sha256_digest(rating_request_identity_payload)
+```
+
+```python
+# ExecutionContextSnapshot
+execution_context_payload = {
+    "request_id": str(request_id) if request_id is not None else None,
+    "design_case_revision_id": str(design_case_revision_id)
+        if design_case_revision_id is not None else None,
+    "calculation_run_id": str(calculation_run_id)
+        if calculation_run_id is not None else None,
+}
+rating_execution_context_digest = sha256_digest(execution_context_payload)
+```
+
+```python
+# SelectedCorrelationSnapshot
+selected_correlation_payload = {
+    "correlation_id": ...,
+    "version": ...,
+    "definition_hash": ...,
+    "source_title": ...,
+    "source_authors": ...,
+    "source_year": ...,
+    "source_reference": ...,
+    "source_verification_status": ...,
+    "nusselt_basis": ...,
+    "is_adaptation": ...,
+    "adaptation_limitation": ...,
+}
+selected_correlation_digest = sha256_digest(selected_correlation_payload)
+```
+
+```python
+# EngineeringMessage
+engineering_message_payload = {
+    "code": ...,
+    "severity": ...,
+    "source_module": ...,
+    "affected_paths": ...,
+    "message": ...,
+    "context_digest": ...,
+}
+engineering_message_digest = sha256_digest(engineering_message_payload)
+```
+
+```python
+# RunFailure
+run_failure_payload = {
+    "failure_stage": ...,
+    "candidate_id": ...,
+    "evaluation_order_index": ...,
+    "context": canonicalized_context,
+}
+run_failure_digest = sha256_digest(run_failure_payload)
+```
+
+Explicit `None` handling: nullable fields enter the payload as `None` (not omitted).
+All computed via the standard `sha256_digest(payload)` contract — single call, `canonical_json` handled internally.
 
 ---
 
@@ -1056,7 +1173,7 @@ Invariants by state:
 | VERIFIED + SUCCEEDED | not None | not None (duty fields populated) | None | None | per duty check | SUCCEEDED | populated (float, not None, feasible determination) | allowed |
 | VERIFIED + BLOCKED | not None | not None | None | None | False | BLOCKED | all None | allowed |
 | VERIFIED + FAILED | not None | not None | None | None | False | FAILED | all None | allowed |
-| PROVIDER_IDENTITY_MISMATCH | not None | not None | None | None | False | actual TASK-008 status | all None | allowed |
+| VERIFIED + PROVIDER_IDENTITY_MISMATCH | not None | not None | None | None | False | actual TASK-008 status | all None | allowed |
 | INTEGRITY_INVALID | None | None | not None | None | False | None | all None | allowed |
 | RUNTIME_FAILED | None | None | None | not None | False | None | all None | allowed |
 | UNEVALUATED | None | None | None | None | False | None | all None | allowed |
@@ -1191,11 +1308,7 @@ CanonicalRawKey =
 {"key_kind": "int", "value": str(integer_value)}
 ```
 
-**Finite float key:**
-
-```python
-{"key_kind": "finite_float", "value": canonical_json(float_value)}
-```
+**Finite float key (handled in §dispatch order):** replaced by the definition below.
 
 **Non-finite float key:**
 
@@ -1243,7 +1356,9 @@ Rules:
 5. int
 6. float
 7. tuple/list
-8. Mapping (dict — string keys only; non-string keys handled via $mapping_entries)
+8. Mapping:
+   - string-key-only mapping → canonical sorted JSON object
+   - mapping containing any non-string key → `$mapping_entries` representation
 9. opaque unsupported (catch-all for arbitrary unrecognized objects)
 ```
 
@@ -1320,7 +1435,7 @@ Rules:
 - Must not silently convert via `str(key)` (key collision risk).
 - Must not call arbitrary `repr()`.
 - Must not raise any exception (would lose snapshot).
-- A `SizingValidationErrorSnapshot` with code `NON_STRING_KEY` is added per non-string-key entry.
+- A `SizingValidationErrorSnapshot` with code `NON_STRING_MAPPING_KEY` is added per non-string-key entry.
 - A `SizingValidationErrorSnapshot` with code `UNSUPPORTED_RAW_MAPPING_KEY` is added per opaque-key entry.
 - Validation error field path uses the frozen `(key_payload_digest, occurrence_index)` after sorting — no pre-sort dependence.
 
@@ -1410,26 +1525,31 @@ SizingValidationErrorSnapshot
 Digest payload:
 
 ```python
-context_digest = sha256_digest({
-    "context": canonical_context
-})
-
-error_digest = sha256_digest({
-    "code": code,
+error_payload = {
+    "code": code.value,
+    "message_key": message_key,
     "field_path": list(field_path),
-    "message": message,
     "rejected_value_digest": rejected_value_digest,
     "context_digest": context_digest,
-})
+}
+error_digest = sha256_digest(error_payload)
 ```
+
+Sort key (message NOT in digest or sort — informational only):
+
+```text
+(code.value, message_key, field_path, rejected_value_digest or "", context_digest)
+```
+
+`message` is for display only, mapped from `message_key` to frozen English text. It does NOT enter error_digest or canonical ordering.
 
 Validation error sort key (single frozen form, no Python raw-tuple comparison of nested context):
 
 ```text
-(code, field_path, message, rejected_value_digest or "", context_digest)
+(code.value, message_key, field_path, rejected_value_digest or "", context_digest)
 ```
 
-### 18.1.6 RawInputValidationCode
+### 18.1.5 RawInputValidationCode
 
 ```text
 class RawInputValidationCode(StrEnum):
@@ -1452,6 +1572,16 @@ class RawInputValidationCode(StrEnum):
 
 No "or frozen equivalent" — these exact values are frozen.
 
+**Frozen message registry:**
+
+| Code | message_key | Message | field_path | rejected_value_digest | context keys | multiplicity |
+|------|------------|---------|------------|----------------------|--------------|-------------|
+| `NON_STRING_MAPPING_KEY` | `"non_string_mapping_key"` | `"Mapping key is not a string"` | `("$mapping_entries", key_payload_digest [, occurrence_index])` | `sha256(key_marker)` | `("key_type", "key_kind")` | 1 per non-string-key entry |
+| `UNSUPPORTED_RAW_MAPPING_KEY` | `"unsupported_raw_mapping_key"` | `"Mapping key is an unsupported type"` | `("$mapping_entries", key_payload_digest [, occurrence_index])` | `sha256(key_marker)` | `("key_type",)` | 1 per opaque-key entry (NOT also NON_STRING_MAPPING_KEY) |
+| `UNSUPPORTED_RAW_INPUT_TYPE` | `"unsupported_raw_input_type"` | `"Unsupported value type in input"` | `("$unsupported_type",)` | `sha256(marker)` | `("object_type",)` | 1 per occurrence |
+| `CYCLIC_RAW_INPUT` | `"cyclic_raw_input"` | `"Container has cyclic reference"` | `("$cyclic_reference",)` | `sha256(marker)` | `("ancestor_distance",)` | 1 per cycle occurrence |
+| `NON_FINITE_RAW_FLOAT` | `"non_finite_raw_float"` | `"Float value is NaN or Infinity"` | per context | `sha256(value)` | `("original_value",)` | 1 per occurrence |
+
 **SizingValidationErrorSnapshot (updated):**
 
 ```text
@@ -1468,7 +1598,7 @@ SizingValidationErrorSnapshot
 
 `message_key` is the stable identity root for digest/provenance. The `message` field is informational only.
 
-### 18.1.7 Strict Per-Candidate Evaluation Pipeline
+### 18.1.6 Strict Per-Candidate Evaluation Pipeline
 
 Each candidate evaluation follows a frozen sequential order within a single sizing run:
 
@@ -1658,8 +1788,6 @@ The current candidate:
 - `InvalidRatingEvidenceRecord` constructed
 - `rating_status = None` on `CandidateEvaluation`
 
-### 19A.5 Verification returns False (integrity invalid)
-
 ### 19A.6 Verification raises exception (runtime error)
 
 RatingResult returned normally and verification raised:
@@ -1749,10 +1877,10 @@ None = 999
 UNEVALUATED, VERIFIED, INTEGRITY_INVALID, RUNTIME_FAILED
 ```
 
-6 status-specific invariant rows (covering VERIFIED subtypes):
+7 status-specific invariant rows (covering VERIFIED subtypes):
 
 ```text
-VERIFIED+SUCCEEDED, VERIFIED+BLOCKED, VERIFIED+FAILED,
+VERIFIED+SUCCEEDED, VERIFIED+BLOCKED, VERIFIED+FAILED, VERIFIED+PROVIDER_IDENTITY_MISMATCH,
 INTEGRITY_INVALID, RUNTIME_FAILED, UNEVALUATED
 ```
 
@@ -1848,6 +1976,7 @@ Edge labels are uniquely frozen:
 |------|-------|
 | ROOT → SIZING_RUN | `"initiates"` |
 | SIZING_RUN → CATALOG_SNAPSHOT | `"consumes"` |
+| SIZING_RUN → OPTIMIZER | `"executes"` |
 | CATALOG_SNAPSHOT → CANDIDATE | `"generates"` |
 | CANDIDATE → TASK008_RATING_RESULT (verified) | `"rated_as"` |
 | CANDIDATE → CLAIMED_TASK008_RATING_RESULT (unverified) | `"rated_as_claimed"` |
@@ -2145,7 +2274,7 @@ Edges:
 - CATALOG_SNAPSHOT -> CANDIDATE "generates"
 - SIZING_RUN -> SIZING_RESULT "produces"
 - RUNTIME_FAILURE -> SIZING_RESULT "fails"
-partial_audit: False, evaluated_candidate_count: 0
+partial_audit: True, evaluated_candidate_count: 0
 ```
 
 ##### RATING_CALL
@@ -2208,22 +2337,14 @@ UUID5 name (when result hash unreadable):
 
 ```text
 uuid5(TASK009_PROVENANCE_NAMESPACE,
-    "claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{claimed_result_digest}")
+    "claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{audit_digest}")
 ```
 
-`claimed_result_digest` uses all safely readable claimed metadata and explicit nulls. If result fields are completely unreadable:
+`audit_digest` is the full `ClaimedRatingResultAuditSnapshot` digest. Always uses the same formula — no condition on result hash readability.
 
-```python
-claimed_result_digest = sha256_digest({
-    "candidate_id": ...,
-    "evaluation_order_index": ...,
-    "hash_verification_outcome": ...,
-    "provenance_verification_outcome": ...,
-    "claim_state": "unreadable",
-})
-```
+Claimed node payload hash: `sha256_digest(claimed_audit_payload)`.
 
-`claim_state` is one of: `"hash_verification_error"`, `"provenance_verification_error"`, `"unreadable"`.
+The `claim_state` is one of: `"hash_verification_error"`, `"provenance_verification_error"`, `"unreadable"`.
 ```
 ```
 
@@ -2453,7 +2574,7 @@ partial_audit = evaluated_candidate_count < unique_candidate_count
 
 `partial_audit = True` in early stages signals that full candidate evaluation was never completed.
 
-`CandidateEvaluation.partial_audit` is **removed** from the `CandidateEvaluation` schema and its digest payload. The candidate record only expresses its own state (UNEVALUATED, VERIFIED, INTEGRITY_INVALID, PROVIDER_IDENTITY_MISMATCH, RUNTIME_FAILED). Run-level completeness is the responsibility of the result object, not individual evaluations.
+`CandidateEvaluation.partial_audit` is **removed** from the `CandidateEvaluation` schema and its digest payload. The candidate record only expresses its own state (UNEVALUATED, VERIFIED, INTEGRITY_INVALID, RUNTIME_FAILED) with VERIFIED subtypes for additional context. Run-level completeness is the responsibility of the result object, not individual evaluations.
 
 ### 22.7 Edge Tamper Detection
 
@@ -2520,7 +2641,7 @@ Before building any identity/hash/provenance payload, collections must be sorted
 | Diagnostics (`CandidateDiagnosticKey`) | `(diagnostic_class_rank, code, source_module, affected_paths, message)` ascending |
 | Warnings / blockers | `(severity_rank, code, source_module, affected_paths, message, canonical_context_digest)` ascending |
 | Evidence records (verified, invalid) | `candidate_id` ascending |
-| Validation errors (`SizingValidationErrorSnapshot`) | `(code, field_path, message, rejected_value_digest or "", context_digest)` ascending |
+- Validation errors (`SizingValidationErrorSnapshot`) | `(code.value, message_key, field_path, rejected_value_digest or "", context_digest)` ascending |
 
 Severity rank:
 
@@ -2656,7 +2777,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ### 27.3 Evidence and Integrity (40–48)
 
-40. `CandidateEvaluationState` enum (4 states)
+40. `CandidateEvaluationState` enum (4 states) — VERIFIED includes PROVIDER_IDENTITY_MISMATCH subtype
 41. `VERIFIED` state invariants
 42. `INTEGRITY_INVALID` state invariants
 43. `UNEVALUATED` state invariants
@@ -2732,8 +2853,8 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 92. Raw request +Infinity canonicalization → `{"$non_finite_float": "+infinity"}`
 93. Raw request -Infinity canonicalization → `{"$non_finite_float": "-infinity"}`
 94. Raw request unsupported object → deterministic `{"$unsupported_type": ...}`
-95. Raw request non-string dict key → deterministic `$mapping_entries` marker + `NON_STRING_KEY` validation error; no exception
-96. Raw request cyclic container → `{"$cyclic_reference": "..."}`
+95. Raw request non-string dict key → deterministic `$mapping_entries` marker + `NON_STRING_MAPPING_KEY` validation error; no exception
+96. Raw request cyclic container → `{"$cyclic_reference": {"ancestor_distance": N}}`
 97. Raw snapshot self-excluding digest (`raw_request_digest` not in own payload)
 98. Structured `SizingValidationErrorSnapshot` digest round-trip
 99. Validation-error insertion-order independence (different order → same digest)
@@ -2769,7 +2890,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 129. INTEGRITY_INVALID candidate record digest (claimed_provider_identity in digest)
 130. Candidate record tamper by modifying failure digest
 131. Candidate record tamper by modifying diagnostic digest
-132. `FeasibilityStatus` exact seven values and numerical ranks
+132. `FeasibilityStatus` exact eight values and numerical ranks
 133. `RatingStatus` None sentinel (None = 999 in sort)
 134. Severity rank exact mapping (INFO=0, WARNING=1, ERROR=2, BLOCKER=3)
 135. `EngineeringMessage` context affects digest (same code/message, different context → different digest)
@@ -2784,7 +2905,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 141. Cyclic `ancestor_distance` stability (`$.field`, `$.field[0]`, `$.field["key"]` path syntax removed — no sort/path loop)
 142. Dict traversal order does not affect `ancestor_distance` determinism
 143. Non-string mapping key still produces `RawSizingRequestSnapshot` (no exception)
-144. Non-string mapping key produces structured `SizingValidationErrorSnapshot` with code `NON_STRING_KEY`
+144. Non-string mapping key produces structured `SizingValidationErrorSnapshot` with code `NON_STRING_MAPPING_KEY`
 145. Unsupported object produces snapshot + `SizingValidationErrorSnapshot` (`UNSUPPORTED_RAW_INPUT_TYPE`)
 146. `VERIFIED+SUCCEEDED` duty fields populated non-None when `heat_duty_w is not None`
 147. `VERIFIED+BLOCKED` duty fields all None
@@ -2796,8 +2917,8 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 153. Rating counter invariant: `0 ≤ verified ≤ completed ≤ attempted ≤ unique`
 154. `RATING_CALL` exception: `attempted = completed + 1`, failed candidate not unevaluated
 155. `RATING_CALL` failed candidate: `CandidateEvaluationState = RUNTIME_FAILED`, `failure_stage = RATING_CALL`
-156. `RATING_VERIFICATION` exception: `attempted == completed`, `verified < completed`
-157. Claimed-result node ID works with unreadable result hash: uses `claimed_result_digest` with `claim_state: "unreadable"`
+156. `RATING_VERIFICATION` exception: `attempted == completed`, `completed = verified + 1`
+157. Claimed-result node ID always uses `audit_digest` with `claim_state` (not conditional `claimed_result_digest`)
 158. `RESULT_CONSTRUCTION` uses exact `SizingRunFailureResult` schema (not degraded `SizingOptimizationResult`)
 159. `RESULT_CONSTRUCTION` `partial_audit = False` (evaluation completed all candidates)
 160. `failure_result_hash` tamper detection (changes on any payload field change)
@@ -2813,7 +2934,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 170. Validation error insertion-order independence
 171. Markdown code fence in `SizingRequestIdentity` schema validated (no leading pipes)
 172. Section numbering continuous (no gaps, no duplicates)
-173. Acceptance Criteria references Round 10
+173. Acceptance Criteria references Round 12
 174. Issue #23 frozen SHA equals new docs commit
 175. Task-card test range headings match numbered entries
 176. Issue test total equals task-card N
@@ -2843,11 +2964,11 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 197. `RESULT_CONSTRUCTION` exact edge set (8 edges, including `precedes_failure`)
 198. Failure result embeds canonical audit digest collections (catalog, evaluation, evidence, ranking digests)
 199. No `RawInputCanonicalizationError` exists in test descriptions (all use deterministic marker)
-200. 4 `CandidateEvaluationState` enum values / 6 invariant rows consistency
+200. 4 `CandidateEvaluationState` enum values / 7 invariant rows consistency
 201. Section numbering continuous (no gaps, section 20.3 present)
 202. Issue #23 test total equals task-card N
 203. Issue #23 frozen SHA equals new docs commit
-204. Acceptance Criteria references Round 10
+204. Acceptance Criteria references Round 12
 
 ### 27.13 Round 9 Contract Tests (205–244)
 
@@ -2864,7 +2985,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 215. Hash verification raises → outcome ERROR, provenances NOT_RUN, RUNTIME_FAILED
 216. Hash PASSED, provenance returns False → outcome PASSED/FAILED, candidate INTEGRITY_INVALID
 217. Hash PASSED, provenance raises → outcome PASSED/ERROR, RUNTIME_FAILED, failure_stage=RATING_VERIFICATION
-218. Strict per-candidate pipeline order enforced (attempt→call→completed→hash→provenance→provider→evidence)
+218. Strict per-candidate pipeline order enforced (attempt→call→completed→hash→provenance→evidence→provider compare)
 219. RATING_CALL exact equality: `attempted = completed + 1, verified = completed`
 220. Verification false exact equality: `completed = verified + 1`
 221. Verification exception exact equality: `completed = verified + 1`
@@ -2887,10 +3008,10 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 238. Distinct `rated_as` (verified) vs `rated_as_claimed` (unverified) edge labels
 239. Round 8 Design Review History records "—" (no PENDING), no comment ID
 240. Round 9 Design Review Comment ID is `4798128591`
-241. Acceptance Criteria references Round 11 (no conflicting Round 8/9/10 references)
+241. Round 10 Review Comment ID is `4798318702`; no duplicate Round 8/9 acceptance refs
 242. Issue #23 frozen SHA equals new docs commit SHA
-243. Test numbering continuous 1–244 (no gaps, no duplicates)
-244. Issue #23 and task card test total both report N=244
+243. Test numbering continuous 1–295 (no gaps, no duplicates)
+244. Issue #23 and task card test total both report N=295
 
 ### 27.14 Round 10 Contract Tests (245–295)
 
@@ -2942,15 +3063,55 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 290. Test numbering continuous 1–295
 291. Section heading test: all `## N.` extracted as int list equals `range(1, 30)`
 292. Section heading test: no duplicates, no gaps
-293. Test matrix section range 27.1–27.14 continuous
-294. Issue #23 test total equals task card N=295
-295. Acceptance Criteria references Round 11
+293. Test matrix section range 27.1–27.15 continuous
+294. Issue #23 test total equals task card N=332
+295. Acceptance Criteria references Round 12
+
+### 27.15 Round 11 Contract Tests (296–332)
+
+296. CandidateEvaluationState exactly 4 enum values (UNEVALUATED, VERIFIED, INTEGRITY_INVALID, RUNTIME_FAILED)
+297. Provider mismatch candidate state is VERIFIED (not separate state)
+298. Provider mismatch feasibility_status is PROVIDER_IDENTITY_MISMATCH
+299. 7 invariant rows: VERIFIED+SUCCEEDED/BLOCKED/FAILED/PROVIDER_IDENTITY_MISMATCH + INTEGRITY_INVALID + RUNTIME_FAILED + UNEVALUATED
+300. No PROVIDER_IDENTITY_MISMATCH in CandidateEvaluationState enum or table
+301. Finite float key value is Python float (canonical_json handles serialization)
+302. No `NON_STRING_KEY` in document (all use `NON_STRING_MAPPING_KEY`)
+303. No old cycle path-string marker (all use `ancestor_distance`)
+304. Validation error digest includes `message_key`, does NOT include `message`
+305. Validation error sort key uses `message_key` not `message`
+306. Exact validation message registry (5 codes × message_key × frozen message)
+307. PRE_RATING topology: `partial_audit = True` (corrected from False)
+308. Candidate hash payload has no `partial_audit` field
+309. No `claimed_result_digest` in document (replaced by `audit_digest`)
+310. RATING_VERIFICATION topology uses `audit_digest` always (not conditional on hash readability)
+311. Old test #157 rewritten: uses `audit_digest` not `claimed_result_digest`
+312. FeasibilityStatus exactly 8 values (PROVIDER_IDENTITY_MISMATCH included)
+313. RATING_VERIFICATION equality: `completed = verified + 1`
+314. Pipeline order: evidence constructed before provider comparison (not provider→evidence)
+315. No `N=244` anywhere in document
+316. Top-level headings continuous 1–29
+317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.7, 27.1–27.15)
+318. No duplicate `19A.5` heading
+319. No `## 14.8` heading (is `### 14.7`)
+320. Issue #23 lists Round 9/10/11 review entries
+321. Issue #23 pipeline description matches evidence-before-provider order
+322. Issue #23 state/row count matches 4 states / 7 rows
+323. Issue #23 test total equals task card total
+324. Claimed safely_readable_field_digests uses whitelist (6 fields only)
+325. Claimed field digest formula: `sha256_digest({"field_name": name, "canonical_value": value})`
+326. Provenance registry includes all 14 concepts with node_type/label/UUID/payload_hash/metadata/edges
+327. Edge registry includes `SIZING_RUN -> SIZING_OPTIMIZER = "executes"`
+328. Nested digest payloads frozen: ProviderIdentitySnapshot (6 fields), ExecutionContextSnapshot (3 fields), SelectedCorrelationSnapshot (11 fields)
+329. Round 11 Review Comment ID is `4798512240`
+330. Acceptance Criteria references Round 12
+331. Issue #23 frozen SHA equals new docs commit
+332. Test numbering continuous 1–332; Issue and task card test total match
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 11 Engineering Design Review.
+1. Complete Round 12 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -2964,7 +3125,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 11 Engineering Design Review passes before implementation starts
+- [ ] Round 12 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -2983,6 +3144,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–295 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), and Round 10 (245–295)
+- [ ] Required test matrix entries 1–332 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), and Round 11 (296–332)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
