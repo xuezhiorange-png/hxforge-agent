@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 18 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 19 Engineering Design Review passes.
 
 ---
 
@@ -51,6 +51,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 15 | 4799188706 | CHANGES REQUIRED |
 | 16 | 4799475298 | CHANGES REQUIRED |
 | 17 | 4799885832 | CHANGES REQUIRED |
+| 18 | 4800120135 | CHANGES REQUIRED |
 
 |---|
 
@@ -2890,7 +2891,7 @@ Before building any identity/hash/provenance payload, collections must be sorted
 | Blocker occurrences | canonical occurrence sort key |
 | Warning occurrence digests | same order as warning occurrences |
 | Blocker occurrence digests | same order as blocker occurrences |
-|- Validation errors (`SizingValidationErrorSnapshot`) | `(code.value, message_key, field_path, rejected_value_digest or "", context_digest)` ascending |
+| Validation errors (`SizingValidationErrorSnapshot`) | `(code.value, message_key, field_path, rejected_value_digest or "", context_digest)` ascending |
 
 Severity rank:
 
@@ -3338,7 +3339,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 314. Pipeline order: evidence constructed before provider comparison (not provider→evidence)
 315. No `N=244` anywhere in document
 316. Top-level headings continuous 1–29
-317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.8, 27.1–27.21)
+317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.7, 27.1–27.21)
 318. No duplicate `19A.5` heading
 319. No `## 14.8` heading (is `### 14.7`)
 320. Issue #23 lists Round 9/10/11 review entries
@@ -3497,7 +3498,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ### 27.20 Round 16 Contract Tests (461–500)
 
-461. TerminationTopologySpec dataclass has exactly 8 fields (termination_class, result_concept, base_node_multiplicities, base_edges, forbidden_concepts, allowed_message_owner_kinds, minimum_warning_occurrences, minimum_blocker_occurrences, counter_invariants)
+461. TerminationTopologySpec dataclass has exactly 10 fields (termination_class, root_selector_formula_name, result_concept, base_node_multiplicities, base_edges, forbidden_concepts, allowed_message_owner_kinds, minimum_warning_occurrences, minimum_blocker_occurrences, counter_invariants)
 462. Registry has exactly 17 entries, one per TerminationClass
 463. INVALID_REQUEST uses ROOT_EXTERNAL, no CATALOG/CANDIDATE/RATING nodes
 464. INVALID_CATALOG uses ROOT_CASE_REVISION with catalog_count CATALOG_SNAPSHOT nodes
@@ -3534,58 +3535,58 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 495. Primitive fallback RunFailure context does NOT cascade fail on canonicalization
 496. Global test numbering continuous 1–540
 497. Section 27 range now 27.1–27.21 continuous (no gaps)
-498. Subsection headings range updated to 22.1–22.8 for provenance subsections
+498. Subsection headings range updated to 22.1–22.7 for provenance subsections
 499. Acceptance Criteria references Round 18 for Delivery Sequence
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 17 Contract Tests (501–540)
+### 27.21 Round 18 Contract Tests (501–540)
 
-501. Round 17 Review Comment ID is `4799885832`
-502. Round 17 row present in Design Review History table after Round 16
-503. Round 17 decision is `CHANGES REQUIRED`
-504. Review History has no gap after Round 17 (18 rows total)
+501. Round 18 Review Comment ID is `4800120135`
+502. Round 18 row present in Design Review History table after Round 17
+503. Round 18 decision is `CHANGES REQUIRED`
+504. Review History has no gap after Round 18 (19 rows total)
 505. Review History columns: Round number, Comment ID, Decision — all present and non-empty
-506. Gate text at top of doc reads "Round 18" not "Round 17"
-507. Gate text: "TASK-009 returns to READY only after Round 18 Engineering Design Review passes."
-508. Delivery Sequence step 1 references "Round 18"
-509. Acceptance Criteria first item references "Round 18 Engineering Design Review"
-510. All Acceptance Criteria references to round gate use "Round 18" (not "Round 17")
-511. §19 SizingOptimizationResult schema contains `claimed_rating_audit_digests`
-512. §19 SizingOptimizationResult schema contains `warning_occurrences`, `blocker_occurrences`
-513. §19 SizingOptimizationResult schema contains `warning_occurrence_digests`, `blocker_occurrence_digests`
-514. §19 SizingResultIdentity schema contains `claimed_rating_audit_digests`
-515. §19 SizingResultIdentity schema contains `warning_occurrence_digests`, `blocker_occurrence_digests`
-516. §23.4 Canonical ordering table contains `Claimed rating audits` row
-517. §23.4 Canonical ordering table contains `Claimed rating audit digests` row
-518. §23.4 Canonical ordering table contains `Warning occurrences` row
-519. §23.4 Canonical ordering table contains `Blocker occurrences` row
-520. §23.4 Canonical ordering table contains `Warning occurrence digests` and `Blocker occurrence digests` rows
-521. Canonical sort key for claimed rating audits: `(source_qualified_candidate_id, evaluation_order_index, audit_digest)`
-522. Warning occurrences sort key: canonical occurrence sort key
-523. Blocker occurrences sort key: canonical occurrence sort key
-524. Warning occurrence digests sort key: same order as warning occurrences
-525. Blocker occurrence digests sort key: same order as blocker occurrences
-526. Section 27.21 present (Round 17 Contract Tests)
-527. Section 27.21 has exactly 40 entries (501–540)
-528. Section 27.21 heading reads "Round 17 Contract Tests (501–540)"
-529. Test numbering 501–540 is continuous with no gaps
-530. Round 17 test range matches heading: 501–540
-531. Global test numbering continuous 1–540
-532. Section 27 range now 27.1–27.21 continuous (no gaps)
-533. Acceptance Criteria references Round 18 for Delivery Sequence
-534. Issue #23 test total equals task-card N (540)
-535. Round 17 subsection numbering locally continuous within 501–540
-536. Issue #23 frozen SHA equals new docs commit for Round 17
-537. Acceptance Criteria required test matrix entries include Round 17 (501–540)
-538. Acceptance Criteria test total updated from 1–500 to 1–540
-539. Section 27.21 test entries cover all Round 17 document changes
-540. TASK-010 in TASK_BACKLOG.md changed from READY to BLOCKED
+506. Gate text at top of doc reads "Round 19" not "Round 18"
+507. Gate text: "TASK-009 returns to READY only after Round 19 Engineering Design Review passes."
+508. Delivery Sequence step 1 references "Round 19"
+509. Acceptance Criteria first item references "Round 19 Engineering Design Review"
+510. All Acceptance Criteria references to round gate use "Round 19" (not "Round 18")
+511. §23.4 canonical ordering table starts every data row with `|` (not `|-`)
+512. Subsection range for §22 does not mention "22.1–22.8"
+513. Subsection range for §22 corrected to 22.1–22.7
+514. Round 18 comment ID `4800120135` used nowhere in older rounds
+515. No orphan Round-18-gate text still says "Round 18" in body
+516. §27.21 heading reads "Round 18 Contract Tests (501–540)"
+517. All `|- ` data row prefixes fixed (no stray pipe-dash in table bodies)
+518. Old test #461 still says "exactly 10 fields" (TerminationTopologySpec)
+519. Old test #498 now says "22.1–22.7" (not "22.1–22.8")
+520. Review History has exactly 19 rows (Rounds 1–18)
+521. Section 27.21 present (Round 18 Contract Tests)
+522. Section 27.21 has exactly 40 entries (501–540)
+523. Section 27.21 heading reads "Round 18 Contract Tests (501–540)"
+524. Test numbering 501–540 is continuous with no gaps
+525. Round 18 test range matches heading: 501–540
+526. Global test numbering continuous 1–540
+527. Section 27 range now 27.1–27.21 continuous (no gaps)
+528. Acceptance Criteria first item references Round 19 for Delivery Sequence
+529. Issue #23 test total equals task-card N (540)
+530. Round 18 subsection numbering locally continuous within 501–540
+531. Issue #23 frozen SHA equals new docs commit for Round 18
+532. Acceptance Criteria required test matrix entries include Round 18 (501–540)
+533. Acceptance Criteria test total remains 1–540
+534. Test #506 confirms gate text reads "Round 19"
+535. Test #512 confirms subsection range is not "22.1–22.8"
+536. TASK-010 in TASK_BACKLOG.md is BLOCKED
+537. Old Round 17 test references to "Round 18" replaced with "Round 19" equivalents
+538. All old Round 17 Acceptance Criteria round references updated to Round 19
+539. Section 27.21 test entries cover all Round 18 document changes
+540. Round 18 tests require no `|- ` data-row prefixes anywhere in document
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 18 Engineering Design Review.
+1. Complete Round 19 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -3599,7 +3600,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 18 Engineering Design Review passes before implementation starts
+- [ ] Round 19 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -3618,6 +3619,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 17 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 18 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
