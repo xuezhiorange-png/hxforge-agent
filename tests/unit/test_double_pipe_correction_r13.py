@@ -3099,68 +3099,137 @@ class TestTerminalQmaxRequiresDiagnostics:
         assert result is False, "terminal parallel Q_max without diag should be rejected"
 
 
+class _PhFailProvider:
+    """Provider wrapper that delegates all calls and fails on the Nth state_ph call.
+
+    For counterflow flow arrangement:
+    - Inlet evaluation: 2 state_tp calls, 0 state_ph calls
+    - Q_max counterflow: 2 state_tp calls, 0 state_ph calls
+    - First BRACKET_PROBE evaluation: 2 state_ph calls + 2 state_tp calls
+
+    With fail_after=0, the 1st state_ph call (= hot outlet PH during
+    BRACKET_PROBE) raises PropertyServiceError, so TrialEvaluator.evaluate
+    returns an infeasible TrialEvaluation, and residual_fn naturally raises
+    TrialEvaluationAbort.
+    """
+
+    def __init__(self, real_provider: object, *, fail_after: int = 0) -> None:
+        self._real: object = real_provider
+        self._ph_calls: int = 0
+        self._fail_after: int = fail_after
+
+    # --- delegate attributes ---
+    @property
+    def name(self) -> str:
+        return str(self._real.name)  # type: ignore[union-attr]
+
+    @property
+    def version(self) -> str:
+        return str(self._real.version)  # type: ignore[union-attr]
+
+    @property
+    def git_revision(self) -> str:
+        return str(self._real.git_revision)  # type: ignore[union-attr]
+
+    @property
+    def reference_state_policy(self) -> object:
+        return self._real.reference_state_policy  # type: ignore[union-attr]
+
+    # --- delegate methods ---
+    def state_ph(  # type: ignore[no-untyped-def]
+        self,
+        fluid,
+        pressure_pa,
+        enthalpy_j_kg,
+        *,
+        reference_state=None,
+    ):
+        from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
+
+        self._ph_calls += 1
+        if self._ph_calls > self._fail_after:
+            raise PropertyServiceError(
+                PropertyErrorCode.INVALID_INPUT,
+                f"Controlled failure on PH call #{self._ph_calls}",
+                context={"fluid": str(fluid)},
+            )
+        real = self._real  # type: ignore[union-attr]
+        return real.state_ph(
+            fluid,
+            pressure_pa,
+            enthalpy_j_kg,
+            reference_state=reference_state or real.reference_state_policy,
+        )
+
+    def state_tp(  # type: ignore[no-untyped-def]
+        self,
+        fluid,
+        temperature_k,
+        pressure_pa,
+    ):
+        return self._real.state_tp(  # type: ignore[union-attr]
+            fluid,
+            temperature_k,
+            pressure_pa,
+        )
+
+    def saturation_at_pressure(  # type: ignore[no-untyped-def]
+        self,
+        fluid,
+        pressure_pa,
+    ):
+        return self._real.saturation_at_pressure(  # type: ignore[union-attr]
+            fluid,
+            pressure_pa,
+        )
+
+    def saturation_at_temperature(  # type: ignore[no-untyped-def]
+        self,
+        fluid,
+        temperature_k,
+    ):
+        return self._real.saturation_at_temperature(  # type: ignore[union-attr]
+            fluid,
+            temperature_k,
+        )
+
+    def cache_info(self) -> object:
+        return self._real.cache_info()  # type: ignore[union-attr]
+
+    def clear_cache(self) -> None:
+        self._real.clear_cache()  # type: ignore[union-attr]
+
+
 class TestTrialAbortPreservesDiagnostics:
     """TrialEvaluationAbort after successful Q_max must retain diagnostics."""
 
-    def test_trial_abort_preserves_qmax_diagnostics(
+    def test_trial_abort_via_controlled_ph_failure(
         self,
         provider: CoolPropProvider,
     ) -> None:
-        """rate_double_pipe with solver abort after Q_max, via real residual_fn.
+        """rate_double_pipe with solver abort after Q_max, via controlled provider.
 
-        Calls the real residual_fn once through a solve_rating harness so
-        the recorder.begin(BRACKET_PROBE) records the aborting evaluation
-        in the property-call trace before TrialEvaluationAbort propagates.
+        The _PhFailProvider fails on the first state_ph call during the
+        BRACKET_PROBE evaluation, so residual_fn naturally raises
+        TrialEvaluationAbort (no synthetic append after suppress).
+
+        Assertions:
+        - BLOCKED result with q_max_diagnostics preserved
+        - INLET -> Q_MAX_COUNTERFLOW -> BRACKET_PROBE trace ordering
+        - last BRACKET_PROBE evaluation contains the failure prefix
+          (hot outlet PH call with success=False and the expected error code)
+        - blockers reflect the property evaluation failure
+        - diagnostics, hash, provenance, and JSON round-trip remain valid
         """
-        from hexagent.exchangers.double_pipe import rating as rating_module
-        from hexagent.exchangers.double_pipe.rating import (
-            SolverEvaluationPhase,
-            TrialEvaluation,
-            TrialEvaluationAbort,
+        from hexagent.domain.messages import ErrorCode
+        from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
+
+        fail_provider = _PhFailProvider(provider, fail_after=0)
+
+        result = _run_rating(
+            fail_provider,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
         )
-
-        abort_trial = TrialEvaluation(
-            q_w=50000.0,
-            residual_w=None,
-            feasible=False,
-            hot_outlet_state=None,
-            cold_outlet_state=None,
-            hot_bulk_state=None,
-            cold_bulk_state=None,
-            tube_flow_input=None,
-            annulus_flow_input=None,
-            tube_result=None,
-            annulus_result=None,
-            property_calls=(),
-            warnings=(),
-            blockers=(),
-        )
-
-        called_residual = False
-
-        def _harness_solve(*, residual_fn, **kwargs):
-            nonlocal called_residual
-            # Call the real residual_fn to trigger recorder.begin()
-            # with SolverEvaluationPhase.BRACKET_PROBE, so the
-            # aborting evaluation is recorded in the property-call
-            # trace.
-            from contextlib import suppress
-
-            with suppress(TrialEvaluationAbort):
-                residual_fn(50000.0, SolverEvaluationPhase.BRACKET_PROBE)
-            called_residual = True
-            # Now raise TrialEvaluationAbort so the rate_double_pipe
-            # handler catches it and builds the BLOCKED result.
-            raise TrialEvaluationAbort(abort_trial)
-
-        original_solve = rating_module.solve_rating
-        rating_module.solve_rating = _harness_solve
-        try:
-            result = _run_rating(provider, flow_arrangement=FlowArrangement.COUNTERFLOW)
-        finally:
-            rating_module.solve_rating = original_solve
-
-        assert called_residual, "harness should have called residual_fn"
 
         # Core result contract
         assert result.status == RatingStatus.BLOCKED, "abort should produce BLOCKED"
@@ -3175,8 +3244,7 @@ class TestTrialAbortPreservesDiagnostics:
 
         # Trace ordering: INLET -> Q_MAX_COUNTERFLOW -> BRACKET_PROBE
         roles = [c.evaluation_role for c in result.property_calls]
-        # Deduplicate contiguous role runs to get the phase sequence
-        unique_roles = []
+        unique_roles: list[str] = []
         for r in roles:
             if not unique_roles or unique_roles[-1] != r:
                 unique_roles.append(r)
@@ -3191,6 +3259,48 @@ class TestTrialAbortPreservesDiagnostics:
         last_calls = [c for c in result.property_calls if c.evaluation_index == last_eval_idx]
         assert all(c.evaluation_role == EvaluationRole.BRACKET_PROBE.value for c in last_calls), (
             f"Last eval should be BRACKET_PROBE, got {last_calls[0].evaluation_role}"
+        )
+
+        # The last evaluation must contain at least one failed call with the
+        # expected error code from the controlled provider failure.
+        failed_calls = [c for c in last_calls if not c.success]
+        assert len(failed_calls) >= 1, (
+            "BRACKET_PROBE evaluation should contain at least one failed "
+            f"property call; found {len(failed_calls)} failures"
+        )
+        assert (
+            failed_calls[0].error_code
+            == PropertyServiceError(
+                PropertyErrorCode.INVALID_INPUT,
+                "",
+            ).code.value
+        ), f"Expected INVALID_INPUT error, got {failed_calls[0].error_code}"
+        # The failed call should be the hot outlet PH (stream_role hot_solver)
+        assert failed_calls[0].stream_role == "hot_solver", (
+            f"Expected hot_solver role for the failing PH call, got {failed_calls[0].stream_role}"
+        )
+
+        # The BRACKET_PROBE evaluation should contain the failure prefix.
+        # Since the failure happens on the first PH call (call 0), the
+        # evaluation has exactly that one call — which is the failure.
+        # This proves the evaluation was real and recorded its failure.
+        call_indices_in_eval = sorted({c.call_index_within_evaluation for c in last_calls})
+        assert len(call_indices_in_eval) >= 1, (
+            "BRACKET_PROBE evaluation should have at least one call"
+        )
+        # The (only) call in the evaluation is the failing PH call
+        assert failed_calls[0].call_index_within_evaluation == 0, (
+            "The failing call should be the first (and only) call in the evaluation"
+        )
+        assert failed_calls[0].query_type == "PH", (
+            f"Failed call should be PH, got {failed_calls[0].query_type}"
+        )
+
+        # Blockers should contain the property evaluation failure
+        assert len(result.blockers) >= 1, "BLOCKED result should have blockers"
+        blocker_codes = {b.code for b in result.blockers}
+        assert ErrorCode.PROPERTY_EVALUATION_FAILED in blocker_codes, (
+            f"Expected PROPERTY_EVALUATION_FAILED blocker, got {blocker_codes}"
         )
 
         # JSON round-trip preserves diagnostics AND provenance
