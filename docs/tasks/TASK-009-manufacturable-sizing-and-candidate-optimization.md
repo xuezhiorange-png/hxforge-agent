@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 23 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 24 Engineering Design Review passes.
 
 ---
 
@@ -56,6 +56,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 20 | 4800787131 | CHANGES REQUIRED |
 | 21 | 4800977010 | CHANGES REQUIRED |
 | 22 | 4801215509 | CHANGES REQUIRED |
+| 23 | 4801552673 | CHANGES REQUIRED |
 
 |---|
 
@@ -1315,8 +1316,31 @@ A mismatch is an invalid shared message object and must not be silently hashed.
 Shared digest functions, usable from every failure path without import ambiguity:
 
 ```python
-def normalize_run_failure_context(context: tuple[tuple[str, str], ...]) -> list[list[str]]:
-    return [[key, value] for key, value in context]
+from enum import Enum
+from uuid import UUID
+
+
+RUN_FAILURE_SCHEMA_VERSION = "1"
+
+
+def normalize_run_failure_context(context: tuple[tuple[str, Any], ...]) -> list[list[str]]:
+    result: list[list[str]] = []
+    for key, value in context:
+        if isinstance(value, Enum):
+            result.append([key, value.value])
+        elif isinstance(value, UUID):
+            result.append([key, str(value)])
+        elif isinstance(value, bool):
+            result.append([key, "true" if value else "false"])
+        elif value is None:
+            result.append([key, "null"])
+        elif isinstance(value, (int, float)):
+            result.append([key, str(value)])
+        elif isinstance(value, str):
+            result.append([key, value])
+        else:
+            result.append([key, repr(value)])
+    return result
 
 
 def build_run_failure_payload(failure: RunFailure) -> CanonicalPayload:
@@ -1436,10 +1460,6 @@ fallback_failure_context = (
 ```
 
 Prohibited in fallback: original value, original object, repr, exception object, traceback object, Enum object.
-
-```python
-RUN_FAILURE_SCHEMA_VERSION = "1"
-```
 
 ```python
 CONTEXT_CANONICALIZATION_FAILURE_MESSAGE = (
@@ -2368,17 +2388,39 @@ INTEGRITY_INVALID, RUNTIME_FAILED, UNEVALUATED
 
 ### 20.5 CandidateDiagnosticKey
 
-```text
-diagnostic_class_rank: int   # BLOCKER=0, ERROR=1, WARNING=2, INFO=3, RUNTIME_FAILURE=4
-code: str
-source_module: str
-affected_paths: tuple[str, ...]
-message: str
+```python
+from enum import IntEnum, Enum
+from dataclasses import dataclass
+
+
+class CandidateDiagnosticRank(IntEnum):
+    BLOCKER = 0
+    ERROR = 1
+    WARNING = 2
+    INFO = 3
+    RUNTIME_FAILURE = 4
+
+
+class CandidateDiagnosticCode(str, Enum):
+    REQUIRED_DUTY_NOT_MET = "REQUIRED_DUTY_NOT_MET"
+    MANUFACTURABILITY_FAILED = "MANUFACTURABILITY_FAILED"
+    FEASIBILITY_FAILED = "FEASIBILITY_FAILED"
+    PROVENANCE_INCOMPLETE = "PROVENANCE_INCOMPLETE"
+    RUNTIME_ERROR = "RUNTIME_ERROR"
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateDiagnosticKey:
+    diagnostic_class_rank: CandidateDiagnosticRank
+    code: CandidateDiagnosticCode
+    source_module: str
+    affected_paths: tuple[str, ...]
+    message: str
 ```
 
-Sentinel when `None`: `(999, "", "", (), "")`.
+Sentinel when `None`: `CandidateDiagnosticKey(CandidateDiagnosticRank.INFO, CandidateDiagnosticCode.RUNTIME_ERROR, "", (), "")`.
 
-From EngineeringMessage: direct. From RunFailure: class_rank=4. From pure duty-infeasible: class_rank=0, code=`REQUIRED_DUTY_NOT_MET`.
+From EngineeringMessage: direct mapping of severity to diagnostic_class_rank. From RunFailure: `diagnostic_class_rank=CandidateDiagnosticRank.RUNTIME_FAILURE`, `code=CandidateDiagnosticCode.RUNTIME_ERROR`. From pure duty-infeasible: `diagnostic_class_rank=CandidateDiagnosticRank.BLOCKER`, `code=CandidateDiagnosticCode.REQUIRED_DUTY_NOT_MET`.
 
 ### 20.6 Primary Diagnostic Selection
 
@@ -2440,7 +2482,15 @@ Root selection delegates to `select_root_concept()` (§22.1). The two distinct `
 ```python
 from enum import StrEnum
 from dataclasses import dataclass
-from typing import TypeAlias, TypeVar, Callable, Any, Mapping, Literal
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Literal,
+    Mapping,
+    TypeAlias,
+    TypeVar,
+)
 from uuid import UUID
 
 class ProvenanceConcept(StrEnum):
@@ -2483,6 +2533,18 @@ class TerminationClass(StrEnum):
 class SizingRunRequestKind(StrEnum):
     VALIDATED = "validated"
     RAW = "raw"
+
+
+class MessageOccurrenceKind(StrEnum):
+    WARNING = "warning"
+    BLOCKER = "blocker"
+
+
+class MessageOwnerKind(StrEnum):
+    SIZING_RUN = "sizing_run"
+    CATALOG_SNAPSHOT = "catalog_snapshot"
+    CANDIDATE = "candidate"
+    OPTIMIZER = "optimizer"
 
 
 ProvenanceIncomingRelation = tuple[str, ProvenanceConcept]  # (label, source_concept)
@@ -2545,10 +2607,41 @@ class RootTopologySelection:
     root_case_revision_count: Literal[0, 1]
     root_external_count: Literal[0, 1]
     initiates_edge: ProvenanceRelationSpec
+    design_case_revision_id: UUID | None
 
     def __post_init__(self) -> None:
+        # Exactly one root count must be 1
         if self.root_case_revision_count + self.root_external_count != 1:
             raise ValueError("exactly one root count must equal 1")
+        # Concept ↔ count consistency
+        if self.root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
+            if self.root_case_revision_count != 1 or self.root_external_count != 0:
+                raise ValueError("ROOT_CASE_REVISION requires root_case_revision_count=1, root_external_count=0")
+            if self.design_case_revision_id is None:
+                raise ValueError("ROOT_CASE_REVISION requires non-None design_case_revision_id")
+        elif self.root_concept == ProvenanceConcept.ROOT_EXTERNAL:
+            if self.root_case_revision_count != 0 or self.root_external_count != 1:
+                raise ValueError("ROOT_EXTERNAL requires root_case_revision_count=0, root_external_count=1")
+            if self.design_case_revision_id is not None:
+                raise ValueError("ROOT_EXTERNAL requires design_case_revision_id=None")
+        else:
+            raise ValueError(f"unexpected root concept: {self.root_concept}")
+        # Concept ↔ node_type consistency
+        expected_node_type = (
+            ProvenanceNodeType.CASE_REVISION
+            if self.root_concept == ProvenanceConcept.ROOT_CASE_REVISION
+            else ProvenanceNodeType.EXTERNAL
+        )
+        if self.root_node_type is not expected_node_type:
+            raise ValueError(f"root_node_type mismatch: expected {expected_node_type}, got {self.root_node_type}")
+        # Concept ↔ label consistency
+        if self.root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
+            expected_label = f"revision_{self.design_case_revision_id}"
+        else:
+            expected_label = "external_root"
+        if self.root_label != expected_label:
+            raise ValueError(f"root_label mismatch: expected '{expected_label}', got '{self.root_label}'")
+        # Edge invariants
         if self.initiates_edge.source_concept is not self.root_concept:
             raise ValueError("root edge source must equal root concept")
         if self.initiates_edge.relation != "initiates":
@@ -2575,6 +2668,7 @@ def derive_root_topology(
         root_case_revision_count=1 if is_case else 0,
         root_external_count=0 if is_case else 1,
         initiates_edge=ProvenanceRelationSpec(root_concept, "initiates", ProvenanceConcept.SIZING_RUN),
+        design_case_revision_id=design_case_revision_id,
     )
 ```
 
@@ -2686,10 +2780,18 @@ class OptimizerConstructionContext:
     request_digest: str
 
 @dataclass(frozen=True, slots=True)
-class MessageOccurrenceConstructionContext:
+class WarningOccurrenceConstructionContext:
     owner_kind: MessageOwnerKind
     owner_id: str
-    occurrence_kind: MessageOccurrenceKind
+    occurrence_kind: Literal[MessageOccurrenceKind.WARNING] = MessageOccurrenceKind.WARNING
+    message_digest: str
+    occurrence_index: int
+
+@dataclass(frozen=True, slots=True)
+class BlockerOccurrenceConstructionContext:
+    owner_kind: MessageOwnerKind
+    owner_id: str
+    occurrence_kind: Literal[MessageOccurrenceKind.BLOCKER] = MessageOccurrenceKind.BLOCKER
     message_digest: str
     occurrence_index: int
 ```
@@ -2976,15 +3078,15 @@ def build_runtime_failure_metadata(context: RuntimeFailureConstructionContext) -
 
 # --- WARNING ---
 
-def build_warning_label(context: MessageOccurrenceConstructionContext) -> str:
+def build_warning_label(context: WarningOccurrenceConstructionContext) -> str:
     return f"{context.owner_kind.value}:{context.owner_id}:{context.occurrence_kind.value}:{context.message_digest}:{context.occurrence_index}"
 
 
-def build_warning_uuid5(context: MessageOccurrenceConstructionContext) -> str:
+def build_warning_uuid5(context: WarningOccurrenceConstructionContext) -> str:
     return f"{context.occurrence_kind.value}:{context.owner_kind.value}:{context.owner_id}:{context.message_digest}:{context.occurrence_index}"
 
 
-def build_warning_payload(context: MessageOccurrenceConstructionContext) -> CanonicalPayload:
+def build_warning_payload(context: WarningOccurrenceConstructionContext) -> CanonicalPayload:
     return {
         "occurrence_kind": context.occurrence_kind.value,
         "owner_kind": context.owner_kind.value,
@@ -2994,7 +3096,7 @@ def build_warning_payload(context: MessageOccurrenceConstructionContext) -> Cano
     }
 
 
-def build_warning_metadata(context: MessageOccurrenceConstructionContext) -> CanonicalMetadata:
+def build_warning_metadata(context: WarningOccurrenceConstructionContext) -> CanonicalMetadata:
     return (
         ("owner_kind", context.owner_kind.value),
         ("owner_id", context.owner_id),
@@ -3006,15 +3108,15 @@ def build_warning_metadata(context: MessageOccurrenceConstructionContext) -> Can
 
 # --- BLOCKER ---
 
-def build_blocker_label(context: MessageOccurrenceConstructionContext) -> str:
+def build_blocker_label(context: BlockerOccurrenceConstructionContext) -> str:
     return f"{context.owner_kind.value}:{context.owner_id}:{context.occurrence_kind.value}:{context.message_digest}:{context.occurrence_index}"
 
 
-def build_blocker_uuid5(context: MessageOccurrenceConstructionContext) -> str:
+def build_blocker_uuid5(context: BlockerOccurrenceConstructionContext) -> str:
     return f"{context.occurrence_kind.value}:{context.owner_kind.value}:{context.owner_id}:{context.message_digest}:{context.occurrence_index}"
 
 
-def build_blocker_payload(context: MessageOccurrenceConstructionContext) -> CanonicalPayload:
+def build_blocker_payload(context: BlockerOccurrenceConstructionContext) -> CanonicalPayload:
     return {
         "occurrence_kind": context.occurrence_kind.value,
         "owner_kind": context.owner_kind.value,
@@ -3024,7 +3126,7 @@ def build_blocker_payload(context: MessageOccurrenceConstructionContext) -> Cano
     }
 
 
-def build_blocker_metadata(context: MessageOccurrenceConstructionContext) -> CanonicalMetadata:
+def build_blocker_metadata(context: BlockerOccurrenceConstructionContext) -> CanonicalMetadata:
     return (
         ("owner_kind", context.owner_kind.value),
         ("owner_id", context.owner_id),
@@ -3034,7 +3136,42 @@ def build_blocker_metadata(context: MessageOccurrenceConstructionContext) -> Can
     )
 ```
 
-### 22.8 ProvenanceConstructorSpec and ProvenanceConceptSpec
+### 22.8 construct_provenance_node_parts Executor
+
+Runtime executor that validates exact context type match before dispatching constructors:
+
+```python
+@dataclass(frozen=True, slots=True)
+class ConstructedProvenanceNodeParts:
+    label: str
+    uuid5_name: str
+    payload: CanonicalPayload
+    metadata: CanonicalMetadata
+
+
+class ProvenanceConstructionContextMismatch(Exception):
+    """Raised when the provided context type does not match the spec's context_type."""
+    pass
+
+
+def construct_provenance_node_parts(
+    spec: ProvenanceConstructorSpec[Any],
+    context: Any,
+) -> ConstructedProvenanceNodeParts:
+    if not isinstance(context, spec.context_type):
+        raise ProvenanceConstructionContextMismatch(
+            f"expected context type {spec.context_type.__name__}, "
+            f"got {type(context).__name__}"
+        )
+    return ConstructedProvenanceNodeParts(
+        label=spec.label_constructor(context),
+        uuid5_name=spec.uuid5_name_constructor(context),
+        payload=spec.payload_constructor(context),
+        metadata=spec.metadata_constructor(context),
+    )
+```
+
+### 22.9 ProvenanceConstructorSpec and ProvenanceConceptSpec
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -3055,7 +3192,7 @@ class ProvenanceConceptSpec:
     allowed_outgoing: tuple[ProvenanceRelationSpec, ...]
 ```
 
-### 22.9 PROVENANCE_CONCEPT_REGISTRY
+### 22.10 PROVENANCE_CONCEPT_REGISTRY
 
 The authoritative registry of all 14 provenance concepts:
 
@@ -3281,8 +3418,8 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
     ProvenanceConceptSpec(
         concept=ProvenanceConcept.WARNING,
         node_type=ProvenanceNodeType.WARNING,
-        constructors=ProvenanceConstructorSpec[MessageOccurrenceConstructionContext](
-            context_type=MessageOccurrenceConstructionContext,
+        constructors=ProvenanceConstructorSpec[WarningOccurrenceConstructionContext](
+            context_type=WarningOccurrenceConstructionContext,
             label_constructor=build_warning_label,
             uuid5_name_constructor=build_warning_uuid5,
             payload_constructor=build_warning_payload,
@@ -3302,8 +3439,8 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
     ProvenanceConceptSpec(
         concept=ProvenanceConcept.BLOCKER,
         node_type=ProvenanceNodeType.BLOCKER,
-        constructors=ProvenanceConstructorSpec[MessageOccurrenceConstructionContext](
-            context_type=MessageOccurrenceConstructionContext,
+        constructors=ProvenanceConstructorSpec[BlockerOccurrenceConstructionContext](
+            context_type=BlockerOccurrenceConstructionContext,
             label_constructor=build_blocker_label,
             uuid5_name_constructor=build_blocker_uuid5,
             payload_constructor=build_blocker_payload,
@@ -3323,7 +3460,7 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
 )
 ```
 
-### 22.10 Topology Infrastructure
+### 22.11 Topology Infrastructure
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -3374,6 +3511,124 @@ NODE_MULTIPLICITY_CONSTRUCTORS: Mapping[str, NodeMultiplicityConstructor] = {
     "warning_content_count": lambda ctx: ctx.counters.warning_content_count,
     "blocker_content_count": lambda ctx: ctx.counters.blocker_content_count,
 }
+
+
+# ── Topology Invariants (typed callables) ─────────────────────
+
+TopologyInvariant = Callable[[TopologyConstructionContext], None]
+
+
+def invariant_selected_root_sum_eq_1(ctx: TopologyConstructionContext) -> None:
+    s = ctx.root_selection.root_case_revision_count + ctx.root_selection.root_external_count
+    if s != 1:
+        raise ValueError(f"root count sum must be 1, got {s}")
+
+
+def invariant_catalog_count_eq_0(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.catalog_count != 0:
+        raise ValueError(f"expected catalog_count=0, got {ctx.counters.catalog_count}")
+
+
+def invariant_catalog_count_ge_1(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.catalog_count < 1:
+        raise ValueError(f"expected catalog_count>=1, got {ctx.counters.catalog_count}")
+
+
+def invariant_unique_candidate_count_eq_0(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.unique_candidate_count != 0:
+        raise ValueError(f"expected unique_candidate_count=0, got {ctx.counters.unique_candidate_count}")
+
+
+def invariant_unique_candidate_count_ge_1(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.unique_candidate_count < 1:
+        raise ValueError(f"expected unique_candidate_count>=1, got {ctx.counters.unique_candidate_count}")
+
+
+def invariant_no_candidate_nodes(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.unique_candidate_count != 0 or ctx.counters.materialized_candidate_count != 0:
+        raise ValueError("candidate nodes present when none expected")
+
+
+def invariant_verified_rating_eq_unique(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.verified_rating_count != ctx.counters.unique_candidate_count:
+        raise ValueError(f"verified_rating_count ({ctx.counters.verified_rating_count}) != unique_candidate_count ({ctx.counters.unique_candidate_count})")
+
+
+def invariant_run_failure_present(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.runtime_failure_count < 1:
+        raise ValueError("expected at least one runtime failure")
+
+
+def invariant_no_feasible_candidate(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.sizing_result_count > 0:
+        raise ValueError("feasible candidate present when none expected")
+
+
+def invariant_cap_exceeded_before_materialization(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.materialized_candidate_count > 0:
+        raise ValueError("candidate materialization occurred before cap exceeded")
+
+
+def invariant_no_manufacturable_candidates(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.unique_candidate_count > 0 or ctx.counters.materialized_candidate_count > 0:
+        raise ValueError("manufacturable candidates present when none expected")
+
+
+def invariant_all_candidates_verified(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.verified_rating_count < ctx.counters.unique_candidate_count:
+        raise ValueError("not all candidates verified")
+
+
+def invariant_provider_mismatch_before_optimizer(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.optimizer_count > 0:
+        raise ValueError("optimizer present when provider mismatch should have prevented it")
+
+
+def invariant_failure_result_node_present(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.sizing_run_failure_result_count != 1:
+        raise ValueError("expected exactly one sizing_run_failure_result node")
+
+
+def invariant_standard_result_absent(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.sizing_result_count > 0:
+        raise ValueError("standard result present when only failure result expected")
+
+
+def invariant_evaluated_eq_unique_eq_verified(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.evaluated_candidate_count != ctx.counters.unique_candidate_count:
+        raise ValueError(f"evaluated ({ctx.counters.evaluated_candidate_count}) != unique ({ctx.counters.unique_candidate_count})")
+    if ctx.counters.verified_rating_count != ctx.counters.unique_candidate_count:
+        raise ValueError(f"verified ({ctx.counters.verified_rating_count}) != unique ({ctx.counters.unique_candidate_count})")
+
+
+def invariant_attempted_eq_completed_plus_1(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.attempted_rating_count != ctx.counters.completed_rating_count + 1:
+        raise ValueError(f"attempted ({ctx.counters.attempted_rating_count}) != completed ({ctx.counters.completed_rating_count}) + 1")
+
+
+def invariant_completed_eq_verified_plus_1(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.completed_rating_count != ctx.counters.verified_rating_count + 1:
+        raise ValueError(f"completed ({ctx.counters.completed_rating_count}) != verified ({ctx.counters.verified_rating_count}) + 1")
+
+
+def invariant_claimed_node_count_1(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.claimed_rating_count != 1:
+        raise ValueError(f"expected 1 claimed node, got {ctx.counters.claimed_rating_count}")
+
+
+def invariant_optimizer_present(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.optimizer_count < 1:
+        raise ValueError("optimizer node absent")
+
+
+def invariant_failed_candidate_no_rating_result(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.completed_rating_count > 0:
+        raise ValueError("completed rating present when candidate failed")
+
+
+def invariant_0_le_materialized_le_unique(ctx: TopologyConstructionContext) -> None:
+    if not (0 <= ctx.counters.materialized_candidate_count <= ctx.counters.unique_candidate_count):
+        raise ValueError(f"materialized ({ctx.counters.materialized_candidate_count}) not in [0, unique ({ctx.counters.unique_candidate_count})]")
 ```
 
 > **NON-NORMATIVE GENERATED SUMMARY.** All constructor function names are resolved via `PROVENANCE_CONCEPT_REGISTRY` (14 typed entries, each with direct callable references). Allowed/forbidden termination classes are derived from `TERMINATION_TOPOLOGY_REGISTRY`. Node multiplicity is resolved via `NODE_MULTIPLICITY_CONSTRUCTORS`. This table is for human reference only and is not an authoritative contract.
@@ -3395,22 +3650,7 @@ NODE_MULTIPLICITY_CONSTRUCTORS: Mapping[str, NodeMultiplicityConstructor] = {
 | WARNING | WARNING | `build_warning_label` | `build_warning_uuid5` | `build_warning_payload` | `build_warning_metadata` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("annotates", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) |
 | BLOCKER | BLOCKER | `build_blocker_label` | `build_blocker_uuid5` | `build_blocker_payload` | `build_blocker_metadata` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("blocks", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) |
 
-### 22.11 TerminationTopologySpec Registry
-
-```python
-@dataclass(frozen=True, slots=True)
-class TerminationTopologySpec:
-    termination_class: TerminationClass
-    root_topology_constructor: RootTopologyConstructor
-    result_concept: ProvenanceConcept
-    base_node_multiplicities: tuple[tuple[ProvenanceConcept, str], ...]
-    static_base_edges: tuple[ProvenanceRelationSpec, ...]
-    forbidden_concepts: tuple[ProvenanceConcept, ...]
-    allowed_message_owner_kinds: tuple[MessageOwnerKind, ...]
-    minimum_warning_occurrences: int
-    minimum_blocker_occurrences: int
-    counter_invariants: tuple[str, ...]
-```
+### 22.12 TerminationTopologySpec Registry
 
 The typed constant `TERMINATION_TOPOLOGY_REGISTRY` is the single authoritative source:
 
@@ -3426,7 +3666,7 @@ class TerminationTopologySpec:
     allowed_message_owner_kinds: tuple[MessageOwnerKind, ...]
     minimum_warning_occurrences: int
     minimum_blocker_occurrences: int
-    counter_invariants: tuple[str, ...]
+    counter_invariants: tuple[TopologyInvariant, ...]
 ```
 
 The typed constant `TERMINATION_TOPOLOGY_REGISTRY` is the single authoritative source:
@@ -3450,7 +3690,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN,),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
-        counter_invariants=("catalog_count=0", "unique_candidate_count=0", "no_candidate_nodes", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_eq_0,
+            invariant_unique_candidate_count_eq_0,
+            invariant_no_candidate_nodes,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.INVALID_CATALOG,
@@ -3471,7 +3716,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
-        counter_invariants=("catalog_count>=1", "unique_candidate_count=0", "no_candidate_nodes", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_ge_1,
+            invariant_unique_candidate_count_eq_0,
+            invariant_no_candidate_nodes,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.CATALOG_IDENTITY_MISMATCH,
@@ -3492,7 +3742,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
-        counter_invariants=("catalog_count>=1", "unique_candidate_count=0", "no_candidate_nodes", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_ge_1,
+            invariant_unique_candidate_count_eq_0,
+            invariant_no_candidate_nodes,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.CAP_EXCEEDED,
@@ -3513,7 +3768,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
-        counter_invariants=("catalog_count>=1", "unique_candidate_count>=1", "cap_exceeded_before_materialization", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_ge_1,
+            invariant_unique_candidate_count_ge_1,
+            invariant_cap_exceeded_before_materialization,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.NO_MANUFACTURABLE_CANDIDATE,
@@ -3534,7 +3794,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
-        counter_invariants=("catalog_count>=1", "unique_candidate_count=0", "no_manufacturable_candidates", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_ge_1,
+            invariant_unique_candidate_count_eq_0,
+            invariant_no_manufacturable_candidates,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.NO_FEASIBLE_CANDIDATE,
@@ -3563,7 +3828,11 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("unique_candidate_count>=1", "verified_rating_count>=0", "no_feasible_candidate", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_unique_candidate_count_ge_1,
+            invariant_no_feasible_candidate,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.SUCCEEDED,
@@ -3592,7 +3861,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("unique_candidate_count>=1", "verified_rating_count=unique_candidate_count", "all_candidates_verified", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_unique_candidate_count_ge_1,
+            invariant_verified_rating_eq_unique,
+            invariant_all_candidates_verified,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH,
@@ -3617,7 +3891,11 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
-        counter_invariants=("verified_rating_count>=1", "provider_mismatch_before_optimizer", "selected_candidate=None", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_verified_rating_eq_unique,
+            invariant_provider_mismatch_before_optimizer,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RATING_RESULT_INTEGRITY_FAILED,
@@ -3645,7 +3923,10 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
-        counter_invariants=("completed=verified+1", "evaluated=attempted", "current_candidate=INTEGRITY_INVALID", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_completed_eq_verified_plus_1,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION,
@@ -3666,7 +3947,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN,),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("catalog_count=0", "no_candidate_nodes", "run_failure_present", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_eq_0,
+            invariant_no_candidate_nodes,
+            invariant_run_failure_present,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION,
@@ -3689,7 +3975,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("catalog_count>=1", "no_candidate_nodes", "run_failure_present", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_ge_1,
+            invariant_no_candidate_nodes,
+            invariant_run_failure_present,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION,
@@ -3714,7 +4005,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("catalog_count>=1", "0<=materialized_candidate_count<=unique_candidate_count", "run_failure_present", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_ge_1,
+            invariant_0_le_materialized_le_unique,
+            invariant_run_failure_present,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RUNTIME_FAILED_PRE_RATING,
@@ -3739,7 +4035,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("catalog_count>=1", "unique_candidate_count>=1", "run_failure_present", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_catalog_count_ge_1,
+            invariant_unique_candidate_count_ge_1,
+            invariant_run_failure_present,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RUNTIME_FAILED_RATING_CALL,
@@ -3766,7 +4067,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("attempted=completed+1", "failed_candidate_no_rating_result", "run_failure_present", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_attempted_eq_completed_plus_1,
+            invariant_failed_candidate_no_rating_result,
+            invariant_run_failure_present,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION,
@@ -3795,7 +4101,11 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("completed=verified+1", "claimed_node_count=1", "total_evidence_nodes=completed", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_completed_eq_verified_plus_1,
+            invariant_claimed_node_count_1,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RUNTIME_FAILED_OPTIMIZATION,
@@ -3826,7 +4136,12 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("evaluated=unique=verified", "optimizer_present", "run_failure_present", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_evaluated_eq_unique_eq_verified,
+            invariant_optimizer_present,
+            invariant_run_failure_present,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
     TerminationTopologySpec(
         termination_class=TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION,
@@ -3857,14 +4172,19 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
-        counter_invariants=("evaluated=unique=verified", "failure_result_node_present", "standard_result_absent", "selected_root_case_revision_count + selected_root_external_count == 1"),
+        counter_invariants=(
+            invariant_evaluated_eq_unique_eq_verified,
+            invariant_failure_result_node_present,
+            invariant_standard_result_absent,
+            invariant_selected_root_sum_eq_1,
+        ),
     ),
 )
 ```
 
 
 
-### 22.12 Topology Resolution
+### 22.13 Topology Resolution
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -3881,16 +4201,52 @@ def resolve_termination_topology(
 ) -> ResolvedTopology:
     root_selection = spec.root_topology_constructor(request_kind, design_case_revision_id)
     context = TopologyConstructionContext(counters=counters, root_selection=root_selection)
+    # Forbidden concept check
+    for forbidden in spec.forbidden_concepts:
+        count = NODE_MULTIPLICITY_CONSTRUCTORS.get(forbidden.value, lambda ctx: 0)(context)
+        if count > 0:
+            raise ValueError(f"forbidden concept {forbidden.value} has multiplicity {count}")
+
     node_multiplicities = tuple(
         (concept, NODE_MULTIPLICITY_CONSTRUCTORS[formula_name](context))
         for concept, formula_name in spec.base_node_multiplicities
     )
-    edges = (root_selection.initiates_edge,) + spec.static_base_edges
-    return ResolvedTopology(node_multiplicities=node_multiplicities, edges=edges)
+    # Result multiplicity check
+    result_count = dict(node_multiplicities).get(spec.result_concept, 0)
+    if result_count != 1:
+        raise ValueError(f"expected exactly 1 {spec.result_concept.value} node, got {result_count}")
+
+    # Build edge set with dedup
+    edges = [root_selection.initiates_edge]
+    seen_edges: set[tuple[ProvenanceConcept, str, ProvenanceConcept]] = set()
+    seen_edges.add((root_selection.initiates_edge.source_concept, root_selection.initiates_edge.relation, root_selection.initiates_edge.target_concept))
+
+    for edge in spec.static_base_edges:
+        key = (edge.source_concept, edge.relation, edge.target_concept)
+        if key in seen_edges:
+            raise ValueError(f"duplicate edge: {edge.source_concept} --{edge.relation}--> {edge.target_concept}")
+        seen_edges.add(key)
+        # Edge endpoint checks
+        source_count = dict(node_multiplicities).get(edge.source_concept, 0)
+        target_count = dict(node_multiplicities).get(edge.target_concept, 0)
+        if source_count == 0:
+            raise ValueError(f"edge source {edge.source_concept} has zero multiplicity")
+        if target_count == 0:
+            raise ValueError(f"edge target {edge.target_concept} has zero multiplicity")
+        edges.append(edge)
+
+    # Run invariants
+    for invariant_fn in spec.counter_invariants:
+        invariant_fn(context)
+
+    return ResolvedTopology(
+        node_multiplicities=tuple(node_multiplicities),
+        edges=tuple(edges),
+    )
 ```
 
 
-### 22.3C Message Content and Occurrence Multiset
+### 22.14 Message Content and Occurrence Multiset
 
 Each message content (warning or blocker) is uniquely identified by its `engineering_message_digest`. When multiple source events produce messages with identical digest, they share one unique content record but generate distinct occurrences.
 
@@ -3902,21 +4258,7 @@ Each message content (warning or blocker) is uniquely identified by its `enginee
 
 This separation ensures that the result payload carries both the unique message content (for human-readable diagnostics) and the full occurrence record (for provenance completeness). The occurrence digests bridge the two collections without duplicating full message content.
 
-### 22.3A MessageOccurrenceKind, MessageOwnerKind, and MessageOccurrenceSnapshot
-
-```python
-class MessageOccurrenceKind(StrEnum):
-    WARNING = "warning"
-    BLOCKER = "blocker"
-```
-
-```python
-class MessageOwnerKind(StrEnum):
-    SIZING_RUN = "sizing_run"
-    CATALOG_SNAPSHOT = "catalog_snapshot"
-    CANDIDATE = "candidate"
-    OPTIMIZER = "optimizer"
-```
+### 22.15 MessageOccurrenceKind, MessageOwnerKind, and MessageOccurrenceSnapshot
 
 **MessageOccurrenceSnapshot** replaces the earlier MessageOccurrenceIdentity concept. Each snapshot captures a single occurrence of a warning or blocker message within its owner's scope.
 
@@ -4013,7 +4355,7 @@ root-case-revision:{design_case_revision_id}
 root-external:{request_kind.value}:{request_digest}
 ```
 
-### 22.3B Message Owner Assignment
+### 22.16 Message Owner Assignment
 
 Each `MessageOccurrenceSnapshot` has exactly one owner, determined by precedence rules.
 
@@ -4038,7 +4380,7 @@ Each `MessageOccurrenceSnapshot` has exactly one owner, determined by precedence
 
 **Invariant:** Each message occurrence has exactly one owner. No occurrence belongs to multiple owners. Owner assignment is frozen at snapshot construction time and cannot be reassigned.
 
-### 22.5 Failure-Result Two-Stage Provenance Construction
+### 22.17 Failure-Result Two-Stage Provenance Construction
 
 Standard result and failure result use two distinct two-stage branches.
 
@@ -4114,7 +4456,7 @@ Standard result verification and failure result verification are two separate br
 - Modifying stored graph edges/nodes only → verification fails.
 - Full objects with recomputed digests reconstruct the identical graph.
 
-### 22.6 partial_audit
+### 22.18 partial_audit
 
 `partial_audit` is a **boolean field** on `SizingResultIdentity` and `SizingOptimizationResult`. It is not a provenance node.
 
@@ -4142,7 +4484,7 @@ partial_audit = evaluated_candidate_count < unique_candidate_count
 
 `CandidateEvaluation.partial_audit` is **removed** from the `CandidateEvaluation` schema and its digest payload. The candidate record only expresses its own state (UNEVALUATED, VERIFIED, INTEGRITY_INVALID, RUNTIME_FAILED) with VERIFIED subtypes for additional context. Run-level completeness is the responsibility of the result object, not individual evaluations.
 
-### 22.7 Edge Tamper Detection
+### 22.19 Edge Tamper Detection
 
 Detected through the canonical graph digest (serialized topology: nodes, edges, payload hashes). No per-edge hash field is defined in the shared `ProvenanceEdge` model.
 ---
@@ -4841,54 +5183,54 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 22 Contract Tests (501–540)
+### 27.21 Round 23 Contract Tests (501–540)
 
-501. Round 22 Review Comment ID is `4801215509`
-502. Round 22 decision is `CHANGES REQUIRED`
-503. Round 22 row follows Round 21 in review history
-504. Gate references Round 23 Engineering Design Review
-505. Gate text at top of doc reads "Round 23" not "Round 22"
-506. Gate text: "TASK-009 returns to READY only after Round 23 Engineering Design Review passes."
-507. Delivery Sequence step 1 references "Round 23"
-508. Acceptance Criteria first item references "Round 23 Engineering Design Review"
-509. All Acceptance Criteria references to round gate use "Round 23" (not "Round 22")
-510. Review History has exactly 23 rows (Rounds 1–22)
-511. Round 22 comment ID `4801215509` not duplicated in older rounds
-512. No orphan "Round 22" gate text references remain in body outside review history
+501. Round 23 Review Comment ID is `4801552673`
+502. Round 23 decision is `CHANGES REQUIRED`
+503. Round 23 row follows Round 22 in review history
+504. Gate references Round 24 Engineering Design Review
+505. Gate text at top of doc reads "Round 24" not "Round 23"
+506. Gate text: "TASK-009 returns to READY only after Round 24 Engineering Design Review passes."
+507. Delivery Sequence step 1 references "Round 24"
+508. Acceptance Criteria first item references "Round 24 Engineering Design Review"
+509. All Acceptance Criteria references to round gate use "Round 24" (not "Round 23")
+510. Review History has exactly 24 rows (Rounds 1–23)
+511. Round 23 comment ID `4801552673` not duplicated in older rounds
+512. No orphan "Round 23" gate text references remain in body outside review history
 513. Test #499 reads "Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round"
-514. Old Acceptance Criteria references no longer say "Round 21" for Delivery Sequence
-515. Delivery Sequence step 1 does NOT reference "Round 22"
-516. Acceptance Criteria first item does NOT reference "Round 22"
-517. Test matrix summary lists Round 22 (501–540) not Round 21
-518. Test matrix acceptance criteria entry: Round 22 (501–540) replaces Round 21
-519. Section 27.21 present (Round 22 Contract Tests)
+514. Old Acceptance Criteria references no longer say "Round 22" for Delivery Sequence
+515. Delivery Sequence step 1 does NOT reference "Round 23"
+516. Acceptance Criteria first item does NOT reference "Round 23"
+517. Test matrix summary lists Round 23 (501–540) not Round 22
+518. Test matrix acceptance criteria entry: Round 23 (501–540) replaces Round 22
+519. Section 27.21 present (Round 23 Contract Tests)
 520. Section 27.21 has exactly 40 entries (501–540)
-521. Section 27.21 heading reads "Round 22 Contract Tests (501–540)"
+521. Section 27.21 heading reads "Round 23 Contract Tests (501–540)"
 522. Test numbering 501–540 is continuous with no gaps
-523. Round 22 test range matches heading: 501–540
+523. Round 23 test range matches heading: 501–540
 524. Global test numbering continuous 1–540
 525. Section 27 range now 27.1–27.21 continuous (no gaps)
-526. Gate text does NOT reference "Round 22" at top of doc
+526. Gate text does NOT reference "Round 23" at top of doc
 527. Issue #23 test total equals task-card N (540)
-528. Round 22 subsection numbering locally continuous within 501–540
-529. Issue #23 frozen SHA equals new docs commit for Round 22
-530. Acceptance Criteria required test matrix entries include Round 22 (501–540)
+528. Round 23 subsection numbering locally continuous within 501–540
+529. Issue #23 frozen SHA equals new docs commit for Round 23
+530. Acceptance Criteria required test matrix entries include Round 23 (501–540)
 531. Acceptance Criteria test total remains 1–540
-532. Test #505 confirms gate text reads "Round 23"
+532. Test #505 confirms gate text reads "Round 24"
 533. Test #506 confirms gate text exact wording
-534. Test #507 confirms Delivery Sequence step 1 reads "Round 23"
-535. Test #508 confirms Acceptance Criteria first item reads "Round 23"
+534. Test #507 confirms Delivery Sequence step 1 reads "Round 24"
+535. Test #508 confirms Acceptance Criteria first item reads "Round 24"
 536. TASK-010 in TASK_BACKLOG.md is BLOCKED
-537. No remaining "Round 21" references in body outside review history
-538. Review history does NOT pre-populate Round 23 comment ID or decision
-539. Section 27.21 test entries cover all Round 22 document changes
+537. No remaining "Round 22" references in body outside review history
+538. Review history does NOT pre-populate Round 24 comment ID or decision
+539. Section 27.21 test entries cover all Round 23 document changes
 540. Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 23 Engineering Design Review.
+1. Complete Round 24 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -4902,7 +5244,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 23 Engineering Design Review passes before implementation starts
+- [ ] Round 24 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -4921,6 +5263,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 22 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 23 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
