@@ -1,12 +1,25 @@
 # TASK-008 — Fixed-geometry double-pipe rating
 
-**Status:** IN_PROGRESS
+**Status:** DONE
 **Milestone:** M2
 **Priority:** P0
 **Depends on:** TASK-003, TASK-005, TASK-006, TASK-007
-**GitHub Issue:** #20
-**Branch:** `codex/task-008-fixed-geometry-double-pipe-rating`
-**Draft PR:** #21
+**GitHub Issue:** #20 — CLOSED / COMPLETED
+**Branch:** `codex/task-008-fixed-geometry-double-pipe-rating` — merged; remote branch deleted
+**PR:** #21 — MERGED
+
+## Completion Record
+
+- **Reviewed Head:** `37eda3580ba7acced1beb4cec307343a9f5449ec`
+- **Merge commit:** `cef3f85402b1696b336347293afc7276bbf67545`
+- **Engineering Review Passed:** Review `4567761204`
+- **CI Run:** `28145757989` — success on Python 3.11 and 3.12
+- **Final diff:** 39 files, +22,104 / -58
+- **r13 correction tests:** 75 passed, 0 skipped
+- **All correction files:** 192 passed, 0 skipped
+- **Full unit-test suite:** 1,502 passed, 1 skipped
+- **Deferred scope:** C4 remains unimplemented and tracked by open Issue #19
+- **Next task:** TASK-009 remains READY; no TASK-009 implementation was included in TASK-008
 
 ## Objective
 
