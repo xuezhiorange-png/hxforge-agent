@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 8 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 9 Engineering Design Review passes.
 
 ---
 
@@ -41,6 +41,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 5 | 4797451288 | CHANGES REQUIRED |
 | 6 | 4797612208 | CHANGES REQUIRED |
 | 7 | 4797806616 | CHANGES REQUIRED |
+| 8 | PENDING | CHANGES REQUIRED |
 
 ---
 
@@ -161,14 +162,16 @@ Freeze canonical quantum string: `str(quantum.normalize())` (e.g. `"0.001"` rath
 ### 5.2 Integer Tick Conversion
 
 ```python
-def to_tick(value_m: float, quantum: Decimal) -> int:
+def to_tick(value_m: float | str | Decimal, quantum: Decimal) -> int:
     raw = Decimal(str(value_m))
     if not raw.is_finite() or raw <= 0:
         raise InvalidLengthError(...)   # structured, not assert
+    if raw < quantum:
+        raise InvalidLengthError(...)   # sub-quantum rejected before quantization
     qty = raw.quantize(quantum, rounding=ROUND_HALF_EVEN)
     tick = int((qty / quantum).to_integral_exact())
     if tick <= 0:
-        raise InvalidLengthError(...)   # positive sub-quantum → rejected
+        raise InvalidLengthError(...)   # should not happen after < quantum guard
     return tick
 
 def from_tick(tick: int, quantum: Decimal) -> Decimal:
@@ -193,6 +196,9 @@ if not canonical_lengths:
 quantum = Decimal(length_quantum_m)
 lo_tick = to_tick(minimum_length_m, quantum)
 hi_tick = to_tick(maximum_length_m, quantum)
+
+if hi_tick < lo_tick:
+    raise CatalogInvalid(...)  # reversed grid — no delta, no divmod
 
 raw_increment = Decimal(str(increment_m))
 if not raw_increment.is_finite() or raw_increment <= 0:
@@ -709,8 +715,8 @@ warnings: tuple[EngineeringMessage, ...]
 blockers: tuple[EngineeringMessage, ...]
 failure: RunFailure | None
 provider_identity: ProviderIdentitySnapshot
-tube_correlation: SelectedCorrelationSnapshot
-annulus_correlation: SelectedCorrelationSnapshot
+tube_correlation: SelectedCorrelationSnapshot | None
+annulus_correlation: SelectedCorrelationSnapshot | None
 rating_result_hash: str
 rating_provenance_digest: str
 rating_verify_hash_result: bool
@@ -806,7 +812,7 @@ source_qualified_candidate_identity: SourceQualifiedCandidateIdentity
 candidate_evaluation_state: CandidateEvaluationState
 candidate_evaluation_identity: CandidateEvaluationIdentity | None
 evaluation_order_index: int
-rating_status: RatingStatus | None     # TASK-008 RatingStatus; None for UNEVALUATED/RUNTIME_FAILED
+rating_status: RatingStatus | None     # TASK-008 RatingStatus; None for UNEVALUATED/RUNTIME_FAILED/INTEGRITY_INVALID
 feasibility_status: FeasibilityStatus  # always populated (UNEVALUATED for unevaluated)
 feasible: bool
 verified_rating_evidence: VerifiedRatingEvidenceSnapshot | None
@@ -867,6 +873,8 @@ duty_shortfall_w: float
 duty_overshoot_w: float
 meets_target_without_tolerance: bool
 feasibility_status: FEASIBLE | INFEASIBLE
+tube_correlation != None
+annulus_correlation != None
 ```
 
 When `rating_status in (BLOCKED, FAILED)` or `heat_duty_w is None`:
@@ -953,26 +961,54 @@ Raw canonicalization never raises an exception for unsupported input structure. 
 | `list` | ordered JSON array |
 | `dict` | string-key-sorted JSON object |
 
-**Non-string mapping keys:** `dict` keys that are not `str` produce a deterministic marker that preserves snapshotability:
+**Non-string mapping keys:** `dict` keys that are not `str` produce a deterministic ordered entry list that preserves all entries, value associations, and insertion-order independence:
 
 ```text
 {
-  "$invalid_mapping": {
-    "reason": "non_string_key",
-    "key_type": "<module>.<qualname>",
-    "key_digest": "<sha256 of safe key marker>",
-    "entries": ["<content_type_marker>", ...]
-  }
+  "$mapping_entries": [
+    {
+      "key_kind": "string",
+      "key": "valid_key_name",
+      "value": <canonical value>
+    },
+    {
+      "key_kind": "invalid",
+      "key_type": "<module>.<qualname>",
+      "key_marker_digest": "sha256:<64hex>",
+      "value": <canonical value>
+    }
+  ]
 }
 ```
 
 Rules:
+- Every original mapping entry is independently preserved — nothing collapsed or discarded.
+- String-key entries use `key_kind: "string"` with the original key.
+- Non-string-key entries use `key_kind: "invalid"` with the key's type metadata as `key_type` and a fixed digest of the safe key marker as `key_marker_digest`.
+- The `value` is recursively canonicalized for all entries.
 - Must not silently convert via `str(key)` (key collision risk).
 - Must not call arbitrary `repr()`.
 - Must not raise `RawInputCanonicalizationError` (would lose snapshot).
-- A `SizingValidationErrorSnapshot` with code `NON_STRING_KEY` is added to `validation_errors`.
-- The invalid key's value is recursively canonicalized as an entry.
-- The `canonical_value` always contains the marker, never raises.
+- A `SizingValidationErrorSnapshot` with code `NON_STRING_KEY` is added to `validation_errors` per invalid entry.
+- Validation error field path uses the frozen canonical entry index.
+
+**$mapping_entries sort order:**
+
+```text
+string entry:   (0, UTF-8/ASCII key)
+invalid entry:  (1, key_type, key_marker_digest, canonical_value_digest)
+```
+
+This ensures same input with different insertion order produces identical canonical output.
+
+**Safe key marker payload:**
+
+```python
+{
+    "key_type": "<module>.<qualname>"
+}
+sha256_digest(marker) → key_marker_digest
+```
 
 **Unsupported arbitrary objects:** Represent safely using type metadata only:
 
@@ -1057,23 +1093,32 @@ SizingValidationErrorSnapshot
 - field_path: tuple[str, ...]
 - message: str
 - rejected_value_digest: str | None
-- context: tuple[tuple[str, canonical value], ...]
+- context: tuple[tuple[str, CanonicalRawValue], ...]
+- context_digest: str
 - error_digest: str
 ```
 
 Digest payload:
 
 ```python
-{
-    "code": ...,
-    "field_path": [...],
-    "message": ...,
-    "rejected_value_digest": ...,
-    "context": [...],
-}
+context_digest = sha256_digest({
+    "context": canonical_context
+})
+
+error_digest = sha256_digest({
+    "code": code,
+    "field_path": list(field_path),
+    "message": message,
+    "rejected_value_digest": rejected_value_digest,
+    "context_digest": context_digest,
+})
 ```
 
-Validation error sort key: `(code, field_path, message, rejected_value_digest or "", context)`.
+Validation error sort key (single frozen form, no Python raw-tuple comparison of nested context):
+
+```text
+(code, field_path, message, rejected_value_digest or "", context_digest)
+```
 
 ### 18.2 InvalidSizingRequestSnapshot
 
@@ -1253,6 +1298,20 @@ FAILED = 2
 None = 999
 ```
 
+### 20.3 CandidateEvaluationState Invariant Rows
+
+4 `CandidateEvaluationState` enum values:
+
+```text
+UNEVALUATED, VERIFIED, INTEGRITY_INVALID, RUNTIME_FAILED
+```
+
+6 status-specific invariant rows (covering VERIFIED subtypes):
+
+```text
+VERIFIED+SUCCEEDED, VERIFIED+BLOCKED, VERIFIED+FAILED,
+INTEGRITY_INVALID, RUNTIME_FAILED, UNEVALUATED
+```
 
 ### 20.4 Full Non-Feasible Sort Key
 
@@ -1327,6 +1386,7 @@ evaluation_order_index: int | None
 | CANDIDATE | `INTERMEDIATE` | `"candidate_{id}"` |
 | TASK008_RATING_RESULT | `RESULT` | `"rating_{result_hash}"` |
 | SIZING_RESULT | `RESULT` | `"sizing_result"` |
+| SIZING_RUN_FAILURE_RESULT | `RESULT` | `"sizing_run_failure"` |
 | INVALID_EVIDENCE | `INTERMEDIATE` | `"invalid_evidence_{candidate_id}"` |
 | RUNTIME_FAILURE | `BLOCKER` | `"runtime_failure"` |
 | WARNING | `WARNING` | per message |
@@ -1607,9 +1667,12 @@ Edges:
 - CANDIDATE -> TASK008_RATING_RESULT "rated_as" (for each completed rating)
 - RUNTIME_FAILURE -> SIZING_RESULT "fails"
 - SIZING_RUN -> SIZING_RESULT "produces"
-Count sources: completed_rating_count; the failed candidate has no TASK008_RATING_RESULT
-partial_audit: True, evaluated_candidate_count: completed_rating_count
-remaining_unevaluated_candidate_count: unique - completed_rating_count
+Count sources: attempted_rating_count = completed_rating_count + 1
+evaluated_candidate_count = attempted_rating_count
+remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
+verified_rating_count <= completed_rating_count
+The failed candidate is RUNTIME_FAILED, has no TASK008_RATING_RESULT,
+and is NOT counted as remaining unevaluated.
 ```
 
 ##### RATING_VERIFICATION
@@ -1620,7 +1683,8 @@ Nodes:
 - SIZING_RUN (1)
 - CATALOG_SNAPSHOT (catalog_count)
 - CANDIDATE (unique_candidate_count)
-- TASK008_RATING_RESULT (completed_rating_count, including claimed results from returned ratings)
+- VERIFIED TASK008_RATING_RESULT (verified_rating_count)
+- CLAIMED TASK008_RATING_RESULT (completed_rating_count - verified_rating_count, when applicable)
 - RUNTIME_FAILURE (1)
 - SIZING_RESULT (1)
 Forbidden: INVALID_EVIDENCE, OPTIMIZER
@@ -1628,10 +1692,17 @@ Edges:
 - ROOT -> SIZING_RUN "initiates"
 - SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
 - CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as" (for each completed rating)
+- CANDIDATE -> VERIFIED result "rated_as" (for each verified rating)
+- CANDIDATE -> CLAIMED result "rated_as_claimed" (for each completed but unverified rating)
 - RUNTIME_FAILURE -> SIZING_RESULT "fails"
 - SIZING_RUN -> SIZING_RESULT "produces"
-Claimed TASK008_RATING_RESULT nodes use claimed-rating-result UUID5 name if result hash is unreadable:
+Count: attempted_rating_count = completed_rating_count
+evaluated_candidate_count = attempted_rating_count
+verified_rating_count < completed_rating_count
+remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
+The claimed-rating-result node uses CLAIMED_TASK008_RATING_RESULT concept
+(ProvenanceNodeType.INTERMEDIATE). It is NOT a verified TASK008 result.
+UUID5 name (when result hash unreadable):
 
 ```text
 uuid5(TASK009_PROVENANCE_NAMESPACE,
@@ -1647,7 +1718,6 @@ claimed_result_digest = sha256_digest({
     "claim_state": "unreadable",
 })
 ```
-partial_audit: True, evaluated_candidate_count: completed_rating_count
 ```
 
 ##### OPTIMIZATION
@@ -1686,6 +1756,13 @@ SizingRunFailureResult
 - validated_sizing_request_identity_digest: str | None
 - failure_stage: RESULT_CONSTRUCTION
 - failure: RunFailure
+- catalog_snapshot_digests: tuple[str, ...]
+- candidate_evaluation_digests: tuple[str, ...]
+- verified_evidence_digests: tuple[str, ...]
+- invalid_evidence_digests: tuple[str, ...]
+- warning_digests: tuple[str, ...]
+- blocker_digests: tuple[str, ...]
+- ranking_record_digests: tuple[str, ...]
 - attempted_rating_count: int
 - completed_rating_count: int
 - verified_rating_count: int
@@ -1698,11 +1775,7 @@ SizingRunFailureResult
 - provenance_digest: str
 ```
 
-`partial_audit` reflects candidate evaluation completeness only — not result construction. Since evaluation completed all unique candidates:
-
-```text
-partial_audit = False
-```
+All digest collections sorted by canonical order (§24.4). `partial_audit = False` (evaluation completed all unique candidates).
 
 **Failure hash payload:**
 
@@ -1712,6 +1785,13 @@ failure_result_payload = {
     "validated_sizing_request_identity_digest": ...,
     "failure_stage": "result_construction",
     "failure_digest": ...,
+    "catalog_snapshot_digests": [...],
+    "candidate_evaluation_digests": [...],
+    "verified_evidence_digests": [...],
+    "invalid_evidence_digests": [...],
+    "warning_digests": [...],
+    "blocker_digests": [...],
+    "ranking_record_digests": [...],
     "attempted_rating_count": ...,
     "completed_rating_count": ...,
     "verified_rating_count": ...,
@@ -1723,22 +1803,47 @@ failure_result_payload = {
 failure_result_hash = sha256_digest(failure_result_payload)
 ```
 
-**Provenance node:** Independent node name (not `sizing-result:{result_hash}` since standard `result_hash` was not constructed):
+**Provenance node concept:** `SIZING_RUN_FAILURE_RESULT`
 
 ```text
-sizing-run-failure:{failure_result_hash}
+ProvenanceNodeType   = RESULT
+label                = "sizing_run_failure"
+UUID5                = uuid5(TASK009_PROVENANCE_NAMESPACE,
+                       "sizing-run-failure:{failure_result_hash}")
+payload_hash         = sha256_digest({"failure_result_hash": failure_result_hash})
+metadata             = (("failure_result_hash", failure_result_hash),
+                       ("failure_stage", "result_construction"))
 ```
 
-**JSON:** `SizingRunFailureResult` must be JSON round-trippable with all fields.
-
-**Provenance topology:**
+**Exact RESULT_CONSTRUCTION topology:**
 
 ```
-Nodes: same as OPTIMIZATION + OPTIMIZER (1)
-Edge: RUNTIME_FAILURE -> SIZING_RESULT "fails" replaces OPTIMIZER -> SIZING_RESULT "produces"
-Core provenance includes OPTIMIZER node.
-Forbidden: none beyond standard runtime-failure constraints
+Nodes:
+- ROOT (1)
+- SIZING_RUN (1)
+- CATALOG_SNAPSHOT (catalog_count)
+- CANDIDATE (unique_candidate_count)
+- VERIFIED TASK008_RATING_RESULT (verified_rating_count)
+- CLAIMED TASK008_RATING_RESULT (completed - verified, when applicable)
+- OPTIMIZER (1)
+- RUNTIME_FAILURE (1)
+- SIZING_RUN_FAILURE_RESULT (1)
+
+Edges:
+- ROOT -> SIZING_RUN "initiates"
+- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
+- CATALOG_SNAPSHOT -> CANDIDATE "generates"
+- CANDIDATE -> TASK008/CLAIMED result "rated_as"
+- verified TASK008 result -> OPTIMIZER "evaluated_by"
+- OPTIMIZER -> SIZING_RUN_FAILURE_RESULT "precedes_failure"
+- RUNTIME_FAILURE -> SIZING_RUN_FAILURE_RESULT "fails"
+- SIZING_RUN -> SIZING_RUN_FAILURE_RESULT "produces_failure_record"
+
+partial_audit: False
+attempted_rating_count == evaluated_candidate_count == unique
 ```
+
+**JSON:** `SizingRunFailureResult` must be JSON round-trippable with all fields, digests, and provenance.
 
 ### 23.5 Two-Stage Construction
 
@@ -1923,7 +2028,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 11. `minimum == maximum` + INCLUDE → count=1
 12. `minimum == maximum` + EXCLUDE → count=0
 13. `increment_m < quantum` → CATALOG_INVALID
-14. `to_tick()` rejects positive sub-quantum → 0 tick
+14. `to_tick()` rejects raw positive length below quantum via `< quantum` guard before quantization
 15. Request min ceiling (does not widen)
 16. Request max floor (does not widen)
 17. Count-only grid — no list pre-cap
@@ -2031,7 +2136,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 92. Raw request +Infinity canonicalization → `{"$non_finite_float": "+infinity"}`
 93. Raw request -Infinity canonicalization → `{"$non_finite_float": "-infinity"}`
 94. Raw request unsupported object → deterministic `{"$unsupported_type": ...}`
-95. Raw request non-string dict key → `RawInputCanonicalizationError`
+95. Raw request non-string dict key → deterministic `$mapping_entries` marker + `NON_STRING_KEY` validation error; no exception
 96. Raw request cyclic container → `{"$cyclic_reference": "..."}`
 97. Raw snapshot self-excluding digest (`raw_request_digest` not in own payload)
 98. Structured `SizingValidationErrorSnapshot` digest round-trip
@@ -2117,11 +2222,42 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 175. Task-card test range headings match numbered entries
 176. Issue test total equals task-card N
 
+### 28.12 Round 8 Contract Tests (177–204)
+
+177. Reversed grid rejected before `delta`/`divmod` (hi_tick < lo_tick → early guard)
+178. Reversed grid produces no materialization, no rating, no evaluation
+179. Explicit length positive sub-quantum rejected via `to_tick()` `< quantum` guard
+180. Grid min/max positive sub-quantum rejected via `to_tick()` `< quantum` guard
+181. Multi invalid-key mapping canonicalization preserves each entry independently
+182. Mixed string/non-string mapping preserves all entries (no discarding)
+183. Invalid mapping insertion-order independence (different order → same canonical output)
+184. Invalid mapping value association preserved (each key paired with its value)
+185. `SizingValidationErrorSnapshot.context_digest` present in schema and JSON round-trip
+186. `context_digest` recomputation produces identical digest
+187. Validation sort never compares raw nested context (uses `context_digest`)
+188. `VERIFIED+BLOCKED` correlation snapshots may be `None`
+189. `VERIFIED+FAILED` correlation snapshots may be `None`
+190. No fabricated empty `SelectedCorrelationSnapshot` when correlation is None
+191. `INTEGRITY_INVALID` `rating_status` is None (not claimed status)
+192. `RATING_CALL` topology uses `attempted_rating_count` (not `completed_rating_count`)
+193. `RATING_CALL` remaining count excludes the failed candidate
+194. `RATING_VERIFICATION` topology distinguishes `VERIFIED` vs `CLAIMED` TASK008 result nodes
+195. `RESULT_CONSTRUCTION` uses independent `SIZING_RUN_FAILURE_RESULT` node type/label/UUID
+196. `RESULT_CONSTRUCTION` exact node multiplicity (`SIZING_RUN_FAILURE_RESULT × 1`)
+197. `RESULT_CONSTRUCTION` exact edge set (8 edges, including `precedes_failure`)
+198. Failure result embeds canonical audit digest collections (catalog, evaluation, evidence, ranking digests)
+199. No `RawInputCanonicalizationError` exists in test descriptions (all use deterministic marker)
+200. 4 `CandidateEvaluationState` enum values / 6 invariant rows consistency
+201. Section numbering continuous (no gaps, section 20.3 present)
+202. Issue #23 test total equals task-card N
+203. Issue #23 frozen SHA equals new docs commit
+204. Acceptance Criteria references Round 9
+
 ---
 
 ## 29. Delivery Sequence
 
-1. Complete Round 8 Engineering Design Review.
+1. Complete Round 9 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -2135,7 +2271,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 30. Acceptance Criteria
 
-- [ ] Round 8 Engineering Design Review passes before implementation starts
+- [ ] Round 9 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -2154,6 +2290,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–176, including Golden (84–85), documentation (86), JSON round-trip (87), quality gates (88), Round 6 contract tests (89–136), and Round 7 contract tests (137–176)
+- [ ] Required test matrix entries 1–204, including Golden (84–85), documentation (86), JSON round-trip (87), quality gates (88), Round 6 (89–136), Round 7 (137–176), and Round 8 (177–204)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
