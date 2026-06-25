@@ -3106,8 +3106,15 @@ class TestTrialAbortPreservesDiagnostics:
         self,
         provider: CoolPropProvider,
     ) -> None:
-        """rate_double_pipe with solver abort after Q_max → BLOCKED + diagnostics."""
+        """rate_double_pipe with solver abort after Q_max, via real residual_fn.
+
+        Calls the real residual_fn once through a solve_rating harness so
+        the recorder.begin(BRACKET_PROBE) records the aborting evaluation
+        in the property-call trace before TrialEvaluationAbort propagates.
+        """
+        from hexagent.exchangers.double_pipe import rating as rating_module
         from hexagent.exchangers.double_pipe.rating import (
+            SolverEvaluationPhase,
             TrialEvaluation,
             TrialEvaluationAbort,
         )
@@ -3129,37 +3136,69 @@ class TestTrialAbortPreservesDiagnostics:
             blockers=(),
         )
 
-        def _aborting_solve(*args, **kwargs):
+        called_residual = False
+
+        def _harness_solve(*, residual_fn, **kwargs):
+            nonlocal called_residual
+            # Call the real residual_fn to trigger recorder.begin()
+            # with SolverEvaluationPhase.BRACKET_PROBE, so the
+            # aborting evaluation is recorded in the property-call
+            # trace.
+            from contextlib import suppress
+
+            with suppress(TrialEvaluationAbort):
+                residual_fn(50000.0, SolverEvaluationPhase.BRACKET_PROBE)
+            called_residual = True
+            # Now raise TrialEvaluationAbort so the rate_double_pipe
+            # handler catches it and builds the BLOCKED result.
             raise TrialEvaluationAbort(abort_trial)
 
-        # Need to get rate_double_pipe from the module to support monkeypatch
-        from hexagent.exchangers.double_pipe import rating as rating_module
-
         original_solve = rating_module.solve_rating
-        rating_module.solve_rating = _aborting_solve
+        rating_module.solve_rating = _harness_solve
         try:
             result = _run_rating(provider, flow_arrangement=FlowArrangement.COUNTERFLOW)
         finally:
             rating_module.solve_rating = original_solve
 
-        # Assertions
+        assert called_residual, "harness should have called residual_fn"
+
+        # Core result contract
         assert result.status == RatingStatus.BLOCKED, "abort should produce BLOCKED"
         assert result.q_max_diagnostics is not None, "Q_max diagnostics must survive trial abort"
-        assert result.q_max_diagnostics.termination_reason == "independent_limits"
-        assert result.converged is False, "aborted trial sets converged=False"
+        assert result.q_max_diagnostics.termination_reason == "independent_limits", (
+            f"Unexpected reason: {result.q_max_diagnostics.termination_reason}"
+        )
+        assert result.converged is False
         assert result.solver_termination_reason == "blocked"
         assert result.verify_hash() is True, "hash must be valid"
         assert result.verify_provenance() is True, "provenance must be valid"
 
-        # JSON round-trip preserves diagnostics
+        # Trace ordering: INLET -> Q_MAX_COUNTERFLOW -> BRACKET_PROBE
+        roles = [c.evaluation_role for c in result.property_calls]
+        # Deduplicate contiguous role runs to get the phase sequence
+        unique_roles = []
+        for r in roles:
+            if not unique_roles or unique_roles[-1] != r:
+                unique_roles.append(r)
+        assert unique_roles == [
+            EvaluationRole.INLET.value,
+            EvaluationRole.Q_MAX_COUNTERFLOW.value,
+            EvaluationRole.BRACKET_PROBE.value,
+        ], f"Expected inlet -> qmax -> bracket, got {unique_roles}"
+
+        # Last evaluation must be the aborting bracket probe
+        last_eval_idx = max({c.evaluation_index for c in result.property_calls})
+        last_calls = [c for c in result.property_calls if c.evaluation_index == last_eval_idx]
+        assert all(c.evaluation_role == EvaluationRole.BRACKET_PROBE.value for c in last_calls), (
+            f"Last eval should be BRACKET_PROBE, got {last_calls[0].evaluation_role}"
+        )
+
+        # JSON round-trip preserves diagnostics AND provenance
         js = result.model_dump_json(exclude_none=False, by_alias=True)
         restored = RatingResult.model_validate_json(js)
         assert restored.q_max_diagnostics is not None, "JSON round-trip lost diagnostics"
-        assert restored.q_max_diagnostics.termination_reason == "independent_limits"
-        assert restored.verify_hash() is True, "round-trip hash must be valid"
-
-        # Property-call trace contains Q_max phase
-        roles = {c.evaluation_role for c in result.property_calls}
-        assert EvaluationRole.Q_MAX_COUNTERFLOW.value in roles, (
-            "trace must contain Q_max evaluation"
+        assert restored.q_max_diagnostics.termination_reason == "independent_limits", (
+            f"Unexpected reason: {restored.q_max_diagnostics.termination_reason}"
         )
+        assert restored.verify_hash() is True, "round-trip hash must be valid"
+        assert restored.verify_provenance() is True, "round-trip provenance must be valid"
