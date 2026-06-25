@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 17 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 18 Engineering Design Review passes.
 
 ---
 
@@ -50,6 +50,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 14 | 4799066285 | CHANGES REQUIRED |
 | 15 | 4799188706 | CHANGES REQUIRED |
 | 16 | 4799475298 | CHANGES REQUIRED |
+| 17 | 4799885832 | CHANGES REQUIRED |
 
 |---|
 
@@ -2372,6 +2373,29 @@ Root selection: if `design_case_revision_id` is present and not None → `ROOT_C
 
 Two distinct `ROOT` concepts prevent expression of root-type selection within a single ambiguous table entry.
 
+```python
+def select_root_concept(
+    design_case_revision_id: str | None,
+) -> tuple[ProvenanceConcept, str, str]:
+    """Select the root concept based on design_case_revision_id presence.
+    
+    If design_case_revision_id is present and not None → ROOT_CASE_REVISION
+    with CASE_REVISION type and label f\"revision_{id}\".
+    Otherwise → ROOT_EXTERNAL with EXTERNAL type and label \"external_root\".
+    """
+    if design_case_revision_id is not None:
+        return (
+            ProvenanceConcept.ROOT_CASE_REVISION,
+            "CASE_REVISION",
+            f"revision_{design_case_revision_id}",
+        )
+    return (
+        ProvenanceConcept.ROOT_EXTERNAL,
+        "EXTERNAL",
+        "external_root",
+    )
+```
+
 Edge labels are uniquely frozen:
 
 | Edge | Label |
@@ -2496,14 +2520,14 @@ class ProvenanceConceptSpec:
 | SIZING_OPTIMIZER | OPTIMIZER | `"sizing_optimizer"` | `f"optimizer:{request_digest}"` | `{"request_kind": request_kind.value, "request_digest": request_digest}` | `("request_kind", "request_digest")` | (("executes", "SIZING_RUN"), ("evaluated_by", "TASK008_RATING_RESULT")) | (("produces", "SIZING_RESULT"), ("precedes_failure", "SIZING_RUN_FAILURE_RESULT"), ("emits", "WARNING"), ("emits", "BLOCKER")) | 1 | (TerminationClass.SUCCEEDED, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH) |
 | CATALOG_SNAPSHOT | INTERMEDIATE | `f"catalog_{catalog_id}"` | `f"catalog:{catalog_id}:{catalog_version}:{catalog_content_hash}"` | `{"catalog_id": catalog_id, "catalog_version": catalog_version, "catalog_content_hash": catalog_content_hash, "source_identity": source_identity, "schema_version": schema_version}` | `("catalog_id", "catalog_version", "catalog_content_hash", "source_identity", "schema_version")` | (("consumes", "SIZING_RUN"),) | (("generates", "CANDIDATE"), ("emits", "WARNING"), ("emits", "BLOCKER")) | catalog_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
 | CANDIDATE | INTERMEDIATE | `f"candidate_{source_qualified_candidate_id}"` | `f"candidate:{source_qualified_candidate_id}"` | `{"source_qualified_candidate_identity_digest": source_qualified_candidate_identity_digest}` | `("source_qualified_candidate_id",)` | (("generates", "CATALOG_SNAPSHOT"),) | (("rated_as", "TASK008_RATING_RESULT"), ("rated_as_claimed", "CLAIMED_TASK008_RATING_RESULT"), ("produced_unverified", "INVALID_EVIDENCE"), ("emits", "WARNING"), ("emits", "BLOCKER")) | unique_candidate_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
-| TASK008_RATING_RESULT | RESULT | `f"rating_{rating_result_hash}"` | `f"rating-result:{rating_result_hash}"` | `{"source_qualified_candidate_id": source_qualified_candidate_id, "rating_result_hash": rating_result_hash, "rating_provenance_digest": rating_provenance_digest}` | `("source_qualified_candidate_id", "rating_result_hash", "rating_provenance_digest")` | (("rated_as", "CANDIDATE"),) | (("evaluated_by", "SIZING_OPTIMIZER"),) | verified_rating_count | (TerminationClass.RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.SUCCEEDED, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING) |
+| TASK008_RATING_RESULT | RESULT | `f"rating_{rating_result_hash}"` | `f"rating-result:{rating_result_hash}"` | `{"source_qualified_candidate_id": source_qualified_candidate_id, "rating_result_hash": rating_result_hash, "rating_provenance_digest": rating_provenance_digest}` | `("source_qualified_candidate_id", "rating_result_hash", "rating_provenance_digest")` | (("rated_as", "CANDIDATE"),) | (("evaluated_by", "SIZING_OPTIMIZER"),) | verified_rating_count | (TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.SUCCEEDED, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING) |
 | CLAIMED_TASK008_RATING_RESULT | INTERMEDIATE | `f"claimed_rating_{source_qualified_candidate_id}"` | `f"claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{audit_digest}"` | `claimed_audit_payload` | `("source_qualified_candidate_id", "evaluation_order_index", "audit_digest")` | (("rated_as_claimed", "CANDIDATE"),) | () | 0 (forbidden in OPTIMIZATION/RESULT_CONSTRUCTION); >= 1 in RATING_VERIFICATION | (TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION,) | (TerminationClass.SUCCEEDED, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION, TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH) |
 | SIZING_RESULT | RESULT | `"sizing_result"` | `f"sizing-result:{result_hash}"` | `{"result_hash": result_hash}` | `("result_hash",)` | (("produces", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("blocks", "BLOCKER"), ("annotates", "WARNING"), ("produces", "SIZING_RUN")) | () | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION) | (TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION,) |
-| SIZING_RUN_FAILURE_RESULT | RESULT | `f"sizing_run_failure"` | `f"sizing-run-failure:{failure_result_hash}"` | `{"failure_result_hash": failure_result_hash, "failure_stage": failure_stage}` | `("failure_result_hash", "failure_stage")` | (("precedes_failure", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("annotates_failure", "BLOCKER"), ("annotates_failure", "WARNING"), ("produces_failure_record", "SIZING_RUN")) | () | 1 | (TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION,) | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION)
+| SIZING_RUN_FAILURE_RESULT | RESULT | `f"sizing_run_failure"` | `f"sizing-run-failure:{failure_result_hash}"` | `{"failure_result_hash": failure_result_hash, "failure_stage": failure_stage.value}` | `("failure_result_hash", "failure_stage")` | (("precedes_failure", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("annotates_failure", "BLOCKER"), ("annotates_failure", "WARNING"), ("produces_failure_record", "SIZING_RUN")) | () | 1 | (TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION,) | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION)
 | INVALID_EVIDENCE | INTERMEDIATE | `f"invalid_evidence_{source_qualified_candidate_id}"` | `f"invalid-evidence:{source_qualified_candidate_id}:{invalid_evidence_digest}"` | `invalid_evidence_payload` | `("source_qualified_candidate_id", "invalid_evidence_digest")` | (("produced_unverified", "CANDIDATE"),) | (("invalidates", "SIZING_RESULT"),) | invalid_evidence_count | (TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.SUCCEEDED, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION) |
 | RUNTIME_FAILURE | BLOCKER | `"runtime_failure"` | `f"runtime-failure:{failure_digest}"` | `{"failure_digest": failure_digest}` | `("failure_digest",)` | () | (("fails", "SIZING_RESULT"), ("fails", "SIZING_RUN_FAILURE_RESULT")) | 1 if runtime_failure_occurred else 0 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
 | WARNING | WARNING | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("annotates", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) | warning_occurrence_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
-|| BLOCKER | BLOCKER | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("blocks", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) | blocker_occurrence_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
+| BLOCKER | BLOCKER | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("blocks", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) | blocker_occurrence_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
 
 ### 22.4 TerminationTopologySpec Registry
 
@@ -2511,6 +2535,7 @@ class ProvenanceConceptSpec:
 @dataclass(frozen=True, slots=True)
 class TerminationTopologySpec:
     termination_class: TerminationClass
+    root_selector_formula_name: str
     result_concept: ProvenanceConcept
     base_node_multiplicities: tuple[tuple[ProvenanceConcept, str], ...]
     base_edges: tuple[ProvenanceRelationSpec, ...]
@@ -2539,7 +2564,7 @@ The registry has exactly 17 entries, one per TerminationClass:
 | 12 | RUNTIME_FAILED_CANDIDATE_MATERIALIZATION | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×materialized_candidate_count, RUNTIME_FAILURE×1, SIZING_RESULT×1 | TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
 | 13 | RUNTIME_FAILED_PRE_RATING | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, RUNTIME_FAILURE×1, SIZING_RESULT×1 | TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
 | 14 | RUNTIME_FAILED_RATING_CALL | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×completed_rating_count, RUNTIME_FAILURE×1, SIZING_RESULT×1 | SIZING_OPTIMIZER, INVALID_EVIDENCE, SIZING_RUN_FAILURE_RESULT, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
-| 15 | RUNTIME_FAILED_RATING_VERIFICATION | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×completed_rating_count, CLAIMED_TASK008_RATING_RESULT×1, RUNTIME_FAILURE×1, SIZING_RESULT×1 | SIZING_OPTIMIZER, INVALID_EVIDENCE, SIZING_RUN_FAILURE_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
+| 15 | RUNTIME_FAILED_RATING_VERIFICATION | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×verified_rating_count, CLAIMED_TASK008_RATING_RESULT×1, RUNTIME_FAILURE×1, SIZING_RESULT×1 | SIZING_OPTIMIZER, INVALID_EVIDENCE, SIZING_RUN_FAILURE_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
 | 16 | RUNTIME_FAILED_OPTIMIZATION | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×evaluated_candidate_count, SIZING_OPTIMIZER×1, RUNTIME_FAILURE×1, SIZING_RESULT×1 | INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, SIZING_RUN_FAILURE_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER |
 | 17 | RUNTIME_FAILED_RESULT_CONSTRUCTION | SIZING_RUN_FAILURE_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×evaluated_candidate_count, SIZING_OPTIMIZER×1, RUNTIME_FAILURE×1, SIZING_RUN_FAILURE_RESULT×1 | INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, SIZING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER |
 
@@ -2690,506 +2715,6 @@ Each `MessageOccurrenceSnapshot` has exactly one owner, determined by precedence
 | 4 (lowest) | SIZING_RUN | All other messages (request validation, result construction) |
 
 **Invariant:** Each message occurrence has exactly one owner. No occurrence belongs to multiple owners. Owner assignment is frozen at snapshot construction time and cannot be reassigned.
-
-### 22.4 Termination-Class Topologies
-
-Each entry lists exact nodes (with multiplicity), exact edges, and forbidden nodes.
-
-#### INVALID_REQUEST
-
-```
-Nodes:
-- ROOT (1, type per root selection rule)
-- SIZING_RUN (1, id = sizing-run:raw:{raw_request_digest})
-- BLOCKER (>=1)
-- SIZING_RESULT (1)
-Forbidden: CATALOG, CANDIDATE, TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE, RUNTIME_FAILURE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- BLOCKER -> SIZING_RESULT "blocks"
-- SIZING_RUN -> SIZING_RESULT "produces"
-```
-
-#### INVALID_CATALOG / CATALOG_IDENTITY_MISMATCH
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (1 per invalid catalog)
-- BLOCKER (>=1)
-- SIZING_RESULT (1)
-Forbidden: CANDIDATE, TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE, RUNTIME_FAILURE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- BLOCKER -> SIZING_RESULT "blocks"
-- SIZING_RUN -> SIZING_RESULT "produces"
-```
-
-#### CAP_EXCEEDED / NO_MANUFACTURABLE_CANDIDATE
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (1 per catalog)
-- BLOCKER (>=1)
-- SIZING_RESULT (1)
-Forbidden: CANDIDATE, TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE, RUNTIME_FAILURE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- BLOCKER -> SIZING_RESULT "blocks"
-- SIZING_RUN -> SIZING_RESULT "produces"
-```
-
-#### NO_FEASIBLE_CANDIDATE (evaluated but no feasible)
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (1 per catalog)
-- CANDIDATE (1 per candidate)
-- TASK008_RATING_RESULT (1 per candidate)
-- OPTIMIZER (1)
-- BLOCKER (>=1)
-- SIZING_RESULT (1)
-Forbidden: INVALID_EVIDENCE, RUNTIME_FAILURE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- SIZING_RUN -> OPTIMIZER "executes"
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as"
-- TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
-- OPTIMIZER -> SIZING_RESULT "produces"
-- BLOCKER -> SIZING_RESULT "blocks"
-```
-
-#### RATING_RESULT_INTEGRITY_FAILED
-
-```text
-Nodes:
-- ROOT (1, type per root selection rule)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (1 per catalog)
-- CANDIDATE (unique_candidate_count)
-- VERIFIED TASK008_RATING_RESULT (verified_rating_count)
-- INVALID_EVIDENCE (1 per integrity-invalid candidate)
-- BLOCKER (>=1)
-- SIZING_RESULT (1)
-Forbidden: OPTIMIZER, RUNTIME_FAILURE, CLAIMED_TASK008_RATING_RESULT
-
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- CANDIDATE -> VERIFIED TASK008 result "rated_as" (for each verified)
-- CANDIDATE(current) -> INVALID_EVIDENCE "produced_unverified"
-- INVALID_EVIDENCE -> SIZING_RESULT "invalidates"
-- BLOCKER -> SIZING_RESULT "blocks"
-- SIZING_RUN -> SIZING_RESULT "produces"
-
-Counters:
-attempted = completed = verified + 1
-evaluated = attempted
-remaining = unique - attempted
-partial_audit = attempted < unique
-
-Candidate records:
-- prior candidates = VERIFIED
-- current candidate = INTEGRITY_INVALID
-- remaining candidates = UNEVALUATED
-```
-
-All `CANDIDATE` nodes correspond to the full `unique_candidate_count` — not just the evaluated subset.
-
-#### SUCCEEDED
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (1 per catalog)
-- CANDIDATE (1 per candidate)
-- TASK008_RATING_RESULT (1 per candidate)
-- OPTIMIZER (1)
-- WARNING (0 or more)
-- SIZING_RESULT (1)
-Forbidden: BLOCKER, INVALID_EVIDENCE, RUNTIME_FAILURE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- SIZING_RUN -> OPTIMIZER "executes"
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as"
-- TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
-- OPTIMIZER -> SIZING_RESULT "produces"
-- WARNING -> SIZING_RESULT "annotates"  (if any)
-```
-
-#### PROPERTY_PROVIDER_IDENTITY_MISMATCH
-
-```text
-Nodes:
-- ROOT (1, type per root selection rule)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (1 per catalog)
-- CANDIDATE (unique_candidate_count)
-- VERIFIED TASK008_RATING_RESULT (verified_rating_count)
-- BLOCKER (>=1)
-- SIZING_RESULT (1)
-Forbidden: OPTIMIZER, INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, RUNTIME_FAILURE
-
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- CANDIDATE -> VERIFIED TASK008 result "rated_as" (for each verified)
-- BLOCKER -> SIZING_RESULT "blocks"
-- SIZING_RUN -> SIZING_RESULT "produces"
-
-Counters:
-attempted = completed = verified
-evaluated = attempted
-remaining = unique - attempted
-partial_audit = (attempted < unique)
-
-Candidate records:
-- through mismatching candidate = VERIFIED
-- remaining = UNEVALUATED
-```
-
-Provider mismatch candidate's verified evidence:
-- Preserves actual provider identity
-- Marks mismatch diagnostic (not feasibility/ranking failure)
-- `selected_candidate = None`, `top_candidates = ()`
-
-#### RUNTIME_FAILED
-
-Each RUNTIME_FAILED result is assigned a `FailureStage` (see §21). The exact topology is determined by the stage at which the failure occurred.
-
-##### REQUEST_VALIDATION
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1, id = sizing-run:raw:{raw_request_digest})
-- RUNTIME_FAILURE (1)
-- SIZING_RESULT (1)
-Forbidden: CATALOG_SNAPSHOT, CANDIDATE, TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- RUNTIME_FAILURE -> SIZING_RESULT "fails"
-- SIZING_RUN -> SIZING_RESULT "produces"
-Count sources: raw_request_digest
-```
-
-##### CATALOG_VALIDATION
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (validated_catalog_count)
-- RUNTIME_FAILURE (1)
-- SIZING_RESULT (1)
-Forbidden: CANDIDATE, TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- RUNTIME_FAILURE -> SIZING_RESULT "fails"
-- SIZING_RUN -> SIZING_RESULT "produces"
-Count sources: validated_catalog_count
-```
-
-##### CANDIDATE_MATERIALIZATION
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (catalog_count)
-- CANDIDATE (materialized_candidate_count)
-- RUNTIME_FAILURE (1)
-- SIZING_RESULT (1)
-Forbidden: TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- RUNTIME_FAILURE -> SIZING_RESULT "fails"
-- SIZING_RUN -> SIZING_RESULT "produces"
-Count sources: catalog_count, materialized_candidate_count
-```
-
-##### PRE_RATING
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (catalog_count)
-- CANDIDATE (unique_candidate_count)
-- TASK008_RATING_RESULT (0)
-- RUNTIME_FAILURE (1)
-- SIZING_RESULT (1)
-Forbidden: TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- SIZING_RUN -> SIZING_RESULT "produces"
-- RUNTIME_FAILURE -> SIZING_RESULT "fails"
-partial_audit: True, evaluated_candidate_count: 0
-```
-
-##### RATING_CALL
-
-```
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (catalog_count)
-- CANDIDATE (unique_candidate_count)
-- TASK008_RATING_RESULT (completed_rating_count)
-- RUNTIME_FAILURE (1)
-- SIZING_RESULT (1)
-Forbidden: INVALID_EVIDENCE, OPTIMIZER
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as" (for each completed rating)
-- RUNTIME_FAILURE -> SIZING_RESULT "fails"
-- SIZING_RUN -> SIZING_RESULT "produces"
-Count sources: attempted_rating_count = completed_rating_count + 1
-evaluated_candidate_count = attempted_rating_count
-remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
-verified_rating_count = completed_rating_count
-The failed candidate is RUNTIME_FAILED, has no TASK008_RATING_RESULT,
-and is NOT counted as remaining unevaluated.
-```
-
-##### RATING_VERIFICATION
-
-```text
-Nodes:
-- ROOT (1, type per root selection rule)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (catalog_count)
-- CANDIDATE (unique_candidate_count)
-- VERIFIED TASK008_RATING_RESULT (verified_rating_count)
-- CLAIMED TASK008_RATING_RESULT (exactly 1)
-- RUNTIME_FAILURE (1)
-- SIZING_RESULT (1)
-Forbidden: INVALID_EVIDENCE, OPTIMIZER
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- CANDIDATE -> VERIFIED result "rated_as" (for each verified rating)
-- CANDIDATE(current) -> CLAIMED result "rated_as_claimed" (exactly 1)
-- RUNTIME_FAILURE -> SIZING_RESULT "fails"
-- SIZING_RUN -> SIZING_RESULT "produces"
-Count: attempted_rating_count = completed_rating_count
-evaluated_candidate_count = attempted_rating_count
-completed_rating_count = verified_rating_count + 1
-CLAIMED_TASK008_RATING_RESULT multiplicity = 1 (exactly one claimed node)
-remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
-
-The claimed-rating-result node uses CLAIMED_TASK008_RATING_RESULT concept
-(ProvenanceNodeType.INTERMEDIATE). It is NOT a verified TASK008 result.
-UUID5 name (when result hash unreadable):
-
-```text
-uuid5(TASK009_PROVENANCE_NAMESPACE,
-    "claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{audit_digest}")
-```
-
-`audit_digest` is the full `ClaimedRatingResultAuditSnapshot` digest. Always uses the same formula — no condition on result hash readability.
-
-Claimed node payload hash: `sha256_digest(claimed_audit_payload)`.
-
-The `claim_state` is one of: `"hash_verification_error"`, `"provenance_verification_error"`, `"unreadable"`.
-```
-```
-
-##### OPTIMIZATION
-
-```text
-Nodes:
-- ROOT (1)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (catalog_count)
-- CANDIDATE (unique_candidate_count)
-- TASK008_RATING_RESULT (evaluated_candidate_count = unique_candidate_count; all verified)
-- OPTIMIZER (1)
-- RUNTIME_FAILURE (1)
-- SIZING_RESULT (1)
-Forbidden: INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as"
-- TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
-- OPTIMIZER -> SIZING_RESULT "produces"
-- RUNTIME_FAILURE -> SIZING_RESULT "fails"
-partial_audit: False, evaluated_candidate_count: unique
-optimizer_node_exists: True, rating_result_nodes_exist: True
-CLAIMED_TASK008_RATING_RESULT count: 0 (precondition: attempted == completed == verified == unique)
-```
-
-##### RESULT_CONSTRUCTION
-
-Uses `SizingRunFailureResult` (independent schema, not `SizingOptimizationResult`):
-
-```text
-SizingRunFailureResult
-- status: FAILED
-- raw_request_digest: str
-- validated_sizing_request_identity_digest: str | None
-- failure_stage: RESULT_CONSTRUCTION
-- failure: RunFailure
-- catalog_snapshots: tuple[CompleteDoublePipeCatalogSnapshot, ...]
-- candidate_evaluations: tuple[CandidateEvaluation, ...]
-- verified_rating_evidence: tuple[VerifiedRatingEvidenceSnapshot, ...]
-- invalid_rating_evidence: tuple[InvalidRatingEvidenceRecord, ...]
-- claimed_rating_audits: tuple[ClaimedRatingResultAuditSnapshot, ...]
-- ranking_records: tuple[CandidateRankingRecord, ...]
-- warnings: tuple[EngineeringMessage, ...]
-- blockers: tuple[EngineeringMessage, ...]
-- catalog_snapshot_digests: tuple[str, ...]
-- candidate_evaluation_digests: tuple[str, ...]
-- verified_evidence_digests: tuple[str, ...]
-- invalid_evidence_digests: tuple[str, ...]
-- claimed_rating_audit_digests: tuple[str, ...]
-- warning_digests: tuple[str, ...]
-- blocker_digests: tuple[str, ...]
-- warning_occurrences: tuple[MessageOccurrenceSnapshot, ...]
-- blocker_occurrences: tuple[MessageOccurrenceSnapshot, ...]
-- warning_occurrence_digests: tuple[str, ...]
-- blocker_occurrence_digests: tuple[str, ...]
-- ranking_record_digests: tuple[str, ...]
-- attempted_rating_count: int
-- completed_rating_count: int
-- verified_rating_count: int
-- unique_candidate_count: int
-- feasible_candidate_count: int
-- partial_audit: bool
-- core_provenance_digest: str
-- failure_result_hash: str
-- provenance: ProvenanceGraph
-- provenance_digest: str
-```
-
-All digest collections sorted by canonical order (§23.4). `partial_audit = False` (evaluation completed all unique candidates).
-
-**Failure hash payload:**
-
-```python
-failure_result_payload = {
-    "raw_request_digest": ...,
-    "validated_sizing_request_identity_digest": ...,
-    "failure_stage": "result_construction",
-    "failure_digest": ...,
-    "catalog_snapshot_digests": [...],
-    "candidate_evaluation_digests": [...],
-    "verified_evidence_digests": [...],
-    "invalid_evidence_digests": [...],
-    "claimed_rating_audit_digests": [...],
-    "warning_digests": [...],
-    "blocker_digests": [...],
-    "warning_occurrence_digests": [...],
-    "blocker_occurrence_digests": [...],
-    "ranking_record_digests": [...],
-    "attempted_rating_count": ...,
-    "completed_rating_count": ...,
-    "verified_rating_count": ...,
-    "unique_candidate_count": ...,
-    "feasible_candidate_count": ...,
-    "partial_audit": False,
-    "core_provenance_digest": ...,
-}
-failure_result_hash = sha256_digest(failure_result_payload)
-```
-
-**Provenance node concept:** `SIZING_RUN_FAILURE_RESULT`
-
-```text
-ProvenanceNodeType   = RESULT
-label                = "sizing_run_failure"
-UUID5                = uuid5(TASK009_PROVENANCE_NAMESPACE,
-                       "sizing-run-failure:{failure_result_hash}")
-payload_hash         = sha256_digest({"failure_result_hash": failure_result_hash})
-metadata             = (("failure_result_hash", failure_result_hash),
-                       ("failure_stage", "result_construction"))
-```
-
-**Exact RESULT_CONSTRUCTION topology:**
-
-```text
-Nodes:
-- ROOT (1, type per root selection rule)
-- SIZING_RUN (1)
-- CATALOG_SNAPSHOT (catalog_count)
-- CANDIDATE (unique_candidate_count)
-- VERIFIED TASK008_RATING_RESULT (verified_rating_count = unique_candidate_count)
-- OPTIMIZER (1)
-- RUNTIME_FAILURE (1)
-- SIZING_RUN_FAILURE_RESULT (1)
-Forbidden: CLAIMED_TASK008_RATING_RESULT, INVALID_EVIDENCE
-
-Edges:
-- ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
-- SIZING_RUN -> OPTIMIZER "executes"
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as" (all verified)
-- TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
-- OPTIMIZER -> SIZING_RUN_FAILURE_RESULT "precedes_failure"
-- RUNTIME_FAILURE -> SIZING_RUN_FAILURE_RESULT "fails"
-- SIZING_RUN -> SIZING_RUN_FAILURE_RESULT "produces_failure_record"
-
-partial_audit: False
-attempted_rating_count == evaluated_candidate_count == verified_rating_count == unique_candidate_count
-CLAIMED_TASK008_RATING_RESULT count: 0 (precondition for entering optimization/result construction)
-```
-
-Base edge count: 9 (excluding occurrence edges).
-
-**The base topology does NOT contain WARNING or BLOCKER nodes or edges.** Warning and blocker nodes only exist by explicit occurrence expansion (below). The base topology includes only the structural nodes (ROOT, SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, TASK008_RATING_RESULT, OPTIMIZER, RUNTIME_FAILURE, SIZING_RUN_FAILURE_RESULT) and their connecting edges. No `emits`, `blocks`, `annotates`, or `annotates_failure` edges exist until occurrence expansion adds them.
-
-Occurrence expansion (applied to all warning/blocker-producing topologies):
-
-```text
-for each warning occurrence:
-  add WARNING node
-  add OWNER -> WARNING "emits"
-  add WARNING -> RESULT "annotates"
-  or WARNING -> FAILURE_RESULT "annotates_failure"
-
-for each blocker occurrence:
-  add BLOCKER node
-  add OWNER -> BLOCKER "emits"
-  add BLOCKER -> RESULT "blocks"
-  or BLOCKER -> FAILURE_RESULT "annotates_failure"
-```
-
-Final edge count for RESULT_CONSTRUCTION:
-
-```text
-final_edge_count = 9 + 2 * warning_occurrence_count + 2 * blocker_occurrence_count
-```
-
-If an owner concept node does not exist in a termination topology, that owner kind is forbidden in that topology.
-
-Failure core graph and final graph reference the same expansion formula.
-
-**JSON:** `SizingRunFailureResult` must be JSON round-trippable with all fields, digests, and provenance.
 
 ### 22.5 Failure-Result Two-Stage Provenance Construction
 
@@ -3359,7 +2884,13 @@ Before building any identity/hash/provenance payload, collections must be sorted
 | Diagnostics (`CandidateDiagnosticKey`) | `(diagnostic_class_rank, code, source_module, affected_paths, message)` ascending |
 | Warnings / blockers | `(severity_rank, code, source_module, affected_paths, message, canonical_context_digest)` ascending |
 | Evidence records (verified, invalid) | `candidate_id` ascending |
-- Validation errors (`SizingValidationErrorSnapshot`) | `(code.value, message_key, field_path, rejected_value_digest or "", context_digest)` ascending |
+| Claimed rating audits | `(source_qualified_candidate_id, evaluation_order_index, audit_digest)` ascending |
+| Claimed rating audit digests | same order as claimed rating audits |
+| Warning occurrences | canonical occurrence sort key |
+| Blocker occurrences | canonical occurrence sort key |
+| Warning occurrence digests | same order as warning occurrences |
+| Blocker occurrence digests | same order as blocker occurrences |
+|- Validation errors (`SizingValidationErrorSnapshot`) | `(code.value, message_key, field_path, rejected_value_digest or "", context_digest)` ascending |
 
 Severity rank:
 
@@ -3651,7 +3182,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 170. Validation error insertion-order independence
 171. Markdown code fence in `SizingRequestIdentity` schema validated (no leading pipes)
 172. Section numbering continuous (no gaps, no duplicates)
-173. Acceptance Criteria references Round 17
+173. Acceptance Criteria references Round 18
 174. Issue #23 frozen SHA equals new docs commit
 175. Task-card test range headings match numbered entries
 176. Issue test total equals task-card N
@@ -3685,7 +3216,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 201. Section numbering continuous (no gaps, section 20.3 present)
 202. Issue #23 test total equals task-card N
 203. Issue #23 frozen SHA equals new docs commit
-204. Acceptance Criteria references Round 17
+204. Acceptance Criteria references Round 18
 
 ### 27.13 Round 9 Contract Tests (205–244)
 
@@ -3781,7 +3312,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 291. Round 10 subsection numbering is locally continuous within 245–295
 292. Section heading test: all `## N.` extracted as int list equals `range(1, 30)`
 293. Section heading test: no duplicates, no gaps
-294. Test matrix section range 27.1–27.20 continuous
+294. Test matrix section range 27.1–27.21 continuous
 295. Round 10 subsection heading range is 245–295
 
 ### 27.15 Round 11 Contract Tests (296–332)
@@ -3807,7 +3338,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 314. Pipeline order: evidence constructed before provider comparison (not provider→evidence)
 315. No `N=244` anywhere in document
 316. Top-level headings continuous 1–29
-317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.8, 27.1–27.20)
+317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.8, 27.1–27.21)
 318. No duplicate `19A.5` heading
 319. No `## 14.8` heading (is `### 14.7`)
 320. Issue #23 lists Round 9/10/11 review entries
@@ -3820,7 +3351,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 327. Edge registry includes `SIZING_RUN -> SIZING_OPTIMIZER = "executes"`
 328. Nested digest payloads frozen: ProviderIdentitySnapshot (6 fields), ExecutionContextSnapshot (3 fields), SelectedCorrelationSnapshot (11 fields)
 329. Round 11 Review Comment ID is `4798512240`
-330. Acceptance Criteria references Round 17
+330. Acceptance Criteria references Round 18
 331. Issue #23 frozen SHA equals new docs commit
 332. Round 11 subsection numbering is locally continuous within 296–332; Issue and task card test total match
 
@@ -3962,7 +3493,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 457. Primitive fallback uses qualified type, context path digest, failure kind, safe marker digest
 458. Every named exact payload serializes Enums using `.value`
 459. Issue contains only 26-field verified evidence contract (no 24-field)
-460. Round 16 Comment ID `4799475298`; frozen SHA matches new commit; global numbering continuous 1–500
+460. Round 16 Comment ID `4799475298`; frozen SHA matches new commit; global numbering continuous 1–540
 
 ### 27.20 Round 16 Contract Tests (461–500)
 
@@ -4001,17 +3532,60 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 493. Canonical sort key: (owner_kind.value, owner_id, occurrence_kind.value, message_digest, occurrence_index, occurrence_digest)
 494. Every unique content digest has at least one occurrence
 495. Primitive fallback RunFailure context does NOT cascade fail on canonicalization
-496. Global test numbering continuous 1–500
-497. Section 27 range now 27.1–27.20 continuous (no gaps)
+496. Global test numbering continuous 1–540
+497. Section 27 range now 27.1–27.21 continuous (no gaps)
 498. Subsection headings range updated to 22.1–22.8 for provenance subsections
-499. Acceptance Criteria references Round 17 for Delivery Sequence
+499. Acceptance Criteria references Round 18 for Delivery Sequence
 500. Issue #23 frozen SHA equals new docs commit for Round 16
+
+### 27.21 Round 17 Contract Tests (501–540)
+
+501. Round 17 Review Comment ID is `4799885832`
+502. Round 17 row present in Design Review History table after Round 16
+503. Round 17 decision is `CHANGES REQUIRED`
+504. Review History has no gap after Round 17 (18 rows total)
+505. Review History columns: Round number, Comment ID, Decision — all present and non-empty
+506. Gate text at top of doc reads "Round 18" not "Round 17"
+507. Gate text: "TASK-009 returns to READY only after Round 18 Engineering Design Review passes."
+508. Delivery Sequence step 1 references "Round 18"
+509. Acceptance Criteria first item references "Round 18 Engineering Design Review"
+510. All Acceptance Criteria references to round gate use "Round 18" (not "Round 17")
+511. §19 SizingOptimizationResult schema contains `claimed_rating_audit_digests`
+512. §19 SizingOptimizationResult schema contains `warning_occurrences`, `blocker_occurrences`
+513. §19 SizingOptimizationResult schema contains `warning_occurrence_digests`, `blocker_occurrence_digests`
+514. §19 SizingResultIdentity schema contains `claimed_rating_audit_digests`
+515. §19 SizingResultIdentity schema contains `warning_occurrence_digests`, `blocker_occurrence_digests`
+516. §23.4 Canonical ordering table contains `Claimed rating audits` row
+517. §23.4 Canonical ordering table contains `Claimed rating audit digests` row
+518. §23.4 Canonical ordering table contains `Warning occurrences` row
+519. §23.4 Canonical ordering table contains `Blocker occurrences` row
+520. §23.4 Canonical ordering table contains `Warning occurrence digests` and `Blocker occurrence digests` rows
+521. Canonical sort key for claimed rating audits: `(source_qualified_candidate_id, evaluation_order_index, audit_digest)`
+522. Warning occurrences sort key: canonical occurrence sort key
+523. Blocker occurrences sort key: canonical occurrence sort key
+524. Warning occurrence digests sort key: same order as warning occurrences
+525. Blocker occurrence digests sort key: same order as blocker occurrences
+526. Section 27.21 present (Round 17 Contract Tests)
+527. Section 27.21 has exactly 40 entries (501–540)
+528. Section 27.21 heading reads "Round 17 Contract Tests (501–540)"
+529. Test numbering 501–540 is continuous with no gaps
+530. Round 17 test range matches heading: 501–540
+531. Global test numbering continuous 1–540
+532. Section 27 range now 27.1–27.21 continuous (no gaps)
+533. Acceptance Criteria references Round 18 for Delivery Sequence
+534. Issue #23 test total equals task-card N (540)
+535. Round 17 subsection numbering locally continuous within 501–540
+536. Issue #23 frozen SHA equals new docs commit for Round 17
+537. Acceptance Criteria required test matrix entries include Round 17 (501–540)
+538. Acceptance Criteria test total updated from 1–500 to 1–540
+539. Section 27.21 test entries cover all Round 17 document changes
+540. TASK-010 in TASK_BACKLOG.md changed from READY to BLOCKED
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 17 Engineering Design Review.
+1. Complete Round 18 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -4025,7 +3599,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 17 Engineering Design Review passes before implementation starts
+- [ ] Round 18 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -4044,6 +3618,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–500 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), and Round 16 (461–500)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 17 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
