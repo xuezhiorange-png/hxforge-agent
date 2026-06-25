@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 14 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 15 Engineering Design Review passes.
 
 ---
 
@@ -47,6 +47,8 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 11 | 4798512240 | CHANGES REQUIRED |
 | 12 | 4798693707 | CHANGES REQUIRED |
 | 13 | 4798895696 | CHANGES REQUIRED |
+| 14 | 4799066285 | CHANGES REQUIRED |
+| 15 | — | CHANGES REQUIRED — review delivered without GitHub comment |
 
 ---
 
@@ -1360,6 +1362,45 @@ If `canonical_json()` fails (unsupported type, non-finite float, cyclic referenc
 - Do not silently skip, `repr()`, stringify, or fall back to a non-deterministic marker.
 - Do not let the implementation choose the handling strategy at runtime.
 
+### 14.7.7 ContextCanonicalizationFailureSnapshot
+
+When `canonical_json()` fails for a trusted context value (unsupported type, non-finite float, cyclic reference, unserializable object) during `EngineeringMessage` or `RunFailure` construction, the system MUST build a primitive-only fallback `RunFailure` that itself cannot recursively fail.
+
+**Fallback RunFailure payload (primitive-only):**
+
+```python
+RunFailure(
+    code="PROVENANCE_INCOMPLETE",
+    message=f"Unsupported context value in {owner_kind}:{owner_id}",
+    traceback=None,
+    context=(
+        ("failure_stage", stage),
+        ("owner_kind", owner_kind),
+        ("owner_id", owner_id),
+        ("original_code", original_code),
+        ("unsupported_type", type(unsupported_value).__name__),
+    ),
+)
+```
+
+The fallback `RunFailure` uses **only** primitive types (`str`, `None`, `tuple[tuple[str, str], ...]`). No nested objects, no non-finite floats, no cyclic references. This guarantees the fallback itself never triggers a recursive canonicalization failure.
+
+**Stage mapping:**
+
+| Context owner | FailureStage |
+|---|---|
+| `EngineeringMessage` during candidate evidence construction | `RATING_VERIFICATION` |
+| `EngineeringMessage` during result/failure-result construction | `RESULT_CONSTRUCTION` |
+| `RunFailure` during candidate evidence construction | `RATING_VERIFICATION` |
+| `RunFailure` during result/failure-result construction | `RESULT_CONSTRUCTION` |
+
+**Recursive failure prevention rules:**
+
+1. Fallback `RunFailure` payload uses only `str`, `None`, and `tuple[tuple[str, str], ...]` — all trivially canonicalizable.
+2. Fallback `RunFailure` does NOT contain its own `context` with nested objects or non-finite values.
+3. The `sha256_digest()` of the fallback `RunFailure` is computed directly from the flat primitive payload, bypassing `canonical_json()` on the original unsupported value.
+4. Under no circumstances does the fallback itself produce a second `PROVENANCE_INCOMPLETE` failure. If the payload somehow fails again (impossible by construction), the system must treat it as a fatal implementation error, not a recoverable fallback.
+
 ---
 
 ## 15. CandidateEvaluation
@@ -1989,6 +2030,8 @@ An invalid request BLOCKED result must still produce:
     "canonical_ranking_digests": [...],
     "warning_digests": [...],
     "blocker_digests": [...],
+    "warning_occurrence_digests": [...],
+    "blocker_occurrence_digests": [...],
     "failure_digest": ... | None,
     "verified_evidence_digests": [...],
     "invalid_evidence_digests": [...],
@@ -2309,10 +2352,14 @@ Edge labels are uniquely frozen:
 | RUNTIME_FAILURE → SIZING_RUN_FAILURE_RESULT | `"fails"` |
 | SIZING_RUN → SIZING_RESULT | `"produces"` |
 | SIZING_RUN → SIZING_RUN_FAILURE_RESULT | `"produces_failure_record"` |
-| BLOCKER → SIZING_RESULT | `"blocks"` |
-| BLOCKER → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
-| WARNING → SIZING_RESULT | `"annotates"` |
-| WARNING → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+|| BLOCKER → SIZING_RESULT | `"blocks"` |
+|| BLOCKER → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+|| WARNING → SIZING_RESULT | `"annotates"` |
+|| WARNING → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+|| SIZING_RUN → WARNING | `"emits"` |
+|| CATALOG_SNAPSHOT → WARNING | `"emits"` |
+|| CANDIDATE → WARNING | `"emits"` |
+|| OPTIMIZER → WARNING | `"emits"` |
 
 No two edges share an ambiguous label with different semantics.
 
@@ -2322,36 +2369,108 @@ No two edges share an ambiguous label with different semantics.
 TASK009_PROVENANCE_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 ```
 
-### 22.3 UUID5 Name Payloads  
+### 22.3 Executable Provenance Concept Registry
 
-**MessageOccurrenceIdentity:**
+Each concept entry defines the exact node_type (ProvenanceNodeType enum value), label formula, UUID5 name formula, payload hash payload, required metadata fields, allowed incoming/outgoing edge node types, multiplicity source, and allowed/forbidden termination classes.
 
-Duplicate warning/blocker messages with identical digests must produce distinct provenance UUIDs when they belong to different owners or occurrence indices.
+| Concept | node_type | label_formula | uuid5_name_formula | payload_hash_payload | required_metadata_fields | allowed_incoming | allowed_outgoing | multiplicity_source | allowed_termination_classes | forbidden_termination_classes |
+|---------|-----------|---------------|--------------------|----------------------|--------------------------|------------------|------------------|---------------------|------------------------------|-------------------------------|
+| ROOT_CASE_REVISION | CASE_REVISION | `f"revision_{design_case_revision_id}"` | `f"root-case-revision:{design_case_revision_id}"` | `{"design_case_revision_id": id}` | `design_case_revision_id` | — | SIZING_RUN | singleton (1 per graph) | all | INVALID_REQUEST |
+| ROOT_EXTERNAL | EXTERNAL | `"external_root"` | `f"root-external:{digest}"` where digest = `validated_sizing_request_identity_digest` if valid else `raw_request_digest` | `{"root_digest": digest}` | — | — | SIZING_RUN | singleton (1 per graph) | all | INVALID_REQUEST |
+| SIZING_RUN | CALCULATION_RUN | `f"sizing_run_{digest}"` | `f"sizing-run:{validated_sizing_request_identity_digest}"` | `{"validated_sizing_request_identity_digest": digest}` | `validated_sizing_request_identity_digest` | ROOT_CASE_REVISION, ROOT_EXTERNAL | CATALOG_SNAPSHOT, OPTIMIZER, SIZING_RESULT, SIZING_RUN_FAILURE_RESULT, WARNING, BLOCKER | 1 per graph | all | — |
+| SIZING_OPTIMIZER | OPTIMIZER | `"sizing_optimizer"` | `f"optimizer:{validated_sizing_request_identity_digest}"` | `{"validated_sizing_request_identity_digest": digest}` | `validated_sizing_request_identity_digest` | SIZING_RUN, TASK008_RATING_RESULT | SIZING_RESULT, SIZING_RUN_FAILURE_RESULT, WARNING, BLOCKER | 1 per graph | OPTIMIZATION, RESULT_CONSTRUCTION | INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING, RATING_CALL, RATING_VERIFICATION, PROVIDER_MISMATCH |
+| CATALOG_SNAPSHOT | INTERMEDIATE | `f"catalog_{catalog_id}"` | `f"catalog:{catalog_id}:{catalog_version}:{catalog_content_hash}"` | `{"catalog_id": id, "catalog_version": v, "catalog_content_hash": hash}` | `catalog_id`, `catalog_version`, `catalog_content_hash` | SIZING_RUN | CANDIDATE, WARNING, BLOCKER | catalog_count (>= 1) | all | — |
+| CANDIDATE | INTERMEDIATE | `f"candidate_{id}"` | `f"candidate:{source_qualified_candidate_id}"` | `{"source_qualified_candidate_id": id}` | `source_qualified_candidate_id` | CATALOG_SNAPSHOT | TASK008_RATING_RESULT, CLAIMED_TASK008_RATING_RESULT, INVALID_EVIDENCE, WARNING, BLOCKER | unique_candidate_count | all | — |
+| TASK008_RATING_RESULT | RESULT | `f"rating_{result_hash}"` | `f"rating-result:{rating_result_hash}"` | `{"rating_result_hash": hash}` | `rating_result_hash` | CANDIDATE | OPTIMIZER | verified_rating_count | RATING_CALL, RATING_VERIFICATION, PROVIDER_MISMATCH, OPTIMIZATION, RESULT_CONSTRUCTION | INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING |
+| CLAIMED_TASK008_RATING_RESULT | INTERMEDIATE | `f"claimed_rating_{candidate_id}"` | `f"claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{audit_digest}"` | `sha256_digest(claimed_audit_payload)` | `source_qualified_candidate_id`, `evaluation_order_index`, `audit_digest` | CANDIDATE | — | 0 (forbidden in OPTIMIZATION/RESULT_CONSTRUCTION); >= 1 in RATING_VERIFICATION | RATING_VERIFICATION | OPTIMIZATION, RESULT_CONSTRUCTION, INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING, RATING_CALL, PROVIDER_MISMATCH |
+| SIZING_RESULT | RESULT | `"sizing_result"` | `f"sizing-result:{result_hash}"` | `{"result_hash": hash}` | `result_hash` | OPTIMIZER, RUNTIME_FAILURE, BLOCKER, WARNING, SIZING_RUN | — | 1 per graph | OPTIMIZATION, RESULT_CONSTRUCTION | INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING, RATING_CALL, RATING_VERIFICATION, PROVIDER_MISMATCH |
+| SIZING_RUN_FAILURE_RESULT | RESULT | `"sizing_run_failure"` | `f"sizing-run-failure:{failure_result_hash}"` | `{"failure_result_hash": hash}` | `failure_result_hash`, `failure_stage` | OPTIMIZER, RUNTIME_FAILURE, BLOCKER, WARNING, SIZING_RUN | — | 1 per graph | RESULT_CONSTRUCTION | all others |
+| INVALID_EVIDENCE | INTERMEDIATE | `f"invalid_evidence_{candidate_id}"` | `f"invalid-evidence:{source_qualified_candidate_id}:{invalid_evidence_digest}"` | `{"invalid_evidence_digest": digest}` | `source_qualified_candidate_id`, `invalid_evidence_digest` | CANDIDATE | SIZING_RESULT, WARNING, BLOCKER | invalid_evidence_count | PROVIDER_MISMATCH, OPTIMIZATION, RESULT_CONSTRUCTION | INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING, RATING_CALL, RATING_VERIFICATION |
+| RUNTIME_FAILURE | BLOCKER | `"runtime_failure"` | `f"runtime-failure:{failure_digest}"` | `{"failure_digest": digest}` | `failure_digest` | — | SIZING_RESULT, SIZING_RUN_FAILURE_RESULT | 0 or 1 | all | — |
+| WARNING | WARNING | per message (canonical message sort key) | `f"warning:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}"` | `sha256_digest(message_occurrence_payload)` | `owner_kind`, `owner_id`, `message_digest`, `occurrence_index` | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER | SIZING_RESULT, SIZING_RUN_FAILURE_RESULT | warning_occurrence_count (>= 0) | all | — |
+| BLOCKER | BLOCKER | per message (canonical message sort key) | `f"blocker:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}"` | `sha256_digest(message_occurrence_payload)` | `owner_kind`, `owner_id`, `message_digest`, `occurrence_index` | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER | SIZING_RESULT, SIZING_RUN_FAILURE_RESULT | blocker_occurrence_count (>= 0) | all | — |
+
+### 22.3A MessageOwnerKind and MessageOccurrenceSnapshot
+
+```python
+class MessageOwnerKind(enum.Enum):
+    SIZING_RUN = "sizing_run"
+    CATALOG_SNAPSHOT = "catalog_snapshot"
+    CANDIDATE = "candidate"
+    OPTIMIZER = "optimizer"
+```
+
+**MessageOccurrenceSnapshot** replaces the earlier MessageOccurrenceIdentity concept. Each snapshot captures a single occurrence of a warning or blocker message within its owner's scope.
 
 ```text
-MessageOccurrenceIdentity
-- owner_kind: str          (sizing_run | candidate | catalog | optimizer)
+MessageOccurrenceSnapshot
+- owner_kind: MessageOwnerKind
 - owner_id: str
 - message_digest: str
 - occurrence_index: int
+- occurrence_digest: str       (sha256 of the complete occurrence payload)
 ```
 
-Rules:
-- Within the same owner, messages are sorted by canonical message sort key (§8).
-- For identical `message_digest` values within the same owner, `occurrence_index` is assigned from 0 consecutively.
-- `occurrence_index` is independent of insertion order.
-- UUID5 formula includes all four fields to guarantee distinctness.
+**Exact occurrence payload:**
 
 ```python
 message_occurrence_payload = {
-    "owner_kind": owner_kind,
+    "owner_kind": owner_kind.value,
     "owner_id": owner_id,
     "message_digest": message_digest,
     "occurrence_index": occurrence_index,
 }
+occurrence_digest = sha256_digest(message_occurrence_payload)
 ```
 
-Node payload hash: `sha256_digest(message_occurrence_payload)`.
+**Canonical occurrence index rules:**
+
+1. Within the same owner, messages are sorted by canonical message sort key (§8).
+2. For identical `message_digest` values within the same owner, `occurrence_index` is assigned from 0 consecutively.
+3. `occurrence_index` is independent of insertion order — it is purely a function of the canonical sort.
+4. UUID5 formula uses all four fields to guarantee distinctness across owners and occurrences.
+5. `occurrence_digest` covers all fields — any tampering with a snapshot field produces a different digest.
+
+**Provenance node UUID5 for WARNING/BLOCKER:**
+
+```python
+uuid5_name = f"{node_kind}:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}"
+# where node_kind is "warning" or "blocker"
+node_uuid = uuid5(TASK009_PROVENANCE_NAMESPACE, uuid5_name)
+```
+
+**Persistence fields in SizingOptimizationResult:**
+
+```text
+warning_occurrences: tuple[MessageOccurrenceSnapshot, ...]
+blocker_occurrences: tuple[MessageOccurrenceSnapshot, ...]
+```
+
+**Persistence fields in SizingRunFailureResult:**
+
+```text
+warning_occurrences: tuple[MessageOccurrenceSnapshot, ...]
+blocker_occurrences: tuple[MessageOccurrenceSnapshot, ...]
+```
+
+**Digest fields in SizingResultIdentity:**
+
+```text
+warning_occurrence_digests: tuple[str, ...]
+blocker_occurrence_digests: tuple[str, ...]
+```
+
+**JSON/tamper rules:**
+
+- Each `MessageOccurrenceSnapshot` is immutable after construction — all fields are frozen.
+- `occurrence_digest` is the sha256 of the serialized `message_occurrence_payload` (canonical JSON, sorted keys).
+- Tampering with `owner_kind`, `owner_id`, `message_digest`, or `occurrence_index` changes `occurrence_digest` and breaks the provenance node UUID5 and payload hash chain.
+- The WARNING and BLOCKER provenance node's payload hash equals `occurrence_digest`.
+- JSON round-trip of `SizingOptimizationResult` and `SizingRunFailureResult` must preserve every `MessageOccurrenceSnapshot` field exactly.
+- `warning_occurrence_digests` and `blocker_occurrence_digests` in `SizingResultIdentity` must match the `occurrence_digest` values from the corresponding `warning_occurrences` and `blocker_occurrences` collections, in the same sorted order.
+- These digest-only fields in `SizingResultIdentity` enable tamper detection on the identity payload without embedding full occurrence snapshots. Full snapshots live only in the result objects.
+
+**UUID5 name list (canonical order, for reference):**
 
 ```text
 sizing-run:{validated_sizing_request_identity_digest}
@@ -2779,6 +2898,8 @@ failure_result_payload = {
     "claimed_rating_audit_digests": [...],
     "warning_digests": [...],
     "blocker_digests": [...],
+    "warning_occurrence_digests": [...],
+    "blocker_occurrence_digests": [...],
     "ranking_record_digests": [...],
     "attempted_rating_count": ...,
     "completed_rating_count": ...,
@@ -2820,6 +2941,7 @@ Forbidden: CLAIMED_TASK008_RATING_RESULT, INVALID_EVIDENCE
 Edges:
 - ROOT -> SIZING_RUN "initiates"
 - SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
+- SIZING_RUN -> OPTIMIZER "executes"
 - CATALOG_SNAPSHOT -> CANDIDATE "generates"
 - CANDIDATE -> TASK008_RATING_RESULT "rated_as" (all verified)
 - TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
@@ -3017,7 +3139,7 @@ Context digest:
 
 ```python
 sha256_digest({
-    "context": canonicalized_context
+    "entries": canonical_context_entries
 })
 ```
 
@@ -3322,7 +3444,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 194. `RATING_VERIFICATION` topology distinguishes `VERIFIED` vs `CLAIMED` TASK008 result nodes
 195. `RESULT_CONSTRUCTION` uses independent `SIZING_RUN_FAILURE_RESULT` node type/label/UUID
 196. `RESULT_CONSTRUCTION` exact node multiplicity (`SIZING_RUN_FAILURE_RESULT × 1`)
-197. `RESULT_CONSTRUCTION` exact edge set (8 edges, including `precedes_failure`)
+197. `RESULT_CONSTRUCTION` exact edge set (9 edges, including `precedes_failure`)
 198. Failure result embeds canonical audit digest collections (catalog, evaluation, evidence, ranking digests)
 199. No `RawInputCanonicalizationError` exists in test descriptions (all use deterministic marker)
 200. 4 `CandidateEvaluationState` enum values / 7 invariant rows consistency
@@ -3425,7 +3547,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 291. Round 10 subsection numbering is locally continuous within 245–295
 292. Section heading test: all `## N.` extracted as int list equals `range(1, 30)`
 293. Section heading test: no duplicates, no gaps
-294. Test matrix section range 27.1–27.17 continuous
+294. Test matrix section range 27.1–27.18 continuous
 295. Round 10 subsection heading range is 245–295
 
 ### 27.15 Round 11 Contract Tests (296–332)
@@ -3451,7 +3573,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 314. Pipeline order: evidence constructed before provider comparison (not provider→evidence)
 315. No `N=244` anywhere in document
 316. Top-level headings continuous 1–29
-317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.7, 27.1–27.17)
+317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.7, 27.1–27.18)
 318. No duplicate `19A.5` heading
 319. No `## 14.8` heading (is `### 14.7`)
 320. Issue #23 lists Round 9/10/11 review entries
@@ -3545,13 +3667,41 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 402. Unsupported trusted context value follows frozen fail-closed path (RUNTIME_FAILED + PROVENANCE_INCOMPLETE)
 403. Non-finite float in trusted context follows frozen fail-closed path
 404. Failure provenance reconstruction requires full audit objects (digest-only reconstruction fails)
-405. Round 13 Comment ID `4798895696`, Issue frozen SHA matches new commit, global numbering continuous 1–405
+405. Round 13 Comment ID `4798895696`, Issue frozen SHA matches new commit, global numbering continuous 1–430
+
+### 27.18 Round 15 Contract Tests (406–430)
+
+406. Actual executable registry contains exactly 14 concept entries
+407. Every registry entry has node type and label formula
+408. Every registry entry has UUID5 name formula
+409. Every registry entry has exact payload-hash payload
+410. Every registry entry has ordered metadata fields
+411. Every registry entry has allowed incoming/outgoing relations
+412. Every registry entry has multiplicity source and topology allow/deny sets
+413. Topologies reference registry concepts without identity redefinition
+414. MessageOccurrenceSnapshot exact schema and digest
+415. Warning occurrences stored in standard and failure result models
+416. Blocker occurrences stored in standard and failure result models
+417. Occurrence digests enter standard/failure result hashes (result identity binding)
+418. TASK-008 candidate warning owner assignment (owner_kind=CANDIDATE, owner_id=source_qualified_candidate_id)
+419. Catalog/optimizer/run message owner assignment (owner_kind as appropriate)
+420. Exactly one incoming `emits` edge per message occurrence node
+421. Duplicate identical warnings retain distinct deterministic nodes via occurrence_index
+422. Duplicate identical blockers retain distinct deterministic nodes via occurrence_index
+423. Single context digest formula uses `{"entries": ...}` consistently
+424. Old `{"context": canonicalized_context}` digest formula absent from active contract
+425. Unsupported trusted context builds primitive-only fallback RunFailure
+426. Fallback RunFailure does not recursively fail canonicalization
+427. RESULT_CONSTRUCTION topology includes `SIZING_RUN -> OPTIMIZER "executes"` edge
+428. RESULT_CONSTRUCTION exact base edge count updated (9 edges)
+429. Every exact enum payload uses `.value` or explicitly notes already-primitive TASK-008 fields
+430. Round 14 Comment ID `4799066285`; Issue frozen SHA matches new commit; global tests continuous 1–430
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 14 Engineering Design Review.
+1. Complete Round 15 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -3565,7 +3715,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 14 Engineering Design Review passes before implementation starts
+- [ ] Round 15 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -3584,6 +3734,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–405 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), and Round 13 (371–405)
+- [ ] Required test matrix entries 1–430 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), and Round 14 (406–430)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
