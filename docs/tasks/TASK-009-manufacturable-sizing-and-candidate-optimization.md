@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 27 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 28 Engineering Design Review passes.
 
 ---
 
@@ -60,6 +60,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 24 | 4801928304 | CHANGES REQUIRED |
 | 25 | 4802083544 | CHANGES REQUIRED |
 | 26 | 4802228027 | CHANGES REQUIRED |
+| 27 | 4802328600 | CHANGES REQUIRED |
 
 |---|
 
@@ -1265,11 +1266,310 @@ selected_correlation_payload = {
 selected_correlation_digest = sha256_digest(selected_correlation_payload)
 ```
 
-### 14.7.2 Shared canonical context normalization
+### 14.7.2 Shared canonical context normalization (merged block)
 
-Add the `CanonicalContextEntry` dataclass and the shared `build_canonical_context_entries()` function. These replace the old per-type normalization functions and the `list[list[str, value]]` format.
+All canonicalization types, constants, and functions in a single executable block:
 
 ```python
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import Enum
+import math
+from typing import Literal, TypeAlias
+from uuid import UUID
+
+
+RUN_FAILURE_SCHEMA_VERSION = "1"
+CONTEXT_CANONICALIZATION_FAILURE_MESSAGE = "Trusted context canonicalization failed."
+NON_STRING_CONTEXT_KEY_MARKER = "<non-string-context-key>"
+NON_STRING_MAPPING_KEY_MARKER = "<non-string-mapping-key>"
+
+
+CanonicalValue: TypeAlias = (
+    None
+    | bool
+    | int
+    | float
+    | str
+    | list["CanonicalValue"]
+    | dict[str, "CanonicalValue"]
+)
+
+
+ContextCanonicalizationFailureKind: TypeAlias = Literal[
+    "unsupported_type", "non_finite_float", "cyclic_reference",
+    "naive_datetime", "non_string_key", "canonicalization_exception",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class ContextCanonicalizationErrorData:
+    failure_kind: ContextCanonicalizationFailureKind
+    context_key: str
+    context_path: tuple[str, ...]
+    offending_type: str
+
+
+class ContextCanonicalizationError(ValueError):
+    data: ContextCanonicalizationErrorData
+
+    def __init__(
+        self,
+        failure_kind: ContextCanonicalizationFailureKind,
+        context_key: str,
+        context_path: tuple[str, ...],
+        offending_type: str,
+    ) -> None:
+        self.data = ContextCanonicalizationErrorData(
+            failure_kind=failure_kind,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=offending_type,
+        )
+        super().__init__(failure_kind)
+
+
+def qualified_type_name(value: object) -> str:
+    return f"{type(value).__module__}.{type(value).__qualname__}"
+
+
+def safe_has_attribute(
+    value: object, name: str, *,
+    context_key: str, context_path: tuple[str, ...],
+) -> bool:
+    try:
+        return hasattr(value, name)
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind="canonicalization_exception",
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+
+
+def is_repository_quantity_like(value: object) -> bool:
+    return (
+        hasattr(value, "value") and hasattr(value, "unit")
+        and hasattr(value, "kind") and hasattr(value, "to_si")
+    )
+
+
+def is_pydantic_model(value: object) -> bool:
+    return hasattr(value, "model_fields")
+
+
+def canonicalize_trusted_context_value(
+    value: object,
+    context_key: str,
+    context_path: tuple[str, ...],
+    ancestor_ids: frozenset[int],
+) -> CanonicalValue:
+    """Recursively canonicalize a trusted context value.
+
+    Dispatch order:
+      1. None
+      2. Enum/StrEnum → .value then recurse
+      3. UUID → str
+      4. timezone-aware datetime
+      5. bool
+      6. int
+      7. finite float
+      8. str
+      9. tuple/list → recursive
+     10. Mapping → recursive (str keys only)
+     11. repository Quantity-like (canonical.py)
+     12. Pydantic model (canonical.py)
+     13. Unsupported → raise
+    """
+    try:
+        if value is None:
+            return None
+
+        # Cycle detection
+        object_id = id(value)
+        if object_id in ancestor_ids:
+            raise ContextCanonicalizationError(
+                failure_kind="cyclic_reference",
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            )
+
+        # Enum → .value then recurse
+        if isinstance(value, Enum):
+            return canonicalize_trusted_context_value(
+                value.value,
+                context_key=context_key,
+                context_path=context_path,
+                ancestor_ids=ancestor_ids,
+            )
+
+        # UUID → str
+        if isinstance(value, UUID):
+            return str(value)
+
+        # timezone-aware datetime
+        if isinstance(value, datetime):
+            try:
+                offset = value.utcoffset()
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind="canonicalization_exception",
+                    context_key=context_key,
+                    context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                ) from exc
+            if value.tzinfo is None or offset is None:
+                raise ContextCanonicalizationError(
+                    failure_kind="naive_datetime",
+                    context_key=context_key,
+                    context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                )
+            try:
+                utc_value = value.astimezone(UTC)
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind="canonicalization_exception",
+                    context_key=context_key,
+                    context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                ) from exc
+            return utc_value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        # bool (must be before int)
+        if isinstance(value, bool):
+            return value
+
+        # int
+        if isinstance(value, int):
+            return value
+
+        # finite float
+        if isinstance(value, float):
+            if not math.isfinite(value):
+                raise ContextCanonicalizationError(
+                    failure_kind="non_finite_float",
+                    context_key=context_key,
+                    context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                )
+            return value
+
+        # str
+        if isinstance(value, str):
+            return value
+
+        # tuple/list → recursive
+        if isinstance(value, (tuple, list)):
+            updated_ancestors = ancestor_ids | {id(value)}
+            result: list[CanonicalValue] = []
+            for index, item in enumerate(value):
+                result.append(canonicalize_trusted_context_value(
+                    item, context_key=context_key,
+                    context_path=context_path + (f"[{index}]",),
+                    ancestor_ids=updated_ancestors,
+                ))
+            return result
+
+        # Mapping → recursive (str keys only)
+        if isinstance(value, Mapping):
+            updated_ancestors = ancestor_ids | {id(value)}
+            result: dict[str, CanonicalValue] = {}
+            for k, v in value.items():
+                if type(k) is not str:
+                    raise ContextCanonicalizationError(
+                        failure_kind="non_string_key",
+                        context_key=context_key,
+                        context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
+                        offending_type=qualified_type_name(k),
+                    )
+                child_path = context_path + (k,)
+                canonical_v = canonicalize_trusted_context_value(
+                    v,
+                    context_key=context_key,
+                    context_path=child_path,
+                    ancestor_ids=updated_ancestors,
+                )
+                result[k] = canonical_v
+            return result
+
+        # repository Quantity-like (canonical.py)
+        if is_repository_quantity_like(value):
+            try:
+                kind = value.kind
+                si_value = value.value
+                if kind is not None:
+                    si_value = value.to_si().value
+                return {
+                    "si_value": canonicalize_trusted_context_value(
+                        si_value, context_key=context_key,
+                        context_path=context_path + ("si_value",),
+                        ancestor_ids=ancestor_ids,
+                    ),
+                    "kind": kind.value if kind is not None else None,
+                }
+            except ContextCanonicalizationError:
+                raise
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind="canonicalization_exception",
+                    context_key=context_key, context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                ) from exc
+
+        # Pydantic model - field-level traversal
+        if is_pydantic_model(value):
+            model_type = type(value)
+            try:
+                model_fields = model_type.model_fields
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind="canonicalization_exception",
+                    context_key=context_key,
+                    context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                ) from exc
+            updated_ancestors = ancestor_ids | {id(value)}
+            result: dict[str, CanonicalValue] = {}
+            for field_name in model_fields:
+                try:
+                    field_value = getattr(value, field_name)
+                except Exception as exc:
+                    raise ContextCanonicalizationError(
+                        failure_kind="canonicalization_exception",
+                        context_key=context_key,
+                        context_path=context_path + (field_name,),
+                        offending_type=qualified_type_name(value),
+                    ) from exc
+                result[field_name] = canonicalize_trusted_context_value(
+                    field_value, context_key=context_key,
+                    context_path=context_path + (field_name,),
+                    ancestor_ids=updated_ancestors,
+                )
+            return result
+
+        raise ContextCanonicalizationError(
+            failure_kind="unsupported_type",
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        )
+    except ContextCanonicalizationError:
+        raise
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind="canonicalization_exception",
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+
+
 @dataclass(frozen=True, slots=True)
 class CanonicalContextEntry:
     key: str
@@ -1291,7 +1591,7 @@ def build_canonical_context_entries(
         if type(key) is not str:
             raise ContextCanonicalizationError(
                 failure_kind="non_string_key",
-                context_key=str(key),
+                context_key=NON_STRING_CONTEXT_KEY_MARKER,
                 context_path=(),
                 offending_type=qualified_type_name(key),
             )
@@ -1309,9 +1609,59 @@ def build_canonical_context_entries(
         ))
     entries.sort(key=lambda e: (e.key, e.value_digest))
     return tuple(entries)
+
+
+def build_run_failure_payload(failure: RunFailure) -> CanonicalPayload:
+    entries = build_canonical_context_entries(failure.context)
+    return {
+        "schema_version": failure.schema_version,
+        "code": failure.code.value,
+        "message": failure.message,
+        "traceback": failure.traceback,
+        "context_entries": [
+            {"key": entry.key, "value": entry.value, "value_digest": entry.value_digest}
+            for entry in entries
+        ],
+    }
+
+
+def digest_run_failure(failure: RunFailure) -> str:
+    return sha256_digest(build_run_failure_payload(failure))
+
+
+def build_context_canonicalization_fallback(
+    *, failure_stage: FailureStage, owner_kind: MessageOwnerKind,
+    owner_id: str, original_code: ErrorCode,
+    error: ContextCanonicalizationError,
+) -> RunFailure:
+    safe_marker_payload = {
+        "context_key": error.data.context_key,
+        "context_path": list(error.data.context_path),
+        "offending_type": error.data.offending_type,
+        "failure_kind": error.data.failure_kind,
+    }
+    safe_marker_digest = sha256_digest(safe_marker_payload)
+    fallback_failure_context = (
+        ("failure_stage", failure_stage.value),
+        ("owner_kind", owner_kind.value),
+        ("owner_id", owner_id),
+        ("original_code", original_code.value),
+        ("context_key", error.data.context_key),
+        ("context_path_digest", sha256_digest({"context_path": list(error.data.context_path)})),
+        ("offending_type", error.data.offending_type),
+        ("failure_kind", error.data.failure_kind),
+        ("safe_marker_digest", safe_marker_digest),
+    )
+    return RunFailure(
+        schema_version=RUN_FAILURE_SCHEMA_VERSION,
+        code=ErrorCode.PROVENANCE_INCOMPLETE,
+        message=CONTEXT_CANONICALIZATION_FAILURE_MESSAGE,
+        traceback=None,
+        context=fallback_failure_context,
+    )
 ```
 
-Sort entries by `(key, value_digest)`. Preserve duplicate entries.
+Usage:
 
 ```python
 canonical_context_entries = build_canonical_context_entries(context)
@@ -1354,268 +1704,7 @@ A mismatch is an invalid shared message object and must not be silently hashed.
 
 ### 14.7.4 RunFailure exact payload
 
-Shared digest functions, usable from every failure path without import ambiguity:
-
-```python
-from __future__ import annotations
-
-from collections.abc import Mapping
-from datetime import UTC, datetime
-from enum import Enum
-from types import MappingProxyType
-from typing import Literal, TypeAlias
-from uuid import UUID
-import math
-
-
-RUN_FAILURE_SCHEMA_VERSION = "1"
-
-
-CanonicalValue: TypeAlias = (
-    None
-    | bool
-    | int
-    | float
-    | str
-    | list["CanonicalValue"]
-    | tuple["CanonicalValue", ...]
-    | dict[str, "CanonicalValue"]
-)
-
-
-def qualified_type_name(value: object) -> str:
-    return f"{type(value).__module__}.{type(value).__qualname__}"
-
-
-def is_repository_quantity_like(value: object) -> bool:
-    return (
-        hasattr(value, "value") and hasattr(value, "unit")
-        and hasattr(value, "kind") and hasattr(value, "to_si")
-    )
-
-
-def is_pydantic_model(value: object) -> bool:
-    return hasattr(value, "model_dump")
-
-
-ContextCanonicalizationFailureKind: TypeAlias = Literal[
-    "unsupported_type", "non_finite_float", "cyclic_reference",
-    "naive_datetime", "non_string_key", "canonicalization_exception",
-]
-
-
-@dataclass(frozen=True, slots=True)
-class ContextCanonicalizationErrorData:
-    failure_kind: ContextCanonicalizationFailureKind
-    context_key: str
-    context_path: tuple[str, ...]
-    offending_type: str
-
-
-class ContextCanonicalizationError(ValueError):
-    data: ContextCanonicalizationErrorData
-
-    def __init__(
-        self,
-        failure_kind: ContextCanonicalizationFailureKind,
-        context_key: str,
-        context_path: tuple[str, ...],
-        offending_type: str,
-    ) -> None:
-        self.data = ContextCanonicalizationErrorData(
-            failure_kind=failure_kind,
-            context_key=context_key,
-            context_path=context_path,
-            offending_type=offending_type,
-        )
-        super().__init__(failure_kind)
-
-
-def canonicalize_trusted_context_value(
-    value: object,
-    context_key: str,
-    context_path: tuple[str, ...],
-    ancestor_ids: frozenset[int],
-) -> CanonicalValue:
-    """Recursively canonicalize a trusted context value.
-
-    Dispatch order:
-      1. None
-      2. Enum/StrEnum → .value then recurse
-      3. UUID → str
-      4. timezone-aware datetime
-      5. bool
-      6. int
-      7. finite float
-      8. str
-      9. tuple/list → recursive
-     10. Mapping → recursive (str keys only)
-     11. repository Quantity-like (canonical.py)
-     12. Pydantic model (canonical.py)
-     13. Unsupported → raise
-    """
-    if value is None:
-        return None
-
-    # Cycle detection
-    object_id = id(value)
-    if object_id in ancestor_ids:
-        raise ContextCanonicalizationError(
-            failure_kind="cyclic_reference",
-            context_key=context_key,
-            context_path=context_path,
-            offending_type=qualified_type_name(value),
-        )
-
-    # Enum → .value then recurse
-    if isinstance(value, Enum):
-        return canonicalize_trusted_context_value(
-            value.value,
-            context_key=context_key,
-            context_path=context_path,
-            ancestor_ids=ancestor_ids,
-        )
-
-    # UUID → str
-    if isinstance(value, UUID):
-        return str(value)
-
-    # timezone-aware datetime
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            raise ContextCanonicalizationError(
-                failure_kind="naive_datetime",
-                context_key=context_key,
-                context_path=context_path,
-                offending_type=qualified_type_name(value),
-            )
-        utc_value = value.astimezone(UTC)
-        return utc_value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-    # bool (must be before int)
-    if isinstance(value, bool):
-        return value
-
-    # int
-    if isinstance(value, int):
-        return value
-
-    # finite float
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ContextCanonicalizationError(
-                failure_kind="non_finite_float",
-                context_key=context_key,
-                context_path=context_path,
-                offending_type=qualified_type_name(value),
-            )
-        return value
-
-    # str
-    if isinstance(value, str):
-        return value
-
-    # tuple/list → recursive
-    if isinstance(value, (tuple, list)):
-        updated_ancestors = ancestor_ids | {id(value)}
-        result: list[CanonicalValue] = []
-        for index, item in enumerate(value):
-            result.append(canonicalize_trusted_context_value(
-                item, context_key=context_key,
-                context_path=context_path + (f"[{index}]",),
-                ancestor_ids=updated_ancestors,
-            ))
-        return result
-
-    # Mapping → recursive (str keys only)
-    if isinstance(value, Mapping):
-        updated_ancestors = ancestor_ids | {id(value)}
-        result: dict[str, CanonicalValue] = {}
-        for k, v in value.items():
-            if type(k) is not str:
-                raise ContextCanonicalizationError(
-                    failure_kind="non_string_key",
-                    context_key=context_key,
-                    context_path=context_path + (str(k),),
-                    offending_type=qualified_type_name(k),
-                )
-            child_path = context_path + (k,)
-            canonical_v = canonicalize_trusted_context_value(
-                v,
-                context_key=context_key,
-                context_path=child_path,
-                ancestor_ids=updated_ancestors,
-            )
-            result[k] = canonical_v
-        return result
-
-    # repository Quantity-like (canonical.py)
-    if is_repository_quantity_like(value):
-        try:
-            kind = value.kind
-            si_value = value.value
-            if kind is not None:
-                si_value = value.to_si().value
-            return {
-                "si_value": canonicalize_trusted_context_value(
-                    si_value, context_key=context_key,
-                    context_path=context_path + ("si_value",),
-                    ancestor_ids=ancestor_ids,
-                ),
-                "kind": kind.value if kind is not None else None,
-            }
-        except ContextCanonicalizationError:
-            raise
-        except Exception as exc:
-            raise ContextCanonicalizationError(
-                failure_kind="canonicalization_exception",
-                context_key=context_key, context_path=context_path,
-                offending_type=qualified_type_name(value),
-            ) from exc
-
-    # Pydantic model
-    if is_pydantic_model(value):
-        try:
-            raw = value.model_dump(mode="python")
-        except Exception as exc:
-            raise ContextCanonicalizationError(
-                failure_kind="canonicalization_exception",
-                context_key=context_key, context_path=context_path,
-                offending_type=qualified_type_name(value),
-            ) from exc
-        return canonicalize_trusted_context_value(
-            raw, context_key=context_key,
-            context_path=context_path,
-            ancestor_ids=ancestor_ids | {id(value)},
-        )
-
-    raise ContextCanonicalizationError(
-        failure_kind="unsupported_type",
-        context_key=context_key,
-        context_path=context_path,
-        offending_type=qualified_type_name(value),
-    )
-
-
-def build_run_failure_payload(failure: RunFailure) -> CanonicalPayload:
-    entries = build_canonical_context_entries(failure.context)
-    return {
-        "schema_version": failure.schema_version,
-        "code": failure.code.value,
-        "message": failure.message,
-        "traceback": failure.traceback,
-        "context_entries": [
-            {"key": entry.key, "value": entry.value, "value_digest": entry.value_digest}
-            for entry in entries
-        ],
-    }
-
-
-def digest_run_failure(failure: RunFailure) -> str:
-    return sha256_digest(build_run_failure_payload(failure))
-```
-
-Usage:
+Shared digest functions, usable from every failure path without import ambiguity (definitions in §14.7.2 merged block):
 
 ```python
 run_failure_payload = build_run_failure_payload(failure)
@@ -1691,46 +1780,7 @@ safe_marker_payload = {
 safe_marker_digest = sha256_digest(safe_marker_payload)
 ```
 
-`failure_kind` values: `unsupported_type`, `non_finite_float`, `cyclic_reference`, `naive_datetime`, `non_string_key`, `canonicalization_exception`.
-
-```python
-CONTEXT_CANONICALIZATION_FAILURE_MESSAGE = (
-    "Context canonicalization failed - see fallback_failure_context "
-    "for canonicalization trace details"
-)
-
-
-def build_context_canonicalization_fallback(
-    *, failure_stage: FailureStage, owner_kind: MessageOwnerKind,
-    owner_id: str, original_code: ErrorCode,
-    error: ContextCanonicalizationError,
-) -> RunFailure:
-    safe_marker_payload = {
-        "context_key": error.data.context_key,
-        "context_path": list(error.data.context_path),
-        "offending_type": error.data.offending_type,
-        "failure_kind": error.data.failure_kind,
-    }
-    safe_marker_digest = sha256_digest(safe_marker_payload)
-    fallback_failure_context = (
-        ("failure_stage", failure_stage.value),
-        ("owner_kind", owner_kind.value),
-        ("owner_id", owner_id),
-        ("original_code", original_code.value),
-        ("context_key", error.data.context_key),
-        ("context_path_digest", sha256_digest({"context_path": list(error.data.context_path)})),
-        ("offending_type", error.data.offending_type),
-        ("failure_kind", error.data.failure_kind),
-        ("safe_marker_digest", safe_marker_digest),
-    )
-    return RunFailure(
-        schema_version=RUN_FAILURE_SCHEMA_VERSION,
-        code=ErrorCode.PROVENANCE_INCOMPLETE,
-        message=CONTEXT_CANONICALIZATION_FAILURE_MESSAGE,
-        traceback=None,
-        context=fallback_failure_context,
-    )
-```
+`failure_kind` values: `unsupported_type`, `non_finite_float`, `cyclic_reference`, `naive_datetime`, `non_string_key`, `canonicalization_exception` (definition in §14.7.2 merged block).
 
 This is the **single path** for constructing a RunFailure from a canonicalization failure. There is no alternative code path, no conditional marker, no fallback within the fallback.
 
@@ -3848,6 +3898,21 @@ def invariant_feasible_count_range(ctx: TopologyConstructionContext) -> None:
         )
 
 
+def invariant_feasible_le_verified(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.feasible_candidate_count > ctx.counters.verified_rating_count:
+        raise ValueError(
+            f"feasible_candidate_count ({ctx.counters.feasible_candidate_count}) > "
+            f"verified_rating_count ({ctx.counters.verified_rating_count})"
+        )
+
+
+def invariant_standard_result_node_present(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.sizing_result_count != 1:
+        raise ValueError(
+            f"expected sizing_result_count=1, got {ctx.counters.sizing_result_count}"
+        )
+
+
 def invariant_cap_exceeded_before_materialization(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.materialized_candidate_count > 0:
         raise ValueError("candidate materialization occurred before cap exceeded")
@@ -4116,6 +4181,8 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             invariant_unique_candidate_count_ge_1,
             invariant_no_feasible_candidate,
             invariant_feasible_count_range,
+            invariant_feasible_le_verified,
+            invariant_standard_result_node_present,
             invariant_selected_root_sum_eq_1,
         ),
     ),
@@ -4152,6 +4219,8 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             invariant_all_candidates_verified,
             invariant_feasible_candidate_present,
             invariant_feasible_count_range,
+            invariant_feasible_le_verified,
+            invariant_standard_result_node_present,
             invariant_selected_root_sum_eq_1,
         ),
     ),
@@ -5504,54 +5573,54 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 26 Contract Tests (501–540)
+### 27.21 Round 27 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 26 changes. **Expected output**: Round 26 row exists with Comment ID `4802228027` and decision `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 26 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 26 row in review history. **Expected output**: Appears immediately after Round 25 row. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 27 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
-505. **Input**: Gate text at top of document. **Expected output**: Reads "Round 27" not "Round 26". **Exception**: N/A — round number check.
-506. **Input**: Gate text. **Expected output**: Exact string "TASK-009 returns to READY only after Round 27 Engineering Design Review passes." **Exception**: N/A — exact wording check.
-507. **Input**: Delivery Sequence step 1. **Expected output**: References "Round 27". **Exception**: N/A — sequence reference check.
-508. **Input**: Acceptance Criteria first item. **Expected output**: References "Round 27 Engineering Design Review". **Exception**: N/A — criteria reference check.
-509. **Input**: All Acceptance Criteria references to round gate. **Expected output**: All use "Round 27" (not "Round 26"). **Exception**: N/A — consistency check.
-510. **Input**: Review History table. **Expected output**: Has exactly 27 data rows (Rounds 1–26). **Exception**: N/A — row count check.
-511. **Input**: All Round 26 comment ID references. **Expected output**: Comment ID `4802228027` is unique to Round 26, not duplicated in older rounds. **Exception**: N/A — uniqueness check.
-512. **Input**: Entire document body outside review history. **Expected output**: No orphan "Round 26" gate text references remain. **Exception**: N/A — stale reference check.
-513. **Input**: Test #499. **Expected output**: Reads "Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round". **Exception**: N/A — generic wording check.
-514. **Input**: Acceptance Criteria references. **Expected output**: No references say "Round 25" for Delivery Sequence. **Exception**: N/A — stale reference check.
-515. **Input**: Delivery Sequence step 1. **Expected output**: Does NOT reference "Round 26". **Exception**: N/A — round advancement check.
-516. **Input**: Acceptance Criteria first item. **Expected output**: Does NOT reference "Round 26". **Exception**: N/A — round advancement check.
-517. **Input**: Test matrix summary in Acceptance Criteria. **Expected output**: Lists Round 26 (501–540) not Round 25. **Exception**: N/A — matrix reference check.
-518. **Input**: Test matrix acceptance criteria entry. **Expected output**: Round 26 (501–540) replaces Round 25. **Exception**: N/A — matrix update check.
-519. **Input**: Section 27 headings. **Expected output**: Section 27.21 present (Round 26 Contract Tests). **Exception**: N/A — section existence check.
-520. **Input**: Section 27.21 entries. **Expected output**: Has exactly 40 test entries (501–540). **Exception**: N/A — entry count check.
-521. **Input**: Section 27.21 heading. **Expected output**: Reads "Round 26 Contract Tests (501–540)". **Exception**: N/A — heading text check.
-522. **Input**: Test numbering in Section 27.21. **Expected output**: Continuous 501–540 with no gaps. **Exception**: N/A — numbering continuity check.
-523. **Input**: Round 26 test range. **Expected output**: Matches heading: 501–540. **Exception**: N/A — range consistency check.
-524. **Input**: Global test numbering 1–540. **Expected output**: Continuous with no gaps. **Exception**: N/A — global numbering check.
-525. **Input**: Section 27 sub-section listing. **Expected output**: Range is 27.1–27.21 continuous (no gaps). **Exception**: N/A — section continuity check.
-526. **Input**: Gate text at top of document. **Expected output**: Does NOT reference "Round 26". **Exception**: N/A — gate consistency check.
-527. **Input**: Issue #23 test total. **Expected output**: Equals task-card N (540). **Exception**: N/A — total consistency check.
-528. **Input**: Round 26 subsection numbering. **Expected output**: Locally continuous within 501–540. **Exception**: N/A — local continuity check.
-529. **Input**: Issue #23 frozen SHA. **Expected output**: Equals new docs commit for Round 26. **Exception**: N/A — SHA consistency check.
-530. **Input**: Acceptance Criteria required test matrix entries. **Expected output**: Include Round 26 (501–540). **Exception**: N/A — matrix inclusion check.
-531. **Input**: Acceptance Criteria test total. **Expected output**: Remains 1–540. **Exception**: N/A — total preservation check.
-532. **Input**: Test #505. **Expected output**: Confirms gate text reads "Round 27". **Exception**: N/A — gate verification check.
-533. **Input**: Test #506. **Expected output**: Confirms gate text exact wording. **Exception**: N/A — wording verification check.
-534. **Input**: Test #507. **Expected output**: Confirms Delivery Sequence step 1 reads "Round 27". **Exception**: N/A — sequence verification check.
-535. **Input**: Test #508. **Expected output**: Confirms Acceptance Criteria first item reads "Round 27". **Exception**: N/A — criteria verification check.
-536. **Input**: TASK_BACKLOG.md. **Expected output**: TASK-010 is BLOCKED. **Exception**: N/A — dependency check.
-537. **Input**: Entire document body outside review history. **Expected output**: No remaining "Round 25" references in body outside review history. **Exception**: N/A — stale reference check.
-538. **Input**: Review history. **Expected output**: Does NOT pre-populate Round 27 comment ID or decision. **Exception**: N/A — forward-reference check.
-539. **Input**: Section 27.21 test entries. **Expected output**: All entries cover Round 26 document changes. **Exception**: N/A — coverage check.
+501. **Input**: Review history table after Round 27 changes. **Expected output**: Round 27 row exists with Comment ID `4802328600` and decision `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 27 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 27 row in review history. **Expected output**: Appears immediately after Round 26 row. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 28 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+505. **Input**: `length_quantum_m` = `"0.025"`. **Expected output**: `InvalidLengthQuantum` raised. **Exception**: `InvalidLengthQuantum` — non-power-of-10 quantum rejected.
+506. **Input**: `length_quantum_m` = `"0.333"`. **Expected output**: `InvalidLengthQuantum` raised. **Exception**: `InvalidLengthQuantum` — non-power-of-10 quantum rejected.
+507. **Input**: `length_quantum_m` = `"10"`. **Expected output**: `InvalidLengthQuantum` raised. **Exception**: `InvalidLengthQuantum` — exponent > 0 rejected.
+508. **Input**: `length_quantum_m` = `"0.001"`. **Expected output**: Accepted as valid quantum; canonical form `"0.001"`. **Exception**: N/A — valid power-of-10.
+509. **Input**: `length_quantum_m` = `"1"`. **Expected output**: Accepted as valid quantum; canonical form `"1"`. **Exception**: N/A — valid power-of-10 with N=0.
+510. **Input**: `to_tick(14.0, Decimal("0.1"))`. **Expected output**: Returns `140`. **Exception**: N/A — integer tick conversion.
+511. **Input**: `to_tick(14.0, Decimal("1"))`. **Expected output**: Returns `14`. **Exception**: N/A — integer tick conversion.
+512. **Input**: `to_tick(0.05, Decimal("0.1"))` — sub-quantum value. **Expected output**: `InvalidLengthError` raised. **Exception**: `InvalidLengthError` — sub-quantum value rejected before quantization.
+513. **Input**: `to_tick(-3.0, Decimal("0.1"))` — non-positive value. **Expected output**: `InvalidLengthError` raised. **Exception**: `InvalidLengthError` — non-positive value rejected.
+514. **Input**: Grid with `minimum_length_m=5.0`, `maximum_length_m=3.0`, `increment_m=0.1` (hi_tick < lo_tick). **Expected output**: `CatalogInvalid` raised. **Exception**: `CatalogInvalid` — reversed grid rejected.
+515. **Input**: Grid with `increment_m=0.005`, `quantum=0.01` (sub-quantum increment). **Expected output**: `CatalogInvalid` raised. **Exception**: `CatalogInvalid` — sub-quantum increment rejected.
+516. **Input**: Grid with `increment_m=0.0`. **Expected output**: `CatalogInvalid` raised. **Exception**: `CatalogInvalid` — non-positive increment rejected.
+517. **Input**: Explicit-length list canonicalization producing empty set. **Expected output**: `CatalogInvalid` raised. **Exception**: `CatalogInvalid` — empty explicit lengths rejected.
+518. **Input**: Request bounds with `minimum_effective_length_m=10.0`, `maximum_effective_length_m=5.0` (min > max). **Expected output**: `InvalidRequestBounds` raised. **Exception**: `InvalidRequestBounds` — reversed request bounds rejected.
+519. **Input**: Request bound not finite (e.g., `float("nan")`). **Expected output**: `InvalidRequestBounds` raised. **Exception**: `InvalidRequestBounds` — non-finite bound rejected.
+520. **Input**: Request bound <= 0 (e.g., `-1.0`). **Expected output**: `InvalidRequestBounds` raised. **Exception**: `InvalidRequestBounds` — non-positive bound rejected.
+521. **Input**: Grid with `INCLUDE_MAX_IF_ALIGNED`, `delta=10`, `step_tick=5`, `remainder=0`. **Expected output**: `catalog_count = 10 // 5 + 1 = 3`. **Exception**: N/A — count formula with max included when aligned.
+522. **Input**: Grid with `EXCLUDE_MAX`, `delta=10`, `step_tick=5`, `remainder=0`. **Expected output**: `catalog_count = 3 - 1 = 2`. **Exception**: N/A — count formula excludes max when aligned.
+523. **Input**: Grid with `EXCLUDE_MAX`, `delta=10`, `step_tick=3`, `remainder=1`. **Expected output**: `catalog_count = 10 // 3 + 1 = 4` (max retained when not aligned). **Exception**: N/A — count formula keeps max when remainder != 0.
+524. **Input**: Request min tick ceiling: `request_min_tick = ceil(5.3 / 0.1)`. **Expected output**: `first_idx` computed via ceiling division; value rounds up to nearest tick. **Exception**: N/A — ceiling rounding for request minimum.
+525. **Input**: Request max tick floor: `request_max_tick = floor(5.7 / 0.1)`. **Expected output**: `last_idx` computed via floor division; value rounds down to nearest tick. **Exception**: N/A — floor rounding for request maximum.
+526. **Input**: Request bounds that widen the catalog interval (min below catalog lo). **Expected output**: `first_idx` clamped to 0; catalog interval not widened. **Exception**: N/A — request bounds must not widen catalog interval.
+527. **Input**: Materialization: `ticks = [lo_tick + step_tick * i for i in range(first_idx, last_idx + 1)]`. **Expected output**: `len(materialized_ticks) == intersection_count`. **Exception**: N/A — invariant: materialized length equals intersection count.
+528. **Input**: `PhysicalCandidateIdentity` struct. **Expected output**: Contains 10 geometry/length fields; does NOT contain `catalog_id`, `catalog_version`, `catalog_content_hash`, `assembly_option_id`, or `manufacturing_option_identity`. **Exception**: N/A — pure geometry identity excludes catalog source.
+529. **Input**: `SourceQualifiedCandidateIdentity` struct. **Expected output**: Contains `physical_candidate_identity_digest`, `catalog_id`, `catalog_version`, `catalog_content_hash`, `assembly_option_id`, `manufacturing_option_identity`. **Exception**: N/A — source-qualified identity includes catalog fields.
+530. **Input**: Two candidates with identical physical geometry but different `catalog_id`. **Expected output**: `SourceQualifiedCandidateIdentity` differs; both retained as distinct candidates. **Exception**: N/A — deduplication key is source-qualified identity.
+531. **Input**: Two candidates with identical `SourceQualifiedCandidateIdentity`. **Expected output**: Deduplicated to one entry. **Exception**: N/A — exact identity deduplication.
+532. **Input**: Canonical evaluation order after deduplication. **Expected output**: Ascending by `source_qualified_candidate_id` (ASCII string). **Exception**: N/A — deterministic evaluation order.
+533. **Input**: `HARD_RAW_COMBINATION_CAP` value. **Expected output**: `10_000`. **Exception**: N/A — hard cap constant.
+534. **Input**: `effective_cap = min(request_raw_combination_cap, HARD_RAW_COMBINATION_CAP)`. **Expected output**: Always <= 10_000; request cap > hard cap is silently reduced. **Exception**: N/A — effective cap never exceeds hard cap.
+535. **Input**: Cap exceeded: `raw_combination_count > effective_cap`. **Expected output**: `status=BLOCKED`, `raw=computed`, `unique=0`, `evaluated=0`, `selected=None`, `top_candidates=()`. **Exception**: N/A — cap-exceeded result block.
+536. **Input**: Provider identity mandatory field mismatch (name, version, git_revision, or reference_state_policy differs). **Expected output**: BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH`. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — mandatory field mismatch.
+537. **Input**: Provider identity optional field mismatch when expected field is not None. **Expected output**: BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH`. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — optional field mismatch.
+538. **Input**: Two verified candidates from the same sizing run with different provider identities. **Expected output**: BLOCKED — provider identity must be consistent across verified candidates. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — cross-candidate inconsistency.
+539. **Input**: Per-candidate `CalculationContext` fields. **Expected output**: `request_id` derived per candidate; `design_case_revision_id` and `calculation_run_id` preserved from caller. **Exception**: N/A — context field roles.
 540. **Input**: Entire document. **Expected output**: Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully. **Exception**: N/A — sync test: parse validation check.
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 27 Engineering Design Review.
+1. Complete Round 28 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5565,7 +5634,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 27 Engineering Design Review passes before implementation starts
+- [ ] Round 28 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -5584,6 +5653,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 26 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 27 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
