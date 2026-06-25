@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 31 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 32 Engineering Design Review passes.
 
 ---
 
@@ -64,8 +64,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 28 | 4802483910 | CHANGES REQUIRED |
 | 29 | 4802701831 | CHANGES REQUIRED |
 | 30 | 4802836532 | CHANGES REQUIRED |
-
-|---|
+| 31 | 4802985042 | CHANGES REQUIRED |
 
 ## 4. Data Model
 
@@ -1271,8 +1270,7 @@ selected_correlation_digest = sha256_digest(selected_correlation_payload)
 
 ### 14.7.2 Shared canonical context normalization (merged block)
 
-All canonicalization types, constants, and functions in a single executable block:
-
+<!-- BEGIN TASK009_CANONICALIZATION_CORE_PY -->
 ```python
 from __future__ import annotations
 
@@ -1348,18 +1346,21 @@ def qualified_type_name(value: object) -> str:
     return f"{type(value).__module__}.{type(value).__qualname__}"
 
 
-@dataclass(frozen=True, slots=True)
-class QuantityKindProtocol:
-    value: str
+class QuantityKindProtocol(Protocol):
+    @property
+    def value(self) -> str:
+        ...
 
 
-@dataclass(frozen=True, slots=True)
-class QuantitySIResultProtocol:
-    value: object
+class QuantitySIResultProtocol(Protocol):
+    @property
+    def value(self) -> object:
+        ...
 
 
 class QuantityToSIProtocol(Protocol):
-    def __call__(self) -> QuantitySIResultProtocol: ...
+    def __call__(self) -> QuantitySIResultProtocol:
+        ...
 
 
 _REQUIRED_QUANTITY_ATTRIBUTES = (
@@ -1575,21 +1576,21 @@ def canonicalize_trusted_context_value(
         # tuple/list → recursive
         if isinstance(value, (tuple, list)):
             updated_ancestors = ancestor_ids | {id(value)}
-            result: list[CanonicalValue] = []
+            list_result: list[CanonicalValue] = []
             for index, item in enumerate(value):
-                result.append(canonicalize_trusted_context_value(
-                    item, context_key=context_key,
-                    context_path=context_path + (f"[{index}]",),
-                    ancestor_ids=updated_ancestors,
+                list_result.append(canonicalize_trusted_context_value(
+                    item, context_key,
+                    context_path + (f"[{index}]",),
+                    updated_ancestors,
                 ))
-            return result
+            return list_result
 
         # Mapping → recursive (str keys only)
         if isinstance(value, Mapping):
             try:
                 items = value.items()
                 updated_ancestors = ancestor_ids | {id(value)}
-                result: dict[str, CanonicalValue] = {}
+                mapping_result: dict[str, CanonicalValue] = {}
                 for key, item in items:
                     if type(key) is not str:
                         raise ContextCanonicalizationError(
@@ -1599,13 +1600,13 @@ def canonicalize_trusted_context_value(
                             offending_type=qualified_type_name(key),
                         )
                     child_path = context_path + (key,)
-                    result[key] = canonicalize_trusted_context_value(
+                    mapping_result[key] = canonicalize_trusted_context_value(
                         item,
                         context_key=context_key,
                         context_path=child_path,
                         ancestor_ids=updated_ancestors,
                     )
-                return result
+                return mapping_result
             except ContextCanonicalizationError:
                 raise
             except Exception as exc:
@@ -1652,7 +1653,7 @@ def canonicalize_trusted_context_value(
         )
         if pydantic_adapter is not None:
             updated_ancestors = ancestor_ids | {id(value)}
-            result: dict[str, CanonicalValue] = {}
+            pydantic_result: dict[str, CanonicalValue] = {}
             for field_name in pydantic_adapter.model_fields:
                 try:
                     field_value = getattr(
@@ -1667,12 +1668,12 @@ def canonicalize_trusted_context_value(
                         context_path=context_path + (field_name,),
                         offending_type=qualified_type_name(value),
                     ) from exc
-                result[field_name] = canonicalize_trusted_context_value(
+                pydantic_result[field_name] = canonicalize_trusted_context_value(
                     field_value, context_key=context_key,
                     context_path=context_path + (field_name,),
                     ancestor_ids=updated_ancestors,
                 )
-            return result
+            return pydantic_result
 
         raise ContextCanonicalizationError(
             failure_kind="unsupported_type",
@@ -1696,8 +1697,17 @@ class CanonicalContextEntry:
     key: str
     value: CanonicalValue
     value_digest: str
+```
+<!-- END TASK009_CANONICALIZATION_CORE_PY -->
 
+The core block above is self-contained: it defines all its own types, imports only from stdlib and `pydantic`, and requires no project-specific dependencies. It can be extracted by the byte-preserving algorithm in §14.7.2.x and verified with `python3.11` / `mypy --strict`.
 
+### 14.7.2.1 Integration Block
+
+The following block depends on project domain types (`ErrorCode`, `RunFailure`, `FailureStage`, `MessageOwnerKind`, `CanonicalPayload`, `sha256_digest`) and is marked as **typed design pseudocode** — its symbols are resolvable only once TASK-009 implementation adds the domain model. Mechanical extraction and mypy verification are not claimed for this block.
+
+<!-- BEGIN TASK009_CANONICALIZATION_INTEGRATION_PY -->
+```python
 def build_canonical_context_entries(
     context: tuple[tuple[str, object], ...],
 ) -> tuple[CanonicalContextEntry, ...]:
@@ -1781,6 +1791,9 @@ def build_context_canonicalization_fallback(
         context=fallback_failure_context,
     )
 ```
+<!-- END TASK009_CANONICALIZATION_INTEGRATION_PY -->
+
+
 
 Usage:
 
@@ -5697,14 +5710,14 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 497. Section 27 range now 27.1–27.21 continuous (no gaps)
 498. Subsection headings range updated to 22.1–22.7 for provenance subsections
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
-500. Issue #23 frozen SHA equals new docs commit for Round 16
+500. Issue #23 Frozen contract commit equals the current reviewed TASK-009 documentation commit.
 
 ### 27.21 Round 30 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 30 changes. **Expected output**: Round 29 row exists with Comment ID `4802701831`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Review history table after Round 30 changes. **Expected output**: Round 30 row exists with Comment ID `4802836532`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 29 and Round 30 rows in review history. **Expected output**: Round 29 immediately follows Round 28; Round 30 immediately follows Round 29. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 31 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+501. **Input**: Review history table after Round 31 changes. **Expected output**: Round 31 row exists with Comment ID `4802985042`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 31 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 31 row in review history. **Expected output**: Round 31 immediately follows Round 30. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 32 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
 505. **Input**: `CountingMapping` with call counter. **Expected output**: `items()` is called exactly once during canonicalization. **Exception**: N/A — single-read invariant: items acquired exactly once.
 506. **Input**: Captured Mapping items iterable is used for iteration. **Expected output**: Canonicalizer iterates the captured items, does not re-read the original Mapping. **Exception**: N/A — single-read invariant: captured iterable is consumed.
 507. **Input**: Mapping whose second `items()` call raises `RuntimeError`. **Expected output**: Canonicalization succeeds because the second call is never made. **Exception**: N/A — single-read invariant: second call not triggered.
@@ -5726,11 +5739,11 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 523. **Input**: Quantity-like object with `to_si` that raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
 524. **Input**: Quantity-like object with `to_si` that raises `RuntimeError("probe")`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — ordinary exception converted.
 525. **Input**: Quantity-like object with non-callable `to_si`. **Expected output**: `try_read_repository_quantity_adapter` returns `None`. **Exception**: N/A — non-callable to_si means adapter returns None.
-526. **Input**: Quantity adapter uses typed `QuantityKindProtocol` and `QuantityToSIProtocol`. **Expected output**: `adapter.kind` type reveals `value: str`; `adapter.to_si` is callable returning SI result. **Exception**: N/A — typed protocol guarantees.
-527. **Input**: Quantity adapter `kind` field type. **Expected output**: `adapter.kind` is typed as `QuantityKindProtocol | None`; no `Any` or `object` escapes. **Exception**: N/A — typed protocol.
-528. **Input**: Normative canonicalization block. **Expected output**: Contains zero `# type: ignore` comments. **Exception**: N/A — strict mypy compliance.
-529. **Input**: Python 3.11 environment with `mypy --strict`. **Expected output**: Normative extracted canonicalization block passes. **Exception**: N/A — type-safe contract.
-530. **Input**: Python 3.12 environment with `mypy --strict`. **Expected output**: Normative extracted canonicalization block passes. **Exception**: N/A — type-safe contract.
+526. **Input**: Source code of `QuantityKindProtocol`. **Expected output**: `QuantityKindProtocol` is a `typing.Protocol` subclass (not a `dataclass`), with `@property(value) -> str`. **Exception**: N/A — typed Protocol contract.
+527. **Input**: Source code of `QuantitySIResultProtocol`. **Expected output**: `QuantitySIResultProtocol` is a `typing.Protocol` subclass (not a `dataclass`), with `@property(value) -> object`. **Exception**: N/A — typed Protocol contract.
+528. **Input**: Source code of `QuantityToSIProtocol`. **Expected output**: `QuantityToSIProtocol` is a `typing.Protocol` that defines `__call__` returning `QuantitySIResultProtocol`. **Exception**: N/A — typed Protocol contract.
+529. **Input**: Exact extracted core canonicalization block via byte-preserving extraction. **Expected output**: `python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found in 1 source file`. **Exception**: N/A — strict mypy passes.
+530. **Input**: Exact extracted core canonicalization block via byte-preserving extraction. **Expected output**: `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found in 1 source file`. **Exception**: N/A — strict mypy passes.
 531. **Input**: Valid NO_FEASIBLE counters: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=0`. **Expected output**: All top-level invariants pass. **Exception**: N/A — regression: valid fixture unchanged.
 532. **Input**: NO_FEASIBLE: `unique=10, evaluated=2, verified=2, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised with `"evaluated"`. **Exception**: `ValueError` — regression: partial evaluation still rejected.
 533. **Input**: Valid SUCCEEDED counters: `unique=10, evaluated=10, verified=10, feasible=3, result=1, failure=0`. **Expected output**: All top-level invariants pass. **Exception**: N/A — regression: valid fixture unchanged.
@@ -5739,13 +5752,13 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 536. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: Rejected by `invariant_feasible_count_range` because `feasible > unique`. **Exception**: `ValueError` — feasible range invariant fires before feasible_le_verified.
 537. **Input**: Standalone `invariant_feasible_le_verified` helper with `unique=10, verified=8, feasible=9`. **Expected output**: `ValueError` raised because `feasible > verified`. **Exception**: `ValueError` — unit contract for feasible_le_verified independent of registry ordering.
 538. **Input**: Deterministic candidate UUID5: same request+candidate → same UUID; different candidate → different UUID; insertion-order independent. **Expected output**: All three UUID5 invariants satisfied. **Exception**: N/A — regression: deterministic IDs unchanged.
-539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 31; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
-540. **Input**: Tests 1–540 continuous, zero/dual roots rejected, Frozen SHA and Round 31 gate synchronized. **Expected output**: Global numbering continuous, Issue frozen SHA matches new commit, gate at Round 31. **Exception**: N/A — structural sync check.
+539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 32; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
+540. **Input**: Tests 1–540 continuous, zero/dual roots rejected, Frozen SHA and Round 32 gate synchronized. **Expected output**: Global numbering continuous, Issue frozen SHA matches new commit, gate at Round 32. **Exception**: N/A — structural sync check.
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 31 Engineering Design Review.
+1. Complete Round 32 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5759,7 +5772,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 31 Engineering Design Review passes before implementation starts
+- [ ] Round 32 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
