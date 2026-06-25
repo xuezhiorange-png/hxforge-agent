@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 6 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 7 Engineering Design Review passes.
 
 ---
 
@@ -39,6 +39,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 3 | 4797267787 | CHANGES REQUIRED |
 | 4 | 4797374705 | CHANGES REQUIRED |
 | 5 | 4797451288 | CHANGES REQUIRED |
+| 6 | 4797612208 | CHANGES REQUIRED |
 
 ---
 
@@ -496,42 +497,38 @@ hot_fluid_name: str
 cold_fluid_name: str
 hot_fluid_equation_of_state: str
 cold_fluid_equation_of_state: str
-hot_fluid_normalized_components: tuple[tuple[str, float], ...]
-cold_fluid_normalized_components: tuple[tuple[str, float], ...]
-hot_inlet_temperature_k: float
-cold_inlet_temperature_k: float
-hot_inlet_pressure_pa: float
-cold_inlet_pressure_pa: float
-hot_mass_flow_kg_s: float
-cold_mass_flow_kg_s: float
-flow_arrangement: str
-tube_in_hot: bool
-tube_boundary_condition: str
-annulus_boundary_condition: str
-minimum_terminal_delta_t: float
-required_duty_w: float
-duty_absolute_tolerance_w: float
-duty_relative_tolerance: float
-optimization_objective: str
-top_n: int
-request_raw_combination_cap: int | None
-catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...]
-minimum_effective_length_m: float | None
-maximum_effective_length_m: float | None
-rating_solver_absolute_residual_w: float
-rating_solver_relative_residual_fraction: float
-rating_solver_bracket_temperature_tolerance_k: float
-rating_solver_max_iterations: int
-property_provider_name: str
-property_provider_version: str
-property_provider_git_revision: str
-property_provider_reference_state_policy: str
-property_provider_cache_policy_version: str
-design_case_revision_id: str | None
-calculation_run_id: str | None
-rating_software_version: str
-execution_context_policy_version: str
-```
+|hot_fluid_normalized_components: tuple[tuple[str, float], ...]
+|cold_fluid_normalized_components: tuple[tuple[str, float], ...]
+|hot_inlet_temperature_k: float
+|cold_inlet_temperature_k: float
+|hot_inlet_pressure_pa: float
+|cold_inlet_pressure_pa: float
+|hot_mass_flow_kg_s: float
+|cold_mass_flow_kg_s: float
+|flow_arrangement: str
+|tube_in_hot: bool
+|tube_boundary_condition: str
+|annulus_boundary_condition: str
+|minimum_terminal_delta_t: float
+|required_duty_w: float
+|duty_absolute_tolerance_w: float
+|duty_relative_tolerance: float
+|optimization_objective: str
+|top_n: int
+|request_raw_combination_cap: int | None
+|catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...]
+|minimum_effective_length_m: float | None
+|maximum_effective_length_m: float | None
+|rating_solver_absolute_residual_w: float
+|rating_solver_relative_residual_fraction: float
+|rating_solver_bracket_temperature_tolerance_k: float
+|rating_solver_max_iterations: int
+|expected_provider_identity: ExpectedProviderIdentity
+|design_case_revision_id: UUID | None
+|calculation_run_id: UUID | None
+|rating_software_version: str
+|execution_context_policy_version: str
+|```
 
 `required_duty_w` is a sizing feasibility input only. It does **not** enter TASK-008 `RatingRequestIdentity` and must not derive `SolverParams`.
 
@@ -549,7 +546,7 @@ All digests computed via `sha256_digest()` (returns `sha256:<64hex>`).
 | `top_n` | `type(value) is int`, `>= 1` — reject `bool` |
 | `request_raw_combination_cap` | None → `HARD_RAW_COMBINATION_CAP`; else `type is int`, `1..HARD_RAW_COMBINATION_CAP` — reject `bool` |
 | Duplicate catalog refs | No two refs share `(catalog_id, catalog_version)` |
-| Provider identity | Declared name/version/git_revision/reference_state_policy must match first successful TASK-008 call |
+| Provider identity | ExpectedProviderIdentity declared in `SizingRequestIdentity`. Each verified candidate's actual provider identity must match expected mandatory fields (name, version, git_revision, reference_state_policy). Optional fields (configuration_fingerprint, cache_policy_version) compared when not None. Provider must be consistent across all verified candidates. |
 
 ---
 
@@ -724,27 +721,35 @@ version: str
 definition_hash: str
 source_title: str
 source_authors: str
-source_year: str
+source_year: int
 source_reference: str
 source_verification_status: str
 nusselt_basis: str
 is_adaptation: bool
-adaptation_limitation: str | None
+adaptation_limitation: str
 ```
 
 ### 14.3 InvalidRatingEvidenceRecord
 
 ```text
 candidate_id: str
-rating_status: str
-claimed_result_hash: str
-claimed_provenance_digest: str
+rating_status: str | None
+claimed_result_hash: str | None
+claimed_provenance_digest: str | None
 verify_hash_result: bool
 verify_provenance_result: bool
-rating_request_identity_digest: str
-provider_identity: ProviderIdentitySnapshot
+rating_request_identity_digest: str | None
+claimed_provider_identity: ProviderIdentitySnapshot | None
 failure_reason: str
 ```
+
+Fields allowed to be None because a damaged or incomplete RatingResult may not provide all values. `claimed_provider_identity` is read from the unverified result's provider snapshot when safely readable; `None` when the field is damaged or unreadable.
+
+**Rules:**
+1. `claimed_provider_identity` is **audit-only**.
+2. It must NOT participate in: expected provider matching, verified provider consistency, feasibility, ranking, selected candidate selection, or verified evidence digest.
+3. `claimed_provider_identity` enters the invalid evidence's own digest.
+4. Verified and claimed provider evidence use **different field names** and different digest paths.
 
 Must not copy trusted thermal metrics from an unverified `RatingResult`.
 
@@ -770,8 +775,8 @@ source_qualified_candidate_identity: SourceQualifiedCandidateIdentity
 candidate_evaluation_state: CandidateEvaluationState
 candidate_evaluation_identity: CandidateEvaluationIdentity | None
 evaluation_order_index: int
-rating_status: str | None
-feasibility_status: str | None
+rating_status: RatingStatus | None     # TASK-008 RatingStatus; None for UNEVALUATED/RUNTIME_FAILED
+feasibility_status: FeasibilityStatus  # always populated (UNEVALUATED for unevaluated)
 feasible: bool
 verified_rating_evidence: VerifiedRatingEvidenceSnapshot | None
 invalid_rating_evidence: InvalidRatingEvidenceRecord | None
@@ -784,6 +789,42 @@ duty_overshoot_w: float | None
 meets_target_without_tolerance: bool | None
 partial_audit: bool
 ```
+
+### 15.1 CandidateEvaluation Digest
+
+Unified digest across all evaluation states:
+
+```python
+{
+    "source_qualified_candidate_identity_digest": ...,
+    "candidate_evaluation_state": ...,
+    "candidate_evaluation_identity_digest": ... | None,
+    "evaluation_order_index": ...,
+    "rating_status": ... | None,
+    "feasibility_status": ...,
+    "feasible": ...,
+    "verified_rating_evidence_digest": ... | None,
+    "invalid_rating_evidence_digest": ... | None,
+    "evaluation_failure_digest": ... | None,
+    "diagnostic_digests": [...],
+    "primary_diagnostic_digest": ... | None,
+    "duty_margin_w": ... | None,
+    "duty_shortfall_w": ... | None,
+    "duty_overshoot_w": ... | None,
+    "meets_target_without_tolerance": ... | None,
+    "partial_audit": ...,
+}
+candidate_evaluation_digest = sha256_digest(payload)
+```
+
+Invariants by state:
+
+| State | candidate_evaluation_identity | verified_evidence | invalid_evidence | evaluation_failure | feasible | rating_status | duty fields | diagnostics |
+|-------|------------------------------|------------------|-----------------|-------------------|----------|---------------|-------------|-------------|
+| UNEVALUATED | None | None | None | None | False | None | all None | allowed |
+| VERIFIED | not None | not None | None | None | per duty | SUCCEEDED/BLOCKED/FAILED | populated | allowed |
+| INTEGRITY_INVALID | None | None | not None | None | False | from claimed | all None | allowed |
+| RUNTIME_FAILED | None | None | None | not None | False | None | all None | allowed |
 
 ---
 
@@ -821,36 +862,105 @@ feasible: bool
 
 ## 18. SizingResultIdentity
 
-### 18.1 RawSizingRequestSnapshot
+### 18.1 Raw Input Canonicalization Contract
 
-For invalid-request BLOCKED results, the raw input must be preserved in a safe canonical form.
+#### 18.1.1 canonicalize_raw_input
 
+```text
+canonicalize_raw_input(value, seen_object_ids) -> CanonicalRawValue
 ```
+
+Recursive value canonicalization for safe JSON-round-trippable representation of raw sizing request inputs, including non-finite floats, unsupported types, and cyclic containers.
+
+**Supported types and representations:**
+
+| Input | Output |
+|-------|--------|
+| `None` | `None` |
+| `bool` | `bool` |
+| `int` | `int` |
+| finite `float` | original value |
+| `NaN` | `{"$non_finite_float": "nan"}` |
+| `+Infinity` | `{"$non_finite_float": "+infinity"}` |
+| `-Infinity` | `{"$non_finite_float": "-infinity"}` |
+| `str` | `str` |
+| `Enum` | `.value` |
+| `UUID` | canonical lowercase string |
+| `tuple` | ordered JSON array |
+| `list` | ordered JSON array |
+| `dict` | string-key-sorted JSON object |
+
+**Non-string mapping keys:** `dict` keys that are not `str` raise `RawInputCanonicalizationError`. Must not silently convert via `str(key)` (key collision risk).
+
+**Unsupported arbitrary objects:** Represent safely using type metadata only (no `__repr__`, no memory address, no process-local state):
+
+```text
+{"$unsupported_type": "<module>.<qualname>"}
+```
+
+Where `module` and `qualname` are the object's type metadata.
+
+**Cyclic reference detection:** Use object-id recursion stack. When a cyclic reference is detected:
+
+```text
+{"$cyclic_reference": "<first-seen-canonical-path>"}
+```
+
+Or returns a fixed canonicalization blocker. The chosen strategy must produce identical results on repeated runs for the same input.
+
+#### 18.1.2 RawSizingRequestSnapshot
+
+```text
 RawSizingRequestSnapshot
 - schema_version: str
 - canonical_raw_input: object
 - raw_request_digest: str
 ```
 
-Non-finite float canonicalization:
+Digest payload (self-excluding):
 
 ```python
-finite float -> original value
-NaN           -> {"$non_finite_float": "nan"}
-+Infinity     -> {"$non_finite_float": "+infinity"}
--Infinity     -> {"$non_finite_float": "-infinity"}
-Enum          -> .value
-UUID          -> str(..)
-tuple/list    -> ordered array
-dict          -> sorted keys
+raw_request_payload = {
+    "schema_version": schema_version,
+    "canonical_raw_input": canonical_raw_input,
+}
+raw_request_digest = sha256_digest(raw_request_payload)
 ```
+
+`raw_request_digest` must not enter its own payload.
+
+#### 18.1.3 SizingValidationErrorSnapshot
+
+```text
+SizingValidationErrorSnapshot
+- code: str
+- field_path: tuple[str, ...]
+- message: str
+- rejected_value_digest: str | None
+- context: tuple[tuple[str, canonical value], ...]
+- error_digest: str
+```
+
+Digest payload:
+
+```python
+{
+    "code": ...,
+    "field_path": [...],
+    "message": ...,
+    "rejected_value_digest": ...,
+    "context": [...],
+}
+```
+
+Validation error sort key: `(code, field_path, message, rejected_value_digest or "", context)`.
 
 ### 18.2 InvalidSizingRequestSnapshot
 
-```
+```text
 InvalidSizingRequestSnapshot
 - raw_request_snapshot: RawSizingRequestSnapshot
-- validation_error_digests: tuple[str, ...]
+- validation_errors: tuple[SizingValidationErrorSnapshot, ...]
 ```
 
 An invalid request BLOCKED result must still produce:
@@ -929,28 +1039,53 @@ JSON round-trip must preserve all fields, hashes, and provenance.
 
 ---
 
-## 20. Non-Feasible Ordering and Diagnostics
+## 20. FeasibilityStatus and Non-Feasible Ordering
 
-### 20.1 Feasibility Status Severity
+### 20.1 FeasibilityStatus Enum
 
 ```text
-INFEASIBLE < RATING_BLOCKED < RATING_FAILED < INTEGRITY_INVALID
+class FeasibilityStatus(StrEnum):
+    FEASIBLE = "feasible"
+    INFEASIBLE = "infeasible"
+    RATING_BLOCKED = "rating_blocked"
+    RATING_FAILED = "rating_failed"
+    INTEGRITY_INVALID = "integrity_invalid"
+    UNEVALUATED = "unevaluated"
+    RUNTIME_FAILED = "runtime_failed"
+```
+
+Rank (lower = higher priority in non-feasible sort):
+
+```text
+FEASIBLE = 0
+INFEASIBLE = 1
+RATING_BLOCKED = 2
+RATING_FAILED = 3
+INTEGRITY_INVALID = 4
+UNEVALUATED = 5
+RUNTIME_FAILED = 6
 ```
 
 ### 20.2 Rating Status Rank
 
+Rating status from TASK-008 `RatingStatus`:
+
 ```text
-SUCCEEDED < BLOCKED < FAILED
+SUCCEEDED = 0
+BLOCKED = 1
+FAILED = 2
+None = 999
 ```
 
-### 20.3 Full Non-Feasible Sort Key
+
+### 20.4 Full Non-Feasible Sort Key
 
 ```text
 (
     feasibility_status_rank,
     rating_status_rank,
     primary_diagnostic.diagnostic_class_rank,
-    primary_diagnostic.error_code,
+    primary_diagnostic.code,
     primary_diagnostic.source_module,
     primary_diagnostic.affected_paths,
     primary_diagnostic.message,
@@ -958,11 +1093,11 @@ SUCCEEDED < BLOCKED < FAILED
 )
 ```
 
-### 20.4 CandidateDiagnosticKey
+### 20.5 CandidateDiagnosticKey
 
 ```text
 diagnostic_class_rank: int   # BLOCKER=0, ERROR=1, WARNING=2, INFO=3, RUNTIME_FAILURE=4
-error_code: str
+code: str
 source_module: str
 affected_paths: tuple[str, ...]
 message: str
@@ -972,15 +1107,41 @@ Sentinel when `None`: `(999, "", "", (), "")`.
 
 From EngineeringMessage: direct. From RunFailure: class_rank=4. From pure duty-infeasible: class_rank=0, code=`REQUIRED_DUTY_NOT_MET`.
 
-### 20.5 Primary Diagnostic Selection
+### 20.6 Primary Diagnostic Selection
 
-Ascending: class_rank → error_code → source_module → affected_paths → message.
+Ascending: class_rank → code → source_module → affected_paths → message.
+
+## 22. RunFailure Stage Model
+
+### 22.1 FailureStage Enum
+
+```text
+class FailureStage(StrEnum):
+    REQUEST_VALIDATION = "request_validation"
+    CATALOG_VALIDATION = "catalog_validation"
+    CANDIDATE_MATERIALIZATION = "candidate_materialization"
+    PRE_RATING = "pre_rating"
+    RATING_CALL = "rating_call"
+    RATING_VERIFICATION = "rating_verification"
+    OPTIMIZATION = "optimization"
+    RESULT_CONSTRUCTION = "result_construction"
+```
+
+`RunFailure.context` carries:
+
+```text
+failure_stage: FailureStage
+candidate_id: str | None
+evaluation_order_index: int | None
+```
+
+`RunFailure` type itself is not modified; the context dict stores these fields.
 
 ---
 
-## 21. Provenance
+## 23. Provenance
 
-### 21.1 Node Type Mapping
+### 23.1 Node Type Mapping
 
 | Concept | ProvenanceNodeType | Label |
 |---------|-------------------|-------|
@@ -998,13 +1159,13 @@ Ascending: class_rank → error_code → source_module → affected_paths → me
 
 Root selection: if `design_case_revision_id` is present and not None → `CASE_REVISION` with label `"revision_{id}"`. Otherwise → `EXTERNAL` with label `"external_root"`.
 
-### 21.2 UUID5 Namespace
+### 23.2 UUID5 Namespace
 
 ```python
 TASK009_PROVENANCE_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 ```
 
-### 21.3 UUID5 Name Payloads
+### 23.3 UUID5 Name Payloads
 
 ```text
 sizing-run:{validated_sizing_request_identity_digest}
@@ -1015,12 +1176,12 @@ rating-result:{rating_result_hash}
 invalid-evidence:{source_qualified_candidate_id}:{rating_result_hash}
 optimizer:{validated_sizing_request_identity_digest}
 sizing-result:{result_hash}
-warning:{error_code}:{message_digest}
-blocker:{error_code}:{message_digest}
+warning:{code}:{message_digest}:{context_digest}
+blocker:{code}:{message_digest}:{context_digest}
 runtime-failure:{failure_digest}
 ```
 
-### 21.4 Termination-Class Topologies
+### 23.4 Termination-Class Topologies
 
 Each entry lists exact nodes (with multiplicity), exact edges, and forbidden nodes.
 
@@ -1174,26 +1335,168 @@ Edges:
 
 #### RUNTIME_FAILED
 
+Each RUNTIME_FAILED result is assigned a `FailureStage` (see §22). The exact topology is determined by the stage at which the failure occurred.
+
+##### REQUEST_VALIDATION
+
+```
+Nodes:
+- ROOT (1)
+- SIZING_RUN (1, id = sizing-run:raw:{raw_request_digest})
+- RUNTIME_FAILURE (1)
+- SIZING_RESULT (1)
+Forbidden: CATALOG_SNAPSHOT, CANDIDATE, TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE
+Edges:
+- ROOT -> SIZING_RUN "initiates"
+- RUNTIME_FAILURE -> SIZING_RESULT "fails"
+- SIZING_RUN -> SIZING_RESULT "produces"
+Count sources: raw_request_digest
+```
+
+##### CATALOG_VALIDATION
+
 ```
 Nodes:
 - ROOT (1)
 - SIZING_RUN (1)
-- CATALOG_SNAPSHOT (0 or more, as available before failure)
-- CANDIDATE (0 or more, as available before failure)
-- TASK008_RATING_RESULT (0 or more, as available before failure)
+- CATALOG_SNAPSHOT (validated_catalog_count)
+- RUNTIME_FAILURE (1)
+- SIZING_RESULT (1)
+Forbidden: CANDIDATE, TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE
+Edges:
+- ROOT -> SIZING_RUN "initiates"
+- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
+- RUNTIME_FAILURE -> SIZING_RESULT "fails"
+- SIZING_RUN -> SIZING_RESULT "produces"
+Count sources: validated_catalog_count
+```
+
+##### CANDIDATE_MATERIALIZATION
+
+```
+Nodes:
+- ROOT (1)
+- SIZING_RUN (1)
+- CATALOG_SNAPSHOT (catalog_count)
+- CANDIDATE (materialized_candidate_count)
+- RUNTIME_FAILURE (1)
+- SIZING_RESULT (1)
+Forbidden: TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE
+Edges:
+- ROOT -> SIZING_RUN "initiates"
+- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
+- CATALOG_SNAPSHOT -> CANDIDATE "generates"
+- RUNTIME_FAILURE -> SIZING_RESULT "fails"
+- SIZING_RUN -> SIZING_RESULT "produces"
+Count sources: catalog_count, materialized_candidate_count
+```
+
+##### PRE_RATING
+
+```
+Nodes:
+- ROOT (1)
+- SIZING_RUN (1)
+- CATALOG_SNAPSHOT (catalog_count)
+- CANDIDATE (unique_candidate_count)
+- TASK008_RATING_RESULT (0)
+- RUNTIME_FAILURE (1)
+- SIZING_RESULT (1)
+Forbidden: TASK008_RATING_RESULT, OPTIMIZER, INVALID_EVIDENCE
+Edges:
+- ROOT -> SIZING_RUN "initiates"
+- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
+- CATALOG_SNAPSHOT -> CANDIDATE "generates"
+- SIZING_RUN -> SIZING_RESULT "produces"
+- RUNTIME_FAILURE -> SIZING_RESULT "fails"
+partial_audit: False, evaluated_candidate_count: 0
+```
+
+##### RATING_CALL
+
+```
+Nodes:
+- ROOT (1)
+- SIZING_RUN (1)
+- CATALOG_SNAPSHOT (catalog_count)
+- CANDIDATE (unique_candidate_count)
+- TASK008_RATING_RESULT (completed_rating_count)
 - RUNTIME_FAILURE (1)
 - SIZING_RESULT (1)
 Forbidden: INVALID_EVIDENCE, OPTIMIZER
 Edges:
 - ROOT -> SIZING_RUN "initiates"
-- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"  (if catalogs validated)
-- CATALOG_SNAPSHOT -> CANDIDATE "generates"  (if candidates created)
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as"  (if ratings completed)
+- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
+- CATALOG_SNAPSHOT -> CANDIDATE "generates"
+- CANDIDATE -> TASK008_RATING_RESULT "rated_as" (for each completed rating)
 - RUNTIME_FAILURE -> SIZING_RESULT "fails"
 - SIZING_RUN -> SIZING_RESULT "produces"
+Count sources: completed_rating_count; the failed candidate has no TASK008_RATING_RESULT
+partial_audit: True, evaluated_candidate_count: completed_rating_count
+remaining_unevaluated_candidate_count: unique - completed_rating_count
 ```
 
-### 21.5 Two-Stage Construction
+##### RATING_VERIFICATION
+
+```
+Nodes:
+- ROOT (1)
+- SIZING_RUN (1)
+- CATALOG_SNAPSHOT (catalog_count)
+- CANDIDATE (unique_candidate_count)
+- TASK008_RATING_RESULT (completed_rating_count, including claimed results from returned ratings)
+- RUNTIME_FAILURE (1)
+- SIZING_RESULT (1)
+Forbidden: INVALID_EVIDENCE, OPTIMIZER
+Edges:
+- ROOT -> SIZING_RUN "initiates"
+- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
+- CATALOG_SNAPSHOT -> CANDIDATE "generates"
+- CANDIDATE -> TASK008_RATING_RESULT "rated_as" (for each completed rating)
+- RUNTIME_FAILURE -> SIZING_RESULT "fails"
+- SIZING_RUN -> SIZING_RESULT "produces"
+Claimed TASK008_RATING_RESULT nodes use claimed-rating-result UUID5 name if result hash is unreadable:
+uuid5(TASK009_PROVENANCE_NAMESPACE, "claimed-rating-result:{candidate_evaluation_identity_digest}")
+partial_audit: True, evaluated_candidate_count: completed_rating_count
+```
+
+##### OPTIMIZATION
+
+```
+Nodes:
+- ROOT (1)
+- SIZING_RUN (1)
+- CATALOG_SNAPSHOT (catalog_count)
+- CANDIDATE (unique_candidate_count)
+- TASK008_RATING_RESULT (evaluated_candidate_count)
+- OPTIMIZER (1)
+- RUNTIME_FAILURE (1)
+- SIZING_RESULT (1)
+Forbidden: INVALID_EVIDENCE
+Edges:
+- ROOT -> SIZING_RUN "initiates"
+- SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
+- CATALOG_SNAPSHOT -> CANDIDATE "generates"
+- CANDIDATE -> TASK008_RATING_RESULT "rated_as"
+- TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
+- OPTIMIZER -> SIZING_RESULT "produces"
+- RUNTIME_FAILURE -> SIZING_RESULT "fails"
+partial_audit: False, evaluated_candidate_count: unique
+optimizer_node_exists: True, rating_result_nodes_exist: True
+```
+
+##### RESULT_CONSTRUCTION
+
+```
+Nodes: same as OPTIMIZATION + OPTIMIZER (1)
+Edge: RUNTIME_FAILURE -> SIZING_RESULT "fails" replaces OPTIMIZER -> SIZING_RESULT "produces"
+Core provenance includes OPTIMIZER node. Result construction failure uses degraded hash/provenance:
+  - result_hash uses partial_audit flag
+  - final provenance includes core_provenance_digest from the completed core stage
+  - SIZING_RESULT node payload uses available fields; missing fields set to None/empty
+partial_audit: True (malformed after full evaluation)
+
+### 23.5 Two-Stage Construction
 
 1. Build core provenance (all nodes except SIZING_RESULT and its WARNING/BLOCKER/RUNTIME_FAILURE/INVALID_EVIDENCE)
 2. Compute `core_provenance_digest`
@@ -1203,40 +1506,64 @@ Edges:
 6. Build final provenance graph
 7. Compute `final_provenance_digest`
 
-### 21.6 partial_audit
+### 23.6 partial_audit
 
 `partial_audit` is a **boolean field** on `SizingResultIdentity` and `SizingOptimizationResult`. It is not a provenance node. Its value is determined by whether evaluation completed all unique candidates.
 
-### 21.7 Edge Tamper Detection
+### 23.7 Edge Tamper Detection
 
 Detected through the canonical graph digest (serialized topology: nodes, edges, payload hashes). No per-edge hash field is defined in the shared `ProvenanceEdge` model.
 
 ---
 
-## 22. Hash Canonical Contract
+## 24. Hash Canonical Contract
 
 - All hashing uses `hexagent.core.canonical.sha256_digest()` (returns `sha256:<64hex>`).
 - All identity payloads use `hexagent.core.canonical.canonical_json()` (sorted keys, no whitespace, no trailing newline).
 - `result_hash = sha256_digest(SizingResultIdentity payload)` — single call, single canonicalization. `sha256_digest()` internally calls `canonical_json()`, so callers pass the payload object, not a pre-serialized string.
 - `sha256_digest()` canonicalizes its input, so the caller passes the raw payload dict → canonical_json is the serialization contract.
 
-### 22.1 Catalog Hash
+### 24.1 Catalog Hash
 
 `catalog_content_hash`: `sha256_digest(payload)` over non-self fields. Duplicate `assembly_option_id` validated **before** sorting for hash.
 
-### 22.2 Numeric Normalization
+### 24.2 Numeric Normalization
 
 - Float fields: serialized by `canonical_json` default.
 - Length fields: canonical Decimal string (`"12.350"`).
 - Same canonical form for catalog hash, candidate identity, JSON round-trip.
 
-### 22.3 Candidate Evaluation Hash
+### 24.3 Candidate Evaluation Hash
 
-Each `CandidateEvaluation` has a digest: `sha256_digest(evaluation_fields)`.
+Each `CandidateEvaluation` has a digest computed from the unified payload defined in §15.1:
 
-### 22.4 Canonical Ordering for All Collections
+```python
+candidate_evaluation_digest = sha256_digest({
+    "source_qualified_candidate_identity_digest": ...,
+    "candidate_evaluation_state": ...,
+    "candidate_evaluation_identity_digest": ... | None,
+    "evaluation_order_index": ...,
+    "rating_status": ... | None,
+    "feasibility_status": ...,
+    "feasible": ...,
+    "verified_rating_evidence_digest": ... | None,
+    "invalid_rating_evidence_digest": ... | None,
+    "evaluation_failure_digest": ... | None,
+    "diagnostic_digests": [...],
+    "primary_diagnostic_digest": ... | None,
+    "duty_margin_w": ... | None,
+    "duty_shortfall_w": ... | None,
+    "duty_overshoot_w": ... | None,
+    "meets_target_without_tolerance": ... | None,
+    "partial_audit": ...,
+})
+```
 
-Before building any identity/hash/provenance payload, collections must be sorted canonically:
+The canonical ordering (§24.4) of evaluation digests in `SizingResultIdentity` uses `evaluation_order_index` ascending.
+
+### 24.4 Canonical Ordering for All Collections
+
+Before building any identity/hash/provenance payload, collections must be sorted canonically using `EngineeringMessage.code` (not `error_code`):
 
 | Collection | Sort Key |
 |-----------|----------|
@@ -1245,17 +1572,41 @@ Before building any identity/hash/provenance payload, collections must be sorted
 | `manufacturing_metadata` tuples | `key` ASCII ascending |
 | Candidate evaluations | `source_qualified_candidate_id` ascending |
 | Ranking records | `rank` ascending, then `source_qualified_candidate_id` ascending |
-| Diagnostics (`CandidateDiagnosticKey`) | `(class_rank, error_code, source_module, affected_paths, message)` ascending |
-| Warnings / blockers | `(severity_rank, error_code, source_module, affected_paths, message)` ascending |
+| Diagnostics (`CandidateDiagnosticKey`) | `(diagnostic_class_rank, code.value, source_module, affected_paths, message)` ascending |
+| Warnings / blockers | `(severity_rank, code, source_module, affected_paths, message, canonical_context_digest)` ascending |
 | Evidence records (verified, invalid) | `candidate_id` ascending |
+
+Severity rank:
+
+```text
+INFO = 0
+WARNING = 1
+ERROR = 2
+BLOCKER = 3
+```
+
+Context digest:
+
+```python
+sha256_digest({
+    "context": canonicalized_context
+})
+```
 
 This ensures insertion-order independence for all identity digests and provenance graphs.
 
+Provenance UUID5 names for warnings and blockers include context digest to prevent node collision when the same code and message have different context:
+
+```text
+warning:{code}:{message_digest}:{context_digest}
+blocker:{code}:{message_digest}:{context_digest}
+```
+
 ---
 
-## 23. Frozen ErrorCode Values
+## 25. Frozen ErrorCode Values
 
-### 23.1 Reused
+### 25.1 Reused
 
 ```text
 INPUT_MISSING, INPUT_INCONSISTENT, UNIT_INVALID
@@ -1265,14 +1616,14 @@ UNSUPPORTED_SERVICE, CALCULATION_BLOCKED
 CORRELATION_IMPLEMENTATION_UNAVAILABLE  — C4, unchanged
 ```
 
-### 23.2 Non-Overlapping Catalog/Identity Codes
+### 25.2 Non-Overlapping Catalog/Identity Codes
 
 ```text
 CATALOG_IDENTITY_MISMATCH   — caller-supplied hash differs from computed hash
 HASH_MISMATCH               — verify_hash() on already-built identity/result fails tamper
 ```
 
-### 23.3 New TASK-009 Codes (14)
+### 25.3 New TASK-009 Codes (14)
 
 ```text
 INVALID_SIZING_REQUEST = "invalid_sizing_request"
@@ -1295,7 +1646,7 @@ No synonymous duplicates.
 
 ---
 
-## 24. Terminology
+## 26. Terminology
 
 | Imprecise | Precise |
 |-----------|---------|
@@ -1304,15 +1655,15 @@ No synonymous duplicates.
 
 ---
 
-## 25. Exclusions
+## 27. Exclusions
 
 Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materials, API, C4, multi-phase.
 
 ---
 
-## 26. Required Test Matrix
+## 28. Required Test Matrix
 
-### 26.1 Length and Catalog (1–25)
+### 28.1 Length and Catalog (1–25)
 
 1. Power-of-10 quantum — rejects non-1E-N
 2. Quantum rejects canonical forms `10`, `100` (exponent > 0)
@@ -1340,7 +1691,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 24. Duplicate `assembly_option_id` before hash verification
 25. `CatalogSnapshotRef` one-to-one with full snapshots
 
-### 26.2 Identity and Evaluation (26–39)
+### 28.2 Identity and Evaluation (26–39)
 
 26. `PhysicalCandidateIdentity` stable across sources
 27. `SourceQualifiedCandidateIdentity` distinct per source
@@ -1357,7 +1708,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 38. `FluidIdentifier` identity includes EOS + components
 39. `tube_in_hot` in sizing identity, not in rating identity
 
-### 26.3 Evidence and Integrity (40–48)
+### 28.3 Evidence and Integrity (40–48)
 
 40. `CandidateEvaluationState` enum (4 states)
 41. `VERIFIED` state invariants
@@ -1369,7 +1720,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 47. `VerifiedRatingEvidenceSnapshot` null thermal fields permitted
 48. Feasibility only from verified SUCCEEDED + non-None duty
 
-### 26.4 Provenance (49–60)
+### 28.4 Provenance (49–60)
 
 49. INVALID_REQUEST topology (no catalog/candidate/rating)
 50. INVALID_CATALOG topology
@@ -1384,7 +1735,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 59. UUID5 deterministic node IDs
 60. INVALID_EVIDENCE node type/label/payload
 
-### 26.5 Validation and ErrorCodes (61–71)
+### 28.5 Validation and ErrorCodes (61–71)
 
 61. `required_duty_w > 0`
 62. `top_n` rejects `bool`
@@ -1398,7 +1749,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 70. `PROPERTY_PROVIDER_IDENTITY_MISMATCH` code
 71. `FluidIdentifier` identity in request
 
-### 26.6 Diagnostics and Ordering (72–76)
+### 28.6 Diagnostics and Ordering (72–76)
 
 72. Full non-feasible sort key (8 fields, nested `affected_paths`)
 73. Sentinel when no diagnostic
@@ -1406,7 +1757,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 75. Deterministic primary diagnostic selection
 76. `sort_key` serialized as canonical JSON array
 
-### 26.7 Tamper (77–83)
+### 28.7 Tamper (77–83)
 
 77. Catalog tamper
 78. Candidate tamper
@@ -1416,22 +1767,73 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 82. Fouling change → identity change
 83. Repeated-run determinism
 
-### 26.8 Golden Cases (84–85)
+### 28.8 Golden Cases (84–85)
 
 84. Independent smallest-outer-area Golden
 85. Independent shortest-effective-length Golden
 
-### 26.9 Documentation and Quality (86–88)
+### 28.9 Documentation and Quality (86–88)
 
 86. Issue #23 references canonical commit SHA
 87. JSON round-trip preserves all fields/hashes/provenance
 88. Ruff, format, mypy, pytest+coverage, pip-audit, Python 3.11/3.12
 
+### 28.10 Round 6 Contract Tests (89–136)
+
+89. `sha256_digest(payload)` != `sha256_digest(canonical_json(payload))` — no pre-serialization
+90. All TASK-009 `sha256_digest` callers pass payload object, not pre-serialized string
+91. Raw request NaN canonicalization → `{"$non_finite_float": "nan"}`
+92. Raw request +Infinity canonicalization → `{"$non_finite_float": "+infinity"}`
+93. Raw request -Infinity canonicalization → `{"$non_finite_float": "-infinity"}`
+94. Raw request unsupported object → deterministic `{"$unsupported_type": ...}`
+95. Raw request non-string dict key → `RawInputCanonicalizationError`
+96. Raw request cyclic container → `{"$cyclic_reference": "..."}`
+97. Raw snapshot self-excluding digest (`raw_request_digest` not in own payload)
+98. Structured `SizingValidationErrorSnapshot` digest round-trip
+99. Validation-error insertion-order independence (different order → same digest)
+100. Reversed grid → `CATALOG_INVALID` (hi_tick < lo_tick)
+101. Explicit-length request intersection correct count
+102. Explicit-length empty intersection → count 0
+103. Explicit-length materialization count invariant: `len == intersection_count`
+104. Grid materialization count invariant: `len(materialized_ticks) == intersection_count`
+105. `ExpectedProviderIdentity` nested within `SizingRequestIdentity` digest
+106. Optional configuration_fingerprint match when expected is not None
+107. Optional cache_policy_version match when expected is not None
+108. Provider mutation between verified candidates → `PROPERTY_PROVIDER_IDENTITY_MISMATCH`
+109. Claimed provider identity NOT used for verified matching decisions
+110. Claimed provider identity absent (`None`) when damaged/unreadable
+111. Exact TASK-008 `SelectedCorrelationSnapshot` field names (11 fields)
+112. Exact TASK-008 `SelectedCorrelationSnapshot` field types (source_year: int, adaptation_limitation: str)
+113. `source_year` remains `int` through JSON round-trip
+114. `adaptation_limitation` remains `str` through JSON round-trip
+115. UUID request context types (`design_case_revision_id`, `calculation_run_id`) as `UUID | None`
+116. REQUEST_VALIDATION FailureStage exact provenance topology
+117. CATALOG_VALIDATION FailureStage exact provenance topology
+118. CANDIDATE_MATERIALIZATION FailureStage exact provenance topology
+119. PRE_RATING FailureStage exact provenance topology
+120. RATING_CALL FailureStage exact provenance topology
+121. RATING_VERIFICATION FailureStage exact provenance topology
+122. OPTIMIZATION FailureStage exact provenance topology
+123. RESULT_CONSTRUCTION FailureStage exact provenance topology
+124. Each FailureStage exact forbidden nodes check
+125. RUNTIME_FAILED retains `RunFailure` with failure_stage, candidate_id, evaluation_order_index
+126. RUNTIME_FAILED candidate record digest (evaluation_failure_digest populated)
+127. UNEVALUATED candidate record digest (all relevant fields None/False)
+128. VERIFIED candidate record digest (complete payload)
+129. INTEGRITY_INVALID candidate record digest (claimed_provider_identity in digest)
+130. Candidate record tamper by modifying failure digest
+131. Candidate record tamper by modifying diagnostic digest
+132. `FeasibilityStatus` exact seven values and numerical ranks
+133. `RatingStatus` None sentinel (None = 999 in sort)
+134. Severity rank exact mapping (INFO=0, WARNING=1, ERROR=2, BLOCKER=3)
+135. `EngineeringMessage` context affects digest (same code/message, different context → different digest)
+136. Provenance UUID collision prevention: warning/blocker with same code/message but different context produce different UUIDs
+
 ---
 
-## 27. Delivery Sequence
+## 29. Delivery Sequence
 
-1. Complete Round 6 Engineering Design Review.
+1. Complete Round 7 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -1443,9 +1845,9 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ---
 
-## 28. Acceptance Criteria
+## 30. Acceptance Criteria
 
-- [ ] Round 5 Design Review passes before implementation starts
+- [ ] Round 7 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -1464,6 +1866,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–88, including Golden (84–85), documentation (86), JSON round-trip (87), and quality gates (88)
+- [ ] Required test matrix entries 1–136, including Golden (84–85), documentation (86), JSON round-trip (87), quality gates (88), and Round 6 contract tests (89–136)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
