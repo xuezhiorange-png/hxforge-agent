@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 24 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 25 Engineering Design Review passes.
 
 ---
 
@@ -57,6 +57,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 21 | 4800977010 | CHANGES REQUIRED |
 | 22 | 4801215509 | CHANGES REQUIRED |
 | 23 | 4801552673 | CHANGES REQUIRED |
+| 24 | 4801928304 | CHANGES REQUIRED |
 
 |---|
 
@@ -1317,29 +1318,67 @@ Shared digest functions, usable from every failure path without import ambiguity
 
 ```python
 from enum import Enum
+from typing import TypeAlias
+from types import MappingProxyType
 from uuid import UUID
+import math
 
 
 RUN_FAILURE_SCHEMA_VERSION = "1"
 
 
-def normalize_run_failure_context(context: tuple[tuple[str, Any], ...]) -> list[list[str]]:
-    result: list[list[str]] = []
+CanonicalContextValue: TypeAlias = (
+    None
+    | bool
+    | int
+    | float
+    | str
+    | UUID
+    | list["CanonicalContextValue"]
+    | tuple["CanonicalContextValue", ...]
+    | dict[str, "CanonicalContextValue"]
+)
+
+
+def canonicalize_context_value(value: object) -> CanonicalContextValue:
+    """Recursively canonicalize a context value.
+
+    Raises ValueError for non-finite floats and unsupported types.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"non-finite float: {value}")
+        return value
+    if isinstance(value, str):
+        return value
+    if isinstance(value, Enum):
+        return canonicalize_context_value(value.value)
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, (tuple, list)):
+        return [canonicalize_context_value(item) for item in value]
+    if isinstance(value, (dict, MappingProxyType)):
+        return {str(k): canonicalize_context_value(v) for k, v in dict(value).items()}
+    raise ValueError(f"unsupported context value type: {type(value).__name__}")
+
+
+def normalize_run_failure_context(
+    context: tuple[tuple[str, Any], ...],
+) -> list[list[str | CanonicalContextValue]]:
+    """Canonicalize RunFailure context entries.
+
+    Each entry becomes [key, canonical_value]. Raises on unsupported types.
+    """
+    result: list[list[str | CanonicalContextValue]] = []
     for key, value in context:
-        if isinstance(value, Enum):
-            result.append([key, value.value])
-        elif isinstance(value, UUID):
-            result.append([key, str(value)])
-        elif isinstance(value, bool):
-            result.append([key, "true" if value else "false"])
-        elif value is None:
-            result.append([key, "null"])
-        elif isinstance(value, (int, float)):
-            result.append([key, str(value)])
-        elif isinstance(value, str):
-            result.append([key, value])
-        else:
-            result.append([key, repr(value)])
+        canonical = canonicalize_context_value(value)
+        result.append([key, canonical])
     return result
 
 
@@ -2389,7 +2428,7 @@ INTEGRITY_INVALID, RUNTIME_FAILED, UNEVALUATED
 ### 20.5 CandidateDiagnosticKey
 
 ```python
-from enum import IntEnum, Enum
+from enum import IntEnum
 from dataclasses import dataclass
 
 
@@ -2401,26 +2440,18 @@ class CandidateDiagnosticRank(IntEnum):
     RUNTIME_FAILURE = 4
 
 
-class CandidateDiagnosticCode(str, Enum):
-    REQUIRED_DUTY_NOT_MET = "REQUIRED_DUTY_NOT_MET"
-    MANUFACTURABILITY_FAILED = "MANUFACTURABILITY_FAILED"
-    FEASIBILITY_FAILED = "FEASIBILITY_FAILED"
-    PROVENANCE_INCOMPLETE = "PROVENANCE_INCOMPLETE"
-    RUNTIME_ERROR = "RUNTIME_ERROR"
-
-
 @dataclass(frozen=True, slots=True)
 class CandidateDiagnosticKey:
     diagnostic_class_rank: CandidateDiagnosticRank
-    code: CandidateDiagnosticCode
+    code: ErrorCode
     source_module: str
     affected_paths: tuple[str, ...]
     message: str
 ```
 
-Sentinel when `None`: `CandidateDiagnosticKey(CandidateDiagnosticRank.INFO, CandidateDiagnosticCode.RUNTIME_ERROR, "", (), "")`.
+Sentinel when `None`: `CandidateDiagnosticKey(CandidateDiagnosticRank.INFO, ErrorCode.PROVENANCE_INCOMPLETE, "", (), "")`.
 
-From EngineeringMessage: direct mapping of severity to diagnostic_class_rank. From RunFailure: `diagnostic_class_rank=CandidateDiagnosticRank.RUNTIME_FAILURE`, `code=CandidateDiagnosticCode.RUNTIME_ERROR`. From pure duty-infeasible: `diagnostic_class_rank=CandidateDiagnosticRank.BLOCKER`, `code=CandidateDiagnosticCode.REQUIRED_DUTY_NOT_MET`.
+From EngineeringMessage: direct mapping of severity to diagnostic_class_rank. From RunFailure: `diagnostic_class_rank=CandidateDiagnosticRank.RUNTIME_FAILURE`, `code=ErrorCode.PROVENANCE_INCOMPLETE`. From pure duty-infeasible: `diagnostic_class_rank=CandidateDiagnosticRank.BLOCKER`, `code=ErrorCode.REQUIRED_DUTY_NOT_MET`.
 
 ### 20.6 Primary Diagnostic Selection
 
@@ -2592,11 +2623,17 @@ def root_node_type(root_concept: ProvenanceConcept) -> ProvenanceNodeType:
 
 def root_label(
     root_concept: ProvenanceConcept,
-    design_case_revision_id: UUID | None,
+    effective_design_case_revision_id: UUID | None,
 ) -> str:
-    if root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
-        return f"revision_{design_case_revision_id}"
-    return "external_root"
+    if root_concept is ProvenanceConcept.ROOT_CASE_REVISION:
+        if effective_design_case_revision_id is None:
+            raise ValueError(
+                "case-revision root requires revision id"
+            )
+        return f"revision_{effective_design_case_revision_id}"
+    if root_concept is ProvenanceConcept.ROOT_EXTERNAL:
+        return "external_root"
+    raise ValueError("unsupported root concept")
 
 
 @dataclass(frozen=True, slots=True)
@@ -2658,8 +2695,13 @@ def derive_root_topology(
     design_case_revision_id: UUID | None,
 ) -> RootTopologySelection:
     root_concept = select_root_concept(request_kind, design_case_revision_id)
+    effective_design_case_revision_id = (
+        design_case_revision_id
+        if root_concept is ProvenanceConcept.ROOT_CASE_REVISION
+        else None
+    )
     ntype = root_node_type(root_concept)
-    label = root_label(root_concept, design_case_revision_id)
+    label = root_label(root_concept, effective_design_case_revision_id)
     is_case = root_concept == ProvenanceConcept.ROOT_CASE_REVISION
     return RootTopologySelection(
         root_concept=root_concept,
@@ -2668,7 +2710,7 @@ def derive_root_topology(
         root_case_revision_count=1 if is_case else 0,
         root_external_count=0 if is_case else 1,
         initiates_edge=ProvenanceRelationSpec(root_concept, "initiates", ProvenanceConcept.SIZING_RUN),
-        design_case_revision_id=design_case_revision_id,
+        design_case_revision_id=effective_design_case_revision_id,
     )
 ```
 
@@ -2783,17 +2825,23 @@ class OptimizerConstructionContext:
 class WarningOccurrenceConstructionContext:
     owner_kind: MessageOwnerKind
     owner_id: str
-    occurrence_kind: Literal[MessageOccurrenceKind.WARNING] = MessageOccurrenceKind.WARNING
     message_digest: str
     occurrence_index: int
+    occurrence_kind: Literal[MessageOccurrenceKind.WARNING] = field(
+        default=MessageOccurrenceKind.WARNING,
+        init=False,
+    )
 
 @dataclass(frozen=True, slots=True)
 class BlockerOccurrenceConstructionContext:
     owner_kind: MessageOwnerKind
     owner_id: str
-    occurrence_kind: Literal[MessageOccurrenceKind.BLOCKER] = MessageOccurrenceKind.BLOCKER
     message_digest: str
     occurrence_index: int
+    occurrence_kind: Literal[MessageOccurrenceKind.BLOCKER] = field(
+        default=MessageOccurrenceKind.BLOCKER,
+        init=False,
+    )
 ```
 
 ### 22.7 Constructor Functions
@@ -3158,7 +3206,7 @@ def construct_provenance_node_parts(
     spec: ProvenanceConstructorSpec[Any],
     context: Any,
 ) -> ConstructedProvenanceNodeParts:
-    if not isinstance(context, spec.context_type):
+    if type(context) is not spec.context_type:
         raise ProvenanceConstructionContextMismatch(
             f"expected context type {spec.context_type.__name__}, "
             f"got {type(context).__name__}"
@@ -4201,20 +4249,44 @@ def resolve_termination_topology(
 ) -> ResolvedTopology:
     root_selection = spec.root_topology_constructor(request_kind, design_case_revision_id)
     context = TopologyConstructionContext(counters=counters, root_selection=root_selection)
-    # Forbidden concept check
-    for forbidden in spec.forbidden_concepts:
-        count = NODE_MULTIPLICITY_CONSTRUCTORS.get(forbidden.value, lambda ctx: 0)(context)
-        if count > 0:
-            raise ValueError(f"forbidden concept {forbidden.value} has multiplicity {count}")
 
-    node_multiplicities = tuple(
-        (concept, NODE_MULTIPLICITY_CONSTRUCTORS[formula_name](context))
-        for concept, formula_name in spec.base_node_multiplicities
-    )
+    # Build node multiplicities from base specs
+    seen_concepts: set[ProvenanceConcept] = set()
+    node_multiplicities: list[tuple[ProvenanceConcept, int]] = []
+    for concept, formula_name in spec.base_node_multiplicities:
+        if concept in seen_concepts:
+            raise ValueError(f"duplicate concept in base_node_multiplicities: {concept}")
+        seen_concepts.add(concept)
+        count = NODE_MULTIPLICITY_CONSTRUCTORS[formula_name](context)
+        node_multiplicities.append((concept, count))
+
+    multiplicity_by_concept: dict[ProvenanceConcept, int] = dict(node_multiplicities)
+
+    # Forbidden concept check — use concept key directly, not formula name
+    for forbidden in spec.forbidden_concepts:
+        if multiplicity_by_concept.get(forbidden, 0) != 0:
+            raise ValueError(f"forbidden concept {forbidden} has positive multiplicity")
+
     # Result multiplicity check
-    result_count = dict(node_multiplicities).get(spec.result_concept, 0)
+    result_count = multiplicity_by_concept.get(spec.result_concept, 0)
     if result_count != 1:
-        raise ValueError(f"expected exactly 1 {spec.result_concept.value} node, got {result_count}")
+        raise ValueError(f"expected exactly 1 {spec.result_concept} node, got {result_count}")
+
+    # Root concept multiplicity matches RootTopologySelection
+    if root_selection.root_concept is ProvenanceConcept.ROOT_CASE_REVISION:
+        root_count = multiplicity_by_concept.get(ProvenanceConcept.ROOT_CASE_REVISION, 0)
+        if root_count != root_selection.root_case_revision_count:
+            raise ValueError(
+                f"ROOT_CASE_REVISION multiplicity {root_count} "
+                f"does not match selection {root_selection.root_case_revision_count}"
+            )
+    elif root_selection.root_concept is ProvenanceConcept.ROOT_EXTERNAL:
+        root_count = multiplicity_by_concept.get(ProvenanceConcept.ROOT_EXTERNAL, 0)
+        if root_count != root_selection.root_external_count:
+            raise ValueError(
+                f"ROOT_EXTERNAL multiplicity {root_count} "
+                f"does not match selection {root_selection.root_external_count}"
+            )
 
     # Build edge set with dedup
     edges = [root_selection.initiates_edge]
@@ -4227,8 +4299,8 @@ def resolve_termination_topology(
             raise ValueError(f"duplicate edge: {edge.source_concept} --{edge.relation}--> {edge.target_concept}")
         seen_edges.add(key)
         # Edge endpoint checks
-        source_count = dict(node_multiplicities).get(edge.source_concept, 0)
-        target_count = dict(node_multiplicities).get(edge.target_concept, 0)
+        source_count = multiplicity_by_concept.get(edge.source_concept, 0)
+        target_count = multiplicity_by_concept.get(edge.target_concept, 0)
         if source_count == 0:
             raise ValueError(f"edge source {edge.source_concept} has zero multiplicity")
         if target_count == 0:
@@ -5183,54 +5255,54 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 23 Contract Tests (501–540)
+### 27.21 Round 24 Contract Tests (501–540)
 
-501. Round 23 Review Comment ID is `4801552673`
-502. Round 23 decision is `CHANGES REQUIRED`
-503. Round 23 row follows Round 22 in review history
-504. Gate references Round 24 Engineering Design Review
-505. Gate text at top of doc reads "Round 24" not "Round 23"
-506. Gate text: "TASK-009 returns to READY only after Round 24 Engineering Design Review passes."
-507. Delivery Sequence step 1 references "Round 24"
-508. Acceptance Criteria first item references "Round 24 Engineering Design Review"
-509. All Acceptance Criteria references to round gate use "Round 24" (not "Round 23")
-510. Review History has exactly 24 rows (Rounds 1–23)
-511. Round 23 comment ID `4801552673` not duplicated in older rounds
-512. No orphan "Round 23" gate text references remain in body outside review history
+501. Round 24 Review Comment ID is `4801928304`
+502. Round 24 decision is `CHANGES REQUIRED`
+503. Round 24 row follows Round 23 in review history
+504. Gate references Round 25 Engineering Design Review
+505. Gate text at top of doc reads "Round 25" not "Round 24"
+506. Gate text: "TASK-009 returns to READY only after Round 25 Engineering Design Review passes."
+507. Delivery Sequence step 1 references "Round 25"
+508. Acceptance Criteria first item references "Round 25 Engineering Design Review"
+509. All Acceptance Criteria references to round gate use "Round 25" (not "Round 24")
+510. Review History has exactly 25 rows (Rounds 1–24)
+511. Round 24 comment ID `4801928304` not duplicated in older rounds
+512. No orphan "Round 24" gate text references remain in body outside review history
 513. Test #499 reads "Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round"
-514. Old Acceptance Criteria references no longer say "Round 22" for Delivery Sequence
-515. Delivery Sequence step 1 does NOT reference "Round 23"
-516. Acceptance Criteria first item does NOT reference "Round 23"
-517. Test matrix summary lists Round 23 (501–540) not Round 22
-518. Test matrix acceptance criteria entry: Round 23 (501–540) replaces Round 22
-519. Section 27.21 present (Round 23 Contract Tests)
+514. Old Acceptance Criteria references no longer say "Round 23" for Delivery Sequence
+515. Delivery Sequence step 1 does NOT reference "Round 24"
+516. Acceptance Criteria first item does NOT reference "Round 24"
+517. Test matrix summary lists Round 24 (501–540) not Round 23
+518. Test matrix acceptance criteria entry: Round 24 (501–540) replaces Round 23
+519. Section 27.21 present (Round 24 Contract Tests)
 520. Section 27.21 has exactly 40 entries (501–540)
-521. Section 27.21 heading reads "Round 23 Contract Tests (501–540)"
+521. Section 27.21 heading reads "Round 24 Contract Tests (501–540)"
 522. Test numbering 501–540 is continuous with no gaps
-523. Round 23 test range matches heading: 501–540
+523. Round 24 test range matches heading: 501–540
 524. Global test numbering continuous 1–540
 525. Section 27 range now 27.1–27.21 continuous (no gaps)
-526. Gate text does NOT reference "Round 23" at top of doc
+526. Gate text does NOT reference "Round 24" at top of doc
 527. Issue #23 test total equals task-card N (540)
-528. Round 23 subsection numbering locally continuous within 501–540
-529. Issue #23 frozen SHA equals new docs commit for Round 23
-530. Acceptance Criteria required test matrix entries include Round 23 (501–540)
+528. Round 24 subsection numbering locally continuous within 501–540
+529. Issue #23 frozen SHA equals new docs commit for Round 24
+530. Acceptance Criteria required test matrix entries include Round 24 (501–540)
 531. Acceptance Criteria test total remains 1–540
-532. Test #505 confirms gate text reads "Round 24"
+532. Test #505 confirms gate text reads "Round 25"
 533. Test #506 confirms gate text exact wording
-534. Test #507 confirms Delivery Sequence step 1 reads "Round 24"
-535. Test #508 confirms Acceptance Criteria first item reads "Round 24"
+534. Test #507 confirms Delivery Sequence step 1 reads "Round 25"
+535. Test #508 confirms Acceptance Criteria first item reads "Round 25"
 536. TASK-010 in TASK_BACKLOG.md is BLOCKED
-537. No remaining "Round 22" references in body outside review history
-538. Review history does NOT pre-populate Round 24 comment ID or decision
-539. Section 27.21 test entries cover all Round 23 document changes
+537. No remaining "Round 23" references in body outside review history
+538. Review history does NOT pre-populate Round 25 comment ID or decision
+539. Section 27.21 test entries cover all Round 24 document changes
 540. Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 24 Engineering Design Review.
+1. Complete Round 25 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5244,7 +5316,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 24 Engineering Design Review passes before implementation starts
+- [ ] Round 25 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -5263,6 +5335,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 23 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 24 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
