@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 29 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 30 Engineering Design Review passes.
 
 ---
 
@@ -1337,12 +1337,29 @@ def qualified_type_name(value: object) -> str:
     return f"{type(value).__module__}.{type(value).__qualname__}"
 
 
-def safe_has_attribute(
-    value: object, name: str, *,
-    context_key: str, context_path: tuple[str, ...],
-) -> bool:
+@dataclass(frozen=True, slots=True)
+class RepositoryQuantityAdapter:
+    raw_value: object
+    unit: object
+    kind: object
+    to_si: object
+
+
+def try_read_repository_quantity_adapter(
+    value: object,
+    *,
+    context_key: str,
+    context_path: tuple[str, ...],
+) -> RepositoryQuantityAdapter | None:
     try:
-        return hasattr(value, name)
+        raw_value = getattr(value, "value")
+        unit = getattr(value, "unit")
+        kind = getattr(value, "kind")
+        to_si = getattr(value, "to_si")
+    except AttributeError:
+        return None
+    except ContextCanonicalizationError:
+        raise
     except Exception as exc:
         raise ContextCanonicalizationError(
             failure_kind="canonicalization_exception",
@@ -1350,17 +1367,33 @@ def safe_has_attribute(
             context_path=context_path,
             offending_type=qualified_type_name(value),
         ) from exc
-
-
-def is_repository_quantity_like(value: object) -> bool:
-    return (
-        hasattr(value, "value") and hasattr(value, "unit")
-        and hasattr(value, "kind") and hasattr(value, "to_si")
+    if not callable(to_si):
+        return None
+    return RepositoryQuantityAdapter(
+        raw_value=raw_value, unit=unit, kind=kind, to_si=to_si,
     )
 
 
-def is_pydantic_model(value: object) -> bool:
-    return hasattr(value, "model_fields")
+def is_pydantic_model(
+    value: object,
+    *,
+    context_key: str,
+    context_path: tuple[str, ...],
+) -> bool:
+    try:
+        model_fields = getattr(type(value), "model_fields")
+    except AttributeError:
+        return False
+    except ContextCanonicalizationError:
+        raise
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind="canonicalization_exception",
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+    return isinstance(model_fields, Mapping)
 
 
 def canonicalize_trusted_context_value(
@@ -1417,6 +1450,8 @@ def canonicalize_trusted_context_value(
         if isinstance(value, datetime):
             try:
                 offset = value.utcoffset()
+            except ContextCanonicalizationError:
+                raise
             except Exception as exc:
                 raise ContextCanonicalizationError(
                     failure_kind="canonicalization_exception",
@@ -1433,6 +1468,8 @@ def canonicalize_trusted_context_value(
                 )
             try:
                 utc_value = value.astimezone(UTC)
+            except ContextCanonicalizationError:
+                raise
             except Exception as exc:
                 raise ContextCanonicalizationError(
                     failure_kind="canonicalization_exception",
@@ -1479,40 +1516,57 @@ def canonicalize_trusted_context_value(
 
         # Mapping → recursive (str keys only)
         if isinstance(value, Mapping):
-            updated_ancestors = ancestor_ids | {id(value)}
-            result: dict[str, CanonicalValue] = {}
-            for k, v in value.items():
-                if type(k) is not str:
-                    raise ContextCanonicalizationError(
-                        failure_kind="non_string_key",
+            try:
+                raw_items: object = value.items()
+                updated_ancestors = ancestor_ids | {id(value)}
+                result: dict[str, CanonicalValue] = {}
+                for k, v in value.items():
+                    if type(k) is not str:
+                        raise ContextCanonicalizationError(
+                            failure_kind="non_string_key",
+                            context_key=context_key,
+                            context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
+                            offending_type=qualified_type_name(k),
+                        )
+                    child_path = context_path + (k,)
+                    canonical_v = canonicalize_trusted_context_value(
+                        v,
                         context_key=context_key,
-                        context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
-                        offending_type=qualified_type_name(k),
+                        context_path=child_path,
+                        ancestor_ids=updated_ancestors,
                     )
-                child_path = context_path + (k,)
-                canonical_v = canonicalize_trusted_context_value(
-                    v,
+                    result[k] = canonical_v
+                return result
+            except ContextCanonicalizationError:
+                raise
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind="canonicalization_exception",
                     context_key=context_key,
-                    context_path=child_path,
-                    ancestor_ids=updated_ancestors,
-                )
-                result[k] = canonical_v
-            return result
+                    context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                ) from exc
 
         # repository Quantity-like (canonical.py)
-        if is_repository_quantity_like(value):
+        adapter = try_read_repository_quantity_adapter(
+            value, context_key=context_key, context_path=context_path,
+        )
+        if adapter is not None:
             try:
-                kind = value.kind
-                si_value = value.value
-                if kind is not None:
-                    si_value = value.to_si().value
+                si_value = adapter.raw_value
+                if adapter.kind is not None:
+                    si_value = adapter.to_si().value
                 return {
                     "si_value": canonicalize_trusted_context_value(
                         si_value, context_key=context_key,
                         context_path=context_path + ("si_value",),
                         ancestor_ids=ancestor_ids,
                     ),
-                    "kind": kind.value if kind is not None else None,
+                    "kind": (
+                        adapter.kind.value
+                        if adapter.kind is not None
+                        else None
+                    ),
                 }
             except ContextCanonicalizationError:
                 raise
@@ -1524,10 +1578,14 @@ def canonicalize_trusted_context_value(
                 ) from exc
 
         # Pydantic model - field-level traversal
-        if is_pydantic_model(value):
+        if is_pydantic_model(
+            value, context_key=context_key, context_path=context_path,
+        ):
             model_type = type(value)
             try:
                 model_fields = model_type.model_fields
+            except ContextCanonicalizationError:
+                raise
             except Exception as exc:
                 raise ContextCanonicalizationError(
                     failure_kind="canonicalization_exception",
@@ -1540,6 +1598,8 @@ def canonicalize_trusted_context_value(
             for field_name in model_fields:
                 try:
                     field_value = getattr(value, field_name)
+                except ContextCanonicalizationError:
+                    raise
                 except Exception as exc:
                     raise ContextCanonicalizationError(
                         failure_kind="canonicalization_exception",
@@ -3912,6 +3972,11 @@ def invariant_standard_result_node_present(ctx: TopologyConstructionContext) -> 
         raise ValueError(
             f"expected sizing_result_count=1, got {ctx.counters.sizing_result_count}"
         )
+    if ctx.counters.sizing_run_failure_result_count != 0:
+        raise ValueError(
+            "sizing_run_failure_result must be absent "
+            "for a standard-result topology"
+        )
 
 
 def invariant_cap_exceeded_before_materialization(ctx: TopologyConstructionContext) -> None:
@@ -4180,6 +4245,7 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         minimum_blocker_occurrences=0,
         counter_invariants=(
             invariant_unique_candidate_count_ge_1,
+            invariant_evaluated_eq_unique_eq_verified,
             invariant_no_feasible_candidate,
             invariant_feasible_count_range,
             invariant_feasible_le_verified,
@@ -4216,8 +4282,7 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         minimum_blocker_occurrences=0,
         counter_invariants=(
             invariant_unique_candidate_count_ge_1,
-            invariant_verified_rating_eq_unique,
-            invariant_all_candidates_verified,
+            invariant_evaluated_eq_unique_eq_verified,
             invariant_feasible_candidate_present,
             invariant_feasible_count_range,
             invariant_feasible_le_verified,
@@ -5574,53 +5639,53 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 28 Contract Tests (501–540)
+### 27.21 Round 29 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 28 changes. **Expected output**: Round 28 row exists with Comment ID `4802483910` and decision `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 28 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 28 row in review history. **Expected output**: Appears immediately after Round 27 row. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 29 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
-505. **Input**: Grid materialization count invariant — `materialized_ticks` length equals `intersection_count` after request intersection. **Expected output**: `len(materialized_ticks) == intersection_count` holds for all valid grid/explicit configurations. **Exception**: `AssertionError` — invariant violation: materialized length must equal intersection count.
-506. **Input**: Grid materialization count invariant with unbounded request (min=None, max=None). **Expected output**: `len(materialized_ticks) == intersection_count == catalog_count`. **Exception**: `AssertionError` — invariant violation when bounds are absent.
-507. **Input**: Grid materialization count invariant with full-intersection request covering entire catalog. **Expected output**: `len(materialized_ticks) == intersection_count == catalog_count`. **Exception**: `AssertionError` — invariant violation for full-intersection case.
-508. **Input**: Grid materialization count invariant with zero-intersection (request min > catalog max). **Expected output**: `materialized_ticks` empty, `intersection_count == 0`. **Exception**: N/A — zero-intersection edge case preserves invariant.
-509. **Input**: Grid materialization count invariant with low-end partial-intersection (request min below catalog lo). **Expected output**: `first_idx` clamped to 0; `len(materialized_ticks) == intersection_count`. **Exception**: `AssertionError` — invariant violation when request min is below catalog lo.
-510. **Input**: Grid materialization count invariant with high-end partial-intersection (request max above catalog hi). **Expected output**: `last_idx` clamped to `catalog_count - 1`; `len(materialized_ticks) == intersection_count`. **Exception**: `AssertionError` — invariant violation when request max is above catalog hi.
-511. **Input**: Grid materialization count invariant with `EXCLUDE_MAX` and aligned max — max excluded from catalog but intersection uses catalog range. **Expected output**: `len(materialized_ticks) == intersection_count`. **Exception**: `AssertionError` — invariant violation for exclude-max aligned case.
-512. **Input**: `to_tick(0.05, Decimal("0.1"))` — sub-quantum value. **Expected output**: `InvalidLengthError` raised. **Exception**: `InvalidLengthError` — typed error propagation: sub-quantum value triggers structured `InvalidLengthError`, must be caught by typed `except InvalidLengthError` and propagate as `CATALOG_INVALID`.
-513. **Input**: `to_tick(-3.0, Decimal("0.1"))` — non-positive value. **Expected output**: `InvalidLengthError` raised. **Exception**: `InvalidLengthError` — typed error propagation: non-positive value triggers structured `InvalidLengthError` with correct error code path.
-514. **Input**: `length_quantum_m = "0.025"` — invalid quantum. **Expected output**: `InvalidLengthQuantum` raised. **Exception**: `InvalidLengthQuantum` — typed error propagation: invalid quantum triggers `InvalidLengthQuantum`, propagates as `CATALOG_INVALID`.
-515. **Input**: `InvalidRequestBounds` raised with reversed min/max bounds. **Expected output**: Error is a typed exception, propagates as `INVALID_SIZING_REQUEST`. **Exception**: `InvalidRequestBounds` — typed error propagation: reversed bounds → `InvalidRequestBounds` → `INVALID_SIZING_REQUEST`.
-516. **Input**: `InvalidRequestBounds` raised with non-finite bound (`float("nan")`). **Expected output**: Error is a typed exception, propagates as `INVALID_SIZING_REQUEST`. **Exception**: `InvalidRequestBounds` — typed error propagation: non-finite bound → `InvalidRequestBounds` → `INVALID_SIZING_REQUEST`.
-517. **Input**: `CatalogInvalid` raised from empty explicit-length set after canonicalization. **Expected output**: Error is a typed exception, caught at catalog validation boundary. **Exception**: `CatalogInvalid` — typed error propagation: empty explicit lengths → `CatalogInvalid`.
-518. **Input**: `CatalogInvalid` raised from reversed grid (`hi_tick < lo_tick`). **Expected output**: Error is a typed exception, caught at catalog validation boundary. **Exception**: `CatalogInvalid` — typed error propagation: reversed grid → `CatalogInvalid`.
-519. **Input**: Pydantic model validation with invalid `length_quantum_m` type (non-string, e.g. integer). **Expected output**: Pydantic `ValidationError` raised before any business logic executes. **Exception**: `ValidationError` — Pydantic schema validation catches type errors before domain validation.
-520. **Input**: Pydantic model validation with missing required fields in `SizingRequest`. **Expected output**: Pydantic `ValidationError` raised, listing all missing field names. **Exception**: `ValidationError` — Pydantic detects missing required fields.
-521. **Input**: Pydantic model validation with extra unknown fields in `SizingRequest` (forbid-extras config). **Expected output**: Pydantic `ValidationError` raised; extra fields rejected per model configuration. **Exception**: `ValidationError` — Pydantic extra-field rejection.
-522. **Input**: Pydantic model validation with invalid field type in nested `CompleteDoublePipeAssemblyOption` (float field with string value). **Expected output**: Pydantic `ValidationError` raised before catalog business-logic validation. **Exception**: `ValidationError` — Pydantic type coercion failure on nested model fields.
-523. **Input**: Pydantic model validation of `CompleteDoublePipeCatalogSnapshot` with duplicate `assembly_option_id` values. **Expected output**: Business-logic duplicate detection raises `CatalogInvalid` after Pydantic model passes schema validation. **Exception**: `CatalogInvalid` — Pydantic schema passes but business logic catches duplicate IDs.
-524. **Input**: Domain validation of negative `inner_tube_inner_diameter_m` in `CompleteDoublePipeAssemblyOption`. **Expected output**: Rejected at model validation layer (Pydantic `field_validator` or `ge` constraint) or business-logic domain check. **Exception**: `ValidationError` or `CatalogInvalid` — negative diameters rejected at model or business layer.
-525. **Input**: `HARD_RAW_COMBINATION_CAP` constant type, visibility, and value. **Expected output**: Declared as module-level `int` with value `10_000`; module-private (prefixed `_`); no runtime mutation allowed. **Exception**: N/A — constant invariant: hard cap is immutable and module-private.
-526. **Input**: Effective cap computation with `request_raw_combination_cap = 20_000` (above hard cap). **Expected output**: `effective_cap = 10_000` (silently reduced to hard cap). **Exception**: N/A — cap siloing invariant: effective cap never exceeds `HARD_RAW_COMBINATION_CAP`.
-527. **Input**: Effective cap computation with `request_raw_combination_cap = 5_000` (below hard cap). **Expected output**: `effective_cap = 5_000` (request cap below hard cap honored). **Exception**: N/A — cap siloing invariant: request cap below hard cap is honored without modification.
-528. **Input**: Cap-exceeded result block with `raw_combination_count = 10_001`, `effective_cap = 10_000`. **Expected output**: `status=BLOCKED`, `raw=10001`, `unique=0`, `evaluated=0`, `selected=None`, `top_candidates=()`. **Exception**: N/A — cap-exceeded result invariant: no candidates materialized or evaluated when cap exceeded.
-529. **Input**: Cap-exceeded result for explicit-length catalog exceeding effective cap. **Expected output**: Same BLOCKED result structure; zero materialized or evaluated candidates. **Exception**: N/A — cap invariant: no materialization occurs when either grid or explicit-length catalog exceeds cap.
-530. **Input**: Provider identity mandatory field mismatch — each of the four mandatory fields independently (name, version, git_revision, reference_state_policy). **Expected output**: Each individual mismatch independently produces `PROPERTY_PROVIDER_IDENTITY_MISMATCH`. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — mandatory field identity invariant: every mandatory field is independently verified.
-531. **Input**: Provider identity optional field mismatch: expected `configuration_fingerprint` set to a value, actual returns None. **Expected output**: BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH`. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — optional field invariant: expected non-None optional must match actual.
-532. **Input**: Provider identity optional field match: expected `configuration_fingerprint` is None, actual returns any value. **Expected output**: Not a mismatch (None in expected means "do not check this field"). **Exception**: N/A — optional field invariant: None expected means skip verification.
-533. **Input**: Cross-candidate provider identity consistency: two verified candidates from same sizing run with different provider identities. **Expected output**: BLOCKED — run-level identity invariant violated. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — cross-candidate consistency invariant: all verified candidates must share identical provider identity.
-534. **Input**: Cross-candidate provider identity consistency: all verified candidates share identical provider identity. **Expected output**: Passes — run-level identity invariant satisfied. **Exception**: N/A — cross-candidate consistency invariant satisfied.
-535. **Input**: Integrity-invalid `RatingResult` claimed identity is NOT used for provider matching decisions. **Expected output**: Provider identity check correctly skips candidates whose verification outcome is `INTEGRITY_INVALID`. **Exception**: N/A — evidence-integrity invariant: unverified claims must not be treated as verified evidence for matching decisions.
-536. **Input**: All candidates produce `INTEGRITY_INVALID` or `RUNTIME_FAILED` — no verified candidate exists. **Expected output**: Provider identity consistency cannot be enforced; sizing terminates via integrity/failure path without provider identity check. **Exception**: N/A — evidence-integrity invariant: zero verified candidates means no provider consistency check.
-537. **Input**: Typed error `PROPERTY_PROVIDER_IDENTITY_MISMATCH` propagates from per-candidate check to run-level `BLOCKED` status. **Expected output**: A single candidate with provider identity mismatch blocks the entire sizing run with structured error. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — typed error propagation: per-candidate mismatch escalates to run-level BLOCKED.
-538. **Input**: `CalculationContext` field roles: `request_id` derived per candidate; `design_case_revision_id` and `calculation_run_id` preserved from caller. **Expected output**: `design_case_revision_id` and `calculation_run_id` are identical across all candidates in the same sizing request. **Exception**: N/A — context invariant: caller revision/run IDs are preserved identically across candidates.
-539. **Input**: `CalculationContext` `request_id` uniqueness across candidates in the same sizing run. **Expected output**: Every candidate receives a distinct `request_id` (UUID v4). **Exception**: N/A — context invariant: `request_id` is unique per candidate.
-540. **Input**: Entire document. **Expected output**: Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully. **Exception**: N/A — sync test: parse validation check.
+501. **Input**: Review history table after Round 29 changes. **Expected output**: Round 29 row exists with Comment ID `4802701831` and decision `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 29 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 29 row in review history. **Expected output**: Appears immediately after Round 28 row. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 30 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+505. **Input**: Actual NO_FEASIBLE registry `counter_invariants`. **Expected output**: Contains `invariant_evaluated_eq_unique_eq_verified`. **Exception**: N/A — registry contract: registry contains required equality invariant.
+506. **Input**: Valid NO_FEASIBLE counters: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=0`. **Expected output**: `invariant_evaluated_eq_unique_eq_verified` passes. **Exception**: N/A — valid fixture: all counters equal.
+507. **Input**: NO_FEASIBLE: `unique=10, evaluated=2, verified=2, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised with `"evaluated (2) != unique (10)"`. **Exception**: `ValueError` — evaluated < unique rejected.
+508. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=8, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised with `"verified (8) != unique (10)"`. **Exception**: `ValueError` — verified < unique rejected.
+509. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=10, feasible=1, result=1, failure=0`. **Expected output**: `ValueError` raised by `invariant_no_feasible_candidate`. **Exception**: `ValueError` — feasible > 0 rejected.
+510. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=10, feasible=0, result=0, failure=0`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present` with `"sizing_result_count=1"`. **Exception**: `ValueError` — result count != 1 rejected.
+511. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=10, feasible=0, result=2, failure=0`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present`. **Exception**: `ValueError` — result count=2 rejected.
+512. **Input**: NO_FEASIBLE: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=1`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present` with `"sizing_run_failure_result must be absent"`. **Exception**: `ValueError` — failure result present rejected.
+513. **Input**: Actual SUCCEEDED registry `counter_invariants`. **Expected output**: Contains `invariant_evaluated_eq_unique_eq_verified` and does NOT contain `invariant_verified_rating_eq_unique` or `invariant_all_candidates_verified`. **Exception**: N/A — registry contract: replaced with stronger equality invariant.
+514. **Input**: Valid SUCCEEDED counters: `unique=10, evaluated=10, verified=10, feasible=3, result=1, failure=0`. **Expected output**: `invariant_evaluated_eq_unique_eq_verified` passes. **Exception**: N/A — valid fixture: all counters equal.
+515. **Input**: SUCCEEDED: `unique=10, evaluated=3, verified=10, feasible=3, result=1, failure=0`. **Expected output**: `ValueError` raised with `"evaluated (3) != unique (10)"`. **Exception**: `ValueError` — evaluated < unique rejected.
+516. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=8, feasible=3, result=1, failure=0`. **Expected output**: `ValueError` raised with `"verified (8) != unique (10)"`. **Exception**: `ValueError` — verified < unique rejected.
+517. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=0, result=1, failure=0`. **Expected output**: `ValueError` raised by `invariant_feasible_candidate_present`. **Exception**: `ValueError` — feasible=0 rejected.
+518. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: `ValueError` raised by `invariant_feasible_le_verified`. **Exception**: `ValueError` — feasible > verified rejected.
+519. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=3, result=0, failure=0`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present`. **Exception**: `ValueError` — result count != 1 rejected.
+520. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=3, result=1, failure=1`. **Expected output**: `ValueError` raised by `invariant_standard_result_node_present` with `"sizing_run_failure_result must be absent"`. **Exception**: `ValueError` — failure result present rejected.
+521. **Input**: `invariant_standard_result_node_present` with `result=1, failure=0`. **Expected output**: passes. **Exception**: N/A — valid standard-result topology.
+522. **Input**: `invariant_standard_result_node_present` with `result=1, failure=1`. **Expected output**: `ValueError` with `"sizing_run_failure_result must be absent"`. **Exception**: `ValueError` — failure-result rejected in standard topology.
+523. **Input**: datetime.utcoffset() raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged — outer boundary does not rewrite to `canonicalization_exception`. **Exception**: `ContextCanonicalizationError` — typed error propagates through nested boundary.
+524. **Input**: Mapping.items() raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
+525. **Input**: `try_read_repository_quantity_adapter` passes detected object, then `adapter.to_si()` raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
+526. **Input**: `adapter.to_si()` raises `RuntimeError`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — ordinary exception converted.
+527. **Input**: `getattr(type(value), "model_fields")` raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates in Pydantic detection.
+528. **Input**: Pydantic field getter `getattr(value, field_name)` raises `ContextCanonicalizationError`. **Expected output**: `ContextCanonicalizationError` propagates unchanged. **Exception**: `ContextCanonicalizationError` — typed error propagates.
+529. **Input**: Pydantic field getter raises `RuntimeError("probe")`. **Expected output**: `ContextCanonicalizationError` with `failure_kind="canonicalization_exception"`. **Exception**: `ContextCanonicalizationError` — ordinary exception converted.
+530. **Input**: A real Pydantic `BaseModel` instance. **Expected output**: `is_pydantic_model` returns `True`. **Exception**: N/A — class-level Pydantic detection recognizes `BaseModel` subclass.
+531. **Input**: A plain object with `model_fields` set on the instance only (not on the class). **Expected output**: `is_pydantic_model` returns `False`; canonicalizer treats it as `unsupported_type`. **Exception**: `ContextCanonicalizationError` with `failure_kind="unsupported_type"`.
+532. **Input**: Quantity canonicalization uses `try_read_repository_quantity_adapter`. **Expected output**: No `is_repository_quantity_like` or `safe_has_attribute` call exists in the normative dispatch path. **Exception**: N/A — single authoritative mechanism.
+533. **Input**: Check for `safe_has_attribute` in normative block. **Expected output**: `safe_has_attribute` is not defined in the canonicalization normative code block. **Exception**: N/A — unused helper removed.
+534. **Input**: Nested Quantity within a Pydantic model. **Expected output**: Quantity is canonicalized via adapter, producing `{"si_value": ..., "kind": ...}` dictionary. **Exception**: N/A — nested Quantity retains SI payload.
+535. **Input**: Two `Quantity` objects with equivalent SI values but different original units (e.g. 1 m and 100 cm). **Expected output**: Both produce identical `si_value` and `kind` after canonicalization. **Exception**: N/A — unit-equivalent values hash identically.
+536. **Input**: Same sizing request digest and same candidate ID. **Expected output**: `uuid5(TASK009_CONTEXT_NAMESPACE, f"{sizing_request_identity_digest}:{source_qualified_candidate_id}")` produces the same UUID across repeated calls. **Exception**: N/A — deterministic request ID contract.
+537. **Input**: Same sizing request digest but different candidate IDs. **Expected output**: Each candidate produces a different deterministic UUID. **Exception**: N/A — per-candidate uniqueness without randomness.
+538. **Input**: Three candidates inserted in order A, B, C vs. order C, A, B. **Expected output**: Each candidate receives the same UUID in both orderings. **Exception**: N/A — insertion-order independence.
+539. **Input**: Repeated sizing run with identical inputs. **Expected output**: Every candidate's `request_id` and execution-context digest are identical to the first run. **Exception**: N/A — fully deterministic execution-context digest.
+540. **Input**: zero-root and dual-root rejection, tests 1–540 continuity, Frozen SHA and Round 30 gate synchronization. **Expected output**: 540 tests continuous, Issue frozen SHA equals new commit, gate references Round 30. **Exception**: N/A — structural sync check.
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 29 Engineering Design Review.
+1. Complete Round 30 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5634,7 +5699,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 29 Engineering Design Review passes before implementation starts
+- [ ] Round 30 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
