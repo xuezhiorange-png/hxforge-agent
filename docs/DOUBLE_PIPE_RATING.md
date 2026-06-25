@@ -1,8 +1,21 @@
 # Double-Pipe Heat-Exchanger Rating — TASK-008
 
-**Status:** IN_PROGRESS / Draft
+**Status:** DONE / Merged
 **Milestone:** M2
 **Task card:** [docs/tasks/TASK-008-double-pipe-rating.md](tasks/TASK-008-double-pipe-rating.md)
+
+## Final Delivery Record
+
+- **PR:** #21 — merged
+- **Reviewed Head:** `37eda3580ba7acced1beb4cec307343a9f5449ec`
+- **Merge commit:** `cef3f85402b1696b336347293afc7276bbf67545`
+- **Engineering Review Passed:** Review `4567761204`
+- **CI Run:** `28145757989` — success on Python 3.11 and 3.12
+- **Final diff:** 39 files, +22,104 / -58
+- **Final unit-test suite:** 1,502 passed, 1 skipped
+- **Issue #20:** closed / completed
+- **Issue #19:** open; C4 remains deferred and unimplemented
+- **TASK-009:** READY; no sizing or optimization work is included here
 
 ---
 
@@ -222,7 +235,7 @@ silent convergence to a physically infeasible solution.
 | Criterion | Formula | Default |
 |-----------|---------|---------|
 | Absolute residual | `|residual_Q| ≤ max(abs_tol, rel_tol × max(|Q|, 1))` | 1e-3 W, 1e-8 |
-|| Bracket temperature effect | `bracket_width / C_min ≤ bracket_tol` | 1e-4 K |
+| Bracket temperature effect | `bracket_width / C_min ≤ bracket_tol` | 1e-4 K |
 | Iteration limit | `iterations ≤ max_iterations` | 100 |
 
 ---
@@ -291,7 +304,7 @@ If operating conditions require C4 (annulus laminar inner constant-heat-flux):
 - No substitution with other correlations
 - No guessing or interpolation of C4 table data
 - Error code: `CORRELATION_IMPLEMENTATION_UNAVAILABLE`
-- See [Issue #19](https://github.com/.../issues/19) for tracking
+- Tracking issue: [Issue #19](https://github.com/xuezhiorange-png/hxforge-agent/issues/19)
 
 ---
 
@@ -437,28 +450,21 @@ Failed results still receive a deterministic hash and valid provenance.
 
 ---
 
-## 15. Test Coverage Summary
+## 15. Final Test Evidence
 
-| Test file | Type | Test count | Scope |
-|-----------|------|------------|-------|
-| `tests/unit/test_double_pipe_geometry.py` | Unit | 48 | Geometry construction, validation, derived quantities, immutability, serialization |
-| `tests/unit/test_double_pipe_thermal.py` | Unit | 45 | Thermal resistance, LMTD (counter + parallel), ε-NTU, wall/convective/fouling resistance |
-| `tests/unit/test_double_pipe_solver.py` | Unit | 64 | Bracket finding, Q-based root-finding solver, convergence criteria, edge cases |
-| `tests/integration/test_double_pipe_rating.py` | Integration | 20 | End-to-end rating with CoolProp: counterflow, parallel-flow, energy balance, zero/negative flows, temperature crossing, hash determinism, provenance, JSON round-trip |
-| **Total** | | **177** | |
+| Scope | Result |
+|-------|--------|
+| r13 correction tests | 75 passed, 0 skipped |
+| All correction files (r5, r6, r8, r10, r12, r13) | 192 passed, 0 skipped |
+| Full unit-test suite | 1,502 passed, 1 skipped |
+| Python matrix | 3.11 and 3.12 passed |
+| Quality gates | ruff check, ruff format, mypy, pytest with coverage, pip-audit passed |
 
-### Key integration test scenarios
-
-1. Counter-flow rating with water-water case
-2. Parallel-flow rating
-3. Counter-flow duty ≥ parallel-flow duty (expected physics)
-4. Zero hot mass flow → BLOCKED
-5. Negative cold mass flow → BLOCKED
-6. Hot inlet ≤ cold inlet → BLOCKED
-7. Same input → same hash (determinism)
-8. Different geometry → different hash
-9. Provenance graph structure and verification
-10. JSON round-trip preserves duty and convergence status
+Key verified scenarios include counterflow and parallel-flow rating, energy
+closure, LMTD and ε-NTU consistency, deterministic Q_max diagnostics,
+property and correlation failure propagation, C4 blocker behavior,
+result/provenance tamper detection, JSON round-trip, evaluation ordering,
+and real `TrialEvaluationAbort` propagation from a controlled PH failure.
 
 ### Example case
 
@@ -467,4 +473,4 @@ Failed results still receive a deterministic hash and valid provenance.
 
 ---
 
-*Generated for TASK-008 on branch `codex/task-008-fixed-geometry-double-pipe-rating`.*
+*Finalized after TASK-008 PR #21 merged into `main`.*
