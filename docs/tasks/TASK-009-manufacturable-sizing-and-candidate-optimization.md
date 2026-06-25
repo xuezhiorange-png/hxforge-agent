@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 20 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 21 Engineering Design Review passes.
 
 ---
 
@@ -53,6 +53,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 17 | 4799885832 | CHANGES REQUIRED |
 | 18 | 4800120135 | CHANGES REQUIRED |
 | 19 | 4800488397 | CHANGES REQUIRED |
+| 20 | 4800787131 | CHANGES REQUIRED |
 
 |---|
 
@@ -1420,6 +1421,10 @@ fallback_failure_context = (
 Prohibited in fallback: original value, original object, repr, exception object, traceback object, Enum object.
 
 ```python
+RUN_FAILURE_SCHEMA_VERSION = "1"
+```
+
+```python
 CONTEXT_CANONICALIZATION_FAILURE_MESSAGE = (
     "Context canonicalization failed - see fallback_failure_context "
     "for canonicalization trace details"
@@ -1430,7 +1435,7 @@ Complete RunFailure construction for the canonicalization failure path:
 
 ```python
 fallback_run_failure = RunFailure(
-    schema_version="1",
+    schema_version=RUN_FAILURE_SCHEMA_VERSION,
     code=ErrorCode.PROVENANCE_INCOMPLETE,
     message=CONTEXT_CANONICALIZATION_FAILURE_MESSAGE,
     traceback=None,
@@ -1494,25 +1499,29 @@ meets_target_without_tolerance: bool | None
 Unified digest across all evaluation states:
 
 ```python
-{
-    "source_qualified_candidate_identity_digest": ...,
-    "candidate_evaluation_state": candidate_evaluation_state.value,
-    "candidate_evaluation_identity_digest": ... | None,
-    "evaluation_order_index": ...,
-    "rating_status": rating_status.value if rating_status is not None else None,
-    "feasibility_status": feasibility_status.value,
-    "feasible": ...,
-    "verified_rating_evidence_digest": ... | None,
-    "invalid_rating_evidence_digest": ... | None,
-    "evaluation_failure_digest": ... | None,
-    "diagnostic_digests": [...],
-    "primary_diagnostic_digest": ... | None,
-    "duty_margin_w": ... | None,
-    "duty_shortfall_w": ... | None,
-    "duty_overshoot_w": ... | None,
-    "meets_target_without_tolerance": ... | None,
-}
-candidate_evaluation_digest = sha256_digest(payload)
+def build_candidate_evaluation_payload(
+    evaluation: CandidateEvaluation,
+) -> dict[str, Any]:
+    return {
+        "source_qualified_candidate_identity_digest": evaluation.source_qualified_candidate_identity.identity_digest,
+        "candidate_evaluation_state": evaluation.candidate_evaluation_state.value,
+        "candidate_evaluation_identity_digest": evaluation.candidate_evaluation_identity.identity_digest if evaluation.candidate_evaluation_identity is not None else None,
+        "evaluation_order_index": evaluation.evaluation_order_index,
+        "rating_status": evaluation.rating_status.value if evaluation.rating_status is not None else None,
+        "feasibility_status": evaluation.feasibility_status.value,
+        "feasible": evaluation.feasible,
+        "verified_rating_evidence_digest": evaluation.verified_rating_evidence.evidence_digest if evaluation.verified_rating_evidence is not None else None,
+        "invalid_rating_evidence_digest": evaluation.invalid_rating_evidence.invalid_evidence_digest if evaluation.invalid_rating_evidence is not None else None,
+        "evaluation_failure_digest": evaluation.evaluation_failure.failure_digest if evaluation.evaluation_failure is not None else None,
+        "diagnostic_digests": [d.diagnostic_digest for d in evaluation.diagnostics] if evaluation.diagnostics else [],
+        "primary_diagnostic_digest": evaluation.primary_diagnostic.diagnostic_digest if evaluation.primary_diagnostic is not None else None,
+        "duty_margin_w": evaluation.duty_margin_w,
+        "duty_shortfall_w": evaluation.duty_shortfall_w,
+        "duty_overshoot_w": evaluation.duty_overshoot_w,
+        "meets_target_without_tolerance": evaluation.meets_target_without_tolerance,
+    }
+
+candidate_evaluation_digest = sha256_digest(build_candidate_evaluation_payload(evaluation))
 ```
 
 Invariants by state:
@@ -2399,9 +2408,7 @@ evaluation_order_index: int | None
 | WARNING | `WARNING` | per message |
 | BLOCKER | `BLOCKER` | per message |
 
-Root selection: if `design_case_revision_id` is present and not None → `ROOT_CASE_REVISION` with `CASE_REVISION` type and label `"revision_{id}"`. Otherwise → `ROOT_EXTERNAL` with `EXTERNAL` type and label `"external_root"`.
-
-Two distinct `ROOT` concepts prevent expression of root-type selection within a single ambiguous table entry.
+Root selection delegates to `select_root_concept()` (§22.1). The two distinct `ROOT` concepts (`ROOT_CASE_REVISION`, `ROOT_EXTERNAL`) prevent expression of root-type selection within a single ambiguous table entry. Callers should never hard-code root selection logic.
 
 ```python
 def select_root_concept(
@@ -2428,8 +2435,23 @@ def root_label(
     if root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
         return f"revision_{design_case_revision_id}"
     return "external_root"
-```
 
+
+@dataclass(frozen=True, slots=True)
+class RootTopologySelection:
+    root_concept: ProvenanceConcept
+    root_node_type: ProvenanceNodeType
+    root_label: str
+
+
+def derive_root_topology(
+    request_kind: SizingRunRequestKind,
+    design_case_revision_id: UUID | None,
+) -> RootTopologySelection:
+    root_concept = select_root_concept(request_kind, design_case_revision_id)
+    ntype = root_node_type(root_concept)
+    label = root_label(root_concept, design_case_revision_id)
+    return RootTopologySelection(root_concept=root_concept, root_node_type=ntype, root_label=label)
 ```
 
 Edge labels are uniquely frozen:
@@ -2466,7 +2488,7 @@ Edge labels are uniquely frozen:
 
 No two edges share an ambiguous label with different semantics.
 
-> **NON-AUTHORITATIVE GENERATED SUMMARY — registry is the sole source of truth.**
+> **NON-AUTHORITATIVE GENERATED SUMMARY — registry and constructor mappings are the sole source of truth.**
 
 ### 22.2 UUID5 Namespace
 
@@ -2785,6 +2807,531 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
         multiplicity_formula_name="blocker_content_count",
     ),
 )
+```
+
+```python
+# ──────────────────────────────────────────────────────────
+# TypeAlias definitions
+# ──────────────────────────────────────────────────────────
+
+CanonicalPrimitive: TypeAlias = None | bool | int | float | str
+CanonicalValue: TypeAlias = CanonicalPrimitive | list["CanonicalValue"] | dict[str, "CanonicalValue"]
+CanonicalPayload: TypeAlias = dict[str, CanonicalValue]
+CanonicalMetadata: TypeAlias = tuple[tuple[str, str], ...]
+LabelConstructor: TypeAlias = Callable[["ProvenanceConstructionContext"], str]
+Uuid5NameConstructor: TypeAlias = Callable[["ProvenanceConstructionContext"], str]
+PayloadConstructor: TypeAlias = Callable[["ProvenanceConstructionContext"], CanonicalPayload]
+MetadataConstructor: TypeAlias = Callable[["ProvenanceConstructionContext"], CanonicalMetadata]
+MultiplicityConstructor: TypeAlias = Callable[["ProvenanceConstructionContext"], int]
+
+
+@dataclass(frozen=True, slots=True)
+class ProvenanceConstructionContext:
+    request_kind: SizingRunRequestKind | None = None
+    request_digest: str | None = None
+    design_case_revision_id: UUID | None = None
+    catalog_id: str | None = None
+    catalog_version: str | None = None
+    catalog_content_hash: str | None = None
+    source_identity: str | None = None
+    schema_version: str | None = None
+    source_qualified_candidate_id: str | None = None
+    source_qualified_candidate_identity_digest: str | None = None
+    rating_result_hash: str | None = None
+    rating_provenance_digest: str | None = None
+    result_hash: str | None = None
+    failure_result_hash: str | None = None
+    failure_stage: FailureStage | None = None
+    failure_digest: str | None = None
+    invalid_evidence_digest: str | None = None
+    evaluation_order_index: int | None = None
+    audit_digest: str | None = None
+    owner_kind: MessageOwnerKind | None = None
+    owner_id: str | None = None
+    occurrence_kind: MessageOccurrenceKind | None = None
+    message_digest: str | None = None
+    occurrence_index: int | None = None
+
+
+# ──────────────────────────────────────────────────────────
+# 14 × 5 constructor functions
+# ──────────────────────────────────────────────────────────
+
+# --- ROOT_CASE_REVISION ---
+
+def build_revision_label(context: ProvenanceConstructionContext) -> str:
+    return f"revision_{context.design_case_revision_id}"
+
+
+def build_root_case_revision_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"root-case-revision:{context.design_case_revision_id}"
+
+
+def build_root_case_revision_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {"design_case_revision_id": str(context.design_case_revision_id)}
+
+
+def build_root_case_revision_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (("design_case_revision_id", str(context.design_case_revision_id)),)
+
+
+def build_root_case_revision_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1 if context.design_case_revision_id is not None else 0
+
+
+# --- ROOT_EXTERNAL ---
+
+def build_external_label(context: ProvenanceConstructionContext) -> str:
+    return "external_root"
+
+
+def build_root_external_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"root-external:{context.request_kind.value}:{context.request_digest}"
+
+
+def build_root_external_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "request_kind": context.request_kind.value if context.request_kind else None,
+        "request_digest": context.request_digest,
+    }
+
+
+def build_root_external_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return ()
+
+
+def build_root_external_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1 if context.design_case_revision_id is None else 0
+
+
+# --- SIZING_RUN ---
+
+def build_sizing_run_label(context: ProvenanceConstructionContext) -> str:
+    return f"sizing_run_{context.request_digest}"
+
+
+def build_sizing_run_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"sizing-run:{context.request_kind.value}:{context.request_digest}"
+
+
+def build_sizing_run_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "request_kind": context.request_kind.value if context.request_kind else None,
+        "request_digest": context.request_digest,
+    }
+
+
+def build_sizing_run_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("request_kind", context.request_kind.value if context.request_kind else None),
+        ("request_digest", context.request_digest),
+    )
+
+
+def build_sizing_run_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- SIZING_OPTIMIZER ---
+
+def build_optimizer_label(context: ProvenanceConstructionContext) -> str:
+    return "sizing_optimizer"
+
+
+def build_optimizer_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"optimizer:{context.request_digest}"
+
+
+def build_optimizer_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "request_kind": context.request_kind.value if context.request_kind else None,
+        "request_digest": context.request_digest,
+    }
+
+
+def build_optimizer_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("request_kind", context.request_kind.value if context.request_kind else None),
+        ("request_digest", context.request_digest),
+    )
+
+
+def build_optimizer_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- CATALOG_SNAPSHOT ---
+
+def build_catalog_label(context: ProvenanceConstructionContext) -> str:
+    return f"catalog_{context.catalog_id}"
+
+
+def build_catalog_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"catalog:{context.catalog_id}:{context.catalog_version}:{context.catalog_content_hash}"
+
+
+def build_catalog_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "catalog_id": context.catalog_id,
+        "catalog_version": context.catalog_version,
+        "catalog_content_hash": context.catalog_content_hash,
+        "source_identity": context.source_identity,
+        "schema_version": context.schema_version,
+    }
+
+
+def build_catalog_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("catalog_id", context.catalog_id),
+        ("catalog_version", context.catalog_version),
+        ("catalog_content_hash", context.catalog_content_hash),
+        ("source_identity", context.source_identity),
+        ("schema_version", context.schema_version),
+    )
+
+
+def build_catalog_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- CANDIDATE ---
+
+def build_candidate_label(context: ProvenanceConstructionContext) -> str:
+    return f"candidate_{context.source_qualified_candidate_id}"
+
+
+def build_candidate_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"candidate:{context.source_qualified_candidate_id}"
+
+
+def build_candidate_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {"source_qualified_candidate_identity_digest": context.source_qualified_candidate_identity_digest}
+
+
+def build_candidate_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (("source_qualified_candidate_id", context.source_qualified_candidate_id),)
+
+
+def build_candidate_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- TASK008_RATING_RESULT ---
+
+def build_rating_result_label(context: ProvenanceConstructionContext) -> str:
+    return f"rating_{context.rating_result_hash}"
+
+
+def build_rating_result_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"rating-result:{context.rating_result_hash}"
+
+
+def build_rating_result_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "source_qualified_candidate_id": context.source_qualified_candidate_id,
+        "rating_result_hash": context.rating_result_hash,
+        "rating_provenance_digest": context.rating_provenance_digest,
+    }
+
+
+def build_rating_result_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("source_qualified_candidate_id", context.source_qualified_candidate_id),
+        ("rating_result_hash", context.rating_result_hash),
+        ("rating_provenance_digest", context.rating_provenance_digest),
+    )
+
+
+def build_rating_result_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- CLAIMED_TASK008_RATING_RESULT ---
+
+def build_claimed_rating_label(context: ProvenanceConstructionContext) -> str:
+    return f"claimed_rating_{context.source_qualified_candidate_id}"
+
+
+def build_claimed_rating_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"claimed-rating-result:{context.source_qualified_candidate_id}:{context.evaluation_order_index}:{context.audit_digest}"
+
+
+def build_claimed_rating_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "source_qualified_candidate_id": context.source_qualified_candidate_id,
+        "evaluation_order_index": context.evaluation_order_index,
+        "audit_digest": context.audit_digest,
+    }
+
+
+def build_claimed_rating_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("source_qualified_candidate_id", context.source_qualified_candidate_id),
+        ("evaluation_order_index", str(context.evaluation_order_index) if context.evaluation_order_index is not None else None),
+        ("audit_digest", context.audit_digest),
+    )
+
+
+def build_claimed_rating_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- SIZING_RESULT ---
+
+def build_sizing_result_label(context: ProvenanceConstructionContext) -> str:
+    return "sizing_result"
+
+
+def build_sizing_result_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"sizing-result:{context.result_hash}"
+
+
+def build_sizing_result_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {"result_hash": context.result_hash}
+
+
+def build_sizing_result_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (("result_hash", context.result_hash),)
+
+
+def build_sizing_result_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- SIZING_RUN_FAILURE_RESULT ---
+
+def build_sizing_run_failure_label(context: ProvenanceConstructionContext) -> str:
+    return "sizing_run_failure"
+
+
+def build_sizing_run_failure_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"sizing-run-failure:{context.failure_result_hash}"
+
+
+def build_sizing_run_failure_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "failure_result_hash": context.failure_result_hash,
+        "failure_stage": context.failure_stage.value if context.failure_stage else None,
+    }
+
+
+def build_sizing_run_failure_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("failure_result_hash", context.failure_result_hash),
+        ("failure_stage", context.failure_stage.value if context.failure_stage else None),
+    )
+
+
+def build_sizing_run_failure_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- INVALID_EVIDENCE ---
+
+def build_invalid_evidence_label(context: ProvenanceConstructionContext) -> str:
+    return f"invalid_evidence_{context.source_qualified_candidate_id}"
+
+
+def build_invalid_evidence_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"invalid-evidence:{context.source_qualified_candidate_id}:{context.invalid_evidence_digest}"
+
+
+def build_invalid_evidence_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "source_qualified_candidate_id": context.source_qualified_candidate_id,
+        "invalid_evidence_digest": context.invalid_evidence_digest,
+    }
+
+
+def build_invalid_evidence_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("source_qualified_candidate_id", context.source_qualified_candidate_id),
+        ("invalid_evidence_digest", context.invalid_evidence_digest),
+    )
+
+
+def build_invalid_evidence_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- RUNTIME_FAILURE ---
+
+def build_runtime_failure_label(context: ProvenanceConstructionContext) -> str:
+    return "runtime_failure"
+
+
+def build_runtime_failure_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"runtime-failure:{context.failure_digest}"
+
+
+def build_runtime_failure_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {"failure_digest": context.failure_digest}
+
+
+def build_runtime_failure_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (("failure_digest", context.failure_digest),)
+
+
+def build_runtime_failure_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- WARNING ---
+
+def build_warning_label(context: ProvenanceConstructionContext) -> str:
+    return f"{context.owner_kind.value}:{context.owner_id}:{context.occurrence_kind.value}:{context.message_digest}:{context.occurrence_index}"
+
+
+def build_warning_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"{context.occurrence_kind.value}:{context.owner_kind.value}:{context.owner_id}:{context.message_digest}:{context.occurrence_index}"
+
+
+def build_warning_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "occurrence_kind": context.occurrence_kind.value if context.occurrence_kind else None,
+        "owner_kind": context.owner_kind.value if context.owner_kind else None,
+        "owner_id": context.owner_id,
+        "message_digest": context.message_digest,
+        "occurrence_index": context.occurrence_index,
+    }
+
+
+def build_warning_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("owner_kind", context.owner_kind.value if context.owner_kind else None),
+        ("owner_id", context.owner_id),
+        ("message_digest", context.message_digest),
+        ("occurrence_index", str(context.occurrence_index) if context.occurrence_index is not None else None),
+        ("occurrence_kind", context.occurrence_kind.value if context.occurrence_kind else None),
+    )
+
+
+def build_warning_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# --- BLOCKER ---
+
+def build_blocker_label(context: ProvenanceConstructionContext) -> str:
+    return f"{context.owner_kind.value}:{context.owner_id}:{context.occurrence_kind.value}:{context.message_digest}:{context.occurrence_index}"
+
+
+def build_blocker_uuid5(context: ProvenanceConstructionContext) -> str:
+    return f"{context.occurrence_kind.value}:{context.owner_kind.value}:{context.owner_id}:{context.message_digest}:{context.occurrence_index}"
+
+
+def build_blocker_payload(context: ProvenanceConstructionContext) -> CanonicalPayload:
+    return {
+        "occurrence_kind": context.occurrence_kind.value if context.occurrence_kind else None,
+        "owner_kind": context.owner_kind.value if context.owner_kind else None,
+        "owner_id": context.owner_id,
+        "message_digest": context.message_digest,
+        "occurrence_index": context.occurrence_index,
+    }
+
+
+def build_blocker_metadata(context: ProvenanceConstructionContext) -> CanonicalMetadata:
+    return (
+        ("owner_kind", context.owner_kind.value if context.owner_kind else None),
+        ("owner_id", context.owner_id),
+        ("message_digest", context.message_digest),
+        ("occurrence_index", str(context.occurrence_index) if context.occurrence_index is not None else None),
+        ("occurrence_kind", context.occurrence_kind.value if context.occurrence_kind else None),
+    )
+
+
+def build_blocker_multiplicity(context: ProvenanceConstructionContext) -> int:
+    return 1
+
+
+# ──────────────────────────────────────────────────────────
+# 5 constructor mappings
+# ──────────────────────────────────────────────────────────
+
+PROVENANCE_LABEL_CONSTRUCTORS: dict[str, LabelConstructor] = {
+    "ROOT_CASE_REVISION": build_revision_label,
+    "ROOT_EXTERNAL": build_external_label,
+    "SIZING_RUN": build_sizing_run_label,
+    "SIZING_OPTIMIZER": build_optimizer_label,
+    "CATALOG_SNAPSHOT": build_catalog_label,
+    "CANDIDATE": build_candidate_label,
+    "TASK008_RATING_RESULT": build_rating_result_label,
+    "CLAIMED_TASK008_RATING_RESULT": build_claimed_rating_label,
+    "SIZING_RESULT": build_sizing_result_label,
+    "SIZING_RUN_FAILURE_RESULT": build_sizing_run_failure_label,
+    "INVALID_EVIDENCE": build_invalid_evidence_label,
+    "RUNTIME_FAILURE": build_runtime_failure_label,
+    "WARNING": build_warning_label,
+    "BLOCKER": build_blocker_label,
+}
+
+PROVENANCE_UUID5_NAME_CONSTRUCTORS: dict[str, Uuid5NameConstructor] = {
+    "ROOT_CASE_REVISION": build_root_case_revision_uuid5,
+    "ROOT_EXTERNAL": build_root_external_uuid5,
+    "SIZING_RUN": build_sizing_run_uuid5,
+    "SIZING_OPTIMIZER": build_optimizer_uuid5,
+    "CATALOG_SNAPSHOT": build_catalog_uuid5,
+    "CANDIDATE": build_candidate_uuid5,
+    "TASK008_RATING_RESULT": build_rating_result_uuid5,
+    "CLAIMED_TASK008_RATING_RESULT": build_claimed_rating_uuid5,
+    "SIZING_RESULT": build_sizing_result_uuid5,
+    "SIZING_RUN_FAILURE_RESULT": build_sizing_run_failure_uuid5,
+    "INVALID_EVIDENCE": build_invalid_evidence_uuid5,
+    "RUNTIME_FAILURE": build_runtime_failure_uuid5,
+    "WARNING": build_warning_uuid5,
+    "BLOCKER": build_blocker_uuid5,
+}
+
+PROVENANCE_PAYLOAD_CONSTRUCTORS: dict[str, PayloadConstructor] = {
+    "ROOT_CASE_REVISION": build_root_case_revision_payload,
+    "ROOT_EXTERNAL": build_root_external_payload,
+    "SIZING_RUN": build_sizing_run_payload,
+    "SIZING_OPTIMIZER": build_optimizer_payload,
+    "CATALOG_SNAPSHOT": build_catalog_payload,
+    "CANDIDATE": build_candidate_payload,
+    "TASK008_RATING_RESULT": build_rating_result_payload,
+    "CLAIMED_TASK008_RATING_RESULT": build_claimed_rating_payload,
+    "SIZING_RESULT": build_sizing_result_payload,
+    "SIZING_RUN_FAILURE_RESULT": build_sizing_run_failure_payload,
+    "INVALID_EVIDENCE": build_invalid_evidence_payload,
+    "RUNTIME_FAILURE": build_runtime_failure_payload,
+    "WARNING": build_warning_payload,
+    "BLOCKER": build_blocker_payload,
+}
+
+PROVENANCE_METADATA_CONSTRUCTORS: dict[str, MetadataConstructor] = {
+    "ROOT_CASE_REVISION": build_root_case_revision_metadata,
+    "ROOT_EXTERNAL": build_root_external_metadata,
+    "SIZING_RUN": build_sizing_run_metadata,
+    "SIZING_OPTIMIZER": build_optimizer_metadata,
+    "CATALOG_SNAPSHOT": build_catalog_metadata,
+    "CANDIDATE": build_candidate_metadata,
+    "TASK008_RATING_RESULT": build_rating_result_metadata,
+    "CLAIMED_TASK008_RATING_RESULT": build_claimed_rating_metadata,
+    "SIZING_RESULT": build_sizing_result_metadata,
+    "SIZING_RUN_FAILURE_RESULT": build_sizing_run_failure_metadata,
+    "INVALID_EVIDENCE": build_invalid_evidence_metadata,
+    "RUNTIME_FAILURE": build_runtime_failure_metadata,
+    "WARNING": build_warning_metadata,
+    "BLOCKER": build_blocker_metadata,
+}
+
+PROVENANCE_MULTIPLICITY_CONSTRUCTORS: dict[str, MultiplicityConstructor] = {
+    "ROOT_CASE_REVISION": build_root_case_revision_multiplicity,
+    "ROOT_EXTERNAL": build_root_external_multiplicity,
+    "SIZING_RUN": build_sizing_run_multiplicity,
+    "SIZING_OPTIMIZER": build_optimizer_multiplicity,
+    "CATALOG_SNAPSHOT": build_catalog_multiplicity,
+    "CANDIDATE": build_candidate_multiplicity,
+    "TASK008_RATING_RESULT": build_rating_result_multiplicity,
+    "CLAIMED_TASK008_RATING_RESULT": build_claimed_rating_multiplicity,
+    "SIZING_RESULT": build_sizing_result_multiplicity,
+    "SIZING_RUN_FAILURE_RESULT": build_sizing_run_failure_multiplicity,
+    "INVALID_EVIDENCE": build_invalid_evidence_multiplicity,
+    "RUNTIME_FAILURE": build_runtime_failure_multiplicity,
+    "WARNING": build_warning_multiplicity,
+    "BLOCKER": build_blocker_multiplicity,
+}
 ```
 
 > **NON-NORMATIVE GENERATED SUMMARY.** Allowed/forbidden termination classes are derived from `TERMINATION_TOPOLOGY_REGISTRY`. Multiplicity is defined in registry `counter_invariants`. This table is for human reference only and is not an authoritative contract.
@@ -3550,10 +4097,10 @@ Detected through the canonical graph digest (serialized topology: nodes, edges, 
 
 ### 23.3 Candidate Evaluation Hash
 
-Each `CandidateEvaluation` has a digest computed from the **single authoritative payload** defined in §15.1:
+Each `CandidateEvaluation` has a digest computed from `build_candidate_evaluation_payload()` (§15.1):
 
-> The exact payload and invariants are defined in §15.1 CandidateEvaluation Digest.  
-> **§23.3 does not redefine the payload.** Refer to §15.1 for the authoritative field list, enum `.value` serialization, None-handling rules, and state-dependent invariants.
+> The exact function and invariants are defined in §15.1 CandidateEvaluation Digest.  
+> **§23.3 does not redefine the payload.** Refer to §15.1 for the authoritative `build_candidate_evaluation_payload()` function, enum `.value` serialization, None-handling rules, and state-dependent invariants.
 
 The authoritative sort order for evaluation digests is `source_qualified_candidate_id` ascending. `evaluation_order_index` is derived as the 0-based consecutive index in this sorted list; verification: `evaluation_order_index == canonical position in sorted list`.
 
@@ -4222,57 +4769,57 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 496. Global test numbering continuous 1–540
 497. Section 27 range now 27.1–27.21 continuous (no gaps)
 498. Subsection headings range updated to 22.1–22.7 for provenance subsections
-499. Acceptance Criteria references Round 19 for Delivery Sequence
+499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 19 Contract Tests (501–540)
+### 27.21 Round 20 Contract Tests (501–540)
 
-501. Round 19 Review Comment ID is `4800488397`
-502. Round 19 decision is `CHANGES REQUIRED`
-503. Round 19 row follows Round 18 in review history
-504. Gate references Round 20 Engineering Design Review
-505. ProvenanceRelationSpec is a frozen slotted dataclass
-506. Gate text at top of doc reads "Round 20" not "Round 19"
-507. Gate text: "TASK-009 returns to READY only after Round 20 Engineering Design Review passes."
-508. Delivery Sequence step 1 references "Round 20"
-509. Acceptance Criteria first item references "Round 20 Engineering Design Review"
-510. All Acceptance Criteria references to round gate use "Round 20" (not "Round 19")
-511. §23.4 canonical ordering table starts every data row with `|` (not `|-`)
-512. Subsection range for §22 does not mention "22.1–22.8"
-513. Subsection range for §22 corrected to 22.1–22.7
-514. Round 19 comment ID `4800488397` not duplicated in older rounds
-515. No orphan "Round 19" gate text references remain in body outside review history
-516. §27.21 heading reads "Round 19 Contract Tests (501–540)"
-517. All `|- ` data row prefixes fixed (no stray pipe-dash in table bodies)
-518. Old test #499 now references "Round 19" (not "Round 18")
-519. Old test #499 references "Round 19 for Delivery Sequence"
-520. Review History has exactly 20 rows (Rounds 1–19)
-521. Section 27.21 present (Round 19 Contract Tests)
-522. Section 27.21 has exactly 40 entries (501–540)
-523. Section 27.21 heading reads "Round 19 Contract Tests (501–540)"
-524. Test numbering 501–540 is continuous with no gaps
-525. Round 19 test range matches heading: 501–540
-526. Global test numbering continuous 1–540
-527. Section 27 range now 27.1–27.21 continuous (no gaps)
-528. Acceptance Criteria first item references Round 20 for Delivery Sequence
-529. Issue #23 test total equals task-card N (540)
-530. Round 19 subsection numbering locally continuous within 501–540
-531. Issue #23 frozen SHA equals new docs commit for Round 19
-532. Acceptance Criteria required test matrix entries include Round 19 (501–540)
-533. Acceptance Criteria test total remains 1–540
-534. Test #506 confirms gate text reads "Round 20"
-535. Test #512 confirms subsection range is not "22.1–22.8"
+501. Round 20 Review Comment ID is `4800787131`
+502. Round 20 decision is `CHANGES REQUIRED`
+503. Round 20 row follows Round 19 in review history
+504. Gate references Round 21 Engineering Design Review
+505. Gate text at top of doc reads "Round 21" not "Round 20"
+506. Gate text: "TASK-009 returns to READY only after Round 21 Engineering Design Review passes."
+507. Delivery Sequence step 1 references "Round 21"
+508. Acceptance Criteria first item references "Round 21 Engineering Design Review"
+509. All Acceptance Criteria references to round gate use "Round 21" (not "Round 20")
+510. Review History has exactly 21 rows (Rounds 1–20)
+511. Round 20 comment ID `4800787131` not duplicated in older rounds
+512. No orphan "Round 20" gate text references remain in body outside review history
+513. Test #499 reads "Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round"
+514. Old Acceptance Criteria references no longer say "Round 19" for Delivery Sequence
+515. Delivery Sequence step 1 does NOT reference "Round 20"
+516. Acceptance Criteria first item does NOT reference "Round 20"
+517. Test matrix summary lists Round 20 (501–540) not Round 19
+518. Test matrix acceptance criteria entry: Round 20 (501–540) replaces Round 19
+519. Section 27.21 present (Round 20 Contract Tests)
+520. Section 27.21 has exactly 40 entries (501–540)
+521. Section 27.21 heading reads "Round 20 Contract Tests (501–540)"
+522. Test numbering 501–540 is continuous with no gaps
+523. Round 20 test range matches heading: 501–540
+524. Global test numbering continuous 1–540
+525. Section 27 range now 27.1–27.21 continuous (no gaps)
+526. Gate text does NOT reference "Round 20" at top of doc
+527. Issue #23 test total equals task-card N (540)
+528. Round 20 subsection numbering locally continuous within 501–540
+529. Issue #23 frozen SHA equals new docs commit for Round 20
+530. Acceptance Criteria required test matrix entries include Round 20 (501–540)
+531. Acceptance Criteria test total remains 1–540
+532. Test #505 confirms gate text reads "Round 21"
+533. Test #506 confirms gate text exact wording
+534. Test #507 confirms Delivery Sequence step 1 reads "Round 21"
+535. Test #508 confirms Acceptance Criteria first item reads "Round 21"
 536. TASK-010 in TASK_BACKLOG.md is BLOCKED
-537. Old Round 18 test references to "Round 19" replaced with "Round 20" equivalents
-538. All old Round 18 Acceptance Criteria round references updated to Round 19
-539. Section 27.21 test entries cover all Round 19 document changes
-540. All identity-affecting Enum fields use .value and all normative Markdown tables are valid
+537. No remaining "Round 19" references in body outside review history
+538. Review history does NOT pre-populate Round 21 comment ID or decision
+539. Section 27.21 test entries cover all Round 20 document changes
+540. All Markdown fences and normative tables parse successfully
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 20 Engineering Design Review.
+1. Complete Round 21 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -4286,7 +4833,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 20 Engineering Design Review passes before implementation starts
+- [ ] Round 21 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -4305,6 +4852,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 19 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 20 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
