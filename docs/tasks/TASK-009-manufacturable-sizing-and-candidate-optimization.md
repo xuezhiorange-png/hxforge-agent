@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 26 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 27 Engineering Design Review passes.
 
 ---
 
@@ -59,6 +59,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 23 | 4801552673 | CHANGES REQUIRED |
 | 24 | 4801928304 | CHANGES REQUIRED |
 | 25 | 4802083544 | CHANGES REQUIRED |
+| 26 | 4802228027 | CHANGES REQUIRED |
 
 |---|
 
@@ -1356,11 +1357,14 @@ A mismatch is an invalid shared message object and must not be silently hashed.
 Shared digest functions, usable from every failure path without import ambiguity:
 
 ```python
-from typing import TypeAlias
-from types import MappingProxyType
-from uuid import UUID
-from datetime import datetime
+from __future__ import annotations
+
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from enum import Enum
+from types import MappingProxyType
+from typing import Literal, TypeAlias
+from uuid import UUID
 import math
 
 
@@ -1383,18 +1387,47 @@ def qualified_type_name(value: object) -> str:
     return f"{type(value).__module__}.{type(value).__qualname__}"
 
 
-class ContextCanonicalizationError(Exception):
+def is_repository_quantity_like(value: object) -> bool:
+    return (
+        hasattr(value, "value") and hasattr(value, "unit")
+        and hasattr(value, "kind") and hasattr(value, "to_si")
+    )
+
+
+def is_pydantic_model(value: object) -> bool:
+    return hasattr(value, "model_dump")
+
+
+ContextCanonicalizationFailureKind: TypeAlias = Literal[
+    "unsupported_type", "non_finite_float", "cyclic_reference",
+    "naive_datetime", "non_string_key", "canonicalization_exception",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class ContextCanonicalizationErrorData:
+    failure_kind: ContextCanonicalizationFailureKind
+    context_key: str
+    context_path: tuple[str, ...]
+    offending_type: str
+
+
+class ContextCanonicalizationError(ValueError):
+    data: ContextCanonicalizationErrorData
+
     def __init__(
         self,
-        failure_kind: str,
+        failure_kind: ContextCanonicalizationFailureKind,
         context_key: str,
         context_path: tuple[str, ...],
         offending_type: str,
     ) -> None:
-        self.failure_kind = failure_kind
-        self.context_key = context_key
-        self.context_path = context_path
-        self.offending_type = offending_type
+        self.data = ContextCanonicalizationErrorData(
+            failure_kind=failure_kind,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=offending_type,
+        )
         super().__init__(failure_kind)
 
 
@@ -1416,7 +1449,7 @@ def canonicalize_trusted_context_value(
       7. finite float
       8. str
       9. tuple/list → recursive
-     10. Mapping/MappingProxyType → recursive (str keys only)
+     10. Mapping → recursive (str keys only)
      11. repository Quantity-like (canonical.py)
      12. Pydantic model (canonical.py)
      13. Unsupported → raise
@@ -1456,7 +1489,8 @@ def canonicalize_trusted_context_value(
                 context_path=context_path,
                 offending_type=qualified_type_name(value),
             )
-        return value.isoformat()
+        utc_value = value.astimezone(UTC)
+        return utc_value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
     # bool (must be before int)
     if isinstance(value, bool):
@@ -1469,7 +1503,12 @@ def canonicalize_trusted_context_value(
     # finite float
     if isinstance(value, float):
         if not math.isfinite(value):
-            raise ValueError(f"non-finite float: {value}")
+            raise ContextCanonicalizationError(
+                failure_kind="non_finite_float",
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            )
         return value
 
     # str
@@ -1478,23 +1517,21 @@ def canonicalize_trusted_context_value(
 
     # tuple/list → recursive
     if isinstance(value, (tuple, list)):
-        updated_ancestors = ancestor_ids | {object_id}
-        child_path = context_path + ("<list>",)
-        return [
-            canonicalize_trusted_context_value(
-                item,
-                context_key=context_key,
-                context_path=child_path,
+        updated_ancestors = ancestor_ids | {id(value)}
+        result: list[CanonicalValue] = []
+        for index, item in enumerate(value):
+            result.append(canonicalize_trusted_context_value(
+                item, context_key=context_key,
+                context_path=context_path + (f"[{index}]",),
                 ancestor_ids=updated_ancestors,
-            )
-            for item in value
-        ]
+            ))
+        return result
 
-    # Mapping/MappingProxyType → recursive (str keys only)
-    if isinstance(value, (dict, MappingProxyType)):
-        updated_ancestors = ancestor_ids | {object_id}
+    # Mapping → recursive (str keys only)
+    if isinstance(value, Mapping):
+        updated_ancestors = ancestor_ids | {id(value)}
         result: dict[str, CanonicalValue] = {}
-        for k, v in dict(value).items():
+        for k, v in value.items():
             if type(k) is not str:
                 raise ContextCanonicalizationError(
                     failure_kind="non_string_key",
@@ -1512,32 +1549,45 @@ def canonicalize_trusted_context_value(
             result[k] = canonical_v
         return result
 
-    # repository Quantity-like (supported by canonical.py)
-    if hasattr(value, "_canonicalize_"):
-        return canonicalize_trusted_context_value(
-            value._canonicalize_(),
-            context_key=context_key,
-            context_path=context_path,
-            ancestor_ids=ancestor_ids,
-        )
-
-    # Pydantic model
-    if hasattr(value, "model_dump"):
+    # repository Quantity-like (canonical.py)
+    if is_repository_quantity_like(value):
         try:
-            raw = value.model_dump(mode="python")
-            return canonicalize_trusted_context_value(
-                raw,
-                context_key=context_key,
-                context_path=context_path,
-                ancestor_ids=ancestor_ids,
-            )
+            kind = value.kind
+            si_value = value.value
+            if kind is not None:
+                si_value = value.to_si().value
+            return {
+                "si_value": canonicalize_trusted_context_value(
+                    si_value, context_key=context_key,
+                    context_path=context_path + ("si_value",),
+                    ancestor_ids=ancestor_ids,
+                ),
+                "kind": kind.value if kind is not None else None,
+            }
+        except ContextCanonicalizationError:
+            raise
         except Exception as exc:
             raise ContextCanonicalizationError(
                 failure_kind="canonicalization_exception",
-                context_key=context_key,
-                context_path=context_path,
+                context_key=context_key, context_path=context_path,
                 offending_type=qualified_type_name(value),
             ) from exc
+
+    # Pydantic model
+    if is_pydantic_model(value):
+        try:
+            raw = value.model_dump(mode="python")
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind="canonicalization_exception",
+                context_key=context_key, context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
+        return canonicalize_trusted_context_value(
+            raw, context_key=context_key,
+            context_path=context_path,
+            ancestor_ids=ancestor_ids | {id(value)},
+        )
 
     raise ContextCanonicalizationError(
         failure_kind="unsupported_type",
@@ -1598,7 +1648,7 @@ UUID
 datetime with timezone
 tuple / list  (recursive)
 dict[str, supported value]  (recursive, string keys only)
-MappingProxyType
+Mapping (dict, MappingProxyType, etc.)
 repository Quantity-like object (supported by canonical.py)
 Pydantic model (supported by canonical.py)
 ```
@@ -1629,60 +1679,57 @@ ContextCanonicalizationFailureSnapshot
 - safe_marker_digest: str
 ```
 
-Exact safe marker payload:
+Exact safe marker payload (built from error data, not the original value):
 
 ```python
 safe_marker_payload = {
-    "context_key": context_key,
-    "context_path": list(context_path),
-    "offending_type":
-        f"{type(unsupported_value).__module__}."
-        f"{type(unsupported_value).__qualname__}",
-    "failure_kind": failure_kind,
+    "context_key": error.data.context_key,
+    "context_path": list(error.data.context_path),
+    "offending_type": error.data.offending_type,
+    "failure_kind": error.data.failure_kind,
 }
 safe_marker_digest = sha256_digest(safe_marker_payload)
 ```
 
 `failure_kind` values: `unsupported_type`, `non_finite_float`, `cyclic_reference`, `naive_datetime`, `non_string_key`, `canonicalization_exception`.
 
-Fallback RunFailure context:
-
-```python
-fallback_failure_context = (
-    ("failure_stage", failure_stage.value),
-    ("owner_kind", owner_kind.value),
-    ("owner_id", owner_id),
-    ("original_code", original_code.value),
-    ("context_key", context_key),
-    ("context_path_digest", sha256_digest({
-        "context_path": list(context_path),
-    })),
-    ("offending_type", offending_type),
-    ("failure_kind", failure_kind),
-    ("safe_marker_digest", safe_marker_digest),
-)
-```
-
-Prohibited in fallback: original value, original object, repr, exception object, traceback object, Enum object.
-
 ```python
 CONTEXT_CANONICALIZATION_FAILURE_MESSAGE = (
     "Context canonicalization failed - see fallback_failure_context "
     "for canonicalization trace details"
 )
-```
 
-Complete RunFailure construction for the canonicalization failure path:
 
-```python
-fallback_run_failure = RunFailure(
-    schema_version=RUN_FAILURE_SCHEMA_VERSION,
-    code=ErrorCode.PROVENANCE_INCOMPLETE,
-    message=CONTEXT_CANONICALIZATION_FAILURE_MESSAGE,
-    traceback=None,
-    context=fallback_failure_context,
-)
-fallback_run_failure_digest = digest_run_failure(fallback_run_failure)
+def build_context_canonicalization_fallback(
+    *, failure_stage: FailureStage, owner_kind: MessageOwnerKind,
+    owner_id: str, original_code: ErrorCode,
+    error: ContextCanonicalizationError,
+) -> RunFailure:
+    safe_marker_payload = {
+        "context_key": error.data.context_key,
+        "context_path": list(error.data.context_path),
+        "offending_type": error.data.offending_type,
+        "failure_kind": error.data.failure_kind,
+    }
+    safe_marker_digest = sha256_digest(safe_marker_payload)
+    fallback_failure_context = (
+        ("failure_stage", failure_stage.value),
+        ("owner_kind", owner_kind.value),
+        ("owner_id", owner_id),
+        ("original_code", original_code.value),
+        ("context_key", error.data.context_key),
+        ("context_path_digest", sha256_digest({"context_path": list(error.data.context_path)})),
+        ("offending_type", error.data.offending_type),
+        ("failure_kind", error.data.failure_kind),
+        ("safe_marker_digest", safe_marker_digest),
+    )
+    return RunFailure(
+        schema_version=RUN_FAILURE_SCHEMA_VERSION,
+        code=ErrorCode.PROVENANCE_INCOMPLETE,
+        message=CONTEXT_CANONICALIZATION_FAILURE_MESSAGE,
+        traceback=None,
+        context=fallback_failure_context,
+    )
 ```
 
 This is the **single path** for constructing a RunFailure from a canonicalization failure. There is no alternative code path, no conditional marker, no fallback within the fallback.
@@ -2591,11 +2638,7 @@ INTEGRITY_INVALID, RUNTIME_FAILED, UNEVALUATED
 (
     feasibility_status_rank,
     rating_status_rank,
-    primary_diagnostic.diagnostic_class_rank,
-    primary_diagnostic.code,
-    primary_diagnostic.source_module,
-    primary_diagnostic.affected_paths,
-    primary_diagnostic.message,
+    candidate_diagnostic_sort_key(primary_diagnostic_or_sentinel),
     source_qualified_candidate_id,
 )
 ```
@@ -2626,7 +2669,7 @@ class CandidateDiagnosticKey:
 
 Sentinel when `None`: `CandidateDiagnosticKey(CandidateDiagnosticRank.INFO, ErrorCode.PROVENANCE_INCOMPLETE, "", (), "")`.
 
-From EngineeringMessage: direct mapping of severity to diagnostic_class_rank. From RunFailure: `diagnostic_class_rank=CandidateDiagnosticRank.RUNTIME_FAILURE`, `code=ErrorCode.PROVENANCE_INCOMPLETE`. From pure duty-infeasible: `diagnostic_class_rank=CandidateDiagnosticRank.BLOCKER`, `code=ErrorCode.REQUIRED_DUTY_NOT_MET`.
+From EngineeringMessage: `diagnostic_class_rank` = severity, `code` = `message.code`. From RunFailure: `diagnostic_class_rank=CandidateDiagnosticRank.RUNTIME_FAILURE`, `code` = `failure.code`. From pure duty-infeasible: `diagnostic_class_rank=CandidateDiagnosticRank.BLOCKER`, `code=ErrorCode.REQUIRED_DUTY_NOT_MET`.
 
 ### 20.6 Primary Diagnostic Selection
 
@@ -3797,6 +3840,14 @@ def invariant_feasible_candidate_present(ctx: TopologyConstructionContext) -> No
         raise ValueError("SUCCEEDED requires feasible_candidate_count>=1")
 
 
+def invariant_feasible_count_range(ctx: TopologyConstructionContext) -> None:
+    if not (0 <= ctx.counters.feasible_candidate_count <= ctx.counters.unique_candidate_count):
+        raise ValueError(
+            f"feasible_candidate_count ({ctx.counters.feasible_candidate_count}) "
+            f"not in [0, unique_candidate_count ({ctx.counters.unique_candidate_count})]"
+        )
+
+
 def invariant_cap_exceeded_before_materialization(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.materialized_candidate_count > 0:
         raise ValueError("candidate materialization occurred before cap exceeded")
@@ -4064,6 +4115,7 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
         counter_invariants=(
             invariant_unique_candidate_count_ge_1,
             invariant_no_feasible_candidate,
+            invariant_feasible_count_range,
             invariant_selected_root_sum_eq_1,
         ),
     ),
@@ -4098,6 +4150,8 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             invariant_unique_candidate_count_ge_1,
             invariant_verified_rating_eq_unique,
             invariant_all_candidates_verified,
+            invariant_feasible_candidate_present,
+            invariant_feasible_count_range,
             invariant_selected_root_sum_eq_1,
         ),
     ),
@@ -5450,54 +5504,54 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 25 Contract Tests (501–540)
+### 27.21 Round 26 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 25 changes. **Expected output**: Round 25 row exists with Comment ID `4802083544` and decision `CHANGES REQUIRED`. **Exception**: N/A — structural consistency check.
-502. **Input**: Round 25 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — structural consistency check.
-503. **Input**: Round 25 row in review history. **Expected output**: Appears immediately after Round 24 row. **Exception**: N/A — ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 26 Engineering Design Review". **Exception**: N/A — gate reference check.
-505. **Input**: Gate text at top of document. **Expected output**: Reads "Round 26" not "Round 25". **Exception**: N/A — round number check.
-506. **Input**: Gate text. **Expected output**: Exact string "TASK-009 returns to READY only after Round 26 Engineering Design Review passes." **Exception**: N/A — exact wording check.
-507. **Input**: Delivery Sequence step 1. **Expected output**: References "Round 26". **Exception**: N/A — sequence reference check.
-508. **Input**: Acceptance Criteria first item. **Expected output**: References "Round 26 Engineering Design Review". **Exception**: N/A — criteria reference check.
-509. **Input**: All Acceptance Criteria references to round gate. **Expected output**: All use "Round 26" (not "Round 25"). **Exception**: N/A — consistency check.
-510. **Input**: Review History table. **Expected output**: Has exactly 26 data rows (Rounds 1–25). **Exception**: N/A — row count check.
-511. **Input**: All Round 25 comment ID references. **Expected output**: Comment ID `4802083544` is unique to Round 25, not duplicated in older rounds. **Exception**: N/A — uniqueness check.
-512. **Input**: Entire document body outside review history. **Expected output**: No orphan "Round 25" gate text references remain. **Exception**: N/A — stale reference check.
+501. **Input**: Review history table after Round 26 changes. **Expected output**: Round 26 row exists with Comment ID `4802228027` and decision `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 26 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 26 row in review history. **Expected output**: Appears immediately after Round 25 row. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 27 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+505. **Input**: Gate text at top of document. **Expected output**: Reads "Round 27" not "Round 26". **Exception**: N/A — round number check.
+506. **Input**: Gate text. **Expected output**: Exact string "TASK-009 returns to READY only after Round 27 Engineering Design Review passes." **Exception**: N/A — exact wording check.
+507. **Input**: Delivery Sequence step 1. **Expected output**: References "Round 27". **Exception**: N/A — sequence reference check.
+508. **Input**: Acceptance Criteria first item. **Expected output**: References "Round 27 Engineering Design Review". **Exception**: N/A — criteria reference check.
+509. **Input**: All Acceptance Criteria references to round gate. **Expected output**: All use "Round 27" (not "Round 26"). **Exception**: N/A — consistency check.
+510. **Input**: Review History table. **Expected output**: Has exactly 27 data rows (Rounds 1–26). **Exception**: N/A — row count check.
+511. **Input**: All Round 26 comment ID references. **Expected output**: Comment ID `4802228027` is unique to Round 26, not duplicated in older rounds. **Exception**: N/A — uniqueness check.
+512. **Input**: Entire document body outside review history. **Expected output**: No orphan "Round 26" gate text references remain. **Exception**: N/A — stale reference check.
 513. **Input**: Test #499. **Expected output**: Reads "Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round". **Exception**: N/A — generic wording check.
-514. **Input**: Acceptance Criteria references. **Expected output**: No references say "Round 24" for Delivery Sequence. **Exception**: N/A — stale reference check.
-515. **Input**: Delivery Sequence step 1. **Expected output**: Does NOT reference "Round 25". **Exception**: N/A — round advancement check.
-516. **Input**: Acceptance Criteria first item. **Expected output**: Does NOT reference "Round 25". **Exception**: N/A — round advancement check.
-517. **Input**: Test matrix summary in Acceptance Criteria. **Expected output**: Lists Round 25 (501–540) not Round 24. **Exception**: N/A — matrix reference check.
-518. **Input**: Test matrix acceptance criteria entry. **Expected output**: Round 25 (501–540) replaces Round 24. **Exception**: N/A — matrix update check.
-519. **Input**: Section 27 headings. **Expected output**: Section 27.21 present (Round 25 Contract Tests). **Exception**: N/A — section existence check.
+514. **Input**: Acceptance Criteria references. **Expected output**: No references say "Round 25" for Delivery Sequence. **Exception**: N/A — stale reference check.
+515. **Input**: Delivery Sequence step 1. **Expected output**: Does NOT reference "Round 26". **Exception**: N/A — round advancement check.
+516. **Input**: Acceptance Criteria first item. **Expected output**: Does NOT reference "Round 26". **Exception**: N/A — round advancement check.
+517. **Input**: Test matrix summary in Acceptance Criteria. **Expected output**: Lists Round 26 (501–540) not Round 25. **Exception**: N/A — matrix reference check.
+518. **Input**: Test matrix acceptance criteria entry. **Expected output**: Round 26 (501–540) replaces Round 25. **Exception**: N/A — matrix update check.
+519. **Input**: Section 27 headings. **Expected output**: Section 27.21 present (Round 26 Contract Tests). **Exception**: N/A — section existence check.
 520. **Input**: Section 27.21 entries. **Expected output**: Has exactly 40 test entries (501–540). **Exception**: N/A — entry count check.
-521. **Input**: Section 27.21 heading. **Expected output**: Reads "Round 25 Contract Tests (501–540)". **Exception**: N/A — heading text check.
+521. **Input**: Section 27.21 heading. **Expected output**: Reads "Round 26 Contract Tests (501–540)". **Exception**: N/A — heading text check.
 522. **Input**: Test numbering in Section 27.21. **Expected output**: Continuous 501–540 with no gaps. **Exception**: N/A — numbering continuity check.
-523. **Input**: Round 25 test range. **Expected output**: Matches heading: 501–540. **Exception**: N/A — range consistency check.
+523. **Input**: Round 26 test range. **Expected output**: Matches heading: 501–540. **Exception**: N/A — range consistency check.
 524. **Input**: Global test numbering 1–540. **Expected output**: Continuous with no gaps. **Exception**: N/A — global numbering check.
 525. **Input**: Section 27 sub-section listing. **Expected output**: Range is 27.1–27.21 continuous (no gaps). **Exception**: N/A — section continuity check.
-526. **Input**: Gate text at top of document. **Expected output**: Does NOT reference "Round 25". **Exception**: N/A — gate consistency check.
+526. **Input**: Gate text at top of document. **Expected output**: Does NOT reference "Round 26". **Exception**: N/A — gate consistency check.
 527. **Input**: Issue #23 test total. **Expected output**: Equals task-card N (540). **Exception**: N/A — total consistency check.
-528. **Input**: Round 25 subsection numbering. **Expected output**: Locally continuous within 501–540. **Exception**: N/A — local continuity check.
-529. **Input**: Issue #23 frozen SHA. **Expected output**: Equals new docs commit for Round 25. **Exception**: N/A — SHA consistency check.
-530. **Input**: Acceptance Criteria required test matrix entries. **Expected output**: Include Round 25 (501–540). **Exception**: N/A — matrix inclusion check.
+528. **Input**: Round 26 subsection numbering. **Expected output**: Locally continuous within 501–540. **Exception**: N/A — local continuity check.
+529. **Input**: Issue #23 frozen SHA. **Expected output**: Equals new docs commit for Round 26. **Exception**: N/A — SHA consistency check.
+530. **Input**: Acceptance Criteria required test matrix entries. **Expected output**: Include Round 26 (501–540). **Exception**: N/A — matrix inclusion check.
 531. **Input**: Acceptance Criteria test total. **Expected output**: Remains 1–540. **Exception**: N/A — total preservation check.
-532. **Input**: Test #505. **Expected output**: Confirms gate text reads "Round 26". **Exception**: N/A — gate verification check.
+532. **Input**: Test #505. **Expected output**: Confirms gate text reads "Round 27". **Exception**: N/A — gate verification check.
 533. **Input**: Test #506. **Expected output**: Confirms gate text exact wording. **Exception**: N/A — wording verification check.
-534. **Input**: Test #507. **Expected output**: Confirms Delivery Sequence step 1 reads "Round 26". **Exception**: N/A — sequence verification check.
-535. **Input**: Test #508. **Expected output**: Confirms Acceptance Criteria first item reads "Round 26". **Exception**: N/A — criteria verification check.
+534. **Input**: Test #507. **Expected output**: Confirms Delivery Sequence step 1 reads "Round 27". **Exception**: N/A — sequence verification check.
+535. **Input**: Test #508. **Expected output**: Confirms Acceptance Criteria first item reads "Round 27". **Exception**: N/A — criteria verification check.
 536. **Input**: TASK_BACKLOG.md. **Expected output**: TASK-010 is BLOCKED. **Exception**: N/A — dependency check.
-537. **Input**: Entire document body outside review history. **Expected output**: No remaining "Round 24" references in body outside review history. **Exception**: N/A — stale reference check.
-538. **Input**: Review history. **Expected output**: Does NOT pre-populate Round 26 comment ID or decision. **Exception**: N/A — forward-reference check.
-539. **Input**: Section 27.21 test entries. **Expected output**: All entries cover Round 25 document changes. **Exception**: N/A — coverage check.
-540. **Input**: Entire document. **Expected output**: Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully. **Exception**: N/A — parse validation check.
+537. **Input**: Entire document body outside review history. **Expected output**: No remaining "Round 25" references in body outside review history. **Exception**: N/A — stale reference check.
+538. **Input**: Review history. **Expected output**: Does NOT pre-populate Round 27 comment ID or decision. **Exception**: N/A — forward-reference check.
+539. **Input**: Section 27.21 test entries. **Expected output**: All entries cover Round 26 document changes. **Exception**: N/A — coverage check.
+540. **Input**: Entire document. **Expected output**: Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully. **Exception**: N/A — sync test: parse validation check.
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 26 Engineering Design Review.
+1. Complete Round 27 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5511,7 +5565,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 26 Engineering Design Review passes before implementation starts
+- [ ] Round 27 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -5530,6 +5584,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 25 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 26 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
