@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 22 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 23 Engineering Design Review passes.
 
 ---
 
@@ -55,6 +55,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 19 | 4800488397 | CHANGES REQUIRED |
 | 20 | 4800787131 | CHANGES REQUIRED |
 | 21 | 4800977010 | CHANGES REQUIRED |
+| 22 | 4801215509 | CHANGES REQUIRED |
 
 |---|
 
@@ -1314,13 +1315,17 @@ A mismatch is an invalid shared message object and must not be silently hashed.
 Shared digest functions, usable from every failure path without import ambiguity:
 
 ```python
+def normalize_run_failure_context(context: tuple[tuple[str, str], ...]) -> list[list[str]]:
+    return [[key, value] for key, value in context]
+
+
 def build_run_failure_payload(failure: RunFailure) -> CanonicalPayload:
     return {
         "schema_version": failure.schema_version,
         "code": failure.code.value,
         "message": failure.message,
         "traceback": failure.traceback,
-        "context_entries": canonical_context_entries,
+        "context_entries": normalize_run_failure_context(failure.context),
     }
 
 
@@ -1328,7 +1333,7 @@ def digest_run_failure(failure: RunFailure) -> str:
     return sha256_digest(build_run_failure_payload(failure))
 ```
 
-Where `canonical_context_entries` is derived via the normalization rules in §14.7.2:
+Usage:
 
 ```python
 run_failure_payload = build_run_failure_payload(failure)
@@ -1453,13 +1458,7 @@ fallback_run_failure = RunFailure(
     traceback=None,
     context=fallback_failure_context,
 )
-fallback_run_failure_digest = sha256_digest({
-    "schema_version": fallback_run_failure.schema_version,
-    "code": fallback_run_failure.code.value,
-    "message": fallback_run_failure.message,
-    "traceback": fallback_run_failure.traceback,
-    "context_entries": list(fallback_run_failure.context),
-})
+fallback_run_failure_digest = digest_run_failure(fallback_run_failure)
 ```
 
 This is the **single path** for constructing a RunFailure from a canonicalization failure. There is no alternative code path, no conditional marker, no fallback within the fallback.
@@ -1511,6 +1510,20 @@ meets_target_without_tolerance: bool | None
 Unified digest across all evaluation states:
 
 ```python
+def build_diagnostic_payload(diagnostic: CandidateDiagnosticKey) -> CanonicalPayload:
+    return {
+        "diagnostic_class_rank": diagnostic.diagnostic_class_rank,
+        "code": diagnostic.code,
+        "source_module": diagnostic.source_module,
+        "affected_paths": list(diagnostic.affected_paths),
+        "message": diagnostic.message,
+    }
+
+
+def build_diagnostic_digest(diagnostic: CandidateDiagnosticKey) -> str:
+    return sha256_digest(build_diagnostic_payload(diagnostic))
+
+
 def build_candidate_evaluation_payload(
     evaluation: CandidateEvaluation,
 ) -> CanonicalPayload:
@@ -1524,9 +1537,9 @@ def build_candidate_evaluation_payload(
         "feasible": evaluation.feasible,
         "verified_rating_evidence_digest": evaluation.verified_rating_evidence.evidence_digest if evaluation.verified_rating_evidence is not None else None,
         "invalid_rating_evidence_digest": evaluation.invalid_rating_evidence.invalid_evidence_digest if evaluation.invalid_rating_evidence is not None else None,
-        "evaluation_failure_digest": evaluation.evaluation_failure.failure_digest if evaluation.evaluation_failure is not None else None,
-        "diagnostic_digests": [d.diagnostic_digest for d in evaluation.diagnostics] if evaluation.diagnostics else [],
-        "primary_diagnostic_digest": evaluation.primary_diagnostic.diagnostic_digest if evaluation.primary_diagnostic is not None else None,
+        "evaluation_failure_digest": digest_run_failure(evaluation.evaluation_failure) if evaluation.evaluation_failure is not None else None,
+        "diagnostic_digests": [build_diagnostic_digest(d) for d in evaluation.diagnostics] if evaluation.diagnostics else [],
+        "primary_diagnostic_digest": build_diagnostic_digest(evaluation.primary_diagnostic) if evaluation.primary_diagnostic is not None else None,
         "duty_margin_w": evaluation.duty_margin_w,
         "duty_shortfall_w": evaluation.duty_shortfall_w,
         "duty_overshoot_w": evaluation.duty_overshoot_w,
@@ -2422,113 +2435,13 @@ evaluation_order_index: int | None
 
 Root selection delegates to `select_root_concept()` (§22.1). The two distinct `ROOT` concepts (`ROOT_CASE_REVISION`, `ROOT_EXTERNAL`) prevent expression of root-type selection within a single ambiguous table entry. Callers should never hard-code root selection logic.
 
-```python
-def select_root_concept(
-    request_kind: SizingRunRequestKind,
-    design_case_revision_id: UUID | None,
-) -> ProvenanceConcept:
-    if request_kind is SizingRunRequestKind.RAW:
-        return ProvenanceConcept.ROOT_EXTERNAL
-    if design_case_revision_id is not None:
-        return ProvenanceConcept.ROOT_CASE_REVISION
-    return ProvenanceConcept.ROOT_EXTERNAL
-
-
-def root_node_type(root_concept: ProvenanceConcept) -> ProvenanceNodeType:
-    if root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
-        return ProvenanceNodeType.CASE_REVISION
-    return ProvenanceNodeType.EXTERNAL
-
-
-def root_label(
-    root_concept: ProvenanceConcept,
-    design_case_revision_id: UUID | None,
-) -> str:
-    if root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
-        return f"revision_{design_case_revision_id}"
-    return "external_root"
-
-```python
-RootTopologyConstructor = Callable[[SizingRunRequestKind, UUID | None], RootTopologySelection]
-
-
-@dataclass(frozen=True, slots=True)
-class RootTopologySelection:
-    root_concept: ProvenanceConcept
-    root_node_type: ProvenanceNodeType
-    root_label: str
-    root_case_revision_count: int = 0
-    root_external_count: int = 0
-    initiates_edge: ProvenanceRelationSpec | None = None
-
-
-def derive_root_topology(
-    request_kind: SizingRunRequestKind,
-    design_case_revision_id: UUID | None,
-) -> RootTopologySelection:
-    root_concept = select_root_concept(request_kind, design_case_revision_id)
-    ntype = root_node_type(root_concept)
-    label = root_label(root_concept, design_case_revision_id)
-    is_case = root_concept == ProvenanceConcept.ROOT_CASE_REVISION
-    return RootTopologySelection(
-        root_concept=root_concept,
-        root_node_type=ntype,
-        root_label=label,
-        root_case_revision_count=1 if is_case else 0,
-        root_external_count=0 if is_case else 1,
-        initiates_edge=ProvenanceRelationSpec(root_concept, "initiates", ProvenanceConcept.SIZING_RUN),
-    )
-```
-
-Edge labels are uniquely frozen:
-
-| Edge | Label |
-|------|-------|
-| ROOT → SIZING_RUN | `"initiates"` |
-| SIZING_RUN → CATALOG_SNAPSHOT | `"consumes"` |
-| SIZING_RUN → OPTIMIZER | `"executes"` |
-| CATALOG_SNAPSHOT → CANDIDATE | `"generates"` |
-| CANDIDATE → TASK008_RATING_RESULT (verified) | `"rated_as"` |
-| CANDIDATE → CLAIMED_TASK008_RATING_RESULT (unverified) | `"rated_as_claimed"` |
-| TASK008_RATING_RESULT → OPTIMIZER | `"evaluated_by"` |
-| CANDIDATE → INVALID_EVIDENCE | `"produced_unverified"` |
-| INVALID_EVIDENCE → SIZING_RESULT | `"invalidates"` |
-| OPTIMIZER → SIZING_RESULT | `"produces"` |
-| OPTIMIZER → SIZING_RUN_FAILURE_RESULT | `"precedes_failure"` |
-| RUNTIME_FAILURE → SIZING_RESULT | `"fails"` |
-| RUNTIME_FAILURE → SIZING_RUN_FAILURE_RESULT | `"fails"` |
-| SIZING_RUN → SIZING_RESULT | `"produces"` |
-| SIZING_RUN → SIZING_RUN_FAILURE_RESULT | `"produces_failure_record"` |
-| BLOCKER → SIZING_RESULT | `"blocks"` |
-| BLOCKER → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
-| WARNING → SIZING_RESULT | `"annotates"` |
-| WARNING → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
-| SIZING_RUN → WARNING | `"emits"` |
-| SIZING_RUN → BLOCKER | `"emits"` |
-| CATALOG_SNAPSHOT → WARNING | `"emits"` |
-| CATALOG_SNAPSHOT → BLOCKER | `"emits"` |
-| CANDIDATE → WARNING | `"emits"` |
-| CANDIDATE → BLOCKER | `"emits"` |
-| OPTIMIZER → WARNING | `"emits"` |
-| OPTIMIZER → BLOCKER | `"emits"` |
-
-No two edges share an ambiguous label with different semantics.
-
-> **NON-AUTHORITATIVE GENERATED SUMMARY — registry and constructor mappings are the sole source of truth.**
-
-### 22.2 UUID5 Namespace
-
-```python
-TASK009_PROVENANCE_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-```
-
-### 22.3 Executable Provenance Concept Registry
-
-Each concept entry defines the exact node_type (ProvenanceNodeType enum value), label formula, UUID5 name formula, payload hash payload, required metadata fields, allowed incoming/outgoing edge node types, multiplicity source, and allowed/forbidden termination classes.
+### 22.2 Enums and Base Types
 
 ```python
 from enum import StrEnum
 from dataclasses import dataclass
+from typing import TypeAlias, TypeVar, Callable, Any, Mapping, Literal
+from uuid import UUID
 
 class ProvenanceConcept(StrEnum):
     ROOT_CASE_REVISION = "root_case_revision"
@@ -2576,6 +2489,18 @@ ProvenanceIncomingRelation = tuple[str, ProvenanceConcept]  # (label, source_con
 ProvenanceOutgoingRelation = tuple[str, ProvenanceConcept]  # (label, target_concept)
 
 
+# TypeAlias definitions
+CanonicalPrimitive: TypeAlias = None | bool | int | float | str
+CanonicalValue: TypeAlias = CanonicalPrimitive | list["CanonicalValue"] | dict[str, "CanonicalValue"]
+CanonicalPayload: TypeAlias = dict[str, CanonicalValue]
+CanonicalMetadata: TypeAlias = tuple[tuple[str, str], ...]
+ContextT = TypeVar("ContextT")
+LabelConstructor: TypeAlias = Callable[[ContextT], str]
+Uuid5NameConstructor: TypeAlias = Callable[[ContextT], str]
+PayloadConstructor: TypeAlias = Callable[[ContextT], CanonicalPayload]
+MetadataConstructor: TypeAlias = Callable[[ContextT], CanonicalMetadata]
+
+
 @dataclass(frozen=True, slots=True)
 class ProvenanceRelationSpec:
     source_concept: ProvenanceConcept
@@ -2583,289 +2508,121 @@ class ProvenanceRelationSpec:
     target_concept: ProvenanceConcept
 ```
 
-```python
-@dataclass(frozen=True, slots=True)
-class ProvenanceConceptSpec:
-    concept: ProvenanceConcept
-    node_type: ProvenanceNodeType
-    label_constructor: LabelConstructor
-    uuid5_name_constructor: Uuid5NameConstructor
-    payload_constructor: PayloadConstructor
-    metadata_constructor: MetadataConstructor
-    allowed_incoming: tuple[ProvenanceRelationSpec, ...]
-    allowed_outgoing: tuple[ProvenanceRelationSpec, ...]
-```
-
-The authoritative registry of all 14 provenance concepts:
+### 22.3 Root Selection
 
 ```python
-PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.ROOT_CASE_REVISION,
-        node_type=ProvenanceNodeType.CASE_REVISION,
-        label_constructor=build_revision_label,
-        uuid5_name_constructor=build_root_case_revision_uuid5,
-        payload_constructor=build_root_case_revision_payload,
-        metadata_constructor=build_root_case_revision_metadata,
-        allowed_incoming=(),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.ROOT_EXTERNAL,
-        node_type=ProvenanceNodeType.EXTERNAL,
-        label_constructor=build_external_label,
-        uuid5_name_constructor=build_root_external_uuid5,
-        payload_constructor=build_root_external_payload,
-        metadata_constructor=build_root_external_metadata,
-        allowed_incoming=(),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.SIZING_RUN,
-        node_type=ProvenanceNodeType.CALCULATION_RUN,
-        label_constructor=build_sizing_run_label,
-        uuid5_name_constructor=build_sizing_run_uuid5,
-        payload_constructor=build_sizing_run_payload,
-        metadata_constructor=build_sizing_run_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
-            ProvenanceRelationSpec(ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN),
-        ),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces_failure_record", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.BLOCKER),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.SIZING_OPTIMIZER,
-        node_type=ProvenanceNodeType.OPTIMIZER,
-        label_constructor=build_optimizer_label,
-        uuid5_name_constructor=build_optimizer_uuid5,
-        payload_constructor=build_optimizer_payload,
-        metadata_constructor=build_optimizer_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
-        ),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "precedes_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.BLOCKER),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.CATALOG_SNAPSHOT,
-        node_type=ProvenanceNodeType.INTERMEDIATE,
-        label_constructor=build_catalog_label,
-        uuid5_name_constructor=build_catalog_uuid5,
-        payload_constructor=build_catalog_payload,
-        metadata_constructor=build_catalog_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-        ),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.BLOCKER),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.CANDIDATE,
-        node_type=ProvenanceNodeType.INTERMEDIATE,
-        label_constructor=build_candidate_label,
-        uuid5_name_constructor=build_candidate_uuid5,
-        payload_constructor=build_candidate_payload,
-        metadata_constructor=build_candidate_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-        ),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as_claimed", ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "produced_unverified", ProvenanceConcept.INVALID_EVIDENCE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.BLOCKER),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.TASK008_RATING_RESULT,
-        node_type=ProvenanceNodeType.RESULT,
-        label_constructor=build_rating_result_label,
-        uuid5_name_constructor=build_rating_result_uuid5,
-        payload_constructor=build_rating_result_payload,
-        metadata_constructor=build_rating_result_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-        ),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
-        node_type=ProvenanceNodeType.INTERMEDIATE,
-        label_constructor=build_claimed_rating_label,
-        uuid5_name_constructor=build_claimed_rating_uuid5,
-        payload_constructor=build_claimed_rating_payload,
-        metadata_constructor=build_claimed_rating_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as_claimed", ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        ),
-        allowed_outgoing=(),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.SIZING_RESULT,
-        node_type=ProvenanceNodeType.RESULT,
-        label_constructor=build_sizing_result_label,
-        uuid5_name_constructor=build_sizing_result_uuid5,
-        payload_constructor=build_sizing_result_payload,
-        metadata_constructor=build_sizing_result_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "blocks", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
-        ),
-        allowed_outgoing=(),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
-        node_type=ProvenanceNodeType.RESULT,
-        label_constructor=build_sizing_run_failure_label,
-        uuid5_name_constructor=build_sizing_run_failure_uuid5,
-        payload_constructor=build_sizing_run_failure_payload,
-        metadata_constructor=build_sizing_run_failure_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "precedes_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces_failure_record", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-        ),
-        allowed_outgoing=(),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.INVALID_EVIDENCE,
-        node_type=ProvenanceNodeType.INTERMEDIATE,
-        label_constructor=build_invalid_evidence_label,
-        uuid5_name_constructor=build_invalid_evidence_uuid5,
-        payload_constructor=build_invalid_evidence_payload,
-        metadata_constructor=build_invalid_evidence_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "produced_unverified", ProvenanceConcept.INVALID_EVIDENCE),
-        ),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.INVALID_EVIDENCE, "invalidates", ProvenanceConcept.SIZING_RESULT),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.RUNTIME_FAILURE,
-        node_type=ProvenanceNodeType.BLOCKER,
-        label_constructor=build_runtime_failure_label,
-        uuid5_name_constructor=build_runtime_failure_uuid5,
-        payload_constructor=build_runtime_failure_payload,
-        metadata_constructor=build_runtime_failure_metadata,
-        allowed_incoming=(),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.WARNING,
-        node_type=ProvenanceNodeType.WARNING,
-        label_constructor=build_warning_label,
-        uuid5_name_constructor=build_warning_uuid5,
-        payload_constructor=build_warning_payload,
-        metadata_constructor=build_warning_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.WARNING),
-        ),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-        ),
-    ),
-    ProvenanceConceptSpec(
-        concept=ProvenanceConcept.BLOCKER,
-        node_type=ProvenanceNodeType.BLOCKER,
-        label_constructor=build_blocker_label,
-        uuid5_name_constructor=build_blocker_uuid5,
-        payload_constructor=build_blocker_payload,
-        metadata_constructor=build_blocker_metadata,
-        allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.BLOCKER),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.BLOCKER),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.BLOCKER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.BLOCKER),
-        ),
-        allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "blocks", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-        ),
-    ),
-)
-```
+def select_root_concept(
+    request_kind: SizingRunRequestKind,
+    design_case_revision_id: UUID | None,
+) -> ProvenanceConcept:
+    if request_kind is SizingRunRequestKind.RAW:
+        return ProvenanceConcept.ROOT_EXTERNAL
+    if design_case_revision_id is not None:
+        return ProvenanceConcept.ROOT_CASE_REVISION
+    return ProvenanceConcept.ROOT_EXTERNAL
 
-```python
-# ──────────────────────────────────────────────────────────
-# TypeAlias definitions
-# ──────────────────────────────────────────────────────────
 
-CanonicalPrimitive: TypeAlias = None | bool | int | float | str
-CanonicalValue: TypeAlias = CanonicalPrimitive | list["CanonicalValue"] | dict[str, "CanonicalValue"]
-CanonicalPayload: TypeAlias = dict[str, CanonicalValue]
-CanonicalMetadata: TypeAlias = tuple[tuple[str, str], ...]
-LabelConstructor: TypeAlias = Callable[..., str]
-Uuid5NameConstructor: TypeAlias = Callable[..., str]
-PayloadConstructor: TypeAlias = Callable[..., CanonicalPayload]
-MetadataConstructor: TypeAlias = Callable[..., CanonicalMetadata]
+def root_node_type(root_concept: ProvenanceConcept) -> ProvenanceNodeType:
+    if root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
+        return ProvenanceNodeType.CASE_REVISION
+    return ProvenanceNodeType.EXTERNAL
+
+
+def root_label(
+    root_concept: ProvenanceConcept,
+    design_case_revision_id: UUID | None,
+) -> str:
+    if root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
+        return f"revision_{design_case_revision_id}"
+    return "external_root"
 
 
 @dataclass(frozen=True, slots=True)
-class TopologyCounters:
-    catalog_count: int = 0
-    unique_candidate_count: int = 0
-    materialized_candidate_count: int = 0
-    attempted_rating_count: int = 0
-    completed_rating_count: int = 0
-    verified_rating_count: int = 0
-    claimed_rating_count: int = 0
-    invalid_evidence_count: int = 0
-    optimizer_count: int = 0
-    sizing_result_count: int = 0
-    sizing_run_failure_result_count: int = 0
-    runtime_failure_count: int = 0
-    warning_content_count: int = 0
-    blocker_content_count: int = 0
+class RootTopologySelection:
+    root_concept: ProvenanceConcept
+    root_node_type: ProvenanceNodeType
+    root_label: str
+    root_case_revision_count: Literal[0, 1]
+    root_external_count: Literal[0, 1]
+    initiates_edge: ProvenanceRelationSpec
+
+    def __post_init__(self) -> None:
+        if self.root_case_revision_count + self.root_external_count != 1:
+            raise ValueError("exactly one root count must equal 1")
+        if self.initiates_edge.source_concept is not self.root_concept:
+            raise ValueError("root edge source must equal root concept")
+        if self.initiates_edge.relation != "initiates":
+            raise ValueError("root edge relation must be initiates")
+        if self.initiates_edge.target_concept is not ProvenanceConcept.SIZING_RUN:
+            raise ValueError("root edge target must be SIZING_RUN")
 
 
-@dataclass(frozen=True, slots=True)
-class TopologyConstructionContext:
-    counters: TopologyCounters
-    root_selection: RootTopologySelection
+RootTopologyConstructor = Callable[[SizingRunRequestKind, UUID | None], RootTopologySelection]
 
 
-NodeMultiplicityConstructor = Callable[[TopologyConstructionContext], int]
+def derive_root_topology(
+    request_kind: SizingRunRequestKind,
+    design_case_revision_id: UUID | None,
+) -> RootTopologySelection:
+    root_concept = select_root_concept(request_kind, design_case_revision_id)
+    ntype = root_node_type(root_concept)
+    label = root_label(root_concept, design_case_revision_id)
+    is_case = root_concept == ProvenanceConcept.ROOT_CASE_REVISION
+    return RootTopologySelection(
+        root_concept=root_concept,
+        root_node_type=ntype,
+        root_label=label,
+        root_case_revision_count=1 if is_case else 0,
+        root_external_count=0 if is_case else 1,
+        initiates_edge=ProvenanceRelationSpec(root_concept, "initiates", ProvenanceConcept.SIZING_RUN),
+    )
 ```
 
-# ──────────────────────────────────────────────────────────
-# Concept-specific construction contexts
-# ──────────────────────────────────────────────────────────
+### 22.4 Edge Labels
 
+Edge labels are uniquely frozen:
+
+| Edge | Label |
+|------|-------|
+| ROOT → SIZING_RUN | `"initiates"` |
+| SIZING_RUN → CATALOG_SNAPSHOT | `"consumes"` |
+| SIZING_RUN → OPTIMIZER | `"executes"` |
+| CATALOG_SNAPSHOT → CANDIDATE | `"generates"` |
+| CANDIDATE → TASK008_RATING_RESULT (verified) | `"rated_as"` |
+| CANDIDATE → CLAIMED_TASK008_RATING_RESULT (unverified) | `"rated_as_claimed"` |
+| TASK008_RATING_RESULT → OPTIMIZER | `"evaluated_by"` |
+| CANDIDATE → INVALID_EVIDENCE | `"produced_unverified"` |
+| INVALID_EVIDENCE → SIZING_RESULT | `"invalidates"` |
+| OPTIMIZER → SIZING_RESULT | `"produces"` |
+| OPTIMIZER → SIZING_RUN_FAILURE_RESULT | `"precedes_failure"` |
+| RUNTIME_FAILURE → SIZING_RESULT | `"fails"` |
+| RUNTIME_FAILURE → SIZING_RUN_FAILURE_RESULT | `"fails"` |
+| SIZING_RUN → SIZING_RESULT | `"produces"` |
+| SIZING_RUN → SIZING_RUN_FAILURE_RESULT | `"produces_failure_record"` |
+| BLOCKER → SIZING_RESULT | `"blocks"` |
+| BLOCKER → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+| WARNING → SIZING_RESULT | `"annotates"` |
+| WARNING → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+| SIZING_RUN → WARNING | `"emits"` |
+| SIZING_RUN → BLOCKER | `"emits"` |
+| CATALOG_SNAPSHOT → WARNING | `"emits"` |
+| CATALOG_SNAPSHOT → BLOCKER | `"emits"` |
+| CANDIDATE → WARNING | `"emits"` |
+| CANDIDATE → BLOCKER | `"emits"` |
+| OPTIMIZER → WARNING | `"emits"` |
+| OPTIMIZER → BLOCKER | `"emits"` |
+
+No two edges share an ambiguous label with different semantics.
+
+### 22.5 UUID5 Namespace
+
+```python
+TASK009_PROVENANCE_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+```
+
+### 22.6 Concept-Specific Construction Contexts
+
+```python
 @dataclass(frozen=True, slots=True)
 class RootCaseRevisionConstructionContext:
     design_case_revision_id: UUID
@@ -2935,12 +2692,15 @@ class MessageOccurrenceConstructionContext:
     occurrence_kind: MessageOccurrenceKind
     message_digest: str
     occurrence_index: int
+```
 
+### 22.7 Constructor Functions
 
+Each concept has its own typed context. Multiplicity is handled by `NODE_MULTIPLICITY_CONSTRUCTORS`.
+
+```python
 # ──────────────────────────────────────────────────────────
 # 14 × 4 constructor functions (label, uuid5, payload, metadata)
-# Each concept has its own typed context. Multiplicity is
-# handled by NODE_MULTIPLICITY_CONSTRUCTORS (§22.4 topology).
 # ──────────────────────────────────────────────────────────
 
 # --- ROOT_CASE_REVISION ---
@@ -2973,7 +2733,7 @@ def build_root_external_uuid5(context: RootExternalConstructionContext) -> str:
 
 def build_root_external_payload(context: RootExternalConstructionContext) -> CanonicalPayload:
     return {
-        "request_kind": context.request_kind.value if context.request_kind else None,
+        "request_kind": context.request_kind.value,
         "request_digest": context.request_digest,
     }
 
@@ -2994,14 +2754,14 @@ def build_sizing_run_uuid5(context: SizingRunConstructionContext) -> str:
 
 def build_sizing_run_payload(context: SizingRunConstructionContext) -> CanonicalPayload:
     return {
-        "request_kind": context.request_kind.value if context.request_kind else None,
+        "request_kind": context.request_kind.value,
         "request_digest": context.request_digest,
     }
 
 
 def build_sizing_run_metadata(context: SizingRunConstructionContext) -> CanonicalMetadata:
     return (
-        ("request_kind", context.request_kind.value if context.request_kind else None),
+        ("request_kind", context.request_kind.value),
         ("request_digest", context.request_digest),
     )
 
@@ -3018,14 +2778,14 @@ def build_optimizer_uuid5(context: OptimizerConstructionContext) -> str:
 
 def build_optimizer_payload(context: OptimizerConstructionContext) -> CanonicalPayload:
     return {
-        "request_kind": context.request_kind.value if context.request_kind else None,
+        "request_kind": context.request_kind.value,
         "request_digest": context.request_digest,
     }
 
 
 def build_optimizer_metadata(context: OptimizerConstructionContext) -> CanonicalMetadata:
     return (
-        ("request_kind", context.request_kind.value if context.request_kind else None),
+        ("request_kind", context.request_kind.value),
         ("request_digest", context.request_digest),
     )
 
@@ -3161,14 +2921,14 @@ def build_sizing_run_failure_uuid5(context: SizingRunFailureConstructionContext)
 def build_sizing_run_failure_payload(context: SizingRunFailureConstructionContext) -> CanonicalPayload:
     return {
         "failure_result_hash": context.failure_result_hash,
-        "failure_stage": context.failure_stage.value if context.failure_stage else None,
+        "failure_stage": context.failure_stage.value,
     }
 
 
 def build_sizing_run_failure_metadata(context: SizingRunFailureConstructionContext) -> CanonicalMetadata:
     return (
         ("failure_result_hash", context.failure_result_hash),
-        ("failure_stage", context.failure_stage.value if context.failure_stage else None),
+        ("failure_stage", context.failure_stage.value),
     )
 
 
@@ -3226,8 +2986,8 @@ def build_warning_uuid5(context: MessageOccurrenceConstructionContext) -> str:
 
 def build_warning_payload(context: MessageOccurrenceConstructionContext) -> CanonicalPayload:
     return {
-        "occurrence_kind": context.occurrence_kind.value if context.occurrence_kind else None,
-        "owner_kind": context.owner_kind.value if context.owner_kind else None,
+        "occurrence_kind": context.occurrence_kind.value,
+        "owner_kind": context.owner_kind.value,
         "owner_id": context.owner_id,
         "message_digest": context.message_digest,
         "occurrence_index": context.occurrence_index,
@@ -3236,11 +2996,11 @@ def build_warning_payload(context: MessageOccurrenceConstructionContext) -> Cano
 
 def build_warning_metadata(context: MessageOccurrenceConstructionContext) -> CanonicalMetadata:
     return (
-        ("owner_kind", context.owner_kind.value if context.owner_kind else None),
+        ("owner_kind", context.owner_kind.value),
         ("owner_id", context.owner_id),
         ("message_digest", context.message_digest),
-        ("occurrence_index", str(context.occurrence_index) if context.occurrence_index is not None else None),
-        ("occurrence_kind", context.occurrence_kind.value if context.occurrence_kind else None),
+        ("occurrence_index", str(context.occurrence_index)),
+        ("occurrence_kind", context.occurrence_kind.value),
     )
 
 
@@ -3256,8 +3016,8 @@ def build_blocker_uuid5(context: MessageOccurrenceConstructionContext) -> str:
 
 def build_blocker_payload(context: MessageOccurrenceConstructionContext) -> CanonicalPayload:
     return {
-        "occurrence_kind": context.occurrence_kind.value if context.occurrence_kind else None,
-        "owner_kind": context.owner_kind.value if context.owner_kind else None,
+        "occurrence_kind": context.occurrence_kind.value,
+        "owner_kind": context.owner_kind.value,
         "owner_id": context.owner_id,
         "message_digest": context.message_digest,
         "occurrence_index": context.occurrence_index,
@@ -3266,20 +3026,333 @@ def build_blocker_payload(context: MessageOccurrenceConstructionContext) -> Cano
 
 def build_blocker_metadata(context: MessageOccurrenceConstructionContext) -> CanonicalMetadata:
     return (
-        ("owner_kind", context.owner_kind.value if context.owner_kind else None),
+        ("owner_kind", context.owner_kind.value),
         ("owner_id", context.owner_id),
         ("message_digest", context.message_digest),
-        ("occurrence_index", str(context.occurrence_index) if context.occurrence_index is not None else None),
-        ("occurrence_kind", context.occurrence_kind.value if context.occurrence_kind else None),
+        ("occurrence_index", str(context.occurrence_index)),
+        ("occurrence_kind", context.occurrence_kind.value),
     )
+```
+
+### 22.8 ProvenanceConstructorSpec and ProvenanceConceptSpec
+
+```python
+@dataclass(frozen=True, slots=True)
+class ProvenanceConstructorSpec(Generic[ContextT]):
+    context_type: type[ContextT]
+    label_constructor: Callable[[ContextT], str]
+    uuid5_name_constructor: Callable[[ContextT], str]
+    payload_constructor: Callable[[ContextT], CanonicalPayload]
+    metadata_constructor: Callable[[ContextT], CanonicalMetadata]
 
 
-# ──────────────────────────────────────────────────────────
-# NODE_MULTIPLICITY_CONSTRUCTORS
-# Topology-level multiplicity mapping, separate from the
-# concept registry. Each entry maps a string key to a
-# callable that resolves the node count for a given topology.
-# ──────────────────────────────────────────────────────────
+@dataclass(frozen=True, slots=True)
+class ProvenanceConceptSpec:
+    concept: ProvenanceConcept
+    node_type: ProvenanceNodeType
+    constructors: ProvenanceConstructorSpec[Any]
+    allowed_incoming: tuple[ProvenanceRelationSpec, ...]
+    allowed_outgoing: tuple[ProvenanceRelationSpec, ...]
+```
+
+### 22.9 PROVENANCE_CONCEPT_REGISTRY
+
+The authoritative registry of all 14 provenance concepts:
+
+```python
+PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.ROOT_CASE_REVISION,
+        node_type=ProvenanceNodeType.CASE_REVISION,
+        constructors=ProvenanceConstructorSpec[RootCaseRevisionConstructionContext](
+            context_type=RootCaseRevisionConstructionContext,
+            label_constructor=build_revision_label,
+            uuid5_name_constructor=build_root_case_revision_uuid5,
+            payload_constructor=build_root_case_revision_payload,
+            metadata_constructor=build_root_case_revision_metadata,
+        ),
+        allowed_incoming=(),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.ROOT_EXTERNAL,
+        node_type=ProvenanceNodeType.EXTERNAL,
+        constructors=ProvenanceConstructorSpec[RootExternalConstructionContext](
+            context_type=RootExternalConstructionContext,
+            label_constructor=build_external_label,
+            uuid5_name_constructor=build_root_external_uuid5,
+            payload_constructor=build_root_external_payload,
+            metadata_constructor=build_root_external_metadata,
+        ),
+        allowed_incoming=(),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.SIZING_RUN,
+        node_type=ProvenanceNodeType.CALCULATION_RUN,
+        constructors=ProvenanceConstructorSpec[SizingRunConstructionContext](
+            context_type=SizingRunConstructionContext,
+            label_constructor=build_sizing_run_label,
+            uuid5_name_constructor=build_sizing_run_uuid5,
+            payload_constructor=build_sizing_run_payload,
+            metadata_constructor=build_sizing_run_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN),
+        ),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces_failure_record", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.BLOCKER),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.SIZING_OPTIMIZER,
+        node_type=ProvenanceNodeType.OPTIMIZER,
+        constructors=ProvenanceConstructorSpec[OptimizerConstructionContext](
+            context_type=OptimizerConstructionContext,
+            label_constructor=build_optimizer_label,
+            uuid5_name_constructor=build_optimizer_uuid5,
+            payload_constructor=build_optimizer_payload,
+            metadata_constructor=build_optimizer_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
+        ),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "precedes_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.BLOCKER),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.CATALOG_SNAPSHOT,
+        node_type=ProvenanceNodeType.INTERMEDIATE,
+        constructors=ProvenanceConstructorSpec[CatalogSnapshotConstructionContext](
+            context_type=CatalogSnapshotConstructionContext,
+            label_constructor=build_catalog_label,
+            uuid5_name_constructor=build_catalog_uuid5,
+            payload_constructor=build_catalog_payload,
+            metadata_constructor=build_catalog_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+        ),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.BLOCKER),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.CANDIDATE,
+        node_type=ProvenanceNodeType.INTERMEDIATE,
+        constructors=ProvenanceConstructorSpec[CandidateConstructionContext](
+            context_type=CandidateConstructionContext,
+            label_constructor=build_candidate_label,
+            uuid5_name_constructor=build_candidate_uuid5,
+            payload_constructor=build_candidate_payload,
+            metadata_constructor=build_candidate_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+        ),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as_claimed", ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "produced_unverified", ProvenanceConcept.INVALID_EVIDENCE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.BLOCKER),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.TASK008_RATING_RESULT,
+        node_type=ProvenanceNodeType.RESULT,
+        constructors=ProvenanceConstructorSpec[RatingResultConstructionContext](
+            context_type=RatingResultConstructionContext,
+            label_constructor=build_rating_result_label,
+            uuid5_name_constructor=build_rating_result_uuid5,
+            payload_constructor=build_rating_result_payload,
+            metadata_constructor=build_rating_result_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+        ),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        node_type=ProvenanceNodeType.INTERMEDIATE,
+        constructors=ProvenanceConstructorSpec[ClaimedRatingConstructionContext](
+            context_type=ClaimedRatingConstructionContext,
+            label_constructor=build_claimed_rating_label,
+            uuid5_name_constructor=build_claimed_rating_uuid5,
+            payload_constructor=build_claimed_rating_payload,
+            metadata_constructor=build_claimed_rating_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as_claimed", ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        ),
+        allowed_outgoing=(),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.SIZING_RESULT,
+        node_type=ProvenanceNodeType.RESULT,
+        constructors=ProvenanceConstructorSpec[SizingResultConstructionContext](
+            context_type=SizingResultConstructionContext,
+            label_constructor=build_sizing_result_label,
+            uuid5_name_constructor=build_sizing_result_uuid5,
+            payload_constructor=build_sizing_result_payload,
+            metadata_constructor=build_sizing_result_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "blocks", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        allowed_outgoing=(),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+        node_type=ProvenanceNodeType.RESULT,
+        constructors=ProvenanceConstructorSpec[SizingRunFailureConstructionContext](
+            context_type=SizingRunFailureConstructionContext,
+            label_constructor=build_sizing_run_failure_label,
+            uuid5_name_constructor=build_sizing_run_failure_uuid5,
+            payload_constructor=build_sizing_run_failure_payload,
+            metadata_constructor=build_sizing_run_failure_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "precedes_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces_failure_record", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+        ),
+        allowed_outgoing=(),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.INVALID_EVIDENCE,
+        node_type=ProvenanceNodeType.INTERMEDIATE,
+        constructors=ProvenanceConstructorSpec[InvalidEvidenceConstructionContext](
+            context_type=InvalidEvidenceConstructionContext,
+            label_constructor=build_invalid_evidence_label,
+            uuid5_name_constructor=build_invalid_evidence_uuid5,
+            payload_constructor=build_invalid_evidence_payload,
+            metadata_constructor=build_invalid_evidence_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "produced_unverified", ProvenanceConcept.INVALID_EVIDENCE),
+        ),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.INVALID_EVIDENCE, "invalidates", ProvenanceConcept.SIZING_RESULT),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.RUNTIME_FAILURE,
+        node_type=ProvenanceNodeType.BLOCKER,
+        constructors=ProvenanceConstructorSpec[RuntimeFailureConstructionContext](
+            context_type=RuntimeFailureConstructionContext,
+            label_constructor=build_runtime_failure_label,
+            uuid5_name_constructor=build_runtime_failure_uuid5,
+            payload_constructor=build_runtime_failure_payload,
+            metadata_constructor=build_runtime_failure_metadata,
+        ),
+        allowed_incoming=(),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.WARNING,
+        node_type=ProvenanceNodeType.WARNING,
+        constructors=ProvenanceConstructorSpec[MessageOccurrenceConstructionContext](
+            context_type=MessageOccurrenceConstructionContext,
+            label_constructor=build_warning_label,
+            uuid5_name_constructor=build_warning_uuid5,
+            payload_constructor=build_warning_payload,
+            metadata_constructor=build_warning_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.WARNING),
+        ),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+        ),
+    ),
+    ProvenanceConceptSpec(
+        concept=ProvenanceConcept.BLOCKER,
+        node_type=ProvenanceNodeType.BLOCKER,
+        constructors=ProvenanceConstructorSpec[MessageOccurrenceConstructionContext](
+            context_type=MessageOccurrenceConstructionContext,
+            label_constructor=build_blocker_label,
+            uuid5_name_constructor=build_blocker_uuid5,
+            payload_constructor=build_blocker_payload,
+            metadata_constructor=build_blocker_metadata,
+        ),
+        allowed_incoming=(
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.BLOCKER),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.BLOCKER),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.BLOCKER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.BLOCKER),
+        ),
+        allowed_outgoing=(
+            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "blocks", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+        ),
+    ),
+)
+```
+
+### 22.10 Topology Infrastructure
+
+```python
+@dataclass(frozen=True, slots=True)
+class TopologyCounters:
+    catalog_count: int = 0
+    unique_candidate_count: int = 0
+    materialized_candidate_count: int = 0
+    attempted_rating_count: int = 0
+    completed_rating_count: int = 0
+    verified_rating_count: int = 0
+    claimed_rating_count: int = 0
+    invalid_evidence_count: int = 0
+    evaluated_candidate_count: int = 0
+    optimizer_count: int = 0
+    sizing_result_count: int = 0
+    sizing_run_failure_result_count: int = 0
+    runtime_failure_count: int = 0
+    warning_content_count: int = 0
+    blocker_content_count: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class TopologyConstructionContext:
+    counters: TopologyCounters
+    root_selection: RootTopologySelection
+
+
+NodeMultiplicityConstructor = Callable[[TopologyConstructionContext], int]
+
 
 NODE_MULTIPLICITY_CONSTRUCTORS: Mapping[str, NodeMultiplicityConstructor] = {
     "0": lambda ctx: 0,
@@ -3293,6 +3366,7 @@ NODE_MULTIPLICITY_CONSTRUCTORS: Mapping[str, NodeMultiplicityConstructor] = {
     "verified_rating_count": lambda ctx: ctx.counters.verified_rating_count,
     "claimed_rating_count": lambda ctx: ctx.counters.claimed_rating_count,
     "invalid_evidence_count": lambda ctx: ctx.counters.invalid_evidence_count,
+    "evaluated_candidate_count": lambda ctx: ctx.counters.evaluated_candidate_count,
     "optimizer_count": lambda ctx: ctx.counters.optimizer_count,
     "sizing_result_count": lambda ctx: ctx.counters.sizing_result_count,
     "sizing_run_failure_result_count": lambda ctx: ctx.counters.sizing_run_failure_result_count,
@@ -3321,7 +3395,24 @@ NODE_MULTIPLICITY_CONSTRUCTORS: Mapping[str, NodeMultiplicityConstructor] = {
 | WARNING | WARNING | `build_warning_label` | `build_warning_uuid5` | `build_warning_payload` | `build_warning_metadata` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("annotates", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) |
 | BLOCKER | BLOCKER | `build_blocker_label` | `build_blocker_uuid5` | `build_blocker_payload` | `build_blocker_metadata` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("blocks", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) |
 
-### 22.4 TerminationTopologySpec Registry
+### 22.11 TerminationTopologySpec Registry
+
+```python
+@dataclass(frozen=True, slots=True)
+class TerminationTopologySpec:
+    termination_class: TerminationClass
+    root_topology_constructor: RootTopologyConstructor
+    result_concept: ProvenanceConcept
+    base_node_multiplicities: tuple[tuple[ProvenanceConcept, str], ...]
+    static_base_edges: tuple[ProvenanceRelationSpec, ...]
+    forbidden_concepts: tuple[ProvenanceConcept, ...]
+    allowed_message_owner_kinds: tuple[MessageOwnerKind, ...]
+    minimum_warning_occurrences: int
+    minimum_blocker_occurrences: int
+    counter_invariants: tuple[str, ...]
+```
+
+The typed constant `TERMINATION_TOPOLOGY_REGISTRY` is the single authoritative source:
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -3771,6 +3862,34 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
 )
 ```
 
+
+
+### 22.12 Topology Resolution
+
+```python
+@dataclass(frozen=True, slots=True)
+class ResolvedTopology:
+    node_multiplicities: tuple[tuple[ProvenanceConcept, int], ...]
+    edges: tuple[ProvenanceRelationSpec, ...]
+
+
+def resolve_termination_topology(
+    spec: TerminationTopologySpec,
+    request_kind: SizingRunRequestKind,
+    design_case_revision_id: UUID | None,
+    counters: TopologyCounters,
+) -> ResolvedTopology:
+    root_selection = spec.root_topology_constructor(request_kind, design_case_revision_id)
+    context = TopologyConstructionContext(counters=counters, root_selection=root_selection)
+    node_multiplicities = tuple(
+        (concept, NODE_MULTIPLICITY_CONSTRUCTORS[formula_name](context))
+        for concept, formula_name in spec.base_node_multiplicities
+    )
+    edges = (root_selection.initiates_edge,) + spec.static_base_edges
+    return ResolvedTopology(node_multiplicities=node_multiplicities, edges=edges)
+```
+
+
 ### 22.3C Message Content and Occurrence Multiset
 
 Each message content (warning or blocker) is uniquely identified by its `engineering_message_digest`. When multiple source events produce messages with identical digest, they share one unique content record but generate distinct occurrences.
@@ -4026,7 +4145,6 @@ partial_audit = evaluated_candidate_count < unique_candidate_count
 ### 22.7 Edge Tamper Detection
 
 Detected through the canonical graph digest (serialized topology: nodes, edges, payload hashes). No per-edge hash field is defined in the shared `ProvenanceEdge` model.
-
 ---
 
 ## 23. Hash Canonical Contract
@@ -4723,54 +4841,54 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 21 Contract Tests (501–540)
+### 27.21 Round 22 Contract Tests (501–540)
 
-501. Round 21 Review Comment ID is `4800977010`
-502. Round 21 decision is `CHANGES REQUIRED`
-503. Round 21 row follows Round 20 in review history
-504. Gate references Round 22 Engineering Design Review
-505. Gate text at top of doc reads "Round 22" not "Round 21"
-506. Gate text: "TASK-009 returns to READY only after Round 22 Engineering Design Review passes."
-507. Delivery Sequence step 1 references "Round 22"
-508. Acceptance Criteria first item references "Round 22 Engineering Design Review"
-509. All Acceptance Criteria references to round gate use "Round 22" (not "Round 21")
-510. Review History has exactly 22 rows (Rounds 1–21)
-511. Round 21 comment ID `4800977010` not duplicated in older rounds
-512. No orphan "Round 21" gate text references remain in body outside review history
+501. Round 22 Review Comment ID is `4801215509`
+502. Round 22 decision is `CHANGES REQUIRED`
+503. Round 22 row follows Round 21 in review history
+504. Gate references Round 23 Engineering Design Review
+505. Gate text at top of doc reads "Round 23" not "Round 22"
+506. Gate text: "TASK-009 returns to READY only after Round 23 Engineering Design Review passes."
+507. Delivery Sequence step 1 references "Round 23"
+508. Acceptance Criteria first item references "Round 23 Engineering Design Review"
+509. All Acceptance Criteria references to round gate use "Round 23" (not "Round 22")
+510. Review History has exactly 23 rows (Rounds 1–22)
+511. Round 22 comment ID `4801215509` not duplicated in older rounds
+512. No orphan "Round 22" gate text references remain in body outside review history
 513. Test #499 reads "Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round"
-514. Old Acceptance Criteria references no longer say "Round 20" for Delivery Sequence
-515. Delivery Sequence step 1 does NOT reference "Round 21"
-516. Acceptance Criteria first item does NOT reference "Round 21"
-517. Test matrix summary lists Round 21 (501–540) not Round 20
-518. Test matrix acceptance criteria entry: Round 21 (501–540) replaces Round 20
-519. Section 27.21 present (Round 21 Contract Tests)
+514. Old Acceptance Criteria references no longer say "Round 21" for Delivery Sequence
+515. Delivery Sequence step 1 does NOT reference "Round 22"
+516. Acceptance Criteria first item does NOT reference "Round 22"
+517. Test matrix summary lists Round 22 (501–540) not Round 21
+518. Test matrix acceptance criteria entry: Round 22 (501–540) replaces Round 21
+519. Section 27.21 present (Round 22 Contract Tests)
 520. Section 27.21 has exactly 40 entries (501–540)
-521. Section 27.21 heading reads "Round 21 Contract Tests (501–540)"
+521. Section 27.21 heading reads "Round 22 Contract Tests (501–540)"
 522. Test numbering 501–540 is continuous with no gaps
-523. Round 21 test range matches heading: 501–540
+523. Round 22 test range matches heading: 501–540
 524. Global test numbering continuous 1–540
 525. Section 27 range now 27.1–27.21 continuous (no gaps)
-526. Gate text does NOT reference "Round 21" at top of doc
+526. Gate text does NOT reference "Round 22" at top of doc
 527. Issue #23 test total equals task-card N (540)
-528. Round 21 subsection numbering locally continuous within 501–540
-529. Issue #23 frozen SHA equals new docs commit for Round 21
-530. Acceptance Criteria required test matrix entries include Round 21 (501–540)
+528. Round 22 subsection numbering locally continuous within 501–540
+529. Issue #23 frozen SHA equals new docs commit for Round 22
+530. Acceptance Criteria required test matrix entries include Round 22 (501–540)
 531. Acceptance Criteria test total remains 1–540
-532. Test #505 confirms gate text reads "Round 22"
+532. Test #505 confirms gate text reads "Round 23"
 533. Test #506 confirms gate text exact wording
-534. Test #507 confirms Delivery Sequence step 1 reads "Round 22"
-535. Test #508 confirms Acceptance Criteria first item reads "Round 22"
+534. Test #507 confirms Delivery Sequence step 1 reads "Round 23"
+535. Test #508 confirms Acceptance Criteria first item reads "Round 23"
 536. TASK-010 in TASK_BACKLOG.md is BLOCKED
-537. No remaining "Round 20" references in body outside review history
-538. Review history does NOT pre-populate Round 22 comment ID or decision
-539. Section 27.21 test entries cover all Round 21 document changes
-540. All Markdown fences and normative tables parse successfully
+537. No remaining "Round 21" references in body outside review history
+538. Review history does NOT pre-populate Round 23 comment ID or decision
+539. Section 27.21 test entries cover all Round 22 document changes
+540. Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 22 Engineering Design Review.
+1. Complete Round 23 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -4784,7 +4902,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 22 Engineering Design Review passes before implementation starts
+- [ ] Round 23 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -4803,6 +4921,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 21 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 22 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
