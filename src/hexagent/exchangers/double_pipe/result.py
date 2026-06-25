@@ -2780,11 +2780,17 @@ def _verify_property_call_identity(
                 ):
                     return False
 
-        # (n) Successful Q_max with later phases requires diagnostics.
-        # If a Q_max phase completed successfully (all calls succeeded)
-        # and later bracket/solver/final phases exist, q_max_diagnostics
-        # must be non-None — regardless of final result status.
-        if has_solver_path and q_max_diagnostics is None:
+        # (n) Successful Q_max requires diagnostics.
+        # Production builds _qmax_diagnostics_snapshot() immediately
+        # after _compute_q_max(), before checking q_max <= 0 or
+        # entering the main solver.  Therefore any returned result
+        # containing a fully successful Q_max phase (all calls in
+        # Q_MAX_COUNTERFLOW, Q_MAX_PARALLEL_LIMITS, or
+        # Q_MAX_PARALLEL_PINCH evaluations succeeded) must carry
+        # non-null q_max_diagnostics — regardless of whether
+        # bracket/solver/final calls follow, and regardless of final
+        # result status.
+        if q_max_diagnostics is None:
             qmax_phases = {
                 EvaluationRole.Q_MAX_COUNTERFLOW.value,
                 EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,

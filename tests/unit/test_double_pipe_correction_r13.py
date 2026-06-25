@@ -2973,3 +2973,193 @@ class TestSuccessfulQmaxRequiresDiagnostics:
             q_max_diagnostics=None,
         )
         assert result is False, "parallel Q_max success without diag should be rejected"
+
+
+class TestTerminalQmaxRequiresDiagnostics:
+    """Successful Q_max without later solver phases must still carry diagnostics."""
+
+    def test_counterflow_terminal_qmax_no_diagnostics_rejected(self) -> None:
+        """Counterflow Q_max success without diagnostics, terminal → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+            q_max_diagnostics=None,
+        )
+        assert result is False, "terminal counterflow Q_max without diag should be rejected"
+
+    def test_parallel_terminal_qmax_no_diagnostics_rejected(self) -> None:
+        """Parallel Q_max success without diagnostics, terminal → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=4,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                call_idx=0,
+                query_type="PH",
+                stream_role="hot_solver",
+                stage="q_max",
+                trial_q_w=80000.0,
+            ),
+            _make_call(
+                seq_idx=5,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                call_idx=1,
+                query_type="PH",
+                stream_role="cold_solver",
+                stage="q_max",
+                trial_q_w=80000.0,
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.PARALLEL,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+            q_max_diagnostics=None,
+        )
+        assert result is False, "terminal parallel Q_max without diag should be rejected"
+
+
+class TestTrialAbortPreservesDiagnostics:
+    """TrialEvaluationAbort after successful Q_max must retain diagnostics."""
+
+    def test_trial_abort_preserves_qmax_diagnostics(
+        self,
+        provider: CoolPropProvider,
+    ) -> None:
+        """rate_double_pipe with solver abort after Q_max → BLOCKED + diagnostics."""
+        from hexagent.exchangers.double_pipe.rating import (
+            TrialEvaluation,
+            TrialEvaluationAbort,
+        )
+
+        abort_trial = TrialEvaluation(
+            q_w=50000.0,
+            residual_w=None,
+            feasible=False,
+            hot_outlet_state=None,
+            cold_outlet_state=None,
+            hot_bulk_state=None,
+            cold_bulk_state=None,
+            tube_flow_input=None,
+            annulus_flow_input=None,
+            tube_result=None,
+            annulus_result=None,
+            property_calls=(),
+            warnings=(),
+            blockers=(),
+        )
+
+        def _aborting_solve(*args, **kwargs):
+            raise TrialEvaluationAbort(abort_trial)
+
+        # Need to get rate_double_pipe from the module to support monkeypatch
+        from hexagent.exchangers.double_pipe import rating as rating_module
+
+        original_solve = rating_module.solve_rating
+        rating_module.solve_rating = _aborting_solve
+        try:
+            result = _run_rating(provider, flow_arrangement=FlowArrangement.COUNTERFLOW)
+        finally:
+            rating_module.solve_rating = original_solve
+
+        # Assertions
+        assert result.status == RatingStatus.BLOCKED, "abort should produce BLOCKED"
+        assert result.q_max_diagnostics is not None, "Q_max diagnostics must survive trial abort"
+        assert result.q_max_diagnostics.termination_reason == "independent_limits"
+        assert result.converged is False, "aborted trial sets converged=False"
+        assert result.solver_termination_reason == "blocked"
+        assert result.verify_hash() is True, "hash must be valid"
+        assert result.verify_provenance() is True, "provenance must be valid"
+
+        # JSON round-trip preserves diagnostics
+        js = result.model_dump_json(exclude_none=False, by_alias=True)
+        restored = RatingResult.model_validate_json(js)
+        assert restored.q_max_diagnostics is not None, "JSON round-trip lost diagnostics"
+        assert restored.q_max_diagnostics.termination_reason == "independent_limits"
+        assert restored.verify_hash() is True, "round-trip hash must be valid"
+
+        # Property-call trace contains Q_max phase
+        roles = {c.evaluation_role for c in result.property_calls}
+        assert EvaluationRole.Q_MAX_COUNTERFLOW.value in roles, (
+            "trace must contain Q_max evaluation"
+        )
