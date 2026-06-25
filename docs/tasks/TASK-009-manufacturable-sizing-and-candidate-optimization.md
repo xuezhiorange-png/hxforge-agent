@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 15 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 16 Engineering Design Review passes.
 
 ---
 
@@ -48,9 +48,9 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 12 | 4798693707 | CHANGES REQUIRED |
 | 13 | 4798895696 | CHANGES REQUIRED |
 | 14 | 4799066285 | CHANGES REQUIRED |
-| 15 | — | CHANGES REQUIRED — review delivered without GitHub comment |
+| 15 | 4799188706 | CHANGES REQUIRED |
 
----
+|---|
 
 ## 4. Data Model
 
@@ -843,8 +843,8 @@ invalid_evidence_digest = sha256_digest({
     "claimed_rating_status": ... | None,
     "claimed_result_hash": ... | None,
     "claimed_provenance_digest": ... | None,
-    "hash_verification_outcome": ...,
-    "provenance_verification_outcome": ...,
+    "hash_verification_outcome": hash_verification_outcome.value,
+    "provenance_verification_outcome": provenance_verification_outcome.value,
     "rating_request_identity_digest": ... | None,
     "claimed_provider_identity_digest": ... | None,
     "failure_reason": ...,
@@ -1029,15 +1029,15 @@ Top-level claimed fields (`claimed_rating_status`, `claimed_result_hash`, `claim
 claimed_audit_payload = {
     "source_qualified_candidate_id": ...,
     "evaluation_order_index": ...,
-    "claim_state": ...,
+    "claim_state": claim_state.value,
     "claimed_rating_status": ...,
     "claimed_result_hash": ...,
     "claimed_provenance_digest": ...,
     "claimed_request_identity_digest": ...,
     "claimed_execution_context_digest": ...,
     "claimed_provider_identity_digest": ...,
-    "hash_verification_outcome": ...,
-    "provenance_verification_outcome": ...,
+    "hash_verification_outcome": hash_verification_outcome.value,
+    "provenance_verification_outcome": provenance_verification_outcome.value,
     "safely_readable_field_digests": [...],
 }
 audit_digest = sha256_digest(claimed_audit_payload)
@@ -1364,42 +1364,74 @@ If `canonical_json()` fails (unsupported type, non-finite float, cyclic referenc
 
 ### 14.7.7 ContextCanonicalizationFailureSnapshot
 
-When `canonical_json()` fails for a trusted context value (unsupported type, non-finite float, cyclic reference, unserializable object) during `EngineeringMessage` or `RunFailure` construction, the system MUST build a primitive-only fallback `RunFailure` that itself cannot recursively fail.
+When trusted context canonicalization fails, a primitive-only `ContextCanonicalizationFailureSnapshot` is constructed.
 
-**Fallback RunFailure payload (primitive-only):**
+```text
+ContextCanonicalizationFailureSnapshot
+- failure_stage: FailureStage
+- owner_kind: MessageOwnerKind
+- owner_id: str
+- original_code_value: str
+- context_key: str
+- context_path: tuple[str, ...]
+- offending_type: str
+- failure_kind: str
+- safe_marker_digest: str
+```
+
+Exact safe marker payload:
 
 ```python
-RunFailure(
-    code="PROVENANCE_INCOMPLETE",
-    message=f"Unsupported context value in {owner_kind}:{owner_id}",
-    traceback=None,
-    context=(
-        ("failure_stage", stage),
-        ("owner_kind", owner_kind),
-        ("owner_id", owner_id),
-        ("original_code", original_code),
-        ("unsupported_type", type(unsupported_value).__name__),
-    ),
+safe_marker_payload = {
+    "context_key": context_key,
+    "context_path": list(context_path),
+    "offending_type":
+        f"{type(unsupported_value).__module__}."
+        f"{type(unsupported_value).__qualname__}",
+    "failure_kind": failure_kind,
+}
+safe_marker_digest = sha256_digest(safe_marker_payload)
+```
+
+`failure_kind` values: `unsupported_type`, `non_finite_float`, `cyclic_reference`, `canonicalization_exception`.
+
+Fallback RunFailure context:
+
+```python
+fallback_failure_context = (
+    ("failure_stage", failure_stage.value),
+    ("owner_kind", owner_kind.value),
+    ("owner_id", owner_id),
+    ("original_code", original_code.value),
+    ("context_key", context_key),
+    ("context_path_digest", sha256_digest({
+        "context_path": list(context_path),
+    })),
+    ("offending_type", offending_type),
+    ("failure_kind", failure_kind),
+    ("safe_marker_digest", safe_marker_digest),
 )
 ```
 
-The fallback `RunFailure` uses **only** primitive types (`str`, `None`, `tuple[tuple[str, str], ...]`). No nested objects, no non-finite floats, no cyclic references. This guarantees the fallback itself never triggers a recursive canonicalization failure.
+Prohibited in fallback: original value, original object, repr, exception object, traceback object, Enum object.
 
-**Stage mapping:**
+All-stage mapping (failure_stage depends on where canonicalization occurs):
 
-| Context owner | FailureStage |
-|---|---|
-| `EngineeringMessage` during candidate evidence construction | `RATING_VERIFICATION` |
-| `EngineeringMessage` during result/failure-result construction | `RESULT_CONSTRUCTION` |
-| `RunFailure` during candidate evidence construction | `RATING_VERIFICATION` |
-| `RunFailure` during result/failure-result construction | `RESULT_CONSTRUCTION` |
+| Pipeline Stage | Where context canonicalization can fail |
+|---------------|--------------------------------------|
+| REQUEST_VALIDATION | request message context |
+| CATALOG_VALIDATION | catalog message context |
+| CANDIDATE_MATERIALIZATION | diagnostic context |
+| PRE_RATING | evidence preparation context |
+| RATING_CALL | TASK-008 call message context |
+| RATING_VERIFICATION | rating evidence/message context |
+| OPTIMIZATION | optimizer message context |
+| RESULT_CONSTRUCTION | result/failure-result context |
 
-**Recursive failure prevention rules:**
-
-1. Fallback `RunFailure` payload uses only `str`, `None`, and `tuple[tuple[str, str], ...]` — all trivially canonicalizable.
-2. Fallback `RunFailure` does NOT contain its own `context` with nested objects or non-finite values.
-3. The `sha256_digest()` of the fallback `RunFailure` is computed directly from the flat primitive payload, bypassing `canonical_json()` on the original unsupported value.
-4. Under no circumstances does the fallback itself produce a second `PROVENANCE_INCOMPLETE` failure. If the payload somehow fails again (impossible by construction), the system must treat it as a fatal implementation error, not a recoverable fallback.
+Non-recursive proof:
+- `fallback_failure_context` domain = `tuple[tuple[str, str], ...]`
+- `canonical_json(fallback failure payload)` succeeds without reading `unsupported_value` again
+- If fallback construction itself fails, the fallback RunFailure is constructed without the context entry; the entry domain is guaranteed primitive by the construction contract above.
 
 ---
 
@@ -2014,7 +2046,7 @@ An invalid request BLOCKED result must still produce:
     "raw_request_digest": ...,
     "validated_sizing_request_identity_digest": ... | None,
     "catalog_snapshot_digests": [...],
-    "status": ...,
+    "status": status.value,
     "termination_reason": ...,
     "partial_audit": ...,
     "raw_combination_count": ...,
@@ -2352,16 +2384,22 @@ Edge labels are uniquely frozen:
 | RUNTIME_FAILURE → SIZING_RUN_FAILURE_RESULT | `"fails"` |
 | SIZING_RUN → SIZING_RESULT | `"produces"` |
 | SIZING_RUN → SIZING_RUN_FAILURE_RESULT | `"produces_failure_record"` |
-|| BLOCKER → SIZING_RESULT | `"blocks"` |
-|| BLOCKER → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
-|| WARNING → SIZING_RESULT | `"annotates"` |
-|| WARNING → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
-|| SIZING_RUN → WARNING | `"emits"` |
-|| CATALOG_SNAPSHOT → WARNING | `"emits"` |
-|| CANDIDATE → WARNING | `"emits"` |
-|| OPTIMIZER → WARNING | `"emits"` |
+| BLOCKER → SIZING_RESULT | `"blocks"` |
+| BLOCKER → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+| WARNING → SIZING_RESULT | `"annotates"` |
+| WARNING → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+| SIZING_RUN → WARNING | `"emits"` |
+| SIZING_RUN → BLOCKER | `"emits"` |
+| CATALOG_SNAPSHOT → WARNING | `"emits"` |
+| CATALOG_SNAPSHOT → BLOCKER | `"emits"` |
+| CANDIDATE → WARNING | `"emits"` |
+| CANDIDATE → BLOCKER | `"emits"` |
+| OPTIMIZER → WARNING | `"emits"` |
+| OPTIMIZER → BLOCKER | `"emits"` |
 
 No two edges share an ambiguous label with different semantics.
+
+> **NON-AUTHORITATIVE GENERATED SUMMARY — registry is the sole source of truth.**
 
 ### 22.2 UUID5 Namespace
 
@@ -2373,27 +2411,96 @@ TASK009_PROVENANCE_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 
 Each concept entry defines the exact node_type (ProvenanceNodeType enum value), label formula, UUID5 name formula, payload hash payload, required metadata fields, allowed incoming/outgoing edge node types, multiplicity source, and allowed/forbidden termination classes.
 
+```python
+from enum import StrEnum
+
+class ProvenanceConcept(StrEnum):
+    ROOT_CASE_REVISION = "root_case_revision"
+    ROOT_EXTERNAL = "root_external"
+    SIZING_RUN = "sizing_run"
+    SIZING_OPTIMIZER = "sizing_optimizer"
+    CATALOG_SNAPSHOT = "catalog_snapshot"
+    CANDIDATE = "candidate"
+    TASK008_RATING_RESULT = "task008_rating_result"
+    CLAIMED_TASK008_RATING_RESULT = "claimed_task008_rating_result"
+    SIZING_RESULT = "sizing_result"
+    SIZING_RUN_FAILURE_RESULT = "sizing_run_failure_result"
+    INVALID_EVIDENCE = "invalid_evidence"
+    RUNTIME_FAILURE = "runtime_failure"
+    WARNING = "warning"
+    BLOCKER = "blocker"
+
+
+class TerminationClass(StrEnum):
+    INVALID_REQUEST = "invalid_request"
+    INVALID_CATALOG = "invalid_catalog"
+    CATALOG_IDENTITY_MISMATCH = "catalog_identity_mismatch"
+    CAP_EXCEEDED = "cap_exceeded"
+    NO_MANUFACTURABLE_CANDIDATE = "no_manufacturable_candidate"
+    NO_FEASIBLE_CANDIDATE = "no_feasible_candidate"
+    SUCCEEDED = "succeeded"
+    PROPERTY_PROVIDER_IDENTITY_MISMATCH = "property_provider_identity_mismatch"
+    RATING_RESULT_INTEGRITY_FAILED = "rating_result_integrity_failed"
+    RUNTIME_FAILED_REQUEST_VALIDATION = "runtime_failed_request_validation"
+    RUNTIME_FAILED_CATALOG_VALIDATION = "runtime_failed_catalog_validation"
+    RUNTIME_FAILED_CANDIDATE_MATERIALIZATION = "runtime_failed_candidate_materialization"
+    RUNTIME_FAILED_PRE_RATING = "runtime_failed_pre_rating"
+    RUNTIME_FAILED_RATING_CALL = "runtime_failed_rating_call"
+    RUNTIME_FAILED_RATING_VERIFICATION = "runtime_failed_rating_verification"
+    RUNTIME_FAILED_OPTIMIZATION = "runtime_failed_optimization"
+    RUNTIME_FAILED_RESULT_CONSTRUCTION = "runtime_failed_result_construction"
+
+
+class SizingRunRequestKind(StrEnum):
+    VALIDATED = "validated"
+    RAW = "raw"
+
+
+ProvenanceIncomingRelation = tuple[str, ProvenanceConcept]  # (label, source_concept)
+ProvenanceOutgoingRelation = tuple[str, ProvenanceConcept]  # (label, target_concept)
+
+
+class ProvenanceConceptSpec(TypedDict, total=False):
+    concept: ProvenanceConcept
+    node_type: str
+    label_formula: str
+    uuid5_name_formula: str
+    payload_hash_payload: object
+    required_metadata_fields: tuple[str, ...]
+    allowed_incoming: tuple[ProvenanceIncomingRelation, ...]
+    allowed_outgoing: tuple[ProvenanceOutgoingRelation, ...]
+    multiplicity_source: str
+    allowed_termination_classes: tuple[TerminationClass, ...]
+    forbidden_termination_classes: tuple[TerminationClass, ...]
+```
+
 | Concept | node_type | label_formula | uuid5_name_formula | payload_hash_payload | required_metadata_fields | allowed_incoming | allowed_outgoing | multiplicity_source | allowed_termination_classes | forbidden_termination_classes |
 |---------|-----------|---------------|--------------------|----------------------|--------------------------|------------------|------------------|---------------------|------------------------------|-------------------------------|
-| ROOT_CASE_REVISION | CASE_REVISION | `f"revision_{design_case_revision_id}"` | `f"root-case-revision:{design_case_revision_id}"` | `{"design_case_revision_id": id}` | `design_case_revision_id` | — | SIZING_RUN | singleton (1 per graph) | all | INVALID_REQUEST |
-| ROOT_EXTERNAL | EXTERNAL | `"external_root"` | `f"root-external:{digest}"` where digest = `validated_sizing_request_identity_digest` if valid else `raw_request_digest` | `{"root_digest": digest}` | — | — | SIZING_RUN | singleton (1 per graph) | all | INVALID_REQUEST |
-| SIZING_RUN | CALCULATION_RUN | `f"sizing_run_{digest}"` | `f"sizing-run:{validated_sizing_request_identity_digest}"` | `{"validated_sizing_request_identity_digest": digest}` | `validated_sizing_request_identity_digest` | ROOT_CASE_REVISION, ROOT_EXTERNAL | CATALOG_SNAPSHOT, OPTIMIZER, SIZING_RESULT, SIZING_RUN_FAILURE_RESULT, WARNING, BLOCKER | 1 per graph | all | — |
-| SIZING_OPTIMIZER | OPTIMIZER | `"sizing_optimizer"` | `f"optimizer:{validated_sizing_request_identity_digest}"` | `{"validated_sizing_request_identity_digest": digest}` | `validated_sizing_request_identity_digest` | SIZING_RUN, TASK008_RATING_RESULT | SIZING_RESULT, SIZING_RUN_FAILURE_RESULT, WARNING, BLOCKER | 1 per graph | OPTIMIZATION, RESULT_CONSTRUCTION | INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING, RATING_CALL, RATING_VERIFICATION, PROVIDER_MISMATCH |
-| CATALOG_SNAPSHOT | INTERMEDIATE | `f"catalog_{catalog_id}"` | `f"catalog:{catalog_id}:{catalog_version}:{catalog_content_hash}"` | `{"catalog_id": id, "catalog_version": v, "catalog_content_hash": hash}` | `catalog_id`, `catalog_version`, `catalog_content_hash` | SIZING_RUN | CANDIDATE, WARNING, BLOCKER | catalog_count (>= 1) | all | — |
-| CANDIDATE | INTERMEDIATE | `f"candidate_{id}"` | `f"candidate:{source_qualified_candidate_id}"` | `{"source_qualified_candidate_id": id}` | `source_qualified_candidate_id` | CATALOG_SNAPSHOT | TASK008_RATING_RESULT, CLAIMED_TASK008_RATING_RESULT, INVALID_EVIDENCE, WARNING, BLOCKER | unique_candidate_count | all | — |
-| TASK008_RATING_RESULT | RESULT | `f"rating_{result_hash}"` | `f"rating-result:{rating_result_hash}"` | `{"rating_result_hash": hash}` | `rating_result_hash` | CANDIDATE | OPTIMIZER | verified_rating_count | RATING_CALL, RATING_VERIFICATION, PROVIDER_MISMATCH, OPTIMIZATION, RESULT_CONSTRUCTION | INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING |
-| CLAIMED_TASK008_RATING_RESULT | INTERMEDIATE | `f"claimed_rating_{candidate_id}"` | `f"claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{audit_digest}"` | `sha256_digest(claimed_audit_payload)` | `source_qualified_candidate_id`, `evaluation_order_index`, `audit_digest` | CANDIDATE | — | 0 (forbidden in OPTIMIZATION/RESULT_CONSTRUCTION); >= 1 in RATING_VERIFICATION | RATING_VERIFICATION | OPTIMIZATION, RESULT_CONSTRUCTION, INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING, RATING_CALL, PROVIDER_MISMATCH |
-| SIZING_RESULT | RESULT | `"sizing_result"` | `f"sizing-result:{result_hash}"` | `{"result_hash": hash}` | `result_hash` | OPTIMIZER, RUNTIME_FAILURE, BLOCKER, WARNING, SIZING_RUN | — | 1 per graph | OPTIMIZATION, RESULT_CONSTRUCTION | INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING, RATING_CALL, RATING_VERIFICATION, PROVIDER_MISMATCH |
-| SIZING_RUN_FAILURE_RESULT | RESULT | `"sizing_run_failure"` | `f"sizing-run-failure:{failure_result_hash}"` | `{"failure_result_hash": hash}` | `failure_result_hash`, `failure_stage` | OPTIMIZER, RUNTIME_FAILURE, BLOCKER, WARNING, SIZING_RUN | — | 1 per graph | RESULT_CONSTRUCTION | all others |
-| INVALID_EVIDENCE | INTERMEDIATE | `f"invalid_evidence_{candidate_id}"` | `f"invalid-evidence:{source_qualified_candidate_id}:{invalid_evidence_digest}"` | `{"invalid_evidence_digest": digest}` | `source_qualified_candidate_id`, `invalid_evidence_digest` | CANDIDATE | SIZING_RESULT, WARNING, BLOCKER | invalid_evidence_count | PROVIDER_MISMATCH, OPTIMIZATION, RESULT_CONSTRUCTION | INVALID_REQUEST, REQUEST_VALIDATION, CATALOG_VALIDATION, CANDIDATE_MATERIALIZATION, PRE_RATING, RATING_CALL, RATING_VERIFICATION |
-| RUNTIME_FAILURE | BLOCKER | `"runtime_failure"` | `f"runtime-failure:{failure_digest}"` | `{"failure_digest": digest}` | `failure_digest` | — | SIZING_RESULT, SIZING_RUN_FAILURE_RESULT | 0 or 1 | all | — |
-| WARNING | WARNING | per message (canonical message sort key) | `f"warning:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}"` | `sha256_digest(message_occurrence_payload)` | `owner_kind`, `owner_id`, `message_digest`, `occurrence_index` | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER | SIZING_RESULT, SIZING_RUN_FAILURE_RESULT | warning_occurrence_count (>= 0) | all | — |
-| BLOCKER | BLOCKER | per message (canonical message sort key) | `f"blocker:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}"` | `sha256_digest(message_occurrence_payload)` | `owner_kind`, `owner_id`, `message_digest`, `occurrence_index` | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER | SIZING_RESULT, SIZING_RUN_FAILURE_RESULT | blocker_occurrence_count (>= 0) | all | — |
+| ROOT_CASE_REVISION | CASE_REVISION | `f"revision_{design_case_revision_id}"` | `f"root-case-revision:{design_case_revision_id}"` | `{"design_case_revision_id": design_case_revision_id}` | `("design_case_revision_id",)` | () | (("initiates", "SIZING_RUN"),) | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST,) |
+| ROOT_EXTERNAL | EXTERNAL | `"external_root"` | `f"root-external:{request_digest}"` where `request_kind` is `SizingRunRequestKind.VALIDATED` if `validated_sizing_request_identity_digest` else `SizingRunRequestKind.RAW` and `request_digest` is the corresponding digest | `{"request_kind": request_kind.value, "request_digest": request_digest}` | () | () | (("initiates", "SIZING_RUN"),) | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST,) |
+| SIZING_RUN | CALCULATION_RUN | `f"sizing_run_{request_digest}"` | `f"sizing-run:{request_digest}"` where `request_kind` determines valid (`SizingRunRequestKind.VALIDATED`) or raw (`SizingRunRequestKind.RAW`) prefix | `{"request_kind": request_kind.value, "request_digest": request_digest}` | `("request_kind", "request_digest")` | (("initiates", "ROOT_CASE_REVISION"), ("initiates", "ROOT_EXTERNAL")) | (("consumes", "CATALOG_SNAPSHOT"), ("executes", "SIZING_OPTIMIZER"), ("produces", "SIZING_RESULT"), ("produces_failure_record", "SIZING_RUN_FAILURE_RESULT"), ("emits", "WARNING"), ("emits", "BLOCKER")) | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
+| SIZING_OPTIMIZER | OPTIMIZER | `"sizing_optimizer"` | `f"optimizer:{request_digest}"` | `{"request_kind": request_kind.value, "request_digest": request_digest}` | `("request_kind", "request_digest")` | (("executes", "SIZING_RUN"), ("evaluated_by", "TASK008_RATING_RESULT")) | (("produces", "SIZING_RESULT"), ("precedes_failure", "SIZING_RUN_FAILURE_RESULT"), ("emits", "WARNING"), ("emits", "BLOCKER")) | 1 | (TerminationClass.OPTIMIZATION, TerminationClass.RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH) |
+| CATALOG_SNAPSHOT | INTERMEDIATE | `f"catalog_{catalog_id}"` | `f"catalog:{catalog_id}:{catalog_version}:{catalog_content_hash}"` | `{"catalog_id": catalog_id, "catalog_version": catalog_version, "catalog_content_hash": catalog_content_hash, "source_identity": source_identity, "schema_version": schema_version}` | `("catalog_id", "catalog_version", "catalog_content_hash", "source_identity", "schema_version")` | (("consumes", "SIZING_RUN"),) | (("generates", "CANDIDATE"), ("emits", "WARNING"), ("emits", "BLOCKER")) | catalog_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
+| CANDIDATE | INTERMEDIATE | `f"candidate_{source_qualified_candidate_id}"` | `f"candidate:{source_qualified_candidate_id}"` | `{"source_qualified_candidate_identity_digest": source_qualified_candidate_identity_digest}` | `("source_qualified_candidate_id",)` | (("generates", "CATALOG_SNAPSHOT"),) | (("rated_as", "TASK008_RATING_RESULT"), ("rated_as_claimed", "CLAIMED_TASK008_RATING_RESULT"), ("produced_unverified", "INVALID_EVIDENCE"), ("emits", "WARNING"), ("emits", "BLOCKER")) | unique_candidate_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
+| TASK008_RATING_RESULT | RESULT | `f"rating_{rating_result_hash}"` | `f"rating-result:{rating_result_hash}"` | `{"candidate_id": candidate_id, "rating_result_hash": rating_result_hash, "rating_provenance_digest": rating_provenance_digest}` | `("candidate_id", "rating_result_hash", "rating_provenance_digest")` | (("rated_as", "CANDIDATE"),) | (("evaluated_by", "SIZING_OPTIMIZER"),) | verified_rating_count | (TerminationClass.RATING_CALL, TerminationClass.RATING_VERIFICATION, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.OPTIMIZATION, TerminationClass.RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING) |
+| CLAIMED_TASK008_RATING_RESULT | INTERMEDIATE | `f"claimed_rating_{candidate_id}"` | `f"claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{audit_digest}"` | `claimed_audit_payload` | `("source_qualified_candidate_id", "evaluation_order_index", "audit_digest")` | (("rated_as_claimed", "CANDIDATE"),) | () | 0 (forbidden in OPTIMIZATION/RESULT_CONSTRUCTION); >= 1 in RATING_VERIFICATION | (TerminationClass.RATING_VERIFICATION,) | (TerminationClass.OPTIMIZATION, TerminationClass.RESULT_CONSTRUCTION, TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH) |
+| SIZING_RESULT | RESULT | `"sizing_result"` | `f"sizing-result:{result_hash}"` | `{"result_hash": result_hash, "result_identity_digest": result_identity_digest}` | `("result_hash", "result_identity_digest")` | (("produces", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("blocks", "BLOCKER"), ("annotates", "WARNING"), ("produces", "SIZING_RUN")) | () | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION) | (TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION,) |
+| SIZING_RUN_FAILURE_RESULT | RESULT | `"sizing_run_failure"` | `f"sizing-run-failure:{failure_result_hash}"` | `{"failure_result_hash": failure_result_hash, "failure_stage": failure_stage}` | `("failure_result_hash", "failure_stage")` | (("precedes_failure", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("annotates_failure", "BLOCKER"), ("annotates_failure", "WARNING"), ("produces_failure_record", "SIZING_RUN")) | () | 1 | (TerminationClass.RESULT_CONSTRUCTION,) | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) |
+| INVALID_EVIDENCE | INTERMEDIATE | `f"invalid_evidence_{source_qualified_candidate_id}"` | `f"invalid-evidence:{source_qualified_candidate_id}:{invalid_evidence_digest}"` | `invalid_evidence_payload` | `("source_qualified_candidate_id", "invalid_evidence_digest")` | (("produced_unverified", "CANDIDATE"),) | (("invalidates", "SIZING_RESULT"), ("emits", "WARNING"), ("emits", "BLOCKER")) | invalid_evidence_count | (TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.OPTIMIZATION, TerminationClass.RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION) |
+| RUNTIME_FAILURE | BLOCKER | `"runtime_failure"` | `f"runtime-failure:{failure_digest}"` | `{"failure_digest": failure_digest}` | `("failure_digest",)` | () | (("fails", "SIZING_RESULT"), ("fails", "SIZING_RUN_FAILURE_RESULT")) | 1 if runtime_failure_occurred else 0 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
+| WARNING | WARNING | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("annotates", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) | warning_occurrence_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
+| BLOCKER | BLOCKER | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("blocks", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) | blocker_occurrence_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
 
-### 22.3A MessageOwnerKind and MessageOccurrenceSnapshot
+### 22.3A MessageOccurrenceKind, MessageOwnerKind, and MessageOccurrenceSnapshot
 
 ```python
-class MessageOwnerKind(enum.Enum):
+class MessageOccurrenceKind(StrEnum):
+    WARNING = "warning"
+    BLOCKER = "blocker"
+```
+
+```python
+class MessageOwnerKind(StrEnum):
     SIZING_RUN = "sizing_run"
     CATALOG_SNAPSHOT = "catalog_snapshot"
     CANDIDATE = "candidate"
@@ -2406,15 +2513,23 @@ class MessageOwnerKind(enum.Enum):
 MessageOccurrenceSnapshot
 - owner_kind: MessageOwnerKind
 - owner_id: str
+- occurrence_kind: MessageOccurrenceKind
 - message_digest: str
 - occurrence_index: int
 - occurrence_digest: str       (sha256 of the complete occurrence payload)
 ```
 
+The full `message: EngineeringMessage` field is NOT retained in the snapshot. Only the digest link (`message_digest`) survives into the occurrence record.
+
+**Invariant:**
+- Warning occurrence → `occurrence_kind == MessageOccurrenceKind.WARNING` and `message_digest` is in the canonical warnings collection (the owner's deduplicated warning message digests).
+- Blocker occurrence → `occurrence_kind == MessageOccurrenceKind.BLOCKER` and `message_digest` is in the canonical blockers collection (the owner's deduplicated blocker message digests).
+
 **Exact occurrence payload:**
 
 ```python
 message_occurrence_payload = {
+    "occurrence_kind": occurrence_kind.value,
     "owner_kind": owner_kind.value,
     "owner_id": owner_id,
     "message_digest": message_digest,
@@ -2428,14 +2543,13 @@ occurrence_digest = sha256_digest(message_occurrence_payload)
 1. Within the same owner, messages are sorted by canonical message sort key (§8).
 2. For identical `message_digest` values within the same owner, `occurrence_index` is assigned from 0 consecutively.
 3. `occurrence_index` is independent of insertion order — it is purely a function of the canonical sort.
-4. UUID5 formula uses all four fields to guarantee distinctness across owners and occurrences.
+4. UUID5 formula uses all fields to guarantee distinctness across owners and occurrences.
 5. `occurrence_digest` covers all fields — any tampering with a snapshot field produces a different digest.
 
 **Provenance node UUID5 for WARNING/BLOCKER:**
 
 ```python
-uuid5_name = f"{node_kind}:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}"
-# where node_kind is "warning" or "blocker"
+uuid5_name = f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"
 node_uuid = uuid5(TASK009_PROVENANCE_NAMESPACE, uuid5_name)
 ```
 
@@ -2483,12 +2597,36 @@ invalid-evidence:{source_qualified_candidate_id}:{invalid_evidence_digest}
 optimizer:{validated_sizing_request_identity_digest}
 sizing-result:{result_hash}
 sizing-run-failure:{failure_result_hash}
-warning:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}
-blocker:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}
+{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}
 runtime-failure:{failure_digest}
 root-case-revision:{design_case_revision_id}
 root-external:{raw_request_digest if invalid request else validated_sizing_request_identity_digest}
 ```
+
+### 22.3B Message Owner Assignment
+
+Each `MessageOccurrenceSnapshot` has exactly one owner, determined by precedence rules.
+
+**Owner kinds and identity formulas:**
+
+1. **Candidate-owned:** `owner_kind = MessageOwnerKind.CANDIDATE`, `owner_id = source_qualified_candidate_id`
+
+2. **Catalog-owned:** `owner_kind = MessageOwnerKind.CATALOG_SNAPSHOT`, `owner_id = f"{catalog_id}:{catalog_version}:{catalog_content_hash}"`
+
+3. **Optimizer-owned:** `owner_kind = MessageOwnerKind.OPTIMIZER`, `owner_id = validated_sizing_request_identity_digest`
+
+4. **Sizing-run-owned:** `owner_kind = MessageOwnerKind.SIZING_RUN`, `owner_id = validated_sizing_request_identity_digest` (valid request) or `raw_request_digest` (invalid request)
+
+**Precedence (lower number = higher priority, first match wins):**
+
+| Precedence | Owner Kind | Condition |
+|------------|-----------|-----------|
+| 1 (highest) | CANDIDATE | Message generated during candidate evaluation |
+| 2 | CATALOG_SNAPSHOT | Message generated during catalog validation / candidate materialization |
+| 3 | OPTIMIZER | Message generated during optimization |
+| 4 (lowest) | SIZING_RUN | All other messages (request validation, result construction) |
+
+**Invariant:** Each message occurrence has exactly one owner. No occurrence belongs to multiple owners. Owner assignment is frozen at snapshot construction time and cannot be reassigned.
 
 ### 22.4 Termination-Class Topologies
 
@@ -2954,6 +3092,34 @@ attempted_rating_count == evaluated_candidate_count == verified_rating_count == 
 CLAIMED_TASK008_RATING_RESULT count: 0 (precondition for entering optimization/result construction)
 ```
 
+Base edge count: 9 (excluding occurrence edges).
+
+Occurrence expansion (applied to all warning/blocker-producing topologies):
+
+```text
+for each warning occurrence:
+  add WARNING node
+  add OWNER -> WARNING "emits"
+  add WARNING -> RESULT "annotates"
+  or WARNING -> FAILURE_RESULT "annotates_failure"
+
+for each blocker occurrence:
+  add BLOCKER node
+  add OWNER -> BLOCKER "emits"
+  add BLOCKER -> RESULT "blocks"
+  or BLOCKER -> FAILURE_RESULT "annotates_failure"
+```
+
+Final edge count for RESULT_CONSTRUCTION:
+
+```text
+final_edge_count = 9 + 2 * warning_occurrence_count + 2 * blocker_occurrence_count
+```
+
+If an owner concept node does not exist in a termination topology, that owner kind is forbidden in that topology.
+
+Failure core graph and final graph reference the same expansion formula.
+
 **JSON:** `SizingRunFailureResult` must be JSON round-trippable with all fields, digests, and provenance.
 
 ### 22.5 Failure-Result Two-Stage Provenance Construction
@@ -3148,8 +3314,7 @@ This ensures insertion-order independence for all identity digests and provenanc
 Provenance UUID5 names for warnings and blockers include context digest to prevent node collision when the same code and message have different context:
 
 ```text
-warning:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}
-blocker:{owner_kind}:{owner_id}:{message_digest}:{occurrence_index}
+{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}
 ```
 
 ---
@@ -3547,7 +3712,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 291. Round 10 subsection numbering is locally continuous within 245–295
 292. Section heading test: all `## N.` extracted as int list equals `range(1, 30)`
 293. Section heading test: no duplicates, no gaps
-294. Test matrix section range 27.1–27.18 continuous
+294. Test matrix section range 27.1–27.19 continuous
 295. Round 10 subsection heading range is 245–295
 
 ### 27.15 Round 11 Contract Tests (296–332)
@@ -3573,7 +3738,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 314. Pipeline order: evidence constructed before provider comparison (not provider→evidence)
 315. No `N=244` anywhere in document
 316. Top-level headings continuous 1–29
-317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.7, 27.1–27.18)
+317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.7, 27.1–27.19)
 318. No duplicate `19A.5` heading
 319. No `## 14.8` heading (is `### 14.7`)
 320. Issue #23 lists Round 9/10/11 review entries
@@ -3667,9 +3832,9 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 402. Unsupported trusted context value follows frozen fail-closed path (RUNTIME_FAILED + PROVENANCE_INCOMPLETE)
 403. Non-finite float in trusted context follows frozen fail-closed path
 404. Failure provenance reconstruction requires full audit objects (digest-only reconstruction fails)
-405. Round 13 Comment ID `4798895696`, Issue frozen SHA matches new commit, global numbering continuous 1–430
+405. Round 13 Comment ID `4798895696`, Issue frozen SHA matches Round 13 commit, global numbering continuous 1–405
 
-### 27.18 Round 15 Contract Tests (406–430)
+### 27.18 Round 14 Contract Tests (406–430)
 
 406. Actual executable registry contains exactly 14 concept entries
 407. Every registry entry has node type and label formula
@@ -3697,11 +3862,44 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 429. Every exact enum payload uses `.value` or explicitly notes already-primitive TASK-008 fields
 430. Round 14 Comment ID `4799066285`; Issue frozen SHA matches new commit; global tests continuous 1–430
 
+### 27.19 Round 15 Contract Tests (431–460)
+
+431. Round 15 history uses Comment ID `4799188706`; no pre-populated future review row
+432. Registry has exactly 14 typed ProvenanceConceptSpec entries
+433. Registry allowed incoming relations include exact source + relation label
+434. Registry allowed outgoing relations include exact relation label + target concept
+435. Registry required metadata fields are ordered tuples
+436. Registry payload constructors use no undefined aliases (`id`, `v`, `hash`, `digest`)
+437. Registry uses no `all`, `all others`, or ambiguous dash termination sets
+438. Registry multiplicity formulas reference frozen counters
+439. Valid SIZING_RUN UUID/payload uses `request_kind`/`request_digest`
+440. Raw invalid-request SIZING_RUN UUID/payload uses `request_kind`=RAW
+441. ROOT_EXTERNAL permits invalid request and uses tagged request payload with `request_kind`
+442. SIZING_RESULT termination set matches every standard-result topology (17 classes)
+443. MessageOccurrenceSnapshot exact schema includes `occurrence_kind`
+444. UUID uses `occurrence_kind.value` and `owner_kind.value` (not hardcoded prefix)
+445. Standard result authoritative schema stores warning occurrences and digests
+446. Standard result authoritative schema stores blocker occurrences and digests
+447. Failure result authoritative schema stores warning occurrences and digests
+448. Failure result authoritative schema stores blocker occurrences and digests
+449. Occurrence collections have exact canonical sort keys
+450. Candidate/catalog/optimizer/run owner assignment exact per P0-7
+451. Every warning occurrence has exactly one incoming `emits` edge
+452. Every blocker occurrence has exactly one incoming `emits` edge
+453. Edge summary contains all 8 owner-to-message `emits` relations and valid Markdown
+454. Base topology + occurrence expansion reconstructs exact graph
+455. RESULT_CONSTRUCTION final edge count formula uses `9 + 2*W + 2*B`
+456. Primitive fallback covers all 8 FailureStage values
+457. Primitive fallback uses qualified type, context path digest, failure kind, safe marker digest
+458. Every named exact payload serializes Enums using `.value`
+459. Issue contains only 26-field verified evidence contract (no 24-field)
+460. Round 15 Comment ID `4799188706`; frozen SHA matches new commit; global numbering continuous 1–460
+
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 15 Engineering Design Review.
+1. Complete Round 16 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -3715,7 +3913,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 15 Engineering Design Review passes before implementation starts
+- [ ] Round 16 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -3734,6 +3932,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–430 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), and Round 14 (406–430)
+- [ ] Required test matrix entries 1–460 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), and Round 15 (431–460)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
