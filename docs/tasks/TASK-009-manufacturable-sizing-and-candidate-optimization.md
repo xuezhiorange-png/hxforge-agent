@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 9 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 10 Engineering Design Review passes.
 
 ---
 
@@ -41,7 +41,8 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 5 | 4797451288 | CHANGES REQUIRED |
 | 6 | 4797612208 | CHANGES REQUIRED |
 | 7 | 4797806616 | CHANGES REQUIRED |
-| 8 | PENDING | CHANGES REQUIRED |
+| 8 | — | CHANGES REQUIRED — review delivered without GitHub comment |
+| 9 | 4798128591 | CHANGES REQUIRED |
 
 ---
 
@@ -500,6 +501,30 @@ request_id = uuid5(TASK009_CONTEXT_NAMESPACE, name)
 
 No random UUIDs. No synthetic domain identities for missing design-case or run IDs.
 
+### 7.8 ExecutionContextSnapshot
+
+TASK-008 `RatingResult` preserves the exact `ExecutionContextSnapshot`:
+
+```text
+request_id: UUID | None
+design_case_revision_id: UUID | None
+calculation_run_id: UUID | None
+```
+
+TASK-009 verified evidence digest:
+
+```python
+rating_execution_context_digest = sha256_digest({
+    "request_id": str(request_id) if request_id is not None else None,
+    "design_case_revision_id": str(design_case_revision_id)
+        if design_case_revision_id is not None else None,
+    "calculation_run_id": str(calculation_run_id)
+        if calculation_run_id is not None else None,
+})
+```
+
+All three fields enter the verified evidence digest and JSON round-trip.
+
 ---
 
 ## 8. SizingRequestIdentity
@@ -697,7 +722,7 @@ class CandidateEvaluationState(StrEnum):
 Constructed only when `verify_hash() and verify_provenance() is True`.
 
 ```text
-rating_status: str
+rating_status: RatingStatus
 heat_duty_w: float | None
 hot_outlet_temperature_k: float | None
 cold_outlet_temperature_k: float | None
@@ -719,10 +744,12 @@ tube_correlation: SelectedCorrelationSnapshot | None
 annulus_correlation: SelectedCorrelationSnapshot | None
 rating_result_hash: str
 rating_provenance_digest: str
-rating_verify_hash_result: bool
-rating_verify_provenance_result: bool
+hash_verification_outcome: VerificationOutcome
+provenance_verification_outcome: VerificationOutcome
+rating_request_identity: RatingRequestIdentity
 rating_request_identity_digest: str
-rating_execution_context_identity: str
+rating_execution_context: ExecutionContextSnapshot
+rating_execution_context_digest: str
 ```
 
 `SelectedCorrelationSnapshot` (TASK-008 exact type):
@@ -740,22 +767,47 @@ nusselt_basis: str
 is_adaptation: bool
 adaptation_limitation: str
 ```
-
 ### 14.3 InvalidRatingEvidenceRecord
 
 ```text
-candidate_id: str
-claimed_rating_status: str | None
-claimed_result_hash: str | None
-claimed_provenance_digest: str | None
-verify_hash_result: bool
-verify_provenance_result: bool
-rating_request_identity_digest: str | None
-claimed_provider_identity: ProviderIdentitySnapshot | None
-failure_reason: str
+class VerificationOutcome(StrEnum):
+    NOT_RUN = "not_run"
+    PASSED = "passed"
+    FAILED = "failed"
+    ERROR = "error"
+```
+
+```text
+InvalidRatingEvidenceRecord
+- candidate_id: str
+- claimed_rating_status: str | None
+- claimed_result_hash: str | None
+- claimed_provenance_digest: str | None
+- hash_verification_outcome: VerificationOutcome
+- provenance_verification_outcome: VerificationOutcome
+- rating_request_identity_digest: str | None
+- claimed_provider_identity: ProviderIdentitySnapshot | None
+- failure_reason: str
 ```
 
 Fields allowed to be None because a damaged or incomplete RatingResult may not provide all values. `claimed_provider_identity` is read from the unverified result's provider snapshot when safely readable; `None` when the field is damaged or unreadable.
+
+`VerificationOutcome` replaces the old `verify_hash_result: bool` and `verify_provenance_result: bool`:
+
+| Scenario | hash_verification_outcome | provenance_verification_outcome |
+|----------|--------------------------|--------------------------------|
+| verify_hash returns False | FAILED | NOT_RUN |
+| verify_hash raises exception | ERROR | NOT_RUN |
+| verify_hash PASSED, verify_provenance returns False | PASSED | FAILED |
+| verify_hash PASSED, verify_provenance raises exception | PASSED | ERROR |
+| Both PASSED | PASSED | PASSED |
+
+| Scenario | CandidateEvaluationState | failure_stage |
+|----------|-------------------------|---------------|
+| hash FAILED or provenance FAILED | INTEGRITY_INVALID | None (blocked) |
+| hash ERROR or provenance ERROR | RUNTIME_FAILED | RATING_VERIFICATION |
+
+Error-path (hash or provenance raises exception) uses `RunFailure` and must NOT construct a trusted invalid evidence record. If a claimed audit record is desired, use a separate `CLAIMED_TASK008_RATING_RESULT` node, not the verified `InvalidRatingEvidenceRecord` digest path.
 
 **Rules:**
 1. `claimed_provider_identity` is **audit-only**.
@@ -776,8 +828,8 @@ invalid_evidence_digest = sha256_digest({
     "claimed_rating_status": ... | None,
     "claimed_result_hash": ... | None,
     "claimed_provenance_digest": ... | None,
-    "verify_hash_result": ...,
-    "verify_provenance_result": ...,
+    "hash_verification_outcome": ...,
+    "provenance_verification_outcome": ...,
     "rating_request_identity_digest": ... | None,
     "claimed_provider_identity_digest": ... | None,
     "failure_reason": ...,
@@ -792,16 +844,28 @@ invalid_evidence_digest = sha256_digest({
 
 ### 14.5 Integrity-Failure Policy
 
-Candidates evaluated in canonical order (§6.4). If any candidate's `verify_hash()` or `verify_provenance()` returns `False`:
+Candidates evaluated in canonical order (§6.4, §18.1.5 strict pipeline). Each candidate's verification outcomes drive the next state:
 
-1. Record `InvalidRatingEvidenceRecord`
-2. This candidate counted in `evaluated_candidate_count`
+**hash_verification_outcome == FAILED or provenance_verification_outcome == FAILED:**
+
+1. Record `InvalidRatingEvidenceRecord` with the exact `VerificationOutcome` values
+2. This candidate: `CandidateEvaluationState = INTEGRITY_INVALID`, counted in `evaluated_candidate_count`
 3. **Stop immediately** — remaining candidates unevaluated
 4. `status = BLOCKED`, `termination = "rating_result_integrity_failed"`
 5. `selected_candidate = None`, `top_candidates = ()`, `partial_audit = True`
 6. Evaluate `remaining_unevaluated_candidate_count = unique - evaluated`
 
-If `verify_hash()` or `verify_provenance()` raises an exception → `FAILED`.
+**hash_verification_outcome == ERROR or provenance_verification_outcome == ERROR:**
+
+1. `CandidateEvaluationState = RUNTIME_FAILED`
+2. `failure_stage = RATING_VERIFICATION`
+3. This candidate counted in `evaluated_candidate_count`
+4. **Stop immediately** — remaining candidates unevaluated
+5. `status = FAILED`, `failure = RunFailure`
+6. `selected_candidate = None`, `top_candidates = ()`, `partial_audit = True`
+7. Evaluate `remaining_unevaluated_candidate_count = unique - evaluated`
+
+The error path does NOT construct a trusted `InvalidRatingEvidenceRecord` (the verification process failed, not the integrity check). If a claimed audit record is needed, use `CLAIMED_TASK008_RATING_RESULT` (§23.4 RATING_VERIFICATION).
 
 ---
 
@@ -961,54 +1025,131 @@ Raw canonicalization never raises an exception for unsupported input structure. 
 | `list` | ordered JSON array |
 | `dict` | string-key-sorted JSON object |
 
-**Non-string mapping keys:** `dict` keys that are not `str` produce a deterministic ordered entry list that preserves all entries, value associations, and insertion-order independence:
+**Non-string mapping keys:** `dict` keys that are not `str` produce a deterministic ordered entry list with type-sensitive key representation. Each entry independently preserves its key-value association.
+
+The canonicalizer distinguishes several key types defined by `CanonicalRawKey`:
+
+```text
+CanonicalRawKey =
+    CanonicalStringKey
+  | CanonicalBoolKey
+  | CanonicalIntKey
+  | CanonicalFiniteFloatKey
+  | CanonicalNonFiniteFloatKey
+  | CanonicalUUIDKey
+  | CanonicalEnumKey
+  | CanonicalOpaqueKey
+```
+
+**String key:**
+
+```python
+{"key_kind": "string", "value": original_string}
+```
+
+**Bool key (checked before int to avoid Python bool-is-int overlap):**
+
+```python
+{"key_kind": "bool", "value": true | false}
+```
+
+**Int key:**
+
+```python
+{"key_kind": "int", "value": str(integer_value)}
+```
+
+**Finite float key:**
+
+```python
+{"key_kind": "finite_float", "value": canonical_json(float_value)}
+```
+
+**Non-finite float key:**
+
+```python
+{"key_kind": "non_finite_float", "value": "nan" | "+infinity" | "-infinity"}
+```
+
+**UUID key:**
+
+```python
+{"key_kind": "uuid", "value": canonical_lowercase_uuid_string}
+```
+
+**Enum key:**
+
+```python
+{"key_kind": "enum", "enum_type": "<module>.<qualname>", "value": canonicalize_raw_input(enum.value)}
+```
+
+**Opaque unsupported object key** (not readable or serializable):
+
+```python
+{"key_kind": "opaque_unsupported", "key_type": "<module>.<qualname>"}
+```
+
+Rules for opaque keys:
+- No `repr()`, no object attributes, no memory address, no process-local identity.
+- Do not claim injective/discriminative representation for opaque objects of the same type.
+- Each opaque key generates a `UNSUPPORTED_RAW_MAPPING_KEY` or frozen equivalent validation error.
+- Entry count and value are preserved; the representation is deterministic but NOT reversible.
+
+**$mapping_entries schema:**
+
+Each entry carries canonical key payload, key digest, value, and value digest:
 
 ```text
 {
   "$mapping_entries": [
     {
-      "key_kind": "string",
-      "key": "valid_key_name",
-      "value": <canonical value>
-    },
-    {
-      "key_kind": "invalid",
-      "key_type": "<module>.<qualname>",
-      "key_marker_digest": "sha256:<64hex>",
-      "value": <canonical value>
+      "key": <CanonicalRawKey>,
+      "key_payload_digest": "sha256:<64hex>",
+      "value": <CanonicalRawValue>,
+      "value_digest": "sha256:<64hex>"
     }
   ]
 }
 ```
 
-Rules:
-- Every original mapping entry is independently preserved — nothing collapsed or discarded.
-- String-key entries use `key_kind: "string"` with the original key.
-- Non-string-key entries use `key_kind: "invalid"` with the key's type metadata as `key_type` and a fixed digest of the safe key marker as `key_marker_digest`.
-- The `value` is recursively canonicalized for all entries.
-- Must not silently convert via `str(key)` (key collision risk).
-- Must not call arbitrary `repr()`.
-- Must not raise `RawInputCanonicalizationError` (would lose snapshot).
-- A `SizingValidationErrorSnapshot` with code `NON_STRING_KEY` is added to `validation_errors` per invalid entry.
-- Validation error field path uses the frozen canonical entry index.
-
-**$mapping_entries sort order:**
-
-```text
-string entry:   (0, UTF-8/ASCII key)
-invalid entry:  (1, key_type, key_marker_digest, canonical_value_digest)
-```
-
-This ensures same input with different insertion order produces identical canonical output.
-
-**Safe key marker payload:**
+Where:
 
 ```python
-{
-    "key_type": "<module>.<qualname>"
-}
-sha256_digest(marker) → key_marker_digest
+key_payload_digest = sha256_digest(key_payload)    # full CanonicalRawKey dict
+value_digest = sha256_digest({"value": canonical_value})
 ```
+
+**Sort order (immutable rank, then digest-based tiebreak):**
+
+```text
+string           key_kind_rank = 0  sort: (0, key_payload_digest, value_digest)
+bool             key_kind_rank = 1  sort: (1, key_payload_digest, value_digest)
+int              key_kind_rank = 2  sort: (2, key_payload_digest, value_digest)
+finite_float     key_kind_rank = 3  sort: (3, key_payload_digest, value_digest)
+non_finite_float key_kind_rank = 4  sort: (4, key_payload_digest, value_digest)
+uuid             key_kind_rank = 5  sort: (5, key_payload_digest, value_digest)
+enum             key_kind_rank = 6  sort: (6, key_payload_digest, value_digest)
+opaque_unsupported key_kind_rank = 7  sort: (7, key_payload_digest, value_digest)
+```
+
+This ensures same input with different insertion order produces identical canonical output. Duplicate canonical entries (same key_payload_digest + value_digest) are retained in the list — duplicate count enters the snapshot.
+
+**Validation error field path for mapping entries:**
+
+```text
+("$mapping_entries", key_payload_digest [, str(occurrence_index)])
+```
+
+Where `occurrence_index` is a 0-based consecutive count within identical (key_payload_digest, value_digest) groups after sorting. This avoids the pre-sort entry-index circular dependency.
+
+Rules:
+- Every original mapping entry is independently preserved — nothing collapsed or discarded.
+- Must not silently convert via `str(key)` (key collision risk).
+- Must not call arbitrary `repr()`.
+- Must not raise any exception (would lose snapshot).
+- A `SizingValidationErrorSnapshot` with code `NON_STRING_KEY` is added per non-string-key entry.
+- A `SizingValidationErrorSnapshot` with code `UNSUPPORTED_RAW_MAPPING_KEY` is added per opaque-key entry.
+- Validation error field path uses the frozen `(key_payload_digest, occurrence_index)` after sorting — no pre-sort dependence.
 
 **Unsupported arbitrary objects:** Represent safely using type metadata only:
 
@@ -1024,25 +1165,19 @@ Rules:
 - A `SizingValidationErrorSnapshot` with code `UNSUPPORTED_RAW_INPUT_TYPE` is added to `validation_errors`.
 - Unsupported objects never enter valid `SizingRequestIdentity`.
 
-**Cyclic reference detection:** Use object-id recursion stack. Always use the single deterministic marker:
+**Cyclic reference detection:** Use object-id recursion stack. Always use the single deterministic, index-independent marker:
 
 ```text
-{"$cyclic_reference": "<first-seen-canonical-path>"}
+{"$cyclic_reference": {"ancestor_distance": <positive integer>}}
 ```
 
-The canonical path syntax:
-
-```text
-$                    — root value
-$.field              — dict key "field"
-$.field[0]           — list/tuple index 0
-$.field["key"]       — dict key with special characters
-```
+Where `ancestor_distance` is the number of frames between the current recursion-stack frame and the frame where the same container was first entered. The first entry into a container records its object identity; re-encountering the same identity computes `distance = stack_depth - first_seen_depth`.
 
 Rules:
-- Dict keys canonicalized as UTF-8 ASCII-sorted strings before traversal.
-- First-seen path recorded at first entry into each container.
-- Repeated runs on the same input produce identical paths.
+- The marker is independent of final mapping entry index, insertion order, and value digest.
+- No path-based syntax (`$`, `$.field`, `$[index]`) — avoids circular dependency between path computation and entry sorting.
+- All container types (tuple, list, dict, mapping-entry list) use the same marker.
+- Repeated runs on the same input produce identical `ancestor_distance` values.
 - No alternate path expression, no exception, no blocker fallback.
 
 #### 18.1.2 Invalid request construction order
@@ -1119,6 +1254,29 @@ Validation error sort key (single frozen form, no Python raw-tuple comparison of
 ```text
 (code, field_path, message, rejected_value_digest or "", context_digest)
 ```
+
+### 18.1.5 Strict Per-Candidate Evaluation Pipeline
+
+Each candidate evaluation follows a frozen sequential order within a single sizing run:
+
+```text
+1. attempted_rating_count += 1
+2. Call rate_double_pipe()
+3. Normal return → completed_rating_count += 1
+4. Call verify_hash()
+5. Hash PASSED → call verify_provenance()
+6. Both PASSED → verified_rating_count += 1
+7. Compare expected vs actual provider identity
+8. Build VerifiedRatingEvidenceSnapshot
+9. Build CandidateEvaluation
+10. Advance to next candidate (§6.4 canonical order)
+```
+
+Rules:
+- All candidates are evaluated in a single tight loop — no batching, no parallel TASK-008 calls.
+- verify_hash() runs immediately after each rating returns. If hash returns False or raises an exception, verify_provenance() is NOT called.
+- Hash verification outcome drives the candidate state immediately — the pipeline does not proceed to provider comparison unless both verification steps pass.
+- Provider comparison occurs only after verification passes for the current candidate. It does NOT batch across candidates.
 
 ### 18.2 InvalidSizingRequestSnapshot
 
@@ -1226,37 +1384,83 @@ Invariant: `0 ≤ verified ≤ completed ≤ attempted ≤ unique_candidate_coun
 
 `evaluated_candidate_count = attempted_rating_count` always. This is the number of candidates that actually executed TASK-008.
 
-### 19A.3 RATING_CALL exception
+### 19A.3 Normal Completion (K candidates all verified)
 
-If the N-th candidate's TASK-008 call raises an exception:
+```text
+attempted_rating_count = completed_rating_count = verified_rating_count = K
+```
+
+### 19A.4 RATING_CALL exception (N-th candidate raises)
+
+If the N-th candidate's TASK-008 call raises an exception, the call has started but never returned:
 
 ```text
 attempted_rating_count = completed_rating_count + 1
 evaluated_candidate_count = attempted_rating_count
+verified_rating_count = completed_rating_count
 remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
 ```
 
 The failed candidate:
 - `CandidateEvaluationState = RUNTIME_FAILED`
 - `failure_stage = RATING_CALL`
+- No `TASK008_RATING_RESULT` node
+- NOT counted as `remaining_unevaluated`
 
-Subsequent candidates:
-- `CandidateEvaluationState = UNEVALUATED`
+Subsequent candidates: `UNEVALUATED`.
 
-The failed candidate is NOT counted as `remaining_unevaluated`.
+### 19A.5 Verification returns False (integrity invalid)
 
-### 19A.4 RATING_VERIFICATION exception
-
-If `RatingResult` returned normally, but `verify_hash()` or `verify_provenance()` raises:
+RatingResult returned normally, but verify_hash() or verify_provenance() returned non-PASSED:
 
 ```text
-attempted_rating_count == completed_rating_count
-verified_rating_count < completed_rating_count
+attempted_rating_count = completed_rating_count
+completed_rating_count = verified_rating_count + 1
+evaluated_candidate_count = attempted_rating_count
+remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
+```
+
+The current candidate:
+- If hash/provenance FAILED: `CandidateEvaluationState = INTEGRITY_INVALID`, `status = BLOCKED`
+- `InvalidRatingEvidenceRecord` constructed
+- `rating_status = None` on `CandidateEvaluation`
+
+### 19A.6 Verification raises exception (runtime error)
+
+RatingResult returned normally, but verify_hash() or verify_provenance() raised:
+
+```text
+attempted_rating_count = completed_rating_count
+completed_rating_count = verified_rating_count + 1
+evaluated_candidate_count = attempted_rating_count
+remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
 ```
 
 The current candidate:
 - `CandidateEvaluationState = RUNTIME_FAILED`
 - `failure_stage = RATING_VERIFICATION`
+- `RunFailure` used (not trusted InvalidRatingEvidenceRecord)
+- `CLAIMED_TASK008_RATING_RESULT` node created for audit
+
+### 19A.7 Provider mismatch (verification passes, identity mismatches)
+
+Provider comparison runs only after both verification steps PASSED:
+
+```text
+attempted_rating_count = completed_rating_count = verified_rating_count
+```
+
+The mismatching candidate is already VERIFIED, but the sizing run is BLOCKED. Verified evidence is preserved.
+
+### 19A.8 Entering OPTIMIZATION / RESULT_CONSTRUCTION
+
+Allowed only when:
+
+```text
+attempted_rating_count = completed_rating_count = verified_rating_count = unique_candidate_count
+```
+
+No `CLAIMED_TASK008_RATING_RESULT` nodes exist during optimization or result construction.
 
 ---
 
@@ -1380,20 +1584,49 @@ evaluation_order_index: int | None
 
 | Concept | ProvenanceNodeType | Label |
 |---------|-------------------|-------|
+| ROOT_CASE_REVISION | `CASE_REVISION` | `"revision_{design_case_revision_id}"` |
+| ROOT_EXTERNAL | `EXTERNAL` | `"external_root"` |
 | SIZING_RUN | `CALCULATION_RUN` | `"sizing_run_{digest}"` |
 | SIZING_OPTIMIZER | `OPTIMIZER` | `"sizing_optimizer"` |
 | CATALOG_SNAPSHOT | `INTERMEDIATE` | `"catalog_{catalog_id}"` |
 | CANDIDATE | `INTERMEDIATE` | `"candidate_{id}"` |
 | TASK008_RATING_RESULT | `RESULT` | `"rating_{result_hash}"` |
+| CLAIMED_TASK008_RATING_RESULT | `INTERMEDIATE` | `"claimed_rating_{candidate_id}"` |
 | SIZING_RESULT | `RESULT` | `"sizing_result"` |
 | SIZING_RUN_FAILURE_RESULT | `RESULT` | `"sizing_run_failure"` |
 | INVALID_EVIDENCE | `INTERMEDIATE` | `"invalid_evidence_{candidate_id}"` |
 | RUNTIME_FAILURE | `BLOCKER` | `"runtime_failure"` |
 | WARNING | `WARNING` | per message |
 | BLOCKER | `BLOCKER` | per message |
-| ROOT | `CASE_REVISION` | `"revision_{design_case_revision_id}"` |
 
-Root selection: if `design_case_revision_id` is present and not None → `CASE_REVISION` with label `"revision_{id}"`. Otherwise → `EXTERNAL` with label `"external_root"`.
+Root selection: if `design_case_revision_id` is present and not None → `ROOT_CASE_REVISION` with `CASE_REVISION` type and label `"revision_{id}"`. Otherwise → `ROOT_EXTERNAL` with `EXTERNAL` type and label `"external_root"`.
+
+Two distinct `ROOT` concepts prevent expression of root-type selection within a single ambiguous table entry.
+
+Edge labels are uniquely frozen:
+
+| Edge | Label |
+|------|-------|
+| ROOT → SIZING_RUN | `"initiates"` |
+| SIZING_RUN → CATALOG_SNAPSHOT | `"consumes"` |
+| CATALOG_SNAPSHOT → CANDIDATE | `"generates"` |
+| CANDIDATE → TASK008_RATING_RESULT (verified) | `"rated_as"` |
+| CANDIDATE → CLAIMED_TASK008_RATING_RESULT (unverified) | `"rated_as_claimed"` |
+| TASK008_RATING_RESULT → OPTIMIZER | `"evaluated_by"` |
+| CANDIDATE → INVALID_EVIDENCE | `"produced_unverified"` |
+| INVALID_EVIDENCE → SIZING_RESULT | `"invalidates"` |
+| OPTIMIZER → SIZING_RESULT | `"produces"` |
+| OPTIMIZER → SIZING_RUN_FAILURE_RESULT | `"precedes_failure"` |
+| RUNTIME_FAILURE → SIZING_RESULT | `"fails"` |
+| RUNTIME_FAILURE → SIZING_RUN_FAILURE_RESULT | `"fails"` |
+| SIZING_RUN → SIZING_RESULT | `"produces"` |
+| SIZING_RUN → SIZING_RUN_FAILURE_RESULT | `"produces_failure_record"` |
+| BLOCKER → SIZING_RESULT | `"blocks"` |
+| BLOCKER → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+| WARNING → SIZING_RESULT | `"annotates"` |
+| WARNING → SIZING_RUN_FAILURE_RESULT | `"annotates_failure"` (if applicable) |
+
+No two edges share an ambiguous label with different semantics.
 
 ### 23.2 UUID5 Namespace
 
@@ -1496,30 +1729,41 @@ Edges:
 
 #### RATING_RESULT_INTEGRITY_FAILED
 
-```
+```text
 Nodes:
-- ROOT (1)
+- ROOT (1, type per root selection rule)
 - SIZING_RUN (1)
 - CATALOG_SNAPSHOT (1 per catalog)
-- CANDIDATE (1 per evaluated candidate)
-- TASK008_RATING_RESULT (1 per verified candidate)
+- CANDIDATE (unique_candidate_count)
+- VERIFIED TASK008_RATING_RESULT (verified_rating_count)
 - INVALID_EVIDENCE (1 per integrity-invalid candidate)
-- OPTIMIZER (1)
 - BLOCKER (>=1)
 - SIZING_RESULT (1)
-Forbidden: RUNTIME_FAILURE
+Forbidden: OPTIMIZER, RUNTIME_FAILURE, CLAIMED_TASK008_RATING_RESULT
+
 Edges:
 - ROOT -> SIZING_RUN "initiates"
 - SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
 - CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- SIZING_RUN -> OPTIMIZER "executes"
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as"
-- TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
-- CANDIDATE -> INVALID_EVIDENCE "produced_unverified"
+- CANDIDATE -> VERIFIED TASK008 result "rated_as" (for each verified)
+- CANDIDATE(current) -> INVALID_EVIDENCE "produced_unverified"
 - INVALID_EVIDENCE -> SIZING_RESULT "invalidates"
 - BLOCKER -> SIZING_RESULT "blocks"
-- OPTIMIZER -> SIZING_RESULT "produces"
+- SIZING_RUN -> SIZING_RESULT "produces"
+
+Counters:
+attempted = completed = verified + 1
+evaluated = attempted
+remaining = unique - attempted
+partial_audit = True
+
+Candidate records:
+- prior candidates = VERIFIED
+- current candidate = INTEGRITY_INVALID
+- remaining candidates = UNEVALUATED
 ```
+
+All `CANDIDATE` nodes correspond to the full `unique_candidate_count` — not just the evaluated subset.
 
 #### SUCCEEDED
 
@@ -1547,27 +1791,40 @@ Edges:
 
 #### PROPERTY_PROVIDER_IDENTITY_MISMATCH
 
-```
+```text
 Nodes:
-- ROOT (1)
+- ROOT (1, type per root selection rule)
 - SIZING_RUN (1)
 - CATALOG_SNAPSHOT (1 per catalog)
-- CANDIDATE (1 per evaluated candidate)
-- TASK008_RATING_RESULT (1 per evaluated candidate)
-- OPTIMIZER (1)
+- CANDIDATE (unique_candidate_count)
+- VERIFIED TASK008_RATING_RESULT (verified_rating_count)
 - BLOCKER (>=1)
 - SIZING_RESULT (1)
-Forbidden: INVALID_EVIDENCE, RUNTIME_FAILURE
+Forbidden: OPTIMIZER, INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, RUNTIME_FAILURE
+
 Edges:
 - ROOT -> SIZING_RUN "initiates"
 - SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
 - CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- SIZING_RUN -> OPTIMIZER "executes"
-- CANDIDATE -> TASK008_RATING_RESULT "rated_as"
-- TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
-- OPTIMIZER -> SIZING_RESULT "produces"
+- CANDIDATE -> VERIFIED TASK008 result "rated_as" (for each verified)
 - BLOCKER -> SIZING_RESULT "blocks"
+- SIZING_RUN -> SIZING_RESULT "produces"
+
+Counters:
+attempted = completed = verified
+evaluated = attempted
+remaining = unique - attempted
+partial_audit = (attempted < unique)
+
+Candidate records:
+- through mismatching candidate = VERIFIED
+- remaining = UNEVALUATED
 ```
+
+Provider mismatch candidate's verified evidence:
+- Preserves actual provider identity
+- Marks mismatch diagnostic (not feasibility/ranking failure)
+- `selected_candidate = None`, `top_candidates = ()`
 
 #### RUNTIME_FAILED
 
@@ -1670,21 +1927,21 @@ Edges:
 Count sources: attempted_rating_count = completed_rating_count + 1
 evaluated_candidate_count = attempted_rating_count
 remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
-verified_rating_count <= completed_rating_count
+verified_rating_count = completed_rating_count
 The failed candidate is RUNTIME_FAILED, has no TASK008_RATING_RESULT,
 and is NOT counted as remaining unevaluated.
 ```
 
 ##### RATING_VERIFICATION
 
-```
+```text
 Nodes:
-- ROOT (1)
+- ROOT (1, type per root selection rule)
 - SIZING_RUN (1)
 - CATALOG_SNAPSHOT (catalog_count)
 - CANDIDATE (unique_candidate_count)
 - VERIFIED TASK008_RATING_RESULT (verified_rating_count)
-- CLAIMED TASK008_RATING_RESULT (completed_rating_count - verified_rating_count, when applicable)
+- CLAIMED TASK008_RATING_RESULT (exactly 1)
 - RUNTIME_FAILURE (1)
 - SIZING_RESULT (1)
 Forbidden: INVALID_EVIDENCE, OPTIMIZER
@@ -1693,13 +1950,15 @@ Edges:
 - SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
 - CATALOG_SNAPSHOT -> CANDIDATE "generates"
 - CANDIDATE -> VERIFIED result "rated_as" (for each verified rating)
-- CANDIDATE -> CLAIMED result "rated_as_claimed" (for each completed but unverified rating)
+- CANDIDATE(current) -> CLAIMED result "rated_as_claimed" (exactly 1)
 - RUNTIME_FAILURE -> SIZING_RESULT "fails"
 - SIZING_RUN -> SIZING_RESULT "produces"
 Count: attempted_rating_count = completed_rating_count
 evaluated_candidate_count = attempted_rating_count
 verified_rating_count < completed_rating_count
+CLAIMED_TASK008_RATING_RESULT multiplicity = 1 (only the current failed candidate)
 remaining_unevaluated_candidate_count = unique_candidate_count - attempted_rating_count
+
 The claimed-rating-result node uses CLAIMED_TASK008_RATING_RESULT concept
 (ProvenanceNodeType.INTERMEDIATE). It is NOT a verified TASK008 result.
 UUID5 name (when result hash unreadable):
@@ -1715,24 +1974,29 @@ uuid5(TASK009_PROVENANCE_NAMESPACE,
 claimed_result_digest = sha256_digest({
     "candidate_id": ...,
     "evaluation_order_index": ...,
+    "hash_verification_outcome": ...,
+    "provenance_verification_outcome": ...,
     "claim_state": "unreadable",
 })
+```
+
+`claim_state` is one of: `"hash_verification_error"`, `"provenance_verification_error"`, `"unreadable"`.
 ```
 ```
 
 ##### OPTIMIZATION
 
-```
+```text
 Nodes:
 - ROOT (1)
 - SIZING_RUN (1)
 - CATALOG_SNAPSHOT (catalog_count)
 - CANDIDATE (unique_candidate_count)
-- TASK008_RATING_RESULT (evaluated_candidate_count)
+- TASK008_RATING_RESULT (evaluated_candidate_count = unique_candidate_count; all verified)
 - OPTIMIZER (1)
 - RUNTIME_FAILURE (1)
 - SIZING_RESULT (1)
-Forbidden: INVALID_EVIDENCE
+Forbidden: INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT
 Edges:
 - ROOT -> SIZING_RUN "initiates"
 - SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
@@ -1743,6 +2007,7 @@ Edges:
 - RUNTIME_FAILURE -> SIZING_RESULT "fails"
 partial_audit: False, evaluated_candidate_count: unique
 optimizer_node_exists: True, rating_result_nodes_exist: True
+CLAIMED_TASK008_RATING_RESULT count: 0 (precondition: attempted == completed == verified == unique)
 ```
 
 ##### RESULT_CONSTRUCTION
@@ -1817,43 +2082,97 @@ metadata             = (("failure_result_hash", failure_result_hash),
 
 **Exact RESULT_CONSTRUCTION topology:**
 
-```
+```text
 Nodes:
-- ROOT (1)
+- ROOT (1, type per root selection rule)
 - SIZING_RUN (1)
 - CATALOG_SNAPSHOT (catalog_count)
 - CANDIDATE (unique_candidate_count)
-- VERIFIED TASK008_RATING_RESULT (verified_rating_count)
-- CLAIMED TASK008_RATING_RESULT (completed - verified, when applicable)
+- VERIFIED TASK008_RATING_RESULT (verified_rating_count = unique_candidate_count)
 - OPTIMIZER (1)
 - RUNTIME_FAILURE (1)
 - SIZING_RUN_FAILURE_RESULT (1)
+Forbidden: CLAIMED_TASK008_RATING_RESULT, INVALID_EVIDENCE
 
 Edges:
 - ROOT -> SIZING_RUN "initiates"
 - SIZING_RUN -> CATALOG_SNAPSHOT "consumes"
 - CATALOG_SNAPSHOT -> CANDIDATE "generates"
-- CANDIDATE -> TASK008/CLAIMED result "rated_as"
-- verified TASK008 result -> OPTIMIZER "evaluated_by"
+- CANDIDATE -> TASK008_RATING_RESULT "rated_as" (all verified)
+- TASK008_RATING_RESULT -> OPTIMIZER "evaluated_by"
 - OPTIMIZER -> SIZING_RUN_FAILURE_RESULT "precedes_failure"
 - RUNTIME_FAILURE -> SIZING_RUN_FAILURE_RESULT "fails"
 - SIZING_RUN -> SIZING_RUN_FAILURE_RESULT "produces_failure_record"
 
 partial_audit: False
-attempted_rating_count == evaluated_candidate_count == unique
+attempted_rating_count == evaluated_candidate_count == verified_rating_count == unique_candidate_count
+CLAIMED_TASK008_RATING_RESULT count: 0 (precondition for entering optimization/result construction)
 ```
 
 **JSON:** `SizingRunFailureResult` must be JSON round-trippable with all fields, digests, and provenance.
 
-### 23.5 Two-Stage Construction
+### 23.5 Failure-Result Two-Stage Provenance Construction
 
-1. Build core provenance (all nodes except SIZING_RESULT and its WARNING/BLOCKER/RUNTIME_FAILURE/INVALID_EVIDENCE)
-2. Compute `core_provenance_digest`
-3. Build `SizingResultIdentity` (includes `core_provenance_digest`)
-4. Compute `result_hash = sha256_digest(SizingResultIdentity)`
-5. Add SIZING_RESULT node, its WARNING/BLOCKER/INVALID_EVIDENCE/RUNTIME_FAILURE nodes
-6. Build final provenance graph
-7. Compute `final_provenance_digest`
+Standard result and failure result use two distinct two-stage branches.
+
+**Failure Core Graph:**
+
+Build `failure_core_graph` containing only nodes whose payloads are determined before the failure result node:
+
+```text
+- ROOT
+- SIZING_RUN
+- CATALOG_SNAPSHOT
+- CANDIDATE
+- VERIFIED TASK008_RATING_RESULT
+- OPTIMIZER
+- RUNTIME_FAILURE
+- warning/blocker nodes (whose payloads are already fixed)
+```
+
+Explicitly excluded: `SIZING_RUN_FAILURE_RESULT` and all edges where this node is source or target.
+
+```python
+failure_core_provenance_digest = digest(failure_core_graph)
+```
+
+**Failure Result Hash:**
+
+```python
+failure_result_payload = {
+    ...
+    "core_provenance_digest": failure_core_provenance_digest,
+}
+failure_result_hash = sha256_digest(failure_result_payload)
+```
+
+**Final Failure Graph:**
+
+Add `SIZING_RUN_FAILURE_RESULT` node and its connecting edges:
+
+```text
+- OPTIMIZER -> SIZING_RUN_FAILURE_RESULT "precedes_failure"
+- RUNTIME_FAILURE -> SIZING_RUN_FAILURE_RESULT "fails"
+- SIZING_RUN -> SIZING_RUN_FAILURE_RESULT "produces_failure_record"
+- WARNING -> SIZING_RUN_FAILURE_RESULT "annotates_failure" (if applicable)
+- BLOCKER -> SIZING_RUN_FAILURE_RESULT "annotates_failure" (if applicable)
+```
+
+```python
+failure_final_provenance_digest = digest(final_failure_graph)
+```
+
+**verify_provenance() for failure results:**
+
+1. Reconstruct failure core graph from result fields (catalog digests, evaluation digests, verified evidence digests, etc.)
+2. Verify `core_provenance_digest` matches reconstruction
+3. Recompute failure result payload and hash
+4. Rebuild `SIZING_RUN_FAILURE_RESULT` node
+5. Rebuild final failure graph
+6. Verify `failure_final_provenance_digest`
+7. Detect node, edge, and payload tamper
+
+Standard result verification and failure result verification are two separate branches — no shared code path ambiguity.
 
 ### 23.6 partial_audit
 
@@ -2184,9 +2503,9 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 137. Raw increment below quantum rejected (Decimal `increment_m < quantum`)
 138. Raw increment exactly equal to quantum accepted
 139. Raw increment just above quantum canonicalized deterministically
-140. Cyclic raw input always uses `$cyclic_reference` marker (no alternate blocker path)
-141. Cyclic canonical path exact syntax (`$.field`, `$.field[0]`, `$.field["key"]`)
-142. Dict traversal order does not alter cyclic path (keys pre-sorted)
+140. Cyclic raw input always uses `$cyclic_reference` marker with `ancestor_distance` (no path-based syntax)
+141. Cyclic `ancestor_distance` stability (`$.field`, `$.field[0]`, `$.field["key"]` path syntax removed — no sort/path loop)
+142. Dict traversal order does not affect `ancestor_distance` determinism
 143. Non-string mapping key still produces `RawSizingRequestSnapshot` (no exception)
 144. Non-string mapping key produces structured `SizingValidationErrorSnapshot` with code `NON_STRING_KEY`
 145. Unsupported object produces snapshot + `SizingValidationErrorSnapshot` (`UNSUPPORTED_RAW_INPUT_TYPE`)
@@ -2217,7 +2536,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 170. Validation error insertion-order independence
 171. Markdown code fence in `SizingRequestIdentity` schema validated (no leading pipes)
 172. Section numbering continuous (no gaps, no duplicates)
-173. Acceptance Criteria references Round 8
+173. Acceptance Criteria references Round 10
 174. Issue #23 frozen SHA equals new docs commit
 175. Task-card test range headings match numbered entries
 176. Issue test total equals task-card N
@@ -2251,13 +2570,54 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 201. Section numbering continuous (no gaps, section 20.3 present)
 202. Issue #23 test total equals task-card N
 203. Issue #23 frozen SHA equals new docs commit
-204. Acceptance Criteria references Round 9
+204. Acceptance Criteria references Round 10
+
+### 28.13 Round 9 Contract Tests (205–244)
+
+205. `{1:"A",2:"B"}` vs `{1:"B",2:"A"}` produce different raw digests (key-value association preserved)
+206. Bool/int key type-sensitive canonicalization (bool checked before int)
+207. UUID key canonicalization produces deterministic lowercase string
+208. Enum key canonicalization preserves enum type + value
+209. Opaque object key does not claim injective/reversible representation
+210. Duplicate opaque marker entries preserve entry count in snapshot
+211. Cyclic invalid mapping canonicalization uses `ancestor_distance` (no sort/path loop)
+212. Cycle marker `ancestor_distance` stability across repeated runs
+213. `VerificationOutcome` enum exactly 4 values (NOT_RUN, PASSED, FAILED, ERROR)
+214. Hash verification returns False → outcome FAILED, provenances NOT_RUN
+215. Hash verification raises → outcome ERROR, provenances NOT_RUN, RUNTIME_FAILED
+216. Hash PASSED, provenance returns False → outcome PASSED/FAILED, candidate INTEGRITY_INVALID
+217. Hash PASSED, provenance raises → outcome PASSED/ERROR, RUNTIME_FAILED, failure_stage=RATING_VERIFICATION
+218. Strict per-candidate pipeline order enforced (attempt→call→completed→hash→provenance→provider→evidence)
+219. RATING_CALL exact equality: `attempted = completed + 1, verified = completed`
+220. Verification false exact equality: `completed = verified + 1`
+221. Verification exception exact equality: `completed = verified + 1`
+222. Provider mismatch exact equality: `attempted = completed = verified`
+223. RATING_RESULT_INTEGRITY_FAILED topology has no OPTIMIZER node
+224. RATING_RESULT_INTEGRITY_FAILED topology includes all unique CANDIDATE nodes (not just evaluated subset)
+225. PROPERTY_PROVIDER_IDENTITY_MISMATCH topology has no OPTIMIZER node
+226. Provider mismatch topology remaining candidates = UNEVALUATED (not VERIFIED)
+227. RATING_VERIFICATION topology exactly 1 CLAIMED_TASK008_RATING_RESULT node
+228. OPTIMIZATION topology CLAIMED_TASK008_RATING_RESULT count = 0
+229. RESULT_CONSTRUCTION topology CLAIMED_TASK008_RATING_RESULT count = 0
+230. Failure core graph excludes SIZING_RUN_FAILURE_RESULT node
+231. Failure result two-stage hash/provenance reconstruction (core→hash→final)
+232. Failure result node/edge tamper detection via final provenance digest
+233. `ExecutionContextSnapshot` exact field types (3 UUID | None)
+234. Execution context digest round-trip (JSON→deserialize→recompute digest)
+235. Verified evidence `rating_status` uses `RatingStatus` type (not `str`)
+236. ROOT_EXTERNAL registry entry (type EXTERNAL, label "external_root")
+237. CLAIMED_TASK008_RATING_RESULT registry entry (type INTERMEDIATE, label "claimed_rating_{candidate_id}")
+238. Distinct `rated_as` (verified) vs `rated_as_claimed` (unverified) edge labels
+239. Round 8 Design Review History records "—" (no PENDING), no comment ID
+240. Round 9 Design Review Comment ID is `4798128591`
+241. Acceptance Criteria references Round 10 (no conflicting Round 8/9 references)
+242. Issue #23 frozen SHA equals new docs commit SHA
+243. Test numbering continuous 1–244 (no gaps, no duplicates)
+244. Issue #23 and task card test total both report N=244
 
 ---
 
-## 29. Delivery Sequence
-
-1. Complete Round 9 Engineering Design Review.
+1. Complete Round 10 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -2271,7 +2631,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 30. Acceptance Criteria
 
-- [ ] Round 9 Engineering Design Review passes before implementation starts
+- [ ] Round 10 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -2290,6 +2650,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–204, including Golden (84–85), documentation (86), JSON round-trip (87), quality gates (88), Round 6 (89–136), Round 7 (137–176), and Round 8 (177–204)
+- [ ] Required test matrix entries 1–N (continuous), including Golden (84–85), documentation (86), JSON round-trip (87), quality gates (88), Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), and Round 9 (205–N)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
