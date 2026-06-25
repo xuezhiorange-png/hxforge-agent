@@ -2073,3 +2073,427 @@ class TestZeroUpperBoundTraceBinding:
             solver_termination_reason="blocked",
         )
         assert result is False, "zero_upper_bound with failed limit should be rejected"
+
+
+# =========================================================================
+# 10. Round 16 verifier contracts
+# =========================================================================
+
+
+class TestFailedQmaxNoDiagnostics:
+    """Failed Q_max calls must have q_max_diagnostics is None."""
+
+    def test_counterflow_failure_with_diagnostics_rejected(self) -> None:
+        """Counterflow hot limit fails + independent_limits diagnostics → False."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+
+        diag = QMaxDiagnosticsSnapshot(
+            q_max_w=80000.0,
+            iterations=0,
+            final_pinch_residual_k=0.0,
+            termination_reason="independent_limits",
+            hot_limit_w=80000.0,
+            cold_limit_w=120000.0,
+            limiting_side="hot_limit",
+        )
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            q_max_diagnostics=diag,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "counterflow failure with diagnostics should be rejected"
+
+    def test_parallel_limits_failure_with_diagnostics_rejected(self) -> None:
+        """Parallel limits cold fails + bisection_converged diagnostics → False."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+
+        q_low = 80000.0
+        q_high = q_low + 1e-4
+        width = q_high - q_low
+        diag = QMaxDiagnosticsSnapshot(
+            q_max_w=q_low,
+            iterations=10,
+            final_pinch_residual_k=1e-8,
+            q_tolerance_w=1e-3,
+            pinch_temperature_tolerance_k=1e-6,
+            final_q_low_w=q_low,
+            final_q_high_w=q_high,
+            final_q_width_w=width,
+            termination_reason="bisection_converged",
+        )
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.PARALLEL,
+            q_max_diagnostics=diag,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "parallel limits failure with diagnostics should be rejected"
+
+    def test_parallel_pinch_failure_with_diagnostics_rejected(self) -> None:
+        """Parallel pinch hot fails + bisection_converged diagnostics → False."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+
+        q_low = 80000.0
+        q_high = q_low + 1e-4
+        width = q_high - q_low
+        diag = QMaxDiagnosticsSnapshot(
+            q_max_w=q_low,
+            iterations=10,
+            final_pinch_residual_k=1e-8,
+            q_tolerance_w=1e-3,
+            pinch_temperature_tolerance_k=1e-6,
+            final_q_low_w=q_low,
+            final_q_high_w=q_high,
+            final_q_width_w=width,
+            termination_reason="bisection_converged",
+        )
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=4,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                call_idx=0,
+                query_type="PH",
+                stream_role="hot_solver",
+                stage="q_max",
+                trial_q_w=80000.0,
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="PH failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.PARALLEL,
+            q_max_diagnostics=diag,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "parallel pinch failure with diagnostics should be rejected"
+
+
+class TestCounterflowOrdering:
+    """Counterflow Q_max must occur directly after inlet, before bracket/solver."""
+
+    def test_counterflow_qmax_after_bracket_rejected(self) -> None:
+        """Counterflow Q_max after bracket probe → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.BRACKET_PROBE.value,
+                call_idx=0,
+                query_type="PH",
+                stream_role="hot_solver",
+                stage="bracket",
+                trial_q_w=50000.0,
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.BRACKET_PROBE.value,
+                call_idx=1,
+                query_type="PH",
+                stream_role="cold_solver",
+                stage="bracket",
+                trial_q_w=50000.0,
+            ),
+            _make_call(
+                seq_idx=4,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=5,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.SUCCEEDED,
+            converged=True,
+            solver_termination_reason="converged",
+        )
+        assert result is False, "counterflow Q_max after bracket should be rejected"
+
+
+class TestDuplicateQmaxEvaluations:
+    """At most/exactly one Q_max evaluation per role on all paths."""
+
+    def test_counterflow_duplicate_qmax_rejected(self) -> None:
+        """Two counterflow Q_max evaluations → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            # First counterflow eval: both succeed
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+            # Second counterflow eval: hot fails
+            _make_call(
+                seq_idx=4,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "duplicate counterflow Q_max should be rejected"
+
+    def test_parallel_limits_without_pinch_duplicate_limits_rejected(self) -> None:
+        """Two limits evals without pinch (second cold fails) → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            # First limits eval: both succeed
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+            # Second limits eval: cold fails
+            _make_call(
+                seq_idx=4,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=5,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.PARALLEL,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "parallel limits-without-pinch duplicate limits should be rejected"

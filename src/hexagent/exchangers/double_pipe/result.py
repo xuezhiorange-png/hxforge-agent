@@ -2347,6 +2347,18 @@ def _verify_property_call_identity(
             else:
                 return False
 
+        # Counterflow: at most one Q_MAX_COUNTERFLOW evaluation.
+        # Production never produces duplicate counterflow Q_max phases.
+        if len(counterflow_evals) > 1:
+            return False
+
+        # Counterflow ordering: q_max_counterflow must be evaluation
+        # index 1 (directly after inlet=0), before any bracket/solver/
+        # final phases.  Having counterflow after solver or final is
+        # never valid.
+        if counterflow_evals and counterflow_evals[0] != 1:
+            return False
+
         # Collect limits and pinch evaluations (used by both parallel
         # state machine below and Q_max diagnostics binding after).
         limits_evals = [
@@ -2541,6 +2553,10 @@ def _verify_property_call_identity(
                     if not has_failure and q_max_diagnostics is None:
                         return False
 
+                    # Exactly one limits evaluation on all parallel paths
+                    if len(limits_evals) != 1:
+                        return False
+
                     # Limits must be the last evaluation — no
                     # bracket/solver/final after
                     limits_last = max(limits_evals)
@@ -2728,6 +2744,12 @@ def _verify_property_call_identity(
                     # This evaluation must be the last one
                     if ei != max(eval_indices):
                         return False
+                    # Failed Q_max calls are incompatible with any Q_max
+                    # diagnostics snapshot (property failure raises before
+                    # _qmax_diagnostics_snapshot() can be built).
+                    if q_max_diagnostics is not None:
+                        return False
+
                     # Status must be BLOCKED, converged=False, termination=blocked
                     if status is None or converged is None or solver_termination_reason is None:
                         return False
