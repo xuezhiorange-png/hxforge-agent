@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 33 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 34 Engineering Design Review passes.
 
 ---
 
@@ -66,6 +66,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 30 | 4802836532 | CHANGES REQUIRED |
 | 31 | 4802985042 | CHANGES REQUIRED |
 | 32 | 4803145772 | CHANGES REQUIRED |
+| 33 | 4803236346 | CHANGES REQUIRED |
 
 ## 4. Data Model
 
@@ -1285,6 +1286,8 @@ The pseudocode block is a design reference and must not be extracted or verified
 
 
 
+### 14.7.2.2 Executable canonicalization core
+
 <!-- BEGIN TASK009_CANONICALIZATION_CORE_PY -->
 ```python
 from __future__ import annotations
@@ -1717,7 +1720,7 @@ class CanonicalContextEntry:
 
 The core block above is self-contained: it defines all its own types, imports only from stdlib and `pydantic`, and requires no project-specific dependencies. It can be extracted by the byte-preserving algorithm in §14.7.2.4 and verified with `python3.11` / `mypy --strict`.
 
-### 14.7.2.1 Integration Block
+### 14.7.2.3 Integration typed design pseudocode
 
 The following block depends on project domain types (`ErrorCode`, `RunFailure`, `FailureStage`, `MessageOwnerKind`, `CanonicalPayload`, `sha256_digest`) and is marked as **typed design pseudocode** — its symbols are resolvable only once TASK-009 implementation adds the domain model. Mechanical extraction and mypy verification are not claimed for this block.
 
@@ -1844,10 +1847,11 @@ DOCUMENT_PATH = Path(
     "TASK-009-manufacturable-sizing-and-candidate-optimization.md"
 )
 BLOCK_ID = b"TASK009_CANONICALIZATION_CORE_PY"
-BEGIN_MARKER = b"<!-- BEGIN " + BLOCK_ID + b" -->\\n"
+BEGIN_MARKER = b"<!-- BEGIN " + BLOCK_ID + b" -->\n"
 END_MARKER = b"<!-- END " + BLOCK_ID + b" -->"
-OPENING_FENCE = b"```python\\n"
-CLOSING_FENCE = b"```\\n"
+OPENING_FENCE = b"```python\n"
+CLOSING_FENCE = b"```\n"
+FENCE_TOKEN = b"```"
 OUTPUT_PATH = Path("/tmp/task009_canonicalization_core.py")
 
 
@@ -1879,7 +1883,7 @@ def extract_exact_block(document_bytes: bytes) -> bytes:
             "END marker must be preceded immediately "
             "by a closing fence"
         )
-    if region.count(b"\`\`\`") != 2:
+    if region.count(FENCE_TOKEN) != 2:
         raise RuntimeError(
             "marked core region must contain exactly "
             "one python code fence"
@@ -5865,10 +5869,10 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ### 27.21 Round 30 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 32 changes. **Expected output**: Round 32 row exists with Comment ID `4803145772`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 32 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 32 row in review history. **Expected output**: Round 32 immediately follows Round 31. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 33 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+501. **Input**: Review history table after Round 33 changes. **Expected output**: Round 33 row exists with Comment ID `4803236346`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 33 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 33 row in review history. **Expected output**: Round 33 immediately follows Round 32. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 34 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
 505. **Input**: `CountingMapping` with call counter. **Expected output**: `items()` is called exactly once during canonicalization. **Exception**: N/A — single-read invariant: items acquired exactly once.
 506. **Input**: Captured Mapping items iterable is used for iteration. **Expected output**: Canonicalizer iterates the captured items, does not re-read the original Mapping. **Exception**: N/A — single-read invariant: captured iterable is consumed.
 507. **Input**: Mapping whose second `items()` call raises `RuntimeError`. **Expected output**: Canonicalization succeeds because the second call is never made. **Exception**: N/A — single-read invariant: second call not triggered.
@@ -5903,13 +5907,41 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 536. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: Rejected by `invariant_feasible_count_range` because `feasible > unique`. **Exception**: `ValueError` — feasible range invariant fires before feasible_le_verified.
 537. **Input**: Standalone `invariant_feasible_le_verified` helper with `unique=10, verified=8, feasible=9`. **Expected output**: `ValueError` raised because `feasible > verified`. **Exception**: `ValueError` — unit contract for feasible_le_verified independent of registry ordering.
 538. **Input**: Deterministic candidate UUID5: same request+candidate → same UUID; different candidate → different UUID; insertion-order independent. **Expected output**: All three UUID5 invariants satisfied. **Exception**: N/A — regression: deterministic IDs unchanged.
-539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 33; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
+539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 34; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
 540. **Input**: Tests 1–540 continuous, zero/dual roots rejected, Frozen SHA and Round 33 gate synchronized. **Expected output**: Global numbering continuous, Issue frozen SHA matches new commit, gate at Round 33. **Exception**: N/A — structural sync check.
+---
+### 27.22 Round 33 Extraction Contract Tests (541–564)
+
+541. **Input**: Document with BEGIN marker removed. **Expected output**: `extract_exact_block()` raises `RuntimeError("core BEGIN marker count must equal 1")`. **Exception**: `RuntimeError` — missing BEGIN fails closed.
+542. **Input**: Document with duplicate BEGIN marker. **Expected output**: `RuntimeError("core BEGIN marker count must equal 1")`. **Exception**: `RuntimeError` — duplicate BEGIN fails closed.
+543. **Input**: Document with END marker removed. **Expected output**: `RuntimeError("core END marker count must equal 1")`. **Exception**: `RuntimeError` — missing END fails closed.
+544. **Input**: Document with duplicate END marker. **Expected output**: `RuntimeError("core END marker count must equal 1")`. **Exception**: `RuntimeError` — duplicate END fails closed.
+545. **Input**: Document with END marker appearing before BEGIN marker. **Expected output**: `extract_exact_block()` raises `ValueError` because `index()` with no match raises `ValueError`. **Exception**: `ValueError` — reversed order fails closed.
+546. **Input**: Document with extra text between BEGIN marker and opening fence. **Expected output**: `RuntimeError("BEGIN marker must be followed immediately by a python fence")`. **Exception**: `RuntimeError` — gap fails closed.
+547. **Input**: Document with extra text between closing fence and END marker. **Expected output**: `RuntimeError("END marker must be preceded immediately by a closing fence")`. **Exception**: `RuntimeError` — gap fails closed.
+548. **Input**: Region with three fence tokens (two inside code). **Expected output**: `RuntimeError("marked core region must contain exactly one python code fence")`. **Exception**: `RuntimeError` — extra fence fails closed.
+549. **Input**: Document with opening fence language set to "text" instead of "python". **Expected output**: `RuntimeError("BEGIN marker must be followed immediately by a python fence")`. **Exception**: `RuntimeError` — wrong language fails closed.
+550. **Input**: Empty region between opening and closing fences. **Expected output**: `RuntimeError("extracted core block must not be empty")`. **Exception**: `RuntimeError` — empty block fails closed.
+551. **Input**: Prepend `from typing import Any\n` to extracted bytes. **Expected output**: SHA-256 digest differs from original recorded digest. **Exception**: N/A — injection detected by digest mismatch.
+552. **Input**: Prepend a stub function to extracted bytes. **Expected output**: SHA-256 digest differs from original. **Exception**: N/A — stub injection detected.
+553. **Input**: Append a helper function to extracted bytes. **Expected output**: SHA-256 digest differs from original. **Exception**: N/A — helper injection detected.
+554. **Input**: Append a type alias (`MyType = str`) to extracted bytes. **Expected output**: SHA-256 digest differs from original. **Exception**: N/A — alias injection detected.
+555. **Input**: Any single byte changed in the extracted file. **Expected output**: `sha256sum --check /tmp/task009_canonicalization_core.sha256` fails with nonzero exit code. **Exception**: exit code ≠ 0 — tamper detection.
+556. **Input**: Remove a required import (`from pydantic import BaseModel`) from a copy of the extracted file. **Expected output**: `mypy --strict` fails with `import-not-found` error. **Exception**: exit code ≠ 0 — missing import detected.
+557. **Input**: Add `undefined_contract_symbol` to a copy of the extracted file. **Expected output**: `mypy --strict` fails with `name-defined` error. **Exception**: exit code ≠ 0 — undefined name detected.
+558. **Input**: Exact extracted core block via byte-preserving extraction. **Expected output**: `python3.11 /tmp/task009_canonicalization_core.py` exits with code 0. **Exception**: N/A — Python 3.11 execution passes.
+559. **Input**: Exact extracted core block. **Expected output**: `python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found`. **Exception**: N/A — Python 3.11 strict mypy passes.
+560. **Input**: Exact extracted core block. **Expected output**: `python3.12 /tmp/task009_canonicalization_core.py` exits with code 0. **Exception**: N/A — Python 3.12 execution passes.
+561. **Input**: Exact extracted core block. **Expected output**: `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found`. **Exception**: N/A — Python 3.12 strict mypy passes.
+562. **Input**: Extract, record SHA-256, then run four verification steps. **Expected output**: All four `sha256sum --check` commands report OK with identical digest. **Exception**: N/A — no-rewrite contract satisfied.
+563. **Input**: Authoritative extraction script from §14.7.2.4. **Expected output**: `python3.11 -W error /tmp/extract_task009_core.py` runs without `SyntaxWarning` or `RuntimeWarning`. **Exception**: N/A — script is warning-free.
+564. **Input**: Document's authoritative extraction script bytes vs. `/tmp/extract_task009_core.py` bytes. **Expected output**: Both files are byte-for-byte identical. **Exception**: N/A — no manual fix before running.
+565. **Input**: Exhaustive regression suite from tests 1–564. **Expected output**: All tests 1–564 are continuous, sequential, and cover Round 1 through Round 33 contracts. **Exception**: N/A — total coverage invariant.
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 33 Engineering Design Review.
+1. Complete Round 34 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5923,7 +5955,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 33 Engineering Design Review passes before implementation starts
+- [ ] Round 34 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -5942,6 +5974,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 30 (501–540)
+- [ ] Required test matrix entries 1–565 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), Round 30 (501–540), and Round 33 (541–564)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
