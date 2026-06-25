@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 28 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 29 Engineering Design Review passes.
 
 ---
 
@@ -61,6 +61,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 25 | 4802083544 | CHANGES REQUIRED |
 | 26 | 4802228027 | CHANGES REQUIRED |
 | 27 | 4802328600 | CHANGES REQUIRED |
+| 28 | 4802483910 | CHANGES REQUIRED |
 
 |---|
 
@@ -5573,54 +5574,53 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 27 Contract Tests (501–540)
+### 27.21 Round 28 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 27 changes. **Expected output**: Round 27 row exists with Comment ID `4802328600` and decision `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 27 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 27 row in review history. **Expected output**: Appears immediately after Round 26 row. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 28 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
-505. **Input**: `length_quantum_m` = `"0.025"`. **Expected output**: `InvalidLengthQuantum` raised. **Exception**: `InvalidLengthQuantum` — non-power-of-10 quantum rejected.
-506. **Input**: `length_quantum_m` = `"0.333"`. **Expected output**: `InvalidLengthQuantum` raised. **Exception**: `InvalidLengthQuantum` — non-power-of-10 quantum rejected.
-507. **Input**: `length_quantum_m` = `"10"`. **Expected output**: `InvalidLengthQuantum` raised. **Exception**: `InvalidLengthQuantum` — exponent > 0 rejected.
-508. **Input**: `length_quantum_m` = `"0.001"`. **Expected output**: Accepted as valid quantum; canonical form `"0.001"`. **Exception**: N/A — valid power-of-10.
-509. **Input**: `length_quantum_m` = `"1"`. **Expected output**: Accepted as valid quantum; canonical form `"1"`. **Exception**: N/A — valid power-of-10 with N=0.
-510. **Input**: `to_tick(14.0, Decimal("0.1"))`. **Expected output**: Returns `140`. **Exception**: N/A — integer tick conversion.
-511. **Input**: `to_tick(14.0, Decimal("1"))`. **Expected output**: Returns `14`. **Exception**: N/A — integer tick conversion.
-512. **Input**: `to_tick(0.05, Decimal("0.1"))` — sub-quantum value. **Expected output**: `InvalidLengthError` raised. **Exception**: `InvalidLengthError` — sub-quantum value rejected before quantization.
-513. **Input**: `to_tick(-3.0, Decimal("0.1"))` — non-positive value. **Expected output**: `InvalidLengthError` raised. **Exception**: `InvalidLengthError` — non-positive value rejected.
-514. **Input**: Grid with `minimum_length_m=5.0`, `maximum_length_m=3.0`, `increment_m=0.1` (hi_tick < lo_tick). **Expected output**: `CatalogInvalid` raised. **Exception**: `CatalogInvalid` — reversed grid rejected.
-515. **Input**: Grid with `increment_m=0.005`, `quantum=0.01` (sub-quantum increment). **Expected output**: `CatalogInvalid` raised. **Exception**: `CatalogInvalid` — sub-quantum increment rejected.
-516. **Input**: Grid with `increment_m=0.0`. **Expected output**: `CatalogInvalid` raised. **Exception**: `CatalogInvalid` — non-positive increment rejected.
-517. **Input**: Explicit-length list canonicalization producing empty set. **Expected output**: `CatalogInvalid` raised. **Exception**: `CatalogInvalid` — empty explicit lengths rejected.
-518. **Input**: Request bounds with `minimum_effective_length_m=10.0`, `maximum_effective_length_m=5.0` (min > max). **Expected output**: `InvalidRequestBounds` raised. **Exception**: `InvalidRequestBounds` — reversed request bounds rejected.
-519. **Input**: Request bound not finite (e.g., `float("nan")`). **Expected output**: `InvalidRequestBounds` raised. **Exception**: `InvalidRequestBounds` — non-finite bound rejected.
-520. **Input**: Request bound <= 0 (e.g., `-1.0`). **Expected output**: `InvalidRequestBounds` raised. **Exception**: `InvalidRequestBounds` — non-positive bound rejected.
-521. **Input**: Grid with `INCLUDE_MAX_IF_ALIGNED`, `delta=10`, `step_tick=5`, `remainder=0`. **Expected output**: `catalog_count = 10 // 5 + 1 = 3`. **Exception**: N/A — count formula with max included when aligned.
-522. **Input**: Grid with `EXCLUDE_MAX`, `delta=10`, `step_tick=5`, `remainder=0`. **Expected output**: `catalog_count = 3 - 1 = 2`. **Exception**: N/A — count formula excludes max when aligned.
-523. **Input**: Grid with `EXCLUDE_MAX`, `delta=10`, `step_tick=3`, `remainder=1`. **Expected output**: `catalog_count = 10 // 3 + 1 = 4` (max retained when not aligned). **Exception**: N/A — count formula keeps max when remainder != 0.
-524. **Input**: Request min tick ceiling: `request_min_tick = ceil(5.3 / 0.1)`. **Expected output**: `first_idx` computed via ceiling division; value rounds up to nearest tick. **Exception**: N/A — ceiling rounding for request minimum.
-525. **Input**: Request max tick floor: `request_max_tick = floor(5.7 / 0.1)`. **Expected output**: `last_idx` computed via floor division; value rounds down to nearest tick. **Exception**: N/A — floor rounding for request maximum.
-526. **Input**: Request bounds that widen the catalog interval (min below catalog lo). **Expected output**: `first_idx` clamped to 0; catalog interval not widened. **Exception**: N/A — request bounds must not widen catalog interval.
-527. **Input**: Materialization: `ticks = [lo_tick + step_tick * i for i in range(first_idx, last_idx + 1)]`. **Expected output**: `len(materialized_ticks) == intersection_count`. **Exception**: N/A — invariant: materialized length equals intersection count.
-528. **Input**: `PhysicalCandidateIdentity` struct. **Expected output**: Contains 10 geometry/length fields; does NOT contain `catalog_id`, `catalog_version`, `catalog_content_hash`, `assembly_option_id`, or `manufacturing_option_identity`. **Exception**: N/A — pure geometry identity excludes catalog source.
-529. **Input**: `SourceQualifiedCandidateIdentity` struct. **Expected output**: Contains `physical_candidate_identity_digest`, `catalog_id`, `catalog_version`, `catalog_content_hash`, `assembly_option_id`, `manufacturing_option_identity`. **Exception**: N/A — source-qualified identity includes catalog fields.
-530. **Input**: Two candidates with identical physical geometry but different `catalog_id`. **Expected output**: `SourceQualifiedCandidateIdentity` differs; both retained as distinct candidates. **Exception**: N/A — deduplication key is source-qualified identity.
-531. **Input**: Two candidates with identical `SourceQualifiedCandidateIdentity`. **Expected output**: Deduplicated to one entry. **Exception**: N/A — exact identity deduplication.
-532. **Input**: Canonical evaluation order after deduplication. **Expected output**: Ascending by `source_qualified_candidate_id` (ASCII string). **Exception**: N/A — deterministic evaluation order.
-533. **Input**: `HARD_RAW_COMBINATION_CAP` value. **Expected output**: `10_000`. **Exception**: N/A — hard cap constant.
-534. **Input**: `effective_cap = min(request_raw_combination_cap, HARD_RAW_COMBINATION_CAP)`. **Expected output**: Always <= 10_000; request cap > hard cap is silently reduced. **Exception**: N/A — effective cap never exceeds hard cap.
-535. **Input**: Cap exceeded: `raw_combination_count > effective_cap`. **Expected output**: `status=BLOCKED`, `raw=computed`, `unique=0`, `evaluated=0`, `selected=None`, `top_candidates=()`. **Exception**: N/A — cap-exceeded result block.
-536. **Input**: Provider identity mandatory field mismatch (name, version, git_revision, or reference_state_policy differs). **Expected output**: BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH`. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — mandatory field mismatch.
-537. **Input**: Provider identity optional field mismatch when expected field is not None. **Expected output**: BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH`. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — optional field mismatch.
-538. **Input**: Two verified candidates from the same sizing run with different provider identities. **Expected output**: BLOCKED — provider identity must be consistent across verified candidates. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — cross-candidate inconsistency.
-539. **Input**: Per-candidate `CalculationContext` fields. **Expected output**: `request_id` derived per candidate; `design_case_revision_id` and `calculation_run_id` preserved from caller. **Exception**: N/A — context field roles.
+501. **Input**: Review history table after Round 28 changes. **Expected output**: Round 28 row exists with Comment ID `4802483910` and decision `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 28 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 28 row in review history. **Expected output**: Appears immediately after Round 27 row. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 29 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+505. **Input**: Grid materialization count invariant — `materialized_ticks` length equals `intersection_count` after request intersection. **Expected output**: `len(materialized_ticks) == intersection_count` holds for all valid grid/explicit configurations. **Exception**: `AssertionError` — invariant violation: materialized length must equal intersection count.
+506. **Input**: Grid materialization count invariant with unbounded request (min=None, max=None). **Expected output**: `len(materialized_ticks) == intersection_count == catalog_count`. **Exception**: `AssertionError` — invariant violation when bounds are absent.
+507. **Input**: Grid materialization count invariant with full-intersection request covering entire catalog. **Expected output**: `len(materialized_ticks) == intersection_count == catalog_count`. **Exception**: `AssertionError` — invariant violation for full-intersection case.
+508. **Input**: Grid materialization count invariant with zero-intersection (request min > catalog max). **Expected output**: `materialized_ticks` empty, `intersection_count == 0`. **Exception**: N/A — zero-intersection edge case preserves invariant.
+509. **Input**: Grid materialization count invariant with low-end partial-intersection (request min below catalog lo). **Expected output**: `first_idx` clamped to 0; `len(materialized_ticks) == intersection_count`. **Exception**: `AssertionError` — invariant violation when request min is below catalog lo.
+510. **Input**: Grid materialization count invariant with high-end partial-intersection (request max above catalog hi). **Expected output**: `last_idx` clamped to `catalog_count - 1`; `len(materialized_ticks) == intersection_count`. **Exception**: `AssertionError` — invariant violation when request max is above catalog hi.
+511. **Input**: Grid materialization count invariant with `EXCLUDE_MAX` and aligned max — max excluded from catalog but intersection uses catalog range. **Expected output**: `len(materialized_ticks) == intersection_count`. **Exception**: `AssertionError` — invariant violation for exclude-max aligned case.
+512. **Input**: `to_tick(0.05, Decimal("0.1"))` — sub-quantum value. **Expected output**: `InvalidLengthError` raised. **Exception**: `InvalidLengthError` — typed error propagation: sub-quantum value triggers structured `InvalidLengthError`, must be caught by typed `except InvalidLengthError` and propagate as `CATALOG_INVALID`.
+513. **Input**: `to_tick(-3.0, Decimal("0.1"))` — non-positive value. **Expected output**: `InvalidLengthError` raised. **Exception**: `InvalidLengthError` — typed error propagation: non-positive value triggers structured `InvalidLengthError` with correct error code path.
+514. **Input**: `length_quantum_m = "0.025"` — invalid quantum. **Expected output**: `InvalidLengthQuantum` raised. **Exception**: `InvalidLengthQuantum` — typed error propagation: invalid quantum triggers `InvalidLengthQuantum`, propagates as `CATALOG_INVALID`.
+515. **Input**: `InvalidRequestBounds` raised with reversed min/max bounds. **Expected output**: Error is a typed exception, propagates as `INVALID_SIZING_REQUEST`. **Exception**: `InvalidRequestBounds` — typed error propagation: reversed bounds → `InvalidRequestBounds` → `INVALID_SIZING_REQUEST`.
+516. **Input**: `InvalidRequestBounds` raised with non-finite bound (`float("nan")`). **Expected output**: Error is a typed exception, propagates as `INVALID_SIZING_REQUEST`. **Exception**: `InvalidRequestBounds` — typed error propagation: non-finite bound → `InvalidRequestBounds` → `INVALID_SIZING_REQUEST`.
+517. **Input**: `CatalogInvalid` raised from empty explicit-length set after canonicalization. **Expected output**: Error is a typed exception, caught at catalog validation boundary. **Exception**: `CatalogInvalid` — typed error propagation: empty explicit lengths → `CatalogInvalid`.
+518. **Input**: `CatalogInvalid` raised from reversed grid (`hi_tick < lo_tick`). **Expected output**: Error is a typed exception, caught at catalog validation boundary. **Exception**: `CatalogInvalid` — typed error propagation: reversed grid → `CatalogInvalid`.
+519. **Input**: Pydantic model validation with invalid `length_quantum_m` type (non-string, e.g. integer). **Expected output**: Pydantic `ValidationError` raised before any business logic executes. **Exception**: `ValidationError` — Pydantic schema validation catches type errors before domain validation.
+520. **Input**: Pydantic model validation with missing required fields in `SizingRequest`. **Expected output**: Pydantic `ValidationError` raised, listing all missing field names. **Exception**: `ValidationError` — Pydantic detects missing required fields.
+521. **Input**: Pydantic model validation with extra unknown fields in `SizingRequest` (forbid-extras config). **Expected output**: Pydantic `ValidationError` raised; extra fields rejected per model configuration. **Exception**: `ValidationError` — Pydantic extra-field rejection.
+522. **Input**: Pydantic model validation with invalid field type in nested `CompleteDoublePipeAssemblyOption` (float field with string value). **Expected output**: Pydantic `ValidationError` raised before catalog business-logic validation. **Exception**: `ValidationError` — Pydantic type coercion failure on nested model fields.
+523. **Input**: Pydantic model validation of `CompleteDoublePipeCatalogSnapshot` with duplicate `assembly_option_id` values. **Expected output**: Business-logic duplicate detection raises `CatalogInvalid` after Pydantic model passes schema validation. **Exception**: `CatalogInvalid` — Pydantic schema passes but business logic catches duplicate IDs.
+524. **Input**: Domain validation of negative `inner_tube_inner_diameter_m` in `CompleteDoublePipeAssemblyOption`. **Expected output**: Rejected at model validation layer (Pydantic `field_validator` or `ge` constraint) or business-logic domain check. **Exception**: `ValidationError` or `CatalogInvalid` — negative diameters rejected at model or business layer.
+525. **Input**: `HARD_RAW_COMBINATION_CAP` constant type, visibility, and value. **Expected output**: Declared as module-level `int` with value `10_000`; module-private (prefixed `_`); no runtime mutation allowed. **Exception**: N/A — constant invariant: hard cap is immutable and module-private.
+526. **Input**: Effective cap computation with `request_raw_combination_cap = 20_000` (above hard cap). **Expected output**: `effective_cap = 10_000` (silently reduced to hard cap). **Exception**: N/A — cap siloing invariant: effective cap never exceeds `HARD_RAW_COMBINATION_CAP`.
+527. **Input**: Effective cap computation with `request_raw_combination_cap = 5_000` (below hard cap). **Expected output**: `effective_cap = 5_000` (request cap below hard cap honored). **Exception**: N/A — cap siloing invariant: request cap below hard cap is honored without modification.
+528. **Input**: Cap-exceeded result block with `raw_combination_count = 10_001`, `effective_cap = 10_000`. **Expected output**: `status=BLOCKED`, `raw=10001`, `unique=0`, `evaluated=0`, `selected=None`, `top_candidates=()`. **Exception**: N/A — cap-exceeded result invariant: no candidates materialized or evaluated when cap exceeded.
+529. **Input**: Cap-exceeded result for explicit-length catalog exceeding effective cap. **Expected output**: Same BLOCKED result structure; zero materialized or evaluated candidates. **Exception**: N/A — cap invariant: no materialization occurs when either grid or explicit-length catalog exceeds cap.
+530. **Input**: Provider identity mandatory field mismatch — each of the four mandatory fields independently (name, version, git_revision, reference_state_policy). **Expected output**: Each individual mismatch independently produces `PROPERTY_PROVIDER_IDENTITY_MISMATCH`. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — mandatory field identity invariant: every mandatory field is independently verified.
+531. **Input**: Provider identity optional field mismatch: expected `configuration_fingerprint` set to a value, actual returns None. **Expected output**: BLOCKED with `PROPERTY_PROVIDER_IDENTITY_MISMATCH`. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — optional field invariant: expected non-None optional must match actual.
+532. **Input**: Provider identity optional field match: expected `configuration_fingerprint` is None, actual returns any value. **Expected output**: Not a mismatch (None in expected means "do not check this field"). **Exception**: N/A — optional field invariant: None expected means skip verification.
+533. **Input**: Cross-candidate provider identity consistency: two verified candidates from same sizing run with different provider identities. **Expected output**: BLOCKED — run-level identity invariant violated. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — cross-candidate consistency invariant: all verified candidates must share identical provider identity.
+534. **Input**: Cross-candidate provider identity consistency: all verified candidates share identical provider identity. **Expected output**: Passes — run-level identity invariant satisfied. **Exception**: N/A — cross-candidate consistency invariant satisfied.
+535. **Input**: Integrity-invalid `RatingResult` claimed identity is NOT used for provider matching decisions. **Expected output**: Provider identity check correctly skips candidates whose verification outcome is `INTEGRITY_INVALID`. **Exception**: N/A — evidence-integrity invariant: unverified claims must not be treated as verified evidence for matching decisions.
+536. **Input**: All candidates produce `INTEGRITY_INVALID` or `RUNTIME_FAILED` — no verified candidate exists. **Expected output**: Provider identity consistency cannot be enforced; sizing terminates via integrity/failure path without provider identity check. **Exception**: N/A — evidence-integrity invariant: zero verified candidates means no provider consistency check.
+537. **Input**: Typed error `PROPERTY_PROVIDER_IDENTITY_MISMATCH` propagates from per-candidate check to run-level `BLOCKED` status. **Expected output**: A single candidate with provider identity mismatch blocks the entire sizing run with structured error. **Exception**: `PROPERTY_PROVIDER_IDENTITY_MISMATCH` — typed error propagation: per-candidate mismatch escalates to run-level BLOCKED.
+538. **Input**: `CalculationContext` field roles: `request_id` derived per candidate; `design_case_revision_id` and `calculation_run_id` preserved from caller. **Expected output**: `design_case_revision_id` and `calculation_run_id` are identical across all candidates in the same sizing request. **Exception**: N/A — context invariant: caller revision/run IDs are preserved identically across candidates.
+539. **Input**: `CalculationContext` `request_id` uniqueness across candidates in the same sizing run. **Expected output**: Every candidate receives a distinct `request_id` (UUID v4). **Exception**: N/A — context invariant: `request_id` is unique per candidate.
 540. **Input**: Entire document. **Expected output**: Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully. **Exception**: N/A — sync test: parse validation check.
-
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 28 Engineering Design Review.
+1. Complete Round 29 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5634,7 +5634,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 28 Engineering Design Review passes before implementation starts
+- [ ] Round 29 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -5653,6 +5653,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 27 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 28 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
