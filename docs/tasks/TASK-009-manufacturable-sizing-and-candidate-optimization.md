@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 12 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 13 Engineering Design Review passes.
 
 ---
 
@@ -45,6 +45,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 9 | 4798128591 | CHANGES REQUIRED |
 | 10 | 4798318702 | CHANGES REQUIRED |
 | 11 | 4798512240 | CHANGES REQUIRED |
+| 12 | 4798693707 | CHANGES REQUIRED |
 
 ---
 
@@ -885,18 +886,118 @@ All unreadable fields must be explicitly `None`.
 
 **safely_readable_field_digests whitelist:**
 
-Only the following field names may be read from the unverified result:
+Only the following six real `RatingResult` public attributes may be read from the unverified result:
 
 ```text
-rating_status
+status
 result_hash
 provenance_digest
-request_identity_digest
-execution_context_digest
-provider_identity_digest
+request_identity
+execution_context
+provider_identity
 ```
 
-Each entry:
+Nonexistent digest attributes (`request_identity_digest`, `execution_context_digest`, `provider_identity_digest`) are prohibited — these are derived, not stored on `RatingResult`.
+
+### 14.5.1 Safe extraction contract
+
+Accepted source object:
+
+```text
+type(result) is RatingResult
+```
+
+Any other type yields `UNREADABLE`. Do not walk arbitrary attributes, inspect `__dict__`, call user methods, use aliases, invoke `repr`, inspect private fields, or traverse arbitrary descriptors. Each field read is independently wrapped in exception handling.
+
+### 14.5.2 Exact conversions
+
+**`status`:**
+
+Available only when value is an exact `RatingStatus`.
+
+```python
+claimed_rating_status = status.value
+safe_canonical_value = status.value
+```
+
+Otherwise unavailable.
+
+**`result_hash`:**
+
+Available only when value is `str`.
+
+```python
+claimed_result_hash = value
+safe_canonical_value = value
+```
+
+Do not require its validity before retaining it as an audit claim.
+
+**`provenance_digest`:**
+
+Available only when value is `str`.
+
+```python
+claimed_provenance_digest = value
+safe_canonical_value = value
+```
+
+**`request_identity`:**
+
+Available only when value is an exact TASK-008 `RatingRequestIdentity`.
+
+```python
+safe_canonical_value = rating_request_identity_payload  # §14.7.1 exact 21-field payload
+claimed_request_identity_digest = sha256_digest(
+    rating_request_identity_payload
+)
+```
+
+**`execution_context`:**
+
+Available only when value is an exact `ExecutionContextSnapshot`.
+
+```python
+execution_context_payload = {
+    "request_id":
+        str(value.request_id) if value.request_id is not None else None,
+    "design_case_revision_id":
+        str(value.design_case_revision_id)
+        if value.design_case_revision_id is not None
+        else None,
+    "calculation_run_id":
+        str(value.calculation_run_id)
+        if value.calculation_run_id is not None
+        else None,
+}
+claimed_execution_context_digest = sha256_digest(
+    execution_context_payload
+)
+safe_canonical_value = execution_context_payload
+```
+
+**`provider_identity`:**
+
+Available only when value is an exact `ProviderIdentitySnapshot`.
+
+```python
+provider_identity_payload = {
+    "name": value.name,
+    "version": value.version,
+    "git_revision": value.git_revision,
+    "reference_state_policy": value.reference_state_policy,
+    "configuration_fingerprint": value.configuration_fingerprint,
+    "cache_policy_version": value.cache_policy_version,
+}
+claimed_provider_identity_digest = sha256_digest(
+    provider_identity_payload
+)
+safe_canonical_value = provider_identity_payload
+```
+
+### 14.5.3 Field digest
+
+Use the real public source field name:
 
 ```python
 field_digest = sha256_digest({
@@ -905,16 +1006,19 @@ field_digest = sha256_digest({
 })
 ```
 
-`safely_readable_field_digests` is `tuple[(field_name, field_digest), ...]` sorted by field_name ASCII ascending.
+Store:
 
-Rules:
-- If a whitelist field doesn't exist on the result object → skip (do not include in tuple)
-- If reading the field raises an exception → skip (record as unavailable)
-- If the field value cannot be safely canonicalized → skip
-- No alias detection (field_name must match exactly 1:1)
-- Duplicate with snapshot-level claimed fields is expected (the field digest is the same canonicalized value used independently)
-- `UNREADABLE` = all whitelist fields are unavailable (no object, damaged object)
-- Never read `__dict__`, internal properties, or call arbitrary methods
+```text
+tuple[(field_name, field_digest), ...]
+```
+
+sorted by ASCII `field_name`.
+
+### 14.5.4 UNREADABLE
+
+Set `claim_state = UNREADABLE` only when all six real `RatingResult` fields are unavailable.
+
+Top-level claimed fields (`claimed_rating_status`, `claimed_result_hash`, `claimed_provenance_digest`, `claimed_request_identity_digest`, `claimed_execution_context_digest`, `claimed_provider_identity_digest`) and the per-field digests are independently retained. Explicit `None` remains in the audit payload.
 
 **Digest payload:**
 
@@ -983,6 +1087,36 @@ Candidates evaluated in canonical order (§6.4, §18.1.5 strict pipeline). Each 
 
 The error path does NOT construct a trusted `InvalidRatingEvidenceRecord` (the verification process failed, not the integrity check). If a claimed audit record is needed, use `CLAIMED_TASK008_RATING_RESULT` (§21.4 RATING_VERIFICATION).
 
+### 14.6.1 Global enum serialization rule
+
+Every `Enum`/`StrEnum` value entering an identity, evidence, audit, ranking, failure, result, provenance payload, UUID5 name component, or diagnostic key is serialized as `.value`.
+
+This includes but is not limited to:
+
+```text
+RatingStatus
+VerificationOutcome
+ClaimedRatingResultState
+CandidateEvaluationState
+FeasibilityStatus
+SizingStatus
+FailureStage
+ErrorCode / RawInputValidationCode
+EngineeringMessageSeverity
+flow_arrangement
+boundary_condition enums
+optimization_objective
+endpoint_policy
+```
+
+For nullable enum fields:
+
+```python
+value.value if value is not None else None
+```
+
+Do not pass enum objects directly to any frozen exact payload.
+
 ### 14.7 VerifiedRatingEvidenceDigest
 
 Full deterministic digest payload for `VerifiedRatingEvidenceSnapshot`:
@@ -1047,18 +1181,43 @@ provider_identity_digest = sha256_digest(provider_identity_payload)
 ```
 
 ```python
-# RatingRequestIdentity
+# RatingRequestIdentity (TASK-008 exact 21-field payload)
 rating_request_identity_payload = {
-    "source_qualified_candidate_id": ...,
-    "sizing_request_identity_digest": ...,
-    "rating_request_identity_digest": ...,
-    "provider_identity_digest": ...,
-    "execution_context_identity_digest": ...,
-    "rating_result_hash": ...,
-    "rating_provenance_digest": ...,
+    "hot_fluid_name": snapshot.hot_fluid_name,
+    "hot_fluid_backend": snapshot.hot_fluid_backend,
+    "hot_fluid_components": snapshot.hot_fluid_components,
+    "cold_fluid_name": snapshot.cold_fluid_name,
+    "cold_fluid_backend": snapshot.cold_fluid_backend,
+    "cold_fluid_components": snapshot.cold_fluid_components,
+    "hot_mass_flow_kg_s": snapshot.hot_mass_flow_kg_s,
+    "cold_mass_flow_kg_s": snapshot.cold_mass_flow_kg_s,
+    "hot_inlet_pressure_pa": snapshot.hot_inlet_pressure_pa,
+    "cold_inlet_pressure_pa": snapshot.cold_inlet_pressure_pa,
+    "hot_inlet_temperature_k": snapshot.hot_inlet_temperature_k,
+    "cold_inlet_temperature_k": snapshot.cold_inlet_temperature_k,
+    "flow_arrangement": snapshot.flow_arrangement,
+    "geometry": snapshot.geometry,
+    "solver_absolute_residual_w": snapshot.solver_absolute_residual_w,
+    "solver_relative_residual_fraction": snapshot.solver_relative_residual_fraction,
+    "solver_bracket_temperature_tolerance_k":
+        snapshot.solver_bracket_temperature_tolerance_k,
+    "solver_max_iterations": snapshot.solver_max_iterations,
+    "tube_boundary_condition": snapshot.tube_boundary_condition,
+    "annulus_boundary_condition": snapshot.annulus_boundary_condition,
+    "minimum_terminal_delta_t": snapshot.minimum_terminal_delta_t,
 }
-rating_request_identity_digest = sha256_digest(rating_request_identity_payload)
+rating_request_identity_digest = sha256_digest(
+    rating_request_identity_payload
+)
 ```
+
+Rules:
+- No self-reference (no `rating_request_identity_digest` inside its own payload)
+- No provider identity, execution context, candidate ID, or rating fields
+- `geometry` is the actual stored TASK-008 geometry dictionary
+- `flow_arrangement`, `tube_boundary_condition`, `annulus_boundary_condition` are enum `.value` strings
+- Equivalent `dataclasses.asdict(snapshot)` is allowed only if field keys exactly match the frozen list above
+- Output uses `sha256:` prefix via repository `sha256_digest()`
 
 ```python
 # ExecutionContextSnapshot
@@ -1090,31 +1249,77 @@ selected_correlation_payload = {
 selected_correlation_digest = sha256_digest(selected_correlation_payload)
 ```
 
+### 14.7.2 Canonical context normalization
+
+For `EngineeringMessage.context` and `RunFailure.context`, use one shared normalization.
+
+For each `(key, value)` pair:
+
 ```python
-# EngineeringMessage
+entry = {
+    "key": key,
+    "value": value,
+    "value_digest": sha256_digest({"value": value}),
+}
+```
+
+Sort entries by `(key, value_digest)`. Preserve duplicate entries.
+
+```python
+canonical_context_entries = sorted_entries
+context_digest = sha256_digest({
+    "entries": canonical_context_entries,
+})
+```
+
+### 14.7.3 EngineeringMessage exact payload
+
+```python
 engineering_message_payload = {
-    "code": ...,
-    "severity": ...,
-    "source_module": ...,
-    "affected_paths": ...,
-    "message": ...,
-    "context_digest": ...,
+    "schema_version": message.schema_version,
+    "code": message.code.value,
+    "severity": message.severity.value,
+    "message": message.message,
+    "source_module": message.source_module,
+    "affected_paths": list(message.affected_paths),
+    "context_entries": canonical_context_entries,
 }
-engineering_message_digest = sha256_digest(engineering_message_payload)
+engineering_message_digest = sha256_digest(
+    engineering_message_payload
+)
 ```
+
+`allows_continuation` is excluded from the digest because it is derived from severity. Before digesting, verify:
+
+```text
+INFO/WARNING  → allows_continuation == True
+ERROR/BLOCKER → allows_continuation == False
+```
+
+A mismatch is an invalid shared message object and must not be silently hashed.
+
+### 14.7.4 RunFailure exact payload
 
 ```python
-# RunFailure
 run_failure_payload = {
-    "failure_stage": ...,
-    "candidate_id": ...,
-    "evaluation_order_index": ...,
-    "context": canonicalized_context,
+    "schema_version": failure.schema_version,
+    "code": failure.code.value,
+    "message": failure.message,
+    "traceback": failure.traceback,
+    "context_entries": canonical_context_entries,
 }
-run_failure_digest = sha256_digest(run_failure_payload)
+run_failure_digest = sha256_digest(
+    run_failure_payload
+)
 ```
 
-Explicit `None` handling: nullable fields enter the payload as `None` (not omitted).
+Rules:
+- Nullable `traceback` enters the payload explicitly as `None`.
+- `failure_stage`, `candidate_id`, and `evaluation_order_index` remain entries inside `RunFailure.context`; they do not replace `code`, `message`, `traceback`, or `schema_version`.
+
+### 14.7.5 Explicit None handling
+
+Nullable fields enter the payload as `None` (not omitted).
 All computed via the standard `sha256_digest(payload)` contract — single call, `canonical_json` handled internally.
 
 ---
@@ -1190,7 +1395,7 @@ tube_correlation != None
 annulus_correlation != None
 ```
 
-When `rating_status in (BLOCKED, FAILED)` or `heat_duty_w is None` or `CandidateEvaluationState == PROVIDER_IDENTITY_MISMATCH`:
+When `rating_status in (BLOCKED, FAILED)` or `heat_duty_w is None` or `candidate_evaluation_state == CandidateEvaluationState.VERIFIED and feasibility_status == FeasibilityStatus.PROVIDER_IDENTITY_MISMATCH`:
 
 ```text
 duty_margin_w = None
@@ -1576,11 +1781,11 @@ No "or frozen equivalent" — these exact values are frozen.
 
 | Code | message_key | Message | field_path | rejected_value_digest | context keys | multiplicity |
 |------|------------|---------|------------|----------------------|--------------|-------------|
-| `NON_STRING_MAPPING_KEY` | `"non_string_mapping_key"` | `"Mapping key is not a string"` | `("$mapping_entries", key_payload_digest [, occurrence_index])` | `sha256(key_marker)` | `("key_type", "key_kind")` | 1 per non-string-key entry |
-| `UNSUPPORTED_RAW_MAPPING_KEY` | `"unsupported_raw_mapping_key"` | `"Mapping key is an unsupported type"` | `("$mapping_entries", key_payload_digest [, occurrence_index])` | `sha256(key_marker)` | `("key_type",)` | 1 per opaque-key entry (NOT also NON_STRING_MAPPING_KEY) |
-| `UNSUPPORTED_RAW_INPUT_TYPE` | `"unsupported_raw_input_type"` | `"Unsupported value type in input"` | `("$unsupported_type",)` | `sha256(marker)` | `("object_type",)` | 1 per occurrence |
-| `CYCLIC_RAW_INPUT` | `"cyclic_raw_input"` | `"Container has cyclic reference"` | `("$cyclic_reference",)` | `sha256(marker)` | `("ancestor_distance",)` | 1 per cycle occurrence |
-| `NON_FINITE_RAW_FLOAT` | `"non_finite_raw_float"` | `"Float value is NaN or Infinity"` | per context | `sha256(value)` | `("original_value",)` | 1 per occurrence |
+| `NON_STRING_MAPPING_KEY` | `"non_string_mapping_key"` | `"Mapping key is not a string"` | `("$mapping_entries", key_payload_digest [, occurrence_index])` | `sha256_digest({"key_payload": key_payload})` | `("key_type", "key_kind")` | 1 per non-string-key entry |
+| `UNSUPPORTED_RAW_MAPPING_KEY` | `"unsupported_raw_mapping_key"` | `"Mapping key is an unsupported type"` | `("$mapping_entries", key_payload_digest [, occurrence_index])` | `sha256_digest({"key_payload": key_payload})` | `("key_type",)` | 1 per opaque-key entry (NOT also NON_STRING_MAPPING_KEY) |
+| `UNSUPPORTED_RAW_INPUT_TYPE` | `"unsupported_raw_input_type"` | `"Unsupported value type in input"` | `("$unsupported_type",)` | `sha256_digest({"unsupported_value_marker": {"$unsupported_type": qualified_type_name}})` | `("object_type",)` | 1 per occurrence |
+| `CYCLIC_RAW_INPUT` | `"cyclic_raw_input"` | `"Container has cyclic reference"` | `("$cyclic_reference",)` | `sha256_digest({"cyclic_reference_marker": {"$cyclic_reference": {"ancestor_distance": ancestor_distance}}})` | `("ancestor_distance",)` | 1 per cycle occurrence |
+| `NON_FINITE_RAW_FLOAT` | `"non_finite_raw_float"` | `"Float value is NaN or Infinity"` | per context | `sha256_digest({"non_finite_float_marker": "nan" | "+infinity" | "-infinity"})` | `("original_value",)` | 1 per occurrence |
 
 **SizingValidationErrorSnapshot (updated):**
 
@@ -1630,6 +1835,50 @@ Rules:
 - verify_hash() runs immediately after each rating returns. If hash returns False or raises an exception, verify_provenance() is NOT called.
 - Hash verification outcome drives the candidate state immediately — the pipeline does not proceed to provider comparison unless both verification steps pass.
 - Provider comparison occurs only after verification passes for the current candidate. It does NOT batch across candidates.
+
+### 18.1.7 Safe verification wrappers
+
+The merged TASK-008 `verify_provenance()` contract catches its internal exceptions and returns `False`. Verification outcomes are derived through two defensive wrappers that distinguish normal boolean outcomes from unexpected runtime exceptions:
+
+```python
+def safe_verify_hash(result) -> VerificationOutcome:
+    try:
+        return (
+            VerificationOutcome.PASSED
+            if result.verify_hash()
+            else VerificationOutcome.FAILED
+        )
+    except Exception:
+        return VerificationOutcome.ERROR
+```
+
+```python
+def safe_verify_provenance(result) -> VerificationOutcome:
+    try:
+        return (
+            VerificationOutcome.PASSED
+            if result.verify_provenance()
+            else VerificationOutcome.FAILED
+        )
+    except Exception:
+        return VerificationOutcome.ERROR
+```
+
+**Semantics:**
+- `FAILED` is the normal integrity-invalid boolean outcome — the TASK-008 result failed verification.
+- `ERROR` is only an unexpected defensive wrapper/runtime exception — it means the verification code itself could not execute normally.
+- Do not claim TASK-008 `verify_provenance()` normally raises; the merged TASK-008 API catches exceptions internally and returns `False`.
+- Do not modify TASK-008 to manufacture an exception path.
+
+**Outcome combinations:**
+
+| hash | provenance | candidate state | sizing status | termination_reason |
+|------|-----------|-----------------|---------------|--------------------|
+| FAILED | NOT_RUN | INTEGRITY_INVALID | BLOCKED | rating_result_integrity_failed |
+| ERROR | NOT_RUN | RUNTIME_FAILED | FAILED | (RunFailure, failure_stage=RATING_VERIFICATION) |
+| PASSED | FAILED | INTEGRITY_INVALID | BLOCKED | rating_result_integrity_failed |
+| PASSED | ERROR | RUNTIME_FAILED | FAILED | (RunFailure, failure_stage=RATING_VERIFICATION) |
+| PASSED | PASSED | VERIFIED | per provider | — |
 
 ### 18.2 InvalidSizingRequestSnapshot
 
@@ -2934,7 +3183,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 170. Validation error insertion-order independence
 171. Markdown code fence in `SizingRequestIdentity` schema validated (no leading pipes)
 172. Section numbering continuous (no gaps, no duplicates)
-173. Acceptance Criteria references Round 12
+173. Acceptance Criteria references Round 13
 174. Issue #23 frozen SHA equals new docs commit
 175. Task-card test range headings match numbered entries
 176. Issue test total equals task-card N
@@ -2968,7 +3217,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 201. Section numbering continuous (no gaps, section 20.3 present)
 202. Issue #23 test total equals task-card N
 203. Issue #23 frozen SHA equals new docs commit
-204. Acceptance Criteria references Round 12
+204. Acceptance Criteria references Round 13
 
 ### 27.13 Round 9 Contract Tests (205–244)
 
@@ -3010,8 +3259,8 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 240. Round 9 Design Review Comment ID is `4798128591`
 241. Round 10 Review Comment ID is `4798318702`; no duplicate Round 8/9 acceptance refs
 242. Issue #23 frozen SHA equals new docs commit SHA
-243. Test numbering continuous 1–295 (no gaps, no duplicates)
-244. Issue #23 and task card test total both report N=295
+243. Test numbering continuous 1–332 (no gaps, no duplicates)
+244. Issue #23 and task card test total both report N=332
 
 ### 27.14 Round 10 Contract Tests (245–295)
 
@@ -3060,12 +3309,12 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 287. Top-level heading sequence continuous (1–29, no gaps)
 288. Section 21 exists (RunFailure Stage Model)
 289. Section 28 Delivery Sequence heading exists
-290. Test numbering continuous 1–295
+290. Test numbering continuous 1–332
 291. Section heading test: all `## N.` extracted as int list equals `range(1, 30)`
 292. Section heading test: no duplicates, no gaps
-293. Test matrix section range 27.1–27.15 continuous
+293. Test matrix section range 27.1–27.16 continuous
 294. Issue #23 test total equals task card N=332
-295. Acceptance Criteria references Round 12
+295. Acceptance Criteria references Round 13
 
 ### 27.15 Round 11 Contract Tests (296–332)
 
@@ -3090,7 +3339,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 314. Pipeline order: evidence constructed before provider comparison (not provider→evidence)
 315. No `N=244` anywhere in document
 316. Top-level headings continuous 1–29
-317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.7, 27.1–27.15)
+317. Subsection headings continuous within each parent section (14.1–14.7, 18.1.1–18.1.6, 19A.1–19A.8, 20.1–20.6, 22.1–22.7, 27.1–27.16)
 318. No duplicate `19A.5` heading
 319. No `## 14.8` heading (is `### 14.7`)
 320. Issue #23 lists Round 9/10/11 review entries
@@ -3103,15 +3352,56 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 327. Edge registry includes `SIZING_RUN -> SIZING_OPTIMIZER = "executes"`
 328. Nested digest payloads frozen: ProviderIdentitySnapshot (6 fields), ExecutionContextSnapshot (3 fields), SelectedCorrelationSnapshot (11 fields)
 329. Round 11 Review Comment ID is `4798512240`
-330. Acceptance Criteria references Round 12
+330. Acceptance Criteria references Round 13
 331. Issue #23 frozen SHA equals new docs commit
 332. Test numbering continuous 1–332; Issue and task card test total match
+
+### 27.16 Round 12 Contract Tests (333–370)
+
+333. TASK-008 `RatingRequestIdentity` exact 21-field payload
+334. Rating request digest has no self-reference (no `rating_request_identity_digest` field)
+335. Provider/context/candidate/result fields excluded from rating request identity payload
+336. `CandidateEvaluationIdentity` remains a separate exact 7-field payload
+337. Claimed whitelist uses six real `RatingResult` attributes (`status`, `result_hash`, `provenance_digest`, `request_identity`, `execution_context`, `provider_identity`)
+338. Nonexistent digest attributes (`request_identity_digest`, `execution_context_digest`, `provider_identity_digest`) are prohibited in whitelist
+339. Safe `status` extraction uses `RatingStatus.value`
+340. Safe request-identity extraction derives the exact 21-field digest
+341. Safe execution-context extraction derives the exact 3-field digest
+342. Safe provider-identity extraction derives the exact 6-field digest
+343. Wrong object type or all unavailable fields yields `claim_state = UNREADABLE`
+344. Claimed field digest uses the real public `RatingResult` field name (not alias)
+345. `EngineeringMessage` exact shared payload (schema_version, code.value, severity.value, message, source_module, affected_paths, context_entries)
+346. `allows_continuation` excluded from digest but verified from severity (INFO/WARNING → True, ERROR/BLOCKER → False)
+347. Engineering-message context normalization: insertion-order independent via sorted entries
+348. `RunFailure` exact shared payload (schema_version, code.value, message, traceback, context_entries)
+349. RunFailure nullable `traceback` enters payload as `None`
+350. TASK-009 `failure_stage`/`candidate_id`/`evaluation_order_index` remain in RunFailure.context entries, not top-level payload fields
+351. Supported non-string key emits exactly one `NON_STRING_MAPPING_KEY` validation error (not also `UNSUPPORTED_RAW_MAPPING_KEY`)
+352. Opaque key emits exactly one `UNSUPPORTED_RAW_MAPPING_KEY` validation error (not also `NON_STRING_MAPPING_KEY`)
+353. Opaque key never emits both raw-key validation codes simultaneously
+354. Rejected-value digests use exact `sha256_digest(payload)` formulas (not bare `sha256(marker)`)
+355. Provider mismatch uses `VERIFIED + feasibility_status == PROVIDER_IDENTITY_MISMATCH` predicate (not `CandidateEvaluationState == PROVIDER_IDENTITY_MISMATCH`)
+356. Removed state comparison (`CandidateEvaluationState == PROVIDER_IDENTITY_MISMATCH`) is prohibited
+357. No executable `N=295` assertion remains in the document
+358. One final test total only (1–370)
+359. `verify_provenance() == False` is the normal integrity-failure outcome (maps to FAILED)
+360. Unexpected wrapper/runtime exception maps to `VerificationOutcome.ERROR`
+361. `verify_hash()` false and exception outcomes are distinct (FAILED vs ERROR)
+362. Complete provenance registry contains all 14 concepts (ROOT_CASE_REVISION, ROOT_EXTERNAL, SIZING_RUN, SIZING_OPTIMIZER, CATALOG_SNAPSHOT, CANDIDATE, TASK008_RATING_RESULT, CLAIMED_TASK008_RATING_RESULT, SIZING_RESULT, SIZING_RUN_FAILURE_RESULT, INVALID_EVIDENCE, RUNTIME_FAILURE, WARNING, BLOCKER)
+363. Every provenance concept has an exact payload-hash payload
+364. Every provenance concept has exact metadata fields (node_type, label, UUID5 name, payload_hash, required metadata, allowed incoming/outgoing edges)
+365. Every provenance concept has allowed incoming/outgoing relations validated
+366. Global enum serialization uses `.value` for all enums in payloads (RatingStatus, VerificationOutcome, FeasibilityStatus, etc.)
+367. No enum object is passed directly in an exact digest payload
+368. Round 12 Review Comment ID is `4798693707`
+369. Issue #23 frozen SHA equals the new Round 12 docs commit
+370. Repository history retains the two hygiene commits (`e7e68f6`, `604a045`), `dummy` is absent, and final numbering is continuous 1–370
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 12 Engineering Design Review.
+1. Complete Round 13 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -3125,7 +3415,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 12 Engineering Design Review passes before implementation starts
+- [ ] Round 13 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -3144,6 +3434,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–332 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), and Round 11 (296–332)
+- [ ] Required test matrix entries 1–370 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), and Round 12 (333–370)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
