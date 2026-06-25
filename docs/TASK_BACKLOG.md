@@ -34,7 +34,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | ID | Task | Status | Depends on |
 |---|---|---|---|
 | TASK-007 | Implement single-phase tube and annulus correlations | DONE | TASK-003, TASK-004, TASK-006 |
-|| TASK-008 | Implement fixed-geometry double-pipe rating | IN_PROGRESS | TASK-005, TASK-006, TASK-007 |
+| TASK-008 | Implement fixed-geometry double-pipe rating | DONE | TASK-005, TASK-006, TASK-007 |
 | TASK-009 | Implement manufacturable sizing and candidate optimization | READY | TASK-008 |
 | TASK-010 | Add versioned API and traceable report | READY | TASK-005, TASK-009 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
@@ -52,7 +52,7 @@ TASK-040 through TASK-059 cover gasketed, brazed and semi-welded types; licensed
 
 ## M5 — Air coolers
 
-TASK-060 through TASK-079 cover forced/induced draft configurations, dry/wet air properties, finned-tube heat transfer, fin efficiency, air-side pressure drop, fan/system curves, altitude and recirculation corrections, noise and freeze screening, structure, costing, API, report and validation.
+TASK-060 through TASK-079 cover forced/induced draft configurations, dry/wet air properties, finned-tube heat transfer, fin efficiency, air-side pressure drop, fan/system curves, altitude and recirculation corrections, noise and freeze screening, structure, costing, optimization, API, report and validation.
 
 ## M6 — Two-phase and refrigerants
 
