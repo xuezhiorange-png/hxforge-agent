@@ -2283,22 +2283,77 @@ def _verify_property_call_identity(
         if inlet_evaluations[0] != 0:
             return False
 
-        # 7. Inlet calls: on success path hot=0, cold=1; on failure path
-        #    partial inlet is allowed (e.g. hot fails before cold is attempted)
-        inlet_calls = by_eval[0]
-        if len(inlet_calls) >= 2:
-            inlet_hot = [pc for pc in inlet_calls if pc.stream_role in ("hot_inlet",)]
-            inlet_cold = [pc for pc in inlet_calls if pc.stream_role in ("cold_inlet",)]
-            if len(inlet_hot) != 1 or len(inlet_cold) != 1:
+        # 7. Inlet evaluation full contract
+        #    hot failure:  1 call (hot_inlet/TP/fail), inlet is last eval,
+        #                  BLOCKED/converged=False/termination=blocked,
+        #                  q_max_diagnostics=None
+        #    cold failure: 2 calls (hot success, cold fail), same context
+        #    success:      2 calls (hot+TP success, cold+TP success)
+        inlet_calls_sorted = sorted(
+            by_eval[0],
+            key=lambda c: c.call_index_within_evaluation,
+        )
+        inlet_is_last = inlet_evaluations[0] == max(eval_indices)
+
+        if len(inlet_calls_sorted) == 1:
+            # Hot failure: exactly one hot_inlet/TP/failed call
+            ic = inlet_calls_sorted[0]
+            if ic.stream_role != "hot_inlet":
                 return False
-            if inlet_hot[0].call_index_within_evaluation != 0:
+            if ic.query_type != "TP":
                 return False
-            if inlet_cold[0].call_index_within_evaluation != 1:
+            if ic.success:
                 return False
-        elif len(inlet_calls) == 1:
-            # Single inlet call (failure before second attempt) is allowed
-            pass
+            if ic.call_index_within_evaluation != 0:
+                return False
+            # Inlet must be the last evaluation
+            if not inlet_is_last:
+                return False
+            # Must be BLOCKED, converged=False, termination=blocked
+            if status is None or converged is None or solver_termination_reason is None:
+                return False
+            if status != RatingStatus.BLOCKED:
+                return False
+            if converged is not False:
+                return False
+            if solver_termination_reason != "blocked":
+                return False
+            # Diagnostics incompatible with failed inlet
+            if q_max_diagnostics is not None:
+                return False
+        elif len(inlet_calls_sorted) == 2:
+            ic0, ic1 = inlet_calls_sorted
+            # call 0 must be hot_inlet/TP
+            if ic0.stream_role != "hot_inlet" or ic0.query_type != "TP":
+                return False
+            if ic0.call_index_within_evaluation != 0:
+                return False
+            # call 1 must be cold_inlet/TP
+            if ic1.stream_role != "cold_inlet" or ic1.query_type != "TP":
+                return False
+            if ic1.call_index_within_evaluation != 1:
+                return False
+
+            if not ic0.success:
+                return False  # hot failure → cold never attempted; impossible with 2 calls
+
+            if not ic1.success:
+                # Cold failure: inlet must be last, BLOCKED, no diagnostics
+                if not inlet_is_last:
+                    return False
+                if status is None or converged is None or solver_termination_reason is None:
+                    return False
+                if status != RatingStatus.BLOCKED:
+                    return False
+                if converged is not False:
+                    return False
+                if solver_termination_reason != "blocked":
+                    return False
+                if q_max_diagnostics is not None:
+                    return False
+            # else both succeed → OK, can proceed to later phases
         else:
+            # 0 or 3+ inlet calls → impossible
             return False
 
         all_roles = {pc.evaluation_role for pc in property_calls}
@@ -2723,6 +2778,27 @@ def _verify_property_call_identity(
                     by_eval[max_eval][0].evaluation_role
                     != EvaluationRole.Q_MAX_PARALLEL_PINCH.value
                 ):
+                    return False
+
+        # (n) Successful Q_max with later phases requires diagnostics.
+        # If a Q_max phase completed successfully (all calls succeeded)
+        # and later bracket/solver/final phases exist, q_max_diagnostics
+        # must be non-None — regardless of final result status.
+        if has_solver_path and q_max_diagnostics is None:
+            qmax_phases = {
+                EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+            }
+            present_qmax = all_roles & qmax_phases
+            if present_qmax:
+                qmax_all_success = all(
+                    c.success
+                    for cs in by_eval.values()
+                    if cs[0].evaluation_role in qmax_phases
+                    for c in cs
+                )
+                if qmax_all_success:
                     return False
 
         # ---- (3) Failed Q_max call stops the state machine ----------------

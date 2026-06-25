@@ -2497,3 +2497,479 @@ class TestDuplicateQmaxEvaluations:
             solver_termination_reason="blocked",
         )
         assert result is False, "parallel limits-without-pinch duplicate limits should be rejected"
+
+
+# =========================================================================
+# 11. Round 17 inlet contract + successful Q_max diagnostics
+# =========================================================================
+
+
+class TestInletFullContract:
+    """Inlet evaluation must enforce exact hot-failure, cold-failure, and
+    success contracts."""
+
+    def test_inlet_hot_failure_accepts(self) -> None:
+        """Hot failure: exactly 1 call hot_inlet/TP/fail, BLOCKED, last → True."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is True, "hot failure inlet should pass"
+
+    def test_inlet_hot_failure_with_diagnostics_rejected(self) -> None:
+        """Hot failure inlet with diagnostics → False."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+
+        diag = QMaxDiagnosticsSnapshot(
+            q_max_w=80000.0,
+            iterations=0,
+            final_pinch_residual_k=0.0,
+            termination_reason="independent_limits",
+            hot_limit_w=80000.0,
+            cold_limit_w=120000.0,
+            limiting_side="hot_limit",
+        )
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            q_max_diagnostics=diag,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "hot failure inlet with diagnostics should be rejected"
+
+    def test_inlet_single_success_rejected(self) -> None:
+        """Single successful inlet call → False (cannot proceed to later phases)."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.SUCCEEDED,
+            converged=True,
+            solver_termination_reason="converged",
+        )
+        assert result is False, "single successful inlet should be rejected"
+
+    def test_inlet_wrong_role_rejected(self) -> None:
+        """Single inlet with wrong stream_role → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "wrong role inlet failure should be rejected"
+
+    def test_inlet_wrong_query_type_rejected(self) -> None:
+        """Single inlet with wrong query type → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="PH",
+                stream_role="hot_inlet",
+                stage="inlet",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="PH failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "wrong query type inlet failure should be rejected"
+
+    def test_inlet_cold_failure_accepts(self) -> None:
+        """Cold failure: hot success, cold fail, last, BLOCKED → True."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is True, "cold failure inlet should pass"
+
+    def test_inlet_cold_failure_followed_by_qmax_rejected(self) -> None:
+        """Cold failure inlet with later Q_max → False (inlet not last)."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+                success=False,
+                error_code="BACKEND_FAILURE",
+                error_message="TP failed",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.BLOCKED,
+            converged=False,
+            solver_termination_reason="blocked",
+        )
+        assert result is False, "cold failure followed by Q_max should be rejected"
+
+    def test_inlet_three_calls_rejected(self) -> None:
+        """Three inlet calls → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=2,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.SUCCEEDED,
+            converged=True,
+            solver_termination_reason="converged",
+        )
+        assert result is False, "three inlet calls should be rejected"
+
+    def test_inlet_success_accepts(self) -> None:
+        """Inlet success: 2 calls, both TP success → True (with full trace)."""
+        from hexagent.exchangers.double_pipe.result import QMaxDiagnosticsSnapshot
+
+        diag = QMaxDiagnosticsSnapshot(
+            q_max_w=80000.0,
+            iterations=0,
+            final_pinch_residual_k=0.0,
+            termination_reason="independent_limits",
+            hot_limit_w=80000.0,
+            cold_limit_w=120000.0,
+            limiting_side="hot_limit",
+        )
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=4,
+                eval_idx=2,
+                role=EvaluationRole.FINAL_EVALUATION.value,
+                call_idx=0,
+                query_type="PH",
+                stream_role="hot_solver",
+                stage="final",
+                trial_q_w=50000.0,
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            q_max_diagnostics=diag,
+            status=RatingStatus.SUCCEEDED,
+            converged=True,
+            solver_termination_reason="converged",
+        )
+        assert result is True, "inlet success should pass"
+
+
+class TestSuccessfulQmaxRequiresDiagnostics:
+    """Successful Q_max with later phases must carry q_max_diagnostics."""
+
+    def test_counterflow_qmax_success_no_diagnostics_rejected(self) -> None:
+        """Counterflow Q_max success + later phases, no diagnostics → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=4,
+                eval_idx=2,
+                role=EvaluationRole.BRACKET_PROBE.value,
+                call_idx=0,
+                query_type="PH",
+                stream_role="hot_solver",
+                stage="bracket",
+                trial_q_w=50000.0,
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.COUNTERFLOW,
+            status=RatingStatus.SUCCEEDED,
+            converged=True,
+            solver_termination_reason="converged",
+            q_max_diagnostics=None,
+        )
+        assert result is False, "counterflow Q_max success without diag should be rejected"
+
+    def test_parallel_qmax_success_no_diagnostics_rejected(self) -> None:
+        """Parallel Q_max success + later phases, no diagnostics → False."""
+        calls = [
+            _make_call(
+                seq_idx=0,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=1,
+                eval_idx=0,
+                role=EvaluationRole.INLET.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_inlet",
+                stage="inlet",
+            ),
+            _make_call(
+                seq_idx=2,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=0,
+                query_type="TP",
+                stream_role="hot_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=3,
+                eval_idx=1,
+                role=EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                call_idx=1,
+                query_type="TP",
+                stream_role="cold_limit",
+                stage="q_max",
+            ),
+            _make_call(
+                seq_idx=4,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                call_idx=0,
+                query_type="PH",
+                stream_role="hot_solver",
+                stage="q_max",
+                trial_q_w=80000.0,
+            ),
+            _make_call(
+                seq_idx=5,
+                eval_idx=2,
+                role=EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                call_idx=1,
+                query_type="PH",
+                stream_role="cold_solver",
+                stage="q_max",
+                trial_q_w=80000.0,
+            ),
+            _make_call(
+                seq_idx=6,
+                eval_idx=3,
+                role=EvaluationRole.FINAL_EVALUATION.value,
+                call_idx=0,
+                query_type="PH",
+                stream_role="hot_solver",
+                stage="final",
+                trial_q_w=50000.0,
+            ),
+        ]
+        result = _verify_property_call_identity(
+            tuple(calls),
+            FlowArrangement.PARALLEL,
+            status=RatingStatus.BLOCKED,
+            converged=True,
+            solver_termination_reason="converged",
+            q_max_diagnostics=None,
+        )
+        assert result is False, "parallel Q_max success without diag should be rejected"

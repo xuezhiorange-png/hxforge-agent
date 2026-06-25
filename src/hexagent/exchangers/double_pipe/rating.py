@@ -2759,6 +2759,7 @@ def rate_double_pipe(
             provider_identity=provider_identity,
             execution_context=ctx_snapshot,
             flow_arrangement=flow_arrangement,
+            q_max_diagnostics=q_max_diag,
         )
 
     # =====================================================================
