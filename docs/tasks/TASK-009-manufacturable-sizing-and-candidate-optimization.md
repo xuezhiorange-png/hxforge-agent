@@ -1434,7 +1434,7 @@ All-stage mapping (failure_stage depends on where canonicalization occurs):
 Non-recursive proof:
 - `fallback_failure_context` domain = `tuple[tuple[str, str], ...]`
 - `canonical_json(fallback failure payload)` succeeds without reading `unsupported_value` again
-- If fallback construction itself fails, the fallback RunFailure is constructed without the context entry; the entry domain is guaranteed primitive by the construction contract above.
+- The entry domain is guaranteed primitive by the construction contract above.
 - To avoid cascading failure, the RunFailure context entry is constructed without attempting to canonicalize the unsupported value; the context path digest, failure kind, and safe marker digest provide traceability without risking a second canonicalization failure.
 
 ---
@@ -2376,25 +2376,31 @@ Two distinct `ROOT` concepts prevent expression of root-type selection within a 
 
 ```python
 def select_root_concept(
-    design_case_revision_id: str | None,
-) -> tuple[ProvenanceConcept, str, str]:
-    """Select the root concept based on design_case_revision_id presence.
-    
-    If design_case_revision_id is present and not None → ROOT_CASE_REVISION
-    with CASE_REVISION type and label f\"revision_{id}\".
-    Otherwise → ROOT_EXTERNAL with EXTERNAL type and label \"external_root\".
-    """
+    request_kind: SizingRunRequestKind,
+    design_case_revision_id: UUID | None,
+) -> ProvenanceConcept:
+    if request_kind is SizingRunRequestKind.RAW:
+        return ProvenanceConcept.ROOT_EXTERNAL
     if design_case_revision_id is not None:
-        return (
-            ProvenanceConcept.ROOT_CASE_REVISION,
-            "CASE_REVISION",
-            f"revision_{design_case_revision_id}",
-        )
-    return (
-        ProvenanceConcept.ROOT_EXTERNAL,
-        "EXTERNAL",
-        "external_root",
-    )
+        return ProvenanceConcept.ROOT_CASE_REVISION
+    return ProvenanceConcept.ROOT_EXTERNAL
+
+
+def root_node_type(root_concept: ProvenanceConcept) -> ProvenanceNodeType:
+    if root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
+        return ProvenanceNodeType.CASE_REVISION
+    return ProvenanceNodeType.EXTERNAL
+
+
+def root_label(
+    root_concept: ProvenanceConcept,
+    design_case_revision_id: UUID | None,
+) -> str:
+    if root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
+        return f"revision_{design_case_revision_id}"
+    return "external_root"
+```
+
 ```
 
 Edge labels are uniquely frozen:
@@ -2494,7 +2500,6 @@ ProvenanceOutgoingRelation = tuple[str, ProvenanceConcept]  # (label, target_con
 
 
 class ProvenanceRelationSpec:
-    """Exact relation with typed source/target concept."""
     source_concept: ProvenanceConcept
     relation: str
     target_concept: ProvenanceConcept
@@ -2513,22 +2518,24 @@ class ProvenanceConceptSpec:
     multiplicity_formula_name: str
 ```
 
-| Concept | node_type | label_formula | uuid5_name_formula | payload_hash_payload | required_metadata_fields | allowed_incoming | allowed_outgoing | multiplicity_source | allowed_termination_classes | forbidden_termination_classes |
-|---------|-----------|---------------|--------------------|----------------------|--------------------------|------------------|------------------|---------------------|------------------------------|-------------------------------|
-| ROOT_CASE_REVISION | CASE_REVISION | `f"revision_{design_case_revision_id}"` | `f"root-case-revision:{design_case_revision_id}"` | `{"design_case_revision_id": design_case_revision_id}` | `("design_case_revision_id",)` | () | (("initiates", "SIZING_RUN"),) | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST,) |
-| ROOT_EXTERNAL | EXTERNAL | `"external_root"` | `f"root-external:{request_kind.value}:{request_digest}"` | `{"request_kind": request_kind.value, "request_digest": request_digest}` | () | () | (("initiates", "SIZING_RUN"),) | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST,) |
-| SIZING_RUN | CALCULATION_RUN | `f"sizing_run_{request_digest}"` | `f"sizing-run:{request_kind.value}:{request_digest}"` | `{"request_kind": request_kind.value, "request_digest": request_digest}` | `("request_kind", "request_digest")` | (("initiates", "ROOT_CASE_REVISION"), ("initiates", "ROOT_EXTERNAL")) | (("consumes", "CATALOG_SNAPSHOT"), ("executes", "SIZING_OPTIMIZER"), ("produces", "SIZING_RESULT"), ("produces_failure_record", "SIZING_RUN_FAILURE_RESULT"), ("emits", "WARNING"), ("emits", "BLOCKER")) | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
-| SIZING_OPTIMIZER | OPTIMIZER | `"sizing_optimizer"` | `f"optimizer:{request_digest}"` | `{"request_kind": request_kind.value, "request_digest": request_digest}` | `("request_kind", "request_digest")` | (("executes", "SIZING_RUN"), ("evaluated_by", "TASK008_RATING_RESULT")) | (("produces", "SIZING_RESULT"), ("precedes_failure", "SIZING_RUN_FAILURE_RESULT"), ("emits", "WARNING"), ("emits", "BLOCKER")) | 1 | (TerminationClass.SUCCEEDED, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH) |
-| CATALOG_SNAPSHOT | INTERMEDIATE | `f"catalog_{catalog_id}"` | `f"catalog:{catalog_id}:{catalog_version}:{catalog_content_hash}"` | `{"catalog_id": catalog_id, "catalog_version": catalog_version, "catalog_content_hash": catalog_content_hash, "source_identity": source_identity, "schema_version": schema_version}` | `("catalog_id", "catalog_version", "catalog_content_hash", "source_identity", "schema_version")` | (("consumes", "SIZING_RUN"),) | (("generates", "CANDIDATE"), ("emits", "WARNING"), ("emits", "BLOCKER")) | catalog_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
-| CANDIDATE | INTERMEDIATE | `f"candidate_{source_qualified_candidate_id}"` | `f"candidate:{source_qualified_candidate_id}"` | `{"source_qualified_candidate_identity_digest": source_qualified_candidate_identity_digest}` | `("source_qualified_candidate_id",)` | (("generates", "CATALOG_SNAPSHOT"),) | (("rated_as", "TASK008_RATING_RESULT"), ("rated_as_claimed", "CLAIMED_TASK008_RATING_RESULT"), ("produced_unverified", "INVALID_EVIDENCE"), ("emits", "WARNING"), ("emits", "BLOCKER")) | unique_candidate_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
-| TASK008_RATING_RESULT | RESULT | `f"rating_{rating_result_hash}"` | `f"rating-result:{rating_result_hash}"` | `{"source_qualified_candidate_id": source_qualified_candidate_id, "rating_result_hash": rating_result_hash, "rating_provenance_digest": rating_provenance_digest}` | `("source_qualified_candidate_id", "rating_result_hash", "rating_provenance_digest")` | (("rated_as", "CANDIDATE"),) | (("evaluated_by", "SIZING_OPTIMIZER"),) | verified_rating_count | (TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.SUCCEEDED, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING) |
-| CLAIMED_TASK008_RATING_RESULT | INTERMEDIATE | `f"claimed_rating_{source_qualified_candidate_id}"` | `f"claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{audit_digest}"` | `claimed_audit_payload` | `("source_qualified_candidate_id", "evaluation_order_index", "audit_digest")` | (("rated_as_claimed", "CANDIDATE"),) | () | 0 (forbidden in OPTIMIZATION/RESULT_CONSTRUCTION); >= 1 in RATING_VERIFICATION | (TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION,) | (TerminationClass.SUCCEEDED, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION, TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH) |
-| SIZING_RESULT | RESULT | `"sizing_result"` | `f"sizing-result:{result_hash}"` | `{"result_hash": result_hash}` | `("result_hash",)` | (("produces", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("blocks", "BLOCKER"), ("annotates", "WARNING"), ("produces", "SIZING_RUN")) | () | 1 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION) | (TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION,) |
-| SIZING_RUN_FAILURE_RESULT | RESULT | `f"sizing_run_failure"` | `f"sizing-run-failure:{failure_result_hash}"` | `{"failure_result_hash": failure_result_hash, "failure_stage": failure_stage.value}` | `("failure_result_hash", "failure_stage")` | (("precedes_failure", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("annotates_failure", "BLOCKER"), ("annotates_failure", "WARNING"), ("produces_failure_record", "SIZING_RUN")) | () | 1 | (TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION,) | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION)
-| INVALID_EVIDENCE | INTERMEDIATE | `f"invalid_evidence_{source_qualified_candidate_id}"` | `f"invalid-evidence:{source_qualified_candidate_id}:{invalid_evidence_digest}"` | `invalid_evidence_payload` | `("source_qualified_candidate_id", "invalid_evidence_digest")` | (("produced_unverified", "CANDIDATE"),) | (("invalidates", "SIZING_RESULT"),) | invalid_evidence_count | (TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.SUCCEEDED, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | (TerminationClass.INVALID_REQUEST, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION) |
-| RUNTIME_FAILURE | BLOCKER | `"runtime_failure"` | `f"runtime-failure:{failure_digest}"` | `{"failure_digest": failure_digest}` | `("failure_digest",)` | () | (("fails", "SIZING_RESULT"), ("fails", "SIZING_RUN_FAILURE_RESULT")) | 1 if runtime_failure_occurred else 0 | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
-| WARNING | WARNING | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("annotates", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) | warning_occurrence_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
-| BLOCKER | BLOCKER | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("blocks", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT")) | blocker_occurrence_count | (TerminationClass.INVALID_REQUEST, TerminationClass.INVALID_CATALOG, TerminationClass.CATALOG_IDENTITY_MISMATCH, TerminationClass.CAP_EXCEEDED, TerminationClass.NO_MANUFACTURABLE_CANDIDATE, TerminationClass.NO_FEASIBLE_CANDIDATE, TerminationClass.SUCCEEDED, TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH, TerminationClass.RATING_RESULT_INTEGRITY_FAILED, TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION, TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION, TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION, TerminationClass.RUNTIME_FAILED_PRE_RATING, TerminationClass.RUNTIME_FAILED_RATING_CALL, TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION, TerminationClass.RUNTIME_FAILED_OPTIMIZATION, TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION) | () |
+> **NON-NORMATIVE GENERATED SUMMARY.** Allowed/forbidden termination classes are derived from `TERMINATION_TOPOLOGY_REGISTRY`. Multiplicity is defined in registry `counter_invariants`. This table is for human reference only and is not an authoritative contract.
+
+| Concept | node_type | label_formula | uuid5_name_formula | payload_hash_payload | required_metadata_fields | allowed_incoming | allowed_outgoing |
+|---------|-----------|---------------|--------------------|----------------------|--------------------------|------------------|------------------|
+| ROOT_CASE_REVISION | CASE_REVISION | `f"revision_{design_case_revision_id}"` | `f"root-case-revision:{design_case_revision_id}"` | `{"design_case_revision_id": design_case_revision_id}` | `("design_case_revision_id",)` | () | (("initiates", "SIZING_RUN"),)
+| ROOT_EXTERNAL | EXTERNAL | `"external_root"` | `f"root-external:{request_kind.value}:{request_digest}"` | `{"request_kind": request_kind.value, "request_digest": request_digest}` | () | () | (("initiates", "SIZING_RUN"),)
+| SIZING_RUN | CALCULATION_RUN | `f"sizing_run_{request_digest}"` | `f"sizing-run:{request_kind.value}:{request_digest}"` | `{"request_kind": request_kind.value, "request_digest": request_digest}` | `("request_kind", "request_digest")` | (("initiates", "ROOT_CASE_REVISION"), ("initiates", "ROOT_EXTERNAL")) | (("consumes", "CATALOG_SNAPSHOT"), ("executes", "SIZING_OPTIMIZER"), ("produces", "SIZING_RESULT"), ("produces_failure_record", "SIZING_RUN_FAILURE_RESULT"), ("emits", "WARNING"), ("emits", "BLOCKER"))
+| SIZING_OPTIMIZER | OPTIMIZER | `"sizing_optimizer"` | `f"optimizer:{request_digest}"` | `{"request_kind": request_kind.value, "request_digest": request_digest}` | `("request_kind", "request_digest")` | (("executes", "SIZING_RUN"), ("evaluated_by", "TASK008_RATING_RESULT")) | (("produces", "SIZING_RESULT"), ("precedes_failure", "SIZING_RUN_FAILURE_RESULT"), ("emits", "WARNING"), ("emits", "BLOCKER"))
+| CATALOG_SNAPSHOT | INTERMEDIATE | `f"catalog_{catalog_id}"` | `f"catalog:{catalog_id}:{catalog_version}:{catalog_content_hash}"` | `{"catalog_id": catalog_id, "catalog_version": catalog_version, "catalog_content_hash": catalog_content_hash, "source_identity": source_identity, "schema_version": schema_version}` | `("catalog_id", "catalog_version", "catalog_content_hash", "source_identity", "schema_version")` | (("consumes", "SIZING_RUN"),) | (("generates", "CANDIDATE"), ("emits", "WARNING"), ("emits", "BLOCKER"))
+| CANDIDATE | INTERMEDIATE | `f"candidate_{source_qualified_candidate_id}"` | `f"candidate:{source_qualified_candidate_id}"` | `{"source_qualified_candidate_identity_digest": source_qualified_candidate_identity_digest}` | `("source_qualified_candidate_id",)` | (("generates", "CATALOG_SNAPSHOT"),) | (("rated_as", "TASK008_RATING_RESULT"), ("rated_as_claimed", "CLAIMED_TASK008_RATING_RESULT"), ("produced_unverified", "INVALID_EVIDENCE"), ("emits", "WARNING"), ("emits", "BLOCKER"))
+| TASK008_RATING_RESULT | RESULT | `f"rating_{rating_result_hash}"` | `f"rating-result:{rating_result_hash}"` | `{"source_qualified_candidate_id": source_qualified_candidate_id, "rating_result_hash": rating_result_hash, "rating_provenance_digest": rating_provenance_digest}` | `("source_qualified_candidate_id", "rating_result_hash", "rating_provenance_digest")` | (("rated_as", "CANDIDATE"),) | (("evaluated_by", "SIZING_OPTIMIZER"),)
+| CLAIMED_TASK008_RATING_RESULT | INTERMEDIATE | `f"claimed_rating_{source_qualified_candidate_id}"` | `f"claimed-rating-result:{source_qualified_candidate_id}:{evaluation_order_index}:{audit_digest}"` | `claimed_audit_payload` | `("source_qualified_candidate_id", "evaluation_order_index", "audit_digest")` | (("rated_as_claimed", "CANDIDATE"),) | ()
+| SIZING_RESULT | RESULT | `"sizing_result"` | `f"sizing-result:{result_hash}"` | `{"result_hash": result_hash}` | `("result_hash",)` | (("produces", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("blocks", "BLOCKER"), ("annotates", "WARNING"), ("produces", "SIZING_RUN")) | ()
+| SIZING_RUN_FAILURE_RESULT | RESULT | `f"sizing_run_failure"` | `f"sizing-run-failure:{failure_result_hash}"` | `{"failure_result_hash": failure_result_hash, "failure_stage": failure_stage.value}` | `("failure_result_hash", "failure_stage")` | (("precedes_failure", "SIZING_OPTIMIZER"), ("fails", "RUNTIME_FAILURE"), ("annotates_failure", "BLOCKER"), ("annotates_failure", "WARNING"), ("produces_failure_record", "SIZING_RUN")) | ()
+| INVALID_EVIDENCE | INTERMEDIATE | `f"invalid_evidence_{source_qualified_candidate_id}"` | `f"invalid-evidence:{source_qualified_candidate_id}:{invalid_evidence_digest}"` | `invalid_evidence_payload` | `("source_qualified_candidate_id", "invalid_evidence_digest")` | (("produced_unverified", "CANDIDATE"),) | (("invalidates", "SIZING_RESULT"),)
+| RUNTIME_FAILURE | BLOCKER | `"runtime_failure"` | `f"runtime-failure:{failure_digest}"` | `{"failure_digest": failure_digest}` | `("failure_digest",)` | () | (("fails", "SIZING_RESULT"), ("fails", "SIZING_RUN_FAILURE_RESULT"))
+| WARNING | WARNING | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("annotates", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT"))
+| BLOCKER | BLOCKER | per message (canonical message sort key) | `f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"` | `message_occurrence_payload` | `("owner_kind", "owner_id", "message_digest", "occurrence_index", "occurrence_kind")` | (("emits", "SIZING_RUN"), ("emits", "CATALOG_SNAPSHOT"), ("emits", "CANDIDATE"), ("emits", "SIZING_OPTIMIZER")) | (("blocks", "SIZING_RESULT"), ("annotates_failure", "SIZING_RUN_FAILURE_RESULT"))
 
 ### 22.4 TerminationTopologySpec Registry
 
@@ -2547,27 +2554,438 @@ class TerminationTopologySpec:
     counter_invariants: tuple[str, ...]
 ```
 
-The registry has exactly 17 entries, one per TerminationClass:
+The typed constant `TERMINATION_TOPOLOGY_REGISTRY` is the single authoritative source:
 
-| # | TerminationClass | result_concept | base_nodes | forbidden_concepts | allowed_owners |
-|---|-----------------|---------------|------------|-------------------|---------------|
-| 1 | INVALID_REQUEST | SIZING_RESULT | ROOT_EXTERNAL×1, SIZING_RUN×1, SIZING_RESULT×1 | CATALOG_SNAPSHOT, CANDIDATE, TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN |
-| 2 | INVALID_CATALOG | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, SIZING_RESULT×1 | CANDIDATE, TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT |
-| 3 | CATALOG_IDENTITY_MISMATCH | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, SIZING_RESULT×1 | CANDIDATE, TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT |
-| 4 | CAP_EXCEEDED | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, SIZING_RESULT×1 | CANDIDATE, TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT |
-| 5 | NO_MANUFACTURABLE_CANDIDATE | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, SIZING_RESULT×1 | CANDIDATE, TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT |
-| 6 | NO_FEASIBLE_CANDIDATE | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×verified_rating_count, SIZING_OPTIMIZER×1, SIZING_RESULT×1 | INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER |
-| 7 | SUCCEEDED | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×unique_candidate_count, SIZING_OPTIMIZER×1, SIZING_RESULT×1 | INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER |
-| 8 | PROPERTY_PROVIDER_IDENTITY_MISMATCH | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×verified_rating_count, SIZING_RESULT×1 | SIZING_OPTIMIZER, INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
-| 9 | RATING_RESULT_INTEGRITY_FAILED | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×verified_rating_count, INVALID_EVIDENCE×1, SIZING_RESULT×1 | CLAIMED_TASK008_RATING_RESULT, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, RUNTIME_FAILURE | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
-| 10 | RUNTIME_FAILED_REQUEST_VALIDATION | SIZING_RESULT | ROOT_EXTERNAL×1, SIZING_RUN×1, RUNTIME_FAILURE×1, SIZING_RESULT×1 | CATALOG_SNAPSHOT, CANDIDATE, TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN |
-| 11 | RUNTIME_FAILED_CATALOG_VALIDATION | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, RUNTIME_FAILURE×1, SIZING_RESULT×1 | CANDIDATE, TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT |
-| 12 | RUNTIME_FAILED_CANDIDATE_MATERIALIZATION | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×materialized_candidate_count, RUNTIME_FAILURE×1, SIZING_RESULT×1 | TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
-| 13 | RUNTIME_FAILED_PRE_RATING | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, RUNTIME_FAILURE×1, SIZING_RESULT×1 | TASK008_RATING_RESULT, INVALID_EVIDENCE, SIZING_OPTIMIZER, SIZING_RUN_FAILURE_RESULT, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
-| 14 | RUNTIME_FAILED_RATING_CALL | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×completed_rating_count, RUNTIME_FAILURE×1, SIZING_RESULT×1 | SIZING_OPTIMIZER, INVALID_EVIDENCE, SIZING_RUN_FAILURE_RESULT, CLAIMED_TASK008_RATING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
-| 15 | RUNTIME_FAILED_RATING_VERIFICATION | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×verified_rating_count, CLAIMED_TASK008_RATING_RESULT×1, RUNTIME_FAILURE×1, SIZING_RESULT×1 | SIZING_OPTIMIZER, INVALID_EVIDENCE, SIZING_RUN_FAILURE_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE |
-| 16 | RUNTIME_FAILED_OPTIMIZATION | SIZING_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×evaluated_candidate_count, SIZING_OPTIMIZER×1, RUNTIME_FAILURE×1, SIZING_RESULT×1 | INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, SIZING_RUN_FAILURE_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER |
-| 17 | RUNTIME_FAILED_RESULT_CONSTRUCTION | SIZING_RUN_FAILURE_RESULT | ROOT_CASE_REVISION×1, SIZING_RUN×1, CATALOG_SNAPSHOT×catalog_count, CANDIDATE×unique_candidate_count, TASK008_RATING_RESULT×evaluated_candidate_count, SIZING_OPTIMIZER×1, RUNTIME_FAILURE×1, SIZING_RUN_FAILURE_RESULT×1 | INVALID_EVIDENCE, CLAIMED_TASK008_RATING_RESULT, SIZING_RESULT | SIZING_RUN, CATALOG_SNAPSHOT, CANDIDATE, OPTIMIZER |
+```python
+TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
+    TerminationTopologySpec(
+        termination_class=TerminationClass.INVALID_REQUEST,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_EXTERNAL, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.CATALOG_SNAPSHOT, ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN,),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=1,
+        counter_invariants=("catalog_count=0", "unique_candidate_count=0", "no_candidate_nodes"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.INVALID_CATALOG,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=1,
+        counter_invariants=("catalog_count>=1", "unique_candidate_count=0", "no_candidate_nodes"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.CATALOG_IDENTITY_MISMATCH,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=1,
+        counter_invariants=("catalog_count>=1", "unique_candidate_count=0", "no_candidate_nodes"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.CAP_EXCEEDED,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=1,
+        counter_invariants=("catalog_count>=1", "unique_candidate_count>=1", "cap_exceeded_before_materialization"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.NO_MANUFACTURABLE_CANDIDATE,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=1,
+        counter_invariants=("catalog_count>=1", "unique_candidate_count=0", "no_manufacturable_candidates"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.NO_FEASIBLE_CANDIDATE,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.TASK008_RATING_RESULT, "verified_rating_count"),
+            (ProvenanceConcept.SIZING_OPTIMIZER, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("unique_candidate_count>=1", "verified_rating_count>=0", "no_feasible_candidate"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.SUCCEEDED,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.TASK008_RATING_RESULT, "unique_candidate_count"),
+            (ProvenanceConcept.SIZING_OPTIMIZER, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("unique_candidate_count>=1", "verified_rating_count=unique_candidate_count", "all_candidates_verified"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.PROPERTY_PROVIDER_IDENTITY_MISMATCH,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.TASK008_RATING_RESULT, "verified_rating_count"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=1,
+        counter_invariants=("verified_rating_count>=1", "provider_mismatch_before_optimizer", "selected_candidate=None"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RATING_RESULT_INTEGRITY_FAILED,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.TASK008_RATING_RESULT, "verified_rating_count"),
+            (ProvenanceConcept.INVALID_EVIDENCE, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "produced_unverified", ProvenanceConcept.INVALID_EVIDENCE),
+            ProvenanceRelationSpec(ProvenanceConcept.INVALID_EVIDENCE, "invalidates", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=1,
+        counter_invariants=("completed=verified+1", "evaluated=attempted", "current_candidate=INTEGRITY_INVALID"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RUNTIME_FAILED_REQUEST_VALIDATION,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_EXTERNAL, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.RUNTIME_FAILURE, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.CATALOG_SNAPSHOT, ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN,),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("catalog_count=0", "no_candidate_nodes", "run_failure_present"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RUNTIME_FAILED_CATALOG_VALIDATION,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.RUNTIME_FAILURE, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("catalog_count>=1", "no_candidate_nodes", "run_failure_present"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RUNTIME_FAILED_CANDIDATE_MATERIALIZATION,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "materialized_candidate_count"),
+            (ProvenanceConcept.RUNTIME_FAILURE, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("catalog_count>=1", "0<=materialized_candidate_count<=unique_candidate_count", "run_failure_present"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RUNTIME_FAILED_PRE_RATING,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.RUNTIME_FAILURE, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("catalog_count>=1", "unique_candidate_count>=1", "run_failure_present"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RUNTIME_FAILED_RATING_CALL,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.TASK008_RATING_RESULT, "completed_rating_count"),
+            (ProvenanceConcept.RUNTIME_FAILURE, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("attempted=completed+1", "failed_candidate_no_rating_result", "run_failure_present"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RUNTIME_FAILED_RATING_VERIFICATION,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.TASK008_RATING_RESULT, "verified_rating_count"),
+            (ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, "1"),
+            (ProvenanceConcept.RUNTIME_FAILURE, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as_claimed", ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("completed=verified+1", "claimed_node_count=1", "total_evidence_nodes=completed"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RUNTIME_FAILED_OPTIMIZATION,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_candidate_count"),
+            (ProvenanceConcept.SIZING_OPTIMIZER, "1"),
+            (ProvenanceConcept.RUNTIME_FAILURE, "1"),
+            (ProvenanceConcept.SIZING_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("evaluated=unique=verified", "optimizer_present", "run_failure_present"),
+    ),
+    TerminationTopologySpec(
+        termination_class=TerminationClass.RUNTIME_FAILED_RESULT_CONSTRUCTION,
+        root_selector_formula_name="select_root_concept",
+        result_concept=ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+        base_node_multiplicities=(
+            (ProvenanceConcept.ROOT_CASE_REVISION, "1"),
+            (ProvenanceConcept.SIZING_RUN, "1"),
+            (ProvenanceConcept.CATALOG_SNAPSHOT, "catalog_count"),
+            (ProvenanceConcept.CANDIDATE, "unique_candidate_count"),
+            (ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_candidate_count"),
+            (ProvenanceConcept.SIZING_OPTIMIZER, "1"),
+            (ProvenanceConcept.RUNTIME_FAILURE, "1"),
+            (ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, "1"),
+        ),
+        base_edges=(
+            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "precedes_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces_failure_record", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+        ),
+        forbidden_concepts=(ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RESULT),
+        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
+        minimum_warning_occurrences=0,
+        minimum_blocker_occurrences=0,
+        counter_invariants=("evaluated=unique=verified", "failure_result_node_present", "standard_result_absent"),
+    ),
+)
+```
 
 ### 22.3C Message Content and Occurrence Multiset
 
