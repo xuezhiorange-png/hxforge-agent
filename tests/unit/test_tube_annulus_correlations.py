@@ -1088,7 +1088,9 @@ class TestC4SourceVerification:
         flow = _water_flow(mass_flow=0.005)
         result = evaluate_hx_correlation(_ann_geom(), flow, "inner_wall_heated")
         assert result.status == CorrelationStatus.BLOCKED
-        assert any(b.code == ErrorCode.NOT_IMPLEMENTED for b in result.blockers)
+        assert any(
+            b.code == ErrorCode.CORRELATION_IMPLEMENTATION_UNAVAILABLE for b in result.blockers
+        )
 
 
 class TestC5SourceVerification:
@@ -1874,7 +1876,9 @@ class TestBoundaryConditionValidation:
         result = evaluate_hx_correlation(_ann_geom(heated="inner"), flow, "inner_wall_heated")
         # C4 is blocked: NotImplementedError (data pending verification)
         assert result.status == CorrelationStatus.BLOCKED
-        assert any(b.code.value == "not_implemented" for b in result.blockers)
+        assert any(
+            b.code.value == "correlation_implementation_unavailable" for b in result.blockers
+        )
 
     def test_tube_unsupported_bc_blocked(self) -> None:
         flow = _water_flow(mass_flow=0.005)
@@ -2064,7 +2068,7 @@ class TestC4MaturityBlockedAllKappa:
         r = _make_c4_maturity_blocked(di=di, do=do)
         assert r.status == CorrelationStatus.BLOCKED
         assert r.applicability_assessment is not None
-        assert any(b.code == ErrorCode.NOT_IMPLEMENTED for b in r.blockers)
+        assert any(b.code == ErrorCode.CORRELATION_IMPLEMENTATION_UNAVAILABLE for b in r.blockers)
         assert any("metadata_only" in b.message for b in r.blockers)
         assert r.applicability_assessment.status.value == "implementation_unavailable"
 
@@ -2093,7 +2097,7 @@ class TestC4MetadataOnlyNotInEvaluator:
 
     def test_blocker_code_not_implemented(self) -> None:
         r = _make_c4_maturity_blocked()
-        assert any(b.code == ErrorCode.NOT_IMPLEMENTED for b in r.blockers)
+        assert any(b.code == ErrorCode.CORRELATION_IMPLEMENTATION_UNAVAILABLE for b in r.blockers)
         # C4 metadata_only preserves identified correlation identity (P0-4)
         assert r.selected_correlation is not None
         assert r.selected_correlation.correlation_id == "annulus_laminar_inner_chf"

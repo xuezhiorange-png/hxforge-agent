@@ -1,0 +1,3358 @@
+"""RatingResult model for double-pipe exchanger rating.
+
+The immutable, hash-verified result of a double-pipe rating calculation.
+Follows the same structural patterns as HeatBalanceResult in
+hexagent.core.heat_balance.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import math
+from collections import Counter
+from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
+from uuid import UUID, uuid5
+
+from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
+
+from hexagent.core.canonical import sha256_digest
+from hexagent.core.heat_balance import (
+    ExecutionContextSnapshot,
+    PropertyCallRecord,
+    ProviderIdentitySnapshot,
+)
+from hexagent.domain.messages import EngineeringMessage, RunFailure
+from hexagent.domain.provenance import (
+    ProvenanceEdge,
+    ProvenanceGraph,
+    ProvenanceNode,
+    ProvenanceNodeType,
+)
+from hexagent.exchangers.double_pipe.recorder import EvaluationRole
+from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+# ---------------------------------------------------------------------------
+# Module constants
+# ---------------------------------------------------------------------------
+
+_SOFTWARE_VERSION: str = "0.1.0"
+
+# Module-level UUID5 namespace for deterministic provenance node IDs.
+_PROVENANCE_NAMESPACE: UUID = uuid5(
+    UUID("00000000-0000-0000-0000-000000000000"),
+    "hexagent:double_pipe_rating:provenance",
+)
+
+# ---------------------------------------------------------------------------
+# Status enum
+# ---------------------------------------------------------------------------
+
+
+class RatingStatus(StrEnum):
+    """Outcome status of a double-pipe rating calculation.
+
+    - SUCCEEDED: solver converged AND energy balance accepted.
+    - BLOCKED: a structural precondition failed (geometry, property, flow).
+    - FAILED: the root-finding solver did not converge.
+    """
+
+    SUCCEEDED = "succeeded"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+
+
+# ---------------------------------------------------------------------------
+# Snapshot dataclasses
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PropertyProvenanceSnapshot:
+    """Deeply immutable snapshot of property-provider provenance metadata."""
+
+    fluid_identifier: str = ""
+    backend_name: str = ""
+    backend_version: str = ""
+    backend_git_revision: str = ""
+    reference_state_policy: str = ""
+    configuration_fingerprint: str = ""
+    validation_level: str = ""
+    cache_policy_version: str = ""
+
+
+@dataclass(frozen=True)
+class FluidStateSnapshot:
+    """Immutable snapshot of a fluid thermodynamic state point."""
+
+    temperature_k: float
+    pressure_pa: float
+    enthalpy_j_kg: float
+    density_kg_m3: float | None = None
+    cp_j_kg_k: float | None = None
+    viscosity_pa_s: float | None = None
+    conductivity_w_m_k: float | None = None
+    phase: str = ""
+    quality: float | None = None
+    property_provenance: PropertyProvenanceSnapshot | None = None
+
+
+@dataclass(frozen=True)
+class SelectedCorrelationSnapshot:
+    """Immutable snapshot of a selected heat-transfer correlation."""
+
+    correlation_id: str = ""
+    version: str = ""
+    definition_hash: str = ""
+    source_title: str = ""
+    source_authors: str = ""
+    source_year: int = 0
+    source_reference: str = ""
+    source_verification_status: str = "unverified"
+    nusselt_basis: str = "hydraulic_diameter"
+    is_adaptation: bool = False
+    adaptation_limitation: str = ""
+
+
+@dataclass(frozen=True)
+class ApplicabilitySnapshot:
+    """Immutable snapshot of a correlation applicability assessment."""
+
+    status: str = ""
+    assessment_hash: str = ""
+    reynolds_min: float | None = None
+    reynolds_max: float | None = None
+    prandtl_min: float | None = None
+    prandtl_max: float | None = None
+    geometry_type: str = ""
+    notes: str = ""
+    raw_assessment: tuple[tuple[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class QMaxDiagnosticsSnapshot:
+    """Immutable snapshot of Q_max computation diagnostics.
+
+    Captures the outcome of the upper-bracket search so it can be
+    embedded in ``RatingResult`` for provenance and debugging.
+    """
+
+    q_max_w: float
+    iterations: int
+    final_pinch_residual_k: float
+    termination_reason: str
+    # Bracket state (parallel-flow bisection)
+    final_q_low_w: float | None = None
+    final_q_high_w: float | None = None
+    final_q_width_w: float | None = None
+    # Counter-flow: explicit limit fields
+    hot_limit_w: float | None = None
+    cold_limit_w: float | None = None
+    limiting_side: str | None = None
+    # Parallel-flow: bracket and pinch diagnostics
+    q_tolerance_w: float | None = None
+    pinch_temperature_tolerance_k: float | None = None
+
+    # -- Valid termination reasons ------------------------------------------
+    _VALID_REASONS: frozenset[str] = frozenset(
+        {
+            "bisection_converged",
+            "pinch_satisfied_at_upper",
+            "independent_limits",
+            "iteration_limit",
+            "zero_upper_bound",
+        }
+    )
+
+    def __post_init__(self) -> None:
+        """Validate termination_reason semantics and bracket invariants."""
+        reason = self.termination_reason
+
+        if reason not in self._VALID_REASONS:
+            raise ValueError(
+                f"Unknown termination_reason: {reason!r}. "
+                f"Expected one of {sorted(self._VALID_REASONS)}"
+            )
+
+        # -- Global finite validation for all numeric fields ---------------
+        if not math.isfinite(self.q_max_w):
+            raise ValueError(f"q_max_w must be finite, got {self.q_max_w!r}")
+        if not isinstance(self.iterations, int) or self.iterations < 0:
+            raise ValueError(f"iterations must be non-negative int, got {self.iterations!r}")
+
+        # Bracket fields: if present, must be finite
+        for fld in ("final_q_low_w", "final_q_high_w", "final_q_width_w"):
+            val = getattr(self, fld)
+            if val is not None and not math.isfinite(val):
+                raise ValueError(f"{fld} must be finite when present, got {val!r}")
+
+        # Limit fields: if present, must be finite
+        for fld in ("hot_limit_w", "cold_limit_w"):
+            val = getattr(self, fld)
+            if val is not None and not math.isfinite(val):
+                raise ValueError(f"{fld} must be finite when present, got {val!r}")
+
+        # Tolerances: if present, must be finite and > 0
+        for fld in ("q_tolerance_w", "pinch_temperature_tolerance_k"):
+            val = getattr(self, fld)
+            if val is not None and (not math.isfinite(val) or val <= 0):
+                raise ValueError(f"{fld} must be finite and > 0 when present, got {val!r}")
+
+        # Pinch residual: must be finite
+        if not math.isfinite(self.final_pinch_residual_k):
+            raise ValueError(
+                f"final_pinch_residual_k must be finite, got {self.final_pinch_residual_k!r}"
+            )
+
+        # -- Termination-specific contracts --------------------------------
+        if reason == "bisection_converged":
+            self._validate_bisection_converged()
+        elif reason == "pinch_satisfied_at_upper":
+            self._validate_pinch_satisfied_at_upper()
+        elif reason == "independent_limits":
+            self._validate_independent_limits()
+        elif reason == "iteration_limit":
+            self._validate_iteration_limit()
+        elif reason == "zero_upper_bound":
+            self._validate_zero_upper_bound()
+
+    def _validate_bisection_converged(self) -> None:
+        """bisection_converged: iterations>0, bracket present & finite,
+        width<=tolerance, pinch within tolerance."""
+        if self.iterations <= 0:
+            raise ValueError(f"bisection_converged requires iterations > 0, got {self.iterations}")
+
+        # All bracket fields present and finite
+        for fld in ("final_q_low_w", "final_q_high_w", "final_q_width_w"):
+            val = getattr(self, fld)
+            if val is None:
+                raise ValueError(f"bisection_converged requires {fld} to be present")
+            if not math.isfinite(val):
+                raise ValueError(f"bisection_converged requires {fld} to be finite, got {val!r}")
+
+        # Narrow types for mypy (above checks guarantee non-None)
+        assert self.final_q_low_w is not None
+        assert self.final_q_high_w is not None
+        assert self.final_q_width_w is not None
+
+        # Tolerances present and > 0
+        if self.q_tolerance_w is None or self.q_tolerance_w <= 0:
+            raise ValueError(
+                f"bisection_converged requires q_tolerance_w > 0, got {self.q_tolerance_w!r}"
+            )
+        if self.pinch_temperature_tolerance_k is None or self.pinch_temperature_tolerance_k <= 0:
+            raise ValueError(
+                "bisection_converged requires "
+                "pinch_temperature_tolerance_k > 0, "
+                f"got {self.pinch_temperature_tolerance_k!r}"
+            )
+
+        # q_max_w == final_q_low_w
+        if self.q_max_w != self.final_q_low_w:
+            raise ValueError(
+                f"bisection_converged requires q_max_w == final_q_low_w, "
+                f"got {self.q_max_w!r} != {self.final_q_low_w!r}"
+            )
+
+        # Ordered bracket
+        if self.final_q_high_w < self.final_q_low_w:
+            raise ValueError(
+                "bisection_converged requires "
+                f"final_q_high_w ({self.final_q_high_w!r}) >= "
+                f"final_q_low_w ({self.final_q_low_w!r})"
+            )
+
+        # Width ≈ high - low
+        expected_width = self.final_q_high_w - self.final_q_low_w
+        if not math.isclose(self.final_q_width_w, expected_width, rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError(
+                f"bisection_converged final_q_width_w "
+                f"({self.final_q_width_w!r}) != "
+                f"high - low ({expected_width!r})"
+            )
+
+        # Width within tolerance
+        if self.final_q_width_w > self.q_tolerance_w:
+            raise ValueError(
+                f"bisection_converged final_q_width_w "
+                f"({self.final_q_width_w!r}) > q_tolerance_w "
+                f"({self.q_tolerance_w!r})"
+            )
+
+        # Pinch within tolerance
+        if abs(self.final_pinch_residual_k) > self.pinch_temperature_tolerance_k:
+            raise ValueError(
+                f"bisection_converged |final_pinch_residual_k| "
+                f"({abs(self.final_pinch_residual_k)!r}) > "
+                "pinch_temperature_tolerance_k "
+                f"({self.pinch_temperature_tolerance_k!r})"
+            )
+
+    def _validate_pinch_satisfied_at_upper(self) -> None:
+        """pinch_satisfied_at_upper: iterations==0, Q=low=high, width=0.
+
+        Additional contracts:
+        - hot_limit_w and cold_limit_w present
+        - q_max_w == min(hot_limit_w, cold_limit_w)
+        - limiting_side consistent with min
+        - final_pinch_residual_k >= 0
+        - tolerances present and > 0
+        """
+        if self.iterations != 0:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires iterations == 0, got {self.iterations}"
+            )
+        if self.final_q_low_w is None or self.final_q_high_w is None:
+            raise ValueError("pinch_satisfied_at_upper requires bracket fields to be present")
+        if self.q_max_w != self.final_q_low_w:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires q_max_w == "
+                f"final_q_low_w, got {self.q_max_w!r} != "
+                f"{self.final_q_low_w!r}"
+            )
+        if self.q_max_w != self.final_q_high_w:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires q_max_w == "
+                f"final_q_high_w, got {self.q_max_w!r} != "
+                f"{self.final_q_high_w!r}"
+            )
+        if self.final_q_width_w != 0.0:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires "
+                f"final_q_width_w == 0.0, got {self.final_q_width_w!r}"
+            )
+        # Hot and cold limits present
+        if self.hot_limit_w is None or self.cold_limit_w is None:
+            raise ValueError(
+                "pinch_satisfied_at_upper requires hot_limit_w and cold_limit_w to be present"
+            )
+        # q_max_w == min(hot_limit_w, cold_limit_w)
+        expected_q = min(self.hot_limit_w, self.cold_limit_w)
+        if self.q_max_w != expected_q:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires q_max_w == "
+                f"min(hot_limit_w, cold_limit_w) == {expected_q!r}, "
+                f"got {self.q_max_w!r}"
+            )
+        # limiting_side consistent
+        expected_side = "hot_limit" if self.hot_limit_w <= self.cold_limit_w else "cold_limit"
+        if self.limiting_side != expected_side:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires limiting_side == {expected_side!r}, "
+                f"got {self.limiting_side!r}"
+            )
+        # final_pinch_residual_k >= 0
+        if self.final_pinch_residual_k < 0:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires "
+                f"final_pinch_residual_k >= 0, got {self.final_pinch_residual_k!r}"
+            )
+        # Tolerances present and > 0
+        if self.q_tolerance_w is None or self.q_tolerance_w <= 0:
+            raise ValueError(
+                f"pinch_satisfied_at_upper requires q_tolerance_w > 0, got {self.q_tolerance_w!r}"
+            )
+        if self.pinch_temperature_tolerance_k is None or self.pinch_temperature_tolerance_k <= 0:
+            raise ValueError(
+                "pinch_satisfied_at_upper requires "
+                "pinch_temperature_tolerance_k > 0, "
+                f"got {self.pinch_temperature_tolerance_k!r}"
+            )
+
+    def _validate_independent_limits(self) -> None:
+        """independent_limits: iterations==0, no bracket, tolerances absent,
+        q_max_w == min(hot_limit_w, cold_limit_w),
+        limiting_side consistent, final_pinch_residual_k == 0."""
+        if self.iterations != 0:
+            raise ValueError(f"independent_limits requires iterations == 0, got {self.iterations}")
+        if (
+            self.final_q_low_w is not None
+            or self.final_q_high_w is not None
+            or self.final_q_width_w is not None
+        ):
+            raise ValueError(
+                "independent_limits requires bracket fields "
+                "(final_q_low_w, final_q_high_w, final_q_width_w) "
+                "to be None"
+            )
+        if self.q_tolerance_w is not None or self.pinch_temperature_tolerance_k is not None:
+            raise ValueError(
+                "independent_limits requires tolerances "
+                "(q_tolerance_w, pinch_temperature_tolerance_k) to be None"
+            )
+        if self.hot_limit_w is None or self.cold_limit_w is None:
+            raise ValueError(
+                "independent_limits requires hot_limit_w and cold_limit_w to be present"
+            )
+        expected = min(self.hot_limit_w, self.cold_limit_w)
+        if self.q_max_w != expected:
+            raise ValueError(
+                f"independent_limits requires q_max_w == "
+                f"min(hot_limit_w, cold_limit_w) == {expected!r}, "
+                f"got {self.q_max_w!r}"
+            )
+        # limiting_side consistent
+        expected_side = "hot_limit" if self.hot_limit_w <= self.cold_limit_w else "cold_limit"
+        if self.limiting_side != expected_side:
+            raise ValueError(
+                f"independent_limits requires limiting_side == {expected_side!r}, "
+                f"got {self.limiting_side!r}"
+            )
+        # final_pinch_residual_k must be 0 (no pinch evaluation needed for
+        # independent enthalpy limits)
+        if self.final_pinch_residual_k != 0.0:
+            raise ValueError(
+                f"independent_limits requires final_pinch_residual_k == 0, "
+                f"got {self.final_pinch_residual_k!r}"
+            )
+
+    def _validate_iteration_limit(self) -> None:
+        """iteration_limit: iterations>0, bracket present & finite,
+        tolerances present and > 0, at least one criterion unmet.
+
+        Contracts:
+        * q_max_w == final_q_low_w
+        * final_q_high_w >= final_q_low_w
+        * final_q_width_w ≈ high - low
+        * final_q_width_w >= 0
+        * At least one of: width > q_tolerance_w OR |pinch_residual| > pinch_tolerance_k
+        """
+        if self.iterations <= 0:
+            raise ValueError(f"iteration_limit requires iterations > 0, got {self.iterations}")
+        for fld in ("final_q_low_w", "final_q_high_w", "final_q_width_w"):
+            val = getattr(self, fld)
+            if val is None:
+                raise ValueError(f"iteration_limit requires {fld} to be present")
+            if not math.isfinite(val):
+                raise ValueError(f"iteration_limit requires {fld} to be finite, got {val!r}")
+        if self.q_tolerance_w is None or self.q_tolerance_w <= 0:
+            raise ValueError(
+                f"iteration_limit requires q_tolerance_w > 0, got {self.q_tolerance_w!r}"
+            )
+        if self.pinch_temperature_tolerance_k is None or self.pinch_temperature_tolerance_k <= 0:
+            raise ValueError(
+                "iteration_limit requires "
+                "pinch_temperature_tolerance_k > 0, "
+                f"got {self.pinch_temperature_tolerance_k!r}"
+            )
+
+        # Narrow types for mypy (above checks guarantee non-None)
+        assert self.final_q_low_w is not None
+        assert self.final_q_high_w is not None
+        assert self.final_q_width_w is not None
+
+        # q_max_w == final_q_low_w
+        if self.q_max_w != self.final_q_low_w:
+            raise ValueError(
+                f"iteration_limit requires q_max_w == final_q_low_w, "
+                f"got {self.q_max_w!r} != {self.final_q_low_w!r}"
+            )
+
+        # final_q_high_w >= final_q_low_w
+        if self.final_q_high_w < self.final_q_low_w:
+            raise ValueError(
+                f"iteration_limit requires final_q_high_w >= final_q_low_w, "
+                f"got {self.final_q_high_w!r} < {self.final_q_low_w!r}"
+            )
+
+        # Width ≈ high - low
+        expected_width = self.final_q_high_w - self.final_q_low_w
+        if not math.isclose(self.final_q_width_w, expected_width, rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError(
+                f"iteration_limit final_q_width_w ({self.final_q_width_w!r}) != "
+                f"high - low ({expected_width!r})"
+            )
+
+        # Width >= 0
+        if self.final_q_width_w < 0:
+            raise ValueError(
+                f"iteration_limit width must be non-negative, got {self.final_q_width_w!r}"
+            )
+
+        # At least one convergence criterion still unmet
+        width_ok = self.final_q_width_w <= self.q_tolerance_w
+        pinch_ok = abs(self.final_pinch_residual_k) <= self.pinch_temperature_tolerance_k
+        if width_ok and pinch_ok:
+            raise ValueError(
+                "iteration_limit but both convergence criteria are satisfied "
+                f"(width={self.final_q_width_w!r} <= q_tolerance_w={self.q_tolerance_w!r} "
+                f"and |pinch|={abs(self.final_pinch_residual_k)!r} <= "
+                f"pinch_tolerance={self.pinch_temperature_tolerance_k!r}). "
+                "Use bisection_converged instead."
+            )
+
+    def _validate_zero_upper_bound(self) -> None:
+        """zero_upper_bound: iterations==0, q_max_w==0, tolerances absent,
+        bracket fields None, final_pinch_residual_k == 0,
+        hot/cold limits present, min(hot, cold) <= 0,
+        limiting_side matches min."""
+        if self.iterations != 0:
+            raise ValueError(f"zero_upper_bound requires iterations == 0, got {self.iterations}")
+        if self.q_max_w != 0.0:
+            raise ValueError(f"zero_upper_bound requires q_max_w == 0, got {self.q_max_w!r}")
+        if self.q_tolerance_w is not None or self.pinch_temperature_tolerance_k is not None:
+            raise ValueError(
+                "zero_upper_bound requires tolerances "
+                "(q_tolerance_w, pinch_temperature_tolerance_k) to be None"
+            )
+        # Bracket fields must be None
+        if self.final_q_low_w is not None:
+            raise ValueError("zero_upper_bound requires final_q_low_w to be None")
+        if self.final_q_high_w is not None:
+            raise ValueError("zero_upper_bound requires final_q_high_w to be None")
+        if self.final_q_width_w is not None:
+            raise ValueError("zero_upper_bound requires final_q_width_w to be None")
+        # final_pinch_residual_k == 0
+        if self.final_pinch_residual_k != 0.0:
+            raise ValueError(
+                f"zero_upper_bound requires final_pinch_residual_k == 0, "
+                f"got {self.final_pinch_residual_k!r}"
+            )
+        # Hot and cold limits present
+        if self.hot_limit_w is None or self.cold_limit_w is None:
+            raise ValueError("zero_upper_bound requires hot_limit_w and cold_limit_w to be present")
+        # min(hot, cold) <= 0
+        lower = min(self.hot_limit_w, self.cold_limit_w)
+        if lower > 0:
+            raise ValueError(
+                f"zero_upper_bound requires min(hot_limit_w, cold_limit_w) <= 0, got {lower!r}"
+            )
+        # limiting_side matches min
+        expected_side = "hot_limit" if self.hot_limit_w <= self.cold_limit_w else "cold_limit"
+        if self.limiting_side != expected_side:
+            raise ValueError(
+                f"zero_upper_bound requires limiting_side == {expected_side!r}, "
+                f"got {self.limiting_side!r}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Local helper models
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RatingRequestIdentity:
+    """Frozen, serializable snapshot of all original rating request fields.
+
+    Stored inside RatingResult so that verify_hash() can rebuild the
+    canonical payload without circular dependencies.
+    """
+
+    # Fluid identity
+    hot_fluid_name: str
+    hot_fluid_backend: str
+    hot_fluid_components: tuple[tuple[str, float], ...]
+    cold_fluid_name: str
+    cold_fluid_backend: str
+    cold_fluid_components: tuple[tuple[str, float], ...]
+    # Stream inputs
+    hot_mass_flow_kg_s: float
+    cold_mass_flow_kg_s: float
+    hot_inlet_pressure_pa: float
+    cold_inlet_pressure_pa: float
+    hot_inlet_temperature_k: float
+    cold_inlet_temperature_k: float
+    # Flow arrangement
+    flow_arrangement: str  # FlowArrangement.value
+    # Geometry (all 9 fields from DoublePipeGeometry)
+    geometry: dict[str, object]
+    # Solver controls
+    solver_absolute_residual_w: float
+    solver_relative_residual_fraction: float
+    solver_bracket_temperature_tolerance_k: float
+    solver_max_iterations: int
+    # Boundary conditions
+    tube_boundary_condition: str = "constant_wall_temperature"
+    annulus_boundary_condition: str = "inner_wall_heated"
+    minimum_terminal_delta_t: float = 0.5
+
+
+class ResistanceBreakdownModel(BaseModel):
+    """Pydantic frozen model for the thermal resistance breakdown."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    r_conv_inner: float
+    r_foul_inner: float
+    r_wall: float
+    r_foul_outer: float
+    r_conv_outer: float
+    total_resistance: float
+    ua_w_k: float
+
+
+class SolverDetailsModel(BaseModel):
+    """Pydantic frozen model for solver diagnostics."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    iterations: int
+    residual_w: float
+    function_evaluations: int
+    termination_reason: str
+    # Bracket tracking
+    initial_bracket_low_w: float = 0.0
+    initial_bracket_high_w: float = 0.0
+    final_bracket_low_w: float = 0.0
+    final_bracket_high_w: float = 0.0
+    final_bracket_width_w: float = 0.0
+    final_bracket_temperature_effect_k: float = 0.0
+    residual_tolerance_w: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# RatingResult
+# ---------------------------------------------------------------------------
+
+
+class RatingResult(BaseModel):
+    """Immutable result of a double-pipe rating calculation.
+
+    Contains thermal performance, resistance breakdown, ε-NTU fields,
+    solver diagnostics, property call trace, warnings, blockers,
+    deterministic hash, and provenance graph.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    # --- Status & arrangement ---
+    status: RatingStatus
+    flow_arrangement: FlowArrangement
+
+    # --- Primary results ---
+    heat_duty_w: float | None
+    hot_outlet_temperature_k: float | None
+    cold_outlet_temperature_k: float | None
+
+    # --- Tube-side convection ---
+    tube_reynolds: float | None = None
+    tube_prandtl: float | None = None
+    tube_nusselt: float | None = None
+    tube_h: float | None = None
+    tube_selected_correlation_id: str | None = None
+    tube_selected_correlation_version: str | None = None
+    tube_applicability_status: str | None = None
+
+    # --- Annulus-side convection ---
+    annulus_reynolds: float | None = None
+    annulus_prandtl: float | None = None
+    annulus_nusselt: float | None = None
+    annulus_h: float | None = None
+    annulus_selected_correlation_id: str | None = None
+    annulus_selected_correlation_version: str | None = None
+    annulus_applicability_status: str | None = None
+
+    # --- Areas ---
+    area_inner_m2: float
+    area_outer_m2: float
+
+    # --- Resistance breakdown ---
+    resistance_breakdown: ResistanceBreakdownModel | None = None
+
+    # --- Overall heat transfer coefficients ---
+    U_inner_basis: float | None = None
+    U_outer_basis: float | None = None
+    UA_w_k: float | None = None
+
+    # --- ε-NTU fields ---
+    C_hot_w_k: float | None = None
+    C_cold_w_k: float | None = None
+    C_min_w_k: float | None = None
+    C_max_w_k: float | None = None
+    capacity_ratio: float | None = None
+    NTU: float | None = None
+    effectiveness: float | None = None
+
+    # --- LMTD ---
+    LMTD_k: float | None = None
+
+    # --- Residuals ---
+    energy_residual_w: float | None = None
+    ua_lmtd_residual_w: float | None = None
+
+    # --- Closure diagnostics ---
+    Q_hot_w: float | None = None
+    Q_cold_w: float | None = None
+    relative_energy_residual: float | None = None
+    energy_tolerance_w: float | None = None
+    relative_ua_lmtd_residual: float | None = None
+    ua_lmtd_tolerance_w: float | None = None
+
+    # --- Solver ---
+    iterations: int
+    converged: bool
+    solver_termination_reason: str
+    solver_details: SolverDetailsModel
+
+    # --- Messages ---
+    warnings: tuple[EngineeringMessage, ...]
+    blockers: tuple[EngineeringMessage, ...]
+    failure: RunFailure | None = None
+
+    # --- Property trace ---
+    property_calls: tuple[PropertyCallRecord, ...]
+
+    # --- Identity & provenance ---
+    provider_identity: ProviderIdentitySnapshot
+    request_identity: RatingRequestIdentity
+    execution_context: ExecutionContextSnapshot = ExecutionContextSnapshot()
+    result_hash: str
+    provenance_graph: ProvenanceGraph
+    provenance_digest: str = ""
+
+    # --- Fluid state snapshots ---
+    hot_inlet_state: FluidStateSnapshot | None = None
+    cold_inlet_state: FluidStateSnapshot | None = None
+    hot_outlet_state: FluidStateSnapshot | None = None
+    cold_outlet_state: FluidStateSnapshot | None = None
+    tube_side_inlet_state: FluidStateSnapshot | None = None
+    tube_side_outlet_state: FluidStateSnapshot | None = None
+    annulus_side_inlet_state: FluidStateSnapshot | None = None
+    annulus_side_outlet_state: FluidStateSnapshot | None = None
+    tube_bulk_state: FluidStateSnapshot | None = None
+    annulus_bulk_state: FluidStateSnapshot | None = None
+
+    # --- Correlation & applicability snapshots ---
+    tube_selected_correlation: SelectedCorrelationSnapshot | None = None
+    annulus_selected_correlation: SelectedCorrelationSnapshot | None = None
+    tube_applicability: ApplicabilitySnapshot | None = None
+    annulus_applicability: ApplicabilitySnapshot | None = None
+
+    # --- Core provenance digest ---
+    core_provenance_digest: str = ""
+
+    # --- Q_max diagnostics ---
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None
+
+    # --- Private field hash for tamper detection ---
+    _field_hash: str = PrivateAttr(default="")
+
+    # ------------------------------------------------------------------
+    # Validators
+    # ------------------------------------------------------------------
+
+    @model_validator(mode="after")
+    def _validate_no_nan_inf(self) -> RatingResult:
+        """Reject NaN and Infinity in all float fields."""
+        float_fields = [
+            "heat_duty_w",
+            "hot_outlet_temperature_k",
+            "cold_outlet_temperature_k",
+            "tube_reynolds",
+            "tube_prandtl",
+            "tube_nusselt",
+            "tube_h",
+            "annulus_reynolds",
+            "annulus_prandtl",
+            "annulus_nusselt",
+            "annulus_h",
+            "area_inner_m2",
+            "area_outer_m2",
+            "U_inner_basis",
+            "U_outer_basis",
+            "UA_w_k",
+            "C_hot_w_k",
+            "C_cold_w_k",
+            "C_min_w_k",
+            "C_max_w_k",
+            "capacity_ratio",
+            "NTU",
+            "effectiveness",
+            "LMTD_k",
+            "energy_residual_w",
+            "ua_lmtd_residual_w",
+            # Closure diagnostics
+            "Q_hot_w",
+            "Q_cold_w",
+            "relative_energy_residual",
+            "energy_tolerance_w",
+            "relative_ua_lmtd_residual",
+            "ua_lmtd_tolerance_w",
+        ]
+        for name in float_fields:
+            val = getattr(self, name)
+            if val is not None and not math.isfinite(val):
+                raise ValueError(f"{name} must be finite, got {val!r}")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_status_contract(self) -> RatingResult:
+        """Ensure status is consistent with blockers/failure."""
+        if self.status == RatingStatus.BLOCKED and not self.blockers:
+            raise ValueError("BLOCKED result must have at least one blocker")
+        if self.status == RatingStatus.FAILED:
+            if self.failure is None:
+                raise ValueError("FAILED result must have a failure record")
+            if self.converged:
+                raise ValueError("FAILED result must not claim solver convergence")
+        if self.status == RatingStatus.SUCCEEDED:
+            if self.blockers:
+                raise ValueError("SUCCEEDED result must not have any blockers")
+            if not self.converged:
+                raise ValueError("SUCCEEDED result must claim solver convergence")
+            if self.failure is not None:
+                raise ValueError("SUCCEEDED result must not have a failure record")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_solver_details_iterations(self) -> RatingResult:
+        """Ensure solver_details.iterations matches top-level iterations."""
+        if (
+            self.solver_details
+            and self.solver_details.termination_reason not in ("not_started", "")
+            and self.solver_details.iterations != self.iterations
+        ):
+            raise ValueError(
+                f"solver_details.iterations ({self.solver_details.iterations}) "
+                f"!= iterations ({self.iterations})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_flow_arrangement_consistency(self) -> RatingResult:
+        """Ensure top-level flow_arrangement matches request_identity."""
+        if self.flow_arrangement.value != self.request_identity.flow_arrangement:
+            raise ValueError(
+                f"flow_arrangement mismatch: top-level={self.flow_arrangement.value!r} "
+                f"!= request_identity.flow_arrangement={self.request_identity.flow_arrangement!r}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_result_hash(self) -> RatingResult:
+        """Verify result_hash starts with sha256: and is 71 chars."""
+        if not self.result_hash.startswith("sha256:"):
+            raise ValueError(f"result_hash must start with 'sha256:', got {self.result_hash!r}")
+        hex_part = self.result_hash[7:]
+        if len(hex_part) != 64:
+            raise ValueError(f"result_hash hex must be 64 chars, got {len(hex_part)}")
+        try:
+            int(hex_part, 16)
+        except ValueError:
+            raise ValueError(f"result_hash contains invalid hex: {self.result_hash!r}") from None
+        return self
+
+    @model_validator(mode="after")
+    def _validate_solver_convergence_contract(self) -> RatingResult:
+        """Ensure solver_termination_reason is consistent with converged flag."""
+        if self.solver_termination_reason == "converged" and not self.converged:
+            raise ValueError("solver_termination_reason is 'converged' but converged is False")
+        if self.solver_termination_reason == "non_convergence" and self.converged:
+            raise ValueError("solver_termination_reason is 'non_convergence' but converged is True")
+        if self.solver_termination_reason == "bracket_not_found" and self.converged:
+            raise ValueError(
+                "solver_termination_reason is 'bracket_not_found' but converged is True"
+            )
+        # Also check solver_details.termination_reason if present
+        if (
+            self.solver_details
+            and self.solver_details.termination_reason not in ("not_started", "")
+            and self.solver_details.termination_reason != self.solver_termination_reason
+        ):
+            raise ValueError(
+                f"solver_details.termination_reason ({self.solver_details.termination_reason!r}) "
+                f"!= solver_termination_reason ({self.solver_termination_reason!r})"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_resistance_breakdown(self) -> RatingResult:
+        """Cross-field validation of resistance_breakdown vs UA / U fields.
+
+        Rules:
+        * SUCCEEDED ⇒ resistance_breakdown must exist.
+        * If resistance_breakdown is None ⇒ UA_w_k, U_inner_basis,
+          U_outer_basis must all be None.
+        * If resistance_breakdown exists ⇒ all resistance components
+          finite non-negative, total_resistance > 0, ua_w_k > 0,
+          total_resistance ≈ sum of five components,
+          ua_w_k ≈ 1 / total_resistance.
+        * For SUCCEEDED with breakdown: UA_w_k ≈ ua_w_k,
+          U_inner_basis ≈ UA / area_inner, U_outer_basis ≈ UA / area_outer.
+        """
+        rb = self.resistance_breakdown
+
+        # -- SUCCEEDED must have breakdown --------------------------------
+        if self.status == RatingStatus.SUCCEEDED and rb is None:
+            raise ValueError("SUCCEEDED result must have a non-null resistance_breakdown")
+
+        # -- Null-breakdown consistency ------------------------------------
+        if rb is None:
+            if self.UA_w_k is not None:
+                raise ValueError("resistance_breakdown is None but UA_w_k is set")
+            if self.U_inner_basis is not None:
+                raise ValueError("resistance_breakdown is None but U_inner_basis is set")
+            if self.U_outer_basis is not None:
+                raise ValueError("resistance_breakdown is None but U_outer_basis is set")
+            return self
+
+        # -- Breakdown exists: validate components (any status) -----------
+        # -- Resistance components: finite non-negative --------------------
+        for comp in (
+            "r_conv_inner",
+            "r_foul_inner",
+            "r_wall",
+            "r_foul_outer",
+            "r_conv_outer",
+        ):
+            val = getattr(rb, comp)
+            if not math.isfinite(val) or val < 0:
+                raise ValueError(
+                    f"resistance_breakdown.{comp} must be finite non-negative, got {val!r}"
+                )
+
+        # -- total_resistance > 0, ua_w_k > 0 ----------------------------
+        if not math.isfinite(rb.total_resistance) or rb.total_resistance <= 0:
+            raise ValueError(
+                f"resistance_breakdown.total_resistance must be finite "
+                f"positive, got {rb.total_resistance!r}"
+            )
+        if not math.isfinite(rb.ua_w_k) or rb.ua_w_k <= 0:
+            raise ValueError(
+                f"resistance_breakdown.ua_w_k must be finite positive, got {rb.ua_w_k!r}"
+            )
+
+        # -- total_resistance ≈ sum of five components --------------------
+        components_sum = (
+            rb.r_conv_inner + rb.r_foul_inner + rb.r_wall + rb.r_foul_outer + rb.r_conv_outer
+        )
+        if not math.isclose(
+            rb.total_resistance,
+            components_sum,
+            rel_tol=1e-9,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(
+                f"resistance_breakdown.total_resistance "
+                f"({rb.total_resistance!r}) != "
+                f"sum of components ({components_sum!r})"
+            )
+
+        # -- ua_w_k ≈ 1 / total_resistance --------------------------------
+        expected_ua = 1.0 / rb.total_resistance
+        if not math.isclose(rb.ua_w_k, expected_ua, rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError(
+                f"resistance_breakdown.ua_w_k ({rb.ua_w_k!r}) != "
+                f"1 / total_resistance ({expected_ua!r})"
+            )
+
+        # -- SUCCEEDED-specific: UA / U must be finite and positive -------
+        if self.status == RatingStatus.SUCCEEDED:
+            if self.UA_w_k is None or not math.isfinite(self.UA_w_k) or self.UA_w_k <= 0:
+                raise ValueError(
+                    f"SUCCEEDED result requires finite positive UA_w_k, got {self.UA_w_k!r}"
+                )
+            if (
+                self.U_inner_basis is None
+                or not math.isfinite(self.U_inner_basis)
+                or self.U_inner_basis <= 0
+            ):
+                raise ValueError(
+                    f"SUCCEEDED result requires finite positive "
+                    f"U_inner_basis, got {self.U_inner_basis!r}"
+                )
+            if (
+                self.U_outer_basis is None
+                or not math.isfinite(self.U_outer_basis)
+                or self.U_outer_basis <= 0
+            ):
+                raise ValueError(
+                    f"SUCCEEDED result requires finite positive "
+                    f"U_outer_basis, got {self.U_outer_basis!r}"
+                )
+
+        # -- UA_w_k ≈ ua_w_k ----------------------------------------------
+        if self.UA_w_k is not None and not math.isclose(
+            self.UA_w_k, rb.ua_w_k, rel_tol=1e-9, abs_tol=1e-12
+        ):
+            raise ValueError(
+                f"UA_w_k ({self.UA_w_k!r}) != resistance_breakdown.ua_w_k ({rb.ua_w_k!r})"
+            )
+
+        # -- U ≈ UA / area when areas positive ----------------------------
+        if self.UA_w_k is not None:
+            if self.area_inner_m2 > 0:
+                expected_u_inner = self.UA_w_k / self.area_inner_m2
+                if self.U_inner_basis is not None and not math.isclose(
+                    self.U_inner_basis,
+                    expected_u_inner,
+                    rel_tol=1e-9,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        f"U_inner_basis ({self.U_inner_basis!r}) != "
+                        f"UA_w_k / area_inner_m2 ({expected_u_inner!r})"
+                    )
+            if self.area_outer_m2 > 0:
+                expected_u_outer = self.UA_w_k / self.area_outer_m2
+                if self.U_outer_basis is not None and not math.isclose(
+                    self.U_outer_basis,
+                    expected_u_outer,
+                    rel_tol=1e-9,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        f"U_outer_basis ({self.U_outer_basis!r}) != "
+                        f"UA_w_k / area_outer_m2 ({expected_u_outer!r})"
+                    )
+
+        return self
+
+    # ------------------------------------------------------------------
+    # Post-init
+    # ------------------------------------------------------------------
+
+    def model_post_init(self, __context: Any) -> None:
+        """Compute field hash for tamper detection."""
+        object.__setattr__(self, "_field_hash", self._compute_field_hash())
+
+    def _compute_field_hash(self) -> str:
+        """Compute SHA-256 of all public fields for tamper detection."""
+        payload: dict[str, Any] = {
+            "status": self.status.value,
+            "flow_arrangement": self.flow_arrangement.value,
+            "heat_duty_w": self.heat_duty_w,
+            "hot_outlet_temperature_k": self.hot_outlet_temperature_k,
+            "cold_outlet_temperature_k": self.cold_outlet_temperature_k,
+            "tube_reynolds": self.tube_reynolds,
+            "tube_prandtl": self.tube_prandtl,
+            "tube_nusselt": self.tube_nusselt,
+            "tube_h": self.tube_h,
+            "tube_selected_correlation_id": self.tube_selected_correlation_id,
+            "tube_selected_correlation_version": self.tube_selected_correlation_version,
+            "tube_applicability_status": self.tube_applicability_status,
+            "annulus_reynolds": self.annulus_reynolds,
+            "annulus_prandtl": self.annulus_prandtl,
+            "annulus_nusselt": self.annulus_nusselt,
+            "annulus_h": self.annulus_h,
+            "annulus_selected_correlation_id": self.annulus_selected_correlation_id,
+            "annulus_selected_correlation_version": self.annulus_selected_correlation_version,
+            "annulus_applicability_status": self.annulus_applicability_status,
+            "area_inner_m2": self.area_inner_m2,
+            "area_outer_m2": self.area_outer_m2,
+            "resistance_breakdown": (
+                self.resistance_breakdown.model_dump()
+                if self.resistance_breakdown is not None
+                else None
+            ),
+            "U_inner_basis": self.U_inner_basis,
+            "U_outer_basis": self.U_outer_basis,
+            "UA_w_k": self.UA_w_k,
+            "C_hot_w_k": self.C_hot_w_k,
+            "C_cold_w_k": self.C_cold_w_k,
+            "C_min_w_k": self.C_min_w_k,
+            "C_max_w_k": self.C_max_w_k,
+            "capacity_ratio": self.capacity_ratio,
+            "NTU": self.NTU,
+            "effectiveness": self.effectiveness,
+            "LMTD_k": self.LMTD_k,
+            "energy_residual_w": self.energy_residual_w,
+            "ua_lmtd_residual_w": self.ua_lmtd_residual_w,
+            "iterations": self.iterations,
+            "converged": self.converged,
+            "solver_termination_reason": self.solver_termination_reason,
+            "solver_details": {
+                k: (None if isinstance(v, float) and math.isnan(v) else v)
+                for k, v in self.solver_details.model_dump().items()
+            },
+            "warnings": [_message_to_dict(m) for m in self.warnings],
+            "blockers": [_message_to_dict(m) for m in self.blockers],
+            "property_calls": [_property_call_record_to_dict(pc) for pc in self.property_calls],
+            "result_hash": self.result_hash,
+            "request_identity": (
+                dataclasses.asdict(self.request_identity)
+                if dataclasses.is_dataclass(self.request_identity)
+                else self.request_identity
+            ),
+            "provider_identity": (
+                self.provider_identity.model_dump(mode="json")
+                if hasattr(self.provider_identity, "model_dump")
+                else dataclasses.asdict(self.provider_identity)
+            ),
+            "execution_context": (
+                self.execution_context.model_dump(mode="json")
+                if hasattr(self.execution_context, "model_dump")
+                else self.execution_context
+            ),
+            "failure": (
+                {
+                    "code": self.failure.code.value,
+                    "message": self.failure.message,
+                    "context": dict(self.failure.context) if self.failure.context else {},
+                }
+                if self.failure is not None
+                else None
+            ),
+            "provenance_graph_digest": _provenance_graph_digest(self.provenance_graph),
+            # Fluid state snapshots
+            "hot_inlet_state": (
+                dataclasses.asdict(self.hot_inlet_state)
+                if self.hot_inlet_state is not None
+                else None
+            ),
+            "cold_inlet_state": (
+                dataclasses.asdict(self.cold_inlet_state)
+                if self.cold_inlet_state is not None
+                else None
+            ),
+            "hot_outlet_state": (
+                dataclasses.asdict(self.hot_outlet_state)
+                if self.hot_outlet_state is not None
+                else None
+            ),
+            "cold_outlet_state": (
+                dataclasses.asdict(self.cold_outlet_state)
+                if self.cold_outlet_state is not None
+                else None
+            ),
+            "tube_side_inlet_state": (
+                dataclasses.asdict(self.tube_side_inlet_state)
+                if self.tube_side_inlet_state is not None
+                else None
+            ),
+            "tube_side_outlet_state": (
+                dataclasses.asdict(self.tube_side_outlet_state)
+                if self.tube_side_outlet_state is not None
+                else None
+            ),
+            "annulus_side_inlet_state": (
+                dataclasses.asdict(self.annulus_side_inlet_state)
+                if self.annulus_side_inlet_state is not None
+                else None
+            ),
+            "annulus_side_outlet_state": (
+                dataclasses.asdict(self.annulus_side_outlet_state)
+                if self.annulus_side_outlet_state is not None
+                else None
+            ),
+            "tube_bulk_state": (
+                dataclasses.asdict(self.tube_bulk_state)
+                if self.tube_bulk_state is not None
+                else None
+            ),
+            "annulus_bulk_state": (
+                dataclasses.asdict(self.annulus_bulk_state)
+                if self.annulus_bulk_state is not None
+                else None
+            ),
+            # Correlation snapshots
+            "tube_selected_correlation": (
+                dataclasses.asdict(self.tube_selected_correlation)
+                if self.tube_selected_correlation is not None
+                else None
+            ),
+            "annulus_selected_correlation": (
+                dataclasses.asdict(self.annulus_selected_correlation)
+                if self.annulus_selected_correlation is not None
+                else None
+            ),
+            # Applicability snapshots
+            "tube_applicability": (
+                dataclasses.asdict(self.tube_applicability)
+                if self.tube_applicability is not None
+                else None
+            ),
+            "annulus_applicability": (
+                dataclasses.asdict(self.annulus_applicability)
+                if self.annulus_applicability is not None
+                else None
+            ),
+            # Core provenance digest
+            "core_provenance_digest": self.core_provenance_digest,
+            # Q_max diagnostics
+            "q_max_diagnostics": (
+                dataclasses.asdict(self.q_max_diagnostics)
+                if self.q_max_diagnostics is not None
+                else None
+            ),
+        }
+        return sha256_digest(payload)
+
+    def validate_integrity(self) -> tuple[bool, list[str]]:
+        """Verify no fields have been tampered with after construction.
+
+        Returns (is_valid, list_of_issues).
+        """
+        issues: list[str] = []
+        if self._field_hash != self._compute_field_hash():
+            issues.append("Field hash mismatch: fields may have been tampered with")
+        if not self.verify_provenance():
+            issues.append("Provenance graph verification failed")
+        return (len(issues) == 0, issues)
+
+    def verify_hash(self) -> bool:
+        """Verify that result_hash is correct."""
+        if not self.result_hash.startswith("sha256:"):
+            return False
+        hex_part = self.result_hash[7:]
+        if len(hex_part) != 64:
+            return False
+        try:
+            int(hex_part, 16)
+        except ValueError:
+            return False
+        recomputed = self._recompute_result_hash()
+        return recomputed == self.result_hash
+
+    def verify_provenance(self) -> bool:
+        """Comprehensive provenance graph identity verification.
+
+        Verifies every node's canonical identity (UUID5, label,
+        payload_hash, metadata) and all structural invariants.
+        Returns False if any check fails; never raises.
+        """
+        try:
+            graph = self.provenance_graph
+
+            # Reject empty graphs
+            if not graph.nodes:
+                return False
+
+            # Verify evaluation identity of property calls
+            if not _verify_property_call_identity(
+                self.property_calls,
+                self.flow_arrangement,
+                status=self.status,
+                converged=self.converged,
+                solver_termination_reason=self.solver_termination_reason,
+                q_max_diagnostics=self.q_max_diagnostics,
+            ):
+                return False
+
+            # Index nodes by type
+            nodes_by_type: dict[ProvenanceNodeType, list[ProvenanceNode]] = {}
+            for n in graph.nodes:
+                nodes_by_type.setdefault(n.node_type, []).append(n)
+
+            # 1. RESULT node identity
+            result_nodes = nodes_by_type.get(ProvenanceNodeType.RESULT, [])
+            if len(result_nodes) != 1:
+                return False
+            result_node = result_nodes[0]
+
+            result_payload: dict[str, Any] = {"result_hash": self.result_hash}
+            expected_result_id = _deterministic_uuid5(result_payload)
+            if result_node.node_id != expected_result_id:
+                return False
+            if result_node.label != "double_pipe_rating_result":
+                return False
+            if result_node.metadata != (((("result_hash", self.result_hash)),)):
+                return False
+            if result_node.payload_hash != sha256_digest(result_payload):
+                return False
+
+            # 2. RESULT linkage
+            result_in_edges = [e for e in graph.edges if e.target_id == result_node.node_id]
+            # Expect: 1 produces + N property_call supports + M correlation supports
+            expected_result_in = 1 + len(self.property_calls)
+            if self.tube_selected_correlation is not None:
+                expected_result_in += 1
+            if self.annulus_selected_correlation is not None:
+                expected_result_in += 1
+            if len(result_in_edges) != expected_result_in:
+                return False
+            result_produces_edges = [e for e in result_in_edges if e.relation == "produces"]
+            if len(result_produces_edges) != 1:
+                return False
+            result_edge = result_produces_edges[0]
+
+            calc_nodes = nodes_by_type.get(ProvenanceNodeType.CALCULATION_RUN, [])
+            if len(calc_nodes) != 1:
+                return False
+            calc_node = calc_nodes[0]
+
+            if result_edge.source_id != calc_node.node_id:
+                return False
+            if result_edge.relation != "produces":
+                return False
+            if result_edge.metadata:
+                return False
+            # RESULT must have no outgoing edges
+            result_out_edges = [e for e in graph.edges if e.source_id == result_node.node_id]
+            if result_out_edges:
+                return False
+
+            # 3. EXTERNAL or CASE_REVISION root node
+            root_nodes = nodes_by_type.get(ProvenanceNodeType.EXTERNAL, []) + nodes_by_type.get(
+                ProvenanceNodeType.CASE_REVISION, []
+            )
+            if len(root_nodes) != 1:
+                return False
+            root_node = root_nodes[0]
+
+            # Rebuild expected root from execution_context
+            _rid = (
+                str(self.execution_context.request_id)
+                if self.execution_context.request_id is not None
+                else None
+            )
+            if self.execution_context.design_case_revision_id is not None:
+                if root_node.node_type != ProvenanceNodeType.CASE_REVISION:
+                    return False
+                _dcr = str(self.execution_context.design_case_revision_id)
+                expected_payload = {
+                    "design_case_revision_id": _dcr,
+                    "request_id": _rid,
+                }
+                expected_metadata: tuple[tuple[str, Any], ...] = (
+                    ("design_case_revision_id", _dcr),
+                    ("request_id", _rid),
+                )
+                expected_label = "case_revision"
+            else:
+                if root_node.node_type != ProvenanceNodeType.EXTERNAL:
+                    return False
+                expected_payload = {
+                    "root_type": "EXTERNAL",
+                    "request_id": _rid,
+                    "flow_arrangement": self.flow_arrangement.value,
+                }
+                expected_metadata = (
+                    ("request_id", _rid),
+                    ("flow_arrangement", self.flow_arrangement.value),
+                )
+                expected_label = "calculation_request"
+            expected_root_id = _deterministic_uuid5(expected_payload)
+            if root_node.node_id != expected_root_id:
+                return False
+            if root_node.label != expected_label:
+                return False
+            if root_node.payload_hash != sha256_digest(expected_payload):
+                return False
+            if root_node.metadata != expected_metadata:
+                return False
+
+            # 4. CALCULATION_RUN node identity
+            if calc_node.node_type != ProvenanceNodeType.CALCULATION_RUN:
+                return False
+            if calc_node.label != "double_pipe_rating_run":
+                return False
+
+            # Rebuild expected payload
+            expected_calc_payload = _build_calculation_run_payload(
+                flow_arrangement=self.flow_arrangement,
+                request_identity=self.request_identity,
+                iterations=self.iterations,
+                converged=self.converged,
+            )
+            expected_calc_id = _deterministic_uuid5(expected_calc_payload)
+            if calc_node.node_id != expected_calc_id:
+                return False
+            if calc_node.payload_hash != sha256_digest(expected_calc_payload):
+                return False
+
+            calc_meta = dict(calc_node.metadata)
+            expected_calc_keys: set[str] = {
+                "flow_arrangement",
+                "iterations",
+                "converged",
+                "software_version",
+                "external_calculation_run_id",
+            }
+            if self.q_max_diagnostics is not None:
+                expected_calc_keys.add("q_max_diagnostics")
+            if set(calc_meta.keys()) != expected_calc_keys:
+                return False
+            if calc_meta["flow_arrangement"] != self.flow_arrangement.value:
+                return False
+            if calc_meta["iterations"] != self.iterations:
+                return False
+            if calc_meta["converged"] != self.converged:
+                return False
+            if calc_meta["software_version"] != _SOFTWARE_VERSION:
+                return False
+            expected_ext_calc_id = (
+                str(self.execution_context.calculation_run_id)
+                if self.execution_context.calculation_run_id is not None
+                else None
+            )
+            if calc_meta.get("external_calculation_run_id") != expected_ext_calc_id:
+                return False
+
+            # 4b. Q_max diagnostics metadata verification
+            if self.q_max_diagnostics is not None:
+                q_max_meta = calc_meta.get("q_max_diagnostics")
+                if q_max_meta is None:
+                    return False
+                q_max_dict = dict(q_max_meta)
+                expected_q_max_fields: dict[str, Any] = {
+                    "q_max_w": self.q_max_diagnostics.q_max_w,
+                    "iterations": self.q_max_diagnostics.iterations,
+                    "termination_reason": self.q_max_diagnostics.termination_reason,
+                    "hot_limit_w": self.q_max_diagnostics.hot_limit_w,
+                    "cold_limit_w": self.q_max_diagnostics.cold_limit_w,
+                    "limiting_side": self.q_max_diagnostics.limiting_side,
+                    "final_q_low_w": self.q_max_diagnostics.final_q_low_w,
+                    "final_q_high_w": self.q_max_diagnostics.final_q_high_w,
+                    "final_q_width_w": self.q_max_diagnostics.final_q_width_w,
+                    "final_pinch_residual_k": self.q_max_diagnostics.final_pinch_residual_k,
+                    "q_tolerance_w": self.q_max_diagnostics.q_tolerance_w,
+                    "pinch_temperature_tolerance_k": (
+                        self.q_max_diagnostics.pinch_temperature_tolerance_k
+                    ),
+                }
+                if q_max_dict != expected_q_max_fields:
+                    return False
+            elif "q_max_diagnostics" in calc_meta:
+                # q_max_diagnostics is None on the result but present in provenance
+                return False
+
+            # 5. PROPERTY_CALL nodes
+            pc_nodes = nodes_by_type.get(ProvenanceNodeType.PROPERTY_CALL, [])
+            if len(pc_nodes) != len(self.property_calls):
+                return False
+
+            pc_node_map: dict[UUID, ProvenanceNode] = {n.node_id: n for n in pc_nodes}
+            for idx, pc in enumerate(self.property_calls):
+                prop_payload = _property_call_record_to_dict(pc)
+                prop_payload["occurrence_index"] = idx
+                expected_pc_id = _deterministic_uuid5(prop_payload)
+                pc_node = pc_node_map.pop(expected_pc_id, None)
+                if pc_node is None:
+                    return False
+                expected_label = f"property_{pc.fluid}_{pc.query_type}"
+                if pc_node.label != expected_label:
+                    return False
+                if pc_node.payload_hash != sha256_digest(prop_payload):
+                    return False
+                expected_meta = (
+                    ("fluid", pc.fluid),
+                    ("query_type", pc.query_type),
+                    ("backend_name", pc.backend_name),
+                    ("backend_version", pc.backend_version),
+                    ("reference_state_policy", pc.reference_state_policy),
+                    ("stage", pc.stage),
+                    ("success", pc.success),
+                    ("error_code", pc.error_code),
+                    ("stream_role", pc.stream_role),
+                    ("sequence_index", pc.sequence_index),
+                    ("evaluation_index", pc.evaluation_index),
+                    ("evaluation_role", pc.evaluation_role),
+                    ("call_index_within_evaluation", pc.call_index_within_evaluation),
+                    ("trial_q_w", pc.trial_q_w),
+                )
+                if pc_node.metadata != expected_meta:
+                    return False
+            if pc_node_map:
+                return False
+
+            # 5b. CORRELATION nodes
+            corr_nodes = nodes_by_type.get(ProvenanceNodeType.CORRELATION, [])
+            expected_corr_nodes = 0
+            if self.tube_selected_correlation is not None:
+                expected_corr_nodes += 1
+            if self.annulus_selected_correlation is not None:
+                expected_corr_nodes += 1
+            if len(corr_nodes) != expected_corr_nodes:
+                return False
+
+            corr_node_map: dict[UUID, ProvenanceNode] = {n.node_id: n for n in corr_nodes}
+            for side, corr_snap, appl_snap in (
+                (
+                    "tube",
+                    self.tube_selected_correlation,
+                    self.tube_applicability,
+                ),
+                (
+                    "annulus",
+                    self.annulus_selected_correlation,
+                    self.annulus_applicability,
+                ),
+            ):
+                if corr_snap is None:
+                    continue
+                corr_payload: dict[str, Any] = _build_correlation_payload(
+                    side=side,
+                    correlation_info=corr_snap,
+                    applicability_info=appl_snap,
+                )
+                expected_corr_id = _deterministic_uuid5(corr_payload)
+                corr_node = corr_node_map.pop(expected_corr_id, None)
+                if corr_node is None:
+                    return False
+                expected_corr_label = f"correlation_{side}"
+                if corr_node.label != expected_corr_label:
+                    return False
+                if corr_node.payload_hash != sha256_digest(corr_payload):
+                    return False
+                expected_corr_meta: tuple[tuple[str, Any], ...] = (
+                    ("side", side),
+                    ("correlation_id", corr_snap.correlation_id),
+                    ("version", corr_snap.version),
+                )
+                if corr_node.metadata != expected_corr_meta:
+                    return False
+            if corr_node_map:
+                return False
+
+            # 6. WARNING nodes
+            warn_nodes = nodes_by_type.get(ProvenanceNodeType.WARNING, [])
+            if len(warn_nodes) != len(self.warnings):
+                return False
+            warn_node_map: dict[UUID, ProvenanceNode] = {n.node_id: n for n in warn_nodes}
+            for idx, w in enumerate(self.warnings):
+                warn_payload: dict[str, Any] = {
+                    "code": w.code.value,
+                    "severity": w.severity.value,
+                    "message": w.message,
+                    "source_module": w.source_module,
+                    "context": dict(w.context) if w.context else {},
+                    "occurrence_index": idx,
+                }
+                expected_warn_id = _deterministic_uuid5(warn_payload)
+                warn_node = warn_node_map.pop(expected_warn_id, None)
+                if warn_node is None:
+                    return False
+                expected_label = f"warning_{w.code.value}"
+                if warn_node.label != expected_label:
+                    return False
+                if warn_node.payload_hash != sha256_digest(warn_payload):
+                    return False
+                expected_warn_meta = (
+                    ("code", w.code.value),
+                    ("severity", w.severity.value),
+                    ("message", w.message),
+                    ("source_module", w.source_module),
+                )
+                if warn_node.metadata != expected_warn_meta:
+                    return False
+            if warn_node_map:
+                return False
+
+            # 7. BLOCKER nodes
+            blocker_nodes = nodes_by_type.get(ProvenanceNodeType.BLOCKER, [])
+            if len(blocker_nodes) != len(self.blockers):
+                return False
+            blocker_node_map: dict[UUID, ProvenanceNode] = {n.node_id: n for n in blocker_nodes}
+            for idx, b in enumerate(self.blockers):
+                block_payload: dict[str, Any] = {
+                    "code": b.code.value,
+                    "severity": b.severity.value,
+                    "message": b.message,
+                    "source_module": b.source_module,
+                    "context": dict(b.context) if b.context else {},
+                    "occurrence_index": idx,
+                }
+                expected_block_id = _deterministic_uuid5(block_payload)
+                blocker_node = blocker_node_map.pop(expected_block_id, None)
+                if blocker_node is None:
+                    return False
+                expected_label = f"blocker_{b.code.value}"
+                if blocker_node.label != expected_label:
+                    return False
+                if blocker_node.payload_hash != sha256_digest(block_payload):
+                    return False
+                expected_block_meta = (
+                    ("code", b.code.value),
+                    ("severity", b.severity.value),
+                    ("message", b.message),
+                    ("source_module", b.source_module),
+                )
+                if blocker_node.metadata != expected_block_meta:
+                    return False
+            if blocker_node_map:
+                return False
+
+            # 8. core_provenance_digest from core graph (without RESULT node)
+            core_node_ids = {
+                n.node_id for n in graph.nodes if n.node_type != ProvenanceNodeType.RESULT
+            }
+            core_nodes = [n for n in graph.nodes if n.node_type != ProvenanceNodeType.RESULT]
+            core_edges = [e for e in graph.edges if e.target_id in core_node_ids]
+            try:
+                core_graph = ProvenanceGraph(
+                    nodes=tuple(core_nodes),
+                    edges=tuple(core_edges),
+                )
+                recomputed_digest = _provenance_graph_digest(core_graph)
+            except Exception:
+                return False
+            if recomputed_digest != self.core_provenance_digest:
+                return False
+
+            # 9. Reject unsupported node types
+            allowed_types = {
+                ProvenanceNodeType.EXTERNAL,
+                ProvenanceNodeType.CASE_REVISION,
+                ProvenanceNodeType.CALCULATION_RUN,
+                ProvenanceNodeType.PROPERTY_CALL,
+                ProvenanceNodeType.CORRELATION,
+                ProvenanceNodeType.WARNING,
+                ProvenanceNodeType.BLOCKER,
+                ProvenanceNodeType.RESULT,
+            }
+            for n in graph.nodes:
+                if n.node_type not in allowed_types:
+                    return False
+
+            # 10. Verify complete edge topology
+            expected_edge_counts: Counter[tuple[str, str, str]] = Counter()
+            # root → CALCULATION_RUN (triggers)
+            expected_edge_counts[(str(root_node.node_id), str(calc_node.node_id), "triggers")] += 1
+            # CALCULATION_RUN → each PROPERTY_CALL (calls)
+            for pc_n in pc_nodes:
+                expected_edge_counts[(str(calc_node.node_id), str(pc_n.node_id), "calls")] += 1
+            # CALCULATION_RUN → each CORRELATION (selects)
+            for corr_n in corr_nodes:
+                expected_edge_counts[(str(calc_node.node_id), str(corr_n.node_id), "selects")] += 1
+            # CALCULATION_RUN → each WARNING (emits)
+            for w_n in warn_nodes:
+                expected_edge_counts[(str(calc_node.node_id), str(w_n.node_id), "emits")] += 1
+            # CALCULATION_RUN → each BLOCKER (emits)
+            for b_n in blocker_nodes:
+                expected_edge_counts[(str(calc_node.node_id), str(b_n.node_id), "emits")] += 1
+            # CALCULATION_RUN → RESULT (produces)
+            expected_edge_counts[
+                (str(calc_node.node_id), str(result_node.node_id), "produces")
+            ] += 1
+            # PROPERTY_CALL → RESULT (supports)
+            for pc_n in pc_nodes:
+                expected_edge_counts[(str(pc_n.node_id), str(result_node.node_id), "supports")] += 1
+            # CORRELATION → RESULT (supports)
+            for corr_n in corr_nodes:
+                corr_src = str(corr_n.node_id)
+                corr_tgt = str(result_node.node_id)
+                expected_edge_counts[(corr_src, corr_tgt, "supports")] += 1
+
+            actual_edge_counts: Counter[tuple[str, str, str]] = Counter()
+            for e in graph.edges:
+                if e.metadata:
+                    return False
+                actual_edge_counts[(str(e.source_id), str(e.target_id), e.relation)] += 1
+
+            if actual_edge_counts != expected_edge_counts:
+                return False
+
+            # 11. All payload hashes are valid SHA-256
+            for node in graph.nodes:
+                if not node.payload_hash.startswith("sha256:"):
+                    return False
+                hex_part = node.payload_hash[7:]
+                if len(hex_part) != 64:
+                    return False
+                try:
+                    int(hex_part, 16)
+                except ValueError:
+                    return False
+
+            return True
+
+        except Exception:
+            return False
+
+    def _recompute_result_hash(self) -> str:
+        """Recompute result_hash from the stored field values.
+
+        Builds the canonical payload identical to _build_identity_payload
+        but using the result object's own stored fields.  Does NOT include
+        result_hash itself in the payload (no circular dependency).
+        """
+        payload = _build_identity_payload(
+            request_identity=self.request_identity,
+            provider_identity=self.provider_identity,
+            flow_arrangement=self.flow_arrangement,
+            heat_duty_w=self.heat_duty_w,
+            hot_outlet_temperature_k=self.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=self.cold_outlet_temperature_k,
+            tube_reynolds=self.tube_reynolds,
+            tube_prandtl=self.tube_prandtl,
+            tube_nusselt=self.tube_nusselt,
+            tube_h=self.tube_h,
+            tube_selected_correlation_id=self.tube_selected_correlation_id,
+            tube_selected_correlation_version=self.tube_selected_correlation_version,
+            tube_applicability_status=self.tube_applicability_status,
+            annulus_reynolds=self.annulus_reynolds,
+            annulus_prandtl=self.annulus_prandtl,
+            annulus_nusselt=self.annulus_nusselt,
+            annulus_h=self.annulus_h,
+            annulus_selected_correlation_id=self.annulus_selected_correlation_id,
+            annulus_selected_correlation_version=self.annulus_selected_correlation_version,
+            annulus_applicability_status=self.annulus_applicability_status,
+            area_inner_m2=self.area_inner_m2,
+            area_outer_m2=self.area_outer_m2,
+            resistance_breakdown=self.resistance_breakdown,
+            U_inner_basis=self.U_inner_basis,
+            U_outer_basis=self.U_outer_basis,
+            UA_w_k=self.UA_w_k,
+            C_hot_w_k=self.C_hot_w_k,
+            C_cold_w_k=self.C_cold_w_k,
+            C_min_w_k=self.C_min_w_k,
+            C_max_w_k=self.C_max_w_k,
+            capacity_ratio=self.capacity_ratio,
+            NTU=self.NTU,
+            effectiveness=self.effectiveness,
+            LMTD_k=self.LMTD_k,
+            energy_residual_w=self.energy_residual_w,
+            ua_lmtd_residual_w=self.ua_lmtd_residual_w,
+            iterations=self.iterations,
+            converged=self.converged,
+            solver_termination_reason=self.solver_termination_reason,
+            solver_details=self.solver_details,
+            property_calls=self.property_calls,
+            warnings=self.warnings,
+            blockers=self.blockers,
+            failure=self.failure,
+            status=self.status,
+            # New snapshot fields
+            hot_inlet_state=self.hot_inlet_state,
+            cold_inlet_state=self.cold_inlet_state,
+            hot_outlet_state=self.hot_outlet_state,
+            cold_outlet_state=self.cold_outlet_state,
+            tube_side_inlet_state=self.tube_side_inlet_state,
+            tube_side_outlet_state=self.tube_side_outlet_state,
+            annulus_side_inlet_state=self.annulus_side_inlet_state,
+            annulus_side_outlet_state=self.annulus_side_outlet_state,
+            tube_bulk_state=self.tube_bulk_state,
+            annulus_bulk_state=self.annulus_bulk_state,
+            tube_selected_correlation_snap=self.tube_selected_correlation,
+            annulus_selected_correlation_snap=self.annulus_selected_correlation,
+            tube_applicability_snap=self.tube_applicability,
+            annulus_applicability_snap=self.annulus_applicability,
+            core_provenance_digest=self.core_provenance_digest,
+            # Closure diagnostics
+            Q_hot_w=self.Q_hot_w,
+            Q_cold_w=self.Q_cold_w,
+            relative_energy_residual=self.relative_energy_residual,
+            energy_tolerance_w=self.energy_tolerance_w,
+            relative_ua_lmtd_residual=self.relative_ua_lmtd_residual,
+            ua_lmtd_tolerance_w=self.ua_lmtd_tolerance_w,
+            q_max_diagnostics=self.q_max_diagnostics,
+        )
+        return sha256_digest(payload)
+
+
+# ---------------------------------------------------------------------------
+# Canonical payload builders (module-level, single source of truth)
+# ---------------------------------------------------------------------------
+
+
+def _build_identity_payload(
+    *,
+    request_identity: RatingRequestIdentity,
+    provider_identity: ProviderIdentitySnapshot,
+    flow_arrangement: FlowArrangement,
+    heat_duty_w: float | None,
+    hot_outlet_temperature_k: float | None,
+    cold_outlet_temperature_k: float | None,
+    tube_reynolds: float | None,
+    tube_prandtl: float | None,
+    tube_nusselt: float | None,
+    tube_h: float | None,
+    tube_selected_correlation_id: str | None,
+    tube_selected_correlation_version: str | None,
+    tube_applicability_status: str | None,
+    annulus_reynolds: float | None,
+    annulus_prandtl: float | None,
+    annulus_nusselt: float | None,
+    annulus_h: float | None,
+    annulus_selected_correlation_id: str | None,
+    annulus_selected_correlation_version: str | None,
+    annulus_applicability_status: str | None,
+    area_inner_m2: float,
+    area_outer_m2: float,
+    resistance_breakdown: ResistanceBreakdownModel | None,
+    U_inner_basis: float | None,
+    U_outer_basis: float | None,
+    UA_w_k: float | None,
+    C_hot_w_k: float | None,
+    C_cold_w_k: float | None,
+    C_min_w_k: float | None,
+    C_max_w_k: float | None,
+    capacity_ratio: float | None,
+    NTU: float | None,
+    effectiveness: float | None,
+    LMTD_k: float | None,
+    energy_residual_w: float | None,
+    ua_lmtd_residual_w: float | None,
+    iterations: int,
+    converged: bool,
+    solver_termination_reason: str,
+    solver_details: SolverDetailsModel,
+    property_calls: tuple[PropertyCallRecord, ...],
+    warnings: tuple[EngineeringMessage, ...],
+    blockers: tuple[EngineeringMessage, ...],
+    failure: RunFailure | None,
+    status: RatingStatus,
+    # New snapshot fields
+    hot_inlet_state: FluidStateSnapshot | None = None,
+    cold_inlet_state: FluidStateSnapshot | None = None,
+    hot_outlet_state: FluidStateSnapshot | None = None,
+    cold_outlet_state: FluidStateSnapshot | None = None,
+    tube_side_inlet_state: FluidStateSnapshot | None = None,
+    tube_side_outlet_state: FluidStateSnapshot | None = None,
+    annulus_side_inlet_state: FluidStateSnapshot | None = None,
+    annulus_side_outlet_state: FluidStateSnapshot | None = None,
+    tube_bulk_state: FluidStateSnapshot | None = None,
+    annulus_bulk_state: FluidStateSnapshot | None = None,
+    tube_selected_correlation_snap: SelectedCorrelationSnapshot | None = None,
+    annulus_selected_correlation_snap: SelectedCorrelationSnapshot | None = None,
+    tube_applicability_snap: ApplicabilitySnapshot | None = None,
+    annulus_applicability_snap: ApplicabilitySnapshot | None = None,
+    core_provenance_digest: str = "",
+    # Closure diagnostics
+    Q_hot_w: float | None = None,
+    Q_cold_w: float | None = None,
+    relative_energy_residual: float | None = None,
+    energy_tolerance_w: float | None = None,
+    relative_ua_lmtd_residual: float | None = None,
+    ua_lmtd_tolerance_w: float | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
+) -> dict[str, Any]:
+    """Build the canonical payload dict used for result hashing.
+
+    This is the single source of truth for the result-hash payload.
+    Both _compute_result_hash (construction) and
+    RatingResult._recompute_result_hash (verification) call this.
+    """
+    failure_dict: dict[str, Any] | None = None
+    if failure is not None:
+        failure_dict = {
+            "code": failure.code.value,
+            "message": failure.message,
+            "context": dict(failure.context) if failure.context else {},
+        }
+
+    return {
+        # Request identity (original inputs)
+        "hot_fluid_name": request_identity.hot_fluid_name,
+        "hot_fluid_backend": request_identity.hot_fluid_backend,
+        "hot_fluid_components": request_identity.hot_fluid_components,
+        "cold_fluid_name": request_identity.cold_fluid_name,
+        "cold_fluid_backend": request_identity.cold_fluid_backend,
+        "cold_fluid_components": request_identity.cold_fluid_components,
+        "hot_mass_flow_kg_s": request_identity.hot_mass_flow_kg_s,
+        "cold_mass_flow_kg_s": request_identity.cold_mass_flow_kg_s,
+        "hot_inlet_pressure_pa": request_identity.hot_inlet_pressure_pa,
+        "cold_inlet_pressure_pa": request_identity.cold_inlet_pressure_pa,
+        "hot_inlet_temperature_k": request_identity.hot_inlet_temperature_k,
+        "cold_inlet_temperature_k": request_identity.cold_inlet_temperature_k,
+        "flow_arrangement": request_identity.flow_arrangement,
+        "geometry": request_identity.geometry,
+        "solver_absolute_residual_w": request_identity.solver_absolute_residual_w,
+        "solver_relative_residual_fraction": request_identity.solver_relative_residual_fraction,
+        "solver_bracket_temperature_tolerance_k": (
+            request_identity.solver_bracket_temperature_tolerance_k
+        ),
+        "solver_max_iterations": request_identity.solver_max_iterations,
+        "tube_boundary_condition": request_identity.tube_boundary_condition,
+        "annulus_boundary_condition": request_identity.annulus_boundary_condition,
+        "minimum_terminal_delta_t": request_identity.minimum_terminal_delta_t,
+        # Provider identity
+        "provider_name": provider_identity.name,
+        "provider_version": provider_identity.version,
+        "provider_git_revision": provider_identity.git_revision,
+        "reference_state_policy": provider_identity.reference_state_policy,
+        "configuration_fingerprint": provider_identity.configuration_fingerprint,
+        "cache_policy_version": provider_identity.cache_policy_version,
+        # Flow arrangement (from request identity)
+        "flow_arrangement_top_level": flow_arrangement.value,
+        # Thermal results
+        "heat_duty_w": heat_duty_w,
+        "hot_outlet_temperature_k": hot_outlet_temperature_k,
+        "cold_outlet_temperature_k": cold_outlet_temperature_k,
+        # Tube-side convection
+        "tube_reynolds": tube_reynolds,
+        "tube_prandtl": tube_prandtl,
+        "tube_nusselt": tube_nusselt,
+        "tube_h": tube_h,
+        "tube_selected_correlation_id": tube_selected_correlation_id,
+        "tube_selected_correlation_version": tube_selected_correlation_version,
+        "tube_applicability_status": tube_applicability_status,
+        # Annulus-side convection
+        "annulus_reynolds": annulus_reynolds,
+        "annulus_prandtl": annulus_prandtl,
+        "annulus_nusselt": annulus_nusselt,
+        "annulus_h": annulus_h,
+        "annulus_selected_correlation_id": annulus_selected_correlation_id,
+        "annulus_selected_correlation_version": annulus_selected_correlation_version,
+        "annulus_applicability_status": annulus_applicability_status,
+        # Areas
+        "area_inner_m2": area_inner_m2,
+        "area_outer_m2": area_outer_m2,
+        # Resistance breakdown
+        "resistance_breakdown": (
+            resistance_breakdown.model_dump() if resistance_breakdown is not None else None
+        ),
+        # Overall coefficients
+        "U_inner_basis": U_inner_basis,
+        "U_outer_basis": U_outer_basis,
+        "UA_w_k": UA_w_k,
+        # Capacity rates
+        "C_hot_w_k": C_hot_w_k,
+        "C_cold_w_k": C_cold_w_k,
+        "C_min_w_k": C_min_w_k,
+        "C_max_w_k": C_max_w_k,
+        "capacity_ratio": capacity_ratio,
+        # ε-NTU
+        "NTU": NTU,
+        "effectiveness": effectiveness,
+        # LMTD
+        "LMTD_k": LMTD_k,
+        # Residuals
+        "energy_residual_w": energy_residual_w,
+        "ua_lmtd_residual_w": ua_lmtd_residual_w,
+        # Solver (sanitize NaN → None for canonical hashing)
+        "iterations": iterations,
+        "converged": converged,
+        "solver_termination_reason": solver_termination_reason,
+        "solver_details": {
+            k: (None if isinstance(v, float) and math.isnan(v) else v)
+            for k, v in solver_details.model_dump().items()
+        },
+        # Property calls
+        "property_calls": [_property_call_record_to_dict(pc) for pc in property_calls],
+        # Messages
+        "warnings": [_message_to_dict(m) for m in warnings],
+        "blockers": [_message_to_dict(m) for m in blockers],
+        # Status
+        "status": status.value,
+        # Failure
+        "failure": failure_dict,
+        # Software version
+        "software_version": _SOFTWARE_VERSION,
+        # Fluid state snapshots
+        "hot_inlet_state": (
+            dataclasses.asdict(hot_inlet_state) if hot_inlet_state is not None else None
+        ),
+        "cold_inlet_state": (
+            dataclasses.asdict(cold_inlet_state) if cold_inlet_state is not None else None
+        ),
+        "hot_outlet_state": (
+            dataclasses.asdict(hot_outlet_state) if hot_outlet_state is not None else None
+        ),
+        "cold_outlet_state": (
+            dataclasses.asdict(cold_outlet_state) if cold_outlet_state is not None else None
+        ),
+        "tube_side_inlet_state": (
+            dataclasses.asdict(tube_side_inlet_state) if tube_side_inlet_state is not None else None
+        ),
+        "tube_side_outlet_state": (
+            dataclasses.asdict(tube_side_outlet_state)
+            if tube_side_outlet_state is not None
+            else None
+        ),
+        "annulus_side_inlet_state": (
+            dataclasses.asdict(annulus_side_inlet_state)
+            if annulus_side_inlet_state is not None
+            else None
+        ),
+        "annulus_side_outlet_state": (
+            dataclasses.asdict(annulus_side_outlet_state)
+            if annulus_side_outlet_state is not None
+            else None
+        ),
+        "tube_bulk_state": (
+            dataclasses.asdict(tube_bulk_state) if tube_bulk_state is not None else None
+        ),
+        "annulus_bulk_state": (
+            dataclasses.asdict(annulus_bulk_state) if annulus_bulk_state is not None else None
+        ),
+        # Correlation snapshots
+        "tube_selected_correlation": (
+            dataclasses.asdict(tube_selected_correlation_snap)
+            if tube_selected_correlation_snap is not None
+            else None
+        ),
+        "annulus_selected_correlation": (
+            dataclasses.asdict(annulus_selected_correlation_snap)
+            if annulus_selected_correlation_snap is not None
+            else None
+        ),
+        # Applicability snapshots
+        "tube_applicability": (
+            dataclasses.asdict(tube_applicability_snap)
+            if tube_applicability_snap is not None
+            else None
+        ),
+        "annulus_applicability": (
+            dataclasses.asdict(annulus_applicability_snap)
+            if annulus_applicability_snap is not None
+            else None
+        ),
+        # Closure diagnostics
+        "Q_hot_w": Q_hot_w,
+        "Q_cold_w": Q_cold_w,
+        "relative_energy_residual": relative_energy_residual,
+        "energy_tolerance_w": energy_tolerance_w,
+        "relative_ua_lmtd_residual": relative_ua_lmtd_residual,
+        "ua_lmtd_tolerance_w": ua_lmtd_tolerance_w,
+        # Core provenance digest
+        "core_provenance_digest": core_provenance_digest,
+        # Q_max diagnostics
+        "q_max_diagnostics": (
+            dataclasses.asdict(q_max_diagnostics) if q_max_diagnostics is not None else None
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Serialization helpers
+# ---------------------------------------------------------------------------
+
+
+def _property_call_record_to_dict(pc: PropertyCallRecord | dict[str, Any]) -> dict[str, Any]:
+    """Convert PropertyCallRecord to a canonical dict for hashing."""
+    if isinstance(pc, dict):
+        return pc
+    return {
+        "fluid": pc.fluid,
+        "query_type": pc.query_type,
+        "inputs": dict(pc.inputs),
+        "backend_name": pc.backend_name,
+        "backend_version": pc.backend_version,
+        "reference_state_policy": pc.reference_state_policy,
+        "stage": pc.stage,
+        "result_temperature_k": pc.result_temperature_k,
+        "result_pressure_pa": pc.result_pressure_pa,
+        "result_enthalpy_j_kg": pc.result_enthalpy_j_kg,
+        "result_phase": pc.result_phase,
+        "result_density_kg_m3": pc.result_density_kg_m3,
+        "result_cp_j_kg_k": pc.result_cp_j_kg_k,
+        "result_viscosity_pa_s": pc.result_viscosity_pa_s,
+        "result_conductivity_w_m_k": pc.result_conductivity_w_m_k,
+        "result_entropy_j_kg_k": pc.result_entropy_j_kg_k,
+        "result_quality": pc.result_quality,
+        "success": pc.success,
+        "error_code": pc.error_code,
+        "error_message": pc.error_message,
+        "stream_role": pc.stream_role,
+        "sequence_index": pc.sequence_index,
+        "backend_git_revision": pc.backend_git_revision,
+        "configuration_fingerprint": pc.configuration_fingerprint,
+        "validation_level": pc.validation_level,
+        "validation_dataset_id": pc.validation_dataset_id,
+        "cache_policy_version": pc.cache_policy_version,
+        # Evaluation identity fields
+        "evaluation_index": pc.evaluation_index,
+        "evaluation_role": pc.evaluation_role,
+        "call_index_within_evaluation": pc.call_index_within_evaluation,
+        "trial_q_w": pc.trial_q_w,
+    }
+
+
+def _message_to_dict(msg: EngineeringMessage | dict[str, Any]) -> dict[str, Any]:
+    """Convert EngineeringMessage to a canonical dict for hashing."""
+    if isinstance(msg, dict):
+        return msg
+    return {
+        "schema_version": msg.schema_version,
+        "code": msg.code.value,
+        "severity": msg.severity.value,
+        "message": msg.message,
+        "source_module": msg.source_module,
+        "affected_paths": msg.affected_paths,
+        "context": dict(msg.context) if msg.context else {},
+        "allows_continuation": msg.allows_continuation,
+    }
+
+
+def _snapshot_to_dict(
+    snap: FluidStateSnapshot | SelectedCorrelationSnapshot | ApplicabilitySnapshot | None,
+) -> dict[str, Any] | None:
+    """Convert a frozen snapshot dataclass to a plain dict for hashing."""
+    if snap is None:
+        return None
+    return dataclasses.asdict(snap)
+
+
+# ---------------------------------------------------------------------------
+# Provenance helpers
+# ---------------------------------------------------------------------------
+
+
+def _deterministic_uuid5(payload: dict[str, Any]) -> UUID:
+    """Compute a deterministic UUID5 from a canonical payload dict."""
+    canonical = sha256_digest(payload)
+    return uuid5(_PROVENANCE_NAMESPACE, canonical)
+
+
+def _provenance_graph_digest(graph: ProvenanceGraph | dict[str, Any]) -> str:
+    """Compute a deterministic SHA-256 digest of a ProvenanceGraph.
+
+    Serializes nodes and edges canonically.  Excludes the result_hash
+    reference inside CALCULATION_RUN metadata to avoid circular
+    dependency with the result hash that includes this digest.
+    """
+    if isinstance(graph, dict):
+        graph = ProvenanceGraph.model_validate(graph)
+    nodes_payload = []
+    for node in graph.nodes:
+        meta = dict(node.metadata)
+        meta.pop("result_hash", None)
+        nodes_payload.append(
+            {
+                "node_id": str(node.node_id),
+                "node_type": node.node_type.value,
+                "label": node.label,
+                "metadata": meta,
+                "payload_hash": node.payload_hash,
+            }
+        )
+    edges_payload = [
+        {
+            "source_id": str(e.source_id),
+            "target_id": str(e.target_id),
+            "relation": e.relation,
+        }
+        for e in graph.edges
+    ]
+    return sha256_digest({"nodes": nodes_payload, "edges": edges_payload})
+
+
+def _build_calculation_run_payload(
+    *,
+    flow_arrangement: FlowArrangement,
+    request_identity: RatingRequestIdentity,
+    iterations: int,
+    converged: bool,
+) -> dict[str, Any]:
+    """Build the canonical CALCULATION_RUN payload dict."""
+    return {
+        "flow_arrangement": flow_arrangement.value,
+        "hot_fluid_name": request_identity.hot_fluid_name,
+        "hot_fluid_backend": request_identity.hot_fluid_backend,
+        "cold_fluid_name": request_identity.cold_fluid_name,
+        "cold_fluid_backend": request_identity.cold_fluid_backend,
+        "hot_mass_flow_kg_s": request_identity.hot_mass_flow_kg_s,
+        "cold_mass_flow_kg_s": request_identity.cold_mass_flow_kg_s,
+        "hot_inlet_pressure_pa": request_identity.hot_inlet_pressure_pa,
+        "cold_inlet_pressure_pa": request_identity.cold_inlet_pressure_pa,
+        "hot_inlet_temperature_k": request_identity.hot_inlet_temperature_k,
+        "cold_inlet_temperature_k": request_identity.cold_inlet_temperature_k,
+        "solver_absolute_residual_w": request_identity.solver_absolute_residual_w,
+        "solver_relative_residual_fraction": request_identity.solver_relative_residual_fraction,
+        "solver_bracket_temperature_tolerance_k": (
+            request_identity.solver_bracket_temperature_tolerance_k
+        ),
+        "solver_max_iterations": request_identity.solver_max_iterations,
+        "iterations": iterations,
+        "converged": converged,
+        "software_version": _SOFTWARE_VERSION,
+    }
+
+
+def _build_correlation_payload(
+    *,
+    side: str,
+    correlation_info: SelectedCorrelationSnapshot,
+    applicability_info: ApplicabilitySnapshot | None,
+) -> dict[str, Any]:
+    """Build the canonical CORRELATION node payload dict."""
+    appl_status = applicability_info.status if applicability_info is not None else ""
+    assess_hash = applicability_info.assessment_hash if applicability_info is not None else ""
+    return {
+        "side": side,
+        "correlation_id": correlation_info.correlation_id,
+        "version": correlation_info.version,
+        "definition_hash": correlation_info.definition_hash,
+        "source_title": correlation_info.source_title,
+        "source_authors": correlation_info.source_authors,
+        "source_year": correlation_info.source_year,
+        "source_reference": correlation_info.source_reference,
+        "source_verification_status": correlation_info.source_verification_status,
+        "nusselt_basis": correlation_info.nusselt_basis,
+        "applicability_status": appl_status,
+        "assessment_hash": assess_hash,
+        "is_adaptation": correlation_info.is_adaptation,
+        "adaptation_limitation": correlation_info.adaptation_limitation,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Evaluation identity verification
+# ---------------------------------------------------------------------------
+
+
+def _verify_property_call_identity(
+    property_calls: tuple[PropertyCallRecord, ...] | list[PropertyCallRecord],
+    flow_arrangement: FlowArrangement,
+    status: RatingStatus | None = None,
+    converged: bool | None = None,
+    solver_termination_reason: str | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
+) -> bool:
+    """Verify the evaluation identity invariants of property calls.
+
+    Checks structural invariants about the evaluation_index, call_index,
+    sequence_index, role ordering and completeness of property calls.
+    Returns False if any check fails; never raises.
+
+    Empty property_calls are allowed only for pre-property structural
+    BLOCKED results: status=BLOCKED, converged=False, termination 'blocked',
+    with no Q_max/solver/final semantics.
+    """
+    try:
+        if not property_calls:
+            # Empty calls: require all context explicitly for structural BLOCKED.
+            # Fail closed when any context is missing.
+            if status is None or converged is None or solver_termination_reason is None:
+                return False
+            if status != RatingStatus.BLOCKED:
+                return False
+            if converged is not False:
+                return False
+            if solver_termination_reason != "blocked":
+                return False
+            return q_max_diagnostics is None
+
+        # a) Role validity - each evaluation_role must be one of the 7 EvaluationRole values
+        valid_roles = {r.value for r in EvaluationRole}
+        for pc in property_calls:
+            if pc.evaluation_role not in valid_roles:
+                return False
+
+        n = len(property_calls)
+
+        # 1. sequence_index == list(range(n))
+        seq_indices = [pc.sequence_index for pc in property_calls]
+        if seq_indices != list(range(n)):
+            return False
+
+        # 2. evaluation_index from 0..N-1 with no gaps
+        eval_indices = sorted({pc.evaluation_index for pc in property_calls})
+        if eval_indices != list(range(len(eval_indices))):
+            return False
+
+        # Group calls by evaluation_index
+        by_eval: dict[int, list[PropertyCallRecord]] = {}
+        for pc in property_calls:
+            by_eval.setdefault(pc.evaluation_index, []).append(pc)
+
+        # 3. Each evaluation has exactly one role and one trial_q_w
+        #    (but may have multiple calls per evaluation, e.g. solver
+        #    iteration evaluates hot+cold outlets + bulks = 4 calls)
+        for ei in range(len(eval_indices)):
+            eval_calls = by_eval.get(ei, [])
+            if not eval_calls:
+                return False
+            roles = {pc.evaluation_role for pc in eval_calls}
+            if len(roles) != 1:
+                return False
+            trial_q_w_values = {pc.trial_q_w for pc in eval_calls}
+            if len(trial_q_w_values) != 1:
+                return False
+
+        # b) Trial Q rules: static roles must have trial_q_w=None,
+        #    dynamic roles must have a finite trial_q_w.
+        static_roles = {
+            EvaluationRole.INLET.value,
+            EvaluationRole.Q_MAX_COUNTERFLOW.value,
+            EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+        }
+        dynamic_roles = {
+            EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+            EvaluationRole.BRACKET_PROBE.value,
+            EvaluationRole.SOLVER_ITERATION.value,
+            EvaluationRole.FINAL_EVALUATION.value,
+        }
+        for pc in property_calls:
+            if pc.evaluation_role in static_roles:
+                if pc.trial_q_w is not None:
+                    return False
+            elif pc.evaluation_role in dynamic_roles and (
+                pc.trial_q_w is None or not math.isfinite(pc.trial_q_w)
+            ):
+                return False
+
+        # 4. Each evaluation's call_index == 0..n-1 (consecutive within eval)
+        for ei in range(len(eval_indices)):
+            eval_calls = by_eval[ei]
+            call_indices = sorted(pc.call_index_within_evaluation for pc in eval_calls)
+            if call_indices != list(range(len(call_indices))):
+                return False
+
+        # 5. (evaluation_index, call_index) globally unique
+        seen_pairs: set[tuple[int, int]] = set()
+        for pc in property_calls:
+            pair = (pc.evaluation_index, pc.call_index_within_evaluation)
+            if pair in seen_pairs:
+                return False
+            seen_pairs.add(pair)
+
+        # 6. Inlet evaluation exactly one, index 0
+        inlet_evaluations = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.INLET.value
+        ]
+        if len(inlet_evaluations) != 1:
+            return False
+        if inlet_evaluations[0] != 0:
+            return False
+
+        # 7. Inlet evaluation full contract
+        #    hot failure:  1 call (hot_inlet/TP/fail), inlet is last eval,
+        #                  BLOCKED/converged=False/termination=blocked,
+        #                  q_max_diagnostics=None
+        #    cold failure: 2 calls (hot success, cold fail), same context
+        #    success:      2 calls (hot+TP success, cold+TP success)
+        inlet_calls_sorted = sorted(
+            by_eval[0],
+            key=lambda c: c.call_index_within_evaluation,
+        )
+        inlet_is_last = inlet_evaluations[0] == max(eval_indices)
+
+        if len(inlet_calls_sorted) == 1:
+            # Hot failure: exactly one hot_inlet/TP/failed call
+            ic = inlet_calls_sorted[0]
+            if ic.stream_role != "hot_inlet":
+                return False
+            if ic.query_type != "TP":
+                return False
+            if ic.success:
+                return False
+            if ic.call_index_within_evaluation != 0:
+                return False
+            # Inlet must be the last evaluation
+            if not inlet_is_last:
+                return False
+            # Must be BLOCKED, converged=False, termination=blocked
+            if status is None or converged is None or solver_termination_reason is None:
+                return False
+            if status != RatingStatus.BLOCKED:
+                return False
+            if converged is not False:
+                return False
+            if solver_termination_reason != "blocked":
+                return False
+            # Diagnostics incompatible with failed inlet
+            if q_max_diagnostics is not None:
+                return False
+        elif len(inlet_calls_sorted) == 2:
+            ic0, ic1 = inlet_calls_sorted
+            # call 0 must be hot_inlet/TP
+            if ic0.stream_role != "hot_inlet" or ic0.query_type != "TP":
+                return False
+            if ic0.call_index_within_evaluation != 0:
+                return False
+            # call 1 must be cold_inlet/TP
+            if ic1.stream_role != "cold_inlet" or ic1.query_type != "TP":
+                return False
+            if ic1.call_index_within_evaluation != 1:
+                return False
+
+            if not ic0.success:
+                return False  # hot failure → cold never attempted; impossible with 2 calls
+
+            if not ic1.success:
+                # Cold failure: inlet must be last, BLOCKED, no diagnostics
+                if not inlet_is_last:
+                    return False
+                if status is None or converged is None or solver_termination_reason is None:
+                    return False
+                if status != RatingStatus.BLOCKED:
+                    return False
+                if converged is not False:
+                    return False
+                if solver_termination_reason != "blocked":
+                    return False
+                if q_max_diagnostics is not None:
+                    return False
+            # else both succeed → OK, can proceed to later phases
+        else:
+            # 0 or 3+ inlet calls → impossible
+            return False
+
+        all_roles = {pc.evaluation_role for pc in property_calls}
+
+        # f) Q_max role vs flow arrangement
+        if flow_arrangement == FlowArrangement.COUNTERFLOW:
+            if EvaluationRole.Q_MAX_PARALLEL_LIMITS.value in all_roles:
+                return False
+            if EvaluationRole.Q_MAX_PARALLEL_PINCH.value in all_roles:
+                return False
+        if (
+            flow_arrangement == FlowArrangement.PARALLEL
+            and EvaluationRole.Q_MAX_COUNTERFLOW.value in all_roles
+        ):
+            return False
+
+        # Counterflow Q_max call prefix contract
+        counterflow_evals = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.Q_MAX_COUNTERFLOW.value
+        ]
+        for ce in counterflow_evals:
+            ce_calls = sorted(
+                by_eval[ce],
+                key=lambda c: c.call_index_within_evaluation,
+            )
+            if len(ce_calls) == 2:
+                # Both calls present: hot succeeded, cold present
+                if ce_calls[0].stream_role != "hot_limit" or ce_calls[0].query_type != "TP":
+                    return False
+                if ce_calls[1].stream_role != "cold_limit" or ce_calls[1].query_type != "TP":
+                    return False
+                # If hot failed, cold should not exist
+                if not ce_calls[0].success:
+                    return False
+            elif len(ce_calls) == 1:
+                # Single counterflow call (hot failure prefix):
+                # must be call 0 = hot_limit/TP, failed
+                if ce_calls[0].call_index_within_evaluation != 0:
+                    return False
+                if ce_calls[0].stream_role != "hot_limit" or ce_calls[0].query_type != "TP":
+                    return False
+                if ce_calls[0].success:
+                    return False
+            else:
+                return False
+
+        # Counterflow: at most one Q_MAX_COUNTERFLOW evaluation.
+        # Production never produces duplicate counterflow Q_max phases.
+        if len(counterflow_evals) > 1:
+            return False
+
+        # Counterflow ordering: q_max_counterflow must be evaluation
+        # index 1 (directly after inlet=0), before any bracket/solver/
+        # final phases.  Having counterflow after solver or final is
+        # never valid.
+        if counterflow_evals and counterflow_evals[0] != 1:
+            return False
+
+        # Collect limits and pinch evaluations (used by both parallel
+        # state machine below and Q_max diagnostics binding after).
+        limits_evals = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
+        ]
+        pinch_evals = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_PINCH.value
+        ]
+        has_limits = len(limits_evals) > 0
+        has_pinch = len(pinch_evals) > 0
+        has_bracket = any(
+            by_eval[ei][0].evaluation_role == EvaluationRole.BRACKET_PROBE.value
+            for ei in eval_indices
+        )
+        has_solver = any(
+            by_eval[ei][0].evaluation_role == EvaluationRole.SOLVER_ITERATION.value
+            for ei in eval_indices
+        )
+        _parallel_final_evals = [
+            ei
+            for ei, cs in by_eval.items()
+            if cs[0].evaluation_role == EvaluationRole.FINAL_EVALUATION.value
+        ]
+        has_final = len(_parallel_final_evals) > 0
+        has_solver_path = has_bracket or has_solver or has_final
+
+        # ---- PARALLEL flow arrangement: strict state machine checks ----
+        if flow_arrangement == FlowArrangement.PARALLEL:
+            _role_order = [
+                EvaluationRole.INLET.value,
+                EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+                EvaluationRole.BRACKET_PROBE.value,
+                EvaluationRole.SOLVER_ITERATION.value,
+                EvaluationRole.FINAL_EVALUATION.value,
+            ]
+
+            # Strict ordering: every evaluation's role rank must be
+            # non-decreasing.  This ensures each phase is contiguous
+            # (no de-duplication of roles before comparing).
+            prev_rank = -1
+            for ei in range(len(eval_indices)):
+                calls = by_eval[ei]
+                role = calls[0].evaluation_role
+                rank = _role_order.index(role)
+                if rank < prev_rank:
+                    return False
+                prev_rank = rank
+
+            # Collect limits and pinch evaluations
+            limits_evals = [
+                ei
+                for ei, calls in by_eval.items()
+                if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
+            ]
+            pinch_evals = [
+                ei
+                for ei, calls in by_eval.items()
+                if calls[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_PINCH.value
+            ]
+            has_limits = len(limits_evals) > 0
+            has_pinch = len(pinch_evals) > 0
+
+            # A normal parallel path cannot contain pinch without limits
+            if has_pinch and not has_limits:
+                return False
+
+            # Determine if this is a solver-based path (has bracket/solver/final)
+            has_bracket = any(
+                by_eval[ei][0].evaluation_role == EvaluationRole.BRACKET_PROBE.value
+                for ei in eval_indices
+            )
+            has_solver = any(
+                by_eval[ei][0].evaluation_role == EvaluationRole.SOLVER_ITERATION.value
+                for ei in eval_indices
+            )
+            _parallel_final_evals = [
+                ei
+                for ei, cs in by_eval.items()
+                if cs[0].evaluation_role == EvaluationRole.FINAL_EVALUATION.value
+            ]
+            has_final = len(_parallel_final_evals) > 0
+            has_solver_path = has_bracket or has_solver or has_final
+
+            # A solver-based parallel path must have limits and pinch
+            if has_solver_path and not has_limits:
+                return False
+            if has_solver_path and not has_pinch:
+                return False
+
+            if has_limits:
+                # Exact limits call contract: call 0 = hot_limit/TP,
+                # call 1 = cold_limit/TP.  Applies on ALL paths (success
+                # and early-failure).
+                for le in limits_evals:
+                    le_calls = sorted(
+                        by_eval[le],
+                        key=lambda c: c.call_index_within_evaluation,
+                    )
+                    if len(le_calls) == 2:
+                        # Both calls present: hot succeeded, cold present
+                        if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                            return False
+                        if (
+                            le_calls[1].stream_role != "cold_limit"
+                            or le_calls[1].query_type != "TP"
+                        ):
+                            return False
+                        # If hot failed, cold should not exist
+                        if not le_calls[0].success:
+                            return False
+                    elif len(le_calls) == 1:
+                        # Single limits call (hot failure prefix):
+                        # must be call 0 = hot_limit/TP, failed
+                        if le_calls[0].call_index_within_evaluation != 0:
+                            return False
+                        if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                            return False
+                        if le_calls[0].success:
+                            return False
+                    else:
+                        return False
+
+                if has_pinch:
+                    # --- Normal path: limits + pinch + solver ---
+
+                    # Exactly one parallel-limits evaluation
+                    if len(limits_evals) != 1:
+                        return False
+
+                    # Limits must precede every pinch evaluation
+                    limits_max = max(limits_evals)
+                    pinch_min = min(pinch_evals)
+                    if limits_max >= pinch_min:
+                        return False
+
+                    # Pinch call contract: each pinch eval must be
+                    # exactly call 0 hot_solver/PH and call 1
+                    # cold_solver/PH for success; failure prefixes
+                    # must be exactly the executed prefix.
+                    for pe in pinch_evals:
+                        pe_calls = sorted(
+                            by_eval[pe],
+                            key=lambda c: c.call_index_within_evaluation,
+                        )
+                        if len(pe_calls) == 2:
+                            # Both calls present
+                            if (
+                                pe_calls[0].stream_role != "hot_solver"
+                                or pe_calls[0].query_type != "PH"
+                            ):
+                                return False
+                            if (
+                                pe_calls[1].stream_role != "cold_solver"
+                                or pe_calls[1].query_type != "PH"
+                            ):
+                                return False
+                            # If hot failed, cold should not exist
+                            if not pe_calls[0].success:
+                                return False
+                        elif len(pe_calls) == 1:
+                            # Single pinch call (hot failure prefix):
+                            # must be call 0 = hot_solver/PH, failed
+                            if pe_calls[0].call_index_within_evaluation != 0:
+                                return False
+                            if (
+                                pe_calls[0].stream_role != "hot_solver"
+                                or pe_calls[0].query_type != "PH"
+                            ):
+                                return False
+                            if pe_calls[0].success:
+                                return False
+                        else:
+                            return False
+                else:
+                    # --- Limits-without-pinch early failure path ---
+
+                    # Must have at least one failed limits call
+                    limits_all_calls: list[PropertyCallRecord] = []
+                    for le in limits_evals:
+                        limits_all_calls.extend(by_eval[le])
+                    has_failure = any(not c.success for c in limits_all_calls)
+
+                    # Zero upper bound no-pinch path: when all limits
+                    # succeed but no pinch follows, only valid when
+                    # q_max_diagnostics is present (indicating a
+                    # zero-upper-bound termination).
+                    if not has_failure and q_max_diagnostics is None:
+                        return False
+
+                    # Exactly one limits evaluation on all parallel paths
+                    if len(limits_evals) != 1:
+                        return False
+
+                    # Limits must be the last evaluation — no
+                    # bracket/solver/final after
+                    limits_last = max(limits_evals)
+                    if limits_last != max(eval_indices):
+                        return False
+
+                    # Limits-without-pinch early failure is valid only
+                    # for status=BLOCKED, converged=False,
+                    # termination='blocked'.  Require all context
+                    # explicitly; fail closed when any is missing.
+                    if status is None or converged is None or solver_termination_reason is None:
+                        return False
+                    if status != RatingStatus.BLOCKED:
+                        return False
+                    if converged is not False:
+                        return False
+                    if solver_termination_reason != "blocked":
+                        return False
+
+        # d) Final evaluation rules (status-aware)
+        final_evals = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.FINAL_EVALUATION.value
+        ]
+        if status is not None:
+            if status == RatingStatus.SUCCEEDED:
+                if len(final_evals) != 1:
+                    return False
+                if final_evals[0] != max(eval_indices):
+                    return False
+            elif converged is True and status == RatingStatus.BLOCKED:
+                # converged BLOCKED should have final evaluation
+                if len(final_evals) != 1:
+                    return False
+                if final_evals[0] != max(eval_indices):
+                    return False
+            elif converged is False or status == RatingStatus.FAILED:
+                # FAILED must NOT have final evaluation
+                if final_evals:
+                    return False
+
+        # e) Order rule - final_evaluation must come after all other roles
+        if final_evals:
+            final_idx = final_evals[0]
+            for ei, calls in by_eval.items():
+                if ei < final_idx:
+                    role = calls[0].evaluation_role
+                    if role == EvaluationRole.FINAL_EVALUATION.value:
+                        return False  # final not at end
+
+        # 11. bracket_probe before solver_iteration
+        bracket_evaluations = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.BRACKET_PROBE.value
+        ]
+        solver_evaluations = [
+            ei
+            for ei, calls in by_eval.items()
+            if calls[0].evaluation_role == EvaluationRole.SOLVER_ITERATION.value
+        ]
+        if (
+            bracket_evaluations
+            and solver_evaluations
+            and max(bracket_evaluations) >= min(solver_evaluations)
+        ):
+            return False
+
+        # ---- Bind Q_max diagnostics to flow arrangement and trace ----------
+        #
+        # (g) q_max_diagnostics not None for SUCCEEDED results
+        if status is not None and status == RatingStatus.SUCCEEDED and q_max_diagnostics is None:
+            return False
+
+        if q_max_diagnostics is not None:
+            reason = q_max_diagnostics.termination_reason
+
+            # (h) Diagnostics reason must match flow arrangement
+            if flow_arrangement == FlowArrangement.COUNTERFLOW and reason not in (
+                "independent_limits",
+            ):
+                return False
+
+            if flow_arrangement == FlowArrangement.PARALLEL and reason not in (
+                "bisection_converged",
+                "pinch_satisfied_at_upper",
+                "zero_upper_bound",
+                "iteration_limit",
+            ):
+                return False
+
+            # (i) independent_limits → counterflow must have q_max_counterflow
+            if reason == "independent_limits":
+                if EvaluationRole.Q_MAX_COUNTERFLOW.value not in all_roles:
+                    return False
+                # counterflow: only one q_max_counterflow evaluation
+                counterflow_evals = [
+                    ei
+                    for ei, cs in by_eval.items()
+                    if cs[0].evaluation_role == EvaluationRole.Q_MAX_COUNTERFLOW.value
+                ]
+                if len(counterflow_evals) != 1:
+                    return False
+
+            # (j) bisection_converged → parallel must have limits + pinch + flow
+            if reason == "bisection_converged" and (not has_limits or not has_pinch):
+                return False
+
+            # (k) pinch_satisfied_at_upper → exactly one limits + exactly one pinch
+            if reason == "pinch_satisfied_at_upper" and (
+                len(limits_evals) != 1 or len(pinch_evals) != 1
+            ):
+                return False
+
+            # (l) zero_upper_bound → limits-only, exactly one successful
+            # limits evaluation with exactly 2 calls (hot+limit both success).
+            if reason == "zero_upper_bound":
+                if not has_limits or has_pinch or has_solver_path:
+                    return False
+                # Exactly one limits evaluation
+                if len(limits_evals) != 1:
+                    return False
+                # Exactly two successful calls in the limits eval
+                le = limits_evals[0]
+                le_calls = sorted(by_eval[le], key=lambda c: c.call_index_within_evaluation)
+                if len(le_calls) != 2:
+                    return False
+                if not all(c.success for c in le_calls):
+                    return False
+                if le_calls[0].stream_role != "hot_limit" or le_calls[0].query_type != "TP":
+                    return False
+                if le_calls[1].stream_role != "cold_limit" or le_calls[1].query_type != "TP":
+                    return False
+
+            # (m) iteration_limit → exactly one successful limits + one or
+            # more successful pinch evaluations; no bracket/solver/final
+            # after Q_max; final Q_max phase must be a pinch evaluation.
+            if reason == "iteration_limit":
+                if not has_limits or not has_pinch:
+                    return False
+                # All limits calls must succeed
+                if any(
+                    not c.success
+                    for cs in by_eval.values()
+                    if cs[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_LIMITS.value
+                    for c in cs
+                ):
+                    return False
+                # All pinch calls must succeed
+                if any(
+                    not c.success
+                    for cs in by_eval.values()
+                    if cs[0].evaluation_role == EvaluationRole.Q_MAX_PARALLEL_PINCH.value
+                    for c in cs
+                ):
+                    return False
+                # No bracket/solver/final after Q_max
+                if has_solver_path:
+                    return False
+                # Final evaluation must be a pinch evaluation
+                max_eval = max(eval_indices)
+                if (
+                    by_eval[max_eval][0].evaluation_role
+                    != EvaluationRole.Q_MAX_PARALLEL_PINCH.value
+                ):
+                    return False
+
+        # (n) Successful Q_max requires diagnostics.
+        # Production builds _qmax_diagnostics_snapshot() immediately
+        # after _compute_q_max(), before checking q_max <= 0 or
+        # entering the main solver.  Therefore any returned result
+        # containing a fully successful Q_max phase (all calls in
+        # Q_MAX_COUNTERFLOW, Q_MAX_PARALLEL_LIMITS, or
+        # Q_MAX_PARALLEL_PINCH evaluations succeeded) must carry
+        # non-null q_max_diagnostics — regardless of whether
+        # bracket/solver/final calls follow, and regardless of final
+        # result status.
+        if q_max_diagnostics is None:
+            qmax_phases = {
+                EvaluationRole.Q_MAX_COUNTERFLOW.value,
+                EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+                EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+            }
+            present_qmax = all_roles & qmax_phases
+            if present_qmax:
+                qmax_all_success = all(
+                    c.success
+                    for cs in by_eval.values()
+                    if cs[0].evaluation_role in qmax_phases
+                    for c in cs
+                )
+                if qmax_all_success:
+                    return False
+
+        # ---- (3) Failed Q_max call stops the state machine ----------------
+        #
+        # Any failed call in a limits or pinch evaluation means that
+        # evaluation must be the last one.  No later evaluations
+        # (bracket, solver, pinch, or final) are allowed.
+        qmax_roles = {
+            EvaluationRole.Q_MAX_COUNTERFLOW.value,
+            EvaluationRole.Q_MAX_PARALLEL_LIMITS.value,
+            EvaluationRole.Q_MAX_PARALLEL_PINCH.value,
+        }
+        for ei in eval_indices:
+            calls = by_eval[ei]
+            role = calls[0].evaluation_role
+            if role in qmax_roles:
+                has_failure = any(not c.success for c in calls)
+                if has_failure:
+                    # This evaluation must be the last one
+                    if ei != max(eval_indices):
+                        return False
+                    # Failed Q_max calls are incompatible with any Q_max
+                    # diagnostics snapshot (property failure raises before
+                    # _qmax_diagnostics_snapshot() can be built).
+                    if q_max_diagnostics is not None:
+                        return False
+
+                    # Status must be BLOCKED, converged=False, termination=blocked
+                    if status is None or converged is None or solver_termination_reason is None:
+                        return False
+                    if status != RatingStatus.BLOCKED:
+                        return False
+                    if converged is not False:
+                        return False
+                    if solver_termination_reason != "blocked":
+                        return False
+
+        return True
+
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Provenance graph construction
+# ---------------------------------------------------------------------------
+
+
+def build_provenance_core(
+    flow_arrangement: FlowArrangement,
+    property_calls: Sequence[PropertyCallRecord],
+    iterations: int,
+    converged: bool,
+    warnings: list[EngineeringMessage],
+    blockers: list[EngineeringMessage],
+    *,
+    execution_context: ExecutionContextSnapshot | None = None,
+    request_identity: RatingRequestIdentity | None = None,
+    tube_correlation_info: SelectedCorrelationSnapshot | None = None,
+    annulus_correlation_info: SelectedCorrelationSnapshot | None = None,
+    tube_applicability: ApplicabilitySnapshot | None = None,
+    annulus_applicability: ApplicabilitySnapshot | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
+) -> tuple[ProvenanceGraph, list[ProvenanceNode], list[ProvenanceEdge]]:
+    """Build the core provenance graph WITHOUT the RESULT node.
+
+    Returns (core_graph, nodes, edges) where nodes/edges are mutable
+    lists so the caller can append the RESULT node.
+    """
+    nodes: list[ProvenanceNode] = []
+    edges: list[ProvenanceEdge] = []
+    ctx = execution_context or ExecutionContextSnapshot()
+
+    # --- Root node ---
+    root_id: UUID
+    if ctx.design_case_revision_id is not None:
+        case_rev_payload: dict[str, Any] = {
+            "design_case_revision_id": str(ctx.design_case_revision_id),
+            "request_id": str(ctx.request_id) if ctx.request_id is not None else None,
+        }
+        root_id = _deterministic_uuid5(case_rev_payload)
+        nodes.append(
+            ProvenanceNode(
+                node_id=root_id,
+                node_type=ProvenanceNodeType.CASE_REVISION,
+                label="case_revision",
+                metadata=(
+                    ("design_case_revision_id", str(ctx.design_case_revision_id)),
+                    ("request_id", str(ctx.request_id) if ctx.request_id is not None else None),
+                ),
+                payload_hash=sha256_digest(case_rev_payload),
+            )
+        )
+    else:
+        ext_payload: dict[str, Any] = {
+            "root_type": "EXTERNAL",
+            "request_id": str(ctx.request_id) if ctx.request_id is not None else None,
+            "flow_arrangement": flow_arrangement.value,
+        }
+        root_id = _deterministic_uuid5(ext_payload)
+        nodes.append(
+            ProvenanceNode(
+                node_id=root_id,
+                node_type=ProvenanceNodeType.EXTERNAL,
+                label="calculation_request",
+                metadata=(
+                    ("request_id", str(ctx.request_id) if ctx.request_id is not None else None),
+                    ("flow_arrangement", flow_arrangement.value),
+                ),
+                payload_hash=sha256_digest(ext_payload),
+            )
+        )
+
+    # --- Calculation run node ---
+    assert request_identity is not None, "request_identity is required"
+    calc_payload = _build_calculation_run_payload(
+        flow_arrangement=flow_arrangement,
+        request_identity=request_identity,
+        iterations=iterations,
+        converged=converged,
+    )
+    calc_id = _deterministic_uuid5(calc_payload)
+
+    # Build Q_max diagnostics metadata
+    q_max_meta: tuple[tuple[str, Any], ...] | None = None
+    if q_max_diagnostics is not None:
+        q_max_meta = (
+            ("q_max_w", q_max_diagnostics.q_max_w),
+            ("iterations", q_max_diagnostics.iterations),
+            ("termination_reason", q_max_diagnostics.termination_reason),
+            ("hot_limit_w", q_max_diagnostics.hot_limit_w),
+            ("cold_limit_w", q_max_diagnostics.cold_limit_w),
+            ("limiting_side", q_max_diagnostics.limiting_side),
+            ("final_q_low_w", q_max_diagnostics.final_q_low_w),
+            ("final_q_high_w", q_max_diagnostics.final_q_high_w),
+            ("final_q_width_w", q_max_diagnostics.final_q_width_w),
+            ("final_pinch_residual_k", q_max_diagnostics.final_pinch_residual_k),
+            ("q_tolerance_w", q_max_diagnostics.q_tolerance_w),
+            ("pinch_temperature_tolerance_k", q_max_diagnostics.pinch_temperature_tolerance_k),
+        )
+
+    calc_metadata: list[tuple[str, Any]] = [
+        ("flow_arrangement", flow_arrangement.value),
+        ("iterations", iterations),
+        ("converged", converged),
+        ("software_version", _SOFTWARE_VERSION),
+        (
+            "external_calculation_run_id",
+            str(ctx.calculation_run_id) if ctx.calculation_run_id is not None else None,
+        ),
+    ]
+    if q_max_meta is not None:
+        calc_metadata.append(("q_max_diagnostics", q_max_meta))
+
+    nodes.append(
+        ProvenanceNode(
+            node_id=calc_id,
+            node_type=ProvenanceNodeType.CALCULATION_RUN,
+            label="double_pipe_rating_run",
+            metadata=tuple(calc_metadata),
+            payload_hash=sha256_digest(calc_payload),
+        )
+    )
+    edges.append(
+        ProvenanceEdge(
+            source_id=root_id,
+            target_id=calc_id,
+            relation="triggers",
+        )
+    )
+
+    # --- Property call nodes ---
+    for _pc_idx, pc in enumerate(property_calls):
+        prop_payload: dict[str, Any] = _property_call_record_to_dict(pc)
+        prop_payload["occurrence_index"] = _pc_idx
+        prop_id = _deterministic_uuid5(prop_payload)
+        nodes.append(
+            ProvenanceNode(
+                node_id=prop_id,
+                node_type=ProvenanceNodeType.PROPERTY_CALL,
+                label=f"property_{pc.fluid}_{pc.query_type}",
+                metadata=(
+                    ("fluid", pc.fluid),
+                    ("query_type", pc.query_type),
+                    ("backend_name", pc.backend_name),
+                    ("backend_version", pc.backend_version),
+                    ("reference_state_policy", pc.reference_state_policy),
+                    ("stage", pc.stage),
+                    ("success", pc.success),
+                    ("error_code", pc.error_code),
+                    ("stream_role", pc.stream_role),
+                    ("sequence_index", pc.sequence_index),
+                    ("evaluation_index", pc.evaluation_index),
+                    ("evaluation_role", pc.evaluation_role),
+                    ("call_index_within_evaluation", pc.call_index_within_evaluation),
+                    ("trial_q_w", pc.trial_q_w),
+                ),
+                payload_hash=sha256_digest(prop_payload),
+            )
+        )
+        edges.append(
+            ProvenanceEdge(
+                source_id=calc_id,
+                target_id=prop_id,
+                relation="calls",
+            )
+        )
+
+    # --- Correlation nodes ---
+    for side, corr_info, appl_info in (
+        ("tube", tube_correlation_info, tube_applicability),
+        ("annulus", annulus_correlation_info, annulus_applicability),
+    ):
+        if corr_info is None:
+            continue
+        corr_payload: dict[str, Any] = _build_correlation_payload(
+            side=side,
+            correlation_info=corr_info,
+            applicability_info=appl_info,
+        )
+        corr_id = _deterministic_uuid5(corr_payload)
+        nodes.append(
+            ProvenanceNode(
+                node_id=corr_id,
+                node_type=ProvenanceNodeType.CORRELATION,
+                label=f"correlation_{side}",
+                metadata=(
+                    ("side", side),
+                    ("correlation_id", corr_info.correlation_id),
+                    ("version", corr_info.version),
+                ),
+                payload_hash=sha256_digest(corr_payload),
+            )
+        )
+        edges.append(
+            ProvenanceEdge(
+                source_id=calc_id,
+                target_id=corr_id,
+                relation="selects",
+            )
+        )
+
+    # --- Warning nodes ---
+    for _w_idx, w in enumerate(warnings):
+        warn_payload: dict[str, Any] = {
+            "code": w.code.value,
+            "severity": w.severity.value,
+            "message": w.message,
+            "source_module": w.source_module,
+            "context": dict(w.context) if w.context else {},
+            "occurrence_index": _w_idx,
+        }
+        warn_id = _deterministic_uuid5(warn_payload)
+        nodes.append(
+            ProvenanceNode(
+                node_id=warn_id,
+                node_type=ProvenanceNodeType.WARNING,
+                label=f"warning_{w.code.value}",
+                metadata=(
+                    ("code", w.code.value),
+                    ("severity", w.severity.value),
+                    ("message", w.message),
+                    ("source_module", w.source_module),
+                ),
+                payload_hash=sha256_digest(warn_payload),
+            )
+        )
+        edges.append(
+            ProvenanceEdge(
+                source_id=calc_id,
+                target_id=warn_id,
+                relation="emits",
+            )
+        )
+
+    # --- Blocker nodes ---
+    for _b_idx, b in enumerate(blockers):
+        block_payload: dict[str, Any] = {
+            "code": b.code.value,
+            "severity": b.severity.value,
+            "message": b.message,
+            "source_module": b.source_module,
+            "context": dict(b.context) if b.context else {},
+            "occurrence_index": _b_idx,
+        }
+        block_id = _deterministic_uuid5(block_payload)
+        nodes.append(
+            ProvenanceNode(
+                node_id=block_id,
+                node_type=ProvenanceNodeType.BLOCKER,
+                label=f"blocker_{b.code.value}",
+                metadata=(
+                    ("code", b.code.value),
+                    ("severity", b.severity.value),
+                    ("message", b.message),
+                    ("source_module", b.source_module),
+                ),
+                payload_hash=sha256_digest(block_payload),
+            )
+        )
+        edges.append(
+            ProvenanceEdge(
+                source_id=calc_id,
+                target_id=block_id,
+                relation="emits",
+            )
+        )
+
+    core_graph = ProvenanceGraph(nodes=tuple(nodes), edges=tuple(edges))
+    return core_graph, nodes, edges
+
+
+def build_provenance(
+    flow_arrangement: FlowArrangement,
+    property_calls: Sequence[PropertyCallRecord],
+    iterations: int,
+    converged: bool,
+    warnings: list[EngineeringMessage],
+    blockers: list[EngineeringMessage],
+    result_hash: str,
+    *,
+    execution_context: ExecutionContextSnapshot | None = None,
+    request_identity: RatingRequestIdentity | None = None,
+    tube_correlation_info: SelectedCorrelationSnapshot | None = None,
+    annulus_correlation_info: SelectedCorrelationSnapshot | None = None,
+    tube_applicability: ApplicabilitySnapshot | None = None,
+    annulus_applicability: ApplicabilitySnapshot | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
+) -> ProvenanceGraph:
+    """Build a deterministic provenance graph for the double-pipe rating.
+
+    1. Build core provenance (without RESULT node)
+    2. Compute provenance_digest from core
+    3. Compute result_hash (includes provenance_digest)
+    4. Add RESULT node with the result_hash
+    """
+    core_graph, nodes, edges = build_provenance_core(
+        flow_arrangement=flow_arrangement,
+        property_calls=property_calls,
+        iterations=iterations,
+        converged=converged,
+        warnings=warnings,
+        blockers=blockers,
+        execution_context=execution_context,
+        request_identity=request_identity,
+        tube_correlation_info=tube_correlation_info,
+        annulus_correlation_info=annulus_correlation_info,
+        tube_applicability=tube_applicability,
+        annulus_applicability=annulus_applicability,
+        q_max_diagnostics=q_max_diagnostics,
+    )
+
+    # Find the CALCULATION_RUN node for the RESULT edge
+    calc_id: UUID | None = None
+    for node in nodes:
+        if node.node_type == ProvenanceNodeType.CALCULATION_RUN:
+            calc_id = node.node_id
+            break
+    assert calc_id is not None
+
+    # Add RESULT node
+    result_payload = {"result_hash": result_hash}
+    result_id = _deterministic_uuid5(result_payload)
+    nodes.append(
+        ProvenanceNode(
+            node_id=result_id,
+            node_type=ProvenanceNodeType.RESULT,
+            label="double_pipe_rating_result",
+            metadata=(("result_hash", result_hash),),
+            payload_hash=sha256_digest(result_payload),
+        )
+    )
+    edges.append(
+        ProvenanceEdge(
+            source_id=calc_id,
+            target_id=result_id,
+            relation="produces",
+        )
+    )
+    # Add PROPERTY_CALL → RESULT (supports) edges
+    for node in nodes:
+        if node.node_type == ProvenanceNodeType.PROPERTY_CALL:
+            edges.append(
+                ProvenanceEdge(
+                    source_id=node.node_id,
+                    target_id=result_id,
+                    relation="supports",
+                )
+            )
+    # Add CORRELATION → RESULT (supports) edges
+    for node in nodes:
+        if node.node_type == ProvenanceNodeType.CORRELATION:
+            edges.append(
+                ProvenanceEdge(
+                    source_id=node.node_id,
+                    target_id=result_id,
+                    relation="supports",
+                )
+            )
+
+    return ProvenanceGraph(
+        nodes=tuple(nodes),
+        edges=tuple(edges),
+    )
+
+
+def compute_result_hash(
+    *,
+    request_identity: RatingRequestIdentity,
+    provider_identity: ProviderIdentitySnapshot,
+    flow_arrangement: FlowArrangement,
+    heat_duty_w: float | None,
+    hot_outlet_temperature_k: float | None,
+    cold_outlet_temperature_k: float | None,
+    tube_reynolds: float | None,
+    tube_prandtl: float | None,
+    tube_nusselt: float | None,
+    tube_h: float | None,
+    tube_selected_correlation_id: str | None,
+    tube_selected_correlation_version: str | None,
+    tube_applicability_status: str | None,
+    annulus_reynolds: float | None,
+    annulus_prandtl: float | None,
+    annulus_nusselt: float | None,
+    annulus_h: float | None,
+    annulus_selected_correlation_id: str | None,
+    annulus_selected_correlation_version: str | None,
+    annulus_applicability_status: str | None,
+    area_inner_m2: float,
+    area_outer_m2: float,
+    resistance_breakdown: ResistanceBreakdownModel | None,
+    U_inner_basis: float | None,
+    U_outer_basis: float | None,
+    UA_w_k: float | None,
+    C_hot_w_k: float | None,
+    C_cold_w_k: float | None,
+    C_min_w_k: float | None,
+    C_max_w_k: float | None,
+    capacity_ratio: float | None,
+    NTU: float | None,
+    effectiveness: float | None,
+    LMTD_k: float | None,
+    energy_residual_w: float | None,
+    ua_lmtd_residual_w: float | None,
+    iterations: int,
+    converged: bool,
+    solver_termination_reason: str,
+    solver_details: SolverDetailsModel,
+    property_calls: tuple[PropertyCallRecord, ...],
+    warnings: tuple[EngineeringMessage, ...],
+    blockers: tuple[EngineeringMessage, ...],
+    failure: RunFailure | None = None,
+    status: RatingStatus = RatingStatus.SUCCEEDED,
+    # New snapshot fields
+    hot_inlet_state: FluidStateSnapshot | None = None,
+    cold_inlet_state: FluidStateSnapshot | None = None,
+    hot_outlet_state: FluidStateSnapshot | None = None,
+    cold_outlet_state: FluidStateSnapshot | None = None,
+    tube_side_inlet_state: FluidStateSnapshot | None = None,
+    tube_side_outlet_state: FluidStateSnapshot | None = None,
+    annulus_side_inlet_state: FluidStateSnapshot | None = None,
+    annulus_side_outlet_state: FluidStateSnapshot | None = None,
+    tube_bulk_state: FluidStateSnapshot | None = None,
+    annulus_bulk_state: FluidStateSnapshot | None = None,
+    tube_selected_correlation_snap: SelectedCorrelationSnapshot | None = None,
+    annulus_selected_correlation_snap: SelectedCorrelationSnapshot | None = None,
+    tube_applicability_snap: ApplicabilitySnapshot | None = None,
+    annulus_applicability_snap: ApplicabilitySnapshot | None = None,
+    core_provenance_digest: str = "",
+    # Closure diagnostics
+    Q_hot_w: float | None = None,
+    Q_cold_w: float | None = None,
+    relative_energy_residual: float | None = None,
+    energy_tolerance_w: float | None = None,
+    relative_ua_lmtd_residual: float | None = None,
+    ua_lmtd_tolerance_w: float | None = None,
+    q_max_diagnostics: QMaxDiagnosticsSnapshot | None = None,
+) -> str:
+    """Compute deterministic SHA-256 hash of the result."""
+    payload = _build_identity_payload(
+        request_identity=request_identity,
+        provider_identity=provider_identity,
+        flow_arrangement=flow_arrangement,
+        heat_duty_w=heat_duty_w,
+        hot_outlet_temperature_k=hot_outlet_temperature_k,
+        cold_outlet_temperature_k=cold_outlet_temperature_k,
+        tube_reynolds=tube_reynolds,
+        tube_prandtl=tube_prandtl,
+        tube_nusselt=tube_nusselt,
+        tube_h=tube_h,
+        tube_selected_correlation_id=tube_selected_correlation_id,
+        tube_selected_correlation_version=tube_selected_correlation_version,
+        tube_applicability_status=tube_applicability_status,
+        annulus_reynolds=annulus_reynolds,
+        annulus_prandtl=annulus_prandtl,
+        annulus_nusselt=annulus_nusselt,
+        annulus_h=annulus_h,
+        annulus_selected_correlation_id=annulus_selected_correlation_id,
+        annulus_selected_correlation_version=annulus_selected_correlation_version,
+        annulus_applicability_status=annulus_applicability_status,
+        area_inner_m2=area_inner_m2,
+        area_outer_m2=area_outer_m2,
+        resistance_breakdown=resistance_breakdown,
+        U_inner_basis=U_inner_basis,
+        U_outer_basis=U_outer_basis,
+        UA_w_k=UA_w_k,
+        C_hot_w_k=C_hot_w_k,
+        C_cold_w_k=C_cold_w_k,
+        C_min_w_k=C_min_w_k,
+        C_max_w_k=C_max_w_k,
+        capacity_ratio=capacity_ratio,
+        NTU=NTU,
+        effectiveness=effectiveness,
+        LMTD_k=LMTD_k,
+        energy_residual_w=energy_residual_w,
+        ua_lmtd_residual_w=ua_lmtd_residual_w,
+        iterations=iterations,
+        converged=converged,
+        solver_termination_reason=solver_termination_reason,
+        solver_details=solver_details,
+        property_calls=property_calls,
+        warnings=warnings,
+        blockers=blockers,
+        failure=failure,
+        status=status,
+        # New snapshot fields
+        hot_inlet_state=hot_inlet_state,
+        cold_inlet_state=cold_inlet_state,
+        hot_outlet_state=hot_outlet_state,
+        cold_outlet_state=cold_outlet_state,
+        tube_side_inlet_state=tube_side_inlet_state,
+        tube_side_outlet_state=tube_side_outlet_state,
+        annulus_side_inlet_state=annulus_side_inlet_state,
+        annulus_side_outlet_state=annulus_side_outlet_state,
+        tube_bulk_state=tube_bulk_state,
+        annulus_bulk_state=annulus_bulk_state,
+        tube_selected_correlation_snap=tube_selected_correlation_snap,
+        annulus_selected_correlation_snap=annulus_selected_correlation_snap,
+        tube_applicability_snap=tube_applicability_snap,
+        annulus_applicability_snap=annulus_applicability_snap,
+        core_provenance_digest=core_provenance_digest,
+        # Closure diagnostics
+        Q_hot_w=Q_hot_w,
+        Q_cold_w=Q_cold_w,
+        relative_energy_residual=relative_energy_residual,
+        energy_tolerance_w=energy_tolerance_w,
+        relative_ua_lmtd_residual=relative_ua_lmtd_residual,
+        ua_lmtd_tolerance_w=ua_lmtd_tolerance_w,
+        q_max_diagnostics=q_max_diagnostics,
+    )
+    return sha256_digest(payload)

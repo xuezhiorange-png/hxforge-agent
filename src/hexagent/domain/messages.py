@@ -83,6 +83,19 @@ class ErrorCode(StrEnum):
     CORRELATION_ABSOLUTE_RANGE_EXCEEDED = "correlation_absolute_range_exceeded"
     CORRELATION_EXTRAPOLATION_USED = "correlation_extrapolation_used"
     CORRELATION_SOURCE_UNVERIFIED = "correlation_source_unverified"
+    CORRELATION_IMPLEMENTATION_UNAVAILABLE = "correlation_implementation_unavailable"
+
+    # Double-pipe rating error codes
+    INVALID_DOUBLE_PIPE_GEOMETRY = "invalid_double_pipe_geometry"
+    INVALID_FLOW_SIDE_ASSIGNMENT = "invalid_flow_side_assignment"
+    NON_POSITIVE_MASS_FLOW = "non_positive_mass_flow"
+    PROPERTY_EVALUATION_FAILED = "property_evaluation_failed"
+    PHASE_NOT_SUPPORTED = "phase_not_supported"
+    TEMPERATURE_CROSSING = "temperature_crossing"
+    INVALID_LMTD = "invalid_lmtd"
+    SOLVER_BRACKET_NOT_FOUND = "solver_bracket_not_found"
+    SOLVER_NON_CONVERGENCE = "solver_non_convergence"
+    ENERGY_BALANCE_NOT_CLOSED = "energy_balance_not_closed"
 
     @classmethod
     def is_valid_code(cls, code: str) -> bool:

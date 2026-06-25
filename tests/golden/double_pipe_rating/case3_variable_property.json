@@ -1,0 +1,42 @@
+{
+  "case_id": "case3_variable_property",
+  "description": "Variable-property water-water counter-flow rating with stainless steel geometry. D_i=0.025, D_o=0.032, D_outer=0.05, L=5, hot=0.8kg/s@360K, cold=2.0kg/s@290K, 250kPa/200kPa.",
+  "geometry": {
+    "inner_tube_inner_diameter_m": 0.025,
+    "inner_tube_outer_diameter_m": 0.032,
+    "outer_pipe_inner_diameter_m": 0.050,
+    "effective_length_m": 5.0,
+    "wall_thermal_conductivity_w_m_k": 16.0,
+    "inner_surface_roughness_m": 4.5e-5,
+    "annulus_surface_roughness_m": 4.5e-5,
+    "inner_fouling_resistance_m2k_w": 0.0002,
+    "outer_fouling_resistance_m2k_w": 0.0002
+  },
+  "hot_fluid": "Water",
+  "cold_fluid": "Water",
+  "hot_mass_flow_kg_s": 0.8,
+  "cold_mass_flow_kg_s": 2.0,
+  "hot_inlet_temperature_k": 360.0,
+  "cold_inlet_temperature_k": 290.0,
+  "hot_inlet_pressure_pa": 250000.0,
+  "cold_inlet_pressure_pa": 200000.0,
+  "tube_in_hot": true,
+  "flow_arrangement": "counterflow",
+  "expected": {
+    "status": "succeeded",
+    "converged": true,
+    "heat_duty_w": 32870.19598326,
+    "hot_outlet_temperature_k": 350.2125572478704,
+    "cold_outlet_temperature_k": 293.9274655778376,
+    "UA_w_k": 520.9453988564617,
+    "LMTD_k": 63.097199928074495,
+    "energy_residual_w_max": 1e-6
+  },
+  "tolerances": {
+    "temperature_absolute": 1e-5,
+    "heat_duty_relative": 1e-5,
+    "UA_relative": 1e-5,
+    "LMTD_relative": 1e-5,
+    "energy_residual_relative": 0.05
+  }
+}

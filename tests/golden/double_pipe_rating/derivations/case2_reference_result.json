@@ -1,0 +1,84 @@
+{
+  "case": "case2_parallelflow",
+  "description": "Parallel-flow water-water double-pipe heat exchanger",
+  "geometry": {
+    "D_i_m": 0.02,
+    "D_o_m": 0.025,
+    "D_outer_m": 0.04,
+    "L_m": 3.0,
+    "k_wall_W_m_K": 50.0,
+    "area_inner_m2": 0.1884955592153876,
+    "area_outer_m2": 0.23561944901923448,
+    "flow_area_tube_m2": 0.0003141592653589793,
+    "flow_area_annulus_m2": 0.000765763209312512,
+    "dh_tube_m": 0.02,
+    "dh_annulus_m": 0.015,
+    "R_wall_K_W": 0.00023676266140490988
+  },
+  "fluids": {
+    "fluid": "Water",
+    "hot": {
+      "side": "tube",
+      "m_dot_kg_s": 0.5,
+      "T_in_K": 350.0,
+      "P_in_Pa": 200000.0,
+      "h_in_J_kg": 321918.3569311111
+    },
+    "cold": {
+      "side": "annulus",
+      "m_dot_kg_s": 1.5,
+      "T_in_K": 300.0,
+      "P_in_Pa": 150000.0,
+      "h_in_J_kg": 112699.71527445214
+    }
+  },
+  "flow_arrangement": "parallel",
+  "tube_in_hot": true,
+  "results": {
+    "Q_W": 14465.525040150274,
+    "T_hot_out_K": 343.0984634763491,
+    "T_cold_out_K": 302.3070110030364,
+    "UA_W_K": 319.75336377143606,
+    "LMTD_K": 45.23963366566483,
+    "ua_lmtd_residual_W": -2.3355823941528797e-07,
+    "energy_residual_W": -2.05721880774945e-06,
+    "h_inner_W_m2_K": 10300.63457245342,
+    "h_outer_W_m2_K": 9112.357592506929,
+    "Re_inner": 82573.43999991227,
+    "Re_outer": 35302.25222092561,
+    "Pr_inner": 2.439384863108695,
+    "Pr_outer": 5.691034542523565,
+    "Nu_inner": 310.9921816441102,
+    "Nu_outer": 223.58121057944072,
+    "R_conv_inner_K_W": 0.0005150328101064022,
+    "R_foul_inner_K_W": 0.0010610329539459688,
+    "R_wall_K_W": 0.00023676266140490988,
+    "R_foul_outer_K_W": 0.0008488263631567752,
+    "R_conv_outer_K_W": 0.0004657556261042494,
+    "R_total_K_W": 0.0031274104147183054
+  },
+  "reference": {
+    "method": "Gnielinski correlation (Petukhov friction factor), bisection Q-solver",
+    "source": "Independent derivation, independent of production kernel",
+    "source_references": [
+      "Gnielinski, V., Int. Chem. Eng., Vol. 16, No. 2, pp. 359-368, 1976",
+      "Petukhov, B.S., Advances in Heat Transfer, Vol. 6, 1970"
+    ],
+    "derivation_file": "case2_parallelflow_reference.py",
+    "independent_from_production_kernel": true,
+    "reference_result_hash": "b6645d2932365d61e550251101dc7057a94af87e4fa3eef135c406e4d8f6c6e6"
+  },
+  "input_parameters": {
+    "D_i_m": 0.02,
+    "D_o_m": 0.025,
+    "D_outer_m": 0.04,
+    "L_m": 3.0,
+    "k_wall_W_m_K": 50.0,
+    "m_hot_kg_s": 0.5,
+    "T_hot_in_K": 350.0,
+    "P_hot_in_Pa": 200000.0,
+    "m_cold_kg_s": 1.5,
+    "T_cold_in_K": 300.0,
+    "P_cold_in_Pa": 150000.0
+  }
+}

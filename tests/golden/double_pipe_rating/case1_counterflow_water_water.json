@@ -1,0 +1,42 @@
+{
+  "case_id": "case1_counterflow_water_water",
+  "description": "Counter-flow water-water rating. D_i=0.02, D_o=0.025, D_outer=0.04, L=3, hot=0.5kg/s@350K, cold=1.5kg/s@300K, 200kPa/150kPa.",
+  "geometry": {
+    "inner_tube_inner_diameter_m": 0.020,
+    "inner_tube_outer_diameter_m": 0.025,
+    "outer_pipe_inner_diameter_m": 0.040,
+    "effective_length_m": 3.0,
+    "wall_thermal_conductivity_w_m_k": 50.0,
+    "inner_surface_roughness_m": 4.5e-5,
+    "annulus_surface_roughness_m": 4.5e-5,
+    "inner_fouling_resistance_m2k_w": 0.0002,
+    "outer_fouling_resistance_m2k_w": 0.0002
+  },
+  "hot_fluid": "Water",
+  "cold_fluid": "Water",
+  "hot_mass_flow_kg_s": 0.5,
+  "cold_mass_flow_kg_s": 1.5,
+  "hot_inlet_temperature_k": 350.0,
+  "cold_inlet_temperature_k": 300.0,
+  "hot_inlet_pressure_pa": 200000.0,
+  "cold_inlet_pressure_pa": 150000.0,
+  "tube_in_hot": true,
+  "flow_arrangement": "counterflow",
+  "expected": {
+    "status": "succeeded",
+    "converged": true,
+    "heat_duty_w": 14499.486309991638,
+    "hot_outlet_temperature_k": 343.0822521365865,
+    "cold_outlet_temperature_k": 302.31242764847565,
+    "UA_w_k": 319.75267128783406,
+    "LMTD_k": 45.345942698746214,
+    "energy_residual_w_max": 1e-6
+  },
+  "tolerances": {
+    "temperature_absolute": 1e-5,
+    "heat_duty_relative": 1e-5,
+    "UA_relative": 1e-5,
+    "LMTD_relative": 1e-5,
+    "energy_residual_relative": 0.05
+  }
+}
