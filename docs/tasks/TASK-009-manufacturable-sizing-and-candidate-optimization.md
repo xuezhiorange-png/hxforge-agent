@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 25 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 26 Engineering Design Review passes.
 
 ---
 
@@ -58,6 +58,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 22 | 4801215509 | CHANGES REQUIRED |
 | 23 | 4801552673 | CHANGES REQUIRED |
 | 24 | 4801928304 | CHANGES REQUIRED |
+| 25 | 4802083544 | CHANGES REQUIRED |
 
 |---|
 
@@ -1263,26 +1264,61 @@ selected_correlation_payload = {
 selected_correlation_digest = sha256_digest(selected_correlation_payload)
 ```
 
-### 14.7.2 Canonical context normalization
+### 14.7.2 Shared canonical context normalization
 
-For `EngineeringMessage.context` and `RunFailure.context`, use one shared normalization.
-
-For each `(key, value)` pair:
+Add the `CanonicalContextEntry` dataclass and the shared `build_canonical_context_entries()` function. These replace the old per-type normalization functions and the `list[list[str, value]]` format.
 
 ```python
-entry = {
-    "key": key,
-    "value": value,
-    "value_digest": sha256_digest({"value": value}),
-}
+@dataclass(frozen=True, slots=True)
+class CanonicalContextEntry:
+    key: str
+    value: CanonicalValue
+    value_digest: str
+
+
+def build_canonical_context_entries(
+    context: tuple[tuple[str, object], ...],
+) -> tuple[CanonicalContextEntry, ...]:
+    """Canonicalize context entries for EngineeringMessage and RunFailure.
+
+    Each (key, value) pair is canonicalized via canonicalize_trusted_context_value(),
+    its value_digest computed, and the result sorted by (key, value_digest).
+    Duplicate entries are preserved.
+    """
+    entries: list[CanonicalContextEntry] = []
+    for key, value in context:
+        if type(key) is not str:
+            raise ContextCanonicalizationError(
+                failure_kind="non_string_key",
+                context_key=str(key),
+                context_path=(),
+                offending_type=qualified_type_name(key),
+            )
+        canonical_value = canonicalize_trusted_context_value(
+            value,
+            context_key=key,
+            context_path=(),
+            ancestor_ids=frozenset(),
+        )
+        value_digest = sha256_digest({"value": canonical_value})
+        entries.append(CanonicalContextEntry(
+            key=key,
+            value=canonical_value,
+            value_digest=value_digest,
+        ))
+    entries.sort(key=lambda e: (e.key, e.value_digest))
+    return tuple(entries)
 ```
 
 Sort entries by `(key, value_digest)`. Preserve duplicate entries.
 
 ```python
-canonical_context_entries = sorted_entries
+canonical_context_entries = build_canonical_context_entries(context)
 context_digest = sha256_digest({
-    "entries": canonical_context_entries,
+    "entries": [
+        {"key": entry.key, "value": entry.value, "value_digest": entry.value_digest}
+        for entry in canonical_context_entries
+    ],
 })
 ```
 
@@ -1296,7 +1332,10 @@ engineering_message_payload = {
     "message": message.message,
     "source_module": message.source_module,
     "affected_paths": list(message.affected_paths),
-    "context_entries": canonical_context_entries,
+    "context_entries": [
+        {"key": entry.key, "value": entry.value, "value_digest": entry.value_digest}
+        for entry in canonical_context_entries
+    ],
 }
 engineering_message_digest = sha256_digest(
     engineering_message_payload
@@ -1317,78 +1356,208 @@ A mismatch is an invalid shared message object and must not be silently hashed.
 Shared digest functions, usable from every failure path without import ambiguity:
 
 ```python
-from enum import Enum
 from typing import TypeAlias
 from types import MappingProxyType
 from uuid import UUID
+from datetime import datetime
+from enum import Enum
 import math
 
 
 RUN_FAILURE_SCHEMA_VERSION = "1"
 
 
-CanonicalContextValue: TypeAlias = (
+CanonicalValue: TypeAlias = (
     None
     | bool
     | int
     | float
     | str
-    | UUID
-    | list["CanonicalContextValue"]
-    | tuple["CanonicalContextValue", ...]
-    | dict[str, "CanonicalContextValue"]
+    | list["CanonicalValue"]
+    | tuple["CanonicalValue", ...]
+    | dict[str, "CanonicalValue"]
 )
 
 
-def canonicalize_context_value(value: object) -> CanonicalContextValue:
-    """Recursively canonicalize a context value.
+def qualified_type_name(value: object) -> str:
+    return f"{type(value).__module__}.{type(value).__qualname__}"
 
-    Raises ValueError for non-finite floats and unsupported types.
+
+class ContextCanonicalizationError(Exception):
+    def __init__(
+        self,
+        failure_kind: str,
+        context_key: str,
+        context_path: tuple[str, ...],
+        offending_type: str,
+    ) -> None:
+        self.failure_kind = failure_kind
+        self.context_key = context_key
+        self.context_path = context_path
+        self.offending_type = offending_type
+        super().__init__(failure_kind)
+
+
+def canonicalize_trusted_context_value(
+    value: object,
+    context_key: str,
+    context_path: tuple[str, ...],
+    ancestor_ids: frozenset[int],
+) -> CanonicalValue:
+    """Recursively canonicalize a trusted context value.
+
+    Dispatch order:
+      1. None
+      2. Enum/StrEnum → .value then recurse
+      3. UUID → str
+      4. timezone-aware datetime
+      5. bool
+      6. int
+      7. finite float
+      8. str
+      9. tuple/list → recursive
+     10. Mapping/MappingProxyType → recursive (str keys only)
+     11. repository Quantity-like (canonical.py)
+     12. Pydantic model (canonical.py)
+     13. Unsupported → raise
     """
     if value is None:
         return None
+
+    # Cycle detection
+    object_id = id(value)
+    if object_id in ancestor_ids:
+        raise ContextCanonicalizationError(
+            failure_kind="cyclic_reference",
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        )
+
+    # Enum → .value then recurse
+    if isinstance(value, Enum):
+        return canonicalize_trusted_context_value(
+            value.value,
+            context_key=context_key,
+            context_path=context_path,
+            ancestor_ids=ancestor_ids,
+        )
+
+    # UUID → str
+    if isinstance(value, UUID):
+        return str(value)
+
+    # timezone-aware datetime
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            raise ContextCanonicalizationError(
+                failure_kind="naive_datetime",
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            )
+        return value.isoformat()
+
+    # bool (must be before int)
     if isinstance(value, bool):
         return value
+
+    # int
     if isinstance(value, int):
         return value
+
+    # finite float
     if isinstance(value, float):
         if not math.isfinite(value):
             raise ValueError(f"non-finite float: {value}")
         return value
+
+    # str
     if isinstance(value, str):
         return value
-    if isinstance(value, Enum):
-        return canonicalize_context_value(value.value)
-    if isinstance(value, UUID):
-        return str(value)
+
+    # tuple/list → recursive
     if isinstance(value, (tuple, list)):
-        return [canonicalize_context_value(item) for item in value]
+        updated_ancestors = ancestor_ids | {object_id}
+        child_path = context_path + ("<list>",)
+        return [
+            canonicalize_trusted_context_value(
+                item,
+                context_key=context_key,
+                context_path=child_path,
+                ancestor_ids=updated_ancestors,
+            )
+            for item in value
+        ]
+
+    # Mapping/MappingProxyType → recursive (str keys only)
     if isinstance(value, (dict, MappingProxyType)):
-        return {str(k): canonicalize_context_value(v) for k, v in dict(value).items()}
-    raise ValueError(f"unsupported context value type: {type(value).__name__}")
+        updated_ancestors = ancestor_ids | {object_id}
+        result: dict[str, CanonicalValue] = {}
+        for k, v in dict(value).items():
+            if type(k) is not str:
+                raise ContextCanonicalizationError(
+                    failure_kind="non_string_key",
+                    context_key=context_key,
+                    context_path=context_path + (str(k),),
+                    offending_type=qualified_type_name(k),
+                )
+            child_path = context_path + (k,)
+            canonical_v = canonicalize_trusted_context_value(
+                v,
+                context_key=context_key,
+                context_path=child_path,
+                ancestor_ids=updated_ancestors,
+            )
+            result[k] = canonical_v
+        return result
 
+    # repository Quantity-like (supported by canonical.py)
+    if hasattr(value, "_canonicalize_"):
+        return canonicalize_trusted_context_value(
+            value._canonicalize_(),
+            context_key=context_key,
+            context_path=context_path,
+            ancestor_ids=ancestor_ids,
+        )
 
-def normalize_run_failure_context(
-    context: tuple[tuple[str, Any], ...],
-) -> list[list[str | CanonicalContextValue]]:
-    """Canonicalize RunFailure context entries.
+    # Pydantic model
+    if hasattr(value, "model_dump"):
+        try:
+            raw = value.model_dump(mode="python")
+            return canonicalize_trusted_context_value(
+                raw,
+                context_key=context_key,
+                context_path=context_path,
+                ancestor_ids=ancestor_ids,
+            )
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind="canonicalization_exception",
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
 
-    Each entry becomes [key, canonical_value]. Raises on unsupported types.
-    """
-    result: list[list[str | CanonicalContextValue]] = []
-    for key, value in context:
-        canonical = canonicalize_context_value(value)
-        result.append([key, canonical])
-    return result
+    raise ContextCanonicalizationError(
+        failure_kind="unsupported_type",
+        context_key=context_key,
+        context_path=context_path,
+        offending_type=qualified_type_name(value),
+    )
 
 
 def build_run_failure_payload(failure: RunFailure) -> CanonicalPayload:
+    entries = build_canonical_context_entries(failure.context)
     return {
         "schema_version": failure.schema_version,
         "code": failure.code.value,
         "message": failure.message,
         "traceback": failure.traceback,
-        "context_entries": normalize_run_failure_context(failure.context),
+        "context_entries": [
+            {"key": entry.key, "value": entry.value, "value_digest": entry.value_digest}
+            for entry in entries
+        ],
     }
 
 
@@ -1434,13 +1603,9 @@ repository Quantity-like object (supported by canonical.py)
 Pydantic model (supported by canonical.py)
 ```
 
-Before digesting each value:
+Before digesting each value, use `canonicalize_trusted_context_value()` which handles the full dispatch order and raises `ContextCanonicalizationError` on failure.
 
-```python
-canonical_json({"value": value})
-```
-
-If `canonical_json()` fails (unsupported type, non-finite float, cyclic reference, unserializable object):
+If `canonicalize_trusted_context_value()` fails (unsupported type, non-finite float, cyclic reference, naive datetime, non-string mapping key, canonicalization exception):
 
 - During candidate evidence construction: terminate with `RUNTIME_FAILED`, `failure_stage = RATING_VERIFICATION`, `RunFailure` code `PROVENANCE_INCOMPLETE`.
 - During result/failure-result construction: terminate through RESULT_CONSTRUCTION failure contract.
@@ -1478,7 +1643,7 @@ safe_marker_payload = {
 safe_marker_digest = sha256_digest(safe_marker_payload)
 ```
 
-`failure_kind` values: `unsupported_type`, `non_finite_float`, `cyclic_reference`, `canonicalization_exception`.
+`failure_kind` values: `unsupported_type`, `non_finite_float`, `cyclic_reference`, `naive_datetime`, `non_string_key`, `canonicalization_exception`.
 
 Fallback RunFailure context:
 
@@ -1569,10 +1734,20 @@ meets_target_without_tolerance: bool | None
 Unified digest across all evaluation states:
 
 ```python
+def candidate_diagnostic_sort_key(diagnostic: CandidateDiagnosticKey):
+    return (
+        int(diagnostic.diagnostic_class_rank),
+        diagnostic.code.value,
+        diagnostic.source_module,
+        diagnostic.affected_paths,
+        diagnostic.message,
+    )
+
+
 def build_diagnostic_payload(diagnostic: CandidateDiagnosticKey) -> CanonicalPayload:
     return {
-        "diagnostic_class_rank": diagnostic.diagnostic_class_rank,
-        "code": diagnostic.code,
+        "diagnostic_class_rank": int(diagnostic.diagnostic_class_rank),
+        "code": diagnostic.code.value,
         "source_module": diagnostic.source_module,
         "affected_paths": list(diagnostic.affected_paths),
         "message": diagnostic.message,
@@ -2759,6 +2934,9 @@ TASK009_PROVENANCE_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 ### 22.6 Concept-Specific Construction Contexts
 
 ```python
+from dataclasses import dataclass, field
+
+
 @dataclass(frozen=True, slots=True)
 class RootCaseRevisionConstructionContext:
     design_case_revision_id: UUID
@@ -3528,6 +3706,7 @@ class TopologyCounters:
     runtime_failure_count: int = 0
     warning_content_count: int = 0
     blocker_content_count: int = 0
+    feasible_candidate_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -3558,6 +3737,7 @@ NODE_MULTIPLICITY_CONSTRUCTORS: Mapping[str, NodeMultiplicityConstructor] = {
     "runtime_failure_count": lambda ctx: ctx.counters.runtime_failure_count,
     "warning_content_count": lambda ctx: ctx.counters.warning_content_count,
     "blocker_content_count": lambda ctx: ctx.counters.blocker_content_count,
+    "feasible_candidate_count": lambda ctx: ctx.counters.feasible_candidate_count,
 }
 
 
@@ -3608,8 +3788,13 @@ def invariant_run_failure_present(ctx: TopologyConstructionContext) -> None:
 
 
 def invariant_no_feasible_candidate(ctx: TopologyConstructionContext) -> None:
-    if ctx.counters.sizing_result_count > 0:
-        raise ValueError("feasible candidate present when none expected")
+    if ctx.counters.feasible_candidate_count != 0:
+        raise ValueError("NO_FEASIBLE requires feasible_candidate_count=0")
+
+
+def invariant_feasible_candidate_present(ctx: TopologyConstructionContext) -> None:
+    if ctx.counters.feasible_candidate_count < 1:
+        raise ValueError("SUCCEEDED requires feasible_candidate_count>=1")
 
 
 def invariant_cap_exceeded_before_materialization(ctx: TopologyConstructionContext) -> None:
@@ -4287,6 +4472,16 @@ def resolve_termination_topology(
                 f"ROOT_EXTERNAL multiplicity {root_count} "
                 f"does not match selection {root_selection.root_external_count}"
             )
+
+    # Exactly-one-root anti-tamper check
+    resolved_case = multiplicity_by_concept.get(ProvenanceConcept.ROOT_CASE_REVISION, 0)
+    resolved_external = multiplicity_by_concept.get(ProvenanceConcept.ROOT_EXTERNAL, 0)
+    if resolved_case + resolved_external != 1:
+        raise ValueError("must contain exactly one root")
+    if resolved_case != root_selection.root_case_revision_count:
+        raise ValueError("case root count mismatch")
+    if resolved_external != root_selection.root_external_count:
+        raise ValueError("external root count mismatch")
 
     # Build edge set with dedup
     edges = [root_selection.initiates_edge]
@@ -5255,54 +5450,54 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 frozen SHA equals new docs commit for Round 16
 
-### 27.21 Round 24 Contract Tests (501–540)
+### 27.21 Round 25 Contract Tests (501–540)
 
-501. Round 24 Review Comment ID is `4801928304`
-502. Round 24 decision is `CHANGES REQUIRED`
-503. Round 24 row follows Round 23 in review history
-504. Gate references Round 25 Engineering Design Review
-505. Gate text at top of doc reads "Round 25" not "Round 24"
-506. Gate text: "TASK-009 returns to READY only after Round 25 Engineering Design Review passes."
-507. Delivery Sequence step 1 references "Round 25"
-508. Acceptance Criteria first item references "Round 25 Engineering Design Review"
-509. All Acceptance Criteria references to round gate use "Round 25" (not "Round 24")
-510. Review History has exactly 25 rows (Rounds 1–24)
-511. Round 24 comment ID `4801928304` not duplicated in older rounds
-512. No orphan "Round 24" gate text references remain in body outside review history
-513. Test #499 reads "Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round"
-514. Old Acceptance Criteria references no longer say "Round 23" for Delivery Sequence
-515. Delivery Sequence step 1 does NOT reference "Round 24"
-516. Acceptance Criteria first item does NOT reference "Round 24"
-517. Test matrix summary lists Round 24 (501–540) not Round 23
-518. Test matrix acceptance criteria entry: Round 24 (501–540) replaces Round 23
-519. Section 27.21 present (Round 24 Contract Tests)
-520. Section 27.21 has exactly 40 entries (501–540)
-521. Section 27.21 heading reads "Round 24 Contract Tests (501–540)"
-522. Test numbering 501–540 is continuous with no gaps
-523. Round 24 test range matches heading: 501–540
-524. Global test numbering continuous 1–540
-525. Section 27 range now 27.1–27.21 continuous (no gaps)
-526. Gate text does NOT reference "Round 24" at top of doc
-527. Issue #23 test total equals task-card N (540)
-528. Round 24 subsection numbering locally continuous within 501–540
-529. Issue #23 frozen SHA equals new docs commit for Round 24
-530. Acceptance Criteria required test matrix entries include Round 24 (501–540)
-531. Acceptance Criteria test total remains 1–540
-532. Test #505 confirms gate text reads "Round 25"
-533. Test #506 confirms gate text exact wording
-534. Test #507 confirms Delivery Sequence step 1 reads "Round 25"
-535. Test #508 confirms Acceptance Criteria first item reads "Round 25"
-536. TASK-010 in TASK_BACKLOG.md is BLOCKED
-537. No remaining "Round 23" references in body outside review history
-538. Review history does NOT pre-populate Round 25 comment ID or decision
-539. Section 27.21 test entries cover all Round 24 document changes
-540. Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully
+501. **Input**: Review history table after Round 25 changes. **Expected output**: Round 25 row exists with Comment ID `4802083544` and decision `CHANGES REQUIRED`. **Exception**: N/A — structural consistency check.
+502. **Input**: Round 25 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — structural consistency check.
+503. **Input**: Round 25 row in review history. **Expected output**: Appears immediately after Round 24 row. **Exception**: N/A — ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 26 Engineering Design Review". **Exception**: N/A — gate reference check.
+505. **Input**: Gate text at top of document. **Expected output**: Reads "Round 26" not "Round 25". **Exception**: N/A — round number check.
+506. **Input**: Gate text. **Expected output**: Exact string "TASK-009 returns to READY only after Round 26 Engineering Design Review passes." **Exception**: N/A — exact wording check.
+507. **Input**: Delivery Sequence step 1. **Expected output**: References "Round 26". **Exception**: N/A — sequence reference check.
+508. **Input**: Acceptance Criteria first item. **Expected output**: References "Round 26 Engineering Design Review". **Exception**: N/A — criteria reference check.
+509. **Input**: All Acceptance Criteria references to round gate. **Expected output**: All use "Round 26" (not "Round 25"). **Exception**: N/A — consistency check.
+510. **Input**: Review History table. **Expected output**: Has exactly 26 data rows (Rounds 1–25). **Exception**: N/A — row count check.
+511. **Input**: All Round 25 comment ID references. **Expected output**: Comment ID `4802083544` is unique to Round 25, not duplicated in older rounds. **Exception**: N/A — uniqueness check.
+512. **Input**: Entire document body outside review history. **Expected output**: No orphan "Round 25" gate text references remain. **Exception**: N/A — stale reference check.
+513. **Input**: Test #499. **Expected output**: Reads "Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round". **Exception**: N/A — generic wording check.
+514. **Input**: Acceptance Criteria references. **Expected output**: No references say "Round 24" for Delivery Sequence. **Exception**: N/A — stale reference check.
+515. **Input**: Delivery Sequence step 1. **Expected output**: Does NOT reference "Round 25". **Exception**: N/A — round advancement check.
+516. **Input**: Acceptance Criteria first item. **Expected output**: Does NOT reference "Round 25". **Exception**: N/A — round advancement check.
+517. **Input**: Test matrix summary in Acceptance Criteria. **Expected output**: Lists Round 25 (501–540) not Round 24. **Exception**: N/A — matrix reference check.
+518. **Input**: Test matrix acceptance criteria entry. **Expected output**: Round 25 (501–540) replaces Round 24. **Exception**: N/A — matrix update check.
+519. **Input**: Section 27 headings. **Expected output**: Section 27.21 present (Round 25 Contract Tests). **Exception**: N/A — section existence check.
+520. **Input**: Section 27.21 entries. **Expected output**: Has exactly 40 test entries (501–540). **Exception**: N/A — entry count check.
+521. **Input**: Section 27.21 heading. **Expected output**: Reads "Round 25 Contract Tests (501–540)". **Exception**: N/A — heading text check.
+522. **Input**: Test numbering in Section 27.21. **Expected output**: Continuous 501–540 with no gaps. **Exception**: N/A — numbering continuity check.
+523. **Input**: Round 25 test range. **Expected output**: Matches heading: 501–540. **Exception**: N/A — range consistency check.
+524. **Input**: Global test numbering 1–540. **Expected output**: Continuous with no gaps. **Exception**: N/A — global numbering check.
+525. **Input**: Section 27 sub-section listing. **Expected output**: Range is 27.1–27.21 continuous (no gaps). **Exception**: N/A — section continuity check.
+526. **Input**: Gate text at top of document. **Expected output**: Does NOT reference "Round 25". **Exception**: N/A — gate consistency check.
+527. **Input**: Issue #23 test total. **Expected output**: Equals task-card N (540). **Exception**: N/A — total consistency check.
+528. **Input**: Round 25 subsection numbering. **Expected output**: Locally continuous within 501–540. **Exception**: N/A — local continuity check.
+529. **Input**: Issue #23 frozen SHA. **Expected output**: Equals new docs commit for Round 25. **Exception**: N/A — SHA consistency check.
+530. **Input**: Acceptance Criteria required test matrix entries. **Expected output**: Include Round 25 (501–540). **Exception**: N/A — matrix inclusion check.
+531. **Input**: Acceptance Criteria test total. **Expected output**: Remains 1–540. **Exception**: N/A — total preservation check.
+532. **Input**: Test #505. **Expected output**: Confirms gate text reads "Round 26". **Exception**: N/A — gate verification check.
+533. **Input**: Test #506. **Expected output**: Confirms gate text exact wording. **Exception**: N/A — wording verification check.
+534. **Input**: Test #507. **Expected output**: Confirms Delivery Sequence step 1 reads "Round 26". **Exception**: N/A — sequence verification check.
+535. **Input**: Test #508. **Expected output**: Confirms Acceptance Criteria first item reads "Round 26". **Exception**: N/A — criteria verification check.
+536. **Input**: TASK_BACKLOG.md. **Expected output**: TASK-010 is BLOCKED. **Exception**: N/A — dependency check.
+537. **Input**: Entire document body outside review history. **Expected output**: No remaining "Round 24" references in body outside review history. **Exception**: N/A — stale reference check.
+538. **Input**: Review history. **Expected output**: Does NOT pre-populate Round 26 comment ID or decision. **Exception**: N/A — forward-reference check.
+539. **Input**: Section 27.21 test entries. **Expected output**: All entries cover Round 25 document changes. **Exception**: N/A — coverage check.
+540. **Input**: Entire document. **Expected output**: Markdown, symbol ordering, formula resolution, and global tests 1–540 parse successfully. **Exception**: N/A — parse validation check.
 
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 25 Engineering Design Review.
+1. Complete Round 26 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5316,7 +5511,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 25 Engineering Design Review passes before implementation starts
+- [ ] Round 26 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
@@ -5335,6 +5530,6 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - [ ] All identity/hash uses `sha256:...` + `canonical_json`
 - [ ] Exact 14 TASK-009 ErrorCode strings; `CATALOG_IDENTITY_MISMATCH` vs `HASH_MISMATCH` non-overlapping
 - [ ] No pressure-drop or velocity constraint
-- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 24 (501–540)
+- [ ] Required test matrix entries 1–540 (continuous), including Round 6 (89–136), Round 7 (137–176), Round 8 (177–204), Round 9 (205–244), Round 10 (245–295), Round 11 (296–332), Round 12 (333–370), Round 13 (371–405), Round 14 (406–430), Round 15 (431–460), Round 16 (461–500), and Round 25 (501–540)
 - [ ] Ruff, format, mypy, pytest+coverage, pip-audit pass on 3.11/3.12
 - [ ] Engineering design review passes before Ready or merge
