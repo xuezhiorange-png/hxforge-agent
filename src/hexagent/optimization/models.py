@@ -486,6 +486,31 @@ class LengthSpecExplicitContext(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Shared identity-key helper (P0-3: seven-field canonical key)
+# ---------------------------------------------------------------------------
+
+
+def option_raw_count_record_identity_key(
+    record: OptionRawCountRecord,
+) -> tuple[str, str, str, str, str, str, str]:
+    """Seven-field compound identity key for gate / materialization.
+
+    Used for duplicate detection, canonical sorting, and materialization
+    lookup.  All call sites must use this single helper — never hand-write
+    the tuple or string key.
+    """
+    return (
+        record.catalog_id,
+        record.catalog_version,
+        record.catalog_content_hash,
+        record.source_identity,
+        record.schema_version,
+        record.assembly_option_id,
+        record.canonical_length_quantum_m,
+    )
+
+
+# ---------------------------------------------------------------------------
 # __all__
 # ---------------------------------------------------------------------------
 

@@ -491,7 +491,9 @@ class PassedSizingGate(BaseModel):
     def _validate_per_option_records(
         cls, records: tuple[OptionRawCountRecord, ...]
     ) -> tuple[OptionRawCountRecord, ...]:
-        seen: set[str] = set()
+        from hexagent.optimization.models import option_raw_count_record_identity_key
+
+        seen: set[tuple[str, str, str, str, str, str, str]] = set()
         for rec in records:
             if isinstance(rec.raw_count, bool):
                 raise TypeError("raw_count in per_option_records must be int, not bool")
@@ -502,26 +504,12 @@ class PassedSizingGate(BaseModel):
                 )
             if rec.raw_count < 0:
                 raise ValueError(f"raw_count must be non-negative, got {rec.raw_count}")
-            key = (
-                f"{rec.catalog_id}:{rec.catalog_version}:"
-                f"{rec.catalog_content_hash}:{rec.source_identity}:"
-                f"{rec.schema_version}:{rec.assembly_option_id}:"
-                f"{rec.canonical_length_quantum_m}"
-            )
+            key = option_raw_count_record_identity_key(rec)
             if key in seen:
                 raise ValueError(f"Duplicate per-option record key: {key}")
             seen.add(key)
-        # Sort by canonical compound key
-        sorted_recs = sorted(
-            records,
-            key=lambda r: (
-                r.catalog_id,
-                r.catalog_version,
-                r.catalog_content_hash,
-                r.assembly_option_id,
-                r.canonical_length_quantum_m,
-            ),
-        )
+        # Sort by canonical seven-field compound key
+        sorted_recs = sorted(records, key=option_raw_count_record_identity_key)
         return tuple(sorted_recs)
 
     @model_validator(mode="after")
@@ -578,8 +566,89 @@ def create_passed_sizing_gate(
 
 
 # ---------------------------------------------------------------------------
-# MaterializedCandidateSet — binds materialization to gate + request
+# MaterializedCandidateSet — explicit payload for P0-1
 # ---------------------------------------------------------------------------
+
+
+def materialized_candidate_set_payload(
+    sizing_request_identity_digest: str,
+    passed_gate_digest: str,
+    catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...],
+    minimum_effective_length_m: float | None,
+    maximum_effective_length_m: float | None,
+    raw_combination_count: int,
+    unique_candidate_count: int,
+    ordered_candidate_ids: tuple[str, ...],
+) -> dict[str, object]:
+    """Explicit canonical payload for MaterializedCandidateSet digest.
+
+    Does not include ``candidate_set_digest`` — the factory computes it
+    from this payload.
+
+    Used by both the factory and ``verify_digest()`` so that the digest
+    is always computed over the exact same set of fields.
+    """
+    return {
+        "sizing_request_identity_digest": sizing_request_identity_digest,
+        "passed_gate_digest": passed_gate_digest,
+        "catalog_snapshot_identities": [
+            {
+                "catalog_id": ref.catalog_id,
+                "catalog_version": ref.catalog_version,
+                "catalog_content_hash": ref.catalog_content_hash,
+                "source_identity": ref.source_identity,
+                "schema_version": ref.schema_version,
+            }
+            for ref in catalog_snapshot_identities
+        ],
+        "minimum_effective_length_m": minimum_effective_length_m,
+        "maximum_effective_length_m": maximum_effective_length_m,
+        "raw_combination_count": raw_combination_count,
+        "unique_candidate_count": unique_candidate_count,
+        "ordered_candidate_ids": list(ordered_candidate_ids),
+    }
+
+
+def create_materialized_candidate_set(
+    sizing_request_identity_digest: str,
+    passed_gate_digest: str,
+    catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...],
+    minimum_effective_length_m: float | None,
+    maximum_effective_length_m: float | None,
+    raw_combination_count: int,
+    ordered_candidates: tuple[Any, ...],
+) -> MaterializedCandidateSet:
+    """Two-phase factory: build payload → compute digest → construct.
+
+    Never constructs with a blank digest and never uses ``model_copy``
+    to backfill — the digest is set before the model is built.
+    """
+    unique_count = len(ordered_candidates)
+    ordered_ids = tuple(c.source_qualified_candidate_id for c in ordered_candidates)
+
+    payload = materialized_candidate_set_payload(
+        sizing_request_identity_digest=sizing_request_identity_digest,
+        passed_gate_digest=passed_gate_digest,
+        catalog_snapshot_identities=catalog_snapshot_identities,
+        minimum_effective_length_m=minimum_effective_length_m,
+        maximum_effective_length_m=maximum_effective_length_m,
+        raw_combination_count=raw_combination_count,
+        unique_candidate_count=unique_count,
+        ordered_candidate_ids=ordered_ids,
+    )
+    digest = sha256_digest(payload)
+
+    return MaterializedCandidateSet(
+        sizing_request_identity_digest=sizing_request_identity_digest,
+        passed_gate_digest=passed_gate_digest,
+        catalog_snapshot_identities=catalog_snapshot_identities,
+        minimum_effective_length_m=minimum_effective_length_m,
+        maximum_effective_length_m=maximum_effective_length_m,
+        raw_combination_count=raw_combination_count,
+        unique_candidate_count=unique_count,
+        ordered_candidate_ids=ordered_ids,
+        candidate_set_digest=digest,
+    )
 
 
 class MaterializedCandidateSet(BaseModel):
@@ -664,37 +733,20 @@ class MaterializedCandidateSet(BaseModel):
         return self
 
     def verify_digest(self) -> bool:
-        """Recalculate digest from payload and compare."""
-        payload = self.model_copy(update={"candidate_set_digest": ""})
-        expected = sha256_digest(payload)
+        """Recalculate digest from explicit payload and compare."""
+        expected = sha256_digest(
+            materialized_candidate_set_payload(
+                sizing_request_identity_digest=self.sizing_request_identity_digest,
+                passed_gate_digest=self.passed_gate_digest,
+                catalog_snapshot_identities=self.catalog_snapshot_identities,
+                minimum_effective_length_m=self.minimum_effective_length_m,
+                maximum_effective_length_m=self.maximum_effective_length_m,
+                raw_combination_count=self.raw_combination_count,
+                unique_candidate_count=self.unique_candidate_count,
+                ordered_candidate_ids=self.ordered_candidate_ids,
+            )
+        )
         return self.candidate_set_digest == expected
-
-
-def create_materialized_candidate_set(
-    sizing_request_identity_digest: str,
-    passed_gate_digest: str,
-    catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...],
-    minimum_effective_length_m: float | None,
-    maximum_effective_length_m: float | None,
-    raw_combination_count: int,
-    ordered_candidates: tuple[Any, ...],
-) -> MaterializedCandidateSet:
-    """Factory: build artifact from materialized candidates."""
-    unique_count = len(ordered_candidates)
-    ordered_ids = tuple(c.source_qualified_candidate_id for c in ordered_candidates)
-    mcs = MaterializedCandidateSet(
-        sizing_request_identity_digest=sizing_request_identity_digest,
-        passed_gate_digest=passed_gate_digest,
-        catalog_snapshot_identities=catalog_snapshot_identities,
-        minimum_effective_length_m=minimum_effective_length_m,
-        maximum_effective_length_m=maximum_effective_length_m,
-        raw_combination_count=raw_combination_count,
-        unique_candidate_count=unique_count,
-        ordered_candidate_ids=ordered_ids,
-        candidate_set_digest="",
-    )
-    digest = sha256_digest(mcs)
-    return mcs.model_copy(update={"candidate_set_digest": digest})
 
 
 # ---------------------------------------------------------------------------

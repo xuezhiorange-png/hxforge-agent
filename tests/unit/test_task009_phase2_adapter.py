@@ -18,11 +18,11 @@ Tests cover:
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 import pytest
 
-from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import (
     CalculationContext,
     ExecutionContextSnapshot,
@@ -40,7 +40,6 @@ from hexagent.optimization.adapter import evaluate_all_candidates
 from hexagent.optimization.catalog import compute_catalog_content_hash
 from hexagent.optimization.context import (
     ExpectedProviderIdentity,
-    MaterializedCandidateSet,
     OptimizationObjective,
     SizingRequestIdentity,
     build_sizing_request_identity,
@@ -50,9 +49,10 @@ from hexagent.optimization.evaluation import (
     CandidateEvaluationState,
 )
 from hexagent.optimization.identities import (
-    ManufacturableCandidate,
+    MaterializationResult,
     build_candidate,
     catalog_snapshot_ref,
+    materialize_all_candidates,
 )
 from hexagent.optimization.models import (
     CompleteDoublePipeAssemblyOption,
@@ -203,7 +203,14 @@ def _make_minimal_result(
         )
         object.__setattr__(result, "provider_identity", pi)
 
-        ec = ExecutionContextSnapshot()
+        ec = object.__new__(ExecutionContextSnapshot)
+        object.__setattr__(ec, "request_id", None)
+        object.__setattr__(ec, "design_case_revision_id", None)
+        object.__setattr__(ec, "calculation_run_id", None)
+        # Extra fields expected by execution_context_snapshot_payload in evaluation.py
+        object.__setattr__(ec, "execution_id", None)
+        object.__setattr__(ec, "rating_software_version", None)
+        object.__setattr__(ec, "execution_context_policy_version", None)
         object.__setattr__(result, "execution_context", ec)
     else:
         object.__setattr__(result, "request_identity", None)
@@ -251,19 +258,16 @@ def _build_and_materialize(
 ) -> tuple[
     SizingRequestIdentity,
     CompleteDoublePipeCatalogSnapshot,
-    tuple[ManufacturableCandidate, ...],
-    MaterializedCandidateSet,
+    MaterializationResult,
 ]:
-    """Build a sizing identity, gate, and materialize candidates.
+    """Build a sizing identity, gate, and materialize using the REAL production chain.
 
-    Returns (identity, catalog, candidates, candidate_set) where the
-    candidate_set has a valid digest.
+    Returns (identity, catalog, materialization_result) where
+    materialization_result is a validated MaterializationResult.
     """
     cat = _make_cat(options=options)
     req = SizingRequest(catalogs=(cat,))
 
-    # Build sizing identity with matching fluid parameters
-    # Use valid ThermalBoundaryCondition values (NOT "adiabatic")
     ident = build_sizing_request_identity(
         request=req,
         hot_fluid_name="w",
@@ -292,7 +296,6 @@ def _build_and_materialize(
         expected_provider_identity=_default_expected_provider(),
     )
 
-    # Build per-option records and gate
     recs: list[OptionRawCountRecord] = []
     for opt in options:
         rec = OptionRawCountRecord(
@@ -315,42 +318,14 @@ def _build_and_materialize(
         per_option_records=tuple(recs),
     )
 
-    # Build candidates manually (avoids broken create_materialized_candidate_set)
-    all_candidates: list[ManufacturableCandidate] = []
-    for opt in options:
-        lengths = sorted(opt.length_source.allowed_effective_lengths_m)
-        for length_m in lengths:
-            length_canonical = str(length_m)
-            cand = build_candidate(cat, opt, length_canonical)
-            all_candidates.append(cand)
-
-    # Deduplicate and assign evaluation order
-    from hexagent.optimization.identities import deduplicate_and_order_candidates
-
-    deduped = deduplicate_and_order_candidates(tuple(all_candidates))
-
-    # Build MaterializedCandidateSet with correct digest
-    cat_refs = (catalog_snapshot_ref(cat),)
-    ordered_ids = tuple(c.source_qualified_candidate_id for c in deduped)
-
-    # First build with placeholder digest, then compute the real one
-    temp = MaterializedCandidateSet(
+    # USE THE REAL PRODUCTION CHAIN
+    mat_result = materialize_all_candidates(
+        catalogs=(cat,),
+        sizing_gate=gate,
         sizing_request_identity_digest=ident.sizing_request_identity_digest,
-        passed_gate_digest=gate.gate_digest,
-        catalog_snapshot_identities=cat_refs,
-        minimum_effective_length_m=None,
-        maximum_effective_length_m=None,
-        raw_combination_count=total_raw,
-        unique_candidate_count=len(deduped),
-        ordered_candidate_ids=ordered_ids,
-        candidate_set_digest="sha256:" + "a" * 64,
     )
-    real_digest = sha256_digest(temp.model_copy(update={"candidate_set_digest": ""}))
-    mcs = temp.model_copy(update={"candidate_set_digest": real_digest})
 
-    assert mcs.verify_digest(), "MaterializedCandidateSet digest must be valid"
-
-    return ident, cat, deduped, mcs
+    return ident, cat, mat_result
 
 
 # ============================================================================
@@ -377,11 +352,10 @@ class TestAdapterSpy:
             max_iterations=100,
         )
 
-    def _eval(self, mcs, candidates, ident, solver_params, provider, rating_fn, **overrides):
+    def _eval(self, mat_result, ident, solver_params, provider, rating_fn, **overrides):
         """Call evaluate_all_candidates with valid defaults for boundary conditions."""
         params = dict(
-            candidate_set=mcs,
-            candidates=candidates,
+            materialization_result=mat_result,
             hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
             cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
             hot_mass_flow_kg_s=5.0,
@@ -413,15 +387,15 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """Spy records every call; results are VERIFIED."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
         )
+        candidates = mat_result.candidates
         calls, spy_fn = make_spy()
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -437,8 +411,31 @@ class TestAdapterSpy:
             assert rec.evaluation_order_index == i
             assert rec.source_qualified_candidate_id == candidates[i].source_qualified_candidate_id
 
-        # Verify spy call parameters match what was passed
+        # Verify spy call parameters match what was passed — P0-8 complete assertions
+        all_lengths = {1.0, 2.0}
+        request_ids = []
         for call in calls:
+            # --- Geometry ---
+            geom = call["geometry"]
+            assert geom.inner_tube_inner_diameter_m == 0.05
+            assert geom.inner_tube_outer_diameter_m == 0.06
+            assert geom.outer_pipe_inner_diameter_m == 0.10
+            assert geom.effective_length_m in all_lengths
+            assert geom.wall_thermal_conductivity_w_m_k == 50.0
+            assert geom.inner_surface_roughness_m == 1e-5
+            assert geom.annulus_surface_roughness_m == 1e-5
+            assert geom.inner_fouling_resistance_m2k_w == 0.0001
+            assert geom.outer_fouling_resistance_m2k_w == 0.0002
+
+            # --- Fluids ---
+            assert call["hot_fluid"].name == "w"
+            assert call["hot_fluid"].equation_of_state_backend == "i"
+            assert call["hot_fluid"].components == ()
+            assert call["cold_fluid"].name == "b"
+            assert call["cold_fluid"].equation_of_state_backend == "n"
+            assert call["cold_fluid"].components == ()
+
+            # --- Rating inputs ---
             assert call["hot_mass_flow_kg_s"] == 5.0
             assert call["cold_mass_flow_kg_s"] == 5.0
             assert call["hot_inlet_temperature_k"] == 300.0
@@ -448,13 +445,23 @@ class TestAdapterSpy:
             assert call["tube_in_hot"] is True
             assert isinstance(call["flow_arrangement"], FlowArrangement)
             assert call["flow_arrangement"] is FlowArrangement.COUNTERFLOW
-            assert call["minimum_terminal_delta_t"] == 5.0
-            assert call["solver_params"] is solver_params
+
+            # --- Provider and Solver (same instance) ---
             assert call["provider"] is provider
-            assert call["hot_fluid"].name == "w"
-            assert call["cold_fluid"].name == "b"
+            assert call["solver_params"] is solver_params
+
+            # --- Context UUID ---
             assert isinstance(call["context"], CalculationContext)
-            assert hasattr(call["geometry"], "inner_tube_inner_diameter_m")
+            assert call["context"].request_id is not None
+            request_ids.append(call["context"].request_id)
+
+            # --- Minimum terminal delta T, boundary conditions ---
+            assert call["minimum_terminal_delta_t"] == 5.0
+            assert call["tube_boundary_condition"] == BUILDER_TUBE_BC
+            assert call["annulus_boundary_condition"] == BUILDER_ANNULUS_BC
+
+        # Each call has a unique context request_id (P0-8 UUID check)
+        assert len(set(request_ids)) == len(request_ids)
 
     # ------------------------------------------------------------------
     # b) Candidate-set digest mismatch
@@ -466,16 +473,18 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """Tampering with candidate_set digest raises ValueError before spy."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
         )
-        bad_mcs = mcs.model_copy(update={"candidate_set_digest": "sha256:" + "f" * 64})
+        bad_set = mat_result.candidate_set.model_copy(
+            update={"candidate_set_digest": "sha256:" + "f" * 64}
+        )
+        bad_mat_result = dataclasses.replace(mat_result, candidate_set=bad_set)
         calls, spy_fn = make_spy()
 
         with pytest.raises(ValueError, match="digest verification failed"):
             self._eval(
-                mcs=bad_mcs,
-                candidates=candidates,
+                mat_result=bad_mat_result,
                 ident=ident,
                 solver_params=solver_params,
                 provider=provider,
@@ -494,7 +503,7 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """Wrong fluid name raises ValueError before spy."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
         )
         wrong_hot = FluidIdentifier(name="steam", equation_of_state_backend="i")
@@ -502,8 +511,7 @@ class TestAdapterSpy:
 
         with pytest.raises(ValueError, match="Input parameter mismatch"):
             self._eval(
-                mcs=mcs,
-                candidates=candidates,
+                mat_result=mat_result,
                 ident=ident,
                 solver_params=solver_params,
                 provider=provider,
@@ -519,15 +527,14 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """Wrong flow rate raises ValueError before spy."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
         )
         calls, spy_fn = make_spy()
 
         with pytest.raises(ValueError, match="Input parameter mismatch"):
             self._eval(
-                mcs=mcs,
-                candidates=candidates,
+                mat_result=mat_result,
                 ident=ident,
                 solver_params=solver_params,
                 provider=provider,
@@ -601,25 +608,22 @@ class TestAdapterSpy:
 
         deduped = deduplicate_and_order_candidates(tuple(all_cands))
         cat_refs = (catalog_snapshot_ref(cat),)
-        ordered_ids = tuple(c.source_qualified_candidate_id for c in deduped)
-        temp = MaterializedCandidateSet(
+
+        # Use create_materialized_candidate_set for correct digest
+        from hexagent.optimization.context import create_materialized_candidate_set
+
+        mcs = create_materialized_candidate_set(
             sizing_request_identity_digest=ident.sizing_request_identity_digest,
             passed_gate_digest=gate.gate_digest,
             catalog_snapshot_identities=cat_refs,
             minimum_effective_length_m=None,
             maximum_effective_length_m=None,
             raw_combination_count=1,
-            unique_candidate_count=len(deduped),
-            ordered_candidate_ids=ordered_ids,
-            candidate_set_digest="sha256:" + "a" * 64,
+            ordered_candidates=deduped,
         )
-        mcs = temp.model_copy(
-            update={
-                "candidate_set_digest": sha256_digest(
-                    temp.model_copy(update={"candidate_set_digest": ""})
-                )
-            }
-        )
+
+        # Wrap into MaterializationResult
+        mat_result = MaterializationResult(candidates=deduped, candidate_set=mcs)
 
         # Use a fluid WITH components, but identity says empty
         wrong_hot = FluidIdentifier(
@@ -632,8 +636,7 @@ class TestAdapterSpy:
 
         with pytest.raises((ValueError,), match="normalized_components|Input parameter mismatch"):
             self._eval(
-                mcs=mcs,
-                candidates=deduped,
+                mat_result=mat_result,
                 ident=ident,
                 solver_params=solver_params,
                 provider=provider,
@@ -655,7 +658,7 @@ class TestAdapterSpy:
     ) -> None:
         """candidate_set.sizing_request_identity_digest mismatch raises ValueError."""
         # Build one setup normally
-        ident1, cat1, candidates1, mcs1 = _build_and_materialize(
+        ident1, cat1, mat_result1 = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
         )
 
@@ -695,8 +698,7 @@ class TestAdapterSpy:
 
         with pytest.raises(ValueError, match="sizing_request_identity_digest mismatch"):
             self._eval(
-                mcs=mcs1,
-                candidates=candidates1,
+                mat_result=mat_result1,
                 ident=ident2,
                 solver_params=solver_params,
                 provider=provider,
@@ -717,17 +719,17 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """When verify_hash returns False, remaining candidates are UNEVALUATED."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
         )
+        candidates = mat_result.candidates
         assert len(candidates) >= 2
 
         calls, spy_fn = make_spy(hash_passes=False)
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -754,10 +756,11 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """When verify_hash raises, remaining candidates are UNEVALUATED."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
         )
+        candidates = mat_result.candidates
         assert len(candidates) >= 2
 
         custom_calls: list[dict[str, Any]] = []
@@ -777,8 +780,7 @@ class TestAdapterSpy:
             return _make_minimal_result()
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -802,10 +804,11 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """When verify_provenance returns False, remaining are UNEVALUATED."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
         )
+        candidates = mat_result.candidates
         assert len(candidates) >= 2
 
         custom_calls: list[dict[str, Any]] = []
@@ -819,8 +822,7 @@ class TestAdapterSpy:
             return _make_minimal_result()
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -845,10 +847,11 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """When verify_provenance raises, remaining are UNEVALUATED."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
         )
+        candidates = mat_result.candidates
         assert len(candidates) >= 2
 
         custom_calls: list[dict[str, Any]] = []
@@ -868,8 +871,7 @@ class TestAdapterSpy:
             return _make_minimal_result()
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -893,10 +895,11 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """When the spy raises, that candidate is RUNTIME_FAILED, rest UNEVALUATED."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
         )
+        candidates = mat_result.candidates
         assert len(candidates) >= 2
 
         custom_calls: list[dict[str, Any]] = []
@@ -910,8 +913,7 @@ class TestAdapterSpy:
             return _make_minimal_result()
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -937,11 +939,12 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """Different provider identities across candidates is detected."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
             _make_opt("c", lengths=(3.0,)),
         )
+        candidates = mat_result.candidates
         assert len(candidates) >= 3
 
         pi_a = ProviderIdentitySnapshot(
@@ -969,8 +972,7 @@ class TestAdapterSpy:
             return result
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -997,15 +999,15 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """Records are returned in the same order as the candidates."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
         )
+        candidates = mat_result.candidates
         calls, spy_fn = make_spy()
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -1031,18 +1033,18 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """Three candidates all pass verification."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
             _make_opt("c", lengths=(3.0,)),
         )
+        candidates = mat_result.candidates
         assert len(candidates) == 3
 
         calls, spy_fn = make_spy()
 
         records = self._eval(
-            mcs=mcs,
-            candidates=candidates,
+            mat_result=mat_result,
             ident=ident,
             solver_params=solver_params,
             provider=provider,
@@ -1064,18 +1066,24 @@ class TestAdapterSpy:
         provider: PropertyProvider,
     ) -> None:
         """Passing candidates in wrong order relative to set raises ValueError."""
-        ident, cat, candidates, mcs = _build_and_materialize(
+        ident, cat, mat_result = _build_and_materialize(
             _make_opt("a", lengths=(1.0,)),
             _make_opt("b", lengths=(2.0,)),
         )
         calls, spy_fn = make_spy()
 
-        reversed_candidates = tuple(reversed(candidates))
+        # Build a MaterializationResult where candidates are in reversed order
+        # relative to candidate_set.ordered_candidate_ids.
+        # We keep the original (sorted) candidate_set but pass candidates
+        # in reverse order, then bypass __post_init__ to avoid its validation.
+        reversed_candidates = tuple(reversed(mat_result.candidates))
+        bad_mat_result = object.__new__(type(mat_result))
+        object.__setattr__(bad_mat_result, "candidates", reversed_candidates)
+        object.__setattr__(bad_mat_result, "candidate_set", mat_result.candidate_set)
 
         with pytest.raises(ValueError, match="Candidate ordering mismatch"):
             self._eval(
-                mcs=mcs,
-                candidates=reversed_candidates,
+                mat_result=bad_mat_result,
                 ident=ident,
                 solver_params=solver_params,
                 provider=provider,

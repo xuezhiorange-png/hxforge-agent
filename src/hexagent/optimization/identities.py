@@ -11,16 +11,19 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from hexagent.core.canonical import sha256_digest
+from hexagent.optimization._quantum import canonicalize_length_quantum
 from hexagent.optimization.context import (
     MaterializedCandidateSet,
     PassedSizingGate,
     create_materialized_candidate_set,
 )
+from hexagent.optimization.materialization import materialize_lengths_for_option
 from hexagent.optimization.models import (
     CatalogSnapshotRef,
     CompleteDoublePipeAssemblyOption,
     CompleteDoublePipeCatalogSnapshot,
     OptionRawCountRecord,
+    option_raw_count_record_identity_key,
 )
 
 # ---------------------------------------------------------------------------
@@ -281,10 +284,59 @@ def build_candidate(
 
 @dataclasses.dataclass(frozen=True)
 class MaterializationResult:
-    """Result of materialize_all_candidates()."""
+    """Result of materialize_all_candidates().
+
+    ``candidates`` and ``candidate_set`` are bound together
+    at construction time and cannot be separately provided later.
+    """
 
     candidates: tuple[ManufacturableCandidate, ...]
     candidate_set: MaterializedCandidateSet
+
+    def __post_init__(self) -> None:
+        """Validate invariants at construction (P0-2)."""
+        errors: list[str] = []
+
+        # unique_candidate_count == len(candidates)
+        if self.candidate_set.unique_candidate_count != len(self.candidates):
+            errors.append(
+                f"unique_candidate_count ({self.candidate_set.unique_candidate_count}) "
+                f"!= len(candidates) ({len(self.candidates)})"
+            )
+
+        # ordered_candidate_ids == tuple(candidate IDs)
+        actual_ids = tuple(c.source_qualified_candidate_id for c in self.candidates)
+        if self.candidate_set.ordered_candidate_ids != actual_ids:
+            errors.append(
+                f"ordered_candidate_ids mismatch: "
+                f"expected {self.candidate_set.ordered_candidate_ids}, "
+                f"got {actual_ids}"
+            )
+
+        # evaluation_order_index == 0..N-1
+        for i, c in enumerate(self.candidates):
+            if c.evaluation_order_index != i:
+                errors.append(
+                    f"candidate[{i}] evaluation_order_index={c.evaluation_order_index} != {i}"
+                )
+
+        # No duplicate candidate IDs
+        seen_ids_set: set[str] = set()
+        for c in self.candidates:
+            sqid = c.source_qualified_candidate_id
+            if sqid in seen_ids_set:
+                errors.append(f"Duplicate candidate ID: {sqid}")
+            seen_ids_set.add(sqid)
+
+        # Candidate IDs canonical sorted
+        if tuple(self.candidate_set.ordered_candidate_ids) != tuple(
+            sorted(self.candidate_set.ordered_candidate_ids)
+        ):
+            errors.append("candidate IDs not in canonical sorted order")
+
+        # Each candidate's self-consistency is already validated by its model_validator
+        if errors:
+            raise ValueError("; ".join(errors))
 
 
 # ---------------------------------------------------------------------------
@@ -311,43 +363,37 @@ def materialize_all_candidates(
     if not sizing_gate.verify_digest():
         raise ValueError("PassedSizingGate digest verification failed")
 
-    from hexagent.optimization.materialization import materialize_lengths_for_option
-
     # Build a lookup for per-option records
-    record_map: dict[str, OptionRawCountRecord] = {}
+    record_map: dict[tuple[str, str, str, str, str, str, str], OptionRawCountRecord] = {}
     for rec in sizing_gate.per_option_records:
-        # Compound key: catalog_id:version:content_hash:source_identity:
-        #               schema_version:option_id:quantum
-        key_parts = (
-            f"{rec.catalog_id}:{rec.catalog_version}:"
-            f"{rec.catalog_content_hash}:{rec.source_identity}:"
-            f"{rec.schema_version}:{rec.assembly_option_id}:"
-            f"{rec.canonical_length_quantum_m}"
-        )
-        if key_parts in record_map:
+        key = option_raw_count_record_identity_key(rec)
+        if key in record_map:
             raise ValueError("Duplicate per-option record key")
-        record_map[key_parts] = rec
+        record_map[key] = rec
 
     all_candidates: list[ManufacturableCandidate] = []
     total_materialized = 0
 
     for cat in catalogs:
         for opt in cat.assembly_options:
-            # Build key and find matching record
-            from hexagent.optimization._quantum import canonicalize_length_quantum
-
+            # Build key using shared identity-key helper
             quantum = canonicalize_length_quantum(opt.length_source.length_quantum_m)
-            key_parts2 = (
-                f"{cat.catalog_id}:{cat.catalog_version}:"
-                f"{cat.catalog_content_hash}:{cat.source_identity}:"
-                f"{cat.schema_version}:{opt.assembly_option_id}:"
-                f"{quantum}"
+            lookup_record = OptionRawCountRecord(
+                catalog_id=cat.catalog_id,
+                catalog_version=cat.catalog_version,
+                catalog_content_hash=cat.catalog_content_hash,
+                source_identity=cat.source_identity,
+                schema_version=cat.schema_version,
+                assembly_option_id=opt.assembly_option_id,
+                canonical_length_quantum_m=quantum,
+                raw_count=0,
             )
+            lookup_key = option_raw_count_record_identity_key(lookup_record)
 
             try:
-                rec = record_map.pop(key_parts2)
+                rec = record_map.pop(lookup_key)
             except KeyError:
-                raise ValueError(f"Missing per-option record for {key_parts2}") from None
+                raise ValueError(f"Missing per-option record for key {lookup_key}") from None
 
             lengths = materialize_lengths_for_option(
                 opt,

@@ -18,7 +18,6 @@ from hexagent.exchangers.double_pipe.result import RatingResult
 from hexagent.exchangers.double_pipe.solver import SolverParams
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 from hexagent.optimization.context import (
-    MaterializedCandidateSet,
     SizingRequestIdentity,
     build_candidate_calculation_context,
 )
@@ -29,7 +28,10 @@ from hexagent.optimization.evaluation import (
     check_provider_consistency,
     verify_and_evaluate_candidate,
 )
-from hexagent.optimization.identities import ManufacturableCandidate
+from hexagent.optimization.identities import (
+    ManufacturableCandidate,
+    MaterializationResult,
+)
 from hexagent.properties.base import FluidIdentifier, PropertyProvider
 
 # ---------------------------------------------------------------------------
@@ -326,8 +328,7 @@ def rate_candidate(
 
 
 def evaluate_all_candidates(
-    candidate_set: MaterializedCandidateSet,
-    candidates: tuple[ManufacturableCandidate, ...],
+    materialization_result: MaterializationResult,
     *,
     hot_fluid: FluidIdentifier,
     cold_fluid: FluidIdentifier,
@@ -347,28 +348,20 @@ def evaluate_all_candidates(
     sizing_request_identity: SizingRequestIdentity,
     rating_fn: RatingCallable = rate_double_pipe,
 ) -> tuple[CandidateEvaluationRecord, ...]:
-    """Evaluate all candidates with strict serial pipeline (P0-1, P0-10).
+    """Evaluate all candidates with strict serial pipeline (P0-1, P0-2).
 
-    Accepts a ``MaterializedCandidateSet`` artifact for provenance verification
-    (replaces separate ``candidates`` + ``gate`` params).
-
-    Strict serial pipeline (P0-1):
-      For each candidate in sequence:
-        1. Build ``CalculationContext``
-        2. Call ``rate_candidate()``
-        3. Call ``verify_and_evaluate_candidate()`` for hash + provenance verification
-      - If adapter raises → emit ``RUNTIME_FAILED`` for that candidate,
-        ``UNEVALUATED`` for all remaining candidates, STOP.
-      - If hash/provenance fails → emit ``UNEVALUATED`` for all remaining
-        candidates, STOP.
-
-    After all candidates are processed, ``check_provider_consistency()`` is
-    applied to the full result set (P0-5).
+    Accepts only a ``MaterializationResult`` (unbindable bundle of
+    ``MaterializedCandidateSet`` + ``tuple[ManufacturableCandidate]``).
+    Internal logic operates on ``materialization_result.candidate_set``
+    and ``materialization_result.candidates``.
     """
 
     # ------------------------------------------------------------------
     # P0-3: Verify MaterializedCandidateSet
     # ------------------------------------------------------------------
+    candidate_set = materialization_result.candidate_set
+    candidates = materialization_result.candidates
+
     if not candidate_set.verify_digest():
         raise ValueError("MaterializedCandidateSet digest verification failed")
     if candidate_set.sizing_request_identity_digest != (

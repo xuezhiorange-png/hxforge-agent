@@ -13,7 +13,7 @@ import dataclasses
 from enum import StrEnum
 from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import ExecutionContextSnapshot, ProviderIdentitySnapshot
@@ -188,6 +188,28 @@ class VerifiedRatingEvidenceSnapshot(BaseModel):
         """
         return sha256_digest(verified_rating_evidence_payload(self))
 
+    # ------------------------------------------------------------------
+    # P0-9: Flow-area model-level finite-positive validators
+    # ------------------------------------------------------------------
+
+    @field_validator(
+        "tube_flow_area_m2",
+        "annulus_flow_area_m2",
+        mode="before",
+    )
+    @classmethod
+    def _finite_positive_flow_area(cls, value: object, info: Any) -> float:
+        if isinstance(value, bool):
+            raise TypeError(f"{info.field_name} must be float, not bool")
+        if type(value) not in (int, float):
+            raise TypeError(f"{info.field_name} must be numeric, got {type(value).__name__}")
+        parsed = float(value)  # type: ignore[arg-type]
+        import math
+
+        if not math.isfinite(parsed) or parsed <= 0:
+            raise ValueError(f"{info.field_name} must be finite positive, got {parsed}")
+        return parsed
+
 
 # ---------------------------------------------------------------------------
 # Standalone 26-field evidence payload (P0-7)
@@ -197,11 +219,27 @@ class VerifiedRatingEvidenceSnapshot(BaseModel):
 def verified_rating_evidence_payload(
     evidence: VerifiedRatingEvidenceSnapshot,
 ) -> dict[str, object]:
-    """Compute the exact 26-field deterministic evidence payload.
+    """Exact 26-field deterministic evidence payload (P0-6).
 
-    Every field is drawn directly from ``evidence`` using the precise
-    serialisation rules specified in P0-7.
+    Every field is drawn directly from ``evidence``.  Nested digests
+    use explicit payload helpers, not model_dump() or dataclasses.asdict().
     """
+
+    # Warning/blocker canonical sort key
+    def _message_sort_key(m: EngineeringMessage) -> tuple[str, str, str, str]:
+        sev = m.severity.value if hasattr(m.severity, "value") else str(m.severity)
+        code = m.code.value if hasattr(m.code, "value") else str(m.code)
+        return (sev, code, m.message, str(sorted(m.context) if m.context else []))
+
+    warning_digests = tuple(
+        sha256_digest(engineering_message_payload(w))
+        for w in sorted(evidence.warnings, key=_message_sort_key)
+    )
+    blocker_digests = tuple(
+        sha256_digest(engineering_message_payload(b))
+        for b in sorted(evidence.blockers, key=_message_sort_key)
+    )
+
     return {
         "rating_status": evidence.rating_status.value,
         "heat_duty_w": evidence.heat_duty_w,
@@ -217,17 +255,21 @@ def verified_rating_evidence_payload(
         "annulus_inlet_density_kg_m3": evidence.annulus_inlet_density_kg_m3,
         "tube_flow_area_m2": evidence.tube_flow_area_m2,
         "annulus_flow_area_m2": evidence.annulus_flow_area_m2,
-        "warning_digests": tuple(sorted(sha256_digest(w.model_dump()) for w in evidence.warnings)),
-        "blocker_digests": tuple(sorted(sha256_digest(b.model_dump()) for b in evidence.blockers)),
-        "failure_digest": sha256_digest(evidence.failure.model_dump())
+        "warning_digests": warning_digests,
+        "blocker_digests": blocker_digests,
+        "failure_digest": sha256_digest(run_failure_payload(evidence.failure))
         if evidence.failure is not None
         else None,
-        "provider_identity_digest": sha256_digest(dataclasses.asdict(evidence.provider_identity)),
-        "tube_correlation_digest": sha256_digest(dataclasses.asdict(evidence.tube_correlation))
+        "provider_identity_digest": sha256_digest(
+            provider_identity_snapshot_payload(evidence.provider_identity)
+        ),
+        "tube_correlation_digest": sha256_digest(
+            selected_correlation_snapshot_payload(evidence.tube_correlation)
+        )
         if evidence.tube_correlation is not None
         else None,
         "annulus_correlation_digest": sha256_digest(
-            dataclasses.asdict(evidence.annulus_correlation)
+            selected_correlation_snapshot_payload(evidence.annulus_correlation)
         )
         if evidence.annulus_correlation is not None
         else None,
@@ -353,6 +395,121 @@ class CandidateEvaluationRecord(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Explicit nested payload helpers (P0-5)
+# ---------------------------------------------------------------------------
+
+
+def rating_request_identity_payload(
+    identity: RatingRequestIdentity,
+) -> dict[str, object]:
+    """Exact 21-field deterministic payload for RatingRequestIdentity.
+
+    Only the frozen-contract-approved fields are included.  Future
+    dataclass fields are excluded.
+    """
+    return {
+        "hot_fluid_name": identity.hot_fluid_name,
+        "hot_fluid_backend": identity.hot_fluid_backend,
+        "hot_fluid_components": list(identity.hot_fluid_components),
+        "cold_fluid_name": identity.cold_fluid_name,
+        "cold_fluid_backend": identity.cold_fluid_backend,
+        "cold_fluid_components": list(identity.cold_fluid_components),
+        "hot_mass_flow_kg_s": identity.hot_mass_flow_kg_s,
+        "cold_mass_flow_kg_s": identity.cold_mass_flow_kg_s,
+        "hot_inlet_pressure_pa": identity.hot_inlet_pressure_pa,
+        "cold_inlet_pressure_pa": identity.cold_inlet_pressure_pa,
+        "hot_inlet_temperature_k": identity.hot_inlet_temperature_k,
+        "cold_inlet_temperature_k": identity.cold_inlet_temperature_k,
+        "flow_arrangement": identity.flow_arrangement,
+        "geometry": dict(identity.geometry),
+        "solver_absolute_residual_w": identity.solver_absolute_residual_w,
+        "solver_relative_residual_fraction": identity.solver_relative_residual_fraction,
+        "solver_bracket_temperature_tolerance_k": identity.solver_bracket_temperature_tolerance_k,
+        "solver_max_iterations": identity.solver_max_iterations,
+        "tube_boundary_condition": identity.tube_boundary_condition,
+        "annulus_boundary_condition": identity.annulus_boundary_condition,
+        "minimum_terminal_delta_t": identity.minimum_terminal_delta_t,
+    }
+
+
+def execution_context_snapshot_payload(
+    context: ExecutionContextSnapshot,
+) -> dict[str, object]:
+    """Exact 3-field deterministic payload for ExecutionContextSnapshot."""
+    ctx_req = str(context.request_id) if context.request_id else None
+    ctx_des = str(context.design_case_revision_id) if context.design_case_revision_id else None
+    ctx_cal = str(context.calculation_run_id) if context.calculation_run_id else None
+    return {
+        "request_id": ctx_req,
+        "design_case_revision_id": ctx_des,
+        "calculation_run_id": ctx_cal,
+    }
+
+
+def provider_identity_snapshot_payload(
+    provider: ProviderIdentitySnapshot,
+) -> dict[str, object]:
+    """Exact frozen payload for ProviderIdentitySnapshot."""
+    cfg = provider.configuration_fingerprint if provider.configuration_fingerprint else None
+    cache = provider.cache_policy_version if provider.cache_policy_version else None
+    return {
+        "name": provider.name,
+        "version": provider.version,
+        "git_revision": provider.git_revision,
+        "reference_state_policy": provider.reference_state_policy,
+        "configuration_fingerprint": cfg,
+        "cache_policy_version": cache,
+    }
+
+
+def selected_correlation_snapshot_payload(
+    correlation: SelectedCorrelationSnapshot,
+) -> dict[str, object]:
+    """Exact frozen payload for SelectedCorrelationSnapshot."""
+    return {
+        "correlation_id": correlation.correlation_id,
+        "version": correlation.version,
+        "definition_hash": correlation.definition_hash,
+        "source_title": correlation.source_title,
+        "source_authors": correlation.source_authors,
+        "source_year": correlation.source_year,
+        "source_reference": correlation.source_reference,
+        "source_verification_status": correlation.source_verification_status,
+        "nusselt_basis": correlation.nusselt_basis,
+        "is_adaptation": correlation.is_adaptation,
+        "adaptation_limitation": correlation.adaptation_limitation,
+    }
+
+
+def engineering_message_payload(message: EngineeringMessage) -> dict[str, object]:
+    """Exact frozen payload for EngineeringMessage (Pydantic BaseModel)."""
+    sev = message.severity.value if hasattr(message.severity, "value") else str(message.severity)
+    code = message.code.value if hasattr(message.code, "value") else message.code
+    return {
+        "schema_version": message.schema_version,
+        "code": code,
+        "severity": sev,
+        "message": message.message,
+        "source_module": message.source_module,
+        "affected_paths": list(message.affected_paths) if message.affected_paths else [],
+        "context": sorted(message.context) if message.context else [],
+        "allows_continuation": message.allows_continuation,
+    }
+
+
+def run_failure_payload(failure: RunFailure) -> dict[str, object]:
+    """Exact frozen payload for RunFailure (Pydantic BaseModel)."""
+    code = failure.code.value if hasattr(failure.code, "value") else failure.code
+    return {
+        "schema_version": failure.schema_version,
+        "code": code,
+        "message": failure.message,
+        "traceback": failure.traceback or None,
+        "context": list(failure.context) if failure.context else [],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Exact-type safe extraction helpers (for audit path only)
 # ---------------------------------------------------------------------------
 
@@ -418,12 +575,7 @@ def _build_audit_snapshot(
     # 1. status
     status_str: str | None = None
     try:
-        if type(result.status) is RatingStatus:
-            status_str = result.status.value
-        elif result.status is None:
-            status_str = None
-        else:
-            status_str = str(result.status)
+        status_str = result.status.value if type(result.status) is RatingStatus else None
     except Exception:
         status_str = None
 
@@ -447,30 +599,30 @@ def _build_audit_snapshot(
     except Exception:
         prov_digest = None
 
-    # 4. request_identity (dataclass — canonical asdict)
+    # 4. request_identity — canonical payload helper
     ri_digest: str | None = None
     try:
         if type(result.request_identity) is RatingRequestIdentity:
-            ri_digest = sha256_digest(dataclasses.asdict(result.request_identity))
+            ri_digest = sha256_digest(rating_request_identity_payload(result.request_identity))
     except Exception:
         ri_digest = None
 
-    # 5. execution_context (BaseModel — canonical model_dump)
+    # 5. execution_context — canonical payload helper
     ec_digest: str | None = None
     try:
         if (
             result.execution_context is not None
             and type(result.execution_context) is ExecutionContextSnapshot
         ):
-            ec_digest = sha256_digest(result.execution_context.model_dump())
+            ec_digest = sha256_digest(execution_context_snapshot_payload(result.execution_context))
     except Exception:
         ec_digest = None
 
-    # 6. provider_identity (dataclass — canonical asdict)
+    # 6. provider_identity — canonical payload helper
     pi_digest: str | None = None
     try:
         if type(result.provider_identity) is ProviderIdentitySnapshot:
-            pi_digest = sha256_digest(dataclasses.asdict(result.provider_identity))
+            pi_digest = sha256_digest(provider_identity_snapshot_payload(result.provider_identity))
     except Exception:
         pi_digest = None
 
@@ -546,8 +698,8 @@ def _extract_trusted_evidence(
     if type(r_prov) is not str or not r_prov:
         raise ValueError("provenance_digest must be non-empty str")
 
-    ri_digest = sha256_digest(dataclasses.asdict(ri))
-    ec_digest = sha256_digest(ec.model_dump())
+    ri_digest = sha256_digest(rating_request_identity_payload(ri))
+    ec_digest = sha256_digest(execution_context_snapshot_payload(ec))
 
     # --- Thermal fields (fail closed for areas, optional for others) ---
     area_inner: float = 0.0
@@ -809,17 +961,17 @@ def _build_candidate_evaluation_identity(
     ri = result.request_identity
     if type(ri) is not RatingRequestIdentity:
         raise TypeError(f"expected RatingRequestIdentity, got {type(ri).__name__}")
-    ri_digest = sha256_digest(dataclasses.asdict(ri))
+    ri_digest = sha256_digest(rating_request_identity_payload(ri))
 
     pi = result.provider_identity
     if type(pi) is not ProviderIdentitySnapshot:
         raise TypeError(f"expected ProviderIdentitySnapshot, got {type(pi).__name__}")
-    pi_digest = sha256_digest(dataclasses.asdict(pi))
+    pi_digest = sha256_digest(provider_identity_snapshot_payload(pi))
 
     ec = result.execution_context
     if type(ec) is not ExecutionContextSnapshot:
         raise TypeError(f"expected ExecutionContextSnapshot, got {type(ec).__name__}")
-    ec_digest = sha256_digest(ec.model_dump())
+    ec_digest = sha256_digest(execution_context_snapshot_payload(ec))
 
     r_hash = result.result_hash
     if type(r_hash) is not str:
@@ -928,7 +1080,7 @@ def _build_invalid_evidence(
         hash_verification_outcome=hash_outcome,
         provenance_verification_outcome=prov_outcome,
         rating_request_identity_digest=(
-            sha256_digest(dataclasses.asdict(result.request_identity))
+            sha256_digest(rating_request_identity_payload(result.request_identity))
             if type(result.request_identity) is RatingRequestIdentity
             else None
         ),
@@ -1247,6 +1399,13 @@ __all__ = [
     "VerificationOutcome",
     "VerifiedRatingEvidenceSnapshot",
     "check_provider_consistency",
+    "engineering_message_payload",
+    "execution_context_snapshot_payload",
+    "provider_identity_snapshot_payload",
+    "rating_request_identity_payload",
+    "run_failure_payload",
+    "selected_correlation_snapshot_payload",
+    "verified_rating_evidence_payload",
     "verify_and_evaluate_candidate",
     "verify_and_evaluate_candidates",
 ]
