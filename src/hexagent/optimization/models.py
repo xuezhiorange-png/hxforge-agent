@@ -150,7 +150,14 @@ class CompleteDoublePipeAssemblyOption(BaseModel):
 
 
 class CompleteDoublePipeCatalogSnapshot(BaseModel):
-    """A full catalog snapshot supplied by the caller."""
+    """A full catalog snapshot supplied by the caller.
+
+    Construction validates:
+      - Identity fields are non-empty ASCII
+      - ``catalog_content_hash`` format is ``sha256:<64 hex>``
+      - Assembly option IDs are unique and canonically sorted
+      - Claimed hash matches computed content hash
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -160,6 +167,38 @@ class CompleteDoublePipeCatalogSnapshot(BaseModel):
     schema_version: str
     assembly_options: tuple[CompleteDoublePipeAssemblyOption, ...]
     catalog_content_hash: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_catalog(cls, data: dict[str, Any]) -> dict[str, Any]:
+        from hexagent.optimization.catalog import validate_and_hash_catalog
+
+        # Extract raw values (may be fields or model instances)
+        cat_id = data.get("catalog_id", "")
+        cat_ver = data.get("catalog_version", "")
+        src_id = data.get("source_identity", "")
+        sch_ver = data.get("schema_version", "")
+        options_raw = data.get("assembly_options", ())
+        claimed_hash = data.get("catalog_content_hash", "")
+
+        # Ensure assembly_options is a tuple
+        if not isinstance(options_raw, (list, tuple)):
+            raise ValueError("assembly_options must be a tuple")
+
+        options = tuple(options_raw)
+
+        sorted_options, _computed = validate_and_hash_catalog(
+            catalog_id=cat_id,
+            catalog_version=cat_ver,
+            source_identity=src_id,
+            schema_version=sch_ver,
+            assembly_options=options,
+            claimed_hash=claimed_hash,
+        )
+
+        # Replace assembly options with sorted version
+        data["assembly_options"] = sorted_options
+        return data
 
 
 class CatalogSnapshotRef(BaseModel):

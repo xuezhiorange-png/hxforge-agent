@@ -13,6 +13,7 @@ from collections.abc import Callable
 from decimal import ROUND_DOWN, ROUND_HALF_EVEN, ROUND_UP, Decimal
 
 from hexagent.optimization._quantum import canonicalize_length_quantum
+from hexagent.optimization.catalog import catalog_identity_key
 from hexagent.optimization.errors import (
     CapExceeded,
     CatalogInvalid,
@@ -300,15 +301,34 @@ def compute_raw_combination_count(
 
     Returns ``(total_count, per_option_records)``.  The total is the
     **sum** of per-option contributions, not a product across options.
-    Records follow canonical catalog/option iteration order.
+    Catalogs are ordered by canonical identity tuple, and assembly
+    options by ``assembly_option_id`` within each catalog.
 
-    Raises ``CatalogInvalid`` / ``InvalidLengthQuantum`` /
-    ``InvalidRequestBounds`` if any option fails validation.
+    Raises ``CatalogInvalid`` on duplicate catalog identity tuples.
     """
+    # Defensive canonical sorting of catalogs by identity key
+    sorted_cats: list[CompleteDoublePipeCatalogSnapshot] = sorted(
+        catalogs, key=catalog_identity_key
+    )
+
+    # Duplicate catalog identity detection
+    seen_keys: set[tuple[str, str, str, str, str]] = set()
+    for cat in sorted_cats:
+        key = catalog_identity_key(cat)
+        if key in seen_keys:
+            raise CatalogInvalid(
+                f"Duplicate catalog identity: catalog_id={cat.catalog_id!r}, "
+                f"catalog_version={cat.catalog_version!r}, "
+                f"catalog_content_hash={cat.catalog_content_hash!r}, "
+                f"source_identity={cat.source_identity!r}, "
+                f"schema_version={cat.schema_version!r}"
+            )
+        seen_keys.add(key)
+
     total = 0
     records: list[OptionRawCountRecord] = []
 
-    for cat in catalogs:
+    for cat in sorted_cats:
         for opt in cat.assembly_options:
             count = compute_option_raw_count(
                 opt,
