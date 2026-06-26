@@ -1,6 +1,7 @@
 """
 TASK-009 Phase 2 — SizingRequestIdentity, per-candidate CalculationContext,
-deterministic UUID5-based request IDs, and the PassedSizingGate artifact.
+deterministic UUID5-based request IDs, PassedSizingGate artifact, and
+MaterializedCandidateSet artifact.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID, uuid5
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hexagent.core.canonical import sha256_digest
 from hexagent.exchangers.double_pipe.solver import SolverParams
@@ -24,15 +25,20 @@ from hexagent.optimization.models import (
 # Frozen namespace for TASK-009 deterministic UUID5 generation.
 TASK009_CONTEXT_NAMESPACE = UUID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")
 
+# ---------------------------------------------------------------------------
+# Hard cap constant
+# ---------------------------------------------------------------------------
+
+HARD_RAW_COMBINATION_CAP = 10000
 
 # ---------------------------------------------------------------------------
-# OptimizationObjective
+# OptimizationObjective — frozen API values
 # ---------------------------------------------------------------------------
 
 
 class OptimizationObjective(StrEnum):
-    MINIMIZE_AREA = "minimize_area"
-    MINIMIZE_LENGTH = "minimize_length"
+    MINIMUM_OUTER_HEAT_TRANSFER_AREA = "minimum_outer_heat_transfer_area"
+    MINIMUM_EFFECTIVE_LENGTH = "minimum_effective_length"
 
 
 # ---------------------------------------------------------------------------
@@ -237,11 +243,13 @@ class SizingRequestIdentity(BaseModel):
             raise TypeError("raw combination cap must be int, not bool")
         if not isinstance(value, int):
             raise TypeError(f"raw combination cap must be int, got {type(value).__name__}")
-        if value < 0:
-            raise ValueError(f"raw combination cap must be >= 0, got {value}")
+        if value < 1 or value > HARD_RAW_COMBINATION_CAP:
+            raise ValueError(
+                f"raw combination cap must be in 1..{HARD_RAW_COMBINATION_CAP}, got {value}"
+            )
         return value
 
-    # --- Numeric finite/range validators for positive float fields ---
+    # --- Numeric finite/range validators ---
 
     @field_validator(
         "hot_inlet_temperature_k",
@@ -252,8 +260,6 @@ class SizingRequestIdentity(BaseModel):
         "cold_mass_flow_kg_s",
         "minimum_terminal_delta_t",
         "required_duty_w",
-        "duty_absolute_tolerance_w",
-        "duty_relative_tolerance",
         "rating_solver_absolute_residual_w",
         "rating_solver_relative_residual_fraction",
         "rating_solver_bracket_temperature_tolerance_k",
@@ -264,6 +270,17 @@ class SizingRequestIdentity(BaseModel):
         if info.field_name is None:
             raise ValueError("field_name required")
         return _validate_positive_finite_float(value, info.field_name)
+
+    @field_validator(
+        "duty_absolute_tolerance_w",
+        "duty_relative_tolerance",
+        mode="before",
+    )
+    @classmethod
+    def _non_negative_finite_float(cls, value: object, info: Any) -> float:
+        if info.field_name is None:
+            raise ValueError("field_name required")
+        return _validate_non_negative_finite_float(value, info.field_name)
 
     @field_validator(
         "minimum_effective_length_m",
@@ -396,7 +413,7 @@ def build_sizing_request_identity(
 
 
 # ---------------------------------------------------------------------------
-# Candidate CalculationContext (typed — only SizingRequestIdentity)
+# Candidate CalculationContext (typed — returns exact type)
 # ---------------------------------------------------------------------------
 
 
@@ -409,8 +426,6 @@ def build_candidate_calculation_context(
     The ``request_id`` is a deterministic UUID5.
     ``design_case_revision_id`` and ``calculation_run_id`` are
     forwarded from the sizing request identity (may be None).
-
-    Returns a ``CalculationContext`` (from ``hexagent.core.heat_balance``).
     """
     from hexagent.core.heat_balance import CalculationContext
 
@@ -429,7 +444,7 @@ def build_candidate_calculation_context(
 
 
 # ---------------------------------------------------------------------------
-# PassedSizingGate artifact
+# PassedSizingGate artifact — must validate semantic invariants
 # ---------------------------------------------------------------------------
 
 
@@ -437,6 +452,7 @@ class PassedSizingGate(BaseModel):
     """Immutable artifact created when the Phase 1 cap gate passes.
 
     Required by Phase 2 materialization entry to proceed.
+    Constructor validates semantic invariants.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -447,6 +463,86 @@ class PassedSizingGate(BaseModel):
     effective_cap: int
     per_option_records: tuple[OptionRawCountRecord, ...]
     gate_digest: str
+
+    @field_validator("raw_combination_count", mode="before")
+    @classmethod
+    def _validate_raw_count(cls, value: object) -> int:
+        if isinstance(value, bool):
+            raise TypeError("raw_combination_count must be int, not bool")
+        if not isinstance(value, int):
+            raise TypeError(f"raw_combination_count must be int, got {type(value).__name__}")
+        if value < 0:
+            raise ValueError(f"raw_combination_count must be >= 0, got {value}")
+        return value
+
+    @field_validator("effective_cap", mode="before")
+    @classmethod
+    def _validate_effective_cap(cls, value: object) -> int:
+        if isinstance(value, bool):
+            raise TypeError("effective_cap must be int, not bool")
+        if not isinstance(value, int):
+            raise TypeError(f"effective_cap must be int, got {type(value).__name__}")
+        if value < 1 or value > HARD_RAW_COMBINATION_CAP:
+            raise ValueError(f"effective_cap must be in 1..{HARD_RAW_COMBINATION_CAP}, got {value}")
+        return value
+
+    @field_validator("per_option_records", mode="after")
+    @classmethod
+    def _validate_per_option_records(
+        cls, records: tuple[OptionRawCountRecord, ...]
+    ) -> tuple[OptionRawCountRecord, ...]:
+        seen: set[str] = set()
+        for rec in records:
+            if isinstance(rec.raw_count, bool):
+                raise TypeError("raw_count in per_option_records must be int, not bool")
+            if not isinstance(rec.raw_count, int):
+                raise TypeError(
+                    f"raw_count in per_option_records must be int, "
+                    f"got {type(rec.raw_count).__name__}"
+                )
+            if rec.raw_count < 0:
+                raise ValueError(f"raw_count must be non-negative, got {rec.raw_count}")
+            key = (
+                f"{rec.catalog_id}:{rec.catalog_version}:"
+                f"{rec.catalog_content_hash}:{rec.source_identity}:"
+                f"{rec.schema_version}:{rec.assembly_option_id}:"
+                f"{rec.canonical_length_quantum_m}"
+            )
+            if key in seen:
+                raise ValueError(f"Duplicate per-option record key: {key}")
+            seen.add(key)
+        # Sort by canonical compound key
+        sorted_recs = sorted(
+            records,
+            key=lambda r: (
+                r.catalog_id,
+                r.catalog_version,
+                r.catalog_content_hash,
+                r.assembly_option_id,
+                r.canonical_length_quantum_m,
+            ),
+        )
+        return tuple(sorted_recs)
+
+    @model_validator(mode="after")
+    def _validate_gate_invariants(self) -> Self:
+        errors: list[str] = []
+        if self.status != "passed":
+            errors.append(f"gate status must be 'passed', got {self.status!r}")
+        if self.raw_combination_count > self.effective_cap:
+            errors.append(
+                f"raw_combination_count ({self.raw_combination_count}) "
+                f"exceeds effective_cap ({self.effective_cap})"
+            )
+        total_raw = sum(r.raw_count for r in self.per_option_records)
+        if total_raw != self.raw_combination_count:
+            errors.append(
+                f"sum(record.raw_count) ({total_raw}) "
+                f"!= raw_combination_count ({self.raw_combination_count})"
+            )
+        if errors:
+            raise ValueError("; ".join(errors))
+        return self
 
     def verify_digest(self) -> bool:
         """Recalculate digest from payload and compare against stored."""
@@ -471,7 +567,6 @@ def create_passed_sizing_gate(
         gate_digest="",
     )
     digest = sha256_digest(gate)
-    # Recreate with digest
     return PassedSizingGate(
         status="passed",
         sizing_request_identity_digest=sizing_request_identity_digest,
@@ -480,6 +575,65 @@ def create_passed_sizing_gate(
         per_option_records=per_option_records,
         gate_digest=digest,
     )
+
+
+# ---------------------------------------------------------------------------
+# MaterializedCandidateSet — binds materialization to gate + request
+# ---------------------------------------------------------------------------
+
+from typing import Self  # noqa: E402
+
+
+class MaterializedCandidateSet(BaseModel):
+    """Immutable artifact binding materialized candidates to their gate.
+
+    Required by the batch evaluator before any TASK-008 call.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    sizing_request_identity_digest: str
+    passed_gate_digest: str
+    catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...]
+    minimum_effective_length_m: float | None = None
+    maximum_effective_length_m: float | None = None
+    raw_combination_count: int
+    unique_candidate_count: int
+    ordered_candidate_ids: tuple[str, ...]
+    candidate_set_digest: str
+
+    def verify_digest(self) -> bool:
+        """Recalculate digest from payload and compare."""
+        payload = self.model_copy(update={"candidate_set_digest": ""})
+        expected = sha256_digest(payload)
+        return self.candidate_set_digest == expected
+
+
+def create_materialized_candidate_set(
+    sizing_request_identity_digest: str,
+    passed_gate_digest: str,
+    catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...],
+    minimum_effective_length_m: float | None,
+    maximum_effective_length_m: float | None,
+    raw_combination_count: int,
+    ordered_candidates: tuple[Any, ...],
+) -> MaterializedCandidateSet:
+    """Factory: build artifact from materialized candidates."""
+    unique_count = len(ordered_candidates)
+    ordered_ids = tuple(c.source_qualified_candidate_id for c in ordered_candidates)
+    mcs = MaterializedCandidateSet(
+        sizing_request_identity_digest=sizing_request_identity_digest,
+        passed_gate_digest=passed_gate_digest,
+        catalog_snapshot_identities=catalog_snapshot_identities,
+        minimum_effective_length_m=minimum_effective_length_m,
+        maximum_effective_length_m=maximum_effective_length_m,
+        raw_combination_count=raw_combination_count,
+        unique_candidate_count=unique_count,
+        ordered_candidate_ids=ordered_ids,
+        candidate_set_digest="",
+    )
+    digest = sha256_digest(mcs)
+    return mcs.model_copy(update={"candidate_set_digest": digest})
 
 
 # ---------------------------------------------------------------------------
@@ -517,6 +671,8 @@ def build_provider_consistency_result(
 
 __all__ = [
     "ExpectedProviderIdentity",
+    "HARD_RAW_COMBINATION_CAP",
+    "MaterializedCandidateSet",
     "OptimizationObjective",
     "PassedSizingGate",
     "ProviderConsistencyResult",
@@ -525,5 +681,6 @@ __all__ = [
     "build_candidate_calculation_context",
     "build_provider_consistency_result",
     "build_sizing_request_identity",
+    "create_materialized_candidate_set",
     "create_passed_sizing_gate",
 ]

@@ -361,6 +361,8 @@ class OptionRawCountRecord(BaseModel):
     catalog_id: str
     catalog_version: str
     catalog_content_hash: str
+    source_identity: str = ""
+    schema_version: str = ""
     assembly_option_id: str
     canonical_length_quantum_m: str
     raw_count: int

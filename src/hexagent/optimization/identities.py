@@ -288,15 +288,21 @@ def materialize_all_candidates(
 
     Raises ``ValueError`` on count mismatch (does not produce candidates).
     """
+    # --- P0-1: verify gate digest before consuming any records ---
+    if not sizing_gate.verify_digest():
+        raise ValueError("PassedSizingGate digest verification failed")
+
     from hexagent.optimization.materialization import materialize_lengths_for_option
 
     # Build a lookup for per-option records
     record_map: dict[str, OptionRawCountRecord] = {}
     for rec in sizing_gate.per_option_records:
-        # Compound key: catalog_id:version:content_hash:option_id:quantum
+        # Compound key: catalog_id:version:content_hash:source_identity:
+        #               schema_version:option_id:quantum
         key_parts = (
             f"{rec.catalog_id}:{rec.catalog_version}:"
-            f"{rec.catalog_content_hash}:{rec.assembly_option_id}:"
+            f"{rec.catalog_content_hash}:{rec.source_identity}:"
+            f"{rec.schema_version}:{rec.assembly_option_id}:"
             f"{rec.canonical_length_quantum_m}"
         )
         if key_parts in record_map:
@@ -314,14 +320,15 @@ def materialize_all_candidates(
             quantum = canonicalize_length_quantum(opt.length_source.length_quantum_m)
             key_parts2 = (
                 f"{cat.catalog_id}:{cat.catalog_version}:"
-                f"{cat.catalog_content_hash}:{opt.assembly_option_id}:"
+                f"{cat.catalog_content_hash}:{cat.source_identity}:"
+                f"{cat.schema_version}:{opt.assembly_option_id}:"
                 f"{quantum}"
             )
 
-            if key_parts2 not in record_map:
-                raise ValueError("Missing per-option record")
-
-            rec = record_map[key_parts2]
+            try:
+                rec = record_map.pop(key_parts2)
+            except KeyError:
+                raise ValueError(f"Missing per-option record for {key_parts2}") from None
 
             lengths = materialize_lengths_for_option(
                 opt,
@@ -339,6 +346,14 @@ def materialize_all_candidates(
                 all_candidates.append(build_candidate(cat, opt, length_str))
 
             total_materialized += len(lengths)
+
+    # --- P0-2: verify no unconsumed records remain ---
+    if record_map:
+        unconsumed = sorted(record_map.keys())
+        raise ValueError(
+            f"Unconsumed per-option records in gate (not matched to any "
+            f"catalog/option): {unconsumed}"
+        )
 
     # Verify aggregate count
     if total_materialized != sizing_gate.raw_combination_count:

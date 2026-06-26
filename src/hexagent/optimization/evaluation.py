@@ -176,9 +176,70 @@ class VerifiedRatingEvidenceSnapshot(BaseModel):
     rating_execution_context: ExecutionContextSnapshot
     rating_execution_context_digest: str
 
-    @property
-    def evidence_digest(self) -> str:
-        return sha256_digest(self)
+    # ------------------------------------------------------------------
+    # P0-7: Explicit digest from the frozen 26-field payload
+    # ------------------------------------------------------------------
+
+    def compute_explicit_evidence_digest(self) -> str:
+        """Compute an explicit evidence digest from all canonical fields.
+
+        This replaces the generic ``sha256_digest(self)`` with a
+        deterministic payload that includes:
+        - warning_digests / blocker_digests (individual digests)
+        - failure_digest (digest of failure model_dump, or "")
+        - provider / correlation identity digests
+        - all scalar fields and verification outcomes
+        """
+
+        # Helper: get canonical dict for dataclasses vs Pydantic models
+        def _canon(obj: object) -> dict[str, Any]:
+            if isinstance(obj, BaseModel):
+                return obj.model_dump()
+            if dataclasses.is_dataclass(obj):
+                return dataclasses.asdict(obj)  # type: ignore[arg-type]
+            return {}  # fallback (should not happen for known types)
+
+        payload = {
+            "rating_status": self.rating_status.value
+            if isinstance(self.rating_status, RatingStatus)
+            else str(self.rating_status),
+            "heat_duty_w": self.heat_duty_w,
+            "hot_outlet_temperature_k": self.hot_outlet_temperature_k,
+            "cold_outlet_temperature_k": self.cold_outlet_temperature_k,
+            "area_inner_m2": self.area_inner_m2,
+            "area_outer_m2": self.area_outer_m2,
+            "UA_w_k": self.UA_w_k,
+            "LMTD_k": self.LMTD_k,
+            "energy_residual_w": self.energy_residual_w,
+            "ua_lmtd_residual_w": self.ua_lmtd_residual_w,
+            "tube_inlet_density_kg_m3": self.tube_inlet_density_kg_m3,
+            "annulus_inlet_density_kg_m3": self.annulus_inlet_density_kg_m3,
+            "tube_flow_area_m2": self.tube_flow_area_m2,
+            "annulus_flow_area_m2": self.annulus_flow_area_m2,
+            "warning_digests": tuple(sha256_digest(w) for w in self.warnings),
+            "blocker_digests": tuple(sha256_digest(b) for b in self.blockers),
+            "failure_digest": sha256_digest(_canon(self.failure))
+            if self.failure is not None
+            else "",
+            "provider_identity_digest": sha256_digest(_canon(self.provider_identity)),
+            "tube_correlation_digest": sha256_digest(_canon(self.tube_correlation))
+            if self.tube_correlation is not None
+            else "",
+            "annulus_correlation_digest": sha256_digest(_canon(self.annulus_correlation))
+            if self.annulus_correlation is not None
+            else "",
+            "rating_result_hash": self.rating_result_hash,
+            "rating_provenance_digest": self.rating_provenance_digest,
+            "hash_verification_outcome": self.hash_verification_outcome.value
+            if isinstance(self.hash_verification_outcome, VerificationOutcome)
+            else str(self.hash_verification_outcome),
+            "provenance_verification_outcome": self.provenance_verification_outcome.value
+            if isinstance(self.provenance_verification_outcome, VerificationOutcome)
+            else str(self.provenance_verification_outcome),
+            "rating_request_identity_digest": self.rating_request_identity_digest,
+            "rating_execution_context_digest": self.rating_execution_context_digest,
+        }
+        return sha256_digest(payload)
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +381,23 @@ def _safe_digest(value: object) -> str | None:
 # Build safe audit snapshot (only for exact RatingResult objects)
 # ---------------------------------------------------------------------------
 
+# P0-8: safely_readable_field_digests format changed.
+# Each entry is (field_name, sha256_digest({"field_name": field_name,
+#   "canonical_value": safe_value}))
+# Identity digests use exact canonical payloads.
+
+
+def _digest_safe_field(field_name: str, safe_value: str | None) -> tuple[str, str] | None:
+    """Produce a (field_name, digest) entry for an audit field.
+
+    Returns None when safe_value is None (field was not readable).
+    Uses the P0-8 canonical payload format.
+    """
+    if safe_value is None:
+        return None
+    canonical_payload = {"field_name": field_name, "canonical_value": safe_value}
+    return (field_name, sha256_digest(canonical_payload))
+
 
 def _build_audit_snapshot(
     candidate_id: str,
@@ -332,54 +410,47 @@ def _build_audit_snapshot(
     """Build a safe audit snapshot — only 6 whitelisted fields.
 
     MUST only be called with an exact ``RatingResult``.  Each field
-    is independently try/except'd.
+    is independently extracted and any error propagates (no suppression).
+    Uses P0-8 canonical payloads for identity digests and
+    safely_readable_field_digests format.
     """
+    # Extract 6 whitelisted fields — errors propagate (fail-closed)
     status_str: str | None = None
-    try:
-        if type(result.status) is RatingStatus:
-            status_str = result.status.value
-    except Exception:
-        pass
+    if type(result.status) is RatingStatus:
+        status_str = result.status.value
+    elif result.status is None:
+        status_str = None
+    else:
+        status_str = str(result.status)
 
     result_hash_str: str | None = None
-    try:
-        if type(result.result_hash) is str:
-            result_hash_str = result.result_hash
-    except Exception:
-        pass
+    if type(result.result_hash) is str:
+        result_hash_str = result.result_hash
+    elif result.result_hash is None:
+        result_hash_str = None
 
     prov_digest: str | None = None
-    try:
-        if type(result.provenance_digest) is str:
-            prov_digest = result.provenance_digest
-    except Exception:
-        pass
+    if type(result.provenance_digest) is str:
+        prov_digest = result.provenance_digest
+    elif result.provenance_digest is None:
+        prov_digest = None
 
     ri_digest: str | None = None
-    try:
-        if type(result.request_identity) is RatingRequestIdentity:
-            ri_digest = sha256_digest(dataclasses.asdict(result.request_identity))
-    except Exception:
-        pass
+    if type(result.request_identity) is RatingRequestIdentity:
+        ri_digest = sha256_digest(dataclasses.asdict(result.request_identity))
 
     ec_digest: str | None = None
-    try:
-        if (
-            result.execution_context is not None
-            and type(result.execution_context) is ExecutionContextSnapshot
-        ):
-            ec_digest = sha256_digest(result.execution_context.model_dump())
-    except Exception:
-        pass
+    if (
+        result.execution_context is not None
+        and type(result.execution_context) is ExecutionContextSnapshot
+    ):
+        ec_digest = sha256_digest(result.execution_context.model_dump())
 
     pi_digest: str | None = None
-    try:
-        if type(result.provider_identity) is ProviderIdentitySnapshot:
-            pi_digest = sha256_digest(dataclasses.asdict(result.provider_identity))
-    except Exception:
-        pass
+    if type(result.provider_identity) is ProviderIdentitySnapshot:
+        pi_digest = sha256_digest(dataclasses.asdict(result.provider_identity))
 
-    # Build safely_readable_field_digests (sorted ASCII-key tuples)
+    # Build safely_readable_field_digests (P0-8 format)
     readable: list[tuple[str, str]] = []
     for key, val in [
         ("claimed_result_hash", result_hash_str),
@@ -389,8 +460,9 @@ def _build_audit_snapshot(
         ("claimed_provider_identity_digest", pi_digest),
         ("claimed_request_identity_digest", ri_digest),
     ]:
-        if val is not None:
-            readable.append((key, val))
+        entry = _digest_safe_field(key, val)
+        if entry is not None:
+            readable.append(entry)
     readable.sort(key=lambda p: p[0])
 
     return ClaimedRatingResultAuditSnapshot(
@@ -410,7 +482,7 @@ def _build_audit_snapshot(
 
 
 # ---------------------------------------------------------------------------
-# Extract verified evidence (fail-closed)
+# Extract verified evidence (fail-closed) — P0-6: no suppression anywhere
 # ---------------------------------------------------------------------------
 
 
@@ -421,6 +493,8 @@ def _extract_trusted_evidence(
     """Extract all trusted evidence fields from a verified RatingResult.
 
     Raises ``ValueError`` / ``TypeError`` on any required field failure.
+    No broad try/except suppression — every extraction error propagates.
+    Legitimate None values remain None where the frozen schema permits.
     """
     # --- Required identity types (fail-closed) ---
     pi = result.provider_identity
@@ -464,127 +538,149 @@ def _extract_trusted_evidence(
     except (TypeError, ValueError, AttributeError):
         raise ValueError("area_outer_m2 required") from None
 
-    # Optional thermal fields
+    # Optional thermal fields — no suppression; errors propagate
     heat_duty: float | None = None
-    try:
-        if result.heat_duty_w is not None:
-            heat_duty = float(result.heat_duty_w)
-    except (TypeError, ValueError, AttributeError):
-        pass
+    raw_hd = result.heat_duty_w
+    if raw_hd is not None:
+        if not isinstance(raw_hd, (int, float)):
+            raise TypeError(f"heat_duty_w must be float or None, got {type(raw_hd).__name__}")
+        heat_duty = float(raw_hd)
 
     hot_outlet: float | None = None
-    try:
-        if result.hot_outlet_temperature_k is not None:
-            hot_outlet = float(result.hot_outlet_temperature_k)
-    except (TypeError, ValueError, AttributeError):
-        pass
+    raw_ho = result.hot_outlet_temperature_k
+    if raw_ho is not None:
+        if not isinstance(raw_ho, (int, float)):
+            raise TypeError(
+                f"hot_outlet_temperature_k must be float or None, got {type(raw_ho).__name__}"
+            )
+        hot_outlet = float(raw_ho)
 
     cold_outlet: float | None = None
-    try:
-        if result.cold_outlet_temperature_k is not None:
-            cold_outlet = float(result.cold_outlet_temperature_k)
-    except (TypeError, ValueError, AttributeError):
-        pass
+    raw_co = result.cold_outlet_temperature_k
+    if raw_co is not None:
+        if not isinstance(raw_co, (int, float)):
+            raise TypeError(
+                f"cold_outlet_temperature_k must be float or None, got {type(raw_co).__name__}"
+            )
+        cold_outlet = float(raw_co)
 
     ua_val: float | None = None
-    try:
-        if result.UA_w_k is not None:
-            ua_val = float(result.UA_w_k)
-    except (TypeError, ValueError, AttributeError):
-        pass
+    raw_ua = result.UA_w_k
+    if raw_ua is not None:
+        if not isinstance(raw_ua, (int, float)):
+            raise TypeError(f"UA_w_k must be float or None, got {type(raw_ua).__name__}")
+        ua_val = float(raw_ua)
 
     lmtd_val: float | None = None
-    try:
-        if result.LMTD_k is not None:
-            lmtd_val = float(result.LMTD_k)
-    except (TypeError, ValueError, AttributeError):
-        pass
+    raw_lmtd = result.LMTD_k
+    if raw_lmtd is not None:
+        if not isinstance(raw_lmtd, (int, float)):
+            raise TypeError(f"LMTD_k must be float or None, got {type(raw_lmtd).__name__}")
+        lmtd_val = float(raw_lmtd)
 
     energy_res: float | None = None
-    try:
-        if result.energy_residual_w is not None:
-            energy_res = float(result.energy_residual_w)
-    except (TypeError, ValueError, AttributeError):
-        pass
+    raw_er = result.energy_residual_w
+    if raw_er is not None:
+        if not isinstance(raw_er, (int, float)):
+            raise TypeError(f"energy_residual_w must be float or None, got {type(raw_er).__name__}")
+        energy_res = float(raw_er)
 
     ua_lmtd_res: float | None = None
-    try:
-        if result.ua_lmtd_residual_w is not None:
-            ua_lmtd_res = float(result.ua_lmtd_residual_w)
-    except (TypeError, ValueError, AttributeError):
-        pass
+    raw_ulr = result.ua_lmtd_residual_w
+    if raw_ulr is not None:
+        if not isinstance(raw_ulr, (int, float)):
+            raise TypeError(
+                f"ua_lmtd_residual_w must be float or None, got {type(raw_ulr).__name__}"
+            )
+        ua_lmtd_res = float(raw_ulr)
 
-    # --- Inlet densities (respect tube_in_hot) ---
+    # --- Inlet densities (respect tube_in_hot) — errors propagate ---
     tube_density: float | None = None
     annulus_density: float | None = None
-    try:
-        hot_inlet = getattr(result, "hot_inlet_state", None)
-        cold_inlet = getattr(result, "cold_inlet_state", None)
-        hot_dens = float(hot_inlet.density_kg_m3) if hot_inlet is not None else None
-        cold_dens = float(cold_inlet.density_kg_m3) if cold_inlet is not None else None
+    hot_inlet = result.hot_inlet_state
+    cold_inlet = result.cold_inlet_state
+    hot_dens: float | None = None
+    if hot_inlet is not None:
+        hd = hot_inlet.density_kg_m3
+        if hd is not None:
+            if not isinstance(hd, (int, float)):
+                raise TypeError(
+                    f"hot_inlet density_kg_m3 must be float or None, got {type(hd).__name__}"
+                )
+            hot_dens = float(hd)
+    cold_dens: float | None = None
+    if cold_inlet is not None:
+        cd = cold_inlet.density_kg_m3
+        if cd is not None:
+            if not isinstance(cd, (int, float)):
+                raise TypeError(
+                    f"cold_inlet density_kg_m3 must be float or None, got {type(cd).__name__}"
+                )
+            cold_dens = float(cd)
 
-        if tube_in_hot:
-            tube_density = hot_dens
-            annulus_density = cold_dens
-        else:
-            tube_density = cold_dens
-            annulus_density = hot_dens
-    except (TypeError, ValueError, AttributeError):
-        pass
+    if tube_in_hot:
+        tube_density = hot_dens
+        annulus_density = cold_dens
+    else:
+        tube_density = cold_dens
+        annulus_density = hot_dens
 
-    # --- Flow areas from geometry ---
+    # --- Flow areas from geometry — errors propagate ---
     tube_area: float | None = None
     annulus_area: float | None = None
-    try:
-        geom_dict = getattr(ri, "geometry", None)
-        if isinstance(geom_dict, dict):
-            from math import pi as MATH_PI
+    geom_dict = ri.geometry
+    if isinstance(geom_dict, dict):
+        from math import pi as MATH_PI
 
-            r_i = geom_dict.get("inner_tube_inner_diameter_m", 0)
-            r_o = geom_dict.get("inner_tube_outer_diameter_m", 0)
-            d_outer = geom_dict.get("outer_pipe_inner_diameter_m", 0)
-            if r_i and r_o and d_outer:
-                tube_area = MATH_PI * (float(r_i) / 2.0) ** 2
-                annulus_area = MATH_PI * ((float(d_outer) / 2.0) ** 2 - (float(r_o) / 2.0) ** 2)
-    except (TypeError, ValueError, AttributeError):
-        pass
+        r_i: object = geom_dict.get("inner_tube_inner_diameter_m", 0)
+        r_o: object = geom_dict.get("inner_tube_outer_diameter_m", 0)
+        d_outer: object = geom_dict.get("outer_pipe_inner_diameter_m", 0)
+        if r_i and r_o and d_outer:
+            try:
+                r_i_f = float(r_i)  # type: ignore[arg-type]
+                r_o_f = float(r_o)  # type: ignore[arg-type]
+                d_outer_f = float(d_outer)  # type: ignore[arg-type]
+                tube_area = MATH_PI * (r_i_f / 2.0) ** 2
+                annulus_area = MATH_PI * ((d_outer_f / 2.0) ** 2 - (r_o_f / 2.0) ** 2)
+            except (TypeError, ValueError):
+                raise ValueError("geometry dimensions must be convertible to float") from None
 
-    # --- Warnings, blockers, failure ---
+    # --- Warnings, blockers, failure — errors propagate ---
     warnings: tuple[EngineeringMessage, ...] = ()
-    try:
-        if result.warnings:
-            warnings = tuple(result.warnings)
-    except Exception:
-        pass
+    raw_warnings = result.warnings
+    if raw_warnings is not None:
+        if not isinstance(raw_warnings, (tuple, list)):
+            raise TypeError(f"warnings must be a tuple, got {type(raw_warnings).__name__}")
+        warnings = tuple(raw_warnings)
 
     blockers: tuple[EngineeringMessage, ...] = ()
-    try:
-        if result.blockers:
-            blockers = tuple(result.blockers)
-    except Exception:
-        pass
+    raw_blockers = result.blockers
+    if raw_blockers is not None:
+        if not isinstance(raw_blockers, (tuple, list)):
+            raise TypeError(f"blockers must be a tuple, got {type(raw_blockers).__name__}")
+        blockers = tuple(raw_blockers)
 
     failure: RunFailure | None = None
-    from contextlib import suppress
+    failure = result.failure  # RunFailure | None — access propagates errors
 
-    # noinspection PyBroadException
-    with suppress(Exception):
-        failure = result.failure
-
-    # --- Correlations ---
+    # --- Correlations — errors propagate ---
     tube_corr: SelectedCorrelationSnapshot | None = None
-    try:
-        if type(result.tube_selected_correlation) is SelectedCorrelationSnapshot:
-            tube_corr = result.tube_selected_correlation
-    except Exception:
-        pass
+    raw_tc = result.tube_selected_correlation
+    if raw_tc is not None and type(raw_tc) is not SelectedCorrelationSnapshot:
+        raise TypeError(
+            f"tube_selected_correlation must be SelectedCorrelationSnapshot or None, "
+            f"got {type(raw_tc).__name__}"
+        )
+    tube_corr = raw_tc
 
     annulus_corr: SelectedCorrelationSnapshot | None = None
-    try:
-        if type(result.annulus_selected_correlation) is SelectedCorrelationSnapshot:
-            annulus_corr = result.annulus_selected_correlation
-    except Exception:
-        pass
+    raw_ac = result.annulus_selected_correlation
+    if raw_ac is not None and type(raw_ac) is not SelectedCorrelationSnapshot:
+        raise TypeError(
+            f"annulus_selected_correlation must be SelectedCorrelationSnapshot or None, "
+            f"got {type(raw_ac).__name__}"
+        )
+    annulus_corr = raw_ac
 
     # One-shot construction
     return VerifiedRatingEvidenceSnapshot(
@@ -785,7 +881,7 @@ def _build_invalid_evidence(
 
 
 # ---------------------------------------------------------------------------
-# Full verification pipeline per candidate
+# Per-candidate verification state machine
 # ---------------------------------------------------------------------------
 
 
@@ -805,7 +901,16 @@ def verify_and_evaluate_candidate(
     actual ``result.provider_identity``, never an external override.
     """
     # Step 0: exact type check — non-exact objects NEVER enter audit
+    # P0-9: Non-exact RatingResult → UNREADABLE audit snapshot
     if type(result) is not RatingResult:
+        audit = ClaimedRatingResultAuditSnapshot(
+            source_qualified_candidate_id=source_qualified_candidate_id,
+            evaluation_order_index=candidate_index,
+            claim_state=ClaimedRatingResultState.UNREADABLE.value,
+            hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
+            provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+            safely_readable_field_digests=(),
+        )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
@@ -813,6 +918,7 @@ def verify_and_evaluate_candidate(
             feasible=False,
             hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
             provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+            claimed_rating_result_audit=audit,
             evaluation_failure=RunFailure(
                 code=ErrorCode.INVALID_STATE_TRANSITION,
                 message=f"Expected exact RatingResult, got {type(result).__name__}",
@@ -989,11 +1095,8 @@ def verify_and_evaluate_candidate(
 
     # Build rating_status string for the record
     rating_status_str: str | None = None
-    try:
-        if type(result.status) is RatingStatus:
-            rating_status_str = result.status.value
-    except Exception:
-        pass
+    if type(result.status) is RatingStatus:
+        rating_status_str = result.status.value
 
     return CandidateEvaluationRecord(
         source_qualified_candidate_id=source_qualified_candidate_id,
@@ -1010,6 +1113,73 @@ def verify_and_evaluate_candidate(
     )
 
 
+# ---------------------------------------------------------------------------
+# P0-10: Batch evaluation with strict stop policy
+# ---------------------------------------------------------------------------
+
+
+def verify_and_evaluate_candidates(
+    candidates: tuple[tuple[int, str, Any], ...],
+    *,
+    sizing_request_identity_digest: str,
+    tube_in_hot: bool,
+    expected_provider: ExpectedProviderIdentity,
+) -> tuple[CandidateEvaluationRecord, ...]:
+    """Evaluate multiple candidates with strict-stop policy.
+
+    Each candidate is a ``(evaluation_order_index, source_qualified_candidate_id, result)``
+    tuple, provided in canonical order.
+
+    Strict-stop rules (P0-10):
+    - When hash verification returns ``False`` or raises, or provenance
+      returns ``False`` or raises, all later candidates are emitted as
+      ``UNEVALUATED``.
+    - The failing candidate is still recorded as attempted (its evaluation
+      state is ``INTEGRITY_INVALID`` or ``RUNTIME_FAILED`` appropriately).
+    - For non-exact ``RatingResult`` (adapter-level exception equivalent),
+      the same strict-stop policy applies: that candidate is
+      ``RUNTIME_FAILED`` and all later candidates are ``UNEVALUATED``.
+
+    Returns one record per input candidate in input order.
+    """
+    results: list[CandidateEvaluationRecord] = []
+    strict_stop = False
+
+    for index, candidate_id, result in candidates:
+        if strict_stop:
+            results.append(
+                CandidateEvaluationRecord(
+                    source_qualified_candidate_id=candidate_id,
+                    evaluation_order_index=index,
+                    candidate_evaluation_state=CandidateEvaluationState.UNEVALUATED.value,
+                    feasible=False,
+                    hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
+                    provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+                )
+            )
+            continue
+
+        rec = verify_and_evaluate_candidate(
+            index,
+            candidate_id,
+            result,
+            sizing_request_identity_digest=sizing_request_identity_digest,
+            tube_in_hot=tube_in_hot,
+            expected_provider=expected_provider,
+        )
+
+        # Activate strict stop when verification fails
+        if rec.candidate_evaluation_state in (
+            CandidateEvaluationState.RUNTIME_FAILED.value,
+            CandidateEvaluationState.INTEGRITY_INVALID.value,
+        ):
+            strict_stop = True
+
+        results.append(rec)
+
+    return tuple(results)
+
+
 __all__ = [
     "CandidateEvaluationIdentity",
     "CandidateEvaluationRecord",
@@ -1022,4 +1192,5 @@ __all__ = [
     "VerifiedRatingEvidenceSnapshot",
     "check_provider_consistency",
     "verify_and_evaluate_candidate",
+    "verify_and_evaluate_candidates",
 ]

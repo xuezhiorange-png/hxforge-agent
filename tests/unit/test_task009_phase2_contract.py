@@ -248,7 +248,7 @@ class TestSizingRequestIdentity:
             "required_duty_w": 50000.0,
             "duty_absolute_tolerance_w": 500.0,
             "duty_relative_tolerance": 0.05,
-            "optimization_objective": OptimizationObjective.MINIMIZE_AREA,
+            "optimization_objective": OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
             "top_n": 5,
             "solver_params": SolverParams(),
             "expected_provider_identity": _default_expected_provider(),
@@ -352,7 +352,7 @@ class TestCandidateContext:
             required_duty_w=1000.0,
             duty_absolute_tolerance_w=10.0,
             duty_relative_tolerance=0.01,
-            optimization_objective=OptimizationObjective.MINIMIZE_AREA,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
             top_n=5,
             solver_params=SolverParams(),
             expected_provider_identity=_default_expected_provider(),
@@ -394,7 +394,7 @@ class TestCandidateContext:
             required_duty_w=1000.0,
             duty_absolute_tolerance_w=10.0,
             duty_relative_tolerance=0.01,
-            optimization_objective=OptimizationObjective.MINIMIZE_AREA,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
             top_n=5,
             solver_params=SolverParams(),
             expected_provider_identity=_default_expected_provider(),
@@ -417,7 +417,7 @@ class TestCandidateContext:
             required_duty_w=1000.0,
             duty_absolute_tolerance_w=10.0,
             duty_relative_tolerance=0.01,
-            optimization_objective=OptimizationObjective.MINIMIZE_AREA,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
             top_n=5,
             solver_params=SolverParams(),
             expected_provider_identity=_default_expected_provider(),
@@ -450,7 +450,7 @@ class TestCandidateContext:
             required_duty_w=1000.0,
             duty_absolute_tolerance_w=10.0,
             duty_relative_tolerance=0.01,
-            optimization_objective=OptimizationObjective.MINIMIZE_AREA,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
             top_n=5,
             solver_params=SolverParams(),
             expected_provider_identity=_default_expected_provider(),
@@ -553,8 +553,8 @@ class TestExactTypeBoundary:
             expected_provider=_default_expected_provider(),
         )
         assert rec.candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED.value
-        # Non-exact objects never enter audit; audit is None
-        assert rec.claimed_rating_result_audit is None
+        # Non-exact objects now get an audit snapshot; audit is not None
+        assert rec.claimed_rating_result_audit is not None
 
     def test_audit_snapshot_has_claim_state(self) -> None:
         rec = verify_and_evaluate_candidate(
@@ -640,7 +640,7 @@ class TestVerifiedEvidence:
         ev1 = r1.verified_rating_evidence
         ev2 = r2.verified_rating_evidence
         assert ev1 is not None and ev2 is not None
-        assert ev1.evidence_digest == ev2.evidence_digest
+        assert ev1.compute_explicit_evidence_digest() == ev2.compute_explicit_evidence_digest()
 
     def test_succeeded_still_not_feasible(self) -> None:
         """Phase 2: verified SUCCEEDED candidate has feasible=False."""
@@ -671,7 +671,7 @@ class TestVerifiedEvidence:
         assert ev is not None
         j = ev.model_dump_json()
         restored = VerifiedRatingEvidenceSnapshot.model_validate_json(j)
-        assert restored.evidence_digest == ev.evidence_digest
+        assert restored.compute_explicit_evidence_digest() == ev.compute_explicit_evidence_digest()
 
 
 # ============================================================================
