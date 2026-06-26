@@ -10,6 +10,7 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from hexagent.core.canonical import sha256_digest
+from hexagent.optimization.context import PassedSizingGate
 from hexagent.optimization.models import (
     CatalogSnapshotRef,
     CompleteDoublePipeAssemblyOption,
@@ -209,8 +210,6 @@ def deduplicate_and_order_candidates(
     seen: dict[str, ManufacturableCandidate] = {}
     for c in candidates:
         key = c.source_qualified_candidate_id
-        # First occurrence wins (deterministic — we process in input order,
-        # but sort afterwards anyway)
         if key not in seen:
             seen[key] = c
 
@@ -277,27 +276,76 @@ def build_candidate(
 
 def materialize_all_candidates(
     catalogs: tuple[CompleteDoublePipeCatalogSnapshot, ...],
-    per_option_records: tuple[OptionRawCountRecord, ...],
+    sizing_gate: PassedSizingGate,
     minimum_effective_length_m: float | None = None,
     maximum_effective_length_m: float | None = None,
 ) -> tuple[ManufacturableCandidate, ...]:
     """Materialise and deduplicate all candidates for a sizing request.
 
-    This is the Phase 2 pipeline entry-point after the cap gate passes.
+    Requires a validated ``PassedSizingGate`` artifact from Phase 1.
+    Per-option and aggregate counts are verified against the gate
+    before any TASK-008 evaluation is started.
+
+    Raises ``ValueError`` on count mismatch (does not produce candidates).
     """
     from hexagent.optimization.materialization import materialize_lengths_for_option
 
+    # Build a lookup for per-option records
+    record_map: dict[str, OptionRawCountRecord] = {}
+    for rec in sizing_gate.per_option_records:
+        # Compound key: catalog_id:version:content_hash:option_id:quantum
+        key_parts = (
+            f"{rec.catalog_id}:{rec.catalog_version}:"
+            f"{rec.catalog_content_hash}:{rec.assembly_option_id}:"
+            f"{rec.canonical_length_quantum_m}"
+        )
+        if key_parts in record_map:
+            raise ValueError("Duplicate per-option record key")
+        record_map[key_parts] = rec
+
     all_candidates: list[ManufacturableCandidate] = []
+    total_materialized = 0
 
     for cat in catalogs:
         for opt in cat.assembly_options:
+            # Build key and find matching record
+            from hexagent.optimization._quantum import canonicalize_length_quantum
+
+            quantum = canonicalize_length_quantum(opt.length_source.length_quantum_m)
+            key_parts2 = (
+                f"{cat.catalog_id}:{cat.catalog_version}:"
+                f"{cat.catalog_content_hash}:{opt.assembly_option_id}:"
+                f"{quantum}"
+            )
+
+            if key_parts2 not in record_map:
+                raise ValueError("Missing per-option record")
+
+            rec = record_map[key_parts2]
+
             lengths = materialize_lengths_for_option(
                 opt,
                 minimum_effective_length_m=minimum_effective_length_m,
                 maximum_effective_length_m=maximum_effective_length_m,
             )
+
+            if len(lengths) != rec.raw_count:
+                raise ValueError(
+                    f"Option {opt.assembly_option_id}: materialized count "
+                    f"{len(lengths)} != expected {rec.raw_count}"
+                )
+
             for length_str in lengths:
                 all_candidates.append(build_candidate(cat, opt, length_str))
+
+            total_materialized += len(lengths)
+
+    # Verify aggregate count
+    if total_materialized != sizing_gate.raw_combination_count:
+        raise ValueError(
+            f"Aggregate materialized count {total_materialized} "
+            f"!= gate raw_combination_count {sizing_gate.raw_combination_count}"
+        )
 
     return deduplicate_and_order_candidates(tuple(all_candidates))
 

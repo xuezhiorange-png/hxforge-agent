@@ -1,12 +1,13 @@
 """
 TASK-009 Phase 2 — SizingRequestIdentity, per-candidate CalculationContext,
-and deterministic UUID5-based request IDs.
+deterministic UUID5-based request IDs, and the PassedSizingGate artifact.
 """
 
 from __future__ import annotations
 
+import math
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -14,7 +15,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from hexagent.core.canonical import sha256_digest
 from hexagent.exchangers.double_pipe.solver import SolverParams
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
-from hexagent.optimization.models import CatalogSnapshotRef, SizingRequest
+from hexagent.optimization.models import (
+    CatalogSnapshotRef,
+    OptionRawCountRecord,
+    SizingRequest,
+)
 
 # Frozen namespace for TASK-009 deterministic UUID5 generation.
 TASK009_CONTEXT_NAMESPACE = UUID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")
@@ -28,7 +33,6 @@ TASK009_CONTEXT_NAMESPACE = UUID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")
 class OptimizationObjective(StrEnum):
     MINIMIZE_AREA = "minimize_area"
     MINIMIZE_LENGTH = "minimize_length"
-    MAXIMIZE_DUTY_MARGIN = "maximize_duty_margin"
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +80,39 @@ class ExpectedProviderIdentity(BaseModel):
             )
         except (AttributeError, TypeError):
             return False
+
+
+# ---------------------------------------------------------------------------
+# Finite/range validators for identity numeric fields
+# ---------------------------------------------------------------------------
+
+
+def _validate_positive_finite_float(value: object, field_name: str) -> float:
+    """Reject bool, NaN, Inf, zero and negatives."""
+    if isinstance(value, bool):
+        raise TypeError(f"{field_name} must be float, not bool")
+    if not isinstance(value, (int, float)):
+        raise TypeError(f"{field_name} must be numeric, got {type(value).__name__}")
+    f = float(value)
+    if not math.isfinite(f):
+        raise ValueError(f"{field_name} must be finite, got {f}")
+    if f <= 0:
+        raise ValueError(f"{field_name} must be positive, got {f}")
+    return f
+
+
+def _validate_non_negative_finite_float(value: object, field_name: str) -> float:
+    """Reject bool, NaN, Inf, negative.  Zero is allowed."""
+    if isinstance(value, bool):
+        raise TypeError(f"{field_name} must be float, not bool")
+    if not isinstance(value, (int, float)):
+        raise TypeError(f"{field_name} must be numeric, got {type(value).__name__}")
+    f = float(value)
+    if not math.isfinite(f):
+        raise ValueError(f"{field_name} must be finite, got {f}")
+    if f < 0:
+        raise ValueError(f"{field_name} must be >= 0, got {f}")
+    return f
 
 
 # ---------------------------------------------------------------------------
@@ -174,16 +211,83 @@ class SizingRequestIdentity(BaseModel):
             name, fraction = item
             if not isinstance(name, str):
                 raise TypeError(f"Component name must be str, got {type(name).__name__}")
+            # Reject bool
+            if isinstance(fraction, bool):
+                raise TypeError("Component fraction must be float, not bool")
             if not isinstance(fraction, (int, float)):
                 raise TypeError(f"Component fraction must be float, got {type(fraction).__name__}")
-            if fraction <= 0 or fraction > 1:
-                raise ValueError(f"Component fraction must be in (0, 1], got {fraction}")
+            f = float(fraction)
+            if not math.isfinite(f):
+                raise ValueError(f"Component fraction must be finite, got {f}")
+            if f <= 0 or f > 1:
+                raise ValueError(f"Component fraction must be in (0, 1], got {f}")
             if name in seen:
                 raise ValueError(f"Duplicate component name: {name!r}")
             seen.add(name)
-            result.append((name, float(fraction)))
+            result.append((name, f))
         result.sort(key=lambda p: p[0])
         return tuple(result)
+
+    @field_validator("request_raw_combination_cap", mode="before")
+    @classmethod
+    def _validate_raw_cap(cls, value: object) -> int | None:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            raise TypeError("raw combination cap must be int, not bool")
+        if not isinstance(value, int):
+            raise TypeError(f"raw combination cap must be int, got {type(value).__name__}")
+        if value < 0:
+            raise ValueError(f"raw combination cap must be >= 0, got {value}")
+        return value
+
+    # --- Numeric finite/range validators for positive float fields ---
+
+    @field_validator(
+        "hot_inlet_temperature_k",
+        "cold_inlet_temperature_k",
+        "hot_inlet_pressure_pa",
+        "cold_inlet_pressure_pa",
+        "hot_mass_flow_kg_s",
+        "cold_mass_flow_kg_s",
+        "minimum_terminal_delta_t",
+        "required_duty_w",
+        "duty_absolute_tolerance_w",
+        "duty_relative_tolerance",
+        "rating_solver_absolute_residual_w",
+        "rating_solver_relative_residual_fraction",
+        "rating_solver_bracket_temperature_tolerance_k",
+        mode="before",
+    )
+    @classmethod
+    def _positive_finite_float(cls, value: object, info: Any) -> float:
+        if info.field_name is None:
+            raise ValueError("field_name required")
+        return _validate_positive_finite_float(value, info.field_name)
+
+    @field_validator(
+        "minimum_effective_length_m",
+        "maximum_effective_length_m",
+        mode="before",
+    )
+    @classmethod
+    def _optional_positive_finite(cls, value: object, info: Any) -> float | None:
+        if value is None:
+            return None
+        if info.field_name is None:
+            raise ValueError("field_name required")
+        return _validate_positive_finite_float(value, info.field_name)
+
+    @field_validator("rating_solver_max_iterations", mode="before")
+    @classmethod
+    def _validate_max_iterations(cls, value: object) -> int:
+        if isinstance(value, bool):
+            raise TypeError("max_iterations must be int, not bool")
+        if not isinstance(value, int):
+            raise TypeError(f"max_iterations must be int, got {type(value).__name__}")
+        if value < 1:
+            raise ValueError(f"max_iterations must be >= 1, got {value}")
+        return value
 
     @property
     def sizing_request_identity_digest(self) -> str:
@@ -292,12 +396,12 @@ def build_sizing_request_identity(
 
 
 # ---------------------------------------------------------------------------
-# Candidate CalculationContext (typed)
+# Candidate CalculationContext (typed — only SizingRequestIdentity)
 # ---------------------------------------------------------------------------
 
 
 def build_candidate_calculation_context(
-    sizing_request_identity: SizingRequestIdentity | str,
+    sizing_request_identity: SizingRequestIdentity,
     source_qualified_candidate_id: str,
 ) -> Any:
     """Build a typed ``CalculationContext`` for a single candidate.
@@ -310,16 +414,10 @@ def build_candidate_calculation_context(
     """
     from hexagent.core.heat_balance import CalculationContext
 
-    design_id: UUID | None
-    run_id: UUID | None
-    if isinstance(sizing_request_identity, str):
-        digest = sizing_request_identity
-        design_id = None
-        run_id = None
-    else:
-        digest = sizing_request_identity.sizing_request_identity_digest
-        design_id = sizing_request_identity.design_case_revision_id
-        run_id = sizing_request_identity.calculation_run_id
+    digest = sizing_request_identity.sizing_request_identity_digest
+    design_id = sizing_request_identity.design_case_revision_id
+    run_id = sizing_request_identity.calculation_run_id
+
     name = f"{digest}:{source_qualified_candidate_id}"
     request_id = uuid5(TASK009_CONTEXT_NAMESPACE, name)
 
@@ -343,23 +441,89 @@ class PassedSizingGate(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    status: str = "passed"
+    status: Literal["passed"]
     sizing_request_identity_digest: str
     raw_combination_count: int
     effective_cap: int
-    per_option_records: tuple[Any, ...] = Field(default_factory=tuple)
+    per_option_records: tuple[OptionRawCountRecord, ...]
+    gate_digest: str
 
-    @property
-    def gate_digest(self) -> str:
-        return sha256_digest(self)
+    def verify_digest(self) -> bool:
+        """Recalculate digest from payload and compare against stored."""
+        payload = self.model_copy(update={"gate_digest": ""})
+        expected = sha256_digest(payload)
+        return self.gate_digest == expected
+
+
+def create_passed_sizing_gate(
+    sizing_request_identity_digest: str,
+    raw_combination_count: int,
+    effective_cap: int,
+    per_option_records: tuple[OptionRawCountRecord, ...],
+) -> PassedSizingGate:
+    """Factory: compute deterministic gate_digest."""
+    gate = PassedSizingGate(
+        status="passed",
+        sizing_request_identity_digest=sizing_request_identity_digest,
+        raw_combination_count=raw_combination_count,
+        effective_cap=effective_cap,
+        per_option_records=per_option_records,
+        gate_digest="",
+    )
+    digest = sha256_digest(gate)
+    # Recreate with digest
+    return PassedSizingGate(
+        status="passed",
+        sizing_request_identity_digest=sizing_request_identity_digest,
+        raw_combination_count=raw_combination_count,
+        effective_cap=effective_cap,
+        per_option_records=per_option_records,
+        gate_digest=digest,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ProviderConsistencyResult — run-level provider consistency artifact
+# ---------------------------------------------------------------------------
+
+
+class ProviderConsistencyResult(BaseModel):
+    """Result of a cross-candidate provider identity consistency check."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    status: Literal["not_applicable", "consistent", "inconsistent"]
+    verified_provider_identity_digests: tuple[str, ...]
+    consistency_digest: str
+
+
+def build_provider_consistency_result(
+    status: Literal["not_applicable", "consistent", "inconsistent"],
+    verified_digests: tuple[str, ...],
+) -> ProviderConsistencyResult:
+    """Factory for ProviderConsistencyResult with deterministic digest."""
+    result = ProviderConsistencyResult(
+        status=status,
+        verified_provider_identity_digests=verified_digests,
+        consistency_digest="",
+    )
+    digest = sha256_digest(result)
+    return ProviderConsistencyResult(
+        status=status,
+        verified_provider_identity_digests=verified_digests,
+        consistency_digest=digest,
+    )
 
 
 __all__ = [
     "ExpectedProviderIdentity",
     "OptimizationObjective",
     "PassedSizingGate",
+    "ProviderConsistencyResult",
     "SizingRequestIdentity",
     "TASK009_CONTEXT_NAMESPACE",
     "build_candidate_calculation_context",
+    "build_provider_consistency_result",
     "build_sizing_request_identity",
+    "create_passed_sizing_gate",
 ]
