@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 35 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 36 Engineering Design Review passes.
 
 ---
 
@@ -68,6 +68,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 32 | 4803145772 | CHANGES REQUIRED |
 | 33 | 4803236346 | CHANGES REQUIRED |
 | 34 | 4805670891 | CHANGES REQUIRED |
+|| 35 | 4805725156 | CHANGES REQUIRED |
 
 ## 4. Data Model
 
@@ -1823,7 +1824,6 @@ def build_context_canonicalization_fallback(
 3. The `BEGIN` marker must be immediately followed by `\n` and a ````python` fence.
 4. The `END` marker must be immediately preceded by a closing `\`\`\`` fence.
 5. The marked region must contain exactly two fence tokens (opening and closing).
-5. The marked region must contain exactly two backtick-fence tokens (opening and closing).
 6. Only the raw bytes between the opening and closing fences are extracted.
 7. No `.strip()`, `.lstrip()`, `.rstrip()`, `.replace()`, `.format()` or newline conversion is applied.
 8. No imports, stubs, `from __future__` or aliases are prepended.
@@ -1837,6 +1837,7 @@ def build_context_canonicalization_fallback(
 The following script is the sole authority for extracting the executable core block.
 It must be copied byte-for-byte to `/tmp/extract_task009_core.py` before each verification run.
 
+<!-- BEGIN TASK009_CORE_EXTRACTOR_PY -->
 ```python
 from __future__ import annotations
 
@@ -1907,80 +1908,100 @@ if written_bytes != extracted_bytes:
         "written extraction differs from source bytes"
     )
 digest = sha256(extracted_bytes).hexdigest()
-sha256_path = OUTPUT_PATH.with_suffix(".sha256")
-sha256_path.write_text(f"{digest}  {OUTPUT_PATH}\n")
 print(f"path={OUTPUT_PATH}")
 print(f"size={len(extracted_bytes)}")
 print(f"sha256={digest}")
-print(f"digest_file={sha256_path}")
-# Verify the digest file is valid
-import subprocess
-result = subprocess.run(
-    ["sha256sum", "--check", str(sha256_path)],
-    capture_output=True, text=True,
-)
-if result.returncode != 0:
-    raise RuntimeError(
-        "digest verification failed"
-    )
-print(f"digest_check=OK")
 ```
+<!-- END TASK009_CORE_EXTRACTOR_PY -->
 
 #### No-rewrite verification contract
 
-#### Mandatory SHA-256 digest gate
+#### Mandatory SHA-256 digest gate — sole authority
 
-The digest file is created **once** after authoritative extraction and checked before every subsequent step.
-If any check fails the command returns a non-zero exit code and the pipeline must stop immediately.
+The digest file is created **once** after authoritative extraction. All four verification gates read the same digest manifest. Regenerating the manifest between checks would mask tampering and is forbidden.
 
-Command to create the digest (executed once after extraction):
+##### Extract and create digest manifest
 
 ```text
+python3.11 -W error /tmp/extract_task009_core.py
 sha256sum /tmp/task009_canonicalization_core.py \
 > /tmp/task009_canonicalization_core.sha256
 ```
 
-Command to verify (executed before each Python/mypy invocation):
+##### Full authoritative verification pipeline
+
+The following commands must be executed as a single script from the repository root. `set -euo pipefail` ensures that any gate failure immediately terminates the pipeline.
 
 ```text
-sha256sum --check /tmp/task009_canonicalization_core.sha256
+set -euo pipefail
+
+DOCUMENT_PATH="docs/tasks/TASK-009-manufacturable-sizing-and-candidate-optimization.md"
+EXTRACTOR_PATH="/tmp/extract_task009_core.py"
+CORE_PATH="/tmp/task009_canonicalization_core.py"
+DIGEST_PATH="/tmp/task009_canonicalization_core.sha256"
+
+rm -f "${CORE_PATH}" "${DIGEST_PATH}"
+
+# 1. Execute the exact authoritative extraction script.
+python3.11 -W error "${EXTRACTOR_PATH}"
+
+# 2. Create the sole digest manifest exactly once.
+sha256sum "${CORE_PATH}" > "${DIGEST_PATH}"
+EXPECTED_DIGEST="$(
+awk '{print $1}' "${DIGEST_PATH}"
+)"
+test -n "${EXPECTED_DIGEST}"
+echo "expected_sha256=${EXPECTED_DIGEST}"
+cat "${DIGEST_PATH}"
+
+# 3. Python 3.11 execution gate.
+sha256sum --check "${DIGEST_PATH}"
+python3.11 "${CORE_PATH}"
+
+# 4. Python 3.11 strict-mypy gate.
+sha256sum --check "${DIGEST_PATH}"
+python3.11 -m mypy --strict "${CORE_PATH}"
+
+# 5. Python 3.12 execution gate.
+sha256sum --check "${DIGEST_PATH}"
+python3.12 "${CORE_PATH}"
+
+# 6. Python 3.12 strict-mypy gate.
+sha256sum --check "${DIGEST_PATH}"
+python3.12 -m mypy --strict "${CORE_PATH}"
+
+# 7. Confirm the manifest still contains the original digest.
+test "$(
+awk '{print $1}' "${DIGEST_PATH}"
+)" = "${EXPECTED_DIGEST}"
+test "$(
+sha256sum "${CORE_PATH}" | awk '{print $1}'
+)" = "${EXPECTED_DIGEST}"
 ```
 
-The following four steps all verify against the **same** digest file:
+**Contracts:**
 
-1. `sha256sum --check /tmp/task009_canonicalization_core.sha256` → `python3.11 /tmp/task009_canonicalization_core.py`
-2. `sha256sum --check /tmp/task009_canonicalization_core.sha256` → `python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py`
-3. `sha256sum --check /tmp/task009_canonicalization_core.sha256` → `python3.12 /tmp/task009_canonicalization_core.py`
-4. `sha256sum --check /tmp/task009_canonicalization_core.sha256` → `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py`
+1. The digest manifest is generated exactly once after extraction, in step 2.
+2. All four verification gates (steps 3–6) check against that same manifest.
+3. `set -euo pipefail` ensures a failed `sha256sum --check` terminates immediately; subsequent Python or mypy on a tampered file never executes.
+4. Any prepend, append, replacement or single-byte change causes `sha256sum --check` to return non-zero.
+5. The manifest is never regenerated between steps 3–6.
+6. The core file is never re-extracted or re-written between steps 3–6.
+7. Python 3.12 is mandatory. If Python 3.12 is not available or fails, the pipeline fails:
+   - `TASK-009: BLOCKED`
+   - `Not ready for Round 36 Engineering Design Review`
+8. All four gates must pass. A `SKIP` or missing output for any gate has the same effect as a failure.
+9. After all gates pass, the final digest comparison (step 7) confirms the manifest has not been tampered with or regenerated.
 
-**Rules:**
-- The digest file is generated exactly once after the authoritative extraction.
-- All four checks read the same digest file.
-- A failing `sha256sum --check` (non-zero exit code) must prevent subsequent Python/mypy commands.
-- Any prepend, append, replacement or single-byte change causes `sha256sum --check` to return non-zero.
-- Regenerating the digest between checks would mask tampering and is forbidden.
+Historical note: Round 32 was reviewed when Python 3.12 was temporarily unavailable and gates correctly reported SKIP. That does not change the current mandatory requirement.
 
-#### Full verification commands (from repository root)
+The authoritative extraction script itself must also compile without warnings:
 
 ```text
-# 9.1 Extract
-python3.11 /tmp/extract_task009_core.py
-sha256sum /tmp/task009_canonicalization_core.py
-
-# 9.2 Python 3.11
-sha256sum /tmp/task009_canonicalization_core.py
-python3.11 /tmp/task009_canonicalization_core.py
-sha256sum /tmp/task009_canonicalization_core.py
-python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py
-
-# 9.3 Python 3.12 (if available)
-sha256sum /tmp/task009_canonicalization_core.py
-python3.12 /tmp/task009_canonicalization_core.py
-sha256sum /tmp/task009_canonicalization_core.py
-python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py
+python3.11 -W error /tmp/extract_task009_core.py
 ```
 
-If Python 3.12 is not available, the corresponding tests must report SKIP — not PASS.
+It prints `path=`, `size=` and `sha256=` lines. It does **not** create the manifest, call `sha256sum`, call `subprocess`, or declare gates passed.
 
 
 Usage:
@@ -5894,18 +5915,18 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 493. Canonical sort key: (owner_kind.value, owner_id, occurrence_kind.value, message_digest, occurrence_index, occurrence_digest)
 494. Every unique content digest has at least one occurrence
 495. Primitive fallback RunFailure context does NOT cascade fail on canonicalization
-496. Global test numbering continuous 1–540
-497. Section 27 range now 27.1–27.21 continuous (no gaps)
+496. Global test numbering continuous 1–565
+497. Section 27 range now 27.1–27.22 continuous (no gaps)
 498. Subsection headings range updated to 22.1–22.7 for provenance subsections
 499. Delivery Sequence and Acceptance Criteria reference the same next Engineering Design Review round
 500. Issue #23 Frozen contract commit equals the current reviewed TASK-009 documentation commit.
 
 ### 27.21 Round 30 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 33 changes. **Expected output**: Round 33 row exists with Comment ID `4803236346`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 33 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 33 row in review history. **Expected output**: Round 33 immediately follows Round 32. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 34 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+501. **Input**: Review history table after Round 35 changes. **Expected output**: Round 35 row exists with Comment ID `4805725156`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 35 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 35 row in review history. **Expected output**: Round 35 immediately follows Round 34. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 36 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
 505. **Input**: `CountingMapping` with call counter. **Expected output**: `items()` is called exactly once during canonicalization. **Exception**: N/A — single-read invariant: items acquired exactly once.
 506. **Input**: Captured Mapping items iterable is used for iteration. **Expected output**: Canonicalizer iterates the captured items, does not re-read the original Mapping. **Exception**: N/A — single-read invariant: captured iterable is consumed.
 507. **Input**: Mapping whose second `items()` call raises `RuntimeError`. **Expected output**: Canonicalization succeeds because the second call is never made. **Exception**: N/A — single-read invariant: second call not triggered.
@@ -5940,8 +5961,8 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 536. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: Rejected by `invariant_feasible_count_range` because `feasible > unique`. **Exception**: `ValueError` — feasible range invariant fires before feasible_le_verified.
 537. **Input**: Standalone `invariant_feasible_le_verified` helper with `unique=10, verified=8, feasible=9`. **Expected output**: `ValueError` raised because `feasible > verified`. **Exception**: `ValueError` — unit contract for feasible_le_verified independent of registry ordering.
 538. **Input**: Deterministic candidate UUID5: same request+candidate → same UUID; different candidate → different UUID; insertion-order independent. **Expected output**: All three UUID5 invariants satisfied. **Exception**: N/A — regression: deterministic IDs unchanged.
-539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 34; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
-540. **Input**: Current document and Issue synchronization state after Round 34 remediation. **Expected output**: Review History contains Round 34 and Comment ID 4805670891; Gate references Round 35 Engineering Design Review; Issue Frozen SHA equals current commit; Global test numbering continuous through test 565; Zero/dual provenance roots remain rejected. **Exception**: N/A — structural synchronization contract.
+539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 36; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
+540. **Input**: Current document and Issue synchronization state after Round 35 remediation. **Expected output**: Review History contains Round 35 and Comment ID 4805725156; Gate references Round 36 Engineering Design Review; Issue Frozen SHA equals current commit; Global test numbering continuous through test 565; Zero/dual provenance roots remain rejected. **Exception**: N/A — structural synchronization contract.
 ---
 ### 27.22 Round 33 Extraction Contract Tests (541–565)
 
@@ -5966,15 +5987,15 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 559. **Input**: Exact extracted core block. **Expected output**: `python3.11 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found`. **Exception**: N/A — Python 3.11 strict mypy passes.
 560. **Input**: Exact extracted core block. **Expected output**: `python3.12 /tmp/task009_canonicalization_core.py` exits with code 0. **Exception**: N/A — Python 3.12 execution passes.
 561. **Input**: Exact extracted core block. **Expected output**: `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found`. **Exception**: N/A — Python 3.12 strict mypy passes.
-562. **Input**: Extract, record SHA-256, then run four verification steps. **Expected output**: All four `sha256sum --check` commands report OK with identical digest. **Exception**: N/A — no-rewrite contract satisfied.
+562. **Input**: Authoritative verification pipeline ($14.7.2.4). **Expected output**: All four `sha256sum --check` commands report OK; all use the same digest manifest; manifest is created exactly once. **Exception**: N/A — no-rewrite contract satisfied.
 563. **Input**: Authoritative extraction script from §14.7.2.4. **Expected output**: `python3.11 -W error /tmp/extract_task009_core.py` runs without `SyntaxWarning` or `RuntimeWarning`. **Exception**: N/A — script is warning-free.
-564. **Input**: Document's authoritative extraction script bytes vs. `/tmp/extract_task009_core.py` bytes. **Expected output**: Both files are byte-for-byte identical. **Exception**: N/A — no manual fix before running.
+564. **Input**: Authoritative extraction script extracted via `TASK009_CORE_EXTRACTOR_PY` marker. **Expected output**: The script byte-for-byte matches the canonical copy at `/tmp/extract_task009_core.py`; both have identical SHA-256. **Exception**: N/A — no manual fix before running.
 565. **Input**: Exhaustive contract-test numbering from 1 through 565. **Expected output**: Every integer from 1 through 565 occurs exactly once; no duplicate number exists; no gap exists; Round 33 extraction tests occupy exactly 541 through 565. **Exception**: N/A — total coverage and numbering invariant.
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 35 Engineering Design Review.
+1. Complete Round 36 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -5988,7 +6009,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 35 Engineering Design Review passes before implementation starts
+- [ ] Round 36 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
