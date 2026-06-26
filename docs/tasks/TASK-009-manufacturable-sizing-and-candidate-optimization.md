@@ -5,9 +5,10 @@
 **Priority:** P0
 **Depends on:** TASK-005, TASK-008
 **GitHub Issue:** #23
-**Implementation branch:** Not created
-**Draft PR:** Not created
-**Production implementation:** Not started
+**Implementation branch:** codex/task-009-manufacturable-sizing-optimization
+**Draft PR:**
+#24 — Draft
+**Production implementation:** In progress
 
 Round 53 Engineering Design Review passed.
 TASK-009 is approved for implementation from frozen contract commit

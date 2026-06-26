@@ -97,6 +97,10 @@ class ErrorCode(StrEnum):
     SOLVER_NON_CONVERGENCE = "solver_non_convergence"
     ENERGY_BALANCE_NOT_CLOSED = "energy_balance_not_closed"
 
+    # TASK-009 optimization error codes
+    CATALOG_INVALID = "catalog_invalid"
+    INVALID_SIZING_REQUEST = "invalid_sizing_request"
+
     @classmethod
     def is_valid_code(cls, code: str) -> bool:
         """Return True if *code* is a known constant or a valid extension."""
