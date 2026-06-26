@@ -12,6 +12,7 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hexagent.optimization._quantum import canonicalize_length_quantum
+from hexagent.optimization.errors import CatalogInvalid
 
 
 class LengthEndpointPolicy(StrEnum):
@@ -117,7 +118,7 @@ class CompleteDoublePipeAssemblyOption(BaseModel):
                     raise ValueError(f"Duplicate manufacturing_metadata key: {k!r}")
                 seen.add(k)
             return tuple(items)
-        elif isinstance(value, tuple):
+        elif isinstance(value, (list, tuple)):
             pairs: list[tuple[str, str]] = []
             for pair in value:
                 if not isinstance(pair, (list, tuple)) or len(pair) != 2:
@@ -152,11 +153,24 @@ class CompleteDoublePipeAssemblyOption(BaseModel):
 class CompleteDoublePipeCatalogSnapshot(BaseModel):
     """A full catalog snapshot supplied by the caller.
 
-    Construction validates:
-      - Identity fields are non-empty ASCII
-      - ``catalog_content_hash`` format is ``sha256:<64 hex>``
-      - Assembly option IDs are unique and canonically sorted
-      - Claimed hash matches computed content hash
+    Construction follows a **two-phase** process:
+
+    **Phase A** (field validator on ``assembly_options``).
+    Raw options (dicts or typed models) are parsed through
+    ``CompleteDoublePipeAssemblyOption.model_validate()``, IDs are
+    validated for non-empty ASCII and uniqueness, and options are sorted
+    by ``assembly_option_id`` ascending.
+
+    **Phase B** (after model validator).
+    Identity fields are checked (non-empty ASCII), the claimed hash
+    format is validated, and the hash is recomputed from the
+    **canonical stored** ``assembly_options``.  A mismatch raises
+    ``CatalogInvalid``.
+
+    These invariants hold after construction:
+      - ``compute_catalog_content_hash(self) == self.catalog_content_hash``
+      - All nested models are fully canonicalised (quantum, metadata)
+      - Options are in deterministic ASCII order
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -168,37 +182,84 @@ class CompleteDoublePipeCatalogSnapshot(BaseModel):
     assembly_options: tuple[CompleteDoublePipeAssemblyOption, ...]
     catalog_content_hash: str
 
-    @model_validator(mode="before")
+    # ------------------------------------------------------------------ #
+    # Phase A: parse raw options into canonical typed models, sort by ID #
+    # ------------------------------------------------------------------ #
+
+    @field_validator("assembly_options", mode="before")
     @classmethod
-    def _validate_catalog(cls, data: dict[str, Any]) -> dict[str, Any]:
-        from hexagent.optimization.catalog import validate_and_hash_catalog
+    def _parse_and_sort_options(cls, value: object) -> tuple[CompleteDoublePipeAssemblyOption, ...]:
+        if not isinstance(value, (list, tuple)):
+            raise ValueError("assembly_options must be a list or tuple")
 
-        # Extract raw values (may be fields or model instances)
-        cat_id = data.get("catalog_id", "")
-        cat_ver = data.get("catalog_version", "")
-        src_id = data.get("source_identity", "")
-        sch_ver = data.get("schema_version", "")
-        options_raw = data.get("assembly_options", ())
-        claimed_hash = data.get("catalog_content_hash", "")
+        parsed: list[CompleteDoublePipeAssemblyOption] = []
+        for item in value:
+            if isinstance(item, CompleteDoublePipeAssemblyOption):
+                parsed.append(item)
+            elif isinstance(item, dict):
+                parsed.append(CompleteDoublePipeAssemblyOption.model_validate(item))
+            else:
+                raise TypeError(
+                    f"Each assembly_option must be a dict or "
+                    f"CompleteDoublePipeAssemblyOption, got {type(item).__name__}"
+                )
 
-        # Ensure assembly_options is a tuple
-        if not isinstance(options_raw, (list, tuple)):
-            raise ValueError("assembly_options must be a tuple")
+        # Validate assembly_option_id: non-empty, ASCII, unique
+        seen_ids: set[str] = set()
+        for opt in parsed:
+            oid = opt.assembly_option_id
+            if not oid:
+                raise ValueError("assembly_option_id must not be empty")
+            if not oid.isascii():
+                raise ValueError(f"assembly_option_id must be ASCII: {oid!r}")
+            if oid in seen_ids:
+                raise ValueError(f"Duplicate assembly_option_id: {oid!r}")
+            seen_ids.add(oid)
 
-        options = tuple(options_raw)
+        # Sort by assembly_option_id ascending
+        parsed.sort(key=lambda o: o.assembly_option_id)
+        return tuple(parsed)
 
-        sorted_options, _computed = validate_and_hash_catalog(
-            catalog_id=cat_id,
-            catalog_version=cat_ver,
-            source_identity=src_id,
-            schema_version=sch_ver,
-            assembly_options=options,
-            claimed_hash=claimed_hash,
+    # ------------------------------------------------------------------ #
+    # Phase B: verify hash against canonical stored state                #
+    # ------------------------------------------------------------------ #
+
+    @model_validator(mode="after")
+    def _verify_catalog_hash(self) -> Self:
+        from hexagent.optimization.catalog import (
+            compute_catalog_content_hash,
+            validate_hash_format,
+            validate_identity_fields,
         )
 
-        # Replace assembly options with sorted version
-        data["assembly_options"] = sorted_options
-        return data
+        # Identity field validation
+        validate_identity_fields(
+            catalog_id=self.catalog_id,
+            catalog_version=self.catalog_version,
+            source_identity=self.source_identity,
+            schema_version=self.schema_version,
+        )
+
+        # Hash format validation
+        validate_hash_format(self.catalog_content_hash)
+
+        # Compute hash from canonical stored nested models
+        computed = compute_catalog_content_hash(
+            catalog_id=self.catalog_id,
+            catalog_version=self.catalog_version,
+            source_identity=self.source_identity,
+            schema_version=self.schema_version,
+            assembly_options=self.assembly_options,
+        )
+
+        if self.catalog_content_hash != computed:
+            raise CatalogInvalid(
+                f"catalog_content_hash mismatch: "
+                f"claimed {self.catalog_content_hash!r}, "
+                f"computed {computed!r}"
+            )
+
+        return self
 
 
 class CatalogSnapshotRef(BaseModel):

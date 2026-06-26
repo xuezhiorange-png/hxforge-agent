@@ -1,5 +1,9 @@
 """
 TASK-009 catalog content-hash authority and canonical ordering.
+
+This module defines the **single authoritative** hash computation for
+catalog snapshots.  All callers — model validators, test fixtures,
+production code — must use ``compute_catalog_content_hash()``.
 """
 
 from __future__ import annotations
@@ -8,12 +12,23 @@ import hashlib
 from typing import Any
 
 from hexagent.core.canonical import canonical_json
+from hexagent.optimization.errors import CatalogInvalid
 
 HASH_PREFIX = "sha256:"
 HASH_HEX_LENGTH = 64
 
 
+# ---------------------------------------------------------------------------
+# Identity key — for duplicate detection and sorting
+# ---------------------------------------------------------------------------
+
+
 def catalog_identity_key(cat: Any) -> tuple[str, str, str, str, str]:
+    """Return the canonical identity tuple for a catalog snapshot.
+
+    Accepts any object with the required attributes (duck-typed to avoid
+    circular imports).
+    """
     return (
         cat.catalog_id,
         cat.catalog_version,
@@ -23,88 +38,126 @@ def catalog_identity_key(cat: Any) -> tuple[str, str, str, str, str]:
     )
 
 
+# ---------------------------------------------------------------------------
+# Identity field validation
+# ---------------------------------------------------------------------------
+
+
 def validate_identity_fields(
     catalog_id: str,
     catalog_version: str,
     source_identity: str,
     schema_version: str,
 ) -> None:
-    _check_identity_field("catalog_id", catalog_id)
-    _check_identity_field("catalog_version", catalog_version)
-    _check_identity_field("source_identity", source_identity)
-    _check_identity_field("schema_version", schema_version)
+    """Validate that all identity fields are non-empty ASCII strings."""
+    _check_field("catalog_id", catalog_id)
+    _check_field("catalog_version", catalog_version)
+    _check_field("source_identity", source_identity)
+    _check_field("schema_version", schema_version)
 
 
-def _check_identity_field(name: str, value: str) -> None:
+def _check_field(name: str, value: str) -> None:
     if not isinstance(value, str):
-        raise ValueError(f"{name} must be a string, got {type(value).__name__}")
+        raise CatalogInvalid(f"{name} must be a string, got {type(value).__name__}")
     if not value:
-        raise ValueError(f"{name} must not be empty")
+        raise CatalogInvalid(f"{name} must not be empty")
     if not value.isascii():
-        raise ValueError(f"{name} must be ASCII: {value!r}")
+        raise CatalogInvalid(f"{name} must be ASCII: {value!r}")
 
 
-def validate_hash_format(hash_value: str) -> None:
+# ---------------------------------------------------------------------------
+# Hash format validation
+# ---------------------------------------------------------------------------
+
+
+def validate_hash_format(hash_value: str) -> str:
+    """Validate ``sha256:<64-lowercase-hex>`` and return the hex part."""
     if not isinstance(hash_value, str):
-        raise ValueError(f"catalog_content_hash must be a string, got {type(hash_value).__name__}")
+        raise CatalogInvalid(
+            f"catalog_content_hash must be a string, got {type(hash_value).__name__}"
+        )
     if not hash_value.startswith(HASH_PREFIX):
-        raise ValueError(
+        raise CatalogInvalid(
             f"catalog_content_hash must start with '{HASH_PREFIX}', got {hash_value!r}"
         )
     hex_part = hash_value[len(HASH_PREFIX) :]
     if len(hex_part) != HASH_HEX_LENGTH:
-        raise ValueError(
+        raise CatalogInvalid(
             f"catalog_content_hash hex part must be {HASH_HEX_LENGTH} chars, got {len(hex_part)}"
         )
     try:
         int(hex_part, 16)
     except ValueError as exc:
-        raise ValueError(f"catalog_content_hash hex part is not valid hex: {hex_part!r}") from exc
+        raise CatalogInvalid(
+            f"catalog_content_hash hex part is not valid hex: {hex_part!r}"
+        ) from exc
     if hex_part != hex_part.lower():
-        raise ValueError(f"catalog_content_hash hex part must be lowercase: {hex_part!r}")
+        raise CatalogInvalid(f"catalog_content_hash hex part must be lowercase: {hex_part!r}")
+    return hex_part
 
 
-def canonical_sort_assembly_options(
-    assembly_options: tuple[Any, ...],
-) -> tuple[Any, ...]:
-    seen: set[str] = set()
-    for opt in assembly_options:
-        oid = opt.get("assembly_option_id", "") if isinstance(opt, dict) else opt.assembly_option_id
-        if oid in seen:
-            raise ValueError(f"Duplicate assembly_option_id: {oid!r}")
-        seen.add(oid)
-    return tuple(
-        sorted(
-            assembly_options,
-            key=lambda o: o["assembly_option_id"] if isinstance(o, dict) else o.assembly_option_id,
-        )
-    )
+# ---------------------------------------------------------------------------
+# Canonical payload & hash computation — single authoritative implementation
+# ---------------------------------------------------------------------------
 
 
-def canonical_catalog_payload(
+def _compute_payload(
+    *,
     catalog_id: str,
     catalog_version: str,
     source_identity: str,
     schema_version: str,
-    assembly_options: tuple[dict[str, Any], ...],
-) -> dict[str, Any]:
+    assembly_options: tuple[Any, ...],
+) -> dict[str, object]:
+    """Build canonical payload dict from typed models for hashing.
+
+    Options are sorted internally by ``assembly_option_id`` and dumped
+    via ``model_dump(mode=\"python\")`` so that all canonicalised
+    representations (normalised quantum, sorted metadata tuples) are
+    captured.
+    """
+    sorted_options = tuple(sorted(assembly_options, key=lambda o: o.assembly_option_id))
     return {
         "catalog_id": catalog_id,
         "catalog_version": catalog_version,
         "source_identity": source_identity,
         "schema_version": schema_version,
-        "assembly_options": list(assembly_options),
+        "assembly_options": [opt.model_dump(mode="python") for opt in sorted_options],
     }
 
 
-def compute_catalog_content_hash(
+def canonical_catalog_payload(
+    *,
     catalog_id: str,
     catalog_version: str,
     source_identity: str,
     schema_version: str,
-    assembly_options: tuple[dict[str, Any], ...],
+    assembly_options: tuple[Any, ...],
+) -> dict[str, object]:
+    """Public entry point for the canonical payload dict."""
+    return _compute_payload(
+        catalog_id=catalog_id,
+        catalog_version=catalog_version,
+        source_identity=source_identity,
+        schema_version=schema_version,
+        assembly_options=assembly_options,
+    )
+
+
+def compute_catalog_content_hash(
+    *,
+    catalog_id: str,
+    catalog_version: str,
+    source_identity: str,
+    schema_version: str,
+    assembly_options: tuple[Any, ...],
 ) -> str:
-    payload = canonical_catalog_payload(
+    """Compute the SHA-256 content hash from typed assembly options.
+
+    The function sorts options internally so that equivalent catalogs
+    with different input orders produce identical hashes.
+    """
+    payload = _compute_payload(
         catalog_id=catalog_id,
         catalog_version=catalog_version,
         source_identity=source_identity,
@@ -116,46 +169,11 @@ def compute_catalog_content_hash(
     return f"{HASH_PREFIX}{digest}"
 
 
-def validate_and_hash_catalog(
-    catalog_id: str,
-    catalog_version: str,
-    source_identity: str,
-    schema_version: str,
-    assembly_options: tuple[Any, ...],
-    claimed_hash: str,
-) -> tuple[tuple[Any, ...], str]:
-    validate_identity_fields(
-        catalog_id=catalog_id,
-        catalog_version=catalog_version,
-        source_identity=source_identity,
-        schema_version=schema_version,
-    )
-    validate_hash_format(claimed_hash)
-    sorted_options = canonical_sort_assembly_options(assembly_options)
-    option_dicts: tuple[dict[str, Any], ...] = tuple(
-        o if isinstance(o, dict) else o.model_dump() for o in sorted_options
-    )
-    computed_hash = compute_catalog_content_hash(
-        catalog_id=catalog_id,
-        catalog_version=catalog_version,
-        source_identity=source_identity,
-        schema_version=schema_version,
-        assembly_options=option_dicts,
-    )
-    if claimed_hash != computed_hash:
-        raise ValueError(
-            f"catalog_content_hash mismatch: claimed {claimed_hash!r}, computed {computed_hash!r}"
-        )
-    return sorted_options, computed_hash
-
-
 __all__ = [
     "HASH_PREFIX",
     "catalog_identity_key",
     "canonical_catalog_payload",
-    "canonical_sort_assembly_options",
     "compute_catalog_content_hash",
-    "validate_and_hash_catalog",
     "validate_hash_format",
     "validate_identity_fields",
 ]
