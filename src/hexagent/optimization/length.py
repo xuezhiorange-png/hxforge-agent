@@ -1,27 +1,35 @@
 """
 TASK-009 Phase 1 length functions — quantum validation, tick conversion,
 explicit-length canonicalization, grid count-only algorithm, request
-bounds intersection, raw-combination counting, and cap check.
+bounds intersection, raw-combination counting, cap check, and
+production orchestration.
 
 All functions are pure and deterministic.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from decimal import ROUND_DOWN, ROUND_HALF_EVEN, ROUND_UP, Decimal
 
+from hexagent.optimization._quantum import canonicalize_length_quantum
 from hexagent.optimization.errors import (
     CapExceeded,
     CatalogInvalid,
     InvalidLengthError,
-    InvalidLengthQuantum,
     InvalidRequestBounds,
 )
 from hexagent.optimization.models import (
+    BlockedSizingResult,
+    CapBlocker,
     CompleteDoublePipeAssemblyOption,
+    CompleteDoublePipeCatalogSnapshot,
     LengthEndpointPolicy,
     LengthGridSpec,
     LengthSpecGridContext,
+    OptionRawCountRecord,
+    SizingGateResult,
+    SizingRequest,
 )
 
 # ---------------------------------------------------------------------------
@@ -32,54 +40,19 @@ HARD_RAW_COMBINATION_CAP: int = 10_000
 
 
 # ---------------------------------------------------------------------------
-# Length quantum validation
+# Length quantum validation & canonicalisation
 # ---------------------------------------------------------------------------
 
 
 def validate_length_quantum(length_quantum_m: str) -> Decimal:
-    """Validate that *length_quantum_m* is a power-of-10 Decimal string.
+    """Validate *length_quantum_m* and return the canonical Decimal.
 
-    Returns the canonical ``Decimal`` value on success.
-    Raises ``InvalidLengthQuantum`` if the quantum is not a valid
-    power-of-10 form (1, 0.1, 0.01, …).
+    Raises ``InvalidLengthQuantum`` if not a valid power-of-10 form.
+    Delegates to ``canonicalize_length_quantum`` and returns the
+    ``Decimal`` so callers have the exact canonical value.
     """
-    try:
-        quantum = Decimal(length_quantum_m)
-    except Exception as exc:
-        raise InvalidLengthQuantum(length_quantum_m, detail=str(exc)) from exc
-
-    if not quantum.is_finite():
-        raise InvalidLengthQuantum(
-            length_quantum_m,
-            detail="quantum must be finite",
-        )
-    if quantum <= 0:
-        raise InvalidLengthQuantum(
-            length_quantum_m,
-            detail="quantum must be positive",
-        )
-
-    norm = quantum.normalize()
-    digit_tuple = norm.as_tuple().digits
-    exponent = norm.as_tuple().exponent
-
-    # Verify exponent is integer (finite Decimal guarantees this)
-    if isinstance(exponent, int):
-        exp: int = exponent
-    else:
-        # Should not happen — already checked is_finite() above
-        raise InvalidLengthQuantum(
-            length_quantum_m,
-            detail=f"non-integer exponent from finite value: {exponent!r}",
-        )
-    # Check power-of-10: exactly one digit "1" and exponent <= 0
-    if len(digit_tuple) != 1 or digit_tuple[0] != 1 or exp > 0:
-        raise InvalidLengthQuantum(
-            length_quantum_m,
-            detail=f"not a power of 10 (digits={digit_tuple}, exponent={exponent})",
-        )
-
-    return quantum
+    canonical = canonicalize_length_quantum(length_quantum_m)
+    return Decimal(canonical)
 
 
 # ---------------------------------------------------------------------------
@@ -88,12 +61,7 @@ def validate_length_quantum(length_quantum_m: str) -> Decimal:
 
 
 def to_tick(value_m: float | str | Decimal, quantum: Decimal) -> int:
-    """Convert a length in metres to an integer tick count.
-
-    The value is quantized to the nearest multiple of *quantum* using
-    ``ROUND_HALF_EVEN``.  Sub-quantum values are rejected before
-    quantization.
-    """
+    """Convert a length in metres to an integer tick count, quantum-aligned."""
     raw = Decimal(str(value_m))
     if not raw.is_finite() or raw <= 0:
         raise InvalidLengthError(
@@ -159,12 +127,7 @@ def grid_count_only(
     request_min_tick: int | None = None,
     request_max_tick: int | None = None,
 ) -> LengthSpecGridContext:
-    """Compute the count-only grid intersection without materialization.
-
-    Returns a ``LengthSpecGridContext`` with the tick range, steps,
-    catalog count, and intersection bounds.  Raises ``CatalogInvalid``
-    for reversed or sub-quantum grids.
-    """
+    """Compute the count-only grid intersection without materialization."""
     lo_tick = to_tick(grid.minimum_length_m, quantum)
     hi_tick = to_tick(grid.maximum_length_m, quantum)
 
@@ -186,7 +149,10 @@ def grid_count_only(
     if raw_increment < quantum:
         raise CatalogInvalid(
             f"Sub-quantum increment: {grid.increment_m} < {quantum}",
-            context={"increment_m": grid.increment_m, "quantum": str(quantum)},
+            context={
+                "increment_m": grid.increment_m,
+                "quantum": str(quantum),
+            },
         )
 
     step_tick = to_tick(grid.increment_m, quantum)
@@ -198,12 +164,10 @@ def grid_count_only(
 
     delta = hi_tick - lo_tick
     _quotient, remainder = divmod(delta, step_tick)
-    _quotient2 = delta // step_tick
 
     if grid.endpoint_policy == LengthEndpointPolicy.INCLUDE_MAX_IF_ALIGNED:
         catalog_count = delta // step_tick + 1
     else:
-        # EXCLUDE_MAX
         catalog_count = delta // step_tick + 1
         if remainder == 0:
             catalog_count -= 1
@@ -211,13 +175,11 @@ def grid_count_only(
     # Request bounds intersection (ceiling/floor)
     first_idx = 0
     if request_min_tick is not None:
-        # ceil division: smallest i with lo + i*step >= request_min_tick
         diff = request_min_tick - lo_tick
         first_idx = max(first_idx, -((-diff) // step_tick))
 
     last_idx = catalog_count - 1
     if request_max_tick is not None:
-        # floor division: largest i with lo + i*step <= request_max_tick
         diff = request_max_tick - lo_tick
         last_idx = min(last_idx, diff // step_tick)
 
@@ -279,20 +241,25 @@ def request_max_floor(
 
 
 # ---------------------------------------------------------------------------
-# Per-option raw combination count
+# Per-option raw combination count (reads quantum from option)
 # ---------------------------------------------------------------------------
 
 
 def compute_option_raw_count(
     option: CompleteDoublePipeAssemblyOption,
-    quantum: Decimal,
-    request_min_tick: int | None,
-    request_max_tick: int | None,
+    minimum_effective_length_m: float | None = None,
+    maximum_effective_length_m: float | None = None,
 ) -> int:
     """Compute the raw combination count for a single assembly option.
 
-    This is purely a count — no materialization occurs.
+    Quantum is read from ``option.length_source.length_quantum_m``.
+    Request bounds are converted with that quantum, so different
+    options can have different quanta.
     """
+    quantum = Decimal(option.length_source.length_quantum_m)
+    request_min_tick = request_min_ceiling(minimum_effective_length_m, quantum)
+    request_max_tick = request_max_floor(maximum_effective_length_m, quantum)
+
     source = option.length_source
 
     if source.allowed_effective_lengths_m is not None:
@@ -320,32 +287,47 @@ def compute_option_raw_count(
 
 
 # ---------------------------------------------------------------------------
-# Full raw combination count (cross-product across all catalogs)
+# Aggregate raw combination count (typed catalogs)
 # ---------------------------------------------------------------------------
 
 
 def compute_raw_combination_count(
-    catalogs: tuple[dict[str, object], ...],  # caller dicts for early validation
-    quantum: Decimal,
-    request_min_tick: int | None,
-    request_max_tick: int | None,
-) -> tuple[int, list[tuple[str, int]]]:
+    catalogs: tuple[CompleteDoublePipeCatalogSnapshot, ...],
+    minimum_effective_length_m: float | None = None,
+    maximum_effective_length_m: float | None = None,
+) -> tuple[int, tuple[OptionRawCountRecord, ...]]:
     """Compute the total raw combination count across all assembly options.
 
-    Returns ``(total_count, per_option_counts)`` where each per-option
-    entry is ``(assembly_option_id, count)``.
+    Returns ``(total_count, per_option_records)``.  The total is the
+    **sum** of per-option contributions, not a product across options.
+    Records follow canonical catalog/option iteration order.
 
-    This is a convenience shortcut — the proper count computation should
-    operate on validated ``CompleteDoublePipeAssemblyOption`` instances.
+    Raises ``CatalogInvalid`` / ``InvalidLengthQuantum`` /
+    ``InvalidRequestBounds`` if any option fails validation.
     """
     total = 0
-    per_option: list[tuple[str, int]] = []
-    for _cat in catalogs:
-        # _cat is a placeholder — real cross-product logic requires
-        # full catalog validation and will be implemented when the
-        # complete pipeline is wired up.
-        pass
-    return total, per_option
+    records: list[OptionRawCountRecord] = []
+
+    for cat in catalogs:
+        for opt in cat.assembly_options:
+            count = compute_option_raw_count(
+                opt,
+                minimum_effective_length_m=minimum_effective_length_m,
+                maximum_effective_length_m=maximum_effective_length_m,
+            )
+            records.append(
+                OptionRawCountRecord(
+                    catalog_id=cat.catalog_id,
+                    catalog_version=cat.catalog_version,
+                    catalog_content_hash=cat.catalog_content_hash,
+                    assembly_option_id=opt.assembly_option_id,
+                    canonical_length_quantum_m=opt.length_source.length_quantum_m,
+                    raw_count=count,
+                )
+            )
+            total += count
+
+    return total, tuple(records)
 
 
 # ---------------------------------------------------------------------------
@@ -361,10 +343,6 @@ def check_cap(
 
     Returns the effective cap on success.  Raises ``CapExceeded`` if
     the count exceeds the cap.
-
-    The ``CapExceeded`` exception must be caught by the caller to
-    return a ``BLOCKED`` result **without** materializing lengths,
-    creating candidate identities, or calling ``rate_double_pipe()``.
     """
     if request_cap is not None:
         if isinstance(request_cap, bool) or not isinstance(request_cap, int) or request_cap <= 0:
@@ -375,7 +353,10 @@ def check_cap(
         if request_cap > HARD_RAW_COMBINATION_CAP:
             raise InvalidRequestBounds(
                 f"Request cap {request_cap} exceeds hard cap {HARD_RAW_COMBINATION_CAP}",
-                context={"request_cap": request_cap, "hard_cap": HARD_RAW_COMBINATION_CAP},
+                context={
+                    "request_cap": request_cap,
+                    "hard_cap": HARD_RAW_COMBINATION_CAP,
+                },
             )
 
     effective_cap = request_cap if request_cap is not None else HARD_RAW_COMBINATION_CAP
@@ -390,12 +371,92 @@ def check_cap(
     return effective_cap
 
 
+# ---------------------------------------------------------------------------
+# Production orchestration seam
+# ---------------------------------------------------------------------------
+
+
+def count_and_gate_sizing_request(
+    request: SizingRequest,
+    *,
+    materialize_lengths: Callable[[], object] | None = None,
+    build_candidate_identities: Callable[[], object] | None = None,
+    rating_evaluator: Callable[[], object] | None = None,
+) -> BlockedSizingResult | SizingGateResult:
+    """Production pipeline: validate → count → cap-gate → materialize.
+
+    This is the Phase 1 orchestration seam.  Later phases will wire
+    real materializers and evaluators through the callable parameters.
+
+    Phase 1 behaviour:
+      1. Validates request via its Pydantic model (already done at construction).
+      2. Computes aggregate raw combination count.
+      3. Computes effective cap.
+      4. If cap exceeded → return ``BlockedSizingResult`` **without**
+         calling any of the injected callables.
+      5. If cap passes → call the injected callables in order
+         (materialization → identity building → evaluation) and return
+         a ``SizingGateResult``.
+
+    Tests must use spy callables to verify call counts on cap-pass vs
+    cap-block paths.
+    """
+    # Step 2: aggregate raw count
+    raw_count, per_option = compute_raw_combination_count(
+        request.catalogs,
+        minimum_effective_length_m=request.minimum_effective_length_m,
+        maximum_effective_length_m=request.maximum_effective_length_m,
+    )
+
+    # Step 3: effective cap (from request or hard cap)
+    request_cap: int | None = request.request_raw_combination_cap
+    effective_cap_val: int
+    try:
+        effective_cap_val = check_cap(raw_count, request_cap=request_cap)
+    except CapExceeded as exc:
+        # Step 4: cap exceeded — return BLOCKED without calling injectables
+        return BlockedSizingResult(
+            raw_combination_count=raw_count,
+            effective_cap=exc.context.get("effective_cap", HARD_RAW_COMBINATION_CAP),
+            blockers=(
+                CapBlocker(
+                    message=str(exc),
+                    context=(
+                        ("raw_count", raw_count),
+                        ("effective_cap", exc.context.get("effective_cap", 0)),
+                    ),
+                ),
+            ),
+        )
+
+    # Step 5a: materialization
+    if materialize_lengths is not None:
+        materialize_lengths()
+
+    # Step 5b: identity building
+    if build_candidate_identities is not None:
+        build_candidate_identities()
+
+    # Step 5c: rating evaluation
+    if rating_evaluator is not None:
+        rating_evaluator()
+
+    # Phase 1 terminal: gate result (later phases will produce final result)
+    return SizingGateResult(
+        raw_combination_count=raw_count,
+        effective_cap=effective_cap_val,
+        per_option=per_option,
+    )
+
+
 __all__ = [
     "HARD_RAW_COMBINATION_CAP",
     "canonicalize_explicit_lengths",
+    "canonicalize_length_quantum",
     "check_cap",
     "compute_option_raw_count",
     "compute_raw_combination_count",
+    "count_and_gate_sizing_request",
     "from_tick",
     "grid_count_only",
     "request_max_floor",
