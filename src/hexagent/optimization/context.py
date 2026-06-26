@@ -25,6 +25,9 @@ from hexagent.optimization.models import (
 # Frozen namespace for TASK-009 deterministic UUID5 generation.
 TASK009_CONTEXT_NAMESPACE = UUID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")
 
+# Private token for unforgeable MaterializationResult construction.
+_MATERIALIZATION_TOKEN = object()
+
 # ---------------------------------------------------------------------------
 # Hard cap constant
 # ---------------------------------------------------------------------------
@@ -609,7 +612,7 @@ def materialized_candidate_set_payload(
     }
 
 
-def create_materialized_candidate_set(
+def _create_materialized_candidate_set(
     sizing_request_identity_digest: str,
     passed_gate_digest: str,
     catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...],
@@ -794,6 +797,5 @@ __all__ = [
     "build_candidate_calculation_context",
     "build_provider_consistency_result",
     "build_sizing_request_identity",
-    "create_materialized_candidate_set",
     "create_passed_sizing_gate",
 ]

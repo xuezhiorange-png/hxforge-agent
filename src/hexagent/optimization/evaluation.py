@@ -10,14 +10,22 @@ No broad ``except Exception`` swallowing.  No ``Any`` field leaks.
 from __future__ import annotations
 
 import dataclasses
+import math
+from datetime import datetime
 from enum import StrEnum
 from typing import Any, Self
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import ExecutionContextSnapshot, ProviderIdentitySnapshot
-from hexagent.domain.messages import EngineeringMessage, ErrorCode, RunFailure
+from hexagent.domain.messages import (
+    EngineeringMessage,
+    EngineeringMessageSeverity,
+    ErrorCode,
+    RunFailure,
+)
 from hexagent.exchangers.double_pipe.result import (
     RatingRequestIdentity,
     RatingResult,
@@ -225,19 +233,13 @@ def verified_rating_evidence_payload(
     use explicit payload helpers, not model_dump() or dataclasses.asdict().
     """
 
-    # Warning/blocker canonical sort key
-    def _message_sort_key(m: EngineeringMessage) -> tuple[str, str, str, str]:
-        sev = m.severity.value if hasattr(m.severity, "value") else str(m.severity)
-        code = m.code.value if hasattr(m.code, "value") else str(m.code)
-        return (sev, code, m.message, str(sorted(m.context) if m.context else []))
-
     warning_digests = tuple(
         sha256_digest(engineering_message_payload(w))
-        for w in sorted(evidence.warnings, key=_message_sort_key)
+        for w in sorted(evidence.warnings, key=engineering_message_sort_key)
     )
     blocker_digests = tuple(
         sha256_digest(engineering_message_payload(b))
-        for b in sorted(evidence.blockers, key=_message_sort_key)
+        for b in sorted(evidence.blockers, key=engineering_message_sort_key)
     )
 
     return {
@@ -395,6 +397,152 @@ class CandidateEvaluationRecord(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Context canonicalization (P0-5)
+# ---------------------------------------------------------------------------
+
+CanonicalValue = (
+    None | bool | int | float | str | list["CanonicalValue"] | dict[str, "CanonicalValue"]
+)
+
+
+class ContextCanonicalizationError(Exception):
+    """Raised when a context value cannot be canonicalized."""
+
+    def __init__(
+        self,
+        *,
+        context_key: str,
+        context_path: str,
+        offending_type: str,
+        failure_kind: str,
+    ) -> None:
+        self.context_key = context_key
+        self.context_path = context_path
+        self.offending_type = offending_type
+        self.failure_kind = failure_kind
+        safe = {
+            "context_key": context_key,
+            "context_path": context_path,
+            "offending_type": offending_type,
+            "failure_kind": failure_kind,
+        }
+        self.safe_marker_digest = sha256_digest(safe)
+        super().__init__(failure_kind)
+
+
+def canonicalize_value(value: object, _path: str = "") -> CanonicalValue:
+    """Canonicalize a context value for deterministic digest computation.
+
+    Must fail-closed: unsupported types, non-finite floats, cyclic
+    references, naive datetimes, non-string mapping keys all raise
+    ``ContextCanonicalizationError``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ContextCanonicalizationError(
+                context_key=_path.rsplit(".", 1)[-1] if "." in _path else _path or "<root>",
+                context_path=_path or "<root>",
+                offending_type=type(value).__name__,
+                failure_kind="non_finite_float",
+            )
+        return value
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            raise ContextCanonicalizationError(
+                context_key=_path.rsplit(".", 1)[-1] if "." in _path else _path or "<root>",
+                context_path=_path or "<root>",
+                offending_type=type(value).__name__,
+                failure_kind="naive_datetime",
+            )
+        return value.isoformat()
+    if hasattr(value, "value") and hasattr(type(value), "__members__"):
+        # Enum / StrEnum
+        return str(value.value) if isinstance(value.value, str) else value.value
+    if isinstance(value, (tuple, list)):
+        result: list[CanonicalValue] = []
+        for i, item in enumerate(value):
+            child_path = f"{_path}[{i}]" if _path else f"[{i}]"
+            result.append(canonicalize_value(item, child_path))
+        return result
+    if isinstance(value, dict):
+        result_dict: dict[str, CanonicalValue] = {}
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise ContextCanonicalizationError(
+                    context_key=str(k),
+                    context_path=f"{_path}[{k}]",
+                    offending_type=type(k).__name__,
+                    failure_kind="non_string_key",
+                )
+            child_path = f"{_path}.{k}" if _path else k
+            result_dict[k] = canonicalize_value(v, child_path)
+        return result_dict
+    if hasattr(value, "model_dump"):
+        # Pydantic BaseModel
+        return canonicalize_value(value.model_dump(), _path)
+    # Fallback for dataclass-like objects with __dict__
+    if hasattr(value, "__dict__"):
+        return canonicalize_value(dict(value.__dict__), _path)
+    raise ContextCanonicalizationError(
+        context_key=_path.rsplit(".", 1)[-1] if "." in _path else _path or "<root>",
+        context_path=_path or "<root>",
+        offending_type=type(value).__name__,
+        failure_kind="unsupported_type",
+    )
+
+
+def build_canonical_context_entries(
+    context: tuple[object, ...] | list[object],
+) -> list[dict[str, object]]:
+    """Build canonical context entries from a context field.
+
+    Each entry is a dict with ``key``, ``value``, ``value_digest``.
+    Sorted by (key, value_digest).  Duplicate entries are preserved.
+    This is the public version used by run_failure_payload.
+    """
+    entries: list[dict[str, object]] = []
+    for entry in context:
+        key = str(entry.key) if hasattr(entry, "key") else str(entry)
+        val = entry.value if hasattr(entry, "value") else entry
+        val_canon = canonicalize_value(val, key)
+        val_digest = sha256_digest({"value": val_canon})
+        entries.append({"key": key, "value": val_canon, "value_digest": val_digest})
+    entries.sort(key=lambda e: (e["key"], e["value_digest"]))
+    return entries
+
+
+def engineering_message_sort_key(
+    message: EngineeringMessage,
+) -> tuple[str, str, str, str, tuple[str, ...], str]:
+    """Canonical sort key for EngineeringMessage (P0-4).
+
+    Used for deterministic ordering of warning/blocker tuples.
+    """
+    payload = engineering_message_payload(message)
+    digest = sha256_digest(payload)
+    return (
+        message.severity.value,
+        message.code.value,
+        message.message,
+        message.source_module,
+        tuple(message.affected_paths),
+        digest,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Explicit nested payload helpers (P0-5)
 # ---------------------------------------------------------------------------
 
@@ -449,16 +597,17 @@ def execution_context_snapshot_payload(
 def provider_identity_snapshot_payload(
     provider: ProviderIdentitySnapshot,
 ) -> dict[str, object]:
-    """Exact frozen payload for ProviderIdentitySnapshot."""
-    cfg = provider.configuration_fingerprint if provider.configuration_fingerprint else None
-    cache = provider.cache_policy_version if provider.cache_policy_version else None
+    """Exact frozen payload for ProviderIdentitySnapshot (P0-7).
+
+    Empty strings are preserved as-is — never converted to None.
+    """
     return {
         "name": provider.name,
         "version": provider.version,
         "git_revision": provider.git_revision,
         "reference_state_policy": provider.reference_state_policy,
-        "configuration_fingerprint": cfg,
-        "cache_policy_version": cache,
+        "configuration_fingerprint": provider.configuration_fingerprint,
+        "cache_policy_version": provider.cache_policy_version,
     }
 
 
@@ -482,30 +631,76 @@ def selected_correlation_snapshot_payload(
 
 
 def engineering_message_payload(message: EngineeringMessage) -> dict[str, object]:
-    """Exact frozen payload for EngineeringMessage (Pydantic BaseModel)."""
-    sev = message.severity.value if hasattr(message.severity, "value") else str(message.severity)
-    code = message.code.value if hasattr(message.code, "value") else message.code
+    """Exact frozen payload for EngineeringMessage.
+
+    ``allows_continuation`` is NOT included in the digest payload.
+    Before returning, validates that ``allows_continuation`` is
+    consistent with ``severity``.
+    """
+    sev = message.severity
+    if type(sev) is not EngineeringMessageSeverity:
+        raise TypeError(f"severity must be EngineeringMessageSeverity, got {type(sev).__name__}")
+    code = message.code
+    if type(code) is not ErrorCode:
+        raise TypeError(f"code must be ErrorCode, got {type(code).__name__}")
+
+    # Validate allows_continuation consistency (derived field, NOT in payload)
+    expected_continuation = sev in {
+        EngineeringMessageSeverity.INFO,
+        EngineeringMessageSeverity.WARNING,
+    }
+    if message.allows_continuation is not expected_continuation:
+        raise ValueError(
+            "EngineeringMessage allows_continuation "
+            f"({message.allows_continuation}) inconsistent with severity "
+            f"({sev.value}): expected {expected_continuation}"
+        )
+
     return {
         "schema_version": message.schema_version,
-        "code": code,
-        "severity": sev,
+        "code": code.value,
+        "severity": sev.value,
         "message": message.message,
         "source_module": message.source_module,
-        "affected_paths": list(message.affected_paths) if message.affected_paths else [],
-        "context": sorted(message.context) if message.context else [],
-        "allows_continuation": message.allows_continuation,
+        "affected_paths": list(message.affected_paths),
+        "context_entries": _build_canonical_context_entries_list(message.context),
     }
 
 
+def _build_canonical_context_entries_list(
+    context: tuple[object, ...] | list[object],
+) -> list[dict[str, object]]:
+    """Build canonical context entries list from a context field.
+
+    Each entry is a dict with ``key``, ``value``, ``value_digest``.
+    Sorted by (key, value_digest).  Duplicate entries are preserved.
+    """
+    entries: list[dict[str, object]] = []
+    for entry in context:
+        key = entry.key if hasattr(entry, "key") else str(entry)
+        val = entry.value if hasattr(entry, "value") else entry
+        val_canon = canonicalize_value(val)
+        val_digest = sha256_digest({"value": val_canon})
+        entries.append({"key": str(key), "value": val_canon, "value_digest": val_digest})
+    entries.sort(key=lambda e: (e["key"], e["value_digest"]))
+    return entries
+
+
 def run_failure_payload(failure: RunFailure) -> dict[str, object]:
-    """Exact frozen payload for RunFailure (Pydantic BaseModel)."""
-    code = failure.code.value if hasattr(failure.code, "value") else failure.code
+    """Exact frozen payload for RunFailure (P0-6).
+
+    ``traceback`` is preserved as-is (None stays None, '' stays '').
+    Context entries use canonical build.
+    """
+    code = failure.code
+    if type(code) is not ErrorCode:
+        raise TypeError(f"code must be ErrorCode, got {type(code).__name__}")
     return {
         "schema_version": failure.schema_version,
-        "code": code,
+        "code": code.value,
         "message": failure.message,
-        "traceback": failure.traceback or None,
-        "context": list(failure.context) if failure.context else [],
+        "traceback": failure.traceback,
+        "context_entries": build_canonical_context_entries(failure.context),
     }
 
 
@@ -542,15 +737,23 @@ def _safe_digest(value: object) -> str | None:
 # Identity digests use exact canonical payloads.
 
 
-def _digest_safe_field(field_name: str, safe_value: str | None) -> tuple[str, str] | None:
+CanonicalAuditValue = (
+    None | bool | int | float | str | list["CanonicalAuditValue"] | dict[str, "CanonicalAuditValue"]
+)
+
+
+def _digest_safe_field(
+    field_name: str,
+    canonical_value: CanonicalAuditValue,
+) -> tuple[str, str] | None:
     """Produce a (field_name, digest) entry for an audit field.
 
     Returns None when safe_value is None (field was not readable).
-    Uses the P0-8 canonical payload format.
+    Uses the P0-3 canonical payload format.
     """
-    if safe_value is None:
+    if canonical_value is None:
         return None
-    canonical_payload = {"field_name": field_name, "canonical_value": safe_value}
+    canonical_payload = {"field_name": field_name, "canonical_value": canonical_value}
     return (field_name, sha256_digest(canonical_payload))
 
 
@@ -599,44 +802,54 @@ def _build_audit_snapshot(
     except Exception:
         prov_digest = None
 
-    # 4. request_identity — canonical payload helper
+    # 4. request_identity
     ri_digest: str | None = None
+    ri_payload: dict[str, object] | None = None
     try:
         if type(result.request_identity) is RatingRequestIdentity:
-            ri_digest = sha256_digest(rating_request_identity_payload(result.request_identity))
+            ri_payload = rating_request_identity_payload(result.request_identity)
+            ri_digest = sha256_digest(ri_payload)
     except Exception:
         ri_digest = None
+        ri_payload = None
 
-    # 5. execution_context — canonical payload helper
+    # 5. execution_context
     ec_digest: str | None = None
+    ec_payload: dict[str, object] | None = None
     try:
         if (
             result.execution_context is not None
             and type(result.execution_context) is ExecutionContextSnapshot
         ):
-            ec_digest = sha256_digest(execution_context_snapshot_payload(result.execution_context))
+            ec_payload = execution_context_snapshot_payload(result.execution_context)
+            ec_digest = sha256_digest(ec_payload)
     except Exception:
         ec_digest = None
+        ec_payload = None
 
-    # 6. provider_identity — canonical payload helper
+    # 6. provider_identity
     pi_digest: str | None = None
+    pi_payload: dict[str, object] | None = None
     try:
         if type(result.provider_identity) is ProviderIdentitySnapshot:
-            pi_digest = sha256_digest(provider_identity_snapshot_payload(result.provider_identity))
+            pi_payload = provider_identity_snapshot_payload(result.provider_identity)
+            pi_digest = sha256_digest(pi_payload)
     except Exception:
         pi_digest = None
+        pi_payload = None
 
-    # Build safely_readable_field_digests with SOURCE field names (P0-8)
+    # Build safely_readable_field_digests with SOURCE field names (P0-3)
+    # For nested identities, canonical_value is the FULL payload dict, not its digest
     readable: list[tuple[str, str]] = []
     for key, val in [
         ("status", status_str),
         ("result_hash", result_hash_str),
         ("provenance_digest", prov_digest),
-        ("request_identity", ri_digest),
-        ("execution_context", ec_digest),
-        ("provider_identity", pi_digest),
+        ("request_identity", ri_payload),
+        ("execution_context", ec_payload),
+        ("provider_identity", pi_payload),
     ]:
-        entry = _digest_safe_field(key, val)
+        entry = _digest_safe_field(key, val)  # type: ignore[arg-type]
         if entry is not None:
             readable.append(entry)
     readable.sort(key=lambda p: p[0])

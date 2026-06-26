@@ -13,9 +13,10 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from hexagent.core.canonical import sha256_digest
 from hexagent.optimization._quantum import canonicalize_length_quantum
 from hexagent.optimization.context import (
+    _MATERIALIZATION_TOKEN,
     MaterializedCandidateSet,
     PassedSizingGate,
-    create_materialized_candidate_set,
+    _create_materialized_candidate_set,
 )
 from hexagent.optimization.materialization import materialize_lengths_for_option
 from hexagent.optimization.models import (
@@ -288,12 +289,29 @@ class MaterializationResult:
 
     ``candidates`` and ``candidate_set`` are bound together
     at construction time and cannot be separately provided later.
+
+    Must be constructed with the module-private ``_MATERIALIZATION_TOKEN``
+    to prevent external forgery.
     """
 
     candidates: tuple[ManufacturableCandidate, ...]
     candidate_set: MaterializedCandidateSet
 
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        candidates: tuple[ManufacturableCandidate, ...],
+        candidate_set: MaterializedCandidateSet,
+        _token: object,
+    ) -> None:
+        if _token is not _MATERIALIZATION_TOKEN:
+            raise TypeError("MaterializationResult must be created by materialize_all_candidates()")
+        # Use object.__setattr__ to bypass frozen dataclass
+        object.__setattr__(self, "candidates", candidates)
+        object.__setattr__(self, "candidate_set", candidate_set)
+        self._validate()
+
+    def _validate(self) -> None:
         """Validate invariants at construction (P0-2)."""
         errors: list[str] = []
 
@@ -347,17 +365,14 @@ class MaterializationResult:
 def materialize_all_candidates(
     catalogs: tuple[CompleteDoublePipeCatalogSnapshot, ...],
     sizing_gate: PassedSizingGate,
-    sizing_request_identity_digest: str,
     minimum_effective_length_m: float | None = None,
     maximum_effective_length_m: float | None = None,
 ) -> MaterializationResult:
     """Materialise and deduplicate all candidates for a sizing request.
 
-    Requires a validated ``PassedSizingGate`` artifact from Phase 1.
-    Per-option and aggregate counts are verified against the gate
-    before any TASK-008 evaluation is started.
-
-    Raises ``ValueError`` on count mismatch (does not produce candidates).
+    ``sizing_request_identity_digest`` is taken strictly from
+    ``sizing_gate.sizing_request_identity_digest`` — the caller cannot
+    supply a separate digest (P0-1).
     """
     # --- P0-1: verify gate digest before consuming any records ---
     if not sizing_gate.verify_digest():
@@ -432,8 +447,8 @@ def materialize_all_candidates(
     # Build catalog_snapshot_identities from catalogs
     catalog_snapshot_identities = tuple(catalog_snapshot_ref(cat) for cat in catalogs)
 
-    candidate_set = create_materialized_candidate_set(
-        sizing_request_identity_digest=sizing_request_identity_digest,
+    candidate_set = _create_materialized_candidate_set(
+        sizing_request_identity_digest=sizing_gate.sizing_request_identity_digest,
         passed_gate_digest=sizing_gate.gate_digest,
         catalog_snapshot_identities=catalog_snapshot_identities,
         minimum_effective_length_m=minimum_effective_length_m,
@@ -445,6 +460,7 @@ def materialize_all_candidates(
     return MaterializationResult(
         candidates=deduped_candidates,
         candidate_set=candidate_set,
+        _token=_MATERIALIZATION_TOKEN,
     )
 
 

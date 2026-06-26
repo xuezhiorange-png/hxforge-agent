@@ -18,11 +18,12 @@ Tests cover:
 
 from __future__ import annotations
 
-import dataclasses
 from typing import Any
+from uuid import UUID, uuid5
 
 import pytest
 
+from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import (
     CalculationContext,
     ExecutionContextSnapshot,
@@ -39,6 +40,7 @@ from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 from hexagent.optimization.adapter import evaluate_all_candidates
 from hexagent.optimization.catalog import compute_catalog_content_hash
 from hexagent.optimization.context import (
+    TASK009_CONTEXT_NAMESPACE,
     ExpectedProviderIdentity,
     OptimizationObjective,
     SizingRequestIdentity,
@@ -47,6 +49,11 @@ from hexagent.optimization.context import (
 )
 from hexagent.optimization.evaluation import (
     CandidateEvaluationState,
+    VerificationOutcome,
+    VerifiedRatingEvidenceSnapshot,
+    execution_context_snapshot_payload,
+    rating_request_identity_payload,
+    verified_rating_evidence_payload,
 )
 from hexagent.optimization.identities import (
     MaterializationResult,
@@ -294,6 +301,8 @@ def _build_and_materialize(
         top_n=5,
         solver_params=SolverParams(),
         expected_provider_identity=_default_expected_provider(),
+        design_case_revision_id=UUID("11111111-1111-1111-1111-111111111111"),
+        calculation_run_id=UUID("22222222-2222-2222-2222-222222222222"),
     )
 
     recs: list[OptionRawCountRecord] = []
@@ -322,7 +331,6 @@ def _build_and_materialize(
     mat_result = materialize_all_candidates(
         catalogs=(cat,),
         sizing_gate=gate,
-        sizing_request_identity_digest=ident.sizing_request_identity_digest,
     )
 
     return ident, cat, mat_result
@@ -450,10 +458,11 @@ class TestAdapterSpy:
             assert call["provider"] is provider
             assert call["solver_params"] is solver_params
 
-            # --- Context UUID ---
+            # --- Context UUID & solver params (P0-8 exact assertions) ---
             assert isinstance(call["context"], CalculationContext)
-            assert call["context"].request_id is not None
             request_ids.append(call["context"].request_id)
+            assert call["context"].design_case_revision_id == ident.design_case_revision_id
+            assert call["context"].calculation_run_id == ident.calculation_run_id
 
             # --- Minimum terminal delta T, boundary conditions ---
             assert call["minimum_terminal_delta_t"] == 5.0
@@ -462,6 +471,32 @@ class TestAdapterSpy:
 
         # Each call has a unique context request_id (P0-8 UUID check)
         assert len(set(request_ids)) == len(request_ids)
+
+        # P0-8: Per-candidate UUID5 exact assertions and solver field assertions
+        for i, (candidate, call) in enumerate(zip(candidates, calls, strict=False)):
+            expected_request_id = uuid5(
+                TASK009_CONTEXT_NAMESPACE,
+                f"{ident.sizing_request_identity_digest}:{candidate.source_qualified_candidate_id}",
+            )
+            assert call["context"].request_id == expected_request_id, (
+                f"Candidate {i}: UUID5 mismatch"
+            )
+            assert call["context"].design_case_revision_id == ident.design_case_revision_id
+            assert call["context"].calculation_run_id == ident.calculation_run_id
+
+            # Solver field exact assertions
+            assert (
+                call["solver_params"].absolute_residual_w == ident.rating_solver_absolute_residual_w
+            )
+            assert (
+                call["solver_params"].relative_residual_fraction
+                == ident.rating_solver_relative_residual_fraction
+            )
+            assert (
+                call["solver_params"].bracket_temperature_tolerance_k
+                == ident.rating_solver_bracket_temperature_tolerance_k
+            )
+            assert call["solver_params"].max_iterations == ident.rating_solver_max_iterations
 
     # ------------------------------------------------------------------
     # b) Candidate-set digest mismatch
@@ -479,7 +514,9 @@ class TestAdapterSpy:
         bad_set = mat_result.candidate_set.model_copy(
             update={"candidate_set_digest": "sha256:" + "f" * 64}
         )
-        bad_mat_result = dataclasses.replace(mat_result, candidate_set=bad_set)
+        bad_mat_result = object.__new__(type(mat_result))
+        object.__setattr__(bad_mat_result, "candidates", mat_result.candidates)
+        object.__setattr__(bad_mat_result, "candidate_set", bad_set)
         calls, spy_fn = make_spy()
 
         with pytest.raises(ValueError, match="digest verification failed"):
@@ -609,10 +646,10 @@ class TestAdapterSpy:
         deduped = deduplicate_and_order_candidates(tuple(all_cands))
         cat_refs = (catalog_snapshot_ref(cat),)
 
-        # Use create_materialized_candidate_set for correct digest
-        from hexagent.optimization.context import create_materialized_candidate_set
+        # Use _create_materialized_candidate_set for correct digest
+        from hexagent.optimization.context import _create_materialized_candidate_set
 
-        mcs = create_materialized_candidate_set(
+        mcs = _create_materialized_candidate_set(
             sizing_request_identity_digest=ident.sizing_request_identity_digest,
             passed_gate_digest=gate.gate_digest,
             catalog_snapshot_identities=cat_refs,
@@ -623,7 +660,9 @@ class TestAdapterSpy:
         )
 
         # Wrap into MaterializationResult
-        mat_result = MaterializationResult(candidates=deduped, candidate_set=mcs)
+        mat_result = object.__new__(MaterializationResult)
+        object.__setattr__(mat_result, "candidates", deduped)
+        object.__setattr__(mat_result, "candidate_set", mcs)
 
         # Use a fluid WITH components, but identity says empty
         wrong_hot = FluidIdentifier(
@@ -1091,3 +1130,219 @@ class TestAdapterSpy:
             )
 
         assert len(calls) == 0
+
+
+# ============================================================================
+# P0-9: 26-field evidence digest mutation suite
+# ============================================================================
+
+
+EXPECTED_26_FIELD_KEYS = (
+    "rating_status",
+    "heat_duty_w",
+    "hot_outlet_temperature_k",
+    "cold_outlet_temperature_k",
+    "area_inner_m2",
+    "area_outer_m2",
+    "UA_w_k",
+    "LMTD_k",
+    "energy_residual_w",
+    "ua_lmtd_residual_w",
+    "tube_inlet_density_kg_m3",
+    "annulus_inlet_density_kg_m3",
+    "tube_flow_area_m2",
+    "annulus_flow_area_m2",
+    "warning_digests",
+    "blocker_digests",
+    "failure_digest",
+    "provider_identity_digest",
+    "tube_correlation_digest",
+    "annulus_correlation_digest",
+    "rating_result_hash",
+    "rating_provenance_digest",
+    "hash_verification_outcome",
+    "provenance_verification_outcome",
+    "rating_request_identity_digest",
+    "rating_execution_context_digest",
+)
+
+
+class TestEvidencePayloadMutation:
+    """P0-9: 26-field evidence digest mutation test suite."""
+
+    def _baseline_evidence(self) -> VerifiedRatingEvidenceSnapshot:
+        from hexagent.exchangers.double_pipe.result import (
+            RatingRequestIdentity,
+            RatingStatus,
+        )
+
+        rri = RatingRequestIdentity(
+            hot_fluid_name="w",
+            hot_fluid_backend="i",
+            hot_fluid_components=(),
+            cold_fluid_name="b",
+            cold_fluid_backend="n",
+            cold_fluid_components=(),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            flow_arrangement="counterflow",
+            geometry={
+                "inner_tube_inner_diameter_m": 0.05,
+                "inner_tube_outer_diameter_m": 0.06,
+                "outer_pipe_inner_diameter_m": 0.10,
+                "effective_length_m": 1.0,
+                "wall_thermal_conductivity_w_m_k": 50.0,
+                "inner_surface_roughness_m": 1e-5,
+                "annulus_surface_roughness_m": 1e-5,
+                "inner_fouling_resistance_m2k_w": 0.0001,
+                "outer_fouling_resistance_m2k_w": 0.0002,
+            },
+            solver_absolute_residual_w=1e-3,
+            solver_relative_residual_fraction=1e-8,
+            solver_bracket_temperature_tolerance_k=1e-4,
+            solver_max_iterations=100,
+            tube_boundary_condition="adiabatic",
+            annulus_boundary_condition="adiabatic",
+            minimum_terminal_delta_t=5.0,
+        )
+        ec = ExecutionContextSnapshot()
+        pi = ProviderIdentitySnapshot(
+            name="test",
+            version="1",
+            git_revision="abc",
+            reference_state_policy="default",
+        )
+        return VerifiedRatingEvidenceSnapshot(
+            rating_status=RatingStatus.SUCCEEDED,
+            heat_duty_w=1000.0,
+            hot_outlet_temperature_k=350.0,
+            cold_outlet_temperature_k=310.0,
+            area_inner_m2=1.5,
+            area_outer_m2=2.0,
+            UA_w_k=500.0,
+            LMTD_k=40.0,
+            energy_residual_w=0.001,
+            ua_lmtd_residual_w=0.002,
+            tube_inlet_density_kg_m3=1000.0,
+            annulus_inlet_density_kg_m3=800.0,
+            tube_flow_area_m2=0.02,
+            annulus_flow_area_m2=0.04,
+            rating_result_hash="sha256:" + "a" * 64,
+            rating_provenance_digest="prov_digest",
+            hash_verification_outcome=VerificationOutcome.PASSED,
+            provenance_verification_outcome=VerificationOutcome.PASSED,
+            rating_request_identity=rri,
+            rating_request_identity_digest=sha256_digest(rating_request_identity_payload(rri)),
+            rating_execution_context=ec,
+            rating_execution_context_digest=sha256_digest(execution_context_snapshot_payload(ec)),
+            provider_identity=pi,
+        )
+
+    def test_payload_has_exactly_26_fields(self) -> None:
+        evidence = self._baseline_evidence()
+        payload = verified_rating_evidence_payload(evidence)
+        assert len(payload) == 26
+        assert tuple(payload.keys()) == EXPECTED_26_FIELD_KEYS
+
+    def test_payload_digest_stable(self) -> None:
+        ev1 = self._baseline_evidence()
+        ev2 = self._baseline_evidence()
+        assert sha256_digest(verified_rating_evidence_payload(ev1)) == sha256_digest(
+            verified_rating_evidence_payload(ev2)
+        )
+
+    @pytest.mark.parametrize(
+        ("field_name", "mutate_kwargs"),
+        [
+            ("rating_status", {"rating_status": RatingStatus.BLOCKED}),
+            ("heat_duty_w", {"heat_duty_w": 999.0}),
+            ("hot_outlet_temperature_k", {"hot_outlet_temperature_k": 340.0}),
+            ("cold_outlet_temperature_k", {"cold_outlet_temperature_k": 300.0}),
+            ("area_inner_m2", {"area_inner_m2": 1.0}),
+            ("area_outer_m2", {"area_outer_m2": 1.5}),
+            ("UA_w_k", {"UA_w_k": 499.0}),
+            ("LMTD_k", {"LMTD_k": 39.0}),
+            ("energy_residual_w", {"energy_residual_w": 0.002}),
+            ("ua_lmtd_residual_w", {"ua_lmtd_residual_w": 0.003}),
+            ("tube_inlet_density_kg_m3", {"tube_inlet_density_kg_m3": 900.0}),
+            ("annulus_inlet_density_kg_m3", {"annulus_inlet_density_kg_m3": 700.0}),
+            ("tube_flow_area_m2", {"tube_flow_area_m2": 0.01}),
+            ("annulus_flow_area_m2", {"annulus_flow_area_m2": 0.03}),
+            ("rating_result_hash", {"rating_result_hash": "sha256:" + "b" * 64}),
+            ("rating_provenance_digest", {"rating_provenance_digest": "other_prov"}),
+            (
+                "hash_verification_outcome",
+                {"hash_verification_outcome": VerificationOutcome.FAILED},
+            ),
+            (
+                "provenance_verification_outcome",
+                {"provenance_verification_outcome": VerificationOutcome.FAILED},
+            ),
+            (
+                "rating_request_identity_digest",
+                {"rating_request_identity_digest": "different_digest"},
+            ),
+            (
+                "rating_execution_context_digest",
+                {"rating_execution_context_digest": "different_ec"},
+            ),
+        ],
+    )
+    def test_top_level_field_mutation_changes_digest(
+        self,
+        field_name: str,
+        mutate_kwargs: dict,
+    ) -> None:
+        baseline = self._baseline_evidence()
+        mutated = baseline.model_copy(update=mutate_kwargs)
+        base_digest = sha256_digest(verified_rating_evidence_payload(baseline))
+        mut_digest = sha256_digest(verified_rating_evidence_payload(mutated))
+        assert base_digest != mut_digest, f"Field {field_name} mutation did not change digest"
+
+    def test_warning_digests_permutation_stable(self) -> None:
+        from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
+
+        base = self._baseline_evidence()
+        w1 = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="test",
+            allows_continuation=True,
+        )
+        w2 = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="other",
+            allows_continuation=True,
+        )
+        ev_a = base.model_copy(update={"warnings": (w1, w2)})
+        ev_b = base.model_copy(update={"warnings": (w2, w1)})
+        assert sha256_digest(verified_rating_evidence_payload(ev_a)) == sha256_digest(
+            verified_rating_evidence_payload(ev_b)
+        )
+
+    def test_blocker_digests_permutation_stable(self) -> None:
+        from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
+
+        base = self._baseline_evidence()
+        b1 = EngineeringMessage(
+            code=ErrorCode.BLOCKER,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="blocker1",
+            allows_continuation=False,
+        )
+        b2 = EngineeringMessage(
+            code=ErrorCode.BLOCKER,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="blocker2",
+            allows_continuation=False,
+        )
+        ev_a = base.model_copy(update={"blockers": (b1, b2)})
+        ev_b = base.model_copy(update={"blockers": (b2, b1)})
+        assert sha256_digest(verified_rating_evidence_payload(ev_a)) == sha256_digest(
+            verified_rating_evidence_payload(ev_b)
+        )
