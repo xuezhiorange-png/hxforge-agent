@@ -67,6 +67,7 @@ class ErrorCode(StrEnum):
     PROVENANCE_INCOMPLETE = "provenance_incomplete"
     HASH_MISMATCH = "hash_mismatch"
     INVALID_STATE_TRANSITION = "invalid_state_transition"
+    TASK008_ADAPTER = "task008_adapter"
     BLOCKER = "blocker"
 
     # Correlation-specific error codes

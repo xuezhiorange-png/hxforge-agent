@@ -9,7 +9,6 @@ No broad ``except Exception`` swallowing.  No ``Any`` field leaks.
 
 from __future__ import annotations
 
-import contextlib
 import dataclasses
 from enum import StrEnum
 from typing import Any, Self
@@ -17,7 +16,7 @@ from typing import Any, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from hexagent.core.canonical import sha256_digest
-from hexagent.core.heat_balance import ProviderIdentitySnapshot
+from hexagent.core.heat_balance import ExecutionContextSnapshot, ProviderIdentitySnapshot
 from hexagent.domain.messages import EngineeringMessage, ErrorCode, RunFailure
 from hexagent.exchangers.double_pipe.result import (
     RatingRequestIdentity,
@@ -136,6 +135,8 @@ class VerifiedRatingEvidenceSnapshot(BaseModel):
     """Trusted thermal evidence from a verified ``RatingResult``.
 
     Constructed in one shot — no post-construction mutation allowed.
+    All required fields are non-optional; if any is missing or unreadable
+    the verification path returns RUNTIME_FAILED.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -160,20 +161,20 @@ class VerifiedRatingEvidenceSnapshot(BaseModel):
     blockers: tuple[EngineeringMessage, ...] = Field(default_factory=tuple)
     failure: RunFailure | None = None
 
-    provider_identity: ProviderIdentitySnapshot | None = None
+    provider_identity: ProviderIdentitySnapshot
     tube_correlation: SelectedCorrelationSnapshot | None = None
     annulus_correlation: SelectedCorrelationSnapshot | None = None
 
     rating_result_hash: str
     rating_provenance_digest: str
 
-    hash_verification_outcome: str
-    provenance_verification_outcome: str
+    hash_verification_outcome: VerificationOutcome
+    provenance_verification_outcome: VerificationOutcome
 
-    rating_request_identity: RatingRequestIdentity | None = None
-    rating_request_identity_digest: str = ""
-    rating_execution_context: Any | None = None
-    rating_execution_context_digest: str = ""
+    rating_request_identity: RatingRequestIdentity
+    rating_request_identity_digest: str
+    rating_execution_context: ExecutionContextSnapshot
+    rating_execution_context_digest: str
 
     @property
     def evidence_digest(self) -> str:
@@ -246,40 +247,54 @@ class CandidateEvaluationRecord(BaseModel):
 
     @model_validator(mode="after")
     def _verify_state_invariants(self) -> Self:
-        """Enforce state-field combination invariants."""
+        """Enforce state-field combination invariants — raise, not assert."""
         state = self.candidate_evaluation_state
 
         if state == CandidateEvaluationState.UNEVALUATED.value:
-            assert self.candidate_evaluation_identity is None, "UNEVALUATED: no identity"
-            assert self.verified_rating_evidence is None, "UNEVALUATED: no evidence"
-            assert self.invalid_rating_evidence is None, "UNEVALUATED: no invalid evidence"
-            assert self.evaluation_failure is None, "UNEVALUATED: no failure"
+            if self.candidate_evaluation_identity is not None:
+                raise ValueError("UNEVALUATED: candidate_evaluation_identity must be None")
+            if self.verified_rating_evidence is not None:
+                raise ValueError("UNEVALUATED: verified_rating_evidence must be None")
+            if self.invalid_rating_evidence is not None:
+                raise ValueError("UNEVALUATED: invalid_rating_evidence must be None")
+            if self.evaluation_failure is not None:
+                raise ValueError("UNEVALUATED: evaluation_failure must be None")
 
         elif state == CandidateEvaluationState.VERIFIED.value:
-            assert self.candidate_evaluation_identity is not None, "VERIFIED: identity required"
-            assert self.verified_rating_evidence is not None, "VERIFIED: evidence required"
-            assert self.invalid_rating_evidence is None, "VERIFIED: no invalid evidence"
+            if self.candidate_evaluation_identity is None:
+                raise ValueError("VERIFIED: candidate_evaluation_identity required")
+            if self.verified_rating_evidence is None:
+                raise ValueError("VERIFIED: verified_rating_evidence required")
+            if self.invalid_rating_evidence is not None:
+                raise ValueError("VERIFIED: invalid_rating_evidence must be None")
 
         elif state == CandidateEvaluationState.INTEGRITY_INVALID.value:
-            assert self.candidate_evaluation_identity is None, "INTEGRITY_INVALID: no identity"
-            assert self.verified_rating_evidence is None, "INTEGRITY_INVALID: no trusted evidence"
-            assert self.invalid_rating_evidence is not None, (
-                "INTEGRITY_INVALID: invalid evidence required"
-            )
-            assert self.evaluation_failure is None, "INTEGRITY_INVALID: no failure"
-            assert self.rating_status is None, "INTEGRITY_INVALID: status must be None"
+            if self.candidate_evaluation_identity is not None:
+                raise ValueError("INTEGRITY_INVALID: candidate_evaluation_identity must be None")
+            if self.verified_rating_evidence is not None:
+                raise ValueError("INTEGRITY_INVALID: verified_rating_evidence must be None")
+            if self.invalid_rating_evidence is None:
+                raise ValueError("INTEGRITY_INVALID: invalid_rating_evidence required")
+            if self.evaluation_failure is not None:
+                raise ValueError("INTEGRITY_INVALID: evaluation_failure must be None")
+            if self.rating_status is not None:
+                raise ValueError("INTEGRITY_INVALID: rating_status must be None")
 
         elif state == CandidateEvaluationState.RUNTIME_FAILED.value:
-            assert self.candidate_evaluation_identity is None, "RUNTIME_FAILED: no identity"
-            assert self.verified_rating_evidence is None, "RUNTIME_FAILED: no evidence"
-            assert self.invalid_rating_evidence is None, "RUNTIME_FAILED: no invalid evidence"
-            assert self.evaluation_failure is not None, "RUNTIME_FAILED: failure required"
+            if self.candidate_evaluation_identity is not None:
+                raise ValueError("RUNTIME_FAILED: candidate_evaluation_identity must be None")
+            if self.verified_rating_evidence is not None:
+                raise ValueError("RUNTIME_FAILED: verified_rating_evidence must be None")
+            if self.invalid_rating_evidence is not None:
+                raise ValueError("RUNTIME_FAILED: invalid_rating_evidence must be None")
+            if self.evaluation_failure is None:
+                raise ValueError("RUNTIME_FAILED: evaluation_failure required")
 
         return self
 
 
 # ---------------------------------------------------------------------------
-# Exact-type safe extraction helpers
+# Exact-type safe extraction helpers (for audit path only)
 # ---------------------------------------------------------------------------
 
 
@@ -301,29 +316,8 @@ def _safe_digest(value: object) -> str | None:
     return None
 
 
-def _extract_provider_identity_digest(pi: object) -> str | None:
-    if type(pi) is not ProviderIdentitySnapshot:
-        return None
-    return sha256_digest(dataclasses.asdict(pi))
-
-
-def _extract_request_identity_digest(ri: object) -> str | None:
-    if type(ri) is not RatingRequestIdentity:
-        return None
-    return sha256_digest(dataclasses.asdict(ri))
-
-
-def _extract_context_digest(ec: object) -> str | None:
-    if type(ec).__name__ != "ExecutionContextSnapshot":
-        return None
-    try:
-        return sha256_digest(ec.model_dump())  # type: ignore[attr-defined]
-    except Exception:
-        return None
-
-
 # ---------------------------------------------------------------------------
-# Build safe audit snapshot
+# Build safe audit snapshot (only for exact RatingResult objects)
 # ---------------------------------------------------------------------------
 
 
@@ -333,9 +327,13 @@ def _build_audit_snapshot(
     claim_state: str,
     hash_outcome: str,
     provenance_outcome: str,
-    result: Any,
+    result: RatingResult,
 ) -> ClaimedRatingResultAuditSnapshot:
-    """Build a safe audit snapshot — only 6 whitelisted fields."""
+    """Build a safe audit snapshot — only 6 whitelisted fields.
+
+    MUST only be called with an exact ``RatingResult``.  Each field
+    is independently try/except'd.
+    """
     status_str: str | None = None
     try:
         if type(result.status) is RatingStatus:
@@ -366,11 +364,11 @@ def _build_audit_snapshot(
 
     ec_digest: str | None = None
     try:
-        if result.execution_context is not None:
-            from hexagent.core.heat_balance import ExecutionContextSnapshot
-
-            if type(result.execution_context) is ExecutionContextSnapshot:
-                ec_digest = sha256_digest(result.execution_context.model_dump())
+        if (
+            result.execution_context is not None
+            and type(result.execution_context) is ExecutionContextSnapshot
+        ):
+            ec_digest = sha256_digest(result.execution_context.model_dump())
     except Exception:
         pass
 
@@ -412,6 +410,286 @@ def _build_audit_snapshot(
 
 
 # ---------------------------------------------------------------------------
+# Extract verified evidence (fail-closed)
+# ---------------------------------------------------------------------------
+
+
+def _extract_trusted_evidence(
+    result: RatingResult,
+    tube_in_hot: bool,
+) -> VerifiedRatingEvidenceSnapshot:
+    """Extract all trusted evidence fields from a verified RatingResult.
+
+    Raises ``ValueError`` / ``TypeError`` on any required field failure.
+    """
+    # --- Required identity types (fail-closed) ---
+    pi = result.provider_identity
+    if type(pi) is not ProviderIdentitySnapshot:
+        raise TypeError(f"expected ProviderIdentitySnapshot, got {type(pi).__name__}")
+
+    ri = result.request_identity
+    if type(ri) is not RatingRequestIdentity:
+        raise TypeError(f"expected RatingRequestIdentity, got {type(ri).__name__}")
+
+    ec = result.execution_context
+    if type(ec) is not ExecutionContextSnapshot:
+        raise TypeError(f"expected ExecutionContextSnapshot, got {type(ec).__name__}")
+
+    rs = result.status
+    if type(rs) is not RatingStatus:
+        raise TypeError(f"expected RatingStatus, got {type(rs).__name__}")
+
+    # --- Digests (must be non-empty str) ---
+    r_hash = result.result_hash
+    if type(r_hash) is not str or not r_hash:
+        raise ValueError("result_hash must be non-empty str")
+
+    r_prov = result.provenance_digest
+    if type(r_prov) is not str or not r_prov:
+        raise ValueError("provenance_digest must be non-empty str")
+
+    ri_digest = sha256_digest(dataclasses.asdict(ri))
+    ec_digest = sha256_digest(ec.model_dump())
+
+    # --- Thermal fields (fail closed for areas, optional for others) ---
+    area_inner: float = 0.0
+    try:
+        area_inner = float(result.area_inner_m2)
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError("area_inner_m2 required") from None
+
+    area_outer: float = 0.0
+    try:
+        area_outer = float(result.area_outer_m2)
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError("area_outer_m2 required") from None
+
+    # Optional thermal fields
+    heat_duty: float | None = None
+    try:
+        if result.heat_duty_w is not None:
+            heat_duty = float(result.heat_duty_w)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    hot_outlet: float | None = None
+    try:
+        if result.hot_outlet_temperature_k is not None:
+            hot_outlet = float(result.hot_outlet_temperature_k)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    cold_outlet: float | None = None
+    try:
+        if result.cold_outlet_temperature_k is not None:
+            cold_outlet = float(result.cold_outlet_temperature_k)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    ua_val: float | None = None
+    try:
+        if result.UA_w_k is not None:
+            ua_val = float(result.UA_w_k)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    lmtd_val: float | None = None
+    try:
+        if result.LMTD_k is not None:
+            lmtd_val = float(result.LMTD_k)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    energy_res: float | None = None
+    try:
+        if result.energy_residual_w is not None:
+            energy_res = float(result.energy_residual_w)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    ua_lmtd_res: float | None = None
+    try:
+        if result.ua_lmtd_residual_w is not None:
+            ua_lmtd_res = float(result.ua_lmtd_residual_w)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    # --- Inlet densities (respect tube_in_hot) ---
+    tube_density: float | None = None
+    annulus_density: float | None = None
+    try:
+        hot_inlet = getattr(result, "hot_inlet_state", None)
+        cold_inlet = getattr(result, "cold_inlet_state", None)
+        hot_dens = float(hot_inlet.density_kg_m3) if hot_inlet is not None else None
+        cold_dens = float(cold_inlet.density_kg_m3) if cold_inlet is not None else None
+
+        if tube_in_hot:
+            tube_density = hot_dens
+            annulus_density = cold_dens
+        else:
+            tube_density = cold_dens
+            annulus_density = hot_dens
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    # --- Flow areas from geometry ---
+    tube_area: float | None = None
+    annulus_area: float | None = None
+    try:
+        geom_dict = getattr(ri, "geometry", None)
+        if isinstance(geom_dict, dict):
+            from math import pi as MATH_PI
+
+            r_i = geom_dict.get("inner_tube_inner_diameter_m", 0)
+            r_o = geom_dict.get("inner_tube_outer_diameter_m", 0)
+            d_outer = geom_dict.get("outer_pipe_inner_diameter_m", 0)
+            if r_i and r_o and d_outer:
+                tube_area = MATH_PI * (float(r_i) / 2.0) ** 2
+                annulus_area = MATH_PI * ((float(d_outer) / 2.0) ** 2 - (float(r_o) / 2.0) ** 2)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    # --- Warnings, blockers, failure ---
+    warnings: tuple[EngineeringMessage, ...] = ()
+    try:
+        if result.warnings:
+            warnings = tuple(result.warnings)
+    except Exception:
+        pass
+
+    blockers: tuple[EngineeringMessage, ...] = ()
+    try:
+        if result.blockers:
+            blockers = tuple(result.blockers)
+    except Exception:
+        pass
+
+    failure: RunFailure | None = None
+    from contextlib import suppress
+
+    # noinspection PyBroadException
+    with suppress(Exception):
+        failure = result.failure
+
+    # --- Correlations ---
+    tube_corr: SelectedCorrelationSnapshot | None = None
+    try:
+        if type(result.tube_selected_correlation) is SelectedCorrelationSnapshot:
+            tube_corr = result.tube_selected_correlation
+    except Exception:
+        pass
+
+    annulus_corr: SelectedCorrelationSnapshot | None = None
+    try:
+        if type(result.annulus_selected_correlation) is SelectedCorrelationSnapshot:
+            annulus_corr = result.annulus_selected_correlation
+    except Exception:
+        pass
+
+    # One-shot construction
+    return VerifiedRatingEvidenceSnapshot(
+        rating_status=rs,
+        heat_duty_w=heat_duty,
+        hot_outlet_temperature_k=hot_outlet,
+        cold_outlet_temperature_k=cold_outlet,
+        area_inner_m2=area_inner,
+        area_outer_m2=area_outer,
+        UA_w_k=ua_val,
+        LMTD_k=lmtd_val,
+        energy_residual_w=energy_res,
+        ua_lmtd_residual_w=ua_lmtd_res,
+        tube_inlet_density_kg_m3=tube_density,
+        annulus_inlet_density_kg_m3=annulus_density,
+        tube_flow_area_m2=tube_area,
+        annulus_flow_area_m2=annulus_area,
+        warnings=warnings,
+        blockers=blockers,
+        failure=failure,
+        provider_identity=pi,
+        tube_correlation=tube_corr,
+        annulus_correlation=annulus_corr,
+        rating_result_hash=r_hash,
+        rating_provenance_digest=r_prov,
+        hash_verification_outcome=VerificationOutcome.PASSED,
+        provenance_verification_outcome=VerificationOutcome.PASSED,
+        rating_request_identity=ri,
+        rating_request_identity_digest=ri_digest,
+        rating_execution_context=ec,
+        rating_execution_context_digest=ec_digest,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Provider identity matching
+# ---------------------------------------------------------------------------
+
+
+def _check_provider_match(
+    result: RatingResult,
+    expected_provider: ExpectedProviderIdentity,
+) -> bool:
+    """Check provider identity from exact result.provider_identity.
+
+    Raises ``TypeError`` if result.provider_identity is not an exact
+    ``ProviderIdentitySnapshot`` (caller must handle).
+    """
+    pi = result.provider_identity
+    if type(pi) is not ProviderIdentitySnapshot:
+        raise TypeError(f"expected ProviderIdentitySnapshot, got {type(pi).__name__}")
+    return expected_provider.matches(pi)
+
+
+# ---------------------------------------------------------------------------
+# Evaluate candidate evaluation identity (only for VERIFIED)
+# ---------------------------------------------------------------------------
+
+
+def _build_candidate_evaluation_identity(
+    sizing_request_identity_digest: str,
+    source_qualified_candidate_id: str,
+    result: RatingResult,
+    tube_in_hot: bool,
+) -> CandidateEvaluationIdentity:
+    """Build identity from trusted fields.
+
+    Raises on type/access errors (caller handles).
+    """
+    ri = result.request_identity
+    if type(ri) is not RatingRequestIdentity:
+        raise TypeError(f"expected RatingRequestIdentity, got {type(ri).__name__}")
+    ri_digest = sha256_digest(dataclasses.asdict(ri))
+
+    pi = result.provider_identity
+    if type(pi) is not ProviderIdentitySnapshot:
+        raise TypeError(f"expected ProviderIdentitySnapshot, got {type(pi).__name__}")
+    pi_digest = sha256_digest(dataclasses.asdict(pi))
+
+    ec = result.execution_context
+    if type(ec) is not ExecutionContextSnapshot:
+        raise TypeError(f"expected ExecutionContextSnapshot, got {type(ec).__name__}")
+    ec_digest = sha256_digest(ec.model_dump())
+
+    r_hash = result.result_hash
+    if type(r_hash) is not str:
+        raise TypeError(f"expected str result_hash, got {type(r_hash).__name__}")
+
+    r_prov = result.provenance_digest
+    if type(r_prov) is not str:
+        raise TypeError(f"expected str provenance_digest, got {type(r_prov).__name__}")
+
+    return CandidateEvaluationIdentity(
+        sizing_request_identity_digest=sizing_request_identity_digest,
+        source_qualified_candidate_id=source_qualified_candidate_id,
+        rating_request_identity_digest=ri_digest,
+        rating_result_hash=r_hash,
+        rating_provenance_digest=r_prov,
+        rating_execution_context_digest=ec_digest,
+        provider_identity_digest=pi_digest,
+        tube_in_hot=tube_in_hot,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Provider consistency
 # ---------------------------------------------------------------------------
 
@@ -423,42 +701,48 @@ def check_provider_consistency(
 
     Only VERIFIED candidates' actual provider identity is compared.
     Claimed provider identities are ignored.
+
+    When inconsistency is found, **all** VERIFIED candidates from the run
+    are marked as provider_identity_matches=False and
+    feasibility_status=provider_identity_mismatch.
     """
     if not records:
         return ()
 
+    # Collect all distinct verified provider identities
     baseline_pi: ProviderIdentitySnapshot | None = None
-    results: list[CandidateEvaluationRecord] = []
+    baseline_digest: str | None = None
+    consistent = True
 
     for rec in records:
         if rec.candidate_evaluation_state != CandidateEvaluationState.VERIFIED.value:
-            results.append(rec)
             continue
-
         ev = rec.verified_rating_evidence
-        if ev is None or ev.provider_identity is None:
-            results.append(rec)
+        if ev is None:
             continue
-
         pi = ev.provider_identity
+        # Compute digest from canonical dump
+        pi_digest = sha256_digest(dataclasses.asdict(pi))
 
         if baseline_pi is None:
             baseline_pi = pi
-            results.append(rec)
-            continue
+            baseline_digest = pi_digest
+        elif pi_digest != baseline_digest:
+            consistent = False
+            break
 
-        # Compare with baseline
-        match = (
-            pi.name == baseline_pi.name
-            and pi.version == baseline_pi.version
-            and pi.git_revision == baseline_pi.git_revision
-            and pi.reference_state_policy == baseline_pi.reference_state_policy
-            and pi.configuration_fingerprint == baseline_pi.configuration_fingerprint
-            and pi.cache_policy_version == baseline_pi.cache_policy_version
-        )
+    if baseline_pi is None:
+        # No VERIFIED candidates — not applicable
+        return records
 
-        if not match:
-            # Replace the record with provider mismatch
+    if consistent:
+        # All identical
+        return records
+
+    # Inconsistent — mark ALL VERIFIED candidates as mismatched
+    results: list[CandidateEvaluationRecord] = []
+    for rec in records:
+        if rec.candidate_evaluation_state == CandidateEvaluationState.VERIFIED.value:
             new_rec = rec.model_copy(
                 update={
                     "provider_identity_matches": False,
@@ -468,8 +752,36 @@ def check_provider_consistency(
             results.append(new_rec)
         else:
             results.append(rec)
-
     return tuple(results)
+
+
+# ---------------------------------------------------------------------------
+# Build invalid evidence record (verification-failure path)
+# ---------------------------------------------------------------------------
+
+
+def _build_invalid_evidence(
+    candidate_id: str,
+    result: RatingResult,
+    hash_outcome: str,
+    prov_outcome: str,
+    failure_reason: str,
+) -> InvalidRatingEvidenceRecord:
+    """Build invalid evidence from safe fields only."""
+    return InvalidRatingEvidenceRecord(
+        candidate_id=candidate_id,
+        claimed_rating_status=_safe_str(result.status),
+        claimed_result_hash=_safe_digest(result.result_hash),
+        claimed_provenance_digest=_safe_digest(result.provenance_digest),
+        hash_verification_outcome=hash_outcome,
+        provenance_verification_outcome=prov_outcome,
+        rating_request_identity_digest=(
+            sha256_digest(dataclasses.asdict(result.request_identity))
+            if type(result.request_identity) is RatingRequestIdentity
+            else None
+        ),
+        failure_reason=failure_reason,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -492,16 +804,8 @@ def verify_and_evaluate_candidate(
     matching the sizing request).  Provider matching always uses the
     actual ``result.provider_identity``, never an external override.
     """
-    # Step 0: exact type check
+    # Step 0: exact type check — non-exact objects NEVER enter audit
     if type(result) is not RatingResult:
-        audit = _build_audit_snapshot(
-            source_qualified_candidate_id,
-            candidate_index,
-            ClaimedRatingResultState.UNREADABLE.value,
-            VerificationOutcome.NOT_RUN.value,
-            VerificationOutcome.NOT_RUN.value,
-            result,
-        )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
@@ -509,7 +813,6 @@ def verify_and_evaluate_candidate(
             feasible=False,
             hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
             provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
-            claimed_rating_result_audit=audit,
             evaluation_failure=RunFailure(
                 code=ErrorCode.INVALID_STATE_TRANSITION,
                 message=f"Expected exact RatingResult, got {type(result).__name__}",
@@ -551,21 +854,12 @@ def verify_and_evaluate_candidate(
             VerificationOutcome.NOT_RUN.value,
             result,
         )
-        invalid = InvalidRatingEvidenceRecord(
-            candidate_id=source_qualified_candidate_id,
-            claimed_rating_status=_safe_str(result.status),
-            claimed_result_hash=_safe_str(result.result_hash)
-            if type(result.result_hash) is str
-            else None,
-            claimed_provenance_digest=_safe_str(result.provenance_digest)
-            if type(result.provenance_digest) is str
-            else None,
-            hash_verification_outcome=VerificationOutcome.FAILED.value,
-            provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
-            rating_request_identity_digest=_extract_request_identity_digest(
-                result.request_identity
-            ),
-            failure_reason="hash verification failed",
+        invalid = _build_invalid_evidence(
+            source_qualified_candidate_id,
+            result,
+            VerificationOutcome.FAILED.value,
+            VerificationOutcome.NOT_RUN.value,
+            "hash verification failed",
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
@@ -615,21 +909,12 @@ def verify_and_evaluate_candidate(
             VerificationOutcome.FAILED.value,
             result,
         )
-        invalid = InvalidRatingEvidenceRecord(
-            candidate_id=source_qualified_candidate_id,
-            claimed_rating_status=_safe_str(result.status),
-            claimed_result_hash=_safe_str(result.result_hash)
-            if type(result.result_hash) is str
-            else None,
-            claimed_provenance_digest=_safe_str(result.provenance_digest)
-            if type(result.provenance_digest) is str
-            else None,
-            hash_verification_outcome=VerificationOutcome.PASSED.value,
-            provenance_verification_outcome=VerificationOutcome.FAILED.value,
-            rating_request_identity_digest=_extract_request_identity_digest(
-                result.request_identity
-            ),
-            failure_reason="provenance verification failed",
+        invalid = _build_invalid_evidence(
+            source_qualified_candidate_id,
+            result,
+            VerificationOutcome.PASSED.value,
+            VerificationOutcome.FAILED.value,
+            "provenance verification failed",
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
@@ -643,237 +928,72 @@ def verify_and_evaluate_candidate(
             rating_status=None,
         )
 
-    # Step 3: Both passed — build trusted evidence (ONE SHOT)
-    rating_status = result.status  # exact RatingStatus
-
-    # Collect all evidence fields BEFORE constructing the frozen model
-    heat_duty_w: float | None = None
-    hot_outlet_temperature_k: float | None = None
-    cold_outlet_temperature_k: float | None = None
-    area_inner_m2: float = 0.0
-    area_outer_m2: float = 0.0
-    UA_w_k: float | None = None
-    LMTD_k: float | None = None
-    energy_residual_w: float | None = None
-    ua_lmtd_residual_w: float | None = None
-    tube_inlet_density_kg_m3: float | None = None
-    annulus_inlet_density_kg_m3: float | None = None
-    tube_flow_area_m2: float | None = None
-    annulus_flow_area_m2: float | None = None
-    warnings: tuple[EngineeringMessage, ...] = ()
-    blockers: tuple[EngineeringMessage, ...] = ()
-    failure: RunFailure | None = None
-    provider_identity: ProviderIdentitySnapshot | None = None
-    tube_correlation: SelectedCorrelationSnapshot | None = None
-    annulus_correlation: SelectedCorrelationSnapshot | None = None
-    rating_result_hash: str = ""
-    rating_provenance_digest: str = ""
-    rating_request_identity: RatingRequestIdentity | None = None
-    rating_request_identity_digest: str = ""
-    rating_execution_context: Any = None
-    rating_execution_context_digest: str = ""
-
-    # Safe copy from verified result (each field independently typed)
-    with contextlib.suppress(Exception):
-        heat_duty_w = result.heat_duty_w
-    with contextlib.suppress(Exception):
-        hot_outlet_temperature_k = result.hot_outlet_temperature_k
-    with contextlib.suppress(Exception):
-        cold_outlet_temperature_k = result.cold_outlet_temperature_k
+    # Step 3: Both passed — build trusted evidence (fail-closed)
     try:
-        area_inner_m2 = float(result.area_inner_m2)
-    except Exception:
-        area_inner_m2 = 0.0
-    try:
-        area_outer_m2 = float(result.area_outer_m2)
-    except Exception:
-        area_outer_m2 = 0.0
-    with contextlib.suppress(Exception):
-        UA_w_k = result.UA_w_k
-    with contextlib.suppress(Exception):
-        LMTD_k = result.LMTD_k
-    with contextlib.suppress(Exception):
-        energy_residual_w = result.energy_residual_w
-    with contextlib.suppress(Exception):
-        ua_lmtd_residual_w = result.ua_lmtd_residual_w
-
-    # Inlet densities
-    try:
-        if result.hot_inlet_state is not None:
-            tube_inlet_density_kg_m3 = result.hot_inlet_state.density_kg_m3
-    except Exception:
-        pass
-    try:
-        if result.cold_inlet_state is not None:
-            annulus_inlet_density_kg_m3 = result.cold_inlet_state.density_kg_m3
-    except Exception:
-        pass
-
-    # Flow areas from TASK-008 geometry
-    try:
-        if type(result.request_identity) is RatingRequestIdentity:
-            geom = result.request_identity.geometry
-            if isinstance(geom, dict):
-                from math import pi as MATH_PI
-
-                r_i = geom.get("inner_tube_inner_diameter_m", 0)
-                r_o = geom.get("inner_tube_outer_diameter_m", 0)
-                d_outer = geom.get("outer_pipe_inner_diameter_m", 0)
-                if r_i and r_o and d_outer:
-                    tube_flow_area_m2 = MATH_PI * (float(r_i) / 2.0) ** 2  # type: ignore[arg-type]
-                    annulus_flow_area_m2 = MATH_PI * (
-                        (float(d_outer) / 2.0) ** 2 - (float(r_o) / 2.0) ** 2  # type: ignore[arg-type]
-                    )
-    except Exception:
-        pass
-
-    # Warnings, blockers, failure
-    try:
-        if result.warnings:
-            warnings = tuple(result.warnings)
-    except Exception:
-        pass
-    try:
-        if result.blockers:
-            blockers = tuple(result.blockers)
-    except Exception:
-        pass
-    with contextlib.suppress(Exception):
-        failure = result.failure
-
-    # Provider identity (exact type)
-    try:
-        if type(result.provider_identity) is ProviderIdentitySnapshot:
-            provider_identity = result.provider_identity
-    except Exception:
-        pass
-
-    # Correlation snapshots
-    try:
-        if type(result.tube_selected_correlation) is SelectedCorrelationSnapshot:
-            tube_correlation = result.tube_selected_correlation
-    except Exception:
-        pass
-    try:
-        if type(result.annulus_selected_correlation) is SelectedCorrelationSnapshot:
-            annulus_correlation = result.annulus_selected_correlation
-    except Exception:
-        pass
-
-    # Hash / provenance digests
-    try:
-        if type(result.result_hash) is str:
-            rating_result_hash = result.result_hash
-    except Exception:
-        pass
-    try:
-        if type(result.provenance_digest) is str:
-            rating_provenance_digest = result.provenance_digest
-    except Exception:
-        pass
-
-    # Request identity + digest
-    try:
-        if type(result.request_identity) is RatingRequestIdentity:
-            rating_request_identity = result.request_identity
-            rating_request_identity_digest = sha256_digest(
-                dataclasses.asdict(result.request_identity)
-            )
-    except Exception:
-        pass
-
-    # Execution context + digest
-    try:
-        if result.execution_context is not None:
-            rating_execution_context = result.execution_context
-            from hexagent.core.heat_balance import ExecutionContextSnapshot
-
-            if type(result.execution_context) is ExecutionContextSnapshot:
-                rating_execution_context_digest = sha256_digest(
-                    result.execution_context.model_dump()
-                )
-    except Exception:
-        pass
-
-    # One-shot construction of trusted evidence
-    evidence = VerifiedRatingEvidenceSnapshot(
-        rating_status=rating_status,
-        heat_duty_w=heat_duty_w,
-        hot_outlet_temperature_k=hot_outlet_temperature_k,
-        cold_outlet_temperature_k=cold_outlet_temperature_k,
-        area_inner_m2=area_inner_m2,
-        area_outer_m2=area_outer_m2,
-        UA_w_k=UA_w_k,
-        LMTD_k=LMTD_k,
-        energy_residual_w=energy_residual_w,
-        ua_lmtd_residual_w=ua_lmtd_residual_w,
-        tube_inlet_density_kg_m3=tube_inlet_density_kg_m3,
-        annulus_inlet_density_kg_m3=annulus_inlet_density_kg_m3,
-        tube_flow_area_m2=tube_flow_area_m2,
-        annulus_flow_area_m2=annulus_flow_area_m2,
-        warnings=warnings,
-        blockers=blockers,
-        failure=failure,
-        provider_identity=provider_identity,
-        tube_correlation=tube_correlation,
-        annulus_correlation=annulus_correlation,
-        rating_result_hash=rating_result_hash,
-        rating_provenance_digest=rating_provenance_digest,
-        hash_verification_outcome=VerificationOutcome.PASSED.value,
-        provenance_verification_outcome=VerificationOutcome.PASSED.value,
-        rating_request_identity=rating_request_identity,
-        rating_request_identity_digest=rating_request_identity_digest,
-        rating_execution_context=rating_execution_context,
-        rating_execution_context_digest=rating_execution_context_digest,
-    )
+        evidence = _extract_trusted_evidence(result, tube_in_hot)
+    except (TypeError, ValueError, RuntimeError, AttributeError) as exc:
+        audit = _build_audit_snapshot(
+            source_qualified_candidate_id,
+            candidate_index,
+            ClaimedRatingResultState.HASH_VERIFICATION_ERROR.value,
+            VerificationOutcome.PASSED.value,
+            VerificationOutcome.PASSED.value,
+            result,
+        )
+        return CandidateEvaluationRecord(
+            source_qualified_candidate_id=source_qualified_candidate_id,
+            evaluation_order_index=candidate_index,
+            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
+            feasible=False,
+            hash_verification_outcome=VerificationOutcome.PASSED.value,
+            provenance_verification_outcome=VerificationOutcome.PASSED.value,
+            claimed_rating_result_audit=audit,
+            evaluation_failure=RunFailure(
+                code=ErrorCode.INVALID_STATE_TRANSITION,
+                message=f"Failed to extract trusted evidence: {exc}",
+            ),
+        )
 
     # Provider matching (from exact result.provider_identity)
-    provider_matches = True
     try:
-        if type(result.provider_identity) is ProviderIdentitySnapshot:
-            provider_matches = expected_provider.matches(result.provider_identity)
-    except Exception:
-        pass
+        provider_matches = _check_provider_match(result, expected_provider)
+    except (TypeError, AttributeError):
+        provider_matches = False
 
     # Evaluate identity (only for VERIFIED)
-    eval_identity: CandidateEvaluationIdentity | None = None
     try:
-        if type(result.request_identity) is RatingRequestIdentity:
-            ri_digest = sha256_digest(dataclasses.asdict(result.request_identity))
-        else:
-            ri_digest = ""
-        if type(result.provider_identity) is ProviderIdentitySnapshot:
-            pi_digest = sha256_digest(dataclasses.asdict(result.provider_identity))
-        else:
-            pi_digest = ""
-
-        ec_digest = ""
-        try:
-            if result.execution_context is not None:
-                from hexagent.core.heat_balance import ExecutionContextSnapshot
-
-                if type(result.execution_context) is ExecutionContextSnapshot:
-                    ec_digest = sha256_digest(result.execution_context.model_dump())
-        except Exception:
-            pass
-
-        eval_identity = CandidateEvaluationIdentity(
-            sizing_request_identity_digest=sizing_request_identity_digest,
-            source_qualified_candidate_id=source_qualified_candidate_id,
-            rating_request_identity_digest=ri_digest,
-            rating_result_hash=rating_result_hash,
-            rating_provenance_digest=rating_provenance_digest,
-            rating_execution_context_digest=ec_digest,
-            provider_identity_digest=pi_digest,
-            tube_in_hot=tube_in_hot,
+        eval_identity = _build_candidate_evaluation_identity(
+            sizing_request_identity_digest,
+            source_qualified_candidate_id,
+            result,
+            tube_in_hot,
         )
-    except Exception:
-        pass
+    except (TypeError, ValueError, RuntimeError):
+        return CandidateEvaluationRecord(
+            source_qualified_candidate_id=source_qualified_candidate_id,
+            evaluation_order_index=candidate_index,
+            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
+            feasible=False,
+            hash_verification_outcome=VerificationOutcome.PASSED.value,
+            provenance_verification_outcome=VerificationOutcome.PASSED.value,
+            evaluation_failure=RunFailure(
+                code=ErrorCode.INVALID_STATE_TRANSITION,
+                message="Failed to build candidate evaluation identity",
+            ),
+        )
 
     # Phase 2: always not-evaluated feasibility
     feasibility_status = FeasibilityStatus.NOT_EVALUATED.value
     if not provider_matches:
         feasibility_status = FeasibilityStatus.PROVIDER_IDENTITY_MISMATCH.value
+
+    # Build rating_status string for the record
+    rating_status_str: str | None = None
+    try:
+        if type(result.status) is RatingStatus:
+            rating_status_str = result.status.value
+    except Exception:
+        pass
 
     return CandidateEvaluationRecord(
         source_qualified_candidate_id=source_qualified_candidate_id,
@@ -886,7 +1006,7 @@ def verify_and_evaluate_candidate(
         candidate_evaluation_identity=eval_identity,
         verified_rating_evidence=evidence,
         provider_identity_matches=provider_matches,
-        rating_status=rating_status.value if rating_status else None,
+        rating_status=rating_status_str,
     )
 
 

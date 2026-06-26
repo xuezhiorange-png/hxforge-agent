@@ -1,6 +1,7 @@
 """
 TASK-009 Phase 2 — TASK-008 adapter with typed CalculationContext,
-PassedSizingGate artifact, and batch error isolation.
+PassedSizingGate artifact, structured runtime-failure records,
+and batch error isolation.
 """
 
 from __future__ import annotations
@@ -10,12 +11,22 @@ from decimal import Decimal
 from typing import Any
 
 from hexagent.correlations.flow import ThermalBoundaryCondition
+from hexagent.domain.messages import ErrorCode, RunFailure
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.rating import rate_double_pipe
 from hexagent.exchangers.double_pipe.result import RatingResult
 from hexagent.exchangers.double_pipe.solver import SolverParams
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
-from hexagent.optimization.context import PassedSizingGate, build_candidate_calculation_context
+from hexagent.optimization.context import (
+    PassedSizingGate,
+    SizingRequestIdentity,
+    build_candidate_calculation_context,
+)
+from hexagent.optimization.evaluation import (
+    CandidateEvaluationRecord,
+    CandidateEvaluationState,
+    VerificationOutcome,
+)
 from hexagent.optimization.identities import ManufacturableCandidate
 from hexagent.properties.base import FluidIdentifier, PropertyProvider
 
@@ -139,29 +150,34 @@ def evaluate_all_candidates(
     minimum_terminal_delta_t: float,
     tube_boundary_condition: ThermalBoundaryCondition | str = "adiabatic",
     annulus_boundary_condition: ThermalBoundaryCondition | str = "adiabatic",
-    sizing_gate: PassedSizingGate,
-    sizing_request_identity_digest: str,
+    sizing_request_identity: SizingRequestIdentity,
+    gate: PassedSizingGate,
     rating_fn: RatingCallable = rate_double_pipe,
-) -> tuple[tuple[ManufacturableCandidate, RatingResult], ...]:
+) -> tuple[CandidateEvaluationRecord, ...]:
     """Evaluate all candidates with uniform request parameters.
 
     Each candidate receives its own typed ``CalculationContext`` via
-    ``build_candidate_calculation_context``.
+    ``build_candidate_calculation_context`` (accepting a full
+    ``SizingRequestIdentity``).
 
     One candidate's adapter exception does not abort the entire batch.
     Results preserve canonical candidate order.
+    Returns structured ``CandidateEvaluationRecord`` for every candidate.
     """
 
     # Verify gate
-    gate_digest = sizing_gate.gate_digest
-    if not gate_digest:
-        raise ValueError("Invalid gate digest")
+    if not gate.verify_digest():
+        raise ValueError("PassedSizingGate digest verification failed")
+    if gate.sizing_request_identity_digest != (
+        sizing_request_identity.sizing_request_identity_digest
+    ):
+        raise ValueError("PassedSizingGate request identity digest mismatch")
 
-    results: list[tuple[ManufacturableCandidate, RatingResult]] = []
+    results: list[CandidateEvaluationRecord] = []
     for candidate in candidates:
         try:
             ctx = build_candidate_calculation_context(
-                sizing_request_identity=sizing_request_identity_digest,
+                sizing_request_identity=sizing_request_identity,
                 source_qualified_candidate_id=candidate.source_qualified_candidate_id,
             )
             result = rate_candidate(
@@ -184,12 +200,37 @@ def evaluate_all_candidates(
                 context=ctx,
                 rating_fn=rating_fn,
             )
-            results.append((candidate, result))
-        except Exception:
-            # Candidate adapter runtime failure — continue with next
-            # The caller must handle missing ratings via the verification step.
-            # We append a sentinel so result order is preserved.
-            results.append((candidate, None))  # type: ignore[arg-type]
+        except Exception as exc:
+            # Structured runtime failure record — no None sentinel
+            results.append(
+                CandidateEvaluationRecord(
+                    source_qualified_candidate_id=candidate.source_qualified_candidate_id,
+                    evaluation_order_index=candidate.evaluation_order_index,
+                    candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
+                    feasible=False,
+                    hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
+                    provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+                    evaluation_failure=RunFailure(
+                        code=ErrorCode.TASK008_ADAPTER,
+                        message=f"TASK-008 adapter raised: {exc}",
+                    ),
+                )
+            )
+            continue
+
+        # Normal result — pass to verification
+        from hexagent.optimization.evaluation import verify_and_evaluate_candidate
+
+        rec = verify_and_evaluate_candidate(
+            candidate.evaluation_order_index,
+            candidate.source_qualified_candidate_id,
+            result,
+            sizing_request_identity_digest=sizing_request_identity.sizing_request_identity_digest,
+            tube_in_hot=tube_in_hot,
+            expected_provider=sizing_request_identity.expected_provider_identity,
+        )
+        results.append(rec)
+
     return tuple(results)
 
 
