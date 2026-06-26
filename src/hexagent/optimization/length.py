@@ -340,6 +340,8 @@ def compute_raw_combination_count(
                     catalog_id=cat.catalog_id,
                     catalog_version=cat.catalog_version,
                     catalog_content_hash=cat.catalog_content_hash,
+                    source_identity=cat.source_identity,
+                    schema_version=cat.schema_version,
                     assembly_option_id=opt.assembly_option_id,
                     canonical_length_quantum_m=opt.length_source.length_quantum_m,
                     raw_count=count,

@@ -361,11 +361,27 @@ class OptionRawCountRecord(BaseModel):
     catalog_id: str
     catalog_version: str
     catalog_content_hash: str
-    source_identity: str = ""
-    schema_version: str = ""
+    source_identity: str
+    schema_version: str
     assembly_option_id: str
     canonical_length_quantum_m: str
     raw_count: int
+
+    @field_validator(
+        "catalog_id",
+        "catalog_version",
+        "catalog_content_hash",
+        "source_identity",
+        "schema_version",
+        "assembly_option_id",
+        "canonical_length_quantum_m",
+        mode="after",
+    )
+    @classmethod
+    def _non_blank(cls, value: str, info: Any) -> str:
+        if not value or value.strip() == "":
+            raise ValueError(f"{info.field_name} must be non-blank")
+        return value
 
 
 # ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, Self
 from uuid import UUID, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -581,8 +581,6 @@ def create_passed_sizing_gate(
 # MaterializedCandidateSet — binds materialization to gate + request
 # ---------------------------------------------------------------------------
 
-from typing import Self  # noqa: E402
-
 
 class MaterializedCandidateSet(BaseModel):
     """Immutable artifact binding materialized candidates to their gate.
@@ -601,6 +599,69 @@ class MaterializedCandidateSet(BaseModel):
     unique_candidate_count: int
     ordered_candidate_ids: tuple[str, ...]
     candidate_set_digest: str
+
+    @field_validator(
+        "sizing_request_identity_digest",
+        "passed_gate_digest",
+        "candidate_set_digest",
+        mode="after",
+    )
+    @classmethod
+    def _nonblank_digest(cls, value: str) -> str:
+        if not value or value.strip() == "":
+            raise ValueError("digest must be non-blank")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_invariants(self) -> Self:
+        errors: list[str] = []
+
+        if self.raw_combination_count < self.unique_candidate_count:
+            errors.append(
+                f"raw_combination_count ({self.raw_combination_count}) < "
+                f"unique_candidate_count ({self.unique_candidate_count})"
+            )
+        if self.unique_candidate_count != len(self.ordered_candidate_ids):
+            errors.append(
+                f"unique_candidate_count ({self.unique_candidate_count}) != "
+                f"len(ordered_candidate_ids) ({len(self.ordered_candidate_ids)})"
+            )
+        # No duplicates in ordered ids
+        seen_ids: set[str] = set()
+        for cid in self.ordered_candidate_ids:
+            if cid in seen_ids:
+                errors.append(f"Duplicate ordered_candidate_id: {cid}")
+            seen_ids.add(cid)
+        # Canonical sort order (ASCII ascending)
+        sorted_ids = tuple(sorted(self.ordered_candidate_ids))
+        if self.ordered_candidate_ids != sorted_ids:
+            errors.append("ordered_candidate_ids not in canonical ASCII sort order")
+        # Catalog identities canonical sorted and unique
+        if self.catalog_snapshot_identities:
+            from hexagent.optimization.catalog import catalog_identity_key
+
+            sorted_cats = tuple(sorted(self.catalog_snapshot_identities, key=catalog_identity_key))
+            if self.catalog_snapshot_identities != sorted_cats:
+                errors.append("catalog_snapshot_identities not in canonical order")
+            seen_cats: set[str] = set()
+            for cat in self.catalog_snapshot_identities:
+                key = f"{cat.catalog_id}:{cat.catalog_version}:{cat.catalog_content_hash}"
+                if key in seen_cats:
+                    errors.append(f"Duplicate catalog identity key: {key}")
+                seen_cats.add(key)
+        # Bounds validation
+        if (
+            self.minimum_effective_length_m is not None
+            and self.maximum_effective_length_m is not None
+            and self.minimum_effective_length_m > self.maximum_effective_length_m
+        ):
+            errors.append(
+                f"minimum_effective_length_m ({self.minimum_effective_length_m}) > "
+                f"maximum_effective_length_m ({self.maximum_effective_length_m})"
+            )
+        if errors:
+            raise ValueError("; ".join(errors))
+        return self
 
     def verify_digest(self) -> bool:
         """Recalculate digest from payload and compare."""

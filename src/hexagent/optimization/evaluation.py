@@ -107,7 +107,7 @@ class ClaimedRatingResultAuditSnapshot(BaseModel):
 
     source_qualified_candidate_id: str
     evaluation_order_index: int
-    claim_state: str  # ClaimedRatingResultState
+    claim_state: ClaimedRatingResultState
 
     claimed_rating_status: str | None = None
     claimed_result_hash: str | None = None
@@ -116,8 +116,8 @@ class ClaimedRatingResultAuditSnapshot(BaseModel):
     claimed_execution_context_digest: str | None = None
     claimed_provider_identity_digest: str | None = None
 
-    hash_verification_outcome: str  # VerificationOutcome
-    provenance_verification_outcome: str
+    hash_verification_outcome: VerificationOutcome
+    provenance_verification_outcome: VerificationOutcome
 
     safely_readable_field_digests: tuple[tuple[str, str], ...] = Field(default_factory=tuple)
 
@@ -154,8 +154,8 @@ class VerifiedRatingEvidenceSnapshot(BaseModel):
 
     tube_inlet_density_kg_m3: float | None = None
     annulus_inlet_density_kg_m3: float | None = None
-    tube_flow_area_m2: float | None = None
-    annulus_flow_area_m2: float | None = None
+    tube_flow_area_m2: float
+    annulus_flow_area_m2: float
 
     warnings: tuple[EngineeringMessage, ...] = Field(default_factory=tuple)
     blockers: tuple[EngineeringMessage, ...] = Field(default_factory=tuple)
@@ -183,63 +183,61 @@ class VerifiedRatingEvidenceSnapshot(BaseModel):
     def compute_explicit_evidence_digest(self) -> str:
         """Compute an explicit evidence digest from all canonical fields.
 
-        This replaces the generic ``sha256_digest(self)`` with a
-        deterministic payload that includes:
-        - warning_digests / blocker_digests (individual digests)
-        - failure_digest (digest of failure model_dump, or "")
-        - provider / correlation identity digests
-        - all scalar fields and verification outcomes
+        Delegates to the standalone ``verified_rating_evidence_payload()``
+        function for exact 26-field deterministic payload.
         """
+        return sha256_digest(verified_rating_evidence_payload(self))
 
-        # Helper: get canonical dict for dataclasses vs Pydantic models
-        def _canon(obj: object) -> dict[str, Any]:
-            if isinstance(obj, BaseModel):
-                return obj.model_dump()
-            if dataclasses.is_dataclass(obj):
-                return dataclasses.asdict(obj)  # type: ignore[arg-type]
-            return {}  # fallback (should not happen for known types)
 
-        payload = {
-            "rating_status": self.rating_status.value
-            if isinstance(self.rating_status, RatingStatus)
-            else str(self.rating_status),
-            "heat_duty_w": self.heat_duty_w,
-            "hot_outlet_temperature_k": self.hot_outlet_temperature_k,
-            "cold_outlet_temperature_k": self.cold_outlet_temperature_k,
-            "area_inner_m2": self.area_inner_m2,
-            "area_outer_m2": self.area_outer_m2,
-            "UA_w_k": self.UA_w_k,
-            "LMTD_k": self.LMTD_k,
-            "energy_residual_w": self.energy_residual_w,
-            "ua_lmtd_residual_w": self.ua_lmtd_residual_w,
-            "tube_inlet_density_kg_m3": self.tube_inlet_density_kg_m3,
-            "annulus_inlet_density_kg_m3": self.annulus_inlet_density_kg_m3,
-            "tube_flow_area_m2": self.tube_flow_area_m2,
-            "annulus_flow_area_m2": self.annulus_flow_area_m2,
-            "warning_digests": tuple(sha256_digest(w) for w in self.warnings),
-            "blocker_digests": tuple(sha256_digest(b) for b in self.blockers),
-            "failure_digest": sha256_digest(_canon(self.failure))
-            if self.failure is not None
-            else "",
-            "provider_identity_digest": sha256_digest(_canon(self.provider_identity)),
-            "tube_correlation_digest": sha256_digest(_canon(self.tube_correlation))
-            if self.tube_correlation is not None
-            else "",
-            "annulus_correlation_digest": sha256_digest(_canon(self.annulus_correlation))
-            if self.annulus_correlation is not None
-            else "",
-            "rating_result_hash": self.rating_result_hash,
-            "rating_provenance_digest": self.rating_provenance_digest,
-            "hash_verification_outcome": self.hash_verification_outcome.value
-            if isinstance(self.hash_verification_outcome, VerificationOutcome)
-            else str(self.hash_verification_outcome),
-            "provenance_verification_outcome": self.provenance_verification_outcome.value
-            if isinstance(self.provenance_verification_outcome, VerificationOutcome)
-            else str(self.provenance_verification_outcome),
-            "rating_request_identity_digest": self.rating_request_identity_digest,
-            "rating_execution_context_digest": self.rating_execution_context_digest,
-        }
-        return sha256_digest(payload)
+# ---------------------------------------------------------------------------
+# Standalone 26-field evidence payload (P0-7)
+# ---------------------------------------------------------------------------
+
+
+def verified_rating_evidence_payload(
+    evidence: VerifiedRatingEvidenceSnapshot,
+) -> dict[str, object]:
+    """Compute the exact 26-field deterministic evidence payload.
+
+    Every field is drawn directly from ``evidence`` using the precise
+    serialisation rules specified in P0-7.
+    """
+    return {
+        "rating_status": evidence.rating_status.value,
+        "heat_duty_w": evidence.heat_duty_w,
+        "hot_outlet_temperature_k": evidence.hot_outlet_temperature_k,
+        "cold_outlet_temperature_k": evidence.cold_outlet_temperature_k,
+        "area_inner_m2": evidence.area_inner_m2,
+        "area_outer_m2": evidence.area_outer_m2,
+        "UA_w_k": evidence.UA_w_k,
+        "LMTD_k": evidence.LMTD_k,
+        "energy_residual_w": evidence.energy_residual_w,
+        "ua_lmtd_residual_w": evidence.ua_lmtd_residual_w,
+        "tube_inlet_density_kg_m3": evidence.tube_inlet_density_kg_m3,
+        "annulus_inlet_density_kg_m3": evidence.annulus_inlet_density_kg_m3,
+        "tube_flow_area_m2": evidence.tube_flow_area_m2,
+        "annulus_flow_area_m2": evidence.annulus_flow_area_m2,
+        "warning_digests": tuple(sorted(sha256_digest(w.model_dump()) for w in evidence.warnings)),
+        "blocker_digests": tuple(sorted(sha256_digest(b.model_dump()) for b in evidence.blockers)),
+        "failure_digest": sha256_digest(evidence.failure.model_dump())
+        if evidence.failure is not None
+        else None,
+        "provider_identity_digest": sha256_digest(dataclasses.asdict(evidence.provider_identity)),
+        "tube_correlation_digest": sha256_digest(dataclasses.asdict(evidence.tube_correlation))
+        if evidence.tube_correlation is not None
+        else None,
+        "annulus_correlation_digest": sha256_digest(
+            dataclasses.asdict(evidence.annulus_correlation)
+        )
+        if evidence.annulus_correlation is not None
+        else None,
+        "rating_result_hash": evidence.rating_result_hash,
+        "rating_provenance_digest": evidence.rating_provenance_digest,
+        "hash_verification_outcome": evidence.hash_verification_outcome.value,
+        "provenance_verification_outcome": evidence.provenance_verification_outcome.value,
+        "rating_request_identity_digest": evidence.rating_request_identity_digest,
+        "rating_execution_context_digest": evidence.rating_execution_context_digest,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -256,8 +254,8 @@ class InvalidRatingEvidenceRecord(BaseModel):
     claimed_rating_status: str | None = None
     claimed_result_hash: str | None = None
     claimed_provenance_digest: str | None = None
-    hash_verification_outcome: str  # VerificationOutcome
-    provenance_verification_outcome: str
+    hash_verification_outcome: VerificationOutcome
+    provenance_verification_outcome: VerificationOutcome
     rating_request_identity_digest: str | None = None
     claimed_provider_identity: ProviderIdentitySnapshot | None = None
     failure_reason: str | None = None
@@ -289,12 +287,12 @@ class CandidateEvaluationRecord(BaseModel):
 
     source_qualified_candidate_id: str
     evaluation_order_index: int
-    candidate_evaluation_state: str  # CandidateEvaluationState
+    candidate_evaluation_state: CandidateEvaluationState
     feasible: bool = False
-    feasibility_status: str = FeasibilityStatus.NOT_EVALUATED.value
+    feasibility_status: FeasibilityStatus = FeasibilityStatus.NOT_EVALUATED
 
-    hash_verification_outcome: str
-    provenance_verification_outcome: str
+    hash_verification_outcome: VerificationOutcome
+    provenance_verification_outcome: VerificationOutcome
 
     candidate_evaluation_identity: CandidateEvaluationIdentity | None = None
     claimed_rating_result_audit: ClaimedRatingResultAuditSnapshot | None = None
@@ -311,7 +309,7 @@ class CandidateEvaluationRecord(BaseModel):
         """Enforce state-field combination invariants — raise, not assert."""
         state = self.candidate_evaluation_state
 
-        if state == CandidateEvaluationState.UNEVALUATED.value:
+        if state is CandidateEvaluationState.UNEVALUATED:
             if self.candidate_evaluation_identity is not None:
                 raise ValueError("UNEVALUATED: candidate_evaluation_identity must be None")
             if self.verified_rating_evidence is not None:
@@ -321,7 +319,7 @@ class CandidateEvaluationRecord(BaseModel):
             if self.evaluation_failure is not None:
                 raise ValueError("UNEVALUATED: evaluation_failure must be None")
 
-        elif state == CandidateEvaluationState.VERIFIED.value:
+        elif state is CandidateEvaluationState.VERIFIED:
             if self.candidate_evaluation_identity is None:
                 raise ValueError("VERIFIED: candidate_evaluation_identity required")
             if self.verified_rating_evidence is None:
@@ -329,7 +327,7 @@ class CandidateEvaluationRecord(BaseModel):
             if self.invalid_rating_evidence is not None:
                 raise ValueError("VERIFIED: invalid_rating_evidence must be None")
 
-        elif state == CandidateEvaluationState.INTEGRITY_INVALID.value:
+        elif state is CandidateEvaluationState.INTEGRITY_INVALID:
             if self.candidate_evaluation_identity is not None:
                 raise ValueError("INTEGRITY_INVALID: candidate_evaluation_identity must be None")
             if self.verified_rating_evidence is not None:
@@ -341,7 +339,7 @@ class CandidateEvaluationRecord(BaseModel):
             if self.rating_status is not None:
                 raise ValueError("INTEGRITY_INVALID: rating_status must be None")
 
-        elif state == CandidateEvaluationState.RUNTIME_FAILED.value:
+        elif state is CandidateEvaluationState.RUNTIME_FAILED:
             if self.candidate_evaluation_identity is not None:
                 raise ValueError("RUNTIME_FAILED: candidate_evaluation_identity must be None")
             if self.verified_rating_evidence is not None:
@@ -402,63 +400,89 @@ def _digest_safe_field(field_name: str, safe_value: str | None) -> tuple[str, st
 def _build_audit_snapshot(
     candidate_id: str,
     index: int,
-    claim_state: str,
-    hash_outcome: str,
-    provenance_outcome: str,
+    claim_state: ClaimedRatingResultState,
+    hash_outcome: VerificationOutcome,
+    provenance_outcome: VerificationOutcome,
     result: RatingResult,
 ) -> ClaimedRatingResultAuditSnapshot:
-    """Build a safe audit snapshot — only 6 whitelisted fields.
+    """Build a safe audit snapshot — only 6 whitelisted fields (P0-8).
 
     MUST only be called with an exact ``RatingResult``.  Each field
-    is independently extracted and any error propagates (no suppression).
-    Uses P0-8 canonical payloads for identity digests and
-    safely_readable_field_digests format.
-    """
-    # Extract 6 whitelisted fields — errors propagate (fail-closed)
-    status_str: str | None = None
-    if type(result.status) is RatingStatus:
-        status_str = result.status.value
-    elif result.status is None:
-        status_str = None
-    else:
-        status_str = str(result.status)
+    is independently extracted with its own try/except so one failure
+    does not block others.
 
+    Uses SOURCE field names for safely_readable_field_digests entries:
+    "status", "result_hash", "provenance_digest", "request_identity",
+    "execution_context", "provider_identity".
+    """
+    # 1. status
+    status_str: str | None = None
+    try:
+        if type(result.status) is RatingStatus:
+            status_str = result.status.value
+        elif result.status is None:
+            status_str = None
+        else:
+            status_str = str(result.status)
+    except Exception:
+        status_str = None
+
+    # 2. result_hash
     result_hash_str: str | None = None
-    if type(result.result_hash) is str:
-        result_hash_str = result.result_hash
-    elif result.result_hash is None:
+    try:
+        if type(result.result_hash) is str:
+            result_hash_str = result.result_hash
+        elif result.result_hash is None:
+            result_hash_str = None
+    except Exception:
         result_hash_str = None
 
+    # 3. provenance_digest
     prov_digest: str | None = None
-    if type(result.provenance_digest) is str:
-        prov_digest = result.provenance_digest
-    elif result.provenance_digest is None:
+    try:
+        if type(result.provenance_digest) is str:
+            prov_digest = result.provenance_digest
+        elif result.provenance_digest is None:
+            prov_digest = None
+    except Exception:
         prov_digest = None
 
+    # 4. request_identity (dataclass — canonical asdict)
     ri_digest: str | None = None
-    if type(result.request_identity) is RatingRequestIdentity:
-        ri_digest = sha256_digest(dataclasses.asdict(result.request_identity))
+    try:
+        if type(result.request_identity) is RatingRequestIdentity:
+            ri_digest = sha256_digest(dataclasses.asdict(result.request_identity))
+    except Exception:
+        ri_digest = None
 
+    # 5. execution_context (BaseModel — canonical model_dump)
     ec_digest: str | None = None
-    if (
-        result.execution_context is not None
-        and type(result.execution_context) is ExecutionContextSnapshot
-    ):
-        ec_digest = sha256_digest(result.execution_context.model_dump())
+    try:
+        if (
+            result.execution_context is not None
+            and type(result.execution_context) is ExecutionContextSnapshot
+        ):
+            ec_digest = sha256_digest(result.execution_context.model_dump())
+    except Exception:
+        ec_digest = None
 
+    # 6. provider_identity (dataclass — canonical asdict)
     pi_digest: str | None = None
-    if type(result.provider_identity) is ProviderIdentitySnapshot:
-        pi_digest = sha256_digest(dataclasses.asdict(result.provider_identity))
+    try:
+        if type(result.provider_identity) is ProviderIdentitySnapshot:
+            pi_digest = sha256_digest(dataclasses.asdict(result.provider_identity))
+    except Exception:
+        pi_digest = None
 
-    # Build safely_readable_field_digests (P0-8 format)
+    # Build safely_readable_field_digests with SOURCE field names (P0-8)
     readable: list[tuple[str, str]] = []
     for key, val in [
-        ("claimed_result_hash", result_hash_str),
-        ("claimed_rating_status", status_str),
-        ("claimed_provenance_digest", prov_digest),
-        ("claimed_execution_context_digest", ec_digest),
-        ("claimed_provider_identity_digest", pi_digest),
-        ("claimed_request_identity_digest", ri_digest),
+        ("status", status_str),
+        ("result_hash", result_hash_str),
+        ("provenance_digest", prov_digest),
+        ("request_identity", ri_digest),
+        ("execution_context", ec_digest),
+        ("provider_identity", pi_digest),
     ]:
         entry = _digest_safe_field(key, val)
         if entry is not None:
@@ -625,25 +649,57 @@ def _extract_trusted_evidence(
         tube_density = cold_dens
         annulus_density = hot_dens
 
-    # --- Flow areas from geometry — errors propagate ---
-    tube_area: float | None = None
-    annulus_area: float | None = None
-    geom_dict = ri.geometry
-    if isinstance(geom_dict, dict):
-        from math import pi as MATH_PI
+    # --- Flow areas from geometry — fail-closed (P0-6) ---
+    import math
+    from math import pi as MATH_PI
 
-        r_i: object = geom_dict.get("inner_tube_inner_diameter_m", 0)
-        r_o: object = geom_dict.get("inner_tube_outer_diameter_m", 0)
-        d_outer: object = geom_dict.get("outer_pipe_inner_diameter_m", 0)
-        if r_i and r_o and d_outer:
-            try:
-                r_i_f = float(r_i)  # type: ignore[arg-type]
-                r_o_f = float(r_o)  # type: ignore[arg-type]
-                d_outer_f = float(d_outer)  # type: ignore[arg-type]
-                tube_area = MATH_PI * (r_i_f / 2.0) ** 2
-                annulus_area = MATH_PI * ((d_outer_f / 2.0) ** 2 - (r_o_f / 2.0) ** 2)
-            except (TypeError, ValueError):
-                raise ValueError("geometry dimensions must be convertible to float") from None
+    geom_dict = ri.geometry
+    if not isinstance(geom_dict, dict):
+        raise ValueError("geometry must be a dict")
+
+    r_i_raw: object = geom_dict.get("inner_tube_inner_diameter_m")
+    r_o_raw: object = geom_dict.get("inner_tube_outer_diameter_m")
+    d_outer_raw: object = geom_dict.get("outer_pipe_inner_diameter_m")
+
+    if r_i_raw is None or r_o_raw is None or d_outer_raw is None:
+        raise ValueError("geometry missing required diameter fields")
+
+    # Must be non-bool numeric (bools are ints in Python, reject them)
+    if isinstance(r_i_raw, bool) or isinstance(r_o_raw, bool) or isinstance(d_outer_raw, bool):
+        raise ValueError("geometry diameters must be numeric, not bool")
+
+    try:
+        r_i = float(r_i_raw)  # type: ignore[arg-type]
+        r_o = float(r_o_raw)  # type: ignore[arg-type]
+        d_outer = float(d_outer_raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise ValueError("geometry diameters must be convertible to float") from None
+
+    # Must be finite and positive
+    if not (math.isfinite(r_i) and r_i > 0):
+        raise ValueError(f"inner_tube_inner_diameter_m must be finite positive, got {r_i}")
+    if not (math.isfinite(r_o) and r_o > 0):
+        raise ValueError(f"inner_tube_outer_diameter_m must be finite positive, got {r_o}")
+    if not (math.isfinite(d_outer) and d_outer > 0):
+        raise ValueError(f"outer_pipe_inner_diameter_m must be finite positive, got {d_outer}")
+
+    # Geometric relations: inner tube ID < inner tube OD < outer pipe ID
+    if not (r_i < r_o):
+        raise ValueError(
+            f"inner_tube_inner_diameter ({r_i}) must be < inner_tube_outer_diameter ({r_o})"
+        )
+    if not (r_o < d_outer):
+        raise ValueError(
+            f"inner_tube_outer_diameter ({r_o}) must be < outer_pipe_inner_diameter ({d_outer})"
+        )
+
+    tube_area = MATH_PI * (r_i / 2.0) ** 2
+    annulus_area = MATH_PI * ((d_outer / 2.0) ** 2 - (r_o / 2.0) ** 2)
+
+    if not (math.isfinite(tube_area) and tube_area > 0):
+        raise ValueError(f"computed tube_flow_area must be finite positive, got {tube_area}")
+    if not (math.isfinite(annulus_area) and annulus_area > 0):
+        raise ValueError(f"computed annulus_flow_area must be finite positive, got {annulus_area}")
 
     # --- Warnings, blockers, failure — errors propagate ---
     warnings: tuple[EngineeringMessage, ...] = ()
@@ -811,7 +867,7 @@ def check_provider_consistency(
     consistent = True
 
     for rec in records:
-        if rec.candidate_evaluation_state != CandidateEvaluationState.VERIFIED.value:
+        if rec.candidate_evaluation_state is not CandidateEvaluationState.VERIFIED:
             continue
         ev = rec.verified_rating_evidence
         if ev is None:
@@ -838,11 +894,11 @@ def check_provider_consistency(
     # Inconsistent — mark ALL VERIFIED candidates as mismatched
     results: list[CandidateEvaluationRecord] = []
     for rec in records:
-        if rec.candidate_evaluation_state == CandidateEvaluationState.VERIFIED.value:
+        if rec.candidate_evaluation_state is CandidateEvaluationState.VERIFIED:
             new_rec = rec.model_copy(
                 update={
                     "provider_identity_matches": False,
-                    "feasibility_status": FeasibilityStatus.PROVIDER_IDENTITY_MISMATCH.value,
+                    "feasibility_status": FeasibilityStatus.PROVIDER_IDENTITY_MISMATCH,
                 }
             )
             results.append(new_rec)
@@ -859,8 +915,8 @@ def check_provider_consistency(
 def _build_invalid_evidence(
     candidate_id: str,
     result: RatingResult,
-    hash_outcome: str,
-    prov_outcome: str,
+    hash_outcome: VerificationOutcome,
+    prov_outcome: VerificationOutcome,
     failure_reason: str,
 ) -> InvalidRatingEvidenceRecord:
     """Build invalid evidence from safe fields only."""
@@ -906,18 +962,18 @@ def verify_and_evaluate_candidate(
         audit = ClaimedRatingResultAuditSnapshot(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
-            claim_state=ClaimedRatingResultState.UNREADABLE.value,
-            hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
-            provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+            claim_state=ClaimedRatingResultState.UNREADABLE,
+            hash_verification_outcome=VerificationOutcome.NOT_RUN,
+            provenance_verification_outcome=VerificationOutcome.NOT_RUN,
             safely_readable_field_digests=(),
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
+            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
             feasible=False,
-            hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
-            provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+            hash_verification_outcome=VerificationOutcome.NOT_RUN,
+            provenance_verification_outcome=VerificationOutcome.NOT_RUN,
             claimed_rating_result_audit=audit,
             evaluation_failure=RunFailure(
                 code=ErrorCode.INVALID_STATE_TRANSITION,
@@ -932,18 +988,18 @@ def verify_and_evaluate_candidate(
         audit = _build_audit_snapshot(
             source_qualified_candidate_id,
             candidate_index,
-            ClaimedRatingResultState.HASH_VERIFICATION_ERROR.value,
-            VerificationOutcome.ERROR.value,
-            VerificationOutcome.NOT_RUN.value,
+            ClaimedRatingResultState.HASH_VERIFICATION_ERROR,
+            VerificationOutcome.ERROR,
+            VerificationOutcome.NOT_RUN,
             result,
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
+            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
             feasible=False,
-            hash_verification_outcome=VerificationOutcome.ERROR.value,
-            provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+            hash_verification_outcome=VerificationOutcome.ERROR,
+            provenance_verification_outcome=VerificationOutcome.NOT_RUN,
             claimed_rating_result_audit=audit,
             evaluation_failure=RunFailure(
                 code=ErrorCode.HASH_MISMATCH,
@@ -955,25 +1011,25 @@ def verify_and_evaluate_candidate(
         audit = _build_audit_snapshot(
             source_qualified_candidate_id,
             candidate_index,
-            ClaimedRatingResultState.HASH_VERIFICATION_ERROR.value,
-            VerificationOutcome.FAILED.value,
-            VerificationOutcome.NOT_RUN.value,
+            ClaimedRatingResultState.HASH_VERIFICATION_ERROR,
+            VerificationOutcome.FAILED,
+            VerificationOutcome.NOT_RUN,
             result,
         )
         invalid = _build_invalid_evidence(
             source_qualified_candidate_id,
             result,
-            VerificationOutcome.FAILED.value,
-            VerificationOutcome.NOT_RUN.value,
+            VerificationOutcome.FAILED,
+            VerificationOutcome.NOT_RUN,
             "hash verification failed",
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.INTEGRITY_INVALID.value,
+            candidate_evaluation_state=CandidateEvaluationState.INTEGRITY_INVALID,
             feasible=False,
-            hash_verification_outcome=VerificationOutcome.FAILED.value,
-            provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+            hash_verification_outcome=VerificationOutcome.FAILED,
+            provenance_verification_outcome=VerificationOutcome.NOT_RUN,
             claimed_rating_result_audit=audit,
             invalid_rating_evidence=invalid,
             provider_identity_matches=False,
@@ -987,18 +1043,18 @@ def verify_and_evaluate_candidate(
         audit = _build_audit_snapshot(
             source_qualified_candidate_id,
             candidate_index,
-            ClaimedRatingResultState.PROVENANCE_VERIFICATION_ERROR.value,
-            VerificationOutcome.PASSED.value,
-            VerificationOutcome.ERROR.value,
+            ClaimedRatingResultState.PROVENANCE_VERIFICATION_ERROR,
+            VerificationOutcome.PASSED,
+            VerificationOutcome.ERROR,
             result,
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
+            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
             feasible=False,
-            hash_verification_outcome=VerificationOutcome.PASSED.value,
-            provenance_verification_outcome=VerificationOutcome.ERROR.value,
+            hash_verification_outcome=VerificationOutcome.PASSED,
+            provenance_verification_outcome=VerificationOutcome.ERROR,
             claimed_rating_result_audit=audit,
             evaluation_failure=RunFailure(
                 code=ErrorCode.PROVENANCE_INCOMPLETE,
@@ -1010,25 +1066,25 @@ def verify_and_evaluate_candidate(
         audit = _build_audit_snapshot(
             source_qualified_candidate_id,
             candidate_index,
-            ClaimedRatingResultState.PROVENANCE_VERIFICATION_ERROR.value,
-            VerificationOutcome.PASSED.value,
-            VerificationOutcome.FAILED.value,
+            ClaimedRatingResultState.PROVENANCE_VERIFICATION_ERROR,
+            VerificationOutcome.PASSED,
+            VerificationOutcome.FAILED,
             result,
         )
         invalid = _build_invalid_evidence(
             source_qualified_candidate_id,
             result,
-            VerificationOutcome.PASSED.value,
-            VerificationOutcome.FAILED.value,
+            VerificationOutcome.PASSED,
+            VerificationOutcome.FAILED,
             "provenance verification failed",
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.INTEGRITY_INVALID.value,
+            candidate_evaluation_state=CandidateEvaluationState.INTEGRITY_INVALID,
             feasible=False,
-            hash_verification_outcome=VerificationOutcome.PASSED.value,
-            provenance_verification_outcome=VerificationOutcome.FAILED.value,
+            hash_verification_outcome=VerificationOutcome.PASSED,
+            provenance_verification_outcome=VerificationOutcome.FAILED,
             claimed_rating_result_audit=audit,
             invalid_rating_evidence=invalid,
             rating_status=None,
@@ -1041,18 +1097,18 @@ def verify_and_evaluate_candidate(
         audit = _build_audit_snapshot(
             source_qualified_candidate_id,
             candidate_index,
-            ClaimedRatingResultState.HASH_VERIFICATION_ERROR.value,
-            VerificationOutcome.PASSED.value,
-            VerificationOutcome.PASSED.value,
+            ClaimedRatingResultState.HASH_VERIFICATION_ERROR,
+            VerificationOutcome.PASSED,
+            VerificationOutcome.PASSED,
             result,
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
+            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
             feasible=False,
-            hash_verification_outcome=VerificationOutcome.PASSED.value,
-            provenance_verification_outcome=VerificationOutcome.PASSED.value,
+            hash_verification_outcome=VerificationOutcome.PASSED,
+            provenance_verification_outcome=VerificationOutcome.PASSED,
             claimed_rating_result_audit=audit,
             evaluation_failure=RunFailure(
                 code=ErrorCode.INVALID_STATE_TRANSITION,
@@ -1078,10 +1134,10 @@ def verify_and_evaluate_candidate(
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
             evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
+            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
             feasible=False,
-            hash_verification_outcome=VerificationOutcome.PASSED.value,
-            provenance_verification_outcome=VerificationOutcome.PASSED.value,
+            hash_verification_outcome=VerificationOutcome.PASSED,
+            provenance_verification_outcome=VerificationOutcome.PASSED,
             evaluation_failure=RunFailure(
                 code=ErrorCode.INVALID_STATE_TRANSITION,
                 message="Failed to build candidate evaluation identity",
@@ -1089,9 +1145,9 @@ def verify_and_evaluate_candidate(
         )
 
     # Phase 2: always not-evaluated feasibility
-    feasibility_status = FeasibilityStatus.NOT_EVALUATED.value
+    feasibility_status = FeasibilityStatus.NOT_EVALUATED
     if not provider_matches:
-        feasibility_status = FeasibilityStatus.PROVIDER_IDENTITY_MISMATCH.value
+        feasibility_status = FeasibilityStatus.PROVIDER_IDENTITY_MISMATCH
 
     # Build rating_status string for the record
     rating_status_str: str | None = None
@@ -1101,11 +1157,11 @@ def verify_and_evaluate_candidate(
     return CandidateEvaluationRecord(
         source_qualified_candidate_id=source_qualified_candidate_id,
         evaluation_order_index=candidate_index,
-        candidate_evaluation_state=CandidateEvaluationState.VERIFIED.value,
+        candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
         feasible=False,
         feasibility_status=feasibility_status,
-        hash_verification_outcome=VerificationOutcome.PASSED.value,
-        provenance_verification_outcome=VerificationOutcome.PASSED.value,
+        hash_verification_outcome=VerificationOutcome.PASSED,
+        provenance_verification_outcome=VerificationOutcome.PASSED,
         candidate_evaluation_identity=eval_identity,
         verified_rating_evidence=evidence,
         provider_identity_matches=provider_matches,
@@ -1151,10 +1207,10 @@ def verify_and_evaluate_candidates(
                 CandidateEvaluationRecord(
                     source_qualified_candidate_id=candidate_id,
                     evaluation_order_index=index,
-                    candidate_evaluation_state=CandidateEvaluationState.UNEVALUATED.value,
+                    candidate_evaluation_state=CandidateEvaluationState.UNEVALUATED,
                     feasible=False,
-                    hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
-                    provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+                    hash_verification_outcome=VerificationOutcome.NOT_RUN,
+                    provenance_verification_outcome=VerificationOutcome.NOT_RUN,
                 )
             )
             continue
@@ -1170,8 +1226,8 @@ def verify_and_evaluate_candidates(
 
         # Activate strict stop when verification fails
         if rec.candidate_evaluation_state in (
-            CandidateEvaluationState.RUNTIME_FAILED.value,
-            CandidateEvaluationState.INTEGRITY_INVALID.value,
+            CandidateEvaluationState.RUNTIME_FAILED,
+            CandidateEvaluationState.INTEGRITY_INVALID,
         ):
             strict_stop = True
 

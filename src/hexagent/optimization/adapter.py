@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from decimal import Decimal
-from typing import Any
 
 from hexagent.core.heat_balance import CalculationContext
 from hexagent.correlations.flow import ThermalBoundaryCondition
@@ -28,7 +27,7 @@ from hexagent.optimization.evaluation import (
     CandidateEvaluationState,
     VerificationOutcome,
     check_provider_consistency,
-    verify_and_evaluate_candidates,
+    verify_and_evaluate_candidate,
 )
 from hexagent.optimization.identities import ManufacturableCandidate
 from hexagent.properties.base import FluidIdentifier, PropertyProvider
@@ -113,6 +112,22 @@ def _verify_identity_consistency(
             f"cold_fluid.equation_of_state_backend={cold_fluid.equation_of_state_backend!r} != "
             f"sizing_request_identity.cold_fluid_equation_of_state="
             f"{sizing_request_identity.cold_fluid_equation_of_state!r}"
+        )
+
+    # Fluid components (P0-3): compare canonical-sorted (name, fraction) tuples
+    hot_components = tuple(sorted(hot_fluid.components, key=lambda p: p[0]))
+    if hot_components != sizing_request_identity.hot_fluid_normalized_components:
+        errors.append(
+            f"hot_fluid.components={hot_components} != "
+            f"sizing_request_identity.hot_fluid_normalized_components="
+            f"{sizing_request_identity.hot_fluid_normalized_components}"
+        )
+    cold_components = tuple(sorted(cold_fluid.components, key=lambda p: p[0]))
+    if cold_components != sizing_request_identity.cold_fluid_normalized_components:
+        errors.append(
+            f"cold_fluid.components={cold_components} != "
+            f"sizing_request_identity.cold_fluid_normalized_components="
+            f"{sizing_request_identity.cold_fluid_normalized_components}"
         )
 
     # Inlet conditions
@@ -261,7 +276,7 @@ def rate_candidate(
     minimum_terminal_delta_t: float,
     tube_boundary_condition: ThermalBoundaryCondition | str = "adiabatic",
     annulus_boundary_condition: ThermalBoundaryCondition | str = "adiabatic",
-    context: CalculationContext | None = None,
+    context: CalculationContext,
     rating_fn: RatingCallable = rate_double_pipe,
 ) -> RatingResult:
     """Evaluate a single candidate via ``rate_double_pipe()``."""
@@ -332,21 +347,22 @@ def evaluate_all_candidates(
     sizing_request_identity: SizingRequestIdentity,
     rating_fn: RatingCallable = rate_double_pipe,
 ) -> tuple[CandidateEvaluationRecord, ...]:
-    """Evaluate all candidates with uniform request parameters (P0-3 .. P0-10).
+    """Evaluate all candidates with strict serial pipeline (P0-1, P0-10).
 
     Accepts a ``MaterializedCandidateSet`` artifact for provenance verification
     (replaces separate ``candidates`` + ``gate`` params).
 
-    Each candidate receives its own typed ``CalculationContext`` via
-    ``build_candidate_calculation_context``.
+    Strict serial pipeline (P0-1):
+      For each candidate in sequence:
+        1. Build ``CalculationContext``
+        2. Call ``rate_candidate()``
+        3. Call ``verify_and_evaluate_candidate()`` for hash + provenance verification
+      - If adapter raises → emit ``RUNTIME_FAILED`` for that candidate,
+        ``UNEVALUATED`` for all remaining candidates, STOP.
+      - If hash/provenance fails → emit ``UNEVALUATED`` for all remaining
+        candidates, STOP.
 
-    Strict-stop semantics (P0-10):
-      - Adapter-level exceptions (``rate_candidate`` raises) cause all
-        subsequent candidates to be emitted as ``UNEVALUATED``.
-      - Verification failures (hash / provenance) are handled by
-        ``verify_and_evaluate_candidates()`` which also applies strict stop.
-
-    After all candidates are evaluated, ``check_provider_consistency()`` is
+    After all candidates are processed, ``check_provider_consistency()`` is
     applied to the full result set (P0-5).
     """
 
@@ -391,30 +407,33 @@ def evaluate_all_candidates(
     )
 
     # ------------------------------------------------------------------
-    # Pre-rate all candidates — handle adapter-level exceptions with
-    # strict stop
+    # P0-1: Strict serial pipeline — rate then verify per candidate
     # ------------------------------------------------------------------
-    successful_results: list[tuple[int, str, Any]] = []
-    pre_failures: dict[int, CandidateEvaluationRecord] = {}
+    results: list[CandidateEvaluationRecord] = []
     strict_stop = False
 
     for candidate in candidates:
         if strict_stop:
-            pre_failures[candidate.evaluation_order_index] = CandidateEvaluationRecord(
-                source_qualified_candidate_id=candidate.source_qualified_candidate_id,
-                evaluation_order_index=candidate.evaluation_order_index,
-                candidate_evaluation_state=CandidateEvaluationState.UNEVALUATED.value,
-                feasible=False,
-                hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
-                provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
+            results.append(
+                CandidateEvaluationRecord(
+                    source_qualified_candidate_id=candidate.source_qualified_candidate_id,
+                    evaluation_order_index=candidate.evaluation_order_index,
+                    candidate_evaluation_state=CandidateEvaluationState.UNEVALUATED,
+                    feasible=False,
+                    hash_verification_outcome=VerificationOutcome.NOT_RUN,
+                    provenance_verification_outcome=VerificationOutcome.NOT_RUN,
+                )
             )
             continue
 
+        # --- Step 1: Build CalculationContext ---
+        ctx = build_candidate_calculation_context(
+            sizing_request_identity=sizing_request_identity,
+            source_qualified_candidate_id=candidate.source_qualified_candidate_id,
+        )
+
+        # --- Step 2: Rate candidate (adapter) ---
         try:
-            ctx = build_candidate_calculation_context(
-                sizing_request_identity=sizing_request_identity,
-                source_qualified_candidate_id=candidate.source_qualified_candidate_id,
-            )
             result = rate_candidate(
                 candidate,
                 hot_fluid=hot_fluid,
@@ -436,58 +455,46 @@ def evaluate_all_candidates(
                 rating_fn=rating_fn,
             )
         except Exception as exc:
-            pre_failures[candidate.evaluation_order_index] = CandidateEvaluationRecord(
-                source_qualified_candidate_id=candidate.source_qualified_candidate_id,
-                evaluation_order_index=candidate.evaluation_order_index,
-                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED.value,
-                feasible=False,
-                hash_verification_outcome=VerificationOutcome.NOT_RUN.value,
-                provenance_verification_outcome=VerificationOutcome.NOT_RUN.value,
-                evaluation_failure=RunFailure(
-                    code=ErrorCode.TASK008_ADAPTER,
-                    message=f"TASK-008 adapter raised: {exc}",
-                ),
+            results.append(
+                CandidateEvaluationRecord(
+                    source_qualified_candidate_id=candidate.source_qualified_candidate_id,
+                    evaluation_order_index=candidate.evaluation_order_index,
+                    candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                    feasible=False,
+                    hash_verification_outcome=VerificationOutcome.NOT_RUN,
+                    provenance_verification_outcome=VerificationOutcome.NOT_RUN,
+                    evaluation_failure=RunFailure(
+                        code=ErrorCode.TASK008_ADAPTER,
+                        message=f"TASK-008 adapter raised: {exc}",
+                    ),
+                )
             )
             strict_stop = True
             continue
 
-        successful_results.append(
-            (
-                candidate.evaluation_order_index,
-                candidate.source_qualified_candidate_id,
-                result,
-            )
-        )
-
-    # ------------------------------------------------------------------
-    # P0-10: Verify successful results (strict stop for verification
-    # failures)
-    # ------------------------------------------------------------------
-    verified = list(
-        verify_and_evaluate_candidates(
-            tuple(successful_results),
+        # --- Step 3: Verify hash + provenance ---
+        rec = verify_and_evaluate_candidate(
+            candidate.evaluation_order_index,
+            candidate.source_qualified_candidate_id,
+            result,
             sizing_request_identity_digest=(sizing_request_identity.sizing_request_identity_digest),
             tube_in_hot=tube_in_hot,
-            expected_provider=(sizing_request_identity.expected_provider_identity),
+            expected_provider=sizing_request_identity.expected_provider_identity,
         )
-    )
 
-    # ------------------------------------------------------------------
-    # Merge pre-failures (adapter-level) with verified records, preserving
-    # original evaluation order
-    # ------------------------------------------------------------------
-    all_records: dict[int, CandidateEvaluationRecord] = {}
-    for rec in pre_failures.values():
-        all_records[rec.evaluation_order_index] = rec
-    for rec in verified:
-        all_records[rec.evaluation_order_index] = rec
+        # Activate strict stop on verification failure
+        if rec.candidate_evaluation_state in (
+            CandidateEvaluationState.RUNTIME_FAILED,
+            CandidateEvaluationState.INTEGRITY_INVALID,
+        ):
+            strict_stop = True
 
-    merged = tuple(all_records[i] for i in sorted(all_records))
+        results.append(rec)
 
     # ------------------------------------------------------------------
     # P0-5: Provider consistency across all candidates
     # ------------------------------------------------------------------
-    merged = check_provider_consistency(merged)
+    merged = check_provider_consistency(tuple(results))
 
     return merged
 

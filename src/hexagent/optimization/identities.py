@@ -5,12 +5,17 @@ source-qualified candidate deduplication and ordering.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from hexagent.core.canonical import sha256_digest
-from hexagent.optimization.context import PassedSizingGate
+from hexagent.optimization.context import (
+    MaterializedCandidateSet,
+    PassedSizingGate,
+    create_materialized_candidate_set,
+)
 from hexagent.optimization.models import (
     CatalogSnapshotRef,
     CompleteDoublePipeAssemblyOption,
@@ -270,6 +275,19 @@ def build_candidate(
 
 
 # ---------------------------------------------------------------------------
+# MaterializationResult — binds candidates + MaterializedCandidateSet
+# ---------------------------------------------------------------------------
+
+
+@dataclasses.dataclass(frozen=True)
+class MaterializationResult:
+    """Result of materialize_all_candidates()."""
+
+    candidates: tuple[ManufacturableCandidate, ...]
+    candidate_set: MaterializedCandidateSet
+
+
+# ---------------------------------------------------------------------------
 # Materialize all candidates for a request (aggregate pipeline step)
 # ---------------------------------------------------------------------------
 
@@ -277,9 +295,10 @@ def build_candidate(
 def materialize_all_candidates(
     catalogs: tuple[CompleteDoublePipeCatalogSnapshot, ...],
     sizing_gate: PassedSizingGate,
+    sizing_request_identity_digest: str,
     minimum_effective_length_m: float | None = None,
     maximum_effective_length_m: float | None = None,
-) -> tuple[ManufacturableCandidate, ...]:
+) -> MaterializationResult:
     """Materialise and deduplicate all candidates for a sizing request.
 
     Requires a validated ``PassedSizingGate`` artifact from Phase 1.
@@ -362,10 +381,29 @@ def materialize_all_candidates(
             f"!= gate raw_combination_count {sizing_gate.raw_combination_count}"
         )
 
-    return deduplicate_and_order_candidates(tuple(all_candidates))
+    deduped_candidates = deduplicate_and_order_candidates(tuple(all_candidates))
+
+    # Build catalog_snapshot_identities from catalogs
+    catalog_snapshot_identities = tuple(catalog_snapshot_ref(cat) for cat in catalogs)
+
+    candidate_set = create_materialized_candidate_set(
+        sizing_request_identity_digest=sizing_request_identity_digest,
+        passed_gate_digest=sizing_gate.gate_digest,
+        catalog_snapshot_identities=catalog_snapshot_identities,
+        minimum_effective_length_m=minimum_effective_length_m,
+        maximum_effective_length_m=maximum_effective_length_m,
+        raw_combination_count=sizing_gate.raw_combination_count,
+        ordered_candidates=deduped_candidates,
+    )
+
+    return MaterializationResult(
+        candidates=deduped_candidates,
+        candidate_set=candidate_set,
+    )
 
 
 __all__ = [
+    "MaterializationResult",
     "PhysicalCandidateIdentity",
     "SourceQualifiedCandidateIdentity",
     "ManufacturableCandidate",
