@@ -1,9 +1,6 @@
 """
-TASK-009 Phase 2 — TASK-008 adapter.
-
-Maps materialized candidates to ``rate_double_pipe()`` calls, forwards
-uniform request parameters, and returns raw ``RatingResult`` objects
-for verification.
+TASK-009 Phase 2 — TASK-008 adapter with typed CalculationContext,
+PassedSizingGate artifact, and batch error isolation.
 """
 
 from __future__ import annotations
@@ -18,6 +15,7 @@ from hexagent.exchangers.double_pipe.rating import rate_double_pipe
 from hexagent.exchangers.double_pipe.result import RatingResult
 from hexagent.exchangers.double_pipe.solver import SolverParams
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+from hexagent.optimization.context import PassedSizingGate, build_candidate_calculation_context
 from hexagent.optimization.identities import ManufacturableCandidate
 from hexagent.properties.base import FluidIdentifier, PropertyProvider
 
@@ -27,19 +25,16 @@ from hexagent.properties.base import FluidIdentifier, PropertyProvider
 
 RatingCallable = Callable[..., RatingResult]
 
+
 # ---------------------------------------------------------------------------
-# TASK-008 adapter — per-candidate rating call
+# Geometry builder
 # ---------------------------------------------------------------------------
 
 
 def build_candidate_geometry(
     candidate: ManufacturableCandidate,
 ) -> DoublePipeGeometry:
-    """Build a ``DoublePipeGeometry`` from a materialized candidate.
-
-    The effective length is parsed from the canonical string and
-    passed as a float.
-    """
+    """Build a ``DoublePipeGeometry`` from a materialized candidate."""
     length_m = float(Decimal(candidate.effective_length_m_canonical))
     return DoublePipeGeometry(
         inner_tube_inner_diameter_m=candidate.physical_identity.inner_tube_inner_diameter_m,
@@ -54,6 +49,11 @@ def build_candidate_geometry(
     )
 
 
+# ---------------------------------------------------------------------------
+# Per-candidate rating
+# ---------------------------------------------------------------------------
+
+
 def rate_candidate(
     candidate: ManufacturableCandidate,
     *,
@@ -66,7 +66,7 @@ def rate_candidate(
     hot_inlet_pressure_pa: float,
     cold_inlet_pressure_pa: float,
     tube_in_hot: bool,
-    flow_arrangement: FlowArrangement,
+    flow_arrangement: FlowArrangement | str,
     provider: PropertyProvider,
     solver_params: SolverParams,
     minimum_terminal_delta_t: float,
@@ -75,16 +75,9 @@ def rate_candidate(
     context: Any = None,
     rating_fn: RatingCallable = rate_double_pipe,
 ) -> RatingResult:
-    """Evaluate a single candidate via ``rate_double_pipe()``.
-
-    All flow/fluid/solver parameters are shared across all candidates
-    in a sizing run.  Only the geometry (length) varies per candidate.
-
-    Returns an exact ``RatingResult`` (never raises for domain errors).
-    """
+    """Evaluate a single candidate via ``rate_double_pipe()``."""
     geometry = build_candidate_geometry(candidate)
 
-    # Resolve boundary condition strings to enum if needed
     tbc = (
         ThermalBoundaryCondition(tube_boundary_condition)
         if isinstance(tube_boundary_condition, str)
@@ -94,6 +87,12 @@ def rate_candidate(
         ThermalBoundaryCondition(annulus_boundary_condition)
         if isinstance(annulus_boundary_condition, str)
         else annulus_boundary_condition
+    )
+
+    fa = (
+        flow_arrangement
+        if isinstance(flow_arrangement, FlowArrangement)
+        else FlowArrangement(flow_arrangement)
     )
 
     return rating_fn(
@@ -107,7 +106,7 @@ def rate_candidate(
         hot_inlet_pressure_pa=hot_inlet_pressure_pa,
         cold_inlet_pressure_pa=cold_inlet_pressure_pa,
         tube_in_hot=tube_in_hot,
-        flow_arrangement=flow_arrangement,
+        flow_arrangement=fa,
         provider=provider,
         solver_params=solver_params,
         context=context,
@@ -118,7 +117,7 @@ def rate_candidate(
 
 
 # ---------------------------------------------------------------------------
-# Batch evaluation — process all candidates
+# Batch evaluation with typed per-candidate CalculationContext
 # ---------------------------------------------------------------------------
 
 
@@ -134,44 +133,63 @@ def evaluate_all_candidates(
     hot_inlet_pressure_pa: float,
     cold_inlet_pressure_pa: float,
     tube_in_hot: bool,
-    flow_arrangement: FlowArrangement,
+    flow_arrangement: FlowArrangement | str,
     provider: PropertyProvider,
     solver_params: SolverParams,
     minimum_terminal_delta_t: float,
     tube_boundary_condition: ThermalBoundaryCondition | str = "adiabatic",
     annulus_boundary_condition: ThermalBoundaryCondition | str = "adiabatic",
-    context_builder: Callable[[ManufacturableCandidate], Any] | None = None,
+    sizing_gate: PassedSizingGate,
+    sizing_request_identity_digest: str,
     rating_fn: RatingCallable = rate_double_pipe,
 ) -> tuple[tuple[ManufacturableCandidate, RatingResult], ...]:
     """Evaluate all candidates with uniform request parameters.
 
-    Returns a tuple of ``(candidate, rating_result)`` pairs preserving
-    candidate evaluation order.
+    Each candidate receives its own typed ``CalculationContext`` via
+    ``build_candidate_calculation_context``.
+
+    One candidate's adapter exception does not abort the entire batch.
+    Results preserve canonical candidate order.
     """
+
+    # Verify gate
+    gate_digest = sizing_gate.gate_digest
+    if not gate_digest:
+        raise ValueError("Invalid gate digest")
+
     results: list[tuple[ManufacturableCandidate, RatingResult]] = []
     for candidate in candidates:
-        ctx = context_builder(candidate) if context_builder else None
-        result = rate_candidate(
-            candidate,
-            hot_fluid=hot_fluid,
-            cold_fluid=cold_fluid,
-            hot_mass_flow_kg_s=hot_mass_flow_kg_s,
-            cold_mass_flow_kg_s=cold_mass_flow_kg_s,
-            hot_inlet_temperature_k=hot_inlet_temperature_k,
-            cold_inlet_temperature_k=cold_inlet_temperature_k,
-            hot_inlet_pressure_pa=hot_inlet_pressure_pa,
-            cold_inlet_pressure_pa=cold_inlet_pressure_pa,
-            tube_in_hot=tube_in_hot,
-            flow_arrangement=flow_arrangement,
-            provider=provider,
-            solver_params=solver_params,
-            minimum_terminal_delta_t=minimum_terminal_delta_t,
-            tube_boundary_condition=tube_boundary_condition,
-            annulus_boundary_condition=annulus_boundary_condition,
-            context=ctx,
-            rating_fn=rating_fn,
-        )
-        results.append((candidate, result))
+        try:
+            ctx = build_candidate_calculation_context(
+                sizing_request_identity=sizing_request_identity_digest,
+                source_qualified_candidate_id=candidate.source_qualified_candidate_id,
+            )
+            result = rate_candidate(
+                candidate,
+                hot_fluid=hot_fluid,
+                cold_fluid=cold_fluid,
+                hot_mass_flow_kg_s=hot_mass_flow_kg_s,
+                cold_mass_flow_kg_s=cold_mass_flow_kg_s,
+                hot_inlet_temperature_k=hot_inlet_temperature_k,
+                cold_inlet_temperature_k=cold_inlet_temperature_k,
+                hot_inlet_pressure_pa=hot_inlet_pressure_pa,
+                cold_inlet_pressure_pa=cold_inlet_pressure_pa,
+                tube_in_hot=tube_in_hot,
+                flow_arrangement=flow_arrangement,
+                provider=provider,
+                solver_params=solver_params,
+                minimum_terminal_delta_t=minimum_terminal_delta_t,
+                tube_boundary_condition=tube_boundary_condition,
+                annulus_boundary_condition=annulus_boundary_condition,
+                context=ctx,
+                rating_fn=rating_fn,
+            )
+            results.append((candidate, result))
+        except Exception:
+            # Candidate adapter runtime failure — continue with next
+            # The caller must handle missing ratings via the verification step.
+            # We append a sentinel so result order is preserved.
+            results.append((candidate, None))  # type: ignore[arg-type]
     return tuple(results)
 
 

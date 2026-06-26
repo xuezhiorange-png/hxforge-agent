@@ -14,6 +14,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from hexagent.optimization._quantum import canonicalize_length_quantum
+from hexagent.optimization.errors import CatalogInvalid
 from hexagent.optimization.length import (
     canonicalize_explicit_lengths,
     from_tick,
@@ -34,20 +35,25 @@ from hexagent.optimization.models import (
 
 def materialize_lengths_for_source(
     length_source: LengthSource,
-    quantum: str,
+    quantum: str | None = None,
     minimum_effective_length_m: float | None = None,
     maximum_effective_length_m: float | None = None,
 ) -> tuple[str, ...]:
     """Materialize the canonical effective-length strings for *length_source*.
 
-    Returns the materialised lengths as canonical ``Decimal`` strings,
-    sorted ascending.  The count is guaranteed to equal the Phase 1
-    intersection count (verified by the caller).
-
-    Raises ``CatalogInvalid`` if the source is misconfigured or the
-    quantum is invalid.
+    If *quantum* is provided, it must match ``length_source.length_quantum_m``
+    after canonicalization, or ``CatalogInvalid`` is raised.  If omitted,
+    the quantum is read from the length source.
     """
-    q = Decimal(canonicalize_length_quantum(quantum))
+    source_quantum = canonicalize_length_quantum(length_source.length_quantum_m)
+    if quantum is not None:
+        external_quantum = canonicalize_length_quantum(quantum)
+        if external_quantum != source_quantum:
+            raise CatalogInvalid(
+                f"External quantum {external_quantum!r} does not match "
+                f"source quantum {source_quantum!r}"
+            )
+    q = Decimal(source_quantum)
     request_min_tick = request_min_ceiling(minimum_effective_length_m, q)
     request_max_tick = request_max_floor(maximum_effective_length_m, q)
 

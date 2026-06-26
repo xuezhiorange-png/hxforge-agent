@@ -5,7 +5,9 @@ source-qualified candidate deduplication and ordering.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from hexagent.core.canonical import sha256_digest
 from hexagent.optimization.models import (
@@ -120,6 +122,74 @@ class ManufacturableCandidate(BaseModel):
 
     # Evaluation order (assigned after dedup + canonical sort)
     evaluation_order_index: int
+
+    @model_validator(mode="after")
+    def _verify_self_consistency(self) -> Self:
+        errors: list[str] = []
+
+        # physical_identity_digest == physical_identity.physical_identity_digest
+        expected_physical_digest = self.physical_identity.physical_identity_digest
+        if self.physical_identity_digest != expected_physical_digest:
+            errors.append(
+                f"physical_identity_digest mismatch: "
+                f"{self.physical_identity_digest!r} != {expected_physical_digest!r}"
+            )
+
+        # source_qualified_identity.physical_identity_digest == physical_identity_digest
+        if self.source_qualified_identity.physical_identity_digest != self.physical_identity_digest:
+            errors.append(
+                "source_qualified_identity.physical_identity_digest "
+                f"({self.source_qualified_identity.physical_identity_digest!r}) "
+                f"!= physical_identity_digest ({self.physical_identity_digest!r})"
+            )
+
+        # source_qualified_candidate_id
+        expected_sq_id = self.source_qualified_identity.source_qualified_candidate_id
+        if self.source_qualified_candidate_id != expected_sq_id:
+            errors.append(
+                f"source_qualified_candidate_id mismatch: "
+                f"{self.source_qualified_candidate_id!r} != {expected_sq_id!r}"
+            )
+
+        # catalog_snapshot_ref fields match source-qualified catalog fields
+        sr = self.catalog_snapshot_ref
+        sq = self.source_qualified_identity
+        if sr.catalog_id != sq.catalog_id:
+            errors.append(f"catalog_id: {sr.catalog_id!r} != {sq.catalog_id!r}")
+        if sr.catalog_version != sq.catalog_version:
+            errors.append(f"catalog_version: {sr.catalog_version!r} != {sq.catalog_version!r}")
+        if sr.catalog_content_hash != sq.catalog_content_hash:
+            errors.append(
+                f"catalog_content_hash: {sr.catalog_content_hash!r} != {sq.catalog_content_hash!r}"
+            )
+
+        # assembly_option_id matches source-qualified
+        if self.assembly_option_id != sq.assembly_option_id:
+            errors.append(
+                f"assembly_option_id: {self.assembly_option_id!r} != {sq.assembly_option_id!r}"
+            )
+
+        # manufacturing_option_identity matches source-qualified
+        if self.manufacturing_option_identity != sq.manufacturing_option_identity:
+            errors.append(
+                f"manufacturing_option_identity: "
+                f"{self.manufacturing_option_identity!r} != "
+                f"{sq.manufacturing_option_identity!r}"
+            )
+
+        # effective_length_m_canonical matches physical identity
+        if self.effective_length_m_canonical != self.physical_identity.effective_length_m_canonical:
+            errors.append("effective_length_m_canonical mismatch with physical_identity")
+
+        # evaluation_order_index >= -1
+        if self.evaluation_order_index < -1:
+            errors.append(
+                f"evaluation_order_index must be >= -1, got {self.evaluation_order_index}"
+            )
+
+        if errors:
+            raise ValueError("; ".join(errors))
+        return self
 
 
 # ---------------------------------------------------------------------------
