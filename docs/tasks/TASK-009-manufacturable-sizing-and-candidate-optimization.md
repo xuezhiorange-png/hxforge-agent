@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 45 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 46 Engineering Design Review passes.
 
 ---
 
@@ -78,6 +78,7 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 42 | 4806697790 | CHANGES REQUIRED |
 | 43 | 4806775891 | CHANGES REQUIRED |
 | 44 | 4806817422 | CHANGES REQUIRED |
+| 45 | 4806876116 | CHANGES REQUIRED |
 
 ## 4. Data Model
 
@@ -2160,7 +2161,7 @@ trap - EXIT
 9. The core file is never re-extracted or re-written between steps 5–8.
 10. Python 3.12 is mandatory. If Python 3.12 is not available or fails, the pipeline fails:
     - `TASK-009: BLOCKED`
-    - `Not ready for Round 45 Engineering Design Review`
+    - `Not ready for Round 46 Engineering Design Review`
 11. All four gates must pass. A `SKIP` or missing output for any gate has the same effect as a failure.
 12. After all gates pass, the final integrity checks (step 9) confirm the manifest, extractor and core files are unchanged since steps 2/4.
 
@@ -6095,10 +6096,10 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ### 27.21 Round 30 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 44 changes. **Expected output**: Round 44 row exists with Comment ID `4806817422`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 44 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 44 row in review history. **Expected output**: Round 44 immediately follows Round 43. Every Review History row contains exactly three non-empty cells. **Exception**: N/A — sync test: ordering and structure check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 45 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+501. **Input**: Review history table after Round 45 changes. **Expected output**: Round 45 row exists with Comment ID `4806876116`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 45 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 45 row in review history. **Expected output**: Round 45 immediately follows Round 44. Every Review History row contains exactly three non-empty cells. **Exception**: N/A — sync test: ordering and structure check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 46 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
 505. **Input**: `CountingMapping` with call counter. **Expected output**: `items()` is called exactly once during canonicalization. **Exception**: N/A — single-read invariant: items acquired exactly once.
 506. **Input**: Captured Mapping items iterable is used for iteration. **Expected output**: Canonicalizer iterates the captured items, does not re-read the original Mapping. **Exception**: N/A — single-read invariant: captured iterable is consumed.
 507. **Input**: Mapping whose second `items()` call raises `RuntimeError`. **Expected output**: Canonicalization succeeds because the second call is never made. **Exception**: N/A — single-read invariant: second call not triggered.
@@ -6133,8 +6134,8 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 536. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: Rejected by `invariant_feasible_count_range` because `feasible > unique`. **Exception**: `ValueError` — feasible range invariant fires before feasible_le_verified.
 537. **Input**: Standalone `invariant_feasible_le_verified` helper with `unique=10, verified=8, feasible=9`. **Expected output**: `ValueError` raised because `feasible > verified`. **Exception**: `ValueError` — unit contract for feasible_le_verified independent of registry ordering.
 538. **Input**: Deterministic candidate UUID5: same request+candidate → same UUID; different candidate → different UUID; insertion-order independent. **Expected output**: All three UUID5 invariants satisfied. **Exception**: N/A — regression: deterministic IDs unchanged.
-539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 45; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
-540. **Input**: Current document and Issue synchronization state after Round 44 remediation. **Expected output**: Review History contains Round 44 and Comment ID 4806817422; Gate references Round 45 Engineering Design Review; Issue Frozen SHA equals current commit; Global test numbering continuous through test 565; Zero/dual provenance roots remain rejected. **Exception**: N/A — structural synchronization contract.
+539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 46; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
+540. **Input**: Current document and Issue synchronization state after Round 45 remediation. **Expected output**: Review History contains Round 45 and Comment ID 4806876116; Gate references Round 46 Engineering Design Review; Issue Frozen SHA equals current commit; Global test numbering continuous through test 565; Zero/dual provenance roots remain rejected. **Exception**: N/A — structural synchronization contract.
 ---
 ### 27.22 Round 33 Extraction Contract Tests (541–565)
 
@@ -6186,7 +6187,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 28. Delivery Sequence
 
-1. Complete Round 45 Engineering Design Review.
+1. Complete Round 46 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -6200,7 +6201,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 45 Engineering Design Review passes before implementation starts
+- [ ] Round 46 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
