@@ -22,15 +22,14 @@ from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 from hexagent.optimization.context import (
     ExpectedProviderIdentity,
     OptimizationObjective,
-    PassedSizingGate,
     SizingRequestIdentity,
     build_candidate_calculation_context,
     build_sizing_request_identity,
+    create_passed_sizing_gate,
 )
 from hexagent.optimization.evaluation import (
     CandidateEvaluationIdentity,
     CandidateEvaluationState,
-    ClaimedRatingResultState,
     FeasibilityStatus,
     VerificationOutcome,
     VerifiedRatingEvidenceSnapshot,
@@ -259,7 +258,7 @@ class TestSizingRequestIdentity:
 
     def test_required_duty_must_be_typed(self) -> None:
         """required_duty_w must be present and a float."""
-        ident = self._make_identity(required_duty_w=0.0)
+        ident = self._make_identity(required_duty_w=1.0)
         assert isinstance(ident.required_duty_w, float)
 
     def test_top_n_bool_rejected(self) -> None:
@@ -328,20 +327,103 @@ class TestSizingRequestIdentity:
 class TestCandidateContext:
     """Typed per-candidate CalculationContext."""
 
+    def _make_ctx_identity(
+        self,
+        digest_suffix: str = "d",
+    ) -> SizingRequestIdentity:
+        opt = _make_opt()
+        cat = _make_cat(options=(opt,))
+        req = SizingRequest(catalogs=(cat,))
+        return build_sizing_request_identity(
+            request=req,
+            hot_fluid_name="w",
+            cold_fluid_name="b",
+            hot_fluid_equation_of_state="i",
+            cold_fluid_equation_of_state="n",
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            minimum_terminal_delta_t=5.0,
+            required_duty_w=1000.0,
+            duty_absolute_tolerance_w=10.0,
+            duty_relative_tolerance=0.01,
+            optimization_objective=OptimizationObjective.MINIMIZE_AREA,
+            top_n=5,
+            solver_params=SolverParams(),
+            expected_provider_identity=_default_expected_provider(),
+        )
+
     def test_uuid5_deterministic(self) -> None:
-        ctx_a = build_candidate_calculation_context("digest1", "sq_1")
-        ctx_b = build_candidate_calculation_context("digest1", "sq_1")
+        ident = self._make_ctx_identity("d1")
+        ctx_a = build_candidate_calculation_context(ident, "sq_1")
+        ctx_b = build_candidate_calculation_context(ident, "sq_1")
         assert ctx_a.request_id == ctx_b.request_id
         assert ctx_a.request_id.version == 5
 
     def test_candidate_changes_id(self) -> None:
-        a = build_candidate_calculation_context("dig1", "sq_a")
-        b = build_candidate_calculation_context("dig1", "sq_b")
+        ident = self._make_ctx_identity("d2")
+        a = build_candidate_calculation_context(ident, "sq_a")
+        b = build_candidate_calculation_context(ident, "sq_b")
         assert a.request_id != b.request_id
 
     def test_sizing_identity_changes_id(self) -> None:
-        a = build_candidate_calculation_context("dig_a", "sq1")
-        b = build_candidate_calculation_context("dig_b", "sq1")
+        # Different fluid names produce different digests -> different IDs
+        opt = _make_opt()
+        cat = _make_cat(options=(opt,))
+        req = SizingRequest(catalogs=(cat,))
+        ident_a = build_sizing_request_identity(
+            request=req,
+            hot_fluid_name="water",
+            cold_fluid_name="brine",
+            hot_fluid_equation_of_state="i",
+            cold_fluid_equation_of_state="n",
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            minimum_terminal_delta_t=5.0,
+            required_duty_w=1000.0,
+            duty_absolute_tolerance_w=10.0,
+            duty_relative_tolerance=0.01,
+            optimization_objective=OptimizationObjective.MINIMIZE_AREA,
+            top_n=5,
+            solver_params=SolverParams(),
+            expected_provider_identity=_default_expected_provider(),
+        )
+        ident_b = build_sizing_request_identity(
+            request=req,
+            hot_fluid_name="steam",
+            cold_fluid_name="oil",
+            hot_fluid_equation_of_state="i",
+            cold_fluid_equation_of_state="n",
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            minimum_terminal_delta_t=5.0,
+            required_duty_w=1000.0,
+            duty_absolute_tolerance_w=10.0,
+            duty_relative_tolerance=0.01,
+            optimization_objective=OptimizationObjective.MINIMIZE_AREA,
+            top_n=5,
+            solver_params=SolverParams(),
+            expected_provider_identity=_default_expected_provider(),
+        )
+        a = build_candidate_calculation_context(ident_a, "sq1")
+        b = build_candidate_calculation_context(ident_b, "sq1")
         assert a.request_id != b.request_id
 
     def test_domain_id_preserved(self) -> None:
@@ -378,7 +460,8 @@ class TestCandidateContext:
         assert ctx.design_case_revision_id == uid
 
     def test_missing_id_none(self) -> None:
-        ctx = build_candidate_calculation_context("dig", "sq_1")
+        ident = self._make_ctx_identity("d3")
+        ctx = build_candidate_calculation_context(ident, "sq_1")
         assert ctx.design_case_revision_id is None
         assert ctx.calculation_run_id is None
 
@@ -470,10 +553,8 @@ class TestExactTypeBoundary:
             expected_provider=_default_expected_provider(),
         )
         assert rec.candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED.value
-        assert rec.claimed_rating_result_audit is not None
-        assert (
-            rec.claimed_rating_result_audit.claim_state == ClaimedRatingResultState.UNREADABLE.value
-        )
+        # Non-exact objects never enter audit; audit is None
+        assert rec.claimed_rating_result_audit is None
 
     def test_audit_snapshot_has_claim_state(self) -> None:
         rec = verify_and_evaluate_candidate(
@@ -964,26 +1045,52 @@ class TestPassedSizingGate:
     """PassedSizingGate artifact."""
 
     def test_gate_created(self) -> None:
-        gate = PassedSizingGate(
+        from hexagent.optimization.models import OptionRawCountRecord
+
+        rec = OptionRawCountRecord(
+            catalog_id="c1",
+            catalog_version="v1",
+            catalog_content_hash="h1",
+            assembly_option_id="opt1",
+            canonical_length_quantum_m="0.1",
+            raw_count=5,
+        )
+        gate = create_passed_sizing_gate(
             sizing_request_identity_digest="sha256:d",
-            raw_combination_count=10,
+            raw_combination_count=5,
             effective_cap=100,
+            per_option_records=(rec,),
         )
         assert gate.status == "passed"
-        assert gate.gate_digest is not None
+        assert gate.gate_digest != ""
+        assert gate.verify_digest()
 
     def test_gate_digest_deterministic(self) -> None:
-        g1 = PassedSizingGate(
-            sizing_request_identity_digest="sha256:d",
-            raw_combination_count=10,
-            effective_cap=100,
+        from hexagent.optimization.models import OptionRawCountRecord
+
+        rec = OptionRawCountRecord(
+            catalog_id="c1",
+            catalog_version="v1",
+            catalog_content_hash="h1",
+            assembly_option_id="opt1",
+            canonical_length_quantum_m="0.1",
+            raw_count=5,
         )
-        g2 = PassedSizingGate(
+        g1 = create_passed_sizing_gate(
             sizing_request_identity_digest="sha256:d",
-            raw_combination_count=10,
+            raw_combination_count=5,
             effective_cap=100,
+            per_option_records=(rec,),
+        )
+        g2 = create_passed_sizing_gate(
+            sizing_request_identity_digest="sha256:d",
+            raw_combination_count=5,
+            effective_cap=100,
+            per_option_records=(rec,),
         )
         assert g1.gate_digest == g2.gate_digest
+        assert g1.verify_digest()
+        assert g2.verify_digest()
 
 
 # ============================================================================
