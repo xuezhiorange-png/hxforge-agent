@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 40 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 41 Engineering Design Review passes.
 
 ---
 
@@ -73,7 +73,8 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 37 | 4805898911 | CHANGES REQUIRED |
 | 38 | 4805976149 | CHANGES REQUIRED |
 | 39 | 4806107217 | CHANGES REQUIRED |
-|
+| 40 | 4806560405 | CHANGES REQUIRED |
+
 ## 4. Data Model
 
 ### 4.1 Container Hierarchy
@@ -1942,6 +1943,20 @@ CORE_PATH="/tmp/task009_canonicalization_core.py"
 DIGEST_PATH="/tmp/task009_canonicalization_core.sha256"
 UNTRUSTED_HELPER_PATH="/tmp/extract_task009_extractor_block.py"
 
+cleanup_on_failure() {
+  status=$?
+  if [ "${status}" -ne 0 ]; then
+    rm -f \
+      "${DOCUMENT_EXTRACTOR_PATH}" \
+      "${EXTRACTOR_PATH}" \
+      "${CORE_PATH}" \
+      "${DIGEST_PATH}" \
+    || true
+  fi
+  exit "${status}"
+}
+trap cleanup_on_failure EXIT
+
 rm -f \
   "${UNTRUSTED_HELPER_PATH}" \
   "${DOCUMENT_EXTRACTOR_PATH}" \
@@ -2125,6 +2140,7 @@ test "$(
   | awk '{print $1}'
 )" = "${EXECUTED_EXTRACTOR_SHA}"
 test ! -e "${UNTRUSTED_HELPER_PATH}"
+trap - EXIT
 ```
 
 **Contracts:**
@@ -2140,7 +2156,7 @@ test ! -e "${UNTRUSTED_HELPER_PATH}"
 9. The core file is never re-extracted or re-written between steps 5–8.
 10. Python 3.12 is mandatory. If Python 3.12 is not available or fails, the pipeline fails:
     - `TASK-009: BLOCKED`
-    - `Not ready for Round 40 Engineering Design Review`
+    - `Not ready for Round 41 Engineering Design Review`
 11. All four gates must pass. A `SKIP` or missing output for any gate has the same effect as a failure.
 12. After all gates pass, the final integrity checks (step 9) confirm the manifest, extractor and core files are unchanged since steps 2/4.
 
@@ -6075,10 +6091,10 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ### 27.21 Round 30 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 39 changes. **Expected output**: Round 39 row exists with Comment ID `4806107217`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 39 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 39 row in review history. **Expected output**: Round 39 immediately follows Round 38. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 40 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+501. **Input**: Review history table after Round 40 changes. **Expected output**: Round 40 row exists with Comment ID `4806560405`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 40 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 40 row in review history. **Expected output**: Round 40 immediately follows Round 39. Every Review History row contains exactly three non-empty cells. **Exception**: N/A — sync test: ordering and structure check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 41 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
 505. **Input**: `CountingMapping` with call counter. **Expected output**: `items()` is called exactly once during canonicalization. **Exception**: N/A — single-read invariant: items acquired exactly once.
 506. **Input**: Captured Mapping items iterable is used for iteration. **Expected output**: Canonicalizer iterates the captured items, does not re-read the original Mapping. **Exception**: N/A — single-read invariant: captured iterable is consumed.
 507. **Input**: Mapping whose second `items()` call raises `RuntimeError`. **Expected output**: Canonicalization succeeds because the second call is never made. **Exception**: N/A — single-read invariant: second call not triggered.
@@ -6113,8 +6129,8 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 536. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: Rejected by `invariant_feasible_count_range` because `feasible > unique`. **Exception**: `ValueError` — feasible range invariant fires before feasible_le_verified.
 537. **Input**: Standalone `invariant_feasible_le_verified` helper with `unique=10, verified=8, feasible=9`. **Expected output**: `ValueError` raised because `feasible > verified`. **Exception**: `ValueError` — unit contract for feasible_le_verified independent of registry ordering.
 538. **Input**: Deterministic candidate UUID5: same request+candidate → same UUID; different candidate → different UUID; insertion-order independent. **Expected output**: All three UUID5 invariants satisfied. **Exception**: N/A — regression: deterministic IDs unchanged.
-539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 40; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
-540. **Input**: Current document and Issue synchronization state after Round 39 remediation. **Expected output**: Review History contains Round 39 and Comment ID 4806107217; Gate references Round 40 Engineering Design Review; Issue Frozen SHA equals current commit; Global test numbering continuous through test 565; Zero/dual provenance roots remain rejected. **Exception**: N/A — structural synchronization contract.
+539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 41; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
+540. **Input**: Current document and Issue synchronization state after Round 40 remediation. **Expected output**: Review History contains Round 40 and Comment ID 4806560405; Gate references Round 41 Engineering Design Review; Issue Frozen SHA equals current commit; Global test numbering continuous through test 565; Zero/dual provenance roots remain rejected. **Exception**: N/A — structural synchronization contract.
 ---
 ### 27.22 Round 33 Extraction Contract Tests (541–565)
 
@@ -6141,7 +6157,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 561. **Input**: Exact extracted core block. **Expected output**: `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found`. **Exception**: N/A — Python 3.12 strict mypy passes.
 562. **Input**: Authoritative verification pipeline ($14.7.2.4). **Expected output**: All four `sha256sum --check` commands report OK; all use the same digest manifest; manifest is created exactly once. **Exception**: N/A — no-rewrite contract satisfied.
 563. **Input**: Authoritative extraction script from §14.7.2.4. **Expected output**: `python3.11 -W error /tmp/extract_task009_core.py` runs without `SyntaxWarning` or `RuntimeWarning`. **Exception**: N/A — script is warning-free.
-564. **Input**: The sole authoritative verification pipeline, `TASK009_CORE_EXTRACTOR_PY` marker region, isolated mutated document copies, and a malicious pre-existing untrusted helper. **Expected output**:
+564. **Input**: The sole authoritative verification pipeline with failure cleanup trap, `TASK009_CORE_EXTRACTOR_PY` marker region, isolated mutated document copies, and a malicious pre-existing untrusted helper. **Expected output**:
 - The untrusted helper is deleted before any Python execution and is never invoked.
 - The extractor is derived directly from the frozen document by the quoted inline bootstrap.
 - The first marker-region line is exactly the Python opening fence.
@@ -6153,14 +6169,19 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 - Multiple fenced blocks fail closed.
 - Document-derived and executed extractor pass byte and SHA-256 identity checks before execution.
 - A one-byte executed-extractor mutation fails before core extraction.
-- After any bootstrap or extractor-authentication failure, document-derived extractor, executed extractor, CORE_PATH, and DIGEST_PATH do not exist.
-**Exception**: Any marker, fence-line, byte-identity, or SHA-identity violation terminates with non-zero exit before authoritative extractor, core, or manifest creation.
+- The cleanup trap is installed after variable definitions and initial rm.
+- On any failure, the cleanup trap removes DOCUMENT_EXTRACTOR_PATH, EXTRACTOR_PATH, CORE_PATH, and DIGEST_PATH.
+- The cleanup trap preserves the original failure exit code (does not overwrite with `rm` exit code).
+- On success, `trap - EXIT` disables the trap before the final integrity check completes.
+- After any bootstrap or extractor-authentication failure: DOCUMENT_EXTRACTOR_PATH, EXTRACTOR_PATH, CORE_PATH, and DIGEST_PATH do not exist.
+- After any bootstrap or extractor-authentication failure: pipeline exit code is non-zero and equals the original failure code.
+**Exception**: Any marker, fence-line, byte-identity, or SHA-identity violation terminates with non-zero exit before authoritative extractor, core, or manifest creation. The cleanup trap runs automatically; pipeline success is the only condition where artifacts are retained.
 565. **Input**: Exhaustive contract-test numbering from 1 through 565. **Expected output**: Every integer from 1 through 565 occurs exactly once; no duplicate number exists; no gap exists; Round 33 extraction tests occupy exactly 541 through 565. **Exception**: N/A — total coverage and numbering invariant.
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 40 Engineering Design Review.
+1. Complete Round 41 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -6174,7 +6195,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 40 Engineering Design Review passes before implementation starts
+- [ ] Round 41 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
