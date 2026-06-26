@@ -9,7 +9,7 @@
 **Draft PR:** Not created
 **Production implementation:** Not started
 
-TASK-009 returns to READY only after Round 37 Engineering Design Review passes.
+TASK-009 returns to READY only after Round 38 Engineering Design Review passes.
 
 ---
 
@@ -67,9 +67,10 @@ From a caller-supplied, structurally validated, hash-verified set of complete do
 | 31 | 4802985042 | CHANGES REQUIRED |
 | 32 | 4803145772 | CHANGES REQUIRED |
 | 33 | 4803236346 | CHANGES REQUIRED |
-|| 34 | 4805670891 | CHANGES REQUIRED |
-|| 35 | 4805725156 | CHANGES REQUIRED |
-|| 36 | 4805851659 | CHANGES REQUIRED |
+| 34 | 4805670891 | CHANGES REQUIRED |
+| 35 | 4805725156 | CHANGES REQUIRED |
+| 36 | 4805851659 | CHANGES REQUIRED |
+| 37 | 4805898911 | CHANGES REQUIRED |
 
 ## 4. Data Model
 
@@ -1923,91 +1924,7 @@ The digest file is created **once** after authoritative extraction. All four ver
 
 The extractor script must be mechanically extracted from the current frozen document. A pre-existing or tampered copy in `/tmp` is rejected. The same applied to the core block: it must be freshly derived from the extractor, never reused from a prior run.
 
-##### Helper: extractor-block extractor (`/tmp/extract_task009_extractor_block.py`)
 
-This script is a one-use tool that extracts the `TASK009_CORE_EXTRACTOR_PY` block from the frozen document. It is the sole authority for producing the executable extractor. It must itself be manually verified once against the block below and then trusted to reproduce itself.
-
-The block-extraction rules mirror the core-block contract:
-
-1. The document is read as UTF-8 bytes. No text normalisation is applied before extraction.
-2. The `BEGIN TASK009_CORE_EXTRACTOR_PY` marker appears exactly once.
-3. The `END TASK009_CORE_EXTRACTOR_PY` marker appears exactly once, after the BEGIN marker.
-4. The BEGIN marker is immediately followed by `\n` and a `` ```python `` fence.
-5. The END marker is immediately preceded by a `` ``` `` closing fence.
-6. The region between the fences contains exactly two fence tokens (opening and closing).
-7. Only the raw bytes between the fences are written. No `.strip()`, `.replace()` or newline conversion.
-8. After writing to the output path, the file is re-read and the bytes are verified to be identical.
-
-```python
-from hashlib import sha256
-from pathlib import Path
-
-DOC_PATH = Path(
-    "docs/tasks/"
-    "TASK-009-manufacturable-sizing-and-candidate-optimization.md"
-)
-BLOCK_ID = b"TASK009_CORE_EXTRACTOR_PY"
-BEGIN_MARKER = b"<!-- BEGIN " + BLOCK_ID + b" -->\n"
-END_MARKER = b"<!-- END " + BLOCK_ID + b" -->"
-OPENING_FENCE = b"```python\n"
-CLOSING_FENCE = b"```\n"
-FENCE_TOKEN = b"```"
-OUTPUT_PATH = Path("/tmp/document_task009_core_extractor.py")
-
-
-def extract_block(document_bytes: bytes) -> bytes:
-    if document_bytes.count(BEGIN_MARKER) != 1:
-        raise RuntimeError(
-            "extractor BEGIN marker count must equal 1"
-        )
-    if document_bytes.count(END_MARKER) != 1:
-        raise RuntimeError(
-            "extractor END marker count must equal 1"
-        )
-    begin_idx = (
-        document_bytes.index(BEGIN_MARKER)
-        + len(BEGIN_MARKER)
-    )
-    end_idx = document_bytes.index(
-        END_MARKER, begin_idx
-    )
-    region = document_bytes[begin_idx:end_idx]
-    if not region.startswith(OPENING_FENCE):
-        raise RuntimeError(
-            "extractor BEGIN marker must be "
-            "followed immediately by a python fence"
-        )
-    if not region.endswith(CLOSING_FENCE):
-        raise RuntimeError(
-            "extractor END marker must be "
-            "preceded immediately by a closing fence"
-        )
-    if region.count(FENCE_TOKEN) != 2:
-        raise RuntimeError(
-            "extractor region must contain exactly "
-            "two fence tokens"
-        )
-    code = region[len(OPENING_FENCE):-len(CLOSING_FENCE)]
-    if not code:
-        raise RuntimeError(
-            "extracted extractor block must not be empty"
-        )
-    return code
-
-
-document_bytes = DOC_PATH.read_bytes()
-extracted = extract_block(document_bytes)
-OUTPUT_PATH.write_bytes(extracted)
-written = OUTPUT_PATH.read_bytes()
-if written != extracted:
-    raise RuntimeError(
-        "written extractor differs from source bytes"
-    )
-digest = sha256(extracted).hexdigest()
-print(f"path={OUTPUT_PATH}")
-print(f"size={len(extracted)}")
-print(f"sha256={digest}")
-```
 
 ##### Full authoritative verification pipeline
 
@@ -2021,17 +1938,89 @@ DOCUMENT_EXTRACTOR_PATH="/tmp/document_task009_core_extractor.py"
 EXTRACTOR_PATH="/tmp/extract_task009_core.py"
 CORE_PATH="/tmp/task009_canonicalization_core.py"
 DIGEST_PATH="/tmp/task009_canonicalization_core.sha256"
+UNTRUSTED_HELPER_PATH="/tmp/extract_task009_extractor_block.py"
 
 rm -f \
+  "${UNTRUSTED_HELPER_PATH}" \
   "${DOCUMENT_EXTRACTOR_PATH}" \
   "${EXTRACTOR_PATH}" \
   "${CORE_PATH}" \
   "${DIGEST_PATH}"
 
-# 1. Mechanically extract the authoritative extractor from DOCUMENT_PATH.
-python3.11 -W error /tmp/extract_task009_extractor_block.py
+test ! -e "${UNTRUSTED_HELPER_PATH}"
 
-# 2. Establish executed-extractor identity.
+# 1. Extract the authoritative extractor directly from the frozen document.
+python3.11 -W error - \
+  "${DOCUMENT_PATH}" \
+  "${DOCUMENT_EXTRACTOR_PATH}" <<'PY'
+from __future__ import annotations
+from hashlib import sha256
+from pathlib import Path
+import sys
+
+document_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+
+block_id = b"TASK009_CORE_EXTRACTOR_PY"
+begin_marker = b"<!-- BEGIN " + block_id + b" -->\n"
+end_marker = b"<!-- END " + block_id + b" -->"
+opening_fence = b"```python\n"
+closing_fence = b"```\n"
+
+document_bytes = document_path.read_bytes()
+
+if document_bytes.count(begin_marker) != 1:
+    raise RuntimeError(
+        "extractor BEGIN marker count must equal 1"
+    )
+if document_bytes.count(end_marker) != 1:
+    raise RuntimeError(
+        "extractor END marker count must equal 1"
+    )
+
+begin_index = (
+    document_bytes.index(begin_marker)
+    + len(begin_marker)
+)
+end_index = document_bytes.index(
+    end_marker, begin_index,
+)
+
+region = document_bytes[begin_index:end_index]
+
+if not region.startswith(opening_fence):
+    raise RuntimeError(
+        "extractor BEGIN marker must be followed "
+        "immediately by a python fence"
+    )
+if not region.endswith(closing_fence):
+    raise RuntimeError(
+        "extractor END marker must be preceded "
+        "immediately by a closing fence"
+    )
+
+extracted_bytes = region[
+    len(opening_fence):-len(closing_fence)
+]
+if not extracted_bytes:
+    raise RuntimeError(
+        "extracted extractor block must not be empty"
+    )
+
+output_path.write_bytes(extracted_bytes)
+written_bytes = output_path.read_bytes()
+if written_bytes != extracted_bytes:
+    raise RuntimeError(
+        "written extractor differs from source bytes"
+    )
+
+digest = sha256(extracted_bytes).hexdigest()
+print(f"path={output_path}")
+print(f"size={len(extracted_bytes)}")
+print(f"sha256={digest}")
+PY
+
+# 2. Establish the exact executed-extractor identity.
 cp "${DOCUMENT_EXTRACTOR_PATH}" "${EXTRACTOR_PATH}"
 cmp --silent \
   "${DOCUMENT_EXTRACTOR_PATH}" \
@@ -2046,28 +2035,50 @@ EXECUTED_EXTRACTOR_SHA="$(
 )"
 test "${DOCUMENT_EXTRACTOR_SHA}" \
   = "${EXECUTED_EXTRACTOR_SHA}"
+DOCUMENT_EXTRACTOR_SIZE="$(
+  wc -c < "${DOCUMENT_EXTRACTOR_PATH}"
+)"
+EXECUTED_EXTRACTOR_SIZE="$(
+  wc -c < "${EXTRACTOR_PATH}"
+)"
+test "${DOCUMENT_EXTRACTOR_SIZE}" \
+  = "${EXECUTED_EXTRACTOR_SIZE}"
+echo \
+  "document_extractor_path=${DOCUMENT_EXTRACTOR_PATH}"
+echo \
+  "executed_extractor_path=${EXTRACTOR_PATH}"
+echo \
+  "document_extractor_size=${DOCUMENT_EXTRACTOR_SIZE}"
+echo \
+  "executed_extractor_size=${EXECUTED_EXTRACTOR_SIZE}"
 echo \
   "document_extractor_sha256=${DOCUMENT_EXTRACTOR_SHA}"
 echo \
   "executed_extractor_sha256=${EXECUTED_EXTRACTOR_SHA}"
 
-# 3. Execute the authenticated extractor.
+# 3. Execute only the authenticated extractor.
 python3.11 -W error "${EXTRACTOR_PATH}"
 
 # 4. Create the sole core digest manifest exactly once.
 sha256sum "${CORE_PATH}" > "${DIGEST_PATH}"
-EXPECTED_DIGEST="$(
+EXPECTED_CORE_SHA="$(
   awk '{print $1}' "${DIGEST_PATH}"
 )"
-test -n "${EXPECTED_DIGEST}"
-echo "core_sha256=${EXPECTED_DIGEST}"
+CORE_SIZE="$(
+  wc -c < "${CORE_PATH}"
+)"
+test -n "${EXPECTED_CORE_SHA}"
+echo "core_path=${CORE_PATH}"
+echo "core_size=${CORE_SIZE}"
+echo "core_sha256=${EXPECTED_CORE_SHA}"
+echo "digest_path=${DIGEST_PATH}"
 cat "${DIGEST_PATH}"
 
 # 5. Python 3.11 execution gate.
 sha256sum --check "${DIGEST_PATH}"
 python3.11 "${CORE_PATH}"
 
-# 6. Python 3.11 strict-mypy gate.
+# 6. Python 3.11 strict mypy gate.
 sha256sum --check "${DIGEST_PATH}"
 python3.11 -m mypy --strict "${CORE_PATH}"
 
@@ -2075,17 +2086,17 @@ python3.11 -m mypy --strict "${CORE_PATH}"
 sha256sum --check "${DIGEST_PATH}"
 python3.12 "${CORE_PATH}"
 
-# 8. Python 3.12 strict-mypy gate.
+# 8. Python 3.12 strict mypy gate.
 sha256sum --check "${DIGEST_PATH}"
 python3.12 -m mypy --strict "${CORE_PATH}"
 
-# 9. Final integrity checks.
+# 9. Final integrity assertions.
 test "$(
   awk '{print $1}' "${DIGEST_PATH}"
-)" = "${EXPECTED_DIGEST}"
+)" = "${EXPECTED_CORE_SHA}"
 test "$(
   sha256sum "${CORE_PATH}" | awk '{print $1}'
-)" = "${EXPECTED_DIGEST}"
+)" = "${EXPECTED_CORE_SHA}"
 cmp --silent \
   "${DOCUMENT_EXTRACTOR_PATH}" \
   "${EXTRACTOR_PATH}"
@@ -2097,23 +2108,25 @@ test "$(
   sha256sum "${EXTRACTOR_PATH}" \
   | awk '{print $1}'
 )" = "${EXECUTED_EXTRACTOR_SHA}"
+test ! -e "${UNTRUSTED_HELPER_PATH}"
 ```
 
 **Contracts:**
 
-1. The extractor script is mechanically extracted from the frozen document at step 1; a pre-existing `/tmp/extract_task009_core.py` is deleted at start.
-2. The document-derived and executed extractor are byte-identical and SHA-identical before step 3 (step 2).
-3. The digest manifest is generated exactly once after core extraction, at step 4.
-4. All four verification gates (steps 5–8) check against that same manifest.
-5. `set -euo pipefail` ensures a failed `sha256sum --check` terminates immediately; subsequent Python or mypy on a tampered file never executes.
-6. Any prepend, append, replacement or single-byte change to either the extractor or the core file causes a non-zero exit before the tampered program executes.
-7. The manifest is never regenerated between steps 5–8.
-8. The core file is never re-extracted or re-written between steps 5–8.
-9. Python 3.12 is mandatory. If Python 3.12 is not available or fails, the pipeline fails:
-   - `TASK-009: BLOCKED`
-   - `Not ready for Round 37 Engineering Design Review`
-10. All four gates must pass. A `SKIP` or missing output for any gate has the same effect as a failure.
-11. After all gates pass, the final integrity checks (step 9) confirm the manifest, extractor and core files are unchanged from step 2/4.
+1. The untrusted helper `/tmp/extract_task009_extractor_block.py` is deleted at pipeline start; the pipeline never executes it.
+2. The extractor is mechanically extracted directly from the frozen document by an inline quoted Python heredoc. No pre-existing helper script is used.
+3. The document-derived and executed extractor are byte-identical and SHA-identical before step 3 (step 2).
+4. The digest manifest is generated exactly once after core extraction, at step 4.
+5. All four verification gates (steps 5–8) check against that same manifest.
+6. `set -euo pipefail` ensures a failed `sha256sum --check` terminates immediately; the subsequent Python or mypy on a tampered file never executes.
+7. If extractor identity authentication fails (step 2), the core file and digest manifest are never created, and no gate executes.
+8. The manifest is never regenerated between steps 5–8.
+9. The core file is never re-extracted or re-written between steps 5–8.
+10. Python 3.12 is mandatory. If Python 3.12 is not available or fails, the pipeline fails:
+    - `TASK-009: BLOCKED`
+    - `Not ready for Round 38 Engineering Design Review`
+11. All four gates must pass. A `SKIP` or missing output for any gate has the same effect as a failure.
+12. After all gates pass, the final integrity checks (step 9) confirm the manifest, extractor and core files are unchanged since steps 2/4.
 
 Historical note: Round 32 was reviewed when Python 3.12 was temporarily unavailable and gates correctly reported SKIP. That does not change the current mandatory requirement.
 
@@ -2124,6 +2137,7 @@ python3.11 -W error /tmp/extract_task009_core.py
 ```
 
 It prints `path=`, `size=` and `sha256=` lines. It does **not** create the manifest, call `sha256sum`, call `subprocess`, or declare gates passed.
+
 
 
 Usage:
@@ -6045,10 +6059,10 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ### 27.21 Round 30 Contract Tests (501–540)
 
-501. **Input**: Review history table after Round 36 changes. **Expected output**: Round 36 row exists with Comment ID `4805851659`. **Exception**: N/A — sync test: structural consistency check.
-502. **Input**: Round 36 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
-503. **Input**: Round 36 row in review history. **Expected output**: Round 36 immediately follows Round 35. **Exception**: N/A — sync test: ordering check.
-504. **Input**: Gate text at top of document. **Expected output**: References "Round 37 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
+501. **Input**: Review history table after Round 37 changes. **Expected output**: Round 37 row exists with Comment ID `4805898911`. **Exception**: N/A — sync test: structural consistency check.
+502. **Input**: Round 37 review history row. **Expected output**: Decision cell reads `CHANGES REQUIRED`. **Exception**: N/A — sync test: structural consistency check.
+503. **Input**: Round 37 row in review history. **Expected output**: Round 37 immediately follows Round 36. **Exception**: N/A — sync test: ordering check.
+504. **Input**: Gate text at top of document. **Expected output**: References "Round 38 Engineering Design Review". **Exception**: N/A — sync test: gate reference check.
 505. **Input**: `CountingMapping` with call counter. **Expected output**: `items()` is called exactly once during canonicalization. **Exception**: N/A — single-read invariant: items acquired exactly once.
 506. **Input**: Captured Mapping items iterable is used for iteration. **Expected output**: Canonicalizer iterates the captured items, does not re-read the original Mapping. **Exception**: N/A — single-read invariant: captured iterable is consumed.
 507. **Input**: Mapping whose second `items()` call raises `RuntimeError`. **Expected output**: Canonicalization succeeds because the second call is never made. **Exception**: N/A — single-read invariant: second call not triggered.
@@ -6083,8 +6097,8 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 536. **Input**: SUCCEEDED: `unique=10, evaluated=10, verified=10, feasible=11, result=1, failure=0`. **Expected output**: Rejected by `invariant_feasible_count_range` because `feasible > unique`. **Exception**: `ValueError` — feasible range invariant fires before feasible_le_verified.
 537. **Input**: Standalone `invariant_feasible_le_verified` helper with `unique=10, verified=8, feasible=9`. **Expected output**: `ValueError` raised because `feasible > verified`. **Exception**: `ValueError` — unit contract for feasible_le_verified independent of registry ordering.
 538. **Input**: Deterministic candidate UUID5: same request+candidate → same UUID; different candidate → different UUID; insertion-order independent. **Expected output**: All three UUID5 invariants satisfied. **Exception**: N/A — regression: deterministic IDs unchanged.
-539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 37; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
-540. **Input**: Current document and Issue synchronization state after Round 36 remediation. **Expected output**: Review History contains Round 36 and Comment ID 4805851659; Gate references Round 37 Engineering Design Review; Issue Frozen SHA equals current commit; Global test numbering continuous through test 565; Zero/dual provenance roots remain rejected. **Exception**: N/A — structural synchronization contract.
+539. **Input**: Acceptance Criteria labels #501–#540 as Round 30. **Expected output**: First Acceptance Criteria item references Round 38; required test matrix entry references Round 30 (501–540). **Exception**: N/A — sync test: label and gate consistency.
+540. **Input**: Current document and Issue synchronization state after Round 37 remediation. **Expected output**: Review History contains Round 37 and Comment ID 4805898911; Gate references Round 38 Engineering Design Review; Issue Frozen SHA equals current commit; Global test numbering continuous through test 565; Zero/dual provenance roots remain rejected. **Exception**: N/A — structural synchronization contract.
 ---
 ### 27.22 Round 33 Extraction Contract Tests (541–565)
 
@@ -6111,13 +6125,13 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 561. **Input**: Exact extracted core block. **Expected output**: `python3.12 -m mypy --strict /tmp/task009_canonicalization_core.py` reports `Success: no issues found`. **Exception**: N/A — Python 3.12 strict mypy passes.
 562. **Input**: Authoritative verification pipeline ($14.7.2.4). **Expected output**: All four `sha256sum --check` commands report OK; all use the same digest manifest; manifest is created exactly once. **Exception**: N/A — no-rewrite contract satisfied.
 563. **Input**: Authoritative extraction script from §14.7.2.4. **Expected output**: `python3.11 -W error /tmp/extract_task009_core.py` runs without `SyntaxWarning` or `RuntimeWarning`. **Exception**: N/A — script is warning-free.
-564. **Input**: Sole authoritative verification pipeline and `TASK009_CORE_EXTRACTOR_PY` block. **Expected output**: Document-derived extractor from `DOCUMENT_EXTRACTOR_PATH` is byte-for-byte identical to `EXTRACTOR_PATH`; `cmp --silent` succeeds before core extraction; a one-byte mutation of `EXTRACTOR_PATH` causes pipeline to exit before core/manifest creation. **Exception**: Any mismatch returns non-zero before core file or digest manifest is created.
+564. **Input**: Sole authoritative verification pipeline and `TASK009_CORE_EXTRACTOR_PY` block. **Expected output**: The untrusted helper `/tmp/extract_task009_extractor_block.py` is deleted before any Python execution; the pipeline never invokes it. The document-derived extractor is produced directly by the quoted inline Python bootstrap. The document-derived and executed extractor pass `cmp --silent` and SHA-256 equality before extractor execution. A one-byte mutation of the executed extractor causes a non-zero exit before core extraction; `CORE_PATH` and `DIGEST_PATH` do not exist after authentication failure. **Exception**: Any bootstrap or extractor-identity mismatch terminates the pipeline before core or manifest creation.
 565. **Input**: Exhaustive contract-test numbering from 1 through 565. **Expected output**: Every integer from 1 through 565 occurs exactly once; no duplicate number exists; no gap exists; Round 33 extraction tests occupy exactly 541 through 565. **Exception**: N/A — total coverage and numbering invariant.
 ---
 
 ## 28. Delivery Sequence
 
-1. Complete Round 37 Engineering Design Review.
+1. Complete Round 38 Engineering Design Review.
 2. Only after review passes: create implementation branch and Draft PR.
 3. Implement catalog and identity models before optimizer.
 4. Implement deterministic candidate generation and deduplication.
@@ -6131,7 +6145,7 @@ Same as Round 3: no pressure-drop, velocity, optimization methods, cost, materia
 
 ## 29. Acceptance Criteria
 
-- [ ] Round 37 Engineering Design Review passes before implementation starts
+- [ ] Round 38 Engineering Design Review passes before implementation starts
 - [ ] Only caller-supplied, structurally validated, hash-verified catalog candidates
 - [ ] `SourceQualifiedCandidateIdentity` is the deduplication key
 - [ ] TASK-008 `rate_double_pipe()` is sole thermal evaluator
