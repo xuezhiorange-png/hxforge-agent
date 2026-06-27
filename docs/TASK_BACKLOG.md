@@ -35,7 +35,9 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 |---|---|---|---|
 | TASK-007 | Implement single-phase tube and annulus correlations | DONE | TASK-003, TASK-004, TASK-006 |
 | TASK-008 | Implement fixed-geometry double-pipe rating | DONE | TASK-005, TASK-006, TASK-007 |
-| TASK-009 | Implement manufacturable sizing and candidate optimization | READY | TASK-008 |
+| TASK-009 (Phase 1-2) | Implement manufacturable sizing and candidate optimization (catalog, gate, materialization, evaluation, identity, zero-TI rating adapter) | COMPLETE | TASK-008 |
+| TASK-009 (Phase 3 design) | Deterministic feasibility, ranking and Top-N contract | DRAFT | TASK-009 Phase 2 |
+| TASK-009 (Phase 3 impl) | Deterministic feasibility, ranking and Top-N implementation | NOT STARTED | TASK-009 Phase 3 design |
 | TASK-010 | Add versioned API and traceable report | BLOCKED | TASK-005, TASK-009 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 | Add materials, mass and preliminary mechanical checks | PLANNED | TASK-012, TASK-013, TASK-016 |
