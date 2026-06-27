@@ -6102,6 +6102,30 @@ class IteratorThatRaisesMidIteration:
         return val  # noqa: FURB105 — unreachable but documents intent
 
 
+class CustomTestExceptionForTest(Exception):
+    """Stable module-level exception for fail-closed testing."""
+
+
+class TraversalCountingMapping(Mapping[str, object]):
+    """Mapping that tracks items() call count without raising."""
+
+    def __init__(self) -> None:
+        self.traversal_count = 0
+
+    def items(self):
+        self.traversal_count += 1
+        return iter((("key", "value"),))
+
+    def __getitem__(self, key: str) -> object:
+        return "value"
+
+    def __len__(self) -> int:
+        return 1
+
+    def __iter__(self):
+        return iter(["key"])
+
+
 class FirstTraversalFailsMapping(Mapping[str, object]):
     """Mapping that fails on first traversal, succeeds on subsequent."""
 
@@ -6335,8 +6359,6 @@ class TestSinglePassCanonicalization(_BuildLegitMixin):
             rating_fn=result_fn,
         )
 
-    # --- Warning: first traversal fails ---
-
     def test_warning_first_fails_then_succeeds(self) -> None:
         """Warning with first-traversal-fails mapping is caught (traversal_count=1)."""
         ident, sp, prov, mat_result = self._build_legit()
@@ -6362,28 +6384,38 @@ class TestSinglePassCanonicalization(_BuildLegitMixin):
     # --- Warning: first traversal succeeds, later fails ---
 
     def test_warning_first_succeeds_then_fails(self) -> None:
-        """Warning: first-success mapping never re-accessed (count=1)."""
+        """Warning: first-success mapping traversed exactly once (count=1)."""
         ident, sp, prov, mat_result = self._build_legit()
-        ctx = FirstTraversalSucceedsMapping()
-        result = self._build_result_with_mapping_warning(ctx)
-
-        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
-        # The first traversal is by _build_message_descriptor's canonicalization.
-        # Any additional traversal (from Pydantic model_validate) is acceptable
-        # as long as it does NOT re-canonicalize the context values.
-        # The key invariant: descriptor is built ONCE.
+        results = []
+        for _ in range(len(mat_result.candidates)):
+            ctx = TraversalCountingMapping()
+            results.append(self._build_result_with_mapping_warning(ctx))
+        iter_results = iter(results)
+        records = self._evaluate_via_adapter(
+            ident, prov, mat_result, lambda **kw: next(iter_results)
+        )
         assert records[0].candidate_evaluation_state == CandidateEvaluationState.VERIFIED
+        for r in results:
+            ctx = r.warnings[0].context[0][1]
+            assert ctx.traversal_count == 1
 
     # --- Blocker: first traversal succeeds, later fails ---
 
     def test_blocker_first_succeeds_then_fails(self) -> None:
-        """Blocker: first-success mapping never re-accessed (count=1)."""
+        """Blocker: first-success mapping traversed exactly once (count=1)."""
         ident, sp, prov, mat_result = self._build_legit()
-        ctx = FirstTraversalSucceedsMapping()
-        result = self._build_result_with_mapping_blocker(ctx)
-
-        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        results = []
+        for _ in range(len(mat_result.candidates)):
+            ctx = TraversalCountingMapping()
+            results.append(self._build_result_with_mapping_blocker(ctx))
+        iter_results = iter(results)
+        records = self._evaluate_via_adapter(
+            ident, prov, mat_result, lambda **kw: next(iter_results)
+        )
         assert records[0].candidate_evaluation_state == CandidateEvaluationState.VERIFIED
+        for r in results:
+            ctx = r.blockers[0].context[0][1]
+            assert ctx.traversal_count == 1
 
     # --- First-next failure ---
 
@@ -6442,88 +6474,115 @@ class TestSinglePassCanonicalization(_BuildLegitMixin):
         assert ctx.traversal_count == 1
 
     def test_run_failure_first_succeeds_then_fails(self) -> None:
-        """RunFailure: first-success mapping never re-accessed (count=1)."""
+        """RunFailure: first-success mapping traversed exactly once (count=1)."""
         ident, sp, prov, mat_result = self._build_legit()
-        ctx = FirstTraversalSucceedsMapping()
-        result = self._build_result_with_mapping_failure(ctx)
-
-        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
-        # RunFailure context with valid values passes canonicalization
+        results = []
+        for _ in range(len(mat_result.candidates)):
+            ctx = TraversalCountingMapping()
+            results.append(self._build_result_with_mapping_failure(ctx))
+        iter_results = iter(results)
+        records = self._evaluate_via_adapter(
+            ident, prov, mat_result, lambda **kw: next(iter_results)
+        )
         assert records[0].candidate_evaluation_state == CandidateEvaluationState.VERIFIED
+        for r in results:
+            ctx = r.failure.context[0][1]
+            assert ctx.traversal_count == 1
 
     # --- Permutation tests ---
 
     def test_warning_permutation_a_b_identical_failure(self) -> None:
         """A then B ordering with mixed valid/invalid context yields same failure as B then A."""
-
         ident, sp, prov, mat_result = self._build_legit()
 
-        def _run_permutation(warning_list):
+        def _make_warning_pair():
+            fail_ctx = FirstTraversalFailsMapping()
+            success_ctx = FirstTraversalSucceedsMapping()
+            fw = EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="test",
+                context=(("ctx", fail_ctx),),
+            )
+            sw = EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="test",
+                context=(("ctx", success_ctx),),
+            )
+            return fw, sw, fail_ctx, success_ctx
+
+        def _run_permutation(warning_list, fail_ctx, success_ctx):
             base = self._make_minimal_result()
             object.__setattr__(base, "warnings", tuple(warning_list))
             object.__setattr__(base, "blockers", ())
             object.__setattr__(base, "failure", None)
             records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: base)
             assert records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED
+            assert fail_ctx.traversal_count == 1
+            assert success_ctx.traversal_count == 1
             return records[0].evaluation_failure
 
-        # Each permutation gets FRESH mapping instances to avoid state bleed
-        ctx_fails = FirstTraversalFailsMapping()
-        warning_a = EngineeringMessage(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            severity=EngineeringMessageSeverity.WARNING,
-            message="test",
-            context=(("ctx", ctx_fails),),
-        )
-        ctx_succeeds = FirstTraversalSucceedsMapping()
-        warning_b = EngineeringMessage(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            severity=EngineeringMessageSeverity.WARNING,
-            message="test",
-            context=(("ctx", ctx_succeeds),),
-        )
+        # A/B: failing warning first, succeeding warning second
+        a_fail, b_success, fail_ab_ctx, success_ab_ctx = _make_warning_pair()
+        fail_ab = _run_permutation([a_fail, b_success], fail_ab_ctx, success_ab_ctx)
 
-        fail_ab = _run_permutation([warning_a, warning_b])
-        fail_ba = _run_permutation([warning_b, warning_a])
+        # B/A: succeeding warning first, failing warning second — FRESH instances
+        b_success2, a_fail2, success_ba_ctx, fail_ba_ctx = _make_warning_pair()
+        fail_ba = _run_permutation([b_success2, a_fail2], fail_ba_ctx, success_ba_ctx)
 
-        # Both should fail with same code/message regardless of order
+        # Full RunFailure comparison
+        assert fail_ab == fail_ba
         assert fail_ab.code is fail_ba.code
         assert fail_ab.message == fail_ba.message
+        assert fail_ab.traceback == fail_ba.traceback
+        assert fail_ab.context == fail_ba.context
 
     def test_blocker_permutation_a_b_identical_failure(self) -> None:
         """Blocker A then B vs B then A yield identical failure."""
         ident, sp, prov, mat_result = self._build_legit()
 
-        def _run_permutation(warning_list):
+        def _make_blocker_pair():
+            fail_ctx = FirstTraversalFailsMapping()
+            success_ctx = FirstTraversalSucceedsMapping()
+            fb = EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.BLOCKER,
+                message="test",
+                context=(("ctx", fail_ctx),),
+            )
+            sb = EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.BLOCKER,
+                message="test",
+                context=(("ctx", success_ctx),),
+            )
+            return fb, sb, fail_ctx, success_ctx
+
+        def _run_permutation(blocker_list, fail_ctx, success_ctx):
             base = self._make_minimal_result()
             object.__setattr__(base, "warnings", ())
-            object.__setattr__(base, "blockers", tuple(warning_list))
+            object.__setattr__(base, "blockers", tuple(blocker_list))
             object.__setattr__(base, "failure", None)
             records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: base)
             assert records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED
+            assert fail_ctx.traversal_count == 1
+            assert success_ctx.traversal_count == 1
             return records[0].evaluation_failure
 
-        # Each permutation gets FRESH mapping instances
-        ctx_fails = FirstTraversalFailsMapping()
-        blocker_a = EngineeringMessage(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            severity=EngineeringMessageSeverity.BLOCKER,
-            message="test",
-            context=(("ctx", ctx_fails),),
-        )
-        ctx_succeeds = FirstTraversalSucceedsMapping()
-        blocker_b = EngineeringMessage(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            severity=EngineeringMessageSeverity.BLOCKER,
-            message="test",
-            context=(("ctx", ctx_succeeds),),
-        )
+        # A/B: failing blocker first, succeeding blocker second
+        a_fail, b_success, fail_ab_ctx, success_ab_ctx = _make_blocker_pair()
+        fail_ab = _run_permutation([a_fail, b_success], fail_ab_ctx, success_ab_ctx)
 
-        fail_ab = _run_permutation([blocker_a, blocker_b])
-        fail_ba = _run_permutation([blocker_b, blocker_a])
+        # B/A: succeeding blocker first, failing blocker second — FRESH instances
+        b_success2, a_fail2, success_ba_ctx, fail_ba_ctx = _make_blocker_pair()
+        fail_ba = _run_permutation([b_success2, a_fail2], fail_ba_ctx, success_ba_ctx)
 
+        assert fail_ab == fail_ba
         assert fail_ab.code is fail_ba.code
         assert fail_ab.message == fail_ba.message
+        assert fail_ab.traceback == fail_ba.traceback
+        assert fail_ab.context == fail_ba.context
 
 
 class TestFailClosedExceptException(_BuildLegitMixin):
@@ -6764,11 +6823,7 @@ class TestFailClosedExceptException(_BuildLegitMixin):
             elif exception_type == "assertion_error":
                 raise AssertionError("assertion_error")
             elif exception_type == "custom":
-
-                class CustomTestException(Exception):
-                    pass
-
-                raise CustomTestException("custom")
+                raise CustomTestExceptionForTest("custom")
             raise RuntimeError("fallback")
 
         ev_mod._build_message_descriptor = broken_descriptor
@@ -6801,11 +6856,41 @@ class TestFailClosedExceptException(_BuildLegitMixin):
             )
 
             assert len(records) >= 2
+            candidate_id = records[0].source_qualified_candidate_id
+            expected_safe_marker_digest = sha256_digest(
+                {
+                    "failure_stage": "rating_verification",
+                    "owner_kind": "verification_runtime",
+                    "owner_id": candidate_id,
+                }
+            )
             assert records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED
             assert records[0].evaluation_failure is not None
             assert records[0].evaluation_failure.code is ErrorCode.PROVENANCE_INCOMPLETE
             assert records[0].evaluation_failure.message == "Trusted rating verification failed."
             assert records[0].evaluation_failure.traceback is None
+            assert records[0].candidate_evaluation_identity is None
+            assert records[0].verified_rating_evidence is None
+            assert records[0].invalid_rating_evidence is None
+            r_fail = records[0].evaluation_failure
+            ctx_dict = dict(r_fail.context)
+            assert ctx_dict.get("failure_stage") == "rating_verification"
+            assert ctx_dict.get("owner_kind") == "verification_runtime"
+            assert ctx_dict.get("owner_id") == candidate_id
+            assert ctx_dict.get("failure_kind") == "verification_exception"
+            assert ctx_dict.get("safe_marker_digest") == expected_safe_marker_digest
+            # offending_type depends on the exception class; verify it's present and matches
+            expected_offending = {
+                "key_error": "builtins.KeyError",
+                "index_error": "builtins.IndexError",
+                "os_error": "builtins.OSError",
+                "arithmetic_error": "builtins.ArithmeticError",
+                "assertion_error": "builtins.AssertionError",
+                "custom": "test_task009_phase2_canonicalization.CustomTestExceptionForTest",
+            }[exception_type]
+            assert ctx_dict.get("offending_type") == expected_offending, (
+                f"expected {expected_offending}, got {ctx_dict.get('offending_type')}"
+            )
             assert records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED
             assert records[1].hash_verification_outcome is VerificationOutcome.NOT_RUN
             assert records[1].provenance_verification_outcome is VerificationOutcome.NOT_RUN
