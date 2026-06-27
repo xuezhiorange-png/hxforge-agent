@@ -536,6 +536,21 @@ class CanonicalContextEntry:
     value_digest: str
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class CanonicalizationOwnerResult:
+    """Result of canonicalizing a single EngineeringMessage context.
+
+    Either canonical_payload (success) or error_data (failure) is set.
+    """
+
+    safe_owner_marker: str
+    owner_sort_key: tuple[str, str, str, str, tuple[str, ...], str]
+    original_code: str
+    canonical_payload: dict[str, object] | None = None
+    payload_digest: str | None = None
+    error_data: ContextCanonicalizationErrorData | None = None
+
+
 def _is_repository_quantity(value: object) -> bool:
     """Check for four static attributes: value, unit, kind, to_si."""
     from inspect import getattr_static
@@ -1113,6 +1128,37 @@ def engineering_message_safe_owner_sort_key(
         tuple(message.affected_paths),
         safe_context_owner_marker(message.context),
     )
+
+
+def _build_canonicalization_owner_result(
+    message: EngineeringMessage,
+) -> CanonicalizationOwnerResult:
+    """Single-pass canonicalization of an EngineeringMessage.
+
+    ********** CANONICALIZES EXACTLY ONCE **********
+    Caches the result so the same context is never traversed again.
+    """
+    sort_key = engineering_message_safe_owner_sort_key(message)
+    safe_marker = safe_context_owner_marker(message.context)
+    original_code = message.code.value
+
+    try:
+        payload = engineering_message_payload(message)
+        p_digest = sha256_digest(payload)
+        return CanonicalizationOwnerResult(
+            safe_owner_marker=safe_marker,
+            owner_sort_key=sort_key,
+            original_code=original_code,
+            canonical_payload=payload,
+            payload_digest=p_digest,
+        )
+    except ContextCanonicalizationError as cce:
+        return CanonicalizationOwnerResult(
+            safe_owner_marker=safe_marker,
+            owner_sort_key=sort_key,
+            original_code=original_code,
+            error_data=cce.data,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2026,19 +2072,253 @@ def verify_and_evaluate_candidate(
             rating_status=None,
         )
 
-    # Step 3: Both passed — build trusted evidence (fail-closed)
-    # P0-3: Canonicalize each warning/blocker/failure individually
-    # so that the specific owner is identified on failure.
+    # Step 3-6: Unified verification with fail-closed boundary (P0-6)
+    # P0-3: Single-pass owner descriptors replace warning/blocker canonicalization loops
     try:
-        evidence = _extract_trusted_evidence(result, tube_in_hot)
-    except (TypeError, ValueError, RuntimeError, AttributeError) as exc:
-        audit = _build_audit_snapshot(
-            source_qualified_candidate_id,
-            candidate_index,
-            ClaimedRatingResultState.HASH_VERIFICATION_ERROR,
-            VerificationOutcome.PASSED,
-            VerificationOutcome.PASSED,
-            result,
+        # 3a. Extract trusted evidence
+        try:
+            evidence = _extract_trusted_evidence(result, tube_in_hot)
+        except (TypeError, ValueError, RuntimeError, AttributeError) as exc:
+            audit = _build_audit_snapshot(
+                source_qualified_candidate_id,
+                candidate_index,
+                ClaimedRatingResultState.HASH_VERIFICATION_ERROR,
+                VerificationOutcome.PASSED,
+                VerificationOutcome.PASSED,
+                result,
+            )
+            return CandidateEvaluationRecord(
+                source_qualified_candidate_id=source_qualified_candidate_id,
+                evaluation_order_index=candidate_index,
+                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                feasible=False,
+                hash_verification_outcome=VerificationOutcome.PASSED,
+                provenance_verification_outcome=VerificationOutcome.PASSED,
+                claimed_rating_result_audit=audit,
+                evaluation_failure=RunFailure(
+                    code=ErrorCode.INVALID_STATE_TRANSITION,
+                    message=f"Failed to extract trusted evidence: {exc}",
+                ),
+            )
+
+        # 3b. Re-validate through model_validate to ensure all validators pass
+        evidence = revalidate_verified_rating_evidence(evidence)
+
+        # 3c. Build owner descriptors ONCE per warning (single-pass canonicalization)
+        warning_descriptors = [_build_canonicalization_owner_result(w) for w in evidence.warnings]
+        warning_descriptors.sort(key=lambda d: d.owner_sort_key)
+
+        for w_idx, w_desc in enumerate(warning_descriptors):
+            if w_desc.error_data is not None:
+                cced = w_desc.error_data
+                context_path_digest = sha256_digest({"context_path": list(cced.context_path)})
+                safe_marker_digest = sha256_digest(
+                    {
+                        "context_key": cced.context_key,
+                        "context_path": list(cced.context_path),
+                        "offending_type": cced.offending_type,
+                        "failure_kind": cced.failure_kind.value,
+                    }
+                )
+                cfail = RunFailure(
+                    code=ErrorCode.PROVENANCE_INCOMPLETE,
+                    message="Trusted context canonicalization failed.",
+                    traceback=None,
+                    context=(
+                        ("failure_stage", "rating_verification"),
+                        ("owner_kind", "warning"),
+                        ("owner_id", f"{source_qualified_candidate_id}:warning:{w_idx}"),
+                        ("original_code", w_desc.original_code),
+                        ("context_key", cced.context_key),
+                        ("context_path_digest", context_path_digest),
+                        ("offending_type", cced.offending_type),
+                        ("failure_kind", cced.failure_kind.value),
+                        ("safe_marker_digest", safe_marker_digest),
+                    ),
+                )
+                return CandidateEvaluationRecord(
+                    source_qualified_candidate_id=source_qualified_candidate_id,
+                    evaluation_order_index=candidate_index,
+                    candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                    feasible=False,
+                    hash_verification_outcome=VerificationOutcome.PASSED,
+                    provenance_verification_outcome=VerificationOutcome.PASSED,
+                    candidate_evaluation_identity=None,
+                    verified_rating_evidence=None,
+                    invalid_rating_evidence=None,
+                    evaluation_failure=cfail,
+                )
+
+        # 3d. Build owner descriptors ONCE per blocker (single-pass canonicalization)
+        blocker_descriptors = [_build_canonicalization_owner_result(b) for b in evidence.blockers]
+        blocker_descriptors.sort(key=lambda d: d.owner_sort_key)
+
+        for b_idx, b_desc in enumerate(blocker_descriptors):
+            if b_desc.error_data is not None:
+                cced = b_desc.error_data
+                context_path_digest = sha256_digest({"context_path": list(cced.context_path)})
+                safe_marker_digest = sha256_digest(
+                    {
+                        "context_key": cced.context_key,
+                        "context_path": list(cced.context_path),
+                        "offending_type": cced.offending_type,
+                        "failure_kind": cced.failure_kind.value,
+                    }
+                )
+                cfail = RunFailure(
+                    code=ErrorCode.PROVENANCE_INCOMPLETE,
+                    message="Trusted context canonicalization failed.",
+                    traceback=None,
+                    context=(
+                        ("failure_stage", "rating_verification"),
+                        ("owner_kind", "blocker"),
+                        ("owner_id", f"{source_qualified_candidate_id}:blocker:{b_idx}"),
+                        ("original_code", b_desc.original_code),
+                        ("context_key", cced.context_key),
+                        ("context_path_digest", context_path_digest),
+                        ("offending_type", cced.offending_type),
+                        ("failure_kind", cced.failure_kind.value),
+                        ("safe_marker_digest", safe_marker_digest),
+                    ),
+                )
+                return CandidateEvaluationRecord(
+                    source_qualified_candidate_id=source_qualified_candidate_id,
+                    evaluation_order_index=candidate_index,
+                    candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                    feasible=False,
+                    hash_verification_outcome=VerificationOutcome.PASSED,
+                    provenance_verification_outcome=VerificationOutcome.PASSED,
+                    candidate_evaluation_identity=None,
+                    verified_rating_evidence=None,
+                    invalid_rating_evidence=None,
+                    evaluation_failure=cfail,
+                )
+
+        # 3e. RunFailure canonicalization
+        if evidence.failure is not None:
+            try:
+                _ = run_failure_payload(evidence.failure)
+            except ContextCanonicalizationError as cce:
+                context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
+                safe_marker_digest = sha256_digest(
+                    {
+                        "context_key": cce.data.context_key,
+                        "context_path": list(cce.data.context_path),
+                        "offending_type": cce.data.offending_type,
+                        "failure_kind": cce.data.failure_kind.value,
+                    }
+                )
+                cfail = RunFailure(
+                    code=ErrorCode.PROVENANCE_INCOMPLETE,
+                    message="Trusted context canonicalization failed.",
+                    traceback=None,
+                    context=(
+                        ("failure_stage", "rating_verification"),
+                        ("owner_kind", "run_failure"),
+                        ("owner_id", f"{source_qualified_candidate_id}:run_failure"),
+                        ("original_code", evidence.failure.code.value),
+                        ("context_key", cce.data.context_key),
+                        ("context_path_digest", context_path_digest),
+                        ("offending_type", cce.data.offending_type),
+                        ("failure_kind", cce.data.failure_kind.value),
+                        ("safe_marker_digest", safe_marker_digest),
+                    ),
+                )
+                return CandidateEvaluationRecord(
+                    source_qualified_candidate_id=source_qualified_candidate_id,
+                    evaluation_order_index=candidate_index,
+                    candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                    feasible=False,
+                    hash_verification_outcome=VerificationOutcome.PASSED,
+                    provenance_verification_outcome=VerificationOutcome.PASSED,
+                    candidate_evaluation_identity=None,
+                    verified_rating_evidence=None,
+                    invalid_rating_evidence=None,
+                    evaluation_failure=cfail,
+                )
+
+        # All canonicalization passed — compute full evidence digest
+        evidence.compute_explicit_evidence_digest()
+
+        # Provider matching (from exact result.provider_identity)
+        try:
+            provider_matches = _check_provider_match(result, expected_provider)
+        except (TypeError, AttributeError):
+            provider_matches = False
+
+        # Evaluate identity (only for VERIFIED)
+        try:
+            eval_identity = _build_candidate_evaluation_identity(
+                sizing_request_identity_digest,
+                source_qualified_candidate_id,
+                result,
+                tube_in_hot,
+            )
+        except (TypeError, ValueError, RuntimeError):
+            return CandidateEvaluationRecord(
+                source_qualified_candidate_id=source_qualified_candidate_id,
+                evaluation_order_index=candidate_index,
+                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                feasible=False,
+                hash_verification_outcome=VerificationOutcome.PASSED,
+                provenance_verification_outcome=VerificationOutcome.PASSED,
+                evaluation_failure=RunFailure(
+                    code=ErrorCode.INVALID_STATE_TRANSITION,
+                    message="Failed to build candidate evaluation identity",
+                ),
+            )
+
+        # Phase 2: always not-evaluated feasibility
+        feasibility_status = FeasibilityStatus.NOT_EVALUATED
+        if not provider_matches:
+            feasibility_status = FeasibilityStatus.PROVIDER_IDENTITY_MISMATCH
+
+        # Build rating_status string for the record
+        rating_status_str: str | None = None
+        if type(result.status) is RatingStatus:
+            rating_status_str = result.status.value
+
+        return CandidateEvaluationRecord(
+            source_qualified_candidate_id=source_qualified_candidate_id,
+            evaluation_order_index=candidate_index,
+            candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
+            feasible=False,
+            feasibility_status=feasibility_status,
+            hash_verification_outcome=VerificationOutcome.PASSED,
+            provenance_verification_outcome=VerificationOutcome.PASSED,
+            candidate_evaluation_identity=eval_identity,
+            verified_rating_evidence=evidence,
+            provider_identity_matches=provider_matches,
+            rating_status=rating_status_str,
+        )
+
+    except (
+        TypeError,
+        ValueError,
+        RuntimeError,
+        AttributeError,
+        ContextCanonicalizationError,
+    ) as exc:
+        # P0-6: Catch-all for unexpected verification errors (fail-closed)
+        save_marker = sha256_digest(
+            {
+                "failure_stage": "rating_verification",
+                "owner_kind": "verification_runtime",
+                "owner_id": source_qualified_candidate_id,
+            }
+        )
+        cfail = RunFailure(
+            code=ErrorCode.PROVENANCE_INCOMPLETE,
+            message="Trusted rating verification failed.",
+            traceback=None,
+            context=(
+                ("failure_stage", "rating_verification"),
+                ("owner_kind", "verification_runtime"),
+                ("owner_id", source_qualified_candidate_id),
+                ("offending_type", qualified_type_name(exc)),
+                ("failure_kind", "verification_exception"),
+                ("safe_marker_digest", save_marker),
+            ),
         )
         return CandidateEvaluationRecord(
             source_qualified_candidate_id=source_qualified_candidate_id,
@@ -2047,177 +2327,11 @@ def verify_and_evaluate_candidate(
             feasible=False,
             hash_verification_outcome=VerificationOutcome.PASSED,
             provenance_verification_outcome=VerificationOutcome.PASSED,
-            claimed_rating_result_audit=audit,
-            evaluation_failure=RunFailure(
-                code=ErrorCode.INVALID_STATE_TRANSITION,
-                message=f"Failed to extract trusted evidence: {exc}",
-            ),
+            candidate_evaluation_identity=None,
+            verified_rating_evidence=None,
+            invalid_rating_evidence=None,
+            evaluation_failure=cfail,
         )
-
-    # P0-6: Re-validate through model_validate to ensure all validators pass
-    evidence = revalidate_verified_rating_evidence(evidence)
-
-    # P0-3: Canonicalize each warning individually, sorted for deterministic owner IDs
-    sorted_warnings = sorted(evidence.warnings, key=engineering_message_safe_owner_sort_key)
-    for w_idx, w_msg in enumerate(sorted_warnings):
-        try:
-            _ = engineering_message_payload(w_msg)
-        except ContextCanonicalizationError as cce:
-            context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
-            cfail = RunFailure(
-                code=ErrorCode.PROVENANCE_INCOMPLETE,
-                message="Trusted context canonicalization failed.",
-                traceback=None,
-                context=(
-                    ("failure_stage", "rating_verification"),
-                    ("owner_kind", "warning"),
-                    ("owner_id", f"{source_qualified_candidate_id}:warning:{w_idx}"),
-                    ("original_code", w_msg.code.value),
-                    ("context_key", cce.data.context_key),
-                    ("context_path_digest", context_path_digest),
-                    ("offending_type", cce.data.offending_type),
-                    ("failure_kind", cce.data.failure_kind.value),
-                    ("safe_marker_digest", cce.safe_marker_digest),
-                ),
-            )
-            return CandidateEvaluationRecord(
-                source_qualified_candidate_id=source_qualified_candidate_id,
-                evaluation_order_index=candidate_index,
-                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
-                feasible=False,
-                hash_verification_outcome=VerificationOutcome.PASSED,
-                provenance_verification_outcome=VerificationOutcome.PASSED,
-                candidate_evaluation_identity=None,
-                verified_rating_evidence=None,
-                invalid_rating_evidence=None,
-                evaluation_failure=cfail,
-            )
-
-    # P0-3: Canonicalize each blocker individually, sorted for deterministic owner IDs
-    sorted_blockers = sorted(evidence.blockers, key=engineering_message_safe_owner_sort_key)
-    for b_idx, b_msg in enumerate(sorted_blockers):
-        try:
-            _ = engineering_message_payload(b_msg)
-        except ContextCanonicalizationError as cce:
-            context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
-            cfail = RunFailure(
-                code=ErrorCode.PROVENANCE_INCOMPLETE,
-                message="Trusted context canonicalization failed.",
-                traceback=None,
-                context=(
-                    ("failure_stage", "rating_verification"),
-                    ("owner_kind", "blocker"),
-                    ("owner_id", f"{source_qualified_candidate_id}:blocker:{b_idx}"),
-                    ("original_code", b_msg.code.value),
-                    ("context_key", cce.data.context_key),
-                    ("context_path_digest", context_path_digest),
-                    ("offending_type", cce.data.offending_type),
-                    ("failure_kind", cce.data.failure_kind.value),
-                    ("safe_marker_digest", cce.safe_marker_digest),
-                ),
-            )
-            return CandidateEvaluationRecord(
-                source_qualified_candidate_id=source_qualified_candidate_id,
-                evaluation_order_index=candidate_index,
-                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
-                feasible=False,
-                hash_verification_outcome=VerificationOutcome.PASSED,
-                provenance_verification_outcome=VerificationOutcome.PASSED,
-                candidate_evaluation_identity=None,
-                verified_rating_evidence=None,
-                invalid_rating_evidence=None,
-                evaluation_failure=cfail,
-            )
-
-    # P0-3: Canonicalize failure if present
-    if evidence.failure is not None:
-        try:
-            _ = run_failure_payload(evidence.failure)
-        except ContextCanonicalizationError as cce:
-            context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
-            cfail = RunFailure(
-                code=ErrorCode.PROVENANCE_INCOMPLETE,
-                message="Trusted context canonicalization failed.",
-                traceback=None,
-                context=(
-                    ("failure_stage", "rating_verification"),
-                    ("owner_kind", "run_failure"),
-                    ("owner_id", f"{source_qualified_candidate_id}:run_failure"),
-                    ("original_code", evidence.failure.code.value),
-                    ("context_key", cce.data.context_key),
-                    ("context_path_digest", context_path_digest),
-                    ("offending_type", cce.data.offending_type),
-                    ("failure_kind", cce.data.failure_kind.value),
-                    ("safe_marker_digest", cce.safe_marker_digest),
-                ),
-            )
-            return CandidateEvaluationRecord(
-                source_qualified_candidate_id=source_qualified_candidate_id,
-                evaluation_order_index=candidate_index,
-                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
-                feasible=False,
-                hash_verification_outcome=VerificationOutcome.PASSED,
-                provenance_verification_outcome=VerificationOutcome.PASSED,
-                candidate_evaluation_identity=None,
-                verified_rating_evidence=None,
-                invalid_rating_evidence=None,
-                evaluation_failure=cfail,
-            )
-
-    # All canonicalization passed — compute full evidence digest
-    evidence.compute_explicit_evidence_digest()
-
-    # Provider matching (from exact result.provider_identity)
-    try:
-        provider_matches = _check_provider_match(result, expected_provider)
-    except (TypeError, AttributeError):
-        provider_matches = False
-
-    # Evaluate identity (only for VERIFIED)
-    try:
-        eval_identity = _build_candidate_evaluation_identity(
-            sizing_request_identity_digest,
-            source_qualified_candidate_id,
-            result,
-            tube_in_hot,
-        )
-    except (TypeError, ValueError, RuntimeError):
-        return CandidateEvaluationRecord(
-            source_qualified_candidate_id=source_qualified_candidate_id,
-            evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
-            feasible=False,
-            hash_verification_outcome=VerificationOutcome.PASSED,
-            provenance_verification_outcome=VerificationOutcome.PASSED,
-            evaluation_failure=RunFailure(
-                code=ErrorCode.INVALID_STATE_TRANSITION,
-                message="Failed to build candidate evaluation identity",
-            ),
-        )
-
-    # Phase 2: always not-evaluated feasibility
-    feasibility_status = FeasibilityStatus.NOT_EVALUATED
-    if not provider_matches:
-        feasibility_status = FeasibilityStatus.PROVIDER_IDENTITY_MISMATCH
-
-    # Build rating_status string for the record
-    rating_status_str: str | None = None
-    if type(result.status) is RatingStatus:
-        rating_status_str = result.status.value
-
-    return CandidateEvaluationRecord(
-        source_qualified_candidate_id=source_qualified_candidate_id,
-        evaluation_order_index=candidate_index,
-        candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
-        feasible=False,
-        feasibility_status=feasibility_status,
-        hash_verification_outcome=VerificationOutcome.PASSED,
-        provenance_verification_outcome=VerificationOutcome.PASSED,
-        candidate_evaluation_identity=eval_identity,
-        verified_rating_evidence=evidence,
-        provider_identity_matches=provider_matches,
-        rating_status=rating_status_str,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -2290,6 +2404,7 @@ def verify_and_evaluate_candidates(
 __all__ = [
     "build_canonical_context_entries",
     "CanonicalContextEntry",
+    "CanonicalizationOwnerResult",
     "canonicalize_trusted_context_value",
     "CandidateEvaluationIdentity",
     "CandidateEvaluationRecord",

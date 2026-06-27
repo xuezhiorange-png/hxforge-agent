@@ -3333,6 +3333,205 @@ class TestMaterializationEntryRejection:
         assert len(calls) == 0
 
     # ------------------------------------------------------------------
+    # P0-5: Bounds negative tests
+    # ------------------------------------------------------------------
+
+    def test_bounds_aggregate_neq_candidate_set_rejected(self) -> None:
+        """MR bounds != candidate_set bounds should be rejected before any rating call."""
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        # Create a forged MaterializationResult where bounds differ
+        forged_mr = object.__new__(type(mr1))
+        object.__setattr__(forged_mr, "candidates", mr1.candidates)
+        object.__setattr__(forged_mr, "candidate_set", mr1.candidate_set)
+        object.__setattr__(forged_mr, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged_mr, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged_mr, "minimum_effective_length_m", 0.5)  # different from None
+        object.__setattr__(forged_mr, "maximum_effective_length_m", 1.5)  # different from None
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged_mr,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    def test_bounds_reverse_mismatch_rejected(self) -> None:
+        """Reverse: aggregate bounds match each other but both differ from candidate_set."""
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        # Aggregate bounds are both None; candidate_set bounds are tampered
+        from hexagent.optimization.context import MaterializedCandidateSet
+
+        cs = mr1.candidate_set
+        bad_set = object.__new__(MaterializedCandidateSet)
+        settr = object.__setattr__
+        settr(bad_set, "sizing_request_identity_digest", cs.sizing_request_identity_digest)
+        settr(bad_set, "passed_gate_digest", cs.passed_gate_digest)
+        settr(bad_set, "catalog_snapshot_identities", cs.catalog_snapshot_identities)
+        settr(bad_set, "minimum_effective_length_m", 999.0)
+        settr(bad_set, "maximum_effective_length_m", 888.0)
+        settr(bad_set, "raw_combination_count", cs.raw_combination_count)
+        settr(bad_set, "unique_candidate_count", cs.unique_candidate_count)
+        settr(bad_set, "ordered_candidate_ids", cs.ordered_candidate_ids)
+        settr(bad_set, "candidate_set_digest", cs.candidate_set_digest)
+
+        forged_mr = object.__new__(type(mr1))
+        object.__setattr__(forged_mr, "candidates", mr1.candidates)
+        object.__setattr__(forged_mr, "candidate_set", bad_set)
+        object.__setattr__(forged_mr, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged_mr, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged_mr, "minimum_effective_length_m", None)
+        object.__setattr__(forged_mr, "maximum_effective_length_m", None)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged_mr,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    def test_bounds_self_consistent_forged_rejected(self) -> None:
+        """Aggregate bounds == forged candidate_set bounds, but replay produces different cands."""
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        from hexagent.optimization.context import MaterializedCandidateSet
+
+        cs = mr1.candidate_set
+        bad_set = object.__new__(MaterializedCandidateSet)
+        settr = object.__setattr__
+        settr(bad_set, "sizing_request_identity_digest", cs.sizing_request_identity_digest)
+        settr(bad_set, "passed_gate_digest", cs.passed_gate_digest)
+        settr(bad_set, "catalog_snapshot_identities", cs.catalog_snapshot_identities)
+        # Set bounds to match aggregate
+        settr(bad_set, "minimum_effective_length_m", None)
+        settr(bad_set, "maximum_effective_length_m", None)
+        settr(bad_set, "raw_combination_count", cs.raw_combination_count)
+        settr(bad_set, "unique_candidate_count", cs.unique_candidate_count)
+        settr(bad_set, "ordered_candidate_ids", cs.ordered_candidate_ids)
+        settr(bad_set, "candidate_set_digest", cs.candidate_set_digest)
+
+        # Aggregate bounds also match
+        forged_mr = object.__new__(type(mr1))
+        object.__setattr__(forged_mr, "candidates", mr1.candidates)
+        object.__setattr__(forged_mr, "candidate_set", bad_set)
+        object.__setattr__(forged_mr, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged_mr, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged_mr, "minimum_effective_length_m", None)
+        object.__setattr__(forged_mr, "maximum_effective_length_m", None)
+
+        # This is the tricky case: bounds match, but replay produces different candidates
+        # We need forged candidate_set bounds that are different from what replay would produce
+        # Since bounds match the aggregate, the candidate_set bounds check passes.
+        # But since candidate_set_digest is still the original, the replay will verify it.
+        # This test validates that self-consistent bounds forgery where bounds are different
+        # from what materialization would produce is caught.
+
+        # Use different bounds in candidate_set (not None) but match them in aggregate too
+        # to make them self-consistent
+        settr(bad_set, "minimum_effective_length_m", 0.5)
+        settr(bad_set, "maximum_effective_length_m", 1.5)
+        object.__setattr__(forged_mr, "minimum_effective_length_m", 0.5)
+        object.__setattr__(forged_mr, "maximum_effective_length_m", 1.5)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged_mr,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    # ------------------------------------------------------------------
     # Test 6: Candidate option not in gate
     # ------------------------------------------------------------------
 
@@ -5205,3 +5404,456 @@ class TestMaterializationEntryRejection:
             mr,
         )
         self._assert_forgery_rejected(ident, forged_mr)
+
+
+# ============================================================================
+# P0-6: Fail-closed boundary tests
+# ============================================================================
+
+
+class TestFailClosedBoundary:
+    """P0-6: Exceptions during canonicalization caught by fail-closed boundary."""
+
+    def _build_legit(self):
+        """Build a valid MaterializationResult through the production chain."""
+        import unittest.mock
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.catalog import compute_catalog_content_hash
+        from hexagent.optimization.context import (
+            ExpectedProviderIdentity,
+            OptimizationObjective,
+            build_sizing_request_identity,
+            create_passed_sizing_gate,
+        )
+        from hexagent.optimization.identities import materialize_all_candidates
+        from hexagent.optimization.models import (
+            CompleteDoublePipeAssemblyOption,
+            CompleteDoublePipeCatalogSnapshot,
+            LengthSource,
+            OptionRawCountRecord,
+            SizingRequest,
+        )
+        from hexagent.properties.base import PropertyProvider
+
+        opt = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="opt_a",
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            manufacturing_option_identity="std",
+            manufacturing_metadata=(),
+            length_source=LengthSource(
+                length_quantum_m="0.1",
+                allowed_effective_lengths_m=(1.0, 2.0),
+            ),
+        )
+        cat_hash = compute_catalog_content_hash(
+            catalog_id="c1",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt,),
+        )
+        cat = CompleteDoublePipeCatalogSnapshot(
+            catalog_id="c1",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt,),
+            catalog_content_hash=cat_hash,
+        )
+        req = SizingRequest(catalogs=(cat,))
+        ident = build_sizing_request_identity(
+            request=req,
+            hot_fluid_name="w",
+            cold_fluid_name="b",
+            hot_fluid_equation_of_state="i",
+            cold_fluid_equation_of_state="n",
+            hot_fluid_normalized_components=(),
+            cold_fluid_normalized_components=(),
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            minimum_terminal_delta_t=5.0,
+            required_duty_w=1000.0,
+            duty_absolute_tolerance_w=10.0,
+            duty_relative_tolerance=0.01,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+            top_n=5,
+            solver_params=SolverParams(),
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="test_provider",
+                version="1.0",
+                git_revision="abc123",
+                reference_state_policy="default",
+            ),
+            design_case_revision_id=UUID("11111111-1111-1111-1111-111111111111"),
+            calculation_run_id=UUID("22222222-2222-2222-2222-222222222222"),
+        )
+        rec = OptionRawCountRecord(
+            catalog_id=cat.catalog_id,
+            catalog_version=cat.catalog_version,
+            catalog_content_hash=cat.catalog_content_hash,
+            source_identity=cat.source_identity,
+            schema_version=cat.schema_version,
+            assembly_option_id=opt.assembly_option_id,
+            canonical_length_quantum_m=opt.length_source.length_quantum_m,
+            raw_count=len(opt.length_source.allowed_effective_lengths_m),
+        )
+        gate = create_passed_sizing_gate(
+            sizing_request_identity_digest=ident.sizing_request_identity_digest,
+            raw_combination_count=2,
+            effective_cap=100,
+            per_option_records=(rec,),
+        )
+        mat_result = materialize_all_candidates(catalogs=(cat,), sizing_gate=gate)
+        provider = unittest.mock.MagicMock(spec=PropertyProvider)
+        solver_params = SolverParams()
+        return ident, solver_params, provider, mat_result
+
+    def _make_minimal_result(self, hash_passes=True, prov_passes=True):
+        """Create a duck-typed RatingResult for the spy rating_fn."""
+        from hexagent.core.heat_balance import ExecutionContextSnapshot, ProviderIdentitySnapshot
+        from hexagent.exchangers.double_pipe.result import (
+            RatingRequestIdentity,
+            RatingResult,
+            RatingStatus,
+        )
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+        result = object.__new__(RatingResult)
+        for attr, val in {
+            "status": RatingStatus.SUCCEEDED,
+            "flow_arrangement": FlowArrangement.COUNTERFLOW,
+            "result_hash": "sha256:" + "e" * 64,
+            "provenance_digest": "prov_digest",
+            "heat_duty_w": 1000.0,
+            "hot_outlet_temperature_k": 350.0,
+            "cold_outlet_temperature_k": 310.0,
+            "area_inner_m2": 1.5,
+            "area_outer_m2": 2.0,
+            "UA_w_k": 500.0,
+            "LMTD_k": 40.0,
+            "energy_residual_w": 0.001,
+            "ua_lmtd_residual_w": 0.002,
+            "tube_selected_correlation_id": "corr_1",
+            "tube_selected_correlation_version": "1.0",
+            "annulus_selected_correlation_id": "corr_2",
+            "annulus_selected_correlation_version": "1.0",
+            "warnings": (),
+            "blockers": (),
+            "failure": None,
+            "hot_inlet_state": None,
+            "cold_inlet_state": None,
+            "tube_selected_correlation": None,
+            "annulus_selected_correlation": None,
+        }.items():
+            object.__setattr__(result, attr, val)
+
+        rri = RatingRequestIdentity(
+            hot_fluid_name="w",
+            hot_fluid_backend="i",
+            hot_fluid_components=(),
+            cold_fluid_name="b",
+            cold_fluid_backend="n",
+            cold_fluid_components=(),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            flow_arrangement="counterflow",
+            geometry={
+                "inner_tube_inner_diameter_m": 0.05,
+                "inner_tube_outer_diameter_m": 0.06,
+                "outer_pipe_inner_diameter_m": 0.10,
+                "effective_length_m": 1.0,
+                "wall_thermal_conductivity_w_m_k": 50.0,
+                "inner_surface_roughness_m": 1e-5,
+                "annulus_surface_roughness_m": 1e-5,
+                "inner_fouling_resistance_m2k_w": 0.0001,
+                "outer_fouling_resistance_m2k_w": 0.0002,
+            },
+            solver_absolute_residual_w=1e-3,
+            solver_relative_residual_fraction=1e-8,
+            solver_bracket_temperature_tolerance_k=1e-4,
+            solver_max_iterations=100,
+        )
+        object.__setattr__(result, "request_identity", rri)
+        pi = ProviderIdentitySnapshot(
+            name="test_provider",
+            version="1.0",
+            git_revision="abc123",
+            reference_state_policy="default",
+        )
+        object.__setattr__(result, "provider_identity", pi)
+        ec = object.__new__(ExecutionContextSnapshot)
+        for attr in (
+            "request_id",
+            "design_case_revision_id",
+            "calculation_run_id",
+            "execution_id",
+            "rating_software_version",
+            "execution_context_policy_version",
+        ):
+            object.__setattr__(ec, attr, None)
+        object.__setattr__(result, "execution_context", ec)
+        object.__setattr__(result, "verify_hash", lambda: hash_passes)
+        object.__setattr__(result, "verify_provenance", lambda: prov_passes)
+        return result
+
+    def _make_result_with_warning(self):
+        """Create a duck-typed RatingResult with a bytes-in-context warning."""
+        from hexagent.domain.messages import (
+            EngineeringMessage,
+            EngineeringMessageSeverity,
+            ErrorCode,
+        )
+
+        result = self._make_minimal_result()
+        bad_warning = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="bad warning",
+            context=(("bad", b"bytes_data"),),
+        )
+        object.__setattr__(result, "warnings", (bad_warning,))
+        object.__setattr__(result, "blockers", ())
+        object.__setattr__(result, "failure", None)
+        return result
+
+    def test_unexpected_verification_error_caught(self) -> None:
+        """Unexpected ValueError during evidence revalidation is caught by fail-closed boundary."""
+        from hexagent.optimization.evaluation import (
+            CandidateEvaluationState,
+            revalidate_verified_rating_evidence,
+        )
+
+        ident, sp, prov, mat_result = self._build_legit()
+        original = revalidate_verified_rating_evidence
+
+        def broken_revalidate(evidence):
+            raise ValueError("unexpected revalidation failure")
+
+        import hexagent.optimization.evaluation as ev_mod
+
+        ev_mod.revalidate_verified_rating_evidence = broken_revalidate
+
+        try:
+            from hexagent.exchangers.double_pipe.solver import SolverParams
+            from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+            from hexagent.optimization.adapter import evaluate_all_candidates
+            from hexagent.properties.base import FluidIdentifier
+
+            records = evaluate_all_candidates(
+                materialization_result=mat_result,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=prov,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident,
+                rating_fn=lambda **kw: self._make_minimal_result(),
+            )
+
+            assert len(records) >= 2
+            # The ValueError from revalidation is caught by the fail-closed boundary
+            assert (
+                records[0].candidate_evaluation_state
+                == CandidateEvaluationState.RUNTIME_FAILED.value
+            )
+            assert records[0].evaluation_failure is not None
+            assert (
+                records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+            )
+        finally:
+            ev_mod.revalidate_verified_rating_evidence = original
+
+    def test_owner_descriptor_exception_caught(self) -> None:
+        """RuntimeError from owner descriptor is caught by fail-closed boundary."""
+        from hexagent.optimization.evaluation import CandidateEvaluationState
+
+        ident, sp, prov, mat_result = self._build_legit()
+
+        import hexagent.optimization.evaluation as ev_mod
+
+        original = ev_mod._build_canonicalization_owner_result
+
+        def broken_owner(*args, **kwargs):
+            raise RuntimeError("owner descriptor explosion")
+
+        ev_mod._build_canonicalization_owner_result = broken_owner
+
+        try:
+            from hexagent.exchangers.double_pipe.solver import SolverParams
+            from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+            from hexagent.optimization.adapter import evaluate_all_candidates
+            from hexagent.properties.base import FluidIdentifier
+
+            # Use a result WITH a warning so _build_canonicalization_owner_result is called
+            records = evaluate_all_candidates(
+                materialization_result=mat_result,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=prov,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident,
+                rating_fn=lambda **kw: self._make_result_with_warning(),
+            )
+
+            assert len(records) >= 2
+            # The RuntimeError propagates and is caught by fail-closed boundary
+            assert (
+                records[0].candidate_evaluation_state
+                == CandidateEvaluationState.RUNTIME_FAILED.value
+            )
+            assert records[0].evaluation_failure is not None
+            assert (
+                records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+            )
+        finally:
+            ev_mod._build_canonicalization_owner_result = original
+
+    def test_safe_marker_iterator_exception_caught(self) -> None:
+        """RuntimeError from entry_marker is caught by fail-closed boundary."""
+        from hexagent.optimization.evaluation import CandidateEvaluationState
+
+        ident, sp, prov, mat_result = self._build_legit()
+
+        import hexagent.optimization.evaluation as ev_mod
+
+        original = ev_mod._entry_marker
+
+        def broken_entry_marker(*args, **kwargs):
+            raise RuntimeError("entry marker explosion")
+
+        ev_mod._entry_marker = broken_entry_marker
+
+        try:
+            from hexagent.exchangers.double_pipe.solver import SolverParams
+            from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+            from hexagent.optimization.adapter import evaluate_all_candidates
+            from hexagent.properties.base import FluidIdentifier
+
+            records = evaluate_all_candidates(
+                materialization_result=mat_result,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=prov,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident,
+                rating_fn=lambda **kw: self._make_result_with_warning(),
+            )
+
+            assert len(records) >= 2
+            assert (
+                records[0].candidate_evaluation_state
+                == CandidateEvaluationState.RUNTIME_FAILED.value
+            )
+            assert records[0].evaluation_failure is not None
+            assert (
+                records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+            )
+        finally:
+            ev_mod._entry_marker = original
+
+    def test_identity_builder_exception_caught(self) -> None:
+        """ValueError from identity builder is caught by fail-closed boundary."""
+        from hexagent.optimization.evaluation import CandidateEvaluationState
+
+        ident, sp, prov, mat_result = self._build_legit()
+
+        import hexagent.optimization.evaluation as ev_mod
+
+        original = ev_mod._build_canonicalization_owner_result
+
+        def broken_owner_identity(*args, **kwargs):
+            raise ValueError("identity builder explosion")
+
+        ev_mod._build_canonicalization_owner_result = broken_owner_identity
+
+        try:
+            from hexagent.exchangers.double_pipe.solver import SolverParams
+            from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+            from hexagent.optimization.adapter import evaluate_all_candidates
+            from hexagent.properties.base import FluidIdentifier
+
+            records = evaluate_all_candidates(
+                materialization_result=mat_result,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=prov,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident,
+                rating_fn=lambda **kw: self._make_result_with_warning(),
+            )
+
+            assert len(records) >= 2
+            assert (
+                records[0].candidate_evaluation_state
+                == CandidateEvaluationState.RUNTIME_FAILED.value
+            )
+            assert records[0].evaluation_failure is not None
+            assert (
+                records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+            )
+        finally:
+            ev_mod._build_canonicalization_owner_result = original

@@ -1242,7 +1242,8 @@ class TestAdapterSpy:
         assert failure_ctx["failure_kind"] == "unsupported_type"
         assert failure_ctx["context_path_digest"] == expected_context_path_digest
         assert failure_ctx["safe_marker_digest"] == expected_safe_marker_digest
-        assert failure_ctx["owner_id"].startswith(records[0].source_qualified_candidate_id)
+        expected_owner_id = f"{records[0].source_qualified_candidate_id}:warning:0"
+        assert failure_ctx["owner_id"] == expected_owner_id
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
         assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
         assert records[0].evaluation_failure.traceback is None
@@ -1315,7 +1316,8 @@ class TestAdapterSpy:
         assert failure_ctx["failure_kind"] == "unsupported_type"
         assert failure_ctx["context_path_digest"] == expected_context_path_digest
         assert failure_ctx["safe_marker_digest"] == expected_safe_marker_digest
-        assert failure_ctx["owner_id"].startswith(records[0].source_qualified_candidate_id)
+        expected_owner_id = f"{records[0].source_qualified_candidate_id}:blocker:0"
+        assert failure_ctx["owner_id"] == expected_owner_id
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
         assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
         assert records[0].evaluation_failure.traceback is None
@@ -1385,7 +1387,8 @@ class TestAdapterSpy:
         assert failure_ctx["failure_kind"] == "unsupported_type"
         assert failure_ctx["context_path_digest"] == expected_context_path_digest
         assert failure_ctx["safe_marker_digest"] == expected_safe_marker_digest
-        assert failure_ctx["owner_id"].startswith(records[0].source_qualified_candidate_id)
+        expected_owner_id = f"{records[0].source_qualified_candidate_id}:run_failure"
+        assert failure_ctx["owner_id"] == expected_owner_id
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
         assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
         assert records[0].evaluation_failure.traceback is None
@@ -1403,7 +1406,445 @@ class TestAdapterSpy:
             )
 
 
-# ============================================================================
+class TestOneShotHostileContext:
+    """P0-3: Canonicalization failure via bytes context — pipeline stops on first bad candidate."""
+
+    def _build_2opt_mat_result(self):
+        """Shared setup: 2-option materialization."""
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.catalog import compute_catalog_content_hash
+        from hexagent.optimization.context import (
+            ExpectedProviderIdentity,
+            OptimizationObjective,
+            build_sizing_request_identity,
+            create_passed_sizing_gate,
+        )
+        from hexagent.optimization.identities import materialize_all_candidates
+        from hexagent.optimization.models import (
+            CompleteDoublePipeAssemblyOption,
+            CompleteDoublePipeCatalogSnapshot,
+            LengthSource,
+            OptionRawCountRecord,
+            SizingRequest,
+        )
+
+        opt_a = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="a",
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            manufacturing_option_identity="std",
+            manufacturing_metadata=(),
+            length_source=LengthSource(
+                length_quantum_m="0.1",
+                allowed_effective_lengths_m=(1.0,),
+            ),
+        )
+        opt_b = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="b",
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            manufacturing_option_identity="std",
+            manufacturing_metadata=(),
+            length_source=LengthSource(
+                length_quantum_m="0.1",
+                allowed_effective_lengths_m=(2.0,),
+            ),
+        )
+        ch = compute_catalog_content_hash(
+            catalog_id="c1",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt_a, opt_b),
+        )
+        cat = CompleteDoublePipeCatalogSnapshot(
+            catalog_id="c1",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt_a, opt_b),
+            catalog_content_hash=ch,
+        )
+        req = SizingRequest(catalogs=(cat,))
+        ident = build_sizing_request_identity(
+            request=req,
+            hot_fluid_name="w",
+            cold_fluid_name="b",
+            hot_fluid_equation_of_state="i",
+            cold_fluid_equation_of_state="n",
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            minimum_terminal_delta_t=5.0,
+            required_duty_w=1000.0,
+            duty_absolute_tolerance_w=10.0,
+            duty_relative_tolerance=0.01,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+            top_n=5,
+            solver_params=SolverParams(),
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="test",
+                version="1",
+                git_revision="a",
+                reference_state_policy="default",
+            ),
+            design_case_revision_id=UUID("11111111-1111-1111-1111-111111111111"),
+            calculation_run_id=UUID("22222222-2222-2222-2222-222222222222"),
+        )
+        recs = (
+            OptionRawCountRecord(
+                catalog_id="c1",
+                catalog_version="v1",
+                catalog_content_hash=ch,
+                source_identity="test",
+                schema_version="1.0",
+                assembly_option_id="a",
+                canonical_length_quantum_m="0.1",
+                raw_count=1,
+            ),
+            OptionRawCountRecord(
+                catalog_id="c1",
+                catalog_version="v1",
+                catalog_content_hash=ch,
+                source_identity="test",
+                schema_version="1.0",
+                assembly_option_id="b",
+                canonical_length_quantum_m="0.1",
+                raw_count=1,
+            ),
+        )
+        gate = create_passed_sizing_gate(
+            sizing_request_identity_digest=ident.sizing_request_identity_digest,
+            raw_combination_count=2,
+            effective_cap=100,
+            per_option_records=recs,
+        )
+        mat_result = materialize_all_candidates(catalogs=(cat,), sizing_gate=gate)
+        return ident, mat_result
+
+    def _make_minimal_result(self):
+        """Create a duck-typed RatingResult for the spy."""
+        from hexagent.core.heat_balance import ExecutionContextSnapshot, ProviderIdentitySnapshot
+        from hexagent.exchangers.double_pipe.result import (
+            RatingRequestIdentity,
+            RatingResult,
+            RatingStatus,
+        )
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+        result = object.__new__(RatingResult)
+        defaults = {
+            "status": RatingStatus.SUCCEEDED,
+            "flow_arrangement": FlowArrangement.COUNTERFLOW,
+            "result_hash": "sha256:" + "e" * 64,
+            "provenance_digest": "prov_digest",
+            "heat_duty_w": 1000.0,
+            "hot_outlet_temperature_k": 350.0,
+            "cold_outlet_temperature_k": 310.0,
+            "area_inner_m2": 1.5,
+            "area_outer_m2": 2.0,
+            "UA_w_k": 500.0,
+            "LMTD_k": 40.0,
+            "energy_residual_w": 0.001,
+            "ua_lmtd_residual_w": 0.002,
+            "tube_selected_correlation": None,
+            "annulus_selected_correlation": None,
+            "hot_inlet_state": None,
+            "cold_inlet_state": None,
+            "tube_selected_correlation_id": None,
+            "tube_selected_correlation_version": None,
+            "annulus_selected_correlation_id": None,
+            "annulus_selected_correlation_version": None,
+            "warnings": (),
+            "blockers": (),
+            "failure": None,
+        }
+        for k, v in defaults.items():
+            object.__setattr__(result, k, v)
+
+        rri = RatingRequestIdentity(
+            hot_fluid_name="w",
+            hot_fluid_backend="i",
+            hot_fluid_components=(),
+            cold_fluid_name="b",
+            cold_fluid_backend="n",
+            cold_fluid_components=(),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            flow_arrangement="counterflow",
+            geometry={
+                "inner_tube_inner_diameter_m": 0.05,
+                "inner_tube_outer_diameter_m": 0.06,
+                "outer_pipe_inner_diameter_m": 0.10,
+                "effective_length_m": 1.0,
+                "wall_thermal_conductivity_w_m_k": 50.0,
+                "inner_surface_roughness_m": 1e-5,
+                "annulus_surface_roughness_m": 1e-5,
+                "inner_fouling_resistance_m2k_w": 0.0001,
+                "outer_fouling_resistance_m2k_w": 0.0002,
+            },
+            solver_absolute_residual_w=1e-3,
+            solver_relative_residual_fraction=1e-8,
+            solver_bracket_temperature_tolerance_k=1e-4,
+            solver_max_iterations=100,
+        )
+        object.__setattr__(result, "request_identity", rri)
+        pi = ProviderIdentitySnapshot(
+            name="test_provider",
+            version="1.0",
+            git_revision="abc123",
+            reference_state_policy="default",
+        )
+        object.__setattr__(result, "provider_identity", pi)
+        ec = object.__new__(ExecutionContextSnapshot)
+        for attr in (
+            "request_id",
+            "design_case_revision_id",
+            "calculation_run_id",
+            "execution_id",
+            "rating_software_version",
+            "execution_context_policy_version",
+        ):
+            object.__setattr__(ec, attr, None)
+        object.__setattr__(result, "execution_context", ec)
+        object.__setattr__(result, "verify_hash", lambda: True)
+        object.__setattr__(result, "verify_provenance", lambda: True)
+        return result
+
+    def test_warning_one_shot_fails_stops_pipeline(self) -> None:
+        """Warning context with bytes — pipeline stops on first bad candidate."""
+        import unittest.mock
+
+        from hexagent.domain.messages import (
+            EngineeringMessage,
+            EngineeringMessageSeverity,
+            ErrorCode,
+        )
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.optimization.evaluation import CandidateEvaluationState
+        from hexagent.properties.base import FluidIdentifier, PropertyProvider
+
+        ident, mat_result = self._build_2opt_mat_result()
+        provider = unittest.mock.MagicMock(spec=PropertyProvider)
+
+        bad_warning = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="bad warning",
+            context=(("bad", b"bytes_data"),),
+        )
+
+        result_with = self._make_minimal_result()
+        object.__setattr__(result_with, "warnings", (bad_warning,))
+        object.__setattr__(result_with, "blockers", ())
+        object.__setattr__(result_with, "failure", None)
+
+        call_idx = [0]
+
+        def spy_fn(**kwargs):
+            call_idx[0] += 1
+            return result_with
+
+        eval_records = evaluate_all_candidates(
+            materialization_result=mat_result,
+            hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+            cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            provider=provider,
+            solver_params=SolverParams(),
+            minimum_terminal_delta_t=5.0,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            sizing_request_identity=ident,
+            rating_fn=spy_fn,
+        )
+
+        assert len(eval_records) == 2
+        assert (
+            eval_records[0].candidate_evaluation_state
+            == CandidateEvaluationState.RUNTIME_FAILED.value
+        )
+        assert eval_records[0].evaluation_failure is not None
+        assert eval_records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert (
+            eval_records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+        )
+        assert call_idx[0] == 1
+
+    def test_blocker_one_shot_fails_stops_pipeline(self) -> None:
+        """Blocker context with bytes — pipeline stops on first bad candidate."""
+        import unittest.mock
+
+        from hexagent.domain.messages import (
+            EngineeringMessage,
+            EngineeringMessageSeverity,
+            ErrorCode,
+        )
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.optimization.evaluation import CandidateEvaluationState
+        from hexagent.properties.base import FluidIdentifier, PropertyProvider
+
+        ident, mat_result = self._build_2opt_mat_result()
+        provider = unittest.mock.MagicMock(spec=PropertyProvider)
+
+        bad_blocker = EngineeringMessage(
+            code=ErrorCode.BLOCKER,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="bad blocker",
+            context=(("bad", b"bytes_data"),),
+        )
+
+        result_with = self._make_minimal_result()
+        object.__setattr__(result_with, "warnings", ())
+        object.__setattr__(result_with, "blockers", (bad_blocker,))
+        object.__setattr__(result_with, "failure", None)
+
+        call_idx = [0]
+
+        def spy_fn(**kwargs):
+            call_idx[0] += 1
+            return result_with
+
+        eval_records = evaluate_all_candidates(
+            materialization_result=mat_result,
+            hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+            cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            provider=provider,
+            solver_params=SolverParams(),
+            minimum_terminal_delta_t=5.0,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            sizing_request_identity=ident,
+            rating_fn=spy_fn,
+        )
+
+        assert len(eval_records) == 2
+        assert (
+            eval_records[0].candidate_evaluation_state
+            == CandidateEvaluationState.RUNTIME_FAILED.value
+        )
+        assert eval_records[0].evaluation_failure is not None
+        assert eval_records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert (
+            eval_records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+        )
+        assert call_idx[0] == 1
+
+    def test_warning_first_success_second_failure(self) -> None:
+        """Two warnings: first valid, second with bytes — pipeline stops on first bad one."""
+        import unittest.mock
+
+        from hexagent.domain.messages import (
+            EngineeringMessage,
+            EngineeringMessageSeverity,
+            ErrorCode,
+        )
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.optimization.evaluation import CandidateEvaluationState
+        from hexagent.properties.base import FluidIdentifier, PropertyProvider
+
+        ident, mat_result = self._build_2opt_mat_result()
+        provider = unittest.mock.MagicMock(spec=PropertyProvider)
+
+        good_warning = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="good warning",
+            context=(("good", "value"),),
+        )
+        bad_warning = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="bad warning",
+            context=(("bad", b"bytes_data"),),
+        )
+
+        result_with = self._make_minimal_result()
+        object.__setattr__(result_with, "warnings", (good_warning, bad_warning))
+        object.__setattr__(result_with, "blockers", ())
+        object.__setattr__(result_with, "failure", None)
+
+        def spy_fn(**kwargs):
+            return result_with
+
+        eval_records = evaluate_all_candidates(
+            materialization_result=mat_result,
+            hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+            cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            provider=provider,
+            solver_params=SolverParams(),
+            minimum_terminal_delta_t=5.0,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            sizing_request_identity=ident,
+            rating_fn=spy_fn,
+        )
+
+        assert len(eval_records) == 2
+        assert (
+            eval_records[0].candidate_evaluation_state
+            == CandidateEvaluationState.RUNTIME_FAILED.value
+        )
+        assert eval_records[0].evaluation_failure is not None
+        assert eval_records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert (
+            eval_records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+        )
+
+
 # P0-9: 26-field evidence digest mutation suite
 # ============================================================================
 

@@ -664,6 +664,20 @@ class MaterializationResult:
         if not self.candidate_set.verify_digest():
             errors.append("candidate_set.verify_digest() failed")
 
+        # P0-5: Bounds cross-check — materialization result bounds must match candidate_set
+        if self.minimum_effective_length_m != self.candidate_set.minimum_effective_length_m:
+            errors.append(
+                f"MaterializationResult minimum_effective_length_m "
+                f"({self.minimum_effective_length_m}) != "
+                f"candidate_set ({self.candidate_set.minimum_effective_length_m})"
+            )
+        if self.maximum_effective_length_m != self.candidate_set.maximum_effective_length_m:
+            errors.append(
+                f"MaterializationResult maximum_effective_length_m "
+                f"({self.maximum_effective_length_m}) != "
+                f"candidate_set ({self.candidate_set.maximum_effective_length_m})"
+            )
+
         if errors:
             raise ValueError(
                 "MaterializationResult verification failed:\n  - " + "\n  - ".join(errors)
