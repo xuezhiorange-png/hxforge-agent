@@ -1,14 +1,20 @@
 # TASK-009 — Manufacturable sizing and deterministic candidate optimization
 
-**Status:** READY — Engineering design review passed
-**Milestone:** M2
-**Priority:** P0
-**Depends on:** TASK-005, TASK-008
-**GitHub Issue:** #23
-**Implementation branch:** codex/task-009-manufacturable-sizing-optimization
-**Draft PR:**
-#24 — Draft
-**Production implementation:** In progress
+## Overall status
+
+| Aspect | Status |
+|---|---|
+| **TASK-009 overall** | Phase 1-2: COMPLETE; Phase 3 design: IN PROGRESS; Phase 3 implementation: NOT STARTED |
+| **Milestone** | M2 |
+| **Priority** | P0 |
+| **Depends on** | TASK-005, TASK-008 |
+| **GitHub Issue** | #23 (Phase 1-2); #25 (Phase 3 design) |
+| **Implementation branch** | codex/task-009-manufacturable-sizing-optimization |
+| **Draft PR** | #24 — Draft |
+| **Phase 1-2 production implementation** | COMPLETE |
+| **Phase 3 production implementation** | NOT STARTED |
+| **Phase 3 design review** | CHANGES REQUIRED |
+| **Phase 3 frozen contract SHA** | NOT ESTABLISHED |
 
 Round 53 Engineering Design Review passed.
 TASK-009 is approved for implementation from frozen contract commit
