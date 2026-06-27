@@ -1285,7 +1285,6 @@ def disposition_from_preparation_failure(
     preparation_result: Phase3CandidatePreparationResult,
 ) -> CandidateDispositionRecord:
     """Construct a Phase 3 RUNTIME_FAILED disposition from a failed preparation."""
-    failure = preparation_result.phase3_failure
     failure_binding = preparation_result.phase3_failure_binding
     if failure_binding is None:
         raise ValueError("disposition_from_preparation_failure: no failure binding")
@@ -2405,7 +2404,7 @@ def verify_optimization_result_or_raise(
             cs.verify_or_raise(
                 source_record=rec,
                 identity_snapshot=ids,
-                authoritative_source_record_descriptor_digest=cs.phase2_source_record_descriptor_digest,
+                authoritative_source_record_descriptor_digest=ei.ordered_phase2_source_record_descriptor_digests[i],
                 warning_descriptor_bindings=wbt,
                 blocker_descriptor_bindings=bbt,
                 source_failure_binding=sfb,
@@ -2536,32 +2535,51 @@ def expected_phase3_node_id(role: str, nt: ProvenanceNodeType, ph: str) -> UUID:
 Roles and order (12 + N + F): root, sizing_request, passed_gate, candidate_set, identity_snapshot_set, complete_snapshot_set, evaluation_input, source_binding_set, preparation_result_set, disposition[0..N-1], ranked[0..F-1], top_n_selection, result_core, optimizer.
 
 ```python
-def expected_phase3_provenance_nodes(*, ei, dispositions, ranked, result):
+def expected_phase3_provenance_nodes(
+    *,
+    ei,
+    dispositions,
+    ranked,
+    total_candidate_count: int,
+    feasible_candidate_count: int,
+    requested_top_n: int,
+    ordered_identity_snapshot_digests: tuple[str, ...],
+    ordered_phase2_source_snapshot_digests: tuple[str | None, ...],
+    ordered_phase3_source_binding_digests: tuple[str | None, ...],
+    ordered_phase3_preparation_result_digests: tuple[str, ...],
+    ordered_ranked_record_digests: tuple[str, ...],
+    ordered_top_n_record_digests: tuple[str, ...],
+    result_core_hash: str,
+    termination_status: TerminationStatus,
+    optimization_objective: OptimizationObjective,
+    evaluation_input_digest: str,
+):
     nodes = []
     root_p = sha256_digest({"artifact_kind":"phase3_evaluation_input","evaluation_input_digest":ei.evaluation_input_digest})
     nodes.append(ExpectedPhase3ProvenanceNode("root", EXTERNAL, root_p))
     nodes.append(ExpectedPhase3ProvenanceNode("sizing_request", INPUT_FILE, ei.sizing_request_identity_digest))
     nodes.append(ExpectedPhase3ProvenanceNode("passed_gate", CALCULATION_RUN, ei.gate_digest))
     nodes.append(ExpectedPhase3ProvenanceNode("candidate_set", CALCULATION_RUN, ei.candidate_set_digest))
-    is_p = sha256_digest({"ordered_identity_snapshot_digests":list(result.ordered_identity_snapshot_digests)})
+    is_p = sha256_digest({"ordered_identity_snapshot_digests": list(ordered_identity_snapshot_digests)})
     nodes.append(ExpectedPhase3ProvenanceNode("identity_snapshot_set", INTERMEDIATE, is_p))
-    css_p = sha256_digest({"ordered_complete_snapshot_digests":list(result.ordered_phase2_source_snapshot_digests)})
+    css_p = sha256_digest({"ordered_complete_snapshot_digests": list(ordered_phase2_source_snapshot_digests)})
     nodes.append(ExpectedPhase3ProvenanceNode("complete_snapshot_set", INTERMEDIATE, css_p))
     nodes.append(ExpectedPhase3ProvenanceNode("evaluation_input", INTERMEDIATE, ei.evaluation_input_digest))
-    sb_p = sha256_digest({"ordered_binding_digests":list(result.ordered_phase3_source_binding_digests)})
+    sb_p = sha256_digest({"ordered_binding_digests": list(ordered_phase3_source_binding_digests)})
     nodes.append(ExpectedPhase3ProvenanceNode("source_binding_set", INTERMEDIATE, sb_p))
-    pr_p = sha256_digest({"ordered_prep_result_digests":list(result.ordered_phase3_preparation_result_digests)})
+    pr_p = sha256_digest({"ordered_prep_result_digests": list(ordered_phase3_preparation_result_digests)})
     nodes.append(ExpectedPhase3ProvenanceNode("preparation_result_set", INTERMEDIATE, pr_p))
     for i,d in enumerate(dispositions):
         nodes.append(ExpectedPhase3ProvenanceNode(f"disposition[{i}]", INTERMEDIATE, d.feasibility_digest))
     for i,r in enumerate(ranked):
         nodes.append(ExpectedPhase3ProvenanceNode(f"ranked[{i}]", INTERMEDIATE, r.ranked_record_digest))
-    tn_p = sha256_digest({"ordered_top_n_record_digests":list(result.ordered_top_n_record_digests)})
+    tn_p = sha256_digest({"ordered_top_n_record_digests": list(ordered_top_n_record_digests)})
     nodes.append(ExpectedPhase3ProvenanceNode("top_n_selection", INTERMEDIATE, tn_p))
-    nodes.append(ExpectedPhase3ProvenanceNode("result_core", RESULT, result.result_core_hash))
-    opt_p = sha256_digest({"evaluation_input_digest":ei.evaluation_input_digest,"optimization_objective":result.optimization_objective.value,
-        "requested_top_n":result.requested_top_n,"termination_status":result.termination_status.value,
-        "result_core_hash":result.result_core_hash,"phase3_algorithm_version":"task009-phase3-v1"})
+    nodes.append(ExpectedPhase3ProvenanceNode("result_core", RESULT, result_core_hash))
+    opt_p = sha256_digest({"evaluation_input_digest": evaluation_input_digest,
+        "optimization_objective": optimization_objective.value,
+        "requested_top_n": requested_top_n, "termination_status": termination_status.value,
+        "result_core_hash": result_core_hash, "phase3_algorithm_version": "task009-phase3-v1"})
     nodes.append(ExpectedPhase3ProvenanceNode("optimizer", OPTIMIZER, opt_p))
     return tuple(nodes)
 ```
@@ -2569,7 +2587,7 @@ def expected_phase3_provenance_nodes(*, ei, dispositions, ranked, result):
 ### 22.3 Expected edges
 
 ```python
-def expected_phase3_provenance_edge_keys(*, expected_nodes, dispositions, ranked, result):
+def expected_phase3_provenance_edge_keys(*, expected_nodes, dispositions, ranked, requested_top_n):
     edges = []
     uid_map = {n.role: str(expected_phase3_node_id(n.role,n.node_type,n.payload_hash)) for n in expected_nodes}
     def uid(r): return uid_map[r]
@@ -2590,7 +2608,7 @@ def expected_phase3_provenance_edge_keys(*, expected_nodes, dispositions, ranked
         if di is None: raise ValueError(f"ranked[{ri}]: no matching FEASIBLE disposition")
         edges.append((uid(f"disposition[{di}]"),uid(f"ranked[{ri}]"),Phase3ProvenanceRelation.RANKED.value))
     edges.append((uid("evaluation_input"),uid("top_n_selection"),Phase3ProvenanceRelation.SELECTED_BY.value))
-    for ri in range(min(result.requested_top_n,len(ranked))):
+    for ri in range(min(requested_top_n,len(ranked))):
         edges.append((uid(f"ranked[{ri}]"),uid("top_n_selection"),Phase3ProvenanceRelation.SELECTED.value))
     edges.append((uid("top_n_selection"),uid("result_core"),Phase3ProvenanceRelation.PRODUCED.value))
     edges.append((uid("result_core"),uid("optimizer"),Phase3ProvenanceRelation.EXECUTED_BY.value))
@@ -2605,9 +2623,21 @@ def build_phase3_provenance_nodes(
     ei: Phase3EvaluationInput,
     dispositions: tuple[CandidateDispositionRecord, ...],
     ranked: tuple[RankedCandidateRecord, ...],
-    result: OptimizationResult,
-    exp_nodes: tuple,
+    total_candidate_count: int,
+    feasible_candidate_count: int,
+    requested_top_n: int,
+    ordered_identity_snapshot_digests: tuple[str, ...],
+    ordered_phase2_source_snapshot_digests: tuple[str | None, ...],
+    ordered_phase3_source_binding_digests: tuple[str | None, ...],
+    ordered_phase3_preparation_result_digests: tuple[str, ...],
+    ordered_ranked_record_digests: tuple[str, ...],
+    ordered_top_n_record_digests: tuple[str, ...],
+    result_core_hash: str,
+    termination_status: TerminationStatus,
+    optimization_objective: OptimizationObjective,
+    evaluation_input_digest: str,
 ) -> tuple[ProvenanceNode, ...]:
+    """Build provenance nodes from pre-result values — no dependency on final OptimizationResult."""
     root_p = sha256_digest({"artifact_kind":"phase3_evaluation_input","evaluation_input_digest":ei.evaluation_input_digest})
     nodes = [
         ProvenanceNode(node_id=expected_phase3_node_id("root",EXTERNAL,root_p), node_type=EXTERNAL, payload_hash=root_p, label="", metadata=()),
@@ -2615,14 +2645,14 @@ def build_phase3_provenance_nodes(
         ProvenanceNode(node_id=expected_phase3_node_id("passed_gate",CALCULATION_RUN,ei.gate_digest), node_type=CALCULATION_RUN, payload_hash=ei.gate_digest, label="", metadata=()),
         ProvenanceNode(node_id=expected_phase3_node_id("candidate_set",CALCULATION_RUN,ei.candidate_set_digest), node_type=CALCULATION_RUN, payload_hash=ei.candidate_set_digest, label="", metadata=()),
     ]
-    is_p = sha256_digest({"ordered_identity_snapshot_digests":list(result.ordered_identity_snapshot_digests)})
+    is_p = sha256_digest({"ordered_identity_snapshot_digests": list(ordered_identity_snapshot_digests)})
     nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("identity_snapshot_set",INTERMEDIATE,is_p), node_type=INTERMEDIATE, payload_hash=is_p, label="", metadata=()))
-    css_p = sha256_digest({"ordered_complete_snapshot_digests":list(result.ordered_phase2_source_snapshot_digests)})
+    css_p = sha256_digest({"ordered_complete_snapshot_digests": list(ordered_phase2_source_snapshot_digests)})
     nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("complete_snapshot_set",INTERMEDIATE,css_p), node_type=INTERMEDIATE, payload_hash=css_p, label="", metadata=()))
     nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("evaluation_input",INTERMEDIATE,ei.evaluation_input_digest), node_type=INTERMEDIATE, payload_hash=ei.evaluation_input_digest, label="", metadata=()))
-    sb_p = sha256_digest({"ordered_binding_digests":list(result.ordered_phase3_source_binding_digests)})
+    sb_p = sha256_digest({"ordered_binding_digests": list(ordered_phase3_source_binding_digests)})
     nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("source_binding_set",INTERMEDIATE,sb_p), node_type=INTERMEDIATE, payload_hash=sb_p, label="", metadata=()))
-    pr_p = sha256_digest({"ordered_prep_result_digests":list(result.ordered_phase3_preparation_result_digests)})
+    pr_p = sha256_digest({"ordered_prep_result_digests": list(ordered_phase3_preparation_result_digests)})
     nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("preparation_result_set",INTERMEDIATE,pr_p), node_type=INTERMEDIATE, payload_hash=pr_p, label="", metadata=()))
     for i,d in enumerate(dispositions):
         nid = expected_phase3_node_id(f"disposition[{i}]",INTERMEDIATE,d.feasibility_digest)
@@ -2630,12 +2660,13 @@ def build_phase3_provenance_nodes(
     for i,r in enumerate(ranked):
         nid = expected_phase3_node_id(f"ranked[{i}]",INTERMEDIATE,r.ranked_record_digest)
         nodes.append(ProvenanceNode(node_id=nid, node_type=INTERMEDIATE, payload_hash=r.ranked_record_digest, label="", metadata=()))
-    tn_p = sha256_digest({"ordered_top_n_record_digests":list(result.ordered_top_n_record_digests)})
+    tn_p = sha256_digest({"ordered_top_n_record_digests": list(ordered_top_n_record_digests)})
     nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("top_n_selection",INTERMEDIATE,tn_p), node_type=INTERMEDIATE, payload_hash=tn_p, label="", metadata=()))
-    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("result_core",RESULT,result.result_core_hash), node_type=RESULT, payload_hash=result.result_core_hash, label="", metadata=()))
-    opt_p = sha256_digest({"evaluation_input_digest":ei.evaluation_input_digest,"optimization_objective":result.optimization_objective.value,
-        "requested_top_n":result.requested_top_n,"termination_status":result.termination_status.value,
-        "result_core_hash":result.result_core_hash,"phase3_algorithm_version":"task009-phase3-v1"})
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("result_core",RESULT,result_core_hash), node_type=RESULT, payload_hash=result_core_hash, label="", metadata=()))
+    opt_p = sha256_digest({"evaluation_input_digest": evaluation_input_digest,
+        "optimization_objective": optimization_objective.value,
+        "requested_top_n": requested_top_n, "termination_status": termination_status.value,
+        "result_core_hash": result_core_hash, "phase3_algorithm_version": "task009-phase3-v1"})
     nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("optimizer",OPTIMIZER,opt_p), node_type=OPTIMIZER, payload_hash=opt_p, label="", metadata=()))
     return tuple(nodes)
 
@@ -2644,8 +2675,8 @@ def build_phase3_provenance_edges(
     ei: Phase3EvaluationInput,
     dispositions: tuple[CandidateDispositionRecord, ...],
     ranked: tuple[RankedCandidateRecord, ...],
-    result: OptimizationResult,
-    exp_nodes: tuple,  # expected nodes with .role/.node_type/.payload_hash
+    requested_top_n: int,
+    exp_nodes: tuple,
 ) -> tuple[ProvenanceEdge, ...]:
     uid_map = {}
     for n in exp_nodes:
@@ -2670,7 +2701,7 @@ def build_phase3_provenance_edges(
         if di is None: raise ValueError(f"ranked[{ri}]: no matching FEASIBLE disposition")
         edges.append(ProvenanceEdge(source_id=uid(f"disposition[{di}]"), target_id=uid(f"ranked[{ri}]"), relation=Phase3ProvenanceRelation.RANKED.value, metadata=()))
     edges.append(ProvenanceEdge(source_id=uid("evaluation_input"), target_id=uid("top_n_selection"), relation=Phase3ProvenanceRelation.SELECTED_BY.value, metadata=()))
-    for ri in range(min(result.requested_top_n,len(ranked))):
+    for ri in range(min(requested_top_n,len(ranked))):
         edges.append(ProvenanceEdge(source_id=uid(f"ranked[{ri}]"), target_id=uid("top_n_selection"), relation=Phase3ProvenanceRelation.SELECTED.value, metadata=()))
     edges.append(ProvenanceEdge(source_id=uid("top_n_selection"), target_id=uid("result_core"), relation=Phase3ProvenanceRelation.PRODUCED.value, metadata=()))
     edges.append(ProvenanceEdge(source_id=uid("result_core"), target_id=uid("optimizer"), relation=Phase3ProvenanceRelation.EXECUTED_BY.value, metadata=()))
@@ -2681,19 +2712,68 @@ def build_phase3_provenance_graph(
     ei: Phase3EvaluationInput,
     dispositions: tuple[CandidateDispositionRecord, ...],
     ranked: tuple[RankedCandidateRecord, ...],
-    result: OptimizationResult,
+    total_candidate_count: int,
+    feasible_candidate_count: int,
+    requested_top_n: int,
+    ordered_identity_snapshot_digests: tuple[str, ...],
+    ordered_phase2_source_snapshot_digests: tuple[str | None, ...],
+    ordered_phase3_source_binding_digests: tuple[str | None, ...],
+    ordered_phase3_preparation_result_digests: tuple[str, ...],
+    ordered_ranked_record_digests: tuple[str, ...],
+    ordered_top_n_record_digests: tuple[str, ...],
+    result_core_hash: str,
+    termination_status: TerminationStatus,
+    optimization_objective: OptimizationObjective,
+    evaluation_input_digest: str,
 ) -> ProvenanceGraph:
-    exp_nodes = expected_phase3_provenance_nodes(ei=ei, dispositions=dispositions, ranked=ranked, result=result)
-    nodes = build_phase3_provenance_nodes(ei=ei, dispositions=dispositions, ranked=ranked, result=result, exp_nodes=exp_nodes)
-    edges = build_phase3_provenance_edges(ei=ei, dispositions=dispositions, ranked=ranked, result=result, exp_nodes=exp_nodes)
+    exp_nodes = expected_phase3_provenance_nodes(ei=ei, dispositions=dispositions, ranked=ranked,
+        total_candidate_count=total_candidate_count, feasible_candidate_count=feasible_candidate_count,
+        requested_top_n=requested_top_n,
+        ordered_identity_snapshot_digests=ordered_identity_snapshot_digests,
+        ordered_phase2_source_snapshot_digests=ordered_phase2_source_snapshot_digests,
+        ordered_phase3_source_binding_digests=ordered_phase3_source_binding_digests,
+        ordered_phase3_preparation_result_digests=ordered_phase3_preparation_result_digests,
+        ordered_ranked_record_digests=ordered_ranked_record_digests,
+        ordered_top_n_record_digests=ordered_top_n_record_digests,
+        result_core_hash=result_core_hash, termination_status=termination_status,
+        optimization_objective=optimization_objective, evaluation_input_digest=evaluation_input_digest)
+    nodes = build_phase3_provenance_nodes(ei=ei, dispositions=dispositions, ranked=ranked,
+        total_candidate_count=total_candidate_count, feasible_candidate_count=feasible_candidate_count,
+        requested_top_n=requested_top_n,
+        ordered_identity_snapshot_digests=ordered_identity_snapshot_digests,
+        ordered_phase2_source_snapshot_digests=ordered_phase2_source_snapshot_digests,
+        ordered_phase3_source_binding_digests=ordered_phase3_source_binding_digests,
+        ordered_phase3_preparation_result_digests=ordered_phase3_preparation_result_digests,
+        ordered_ranked_record_digests=ordered_ranked_record_digests,
+        ordered_top_n_record_digests=ordered_top_n_record_digests,
+        result_core_hash=result_core_hash, termination_status=termination_status,
+        optimization_objective=optimization_objective, evaluation_input_digest=evaluation_input_digest,
+        exp_nodes=exp_nodes)
+    edges = build_phase3_provenance_edges(ei=ei, dispositions=dispositions, ranked=ranked,
+        requested_top_n=requested_top_n, exp_nodes=exp_nodes)
     return ProvenanceGraph(nodes=nodes, edges=edges)
 ```
 
 ### 22.6 Semantic verifier
 
 ```python
-def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked, result):
-    expected_nodes = expected_phase3_provenance_nodes(ei=ei,dispositions=dispositions,ranked=ranked,result=result)
+def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
+    total_candidate_count, feasible_candidate_count, requested_top_n,
+    ordered_identity_snapshot_digests, ordered_phase2_source_snapshot_digests,
+    ordered_phase3_source_binding_digests, ordered_phase3_preparation_result_digests,
+    ordered_ranked_record_digests, ordered_top_n_record_digests,
+    result_core_hash, termination_status, optimization_objective, evaluation_input_digest):
+    expected_nodes = expected_phase3_provenance_nodes(ei=ei,dispositions=dispositions,ranked=ranked,
+        total_candidate_count=total_candidate_count, feasible_candidate_count=feasible_candidate_count,
+        requested_top_n=requested_top_n,
+        ordered_identity_snapshot_digests=ordered_identity_snapshot_digests,
+        ordered_phase2_source_snapshot_digests=ordered_phase2_source_snapshot_digests,
+        ordered_phase3_source_binding_digests=ordered_phase3_source_binding_digests,
+        ordered_phase3_preparation_result_digests=ordered_phase3_preparation_result_digests,
+        ordered_ranked_record_digests=ordered_ranked_record_digests,
+        ordered_top_n_record_digests=ordered_top_n_record_digests,
+        result_core_hash=result_core_hash, termination_status=termination_status,
+        optimization_objective=optimization_objective, evaluation_input_digest=evaluation_input_digest)
     expected_count = 12 + len(dispositions) + len(ranked)
     if len(expected_nodes) != expected_count: raise ValueError(f"expected node count {len(expected_nodes)} != {expected_count}")
     if len(graph.nodes) != expected_count: raise ValueError(f"graph node count {len(graph.nodes)} != {expected_count}")
@@ -2716,7 +2796,7 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked, 
         if actual.metadata != (): raise ValueError(f"{exp.role}: metadata not empty")
     extra = set(actual_by_id) - set(expected_ids)
     if extra: raise ValueError(f"extra nodes: {len(extra)}")
-    expected_edges = expected_phase3_provenance_edge_keys(expected_nodes=expected_nodes,dispositions=dispositions,ranked=ranked,result=result)
+    expected_edges = expected_phase3_provenance_edge_keys(expected_nodes=expected_nodes,dispositions=dispositions,ranked=ranked,requested_top_n=requested_top_n)
     actual_edges = tuple(sorted((str(e.source_id),str(e.target_id),e.relation) for e in graph.edges))
     if len(actual_edges) != len(set(actual_edges)): raise ValueError("duplicate edges")
     if actual_edges != expected_edges: raise ValueError("edge set mismatch")
