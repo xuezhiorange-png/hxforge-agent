@@ -63,6 +63,8 @@ class Phase3PreparationFailureStage(StrEnum):
 ## 3. Evidence digest via authoritative Phase 2 helper
 
 ```python
+from __future__ import annotations
+
 def compute_evidence_digest(
     evidence: VerifiedRatingEvidenceSnapshot | None,
     *,
@@ -249,9 +251,6 @@ def build_phase2_source_record_descriptor(
         claimed_rating_result_audit_digest=payload["claimed_rating_result_audit_digest"],
         evaluation_failure_digest=evaluation_failure_digest,
         descriptor_digest=d)
-```
-
----
 ```
 
 ---
@@ -606,13 +605,22 @@ class Phase2SourceRecordSnapshot(BaseModel):
         *,
         source_record: CandidateEvaluationRecord,
         identity_snapshot: Phase2SourceRecordIdentitySnapshot,
-        authoritative_source_record_descriptor_digest: str,
+        source_record_descriptor: Phase2SourceRecordDescriptor,
+        verified_evidence: VerifiedRatingEvidenceSnapshot | None,
         warning_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
         blocker_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
         source_failure_binding: Phase3RunFailureDescriptorBinding | None,
         evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
     ) -> None:
-        # 1) Check field-level consistency with source_record
+        # 1) Delegate to upstream authority: identity snapshot verifier
+        identity_snapshot.verify_or_raise(source_record=source_record)
+        # 2) Delegate to upstream authority: source record descriptor verifier
+        source_record_descriptor.verify_or_raise(
+            source_record=source_record,
+            identity_snapshot=identity_snapshot,
+            verified_evidence=verified_evidence,
+            source_failure_binding=source_failure_binding)
+        # 3) Field-level consistency with source_record
         if self.source_qualified_candidate_id != source_record.source_qualified_candidate_id:
             raise ValueError("candidate_id mismatch")
         if self.evaluation_order_index != source_record.evaluation_order_index:
@@ -631,19 +639,19 @@ class Phase2SourceRecordSnapshot(BaseModel):
             raise ValueError("provider_identity_matches mismatch")
         if self.rating_status != source_record.rating_status:
             raise ValueError("rating_status mismatch")
-        # 2) Digest fields: use source_failure_binding.descriptor_binding_digest
+        # 4) Digest fields: use source_failure_binding.descriptor_binding_digest
         # as the stable identity (payload_digest may be None on canonicalization failure)
         efd = source_failure_binding.descriptor_binding_digest \
             if source_failure_binding is not None and source_record.evaluation_failure is not None else None
         if self.evaluation_failure_digest != efd:
             raise ValueError("evaluation_failure_digest mismatch")
-        # 3) Digest fields: extract from source_record and compare
+        # 5) Digest fields: extract from source_record and compare
         expected_identity_digest = source_record.candidate_evaluation_identity.candidate_evaluation_identity_digest \
             if source_record.candidate_evaluation_identity is not None else None
         if self.candidate_evaluation_identity_digest != expected_identity_digest:
             raise ValueError("candidate_evaluation_identity_digest mismatch")
-        expected_verified_digest = source_record.verified_rating_evidence.verified_evidence_digest \
-            if source_record.verified_rating_evidence is not None else None
+        expected_verified_digest = verified_evidence.verified_evidence_digest \
+            if verified_evidence is not None else None
         if self.verified_rating_evidence_digest != expected_verified_digest:
             raise ValueError("verified_rating_evidence_digest mismatch")
         expected_invalid_digest = source_record.invalid_rating_evidence.invalid_evidence_digest \
@@ -654,10 +662,10 @@ class Phase2SourceRecordSnapshot(BaseModel):
             if source_record.claimed_rating_result_audit is not None else None
         if self.claimed_rating_result_audit_digest != expected_audit_digest:
             raise ValueError("claimed_rating_result_audit_digest mismatch")
-        # 3b) Authoritative source record descriptor digest (from artifact)
+        # 6) Authoritative source record descriptor digest (from artifact)
         if self.phase2_source_record_descriptor_digest != source_record_descriptor.descriptor_digest:
             raise ValueError("phase2_source_record_descriptor_digest mismatch")
-        # 5) Warning/blocker bindings
+        # 7) Warning/blocker bindings
         if len(self.warning_descriptor_binding_digests) != len(warning_descriptor_bindings):
             raise ValueError("warning_binding_digests length mismatch")
         for actual_d, expected in zip(self.warning_descriptor_binding_digests, warning_descriptor_bindings):
@@ -668,17 +676,14 @@ class Phase2SourceRecordSnapshot(BaseModel):
         for actual_d, expected in zip(self.blocker_descriptor_binding_digests, blocker_descriptor_bindings):
             if actual_d != expected.descriptor_binding_digest:
                 raise ValueError("blocker_binding_digest mismatch")
-        # 6) Failure bindings
+        # 8) Failure bindings
         sfbd = source_failure_binding.descriptor_binding_digest if source_failure_binding is not None else None
         if self.source_evaluation_failure_binding_digest != sfbd:
             raise ValueError("source_failure_binding_digest mismatch")
         efbd = evidence_failure_binding.descriptor_binding_digest if evidence_failure_binding is not None else None
         if self.evidence_failure_binding_digest != efbd:
             raise ValueError("evidence_failure_binding_digest mismatch")
-        # 7) Identity snapshot correlation
-        if self.source_qualified_candidate_id != identity_snapshot.source_qualified_candidate_id:
-            raise ValueError("identity_snapshot candidate_id mismatch")
-        # 8) Replay self-hash as integrity check
+        # 9) Self-hash replay as integrity check
         payload = phase2_source_record_snapshot_payload_from_values(
             schema_version=self.schema_version, source_qualified_candidate_id=self.source_qualified_candidate_id,
             evaluation_order_index=self.evaluation_order_index, candidate_evaluation_state=self.candidate_evaluation_state,
@@ -1024,6 +1029,7 @@ class Phase3EvaluationInput(BaseModel):
                 source_record=rec,
                 identity_snapshot=self.identity_snapshots[i],
                 source_record_descriptor=phase2_source_record_descriptors[i],
+                verified_evidence=rec.verified_rating_evidence,
                 warning_descriptor_bindings=warning_binding_tuples[i],
                 blocker_descriptor_bindings=blocker_binding_tuples[i],
                 source_failure_binding=source_failure_bindings[i],
@@ -1385,21 +1391,39 @@ class Phase3CandidatePreparationResult(BaseModel):
     identity_snapshot: Phase2SourceRecordIdentitySnapshot | None = None
     complete_snapshot: Phase2SourceRecordSnapshot | None = None
     source_binding: Phase3SourceRecordBinding | None = None
+    evidence_failure_binding: Phase3RunFailureDescriptorBinding | None = None
+    source_failure_binding: Phase3RunFailureDescriptorBinding | None = None
     phase3_failure_binding: Phase3RunFailureDescriptorBinding | None = None
     preparation_result_digest: str
     @model_validator(mode="after")
     def _validate(self) -> typing.Self:
         if not self.source_qualified_candidate_id: raise ValueError("candidate_id required")
         if self.evaluation_order_index < 0: raise ValueError("index must be ≥ 0")
+        # 1) Matrix enforcement
+        artifacts: dict[str, object | None] = {
+            "identity_snapshot": self.identity_snapshot,
+            "complete_snapshot": self.complete_snapshot,
+            "source_binding": self.source_binding,
+            "classification_input": self.classification_input,
+            "evidence_failure_binding": self.evidence_failure_binding,
+            "source_failure_binding": self.source_failure_binding,
+            "phase3_failure_binding": self.phase3_failure_binding,
+        }
+        verify_preparation_stage_matrix(status=self.status, failure_stage=self.failure_stage, artifacts=artifacts)
+        # 2) Re-derive digests from nested artifacts
+        self.identity_snapshot_digest = self.identity_snapshot.identity_snapshot_digest if self.identity_snapshot is not None else None
+        self.complete_snapshot_digest = self.complete_snapshot.snapshot_digest if self.complete_snapshot is not None else None
+        self.source_binding_digest = self.source_binding.binding_digest if self.source_binding is not None else None
+        self.classification_input_digest = self.classification_input.classification_input_digest if self.classification_input is not None else None
+        self.evidence_failure_binding_digest = self.evidence_failure_binding.descriptor_binding_digest if self.evidence_failure_binding is not None else None
+        self.source_failure_binding_digest = self.source_failure_binding.descriptor_binding_digest if self.source_failure_binding is not None else None
+        self.phase3_failure_binding_digest = self.phase3_failure_binding.descriptor_binding_digest if self.phase3_failure_binding is not None else None
+        # 3) Status-specific checks
         if self.status is Phase3PreparationStatus.READY:
             if self.classification_input is None: raise ValueError("READY: cin required")
             if self.complete_snapshot is None: raise ValueError("READY: complete_snapshot required")
             if self.source_binding is None: raise ValueError("READY: source_binding required")
             if self.identity_snapshot is None: raise ValueError("READY: identity_snapshot required")
-            if self.identity_snapshot_digest != self.identity_snapshot.identity_snapshot_digest: raise ValueError("READY: identity digest mismatch")
-            if self.complete_snapshot_digest != self.complete_snapshot.snapshot_digest: raise ValueError("READY: snapshot digest mismatch")
-            if self.source_binding_digest != self.source_binding.binding_digest: raise ValueError("READY: binding digest mismatch")
-            if self.classification_input_digest != self.classification_input.classification_input_digest: raise ValueError("READY: cin digest mismatch")
             if self.evidence_failure_binding_digest is not None: raise ValueError("READY: no evidence failure")
             if self.source_failure_binding_digest is not None: raise ValueError("READY: no source failure")
             if self.phase3_failure_binding_digest is not None: raise ValueError("READY: no phase3 failure")
@@ -1409,7 +1433,6 @@ class Phase3CandidatePreparationResult(BaseModel):
             if self.failure_stage is None: raise ValueError("FAILED: failure_stage required")
             if self.classification_input is not None: raise ValueError("FAILED: no cin")
             if self.phase3_failure_binding_digest is None: raise ValueError("FAILED: failure_binding_digest required")
-            if self.phase3_failure_binding_digest != self.phase3_failure_binding.descriptor_binding_digest: raise ValueError("FAILED: failure_binding_digest mismatch")
         expected = sha256_digest(_prep_result_payload(self))
         if self.preparation_result_digest != expected: raise ValueError("preparation_result_digest mismatch")
         return self
@@ -1482,7 +1505,7 @@ def build_phase3_candidate_preparation_result(
     status: Phase3PreparationStatus,
     source_qualified_candidate_id: str,
     evaluation_order_index: int,
-    identity_snapshot: Phase2SourceRecordIdentitySnapshot | None = None,
+    identity_snapshot: Phase2SourceRecordIdentitySnapshot,
     complete_snapshot: Phase2SourceRecordSnapshot | None = None,
     source_binding: Phase3SourceRecordBinding | None = None,
     classification_input: Phase3CandidateClassificationInput | None = None,
@@ -1491,7 +1514,18 @@ def build_phase3_candidate_preparation_result(
     phase3_failure_binding: Phase3RunFailureDescriptorBinding | None = None,
     failure_stage: Phase3PreparationFailureStage | None = None,
 ) -> Phase3CandidatePreparationResult:
-    isnap_d = identity_snapshot.identity_snapshot_digest if identity_snapshot is not None else None
+    # 1) Matrix enforcement before computing digests
+    artifacts: dict[str, object | None] = {
+        "identity_snapshot": identity_snapshot,
+        "complete_snapshot": complete_snapshot,
+        "source_binding": source_binding,
+        "classification_input": classification_input,
+        "evidence_failure_binding": evidence_failure_binding,
+        "source_failure_binding": source_failure_binding,
+        "phase3_failure_binding": phase3_failure_binding,
+    }
+    verify_preparation_stage_matrix(status=status, failure_stage=failure_stage, artifacts=artifacts)
+    isnap_d = identity_snapshot.identity_snapshot_digest
     cs_d = complete_snapshot.snapshot_digest if complete_snapshot is not None else None
     sb_d = source_binding.binding_digest if source_binding is not None else None
     cin_d = classification_input.classification_input_digest if classification_input is not None else None
@@ -1514,6 +1548,7 @@ def build_phase3_candidate_preparation_result(
         phase3_failure_binding_digest=p3fb_d, failure_stage=failure_stage,
         classification_input=classification_input, identity_snapshot=identity_snapshot,
         complete_snapshot=complete_snapshot, source_binding=source_binding,
+        evidence_failure_binding=evidence_failure_binding, source_failure_binding=source_failure_binding,
         phase3_failure_binding=phase3_failure_binding,
         preparation_result_digest=prep_d)
 
@@ -1601,6 +1636,7 @@ def build_candidate_disposition_record(
     phase3_failure_payload_digest: str | None,
     failure_origin: FailureOrigin,
     failure_stage: Phase3PreparationFailureStage | None = None,
+    phase3_failure_binding_digest: str | None = None,
 ) -> CandidateDispositionRecord:
     wdd = tuple(d.message_payload_digest for d in warning_descriptors)
     bdd = tuple(d.message_payload_digest for d in blocker_descriptors)
@@ -1623,6 +1659,7 @@ def build_candidate_disposition_record(
         source_evaluation_failure_payload_digest=source_evaluation_failure_payload_digest,
         source_evaluation_failure_binding_digest=source_evaluation_failure_binding_digest,
         phase3_failure_payload_digest=phase3_failure_payload_digest,
+        phase3_failure_binding_digest=phase3_failure_binding_digest,
         failure_origin=failure_origin, failure_stage=failure_stage)
     digest = sha256_digest(payload)
     return CandidateDispositionRecord(
@@ -1644,6 +1681,7 @@ def build_candidate_disposition_record(
         source_evaluation_failure_payload_digest=source_evaluation_failure_payload_digest,
         source_evaluation_failure_binding_digest=source_evaluation_failure_binding_digest,
         phase3_failure_payload_digest=phase3_failure_payload_digest,
+        phase3_failure_binding_digest=phase3_failure_binding_digest,
         failure_origin=failure_origin, failure_stage=failure_stage,
         feasibility_digest=digest)
 
@@ -1669,6 +1707,7 @@ def candidate_disposition_payload(record: CandidateDispositionRecord) -> dict[st
         source_evaluation_failure_payload_digest=record.source_evaluation_failure_payload_digest,
         source_evaluation_failure_binding_digest=record.source_evaluation_failure_binding_digest,
         phase3_failure_payload_digest=record.phase3_failure_payload_digest,
+        phase3_failure_binding_digest=record.phase3_failure_binding_digest,
         failure_origin=record.failure_origin, failure_stage=record.failure_stage)
 
 def disposition_from_preparation_failure(
@@ -1682,12 +1721,24 @@ def disposition_from_preparation_failure(
     blocker_descriptors: tuple[Phase3MessageDescriptor, ...],
     source_failure_binding: Phase3RunFailureDescriptorBinding | None,
     evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
-    phase3_failure_binding_digest: str | None,
 ) -> CandidateDispositionRecord:
-    """Construct a Phase 3 RUNTIME_FAILED disposition from a failed preparation."""
+    """Construct a Phase 3 RUNTIME_FAILED disposition from a failed preparation.
+
+    Derives phase3_failure_binding_digest and phase3_failure_payload_digest
+    from the authoritative preparation_result.phase3_failure_binding artifact.
+    """
     failure_binding = preparation_result.phase3_failure_binding
     if failure_binding is None:
         raise ValueError("disposition_from_preparation_failure: no failure binding")
+    # Verify the binding belongs to the same preparation result
+    if failure_binding is not preparation_result.phase3_failure_binding:
+        raise ValueError("disposition_from_preparation_failure: binding artifact mismatch")
+    phase3_failure_binding_digest = failure_binding.descriptor_binding_digest
+    phase3_failure_payload_digest = failure_binding.payload_digest
+    # Canonicalization success: both digests present
+    # Canonicalization failure: binding digest present, payload digest None
+    if phase3_failure_binding_digest is None:
+        raise ValueError("disposition_from_preparation_failure: no binding digest (canonicalization broken)")
     stage = preparation_result.failure_stage
     if stage is None:
         raise ValueError("disposition_from_preparation_failure: no failure_stage")
@@ -1715,7 +1766,8 @@ def disposition_from_preparation_failure(
         warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
         source_evaluation_failure_payload_digest=None,
         source_evaluation_failure_binding_digest=source_failure_binding.descriptor_binding_digest if source_failure_binding is not None else None,
-        phase3_failure_payload_digest=failure_binding.payload_digest,
+        phase3_failure_payload_digest=phase3_failure_payload_digest,
+        phase3_failure_binding_digest=phase3_failure_binding_digest,
         failure_origin=PHASE3_CLASSIFICATION,
         failure_stage=stage)
 ```
@@ -2521,7 +2573,39 @@ class OptimizationResultCoreValues:
     ordered_blocker_digests: tuple[str, ...]
 
     def compute_hash(self) -> str:
-        return sha256_digest(result_core_payload_from_values(**asdict(self)))
+        """Compute result core hash via canonical payload — no asdict() dependency."""
+        return sha256_digest(result_core_payload_from_values(
+            schema_version=self.schema_version,
+            sizing_request_identity_digest=self.sizing_request_identity_digest,
+            passed_gate_digest=self.passed_gate_digest,
+            candidate_set_digest=self.candidate_set_digest,
+            evaluation_input_digest=self.evaluation_input_digest,
+            optimization_objective=self.optimization_objective,
+            requested_top_n=self.requested_top_n,
+            total_candidate_count=self.total_candidate_count,
+            feasible_candidate_count=self.feasible_candidate_count,
+            infeasible_candidate_count=self.infeasible_candidate_count,
+            provider_mismatch_count=self.provider_mismatch_count,
+            integrity_failed_count=self.integrity_failed_count,
+            provenance_failed_count=self.provenance_failed_count,
+            runtime_failed_count=self.runtime_failed_count,
+            unevaluated_count=self.unevaluated_count,
+            phase2_verified_record_count=self.phase2_verified_record_count,
+            phase2_integrity_invalid_record_count=self.phase2_integrity_invalid_record_count,
+            phase2_runtime_failed_record_count=self.phase2_runtime_failed_record_count,
+            phase2_unevaluated_record_count=self.phase2_unevaluated_record_count,
+            runtime_failed_from_phase2_verified_count=self.runtime_failed_from_phase2_verified_count,
+            runtime_failed_from_phase2_runtime_failed_count=self.runtime_failed_from_phase2_runtime_failed_count,
+            ordered_disposition_record_digests=self.ordered_disposition_record_digests,
+            ordered_ranked_record_digests=self.ordered_ranked_record_digests,
+            ordered_top_n_record_digests=self.ordered_top_n_record_digests,
+            ordered_identity_snapshot_digests=self.ordered_identity_snapshot_digests,
+            ordered_phase2_source_snapshot_digests=self.ordered_phase2_source_snapshot_digests,
+            ordered_phase3_source_binding_digests=self.ordered_phase3_source_binding_digests,
+            ordered_phase3_preparation_result_digests=self.ordered_phase3_preparation_result_digests,
+            termination_status=self.termination_status,
+            ordered_warning_digests=self.ordered_warning_digests,
+            ordered_blocker_digests=self.ordered_blocker_digests))
 ```
 
 ### 19.1 Factory
@@ -2535,8 +2619,27 @@ def build_optimization_result(
     dispositions: tuple[CandidateDispositionRecord, ...],
     ranked_records: tuple[RankedCandidateRecord, ...],
 ) -> tuple[OptimizationResult, ProvenanceGraph]:
-    N = len(dispositions)
+    # 0) Length gates
+    N = evaluation_input.evaluation_record_count
+    if N != len(dispositions): raise ValueError("dispositions count != N")
+    if N != len(preparation_results): raise ValueError("preparation_results count != N")
+    if N != len(phase2_source_record_descriptors): raise ValueError("descriptors count != N")
+    if N != len(evaluation_input.identity_snapshots): raise ValueError("identity_snapshots count != N")
+    if N != len(evaluation_input.complete_snapshots): raise ValueError("complete_snapshots count != N")
     F = sum(1 for d in dispositions if d.disposition is FEASIBLE)
+    if F != len(ranked_records): raise ValueError("ranked_records count != F")
+    # 0b) Upstream verifier calls
+    for i, (pr, dr, rr) in enumerate(zip(preparation_results, dispositions, ranked_records)):
+        pr.verify_or_raise(
+            source_record=evaluation_input.evaluation_records[i],
+            identity_snapshot=evaluation_input.identity_snapshots[i],
+            complete_snapshot=evaluation_input.complete_snapshots[i],
+            source_binding=pr.source_binding,
+            evidence_failure_binding=pr.evidence_failure_binding,
+            source_failure_binding=pr.source_failure_binding)
+        dr.verify_or_raise(source_record=evaluation_input.evaluation_records[i])
+        if dr.disposition is FEASIBLE:
+            rr.verify_or_raise(disposition=dr)
     # Derive Phase 2 counts from evaluation records
     recs = evaluation_input.evaluation_records
     p2_v = sum(1 for r in recs if r.candidate_evaluation_state == VERIFIED)
@@ -2570,7 +2673,7 @@ def build_optimization_result(
     sbd = tuple(p.source_binding_digest if p.source_binding is not None else None for p in preparation_results)
     prd = tuple(p.preparation_result_digest for p in preparation_results)
     # Build core values
-    core_values = result_core_payload_from_values(
+    core_values = OptimizationResultCoreValues(
         schema_version=1,
         sizing_request_identity_digest=evaluation_input.sizing_request_identity_digest,
         passed_gate_digest=evaluation_input.gate_digest,
@@ -2595,7 +2698,7 @@ def build_optimization_result(
         ordered_phase3_preparation_result_digests=prd,
         termination_status=ts,
         ordered_warning_digests=w_digests, ordered_blocker_digests=b_digests)
-    result_core_hash = sha256_digest(core_values)
+    result_core_hash = core_values.compute_hash()
     # Build provenance
     graph = build_phase3_provenance_graph(
         ei=evaluation_input, dispositions=dispositions, ranked=ranked_records,
@@ -2877,6 +2980,8 @@ def verify_optimization_result_or_raise(
     phase2_source_record_descriptors: tuple[Phase2SourceRecordDescriptor | None, ...],
     source_bindings: tuple[Phase3SourceRecordBinding | None, ...],
     preparation_results: tuple[Phase3CandidatePreparationResult, ...],
+    warning_descriptor_tuples: tuple[tuple[Phase3MessageDescriptor, ...], ...],
+    blocker_descriptor_tuples: tuple[tuple[Phase3MessageDescriptor, ...], ...],
     warning_binding_tuples: tuple[tuple[Phase3MessageDescriptorBinding, ...], ...],
     blocker_binding_tuples: tuple[tuple[Phase3MessageDescriptorBinding, ...], ...],
     evidence_failure_bindings: tuple[Phase3RunFailureDescriptorBinding | None, ...],
@@ -2900,17 +3005,30 @@ def verify_optimization_result_or_raise(
     if len(preparation_results) != N: raise ValueError("preparation_results count mismatch")
     if len(dispositions) != N: raise ValueError("dispositions count mismatch")
     if len(phase2_source_record_descriptors) != N: raise ValueError("descriptors count mismatch")
+    if len(warning_descriptor_tuples) != N: raise ValueError("warning_descriptor_tuples count mismatch")
+    if len(blocker_descriptor_tuples) != N: raise ValueError("blocker_descriptor_tuples count mismatch")
     if len(warning_binding_tuples) != N: raise ValueError("warning_binding_tuples count mismatch")
     if len(blocker_binding_tuples) != N: raise ValueError("blocker_binding_tuples count mismatch")
     if len(evidence_failure_bindings) != N: raise ValueError("evidence_failure_bindings count mismatch")
     if len(source_failure_bindings) != N: raise ValueError("source_failure_bindings count mismatch")
-    if len(phase2_source_record_descriptors) != N: raise ValueError("phase2_source_record_descriptors count mismatch")
     # 4-13. Per-index verification
     for i, (rec, cand) in enumerate(zip(ei.evaluation_records, ei.materialization_result.candidates)):
         ids = identity_snapshots[i]; cs = complete_snapshots[i]; sb = source_bindings[i]
         pr = preparation_results[i]; dr = dispositions[i]
+        wdt = warning_descriptor_tuples[i]; bdt = blocker_descriptor_tuples[i]
         wbt = warning_binding_tuples[i]; bbt = blocker_binding_tuples[i]
         efb = evidence_failure_bindings[i]; sfb = source_failure_bindings[i]
+        # Descriptor-binding cross-validation
+        if len(wdt) != len(wbt): raise ValueError(f"[{i}] warning descriptor/binding count mismatch")
+        for j, (d, b) in enumerate(zip(wdt, wbt)):
+            if d.owner_sort_key != b.owner_sort_key: raise ValueError(f"[{i}] warn[{j}] sort_key mismatch")
+            if d.original_code != b.original_code: raise ValueError(f"[{i}] warn[{j}] code mismatch")
+            if d.message_payload_digest != b.message_payload_digest: raise ValueError(f"[{i}] warn[{j}] digest mismatch")
+        if len(bdt) != len(bbt): raise ValueError(f"[{i}] blocker descriptor/binding count mismatch")
+        for j, (d, b) in enumerate(zip(bdt, bbt)):
+            if d.owner_sort_key != b.owner_sort_key: raise ValueError(f"[{i}] block[{j}] sort_key mismatch")
+            if d.original_code != b.original_code: raise ValueError(f"[{i}] block[{j}] code mismatch")
+            if d.message_payload_digest != b.message_payload_digest: raise ValueError(f"[{i}] block[{j}] digest mismatch")
         # Identity snapshot
         if ids.source_qualified_candidate_id != rec.source_qualified_candidate_id: raise ValueError(f"[{i}] ids candidate_id")
         if ids.evaluation_order_index != i: raise ValueError(f"[{i}] ids index")
@@ -2924,7 +3042,8 @@ def verify_optimization_result_or_raise(
             cs.verify_or_raise(
                 source_record=rec,
                 identity_snapshot=ids,
-                authoritative_source_record_descriptor_digest=ei.ordered_phase2_source_record_descriptor_digests[i],
+                source_record_descriptor=phase2_source_record_descriptors[i],
+                verified_evidence=rec.verified_rating_evidence,
                 warning_descriptor_bindings=wbt,
                 blocker_descriptor_bindings=bbt,
                 source_failure_binding=sfb,
@@ -2960,7 +3079,7 @@ def verify_optimization_result_or_raise(
             if cin.sizing_request_identity_digest != ei.sizing_request_identity_digest: raise ValueError(f"[{i}] cin sizing digest")
             if cin.evidence_binding.binding_digest != sb.binding_digest: raise ValueError(f"[{i}] cin binding digest")
             if cin.verified_rating_evidence_digest != cs.verified_rating_evidence_digest: raise ValueError(f"[{i}] cin evidence digest")
-            expected = classify_candidate(cin, warning_descriptors=wbt, blocker_descriptors=bbt,
+            expected = classify_candidate(cin, warning_descriptors=wdt, blocker_descriptors=bdt,
                 source_failure_binding=sfb)
             if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] disposition mismatch")
         else:
@@ -2969,19 +3088,19 @@ def verify_optimization_result_or_raise(
                 source_record=rec, source_snapshot=cs,
                 identity_snapshot_digest=ids.identity_snapshot_digest,
                 candidate=cand, preparation_result=pr,
-                warning_descriptors=wbt, blocker_descriptors=bbt,
+                warning_descriptors=wdt, blocker_descriptors=bdt,
                 source_failure_binding=sfb, evidence_failure_binding=efb)
             if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] prep-failure mismatch")
         # Descriptor tuple exact length and value
-        if len(dr.warning_descriptors) != len(wbt): raise ValueError(f"[{i}] warning count {len(dr.warning_descriptors)} != {len(wbt)}")
+        if len(dr.warning_descriptors) != len(wdt): raise ValueError(f"[{i}] warning count {len(dr.warning_descriptors)} != {len(wdt)}")
         for j,d in enumerate(dr.warning_descriptors):
-            b = wbt[j]
+            b = wdt[j]
             if d.owner_sort_key != b.owner_sort_key: raise ValueError(f"[{i}] warn[{j}] sort_key")
             if d.original_code != b.original_code: raise ValueError(f"[{i}] warn[{j}] code")
             if d.message_payload_digest != b.message_payload_digest: raise ValueError(f"[{i}] warn[{j}] digest")
-        if len(dr.blocker_descriptors) != len(bbt): raise ValueError(f"[{i}] blocker count mismatch")
+        if len(dr.blocker_descriptors) != len(bdt): raise ValueError(f"[{i}] blocker count mismatch")
         for j,d in enumerate(dr.blocker_descriptors):
-            b = bbt[j]
+            b = bdt[j]
             if d.owner_sort_key != b.owner_sort_key: raise ValueError(f"[{i}] block[{j}] sort_key")
             if d.original_code != b.original_code: raise ValueError(f"[{i}] block[{j}] code")
             if d.message_payload_digest != b.message_payload_digest: raise ValueError(f"[{i}] block[{j}] digest")
