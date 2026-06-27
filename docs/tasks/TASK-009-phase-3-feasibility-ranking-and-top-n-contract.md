@@ -6,7 +6,7 @@
 **Milestone:** M2
 **Priority:** P0
 **Depends on:** TASK-008, TASK-009 Phase 2 (c77d723c51c4d8045cafa783f97fdc0d628a0e91)
-**Frozen Phase 2 contract SHA:** 7e4522ab5be740fb6af759743c1c1f79801312fc
+**Frozen Phase 1-2 contract SHA:** 7e4522ab5be740fb6af759743c1c1f79801312fc
 
 > ⚠️ This document is a **design contract** for review only. No implementation is authorized until a separate engineering design review passes and a frozen contract commit SHA is established.
 
@@ -14,51 +14,53 @@
 
 ## 1. Scope
 
-Phase 3 completes the candidate optimization pipeline by consuming Phase 2 validated `CandidateEvaluationRecord` artifacts (`tuple[CandidateEvaluationRecord, ...]`) and producing a deterministic, provenance-tracked `OptimizationResult`.
+Phase 3 consumes Phase 2's real output — `tuple[CandidateEvaluationRecord, ...]` — through a single typed input artifact (`Phase3EvaluationInput`), then produces a deterministic, provenance-tracked `OptimizationResult`.
 
 Phase 3 is responsible for:
 
-- Typed immutable input artifact construction and verification (`Phase3EvaluationInput`)
-- Deterministic feasibility classification per the exact Phase 2 state matrix
-- Deterministic ranking with explicit per-objective tie-breaking
-- Deterministic Top-N result construction (feasible-only)
-- Result-level integrity hash and provenance DAG
-- Fail-closed semantics for all verification failures
+- Typed immutable input artifact with real-existing digest bindings: `Phase3EvaluationInput`
+- Complete 11-step input verification, including record↔candidate one-to-one binding
+- Deterministic feasibility classification against the exact Phase 2 state invariants
+- Deterministic ranking with per-objective complete ranking keys (two frozen objectives)
+- Deterministic Top-N result construction from FEASIBLE candidates only
+- Three-layer hash (core → provenance → envelope) with zero circular dependencies
+- Executable provenance topology using `ProvenanceGraph` / `ProvenanceNode` / `ProvenanceEdge`
+- Fail-closed semantics for all verification failures; typed error model compatible with `ErrorCode`
 
-Phase 3 does **not** re-execute candidate generation, materialization, or TASK-008 thermal rating.
+Phase 3 does **not** re-execute candidate generation, materialization, or TASK-008 `rate_double_pipe()`.
 
 ---
 
 ## 2. Non-goals
 
-The following are explicitly **out of scope** for Phase 3:
+Explicitly out of scope:
 
-- ❌ TASK-010 (versioned API and traceable report)
+- ❌ TASK-010 (versioned API)
 - ❌ C4 (cost constraint)
-- ❌ Pressure-drop calculation
-- ❌ Pressure-drop constraint
+- ❌ Pressure-drop calculation or constraint
 - ❌ Velocity constraint
 - ❌ Pump power estimation
 - ❌ Economic / life-cycle / multi-objective Pareto optimization
-- ❌ Stochastic or heuristic optimization (genetic algorithms, simulated annealing, random search)
-- ❌ Machine-learning ranking or scoring
-- ❌ New heat-transfer correlations
-- ❌ New rating-solver logic
-- ❌ Candidate-generation changes
-- ❌ Catalog-schema changes
+- ❌ Stochastic or heuristic optimization
+- ❌ ML ranking or scoring
+- ❌ New heat-transfer correlations or rating solver logic
+- ❌ Candidate generation or catalog schema changes
 - ❌ Phase 2 artifact mutation
-- ❌ Re-running TASK-008 `rate_double_pipe()` for any candidate
-- ❌ Recovering, re-running, or reinterpreting Phase 2 strict-stop failures
+- ❌ Re-running TASK-008 for any candidate
+- ❌ Recovering or reinterpreting Phase 2 strict-stop failures
 
 ---
 
-## 3. Upstream frozen dependencies (P0-1: Phase 3 input artifact)
+## 3. Phase 3 input artifact: Phase3EvaluationInput (P0-1)
 
-Phase 2 returns `tuple[CandidateEvaluationRecord, ...]` (not an `EvaluationBatch`). Phase 3 defines a single typed immutable artifact that bundles the real Phase 2 outputs:
+### 3.1 Model
 
 ```python
 class Phase3EvaluationInput(BaseModel):
-    """Complete typed input for Phase 3, constructed from real Phase 2 outputs.
+    """Complete typed input for Phase 3.
+
+    Constructed from real Phase 2 outputs using existing digest properties
+    — no generic sha256(object) calls.
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     """
@@ -66,53 +68,113 @@ class Phase3EvaluationInput(BaseModel):
     schema_version: int  # 1
 
     sizing_request_identity: SizingRequestIdentity
-    sizing_request_identity_digest: str
+    sizing_request_identity_digest: str  # identity property
 
     materialization_result: MaterializationResult
-    materialization_result_digest: str
-    passed_gate_digest: str
+    candidate_set_digest: str            # materialization_result.candidate_set.candidate_set_digest
+    gate_digest: str                     # materialization_result.sizing_gate.gate_digest
 
     evaluation_records: tuple[CandidateEvaluationRecord, ...]
     evaluation_record_count: int  # == len(evaluation_records)
 
-    evaluation_input_digest: str  # SHA-256 of canonical payload (below)
+    evaluation_input_digest: str  # exact canonical payload below
 ```
 
-### 3.1 Canonical payload for digest
+### 3.2 Existing digest bindings — no generic sha256
 
-The `evaluation_input_digest` is computed over the following deterministic payload:
-
-| Field | Canonical form |
+| Field | Source |
 |---|---|
-| `schema_version` | integer |
-| `sizing_request_identity_digest` | string |
-| `materialization_result_digest` | string |
-| `passed_gate_digest` | string |
-| `evaluation_record_count` | integer |
-| `ordered_candidate_ids` | ordered string list (from materialization result) |
-| `ordered_evaluation_identity_digests` | ordered string list (None → "null") |
-| `ordered_evidence_digests` | ordered string list (None → "null") |
+| `sizing_request_identity_digest` | `sizing_request_identity.sizing_request_identity_digest` (property) |
+| `candidate_set_digest` | `materialization_result.candidate_set.candidate_set_digest` (field) |
+| `gate_digest` | `materialization_result.sizing_gate.gate_digest` (field) |
+| `candidate_evaluation_identity_digest` | `record.candidate_evaluation_identity.candidate_evaluation_identity_digest` (property, if present) |
+| `verified_rating_evidence_digest` | `verified_rating_evidence.compute_explicit_evidence_digest()` (method, if present) |
+| `invalid_rating_evidence_digest` | `record.invalid_rating_evidence.invalid_evidence_digest` (property, if present) |
+| `claimed_rating_result_audit_digest` | `record.claimed_rating_result_audit.audit_digest` (property, if present) |
+| `evaluation_failure_digest` | `sha256(record.evaluation_failure)` via `canonical_json` (if present) |
+| `candidate_set_digest` | `materialization_result.candidate_set.candidate_set_digest` |
+| `gate_digest` | `materialization_result.sizing_gate.gate_digest` |
 
-Serialise via `canonical_json` and compute `sha256(...).hexdigest()`.
+Prohibited: `sha256(materialization_result)`, `sha256(sizing_gate)`, `sha256(record)`, `sha256(evidence_snapshot)` — none of these are existing digest properties.
 
-### 3.2 Consumer-boundary verification
+### 3.3 Evaluation record descriptor
 
-`Phase3EvaluationInput.verify_or_raise()` must verify at minimum:
+For each record at index `i`, a deterministic `evaluation_record_descriptor` payload (primitive-only) is:
 
-1. `sizing_request_identity_digest == sha256(sizing_request_identity)`
-2. `materialization_result_digest == sha256(materialization_result)` (using canonical serialisation)
-3. `passed_gate_digest == sha256(materialization_result.sizing_gate)` (using canonical serialisation)
-4. `evaluation_record_count == len(evaluation_records)`
-5. Each `CandidateEvaluationRecord` identity: if present, `sha256(record) == record.candidate_evaluation_identity` (when non-None)
-6. Each `VerifiedRatingEvidenceSnapshot` identity: if present, `sha256(snapshot) == snapshot.rating_result_hash`
-7. No duplicate `source_qualified_candidate_id`
-8. `evaluation_input_digest == recomputed digest`
+```
+{
+  "source_qualified_candidate_id": record.source_qualified_candidate_id,
+  "evaluation_order_index": i,
+  "candidate_evaluation_state": record.candidate_evaluation_state.value,
+  "feasible": record.feasible,
+  "feasibility_status": record.feasibility_status.value,
+  "hash_verification_outcome": record.hash_verification_outcome.value,
+  "provenance_verification_outcome": record.provenance_verification_outcome.value,
+  "provider_identity_matches": record.provider_identity_matches,
+  "rating_status": record.rating_status,
+  "candidate_evaluation_identity_digest": <str or null>,
+  "verified_rating_evidence_digest": <str or null>,
+  "invalid_rating_evidence_digest": <str or null>,
+  "claimed_rating_result_audit_digest": <str or null>,
+  "evaluation_failure_digest": <str or null>,
+}
+```
 
-Any failure raises with fixed deterministic error message (no `str(exc)`).
+Each `*_digest` field is obtained via the existing property/method listed in §3.2, or `null` when the corresponding Phase 2 field is `None`.
+
+The `evaluation_record_descriptor_digest` for record `i` is `sha256(descriptor_payload)` using `canonical_json`.
+
+### 3.4 evaluation_input_digest
+
+```
+evaluation_input_payload = {
+  "schema_version": 1,
+  "sizing_request_identity_digest": <str>,
+  "candidate_set_digest": <str>,
+  "gate_digest": <str>,
+  "evaluation_record_count": N,
+  "ordered_evaluation_record_descriptor_digests": [digest_0, digest_1, ..., digest_{N-1}],
+}
+
+evaluation_input_digest = sha256(canonical_json(evaluation_input_payload))
+```
+
+All payloads are **primitive-only** (str, int, list, null). No `model_dump`, no generic serializer, no `sha256(arbitrary_object)`.
+
+### 3.5 verify_or_raise() — 11-step sequence
+
+`Phase3EvaluationInput.verify_or_raise()` must execute the following checks in order. Any failure raises `ValueError` with a fixed deterministic message; no `str(exc)`.
+
+1. **Exact type verification:** Verify `sizing_request_identity` is `SizingRequestIdentity`, `materialization_result` is `MaterializationResult`, each record is `CandidateEvaluationRecord`. Type errors raise.
+
+2. **materialization_result.verify_or_raise():** Delegate to the existing `MaterializationResult.verify_or_raise()` which verifies gate digest, candidate set digest, catalog ref binding, etc.
+
+3. **Sizing identity digest verification:** Verify `sizing_request_identity_digest == sizing_request_identity.sizing_request_identity_digest`.
+
+4. **candidate_set.verify_digest():** Verify `materialization_result.candidate_set.verify_digest()` returns `True`.
+
+5. **sizing_gate.verify_digest():** Verify `materialization_result.sizing_gate.verify_digest()` returns `True`.
+
+6. **candidate_set ↔ sizing identity binding:** Verify `materialization_result.candidate_set.sizing_request_identity_digest == sizing_request_identity_digest`.
+
+7. **gate ↔ candidate_set binding:** Verify `materialization_result.sizing_gate.gate_digest == materialization_result.candidate_set.passed_gate_digest`.
+
+8. **Evaluation records count verification:** Verify `evaluation_record_count == len(evaluation_records)` and `evaluation_record_count == len(materialization_result.candidates)`.
+
+9. **Record ↔ candidate one-to-one binding:** For each index `i`:
+   - `record.evaluation_order_index == i`
+   - `candidate.evaluation_order_index == i`
+   - `record.source_qualified_candidate_id == candidate.source_qualified_candidate_id`
+   - `record.source_qualified_candidate_id == candidate_set.ordered_candidate_ids[i]`
+   - No missing record, no extra record, no duplicate ID, no displaced record, no skipped index, no record whose order differs from Phase 2 materialization order.
+
+10. **Complete ordered record descriptor verification:** For each index `i`, compute `evaluation_record_descriptor_digest` per §3.3. Verify the computed digest matches the expected ordered list. Any mismatch indicates tampered record fields, displaced record, or insertion-order violation.
+
+11. **evaluation_input_digest verification:** Recompute `evaluation_input_digest` per §3.4 and verify it matches the stored field.
 
 ---
 
-## 4. Phase 2 state alignment (P0-2, P0-4)
+## 4. Phase 2 state invariants (P0-2)
 
 ### 4.1 Real Phase 2 state enum
 
@@ -124,7 +186,7 @@ class CandidateEvaluationState(StrEnum):
     RUNTIME_FAILED = "runtime_failed"
 ```
 
-### 4.2 Real Phase 2 verification outcome enum
+### 4.2 Real Phase 2 verification outcomes
 
 ```python
 class VerificationOutcome(StrEnum):
@@ -134,108 +196,218 @@ class VerificationOutcome(StrEnum):
     ERROR = "error"
 ```
 
-### 4.3 Real Phase 2 feasibility_status enum
+### 4.3 Real Phase 2 verification outcomes on VerifiedRatingEvidenceSnapshot
 
+The `VerifiedRatingEvidenceSnapshot` model itself requires:
 ```python
-class FeasibilityStatus(StrEnum):
-    NOT_EVALUATED = "not_evaluated"
-    PROVIDER_IDENTITY_MISMATCH = "provider_identity_mismatch"
+hash_verification_outcome == VerificationOutcome.PASSED
+provenance_verification_outcome == VerificationOutcome.PASSED
 ```
 
-### 4.4 Phase 2 → Phase 3 disposition mapping matrix
+Therefore a `VERIFIED` record **always** has hash=PASSED and provenance=PASSED at the evidence level.
 
-The complete mapping covers all observable `CandidateEvaluationRecord` state combinations:
+### 4.4 Valid record state matrix
 
-| State | hash outcome | provenance outcome | provider matches | Phase 2 feasibility | rating_status | identity present | evidence present | Phase 3 Disposition |
-|---|---|---|---|---|---|---|---|---|
-| UNEVALUATED | NOT_RUN | NOT_RUN | true/false | NOT_EVALUATED | None | None | None | **UNEVALUATED** |
-| VERIFIED | PASSED | PASSED | true | NOT_EVALUATED | SUCCEEDED | present | present | **FEASIBLE or INFEASIBLE** (by duty/constraint check) |
-| VERIFIED | PASSED | PASSED | false | PROVIDER_IDENTITY_MISMATCH | SUCCEEDED/BLOCKED/FAILED | present | present | **PROVIDER_IDENTITY_MISMATCH** |
-| VERIFIED | PASSED | FAILED | *any* | NOT_EVALUATED | any | present | present | **PROVENANCE_FAILED** |
-| VERIFIED | PASSED | ERROR | *any* | NOT_EVALUATED | any | present | present | **PROVENANCE_FAILED** |
-| VERIFIED | FAILED | NOT_RUN | *any* | NOT_EVALUATED | any | present | present | **INTEGRITY_FAILED** |
-| VERIFIED | FAILED | FAILED | *any* | NOT_EVALUATED | any | present | present | **INTEGRITY_FAILED** |
-| VERIFIED | ERROR | NOT_RUN | *any* | NOT_EVALUATED | any | present | present | **INTEGRITY_FAILED** |
-| INTEGRITY_INVALID | FAILED | NOT_RUN | *any* | NOT_EVALUATED | None | None | present (invalid) | **INTEGRITY_FAILED** |
-| RUNTIME_FAILED | NOT_RUN | NOT_RUN | *any* | NOT_EVALUATED | None/FAILED | None | None | **RUNTIME_FAILED** |
+Only the following field combinations are **valid constructible Phase 2 records**:
 
-### 4.5 Phase 3 disposition enum (P0-4)
+| State | identity | verified evidence | invalid evidence | hash outcome | provenance outcome | rating_status | provider matches |
+|---|---|---|---|---|---|---|---|
+| UNEVALUATED | None | None | None | NOT_RUN | NOT_RUN | None | any |
+| VERIFIED | present | present | None | PASSED | PASSED | SUCCEEDED/BLOCKED/FAILED | any |
+| INTEGRITY_INVALID | None | None | present | FAILED/ERROR | NOT_RUN/FAILED/ERROR | None | any |
+| RUNTIME_FAILED | None | None | None | NOT_RUN | NOT_RUN | None | any |
+
+### 4.5 Invalid cross-field combinations rejected at Phase 3 input boundary
+
+The following **cannot** occur in a Phase 2 record due to `CandidateEvaluationRecord._verify_state_invariants()`, but if they somehow reach Phase 3 (corrupted data, serialization error), `Phase3EvaluationInput.verify_or_raise()` must reject them:
+
+| Invalid pattern | Rejection behaviour |
+|---|---|
+| VERIFIED + identity=None | Input verification failure |
+| VERIFIED + evidence=None | Input verification failure |
+| VERIFIED + invalid_evidence present | Input verification failure |
+| VERIFIED + hash=PASSED + evidence.hash!=PASSED | Input verification failure |
+| INTEGRITY_INVALID + invalid_evidence=None | Input verification failure |
+| INTEGRITY_INVALID + identity present | Input verification failure |
+| INTEGRITY_INVALID + evidence present | Input verification failure |
+| RUNTIME_FAILED + evaluation_failure=None | Input verification failure |
+| RUNTIME_FAILED + identity present | Input verification failure |
+| UNEVALUATED + identity present | Input verification failure |
+| UNEVALUATED + evidence present | Input verification failure |
+
+These are invariant violations, not candidate dispositions. They represent data corruption or programming error and must prevent any Phase 3 processing.
+
+### 4.6 Phase 2 → Phase 3 disposition mapping
+
+For records passing the invariant checks above:
+
+| Phase 2 state | Evidence hash | Evidence provenance | provider matches | Phase 3 Disposition |
+|---|---|---|---|---|
+| UNEVALUATED | NOT_RUN | NOT_RUN | any | **UNEVALUATED** |
+| VERIFIED | PASSED | PASSED | True | **FEASIBLE or INFEASIBLE** (by feasibility check) |
+| VERIFIED | PASSED | PASSED | False | **PROVIDER_IDENTITY_MISMATCH** |
+| INTEGRITY_INVALID | FAILED/ERROR | NOT_RUN/FAILED/ERROR | any | **INTEGRITY_FAILED** (audit subtype from `invalid_evidence.hash/provenance`) |
+| RUNTIME_FAILED | NOT_RUN | NOT_RUN | any | **RUNTIME_FAILED** |
+
+### 4.7 Phase 3 disposition enum
 
 ```python
 class Phase3Disposition(StrEnum):
-    FEASIBLE = "feasible"                      # Engineering-rank-eligible
-    INFEASIBLE = "infeasible"                  # Trusted evidence, but engineering criteria not met
-    PROVIDER_IDENTITY_MISMATCH = "provider_identity_mismatch"  # Not rank-eligible
-    UNEVALUATED = "unevaluated"                # Strict-stop: never reached
-    INTEGRITY_FAILED = "integrity_failed"      # Hash verification failed
-    PROVENANCE_FAILED = "provenance_failed"    # Provenance verification failed
-    RUNTIME_FAILED = "runtime_failed"          # TASK-008 runtime failure
+    FEASIBLE = "feasible"
+    INFEASIBLE = "infeasible"
+    PROVIDER_IDENTITY_MISMATCH = "provider_identity_mismatch"
+    UNEVALUATED = "unevaluated"
+    INTEGRITY_FAILED = "integrity_failed"
+    PROVENANCE_FAILED = "provenance_failed"   # Produced from INTEGRITY_INVALID records
+                                              # where invalid_evidence.provenance_verification_outcome==FAILED/ERROR
+    RUNTIME_FAILED = "runtime_failed"
 ```
 
-### 4.6 Engineering-rank-eligibility invariant
+### 4.8 Engineering-rank-eligibility
 
-A candidate is **engineering-rank-eligible** (may receive a numerical rank and enter Top-N) **only** when:
+A candidate is **engineering-rank-eligible** only when:
+- disposition == `FEASIBLE`
+- `provider_identity_matches == True`
+- All numerical fields required for ranking are finite and non-null
 
-1. `disposition == FEASIBLE`
-
-The following dispositions must **never** be engineering-rank-eligible or enter Top-N:
-
-- `INFEASIBLE` — trusted evidence shows engineering constraints not met
-- `PROVIDER_IDENTITY_MISMATCH` — mismatched provider, regardless of evidence quality
+The following dispositions are **never** engineering-rank-eligible:
+- `INFEASIBLE` — engineering constraints not met
+- `PROVIDER_IDENTITY_MISMATCH` — mismatched provider
 - `UNEVALUATED` — no TASK-008 call was attempted
-- `INTEGRITY_FAILED` — evidence was tampered or hash verification failed
-- `PROVENANCE_FAILED` — evidence provenance is untrusted
+- `INTEGRITY_FAILED` — evidence hash or integrity verification failed
+- `PROVENANCE_FAILED` — evidence provenance verification failed
 - `RUNTIME_FAILED` — TASK-008 raised or returned evaluation failure
 
 ---
 
-## 5. Strict-stop semantics (P0-3)
+## 5. Strict-stop invariants (P0-3)
 
-Phase 3 must honour Phase 2 strict-stop behaviour exactly:
+### 5.1 Exact strict-stop detection
 
-1. Phase 2 `UNEVALUATED` is the **final** evaluation state for all candidates after the first failure. Phase 3 must not re-order, re-run, or skip these records.
-2. Candidates following a hash/provenance failure in Phase 2 are recorded as `UNEVALUATED` with `VerificationOutcome.NOT_RUN` — they are **not** eligible for any Phase 3 feasibility or ranking processing.
-3. Phase 3 must not call TASK-008 `rate_double_pipe()` for any candidate, regardless of state.
-4. A software exception (unexpected `Exception`) encountered during Phase 3 feasibility classification must be elevated to a structured runtime failure, **not** demoted to `INFEASIBLE`. If such an exception occurs at the per-candidate level, that specific candidate receives `RUNTIME_FAILED` disposition; if the exception prevents the entire Phase 3 pipeline from continuing, a global `FAILED` termination status applies.
+Define `stop_index` as the first index `s` where `record.candidate_evaluation_state` is:
+
+```
+CandidateEvaluationState.INTEGRITY_INVALID
+CandidateEvaluationState.RUNTIME_FAILED
+```
+
+If no such index exists, `stop_index = None` (no strict-stop occurred).
+
+### 5.2 Invariant
+
+If `stop_index` is not `None`:
+
+```
+all indices < stop_index:
+    state may be VERIFIED only (UNEVALUATED/INTEGRITY_INVALID/RUNTIME_FAILED not allowed before stop)
+
+index == stop_index:
+    state == INTEGRITY_INVALID or RUNTIME_FAILED
+
+all indices > stop_index:
+    state == UNEVALUATED
+    no VERIFIED/INTEGRITY_INVALID/RUNTIME_FAILED after stop_index
+```
+
+If this invariant is violated, `Phase3EvaluationInput.verify_or_raise()` must reject the input.
+
+### 5.3 Covered scenarios
+
+| Scenario | stop_index | Earlier records | Later records |
+|---|---|---|---|
+| No strict-stop | None | All VERIFIED (or mixed VERIFIED/BLOCKED/FAILED) | N/A |
+| First candidate fails | 0 | None | All UNEVALUATED |
+| Middle candidate fails | k (0 < k < N-1) | k VERIFIED records | N-k-1 UNEVALUATED |
+| Last candidate fails | N-1 | N-1 VERIFIED records | 0 UNEVALUATED |
+| Failure with earlier FEASIBLE | k | Some VERIFIED+FEASIBLE before k | UNEVALUATED |
+| Failure with no earlier FEASIBLE | k | All VERIFIED but INFEASIBLE before k | UNEVALUATED |
+
+### 5.4 Phase 3 honouring strict-stop
+
+- UNEVALUATED records are not evaluated for feasibility
+- UNEVALUATED records do not receive an engineering rank
+- UNEVALUATED records are counted in `unevaluated_count`
+- Phase 3 must not re-run any TASK-008 call
+- Phase 3 must not skip, reorder, or recover UNEVALUATED records
+- Feasibility classification encountering an unexpected `Exception` for a specific candidate → that candidate receives runtime failure, not INFEASIBLE
+- Feasibility exception that prevents continuation of the entire batch → `TerminationStatus.FAILED`
 
 ---
 
-## 6. Numeric type contract (P0-5)
+## 6. Numeric canonicalization (P0-4)
 
-### 6.1 Input boundary
+### 6.1 Mandatory Decimal conversion
 
-Phase 2 verified evidence (`VerifiedRatingEvidenceSnapshot`) stores engineering metrics as **validated finite `float`** values:
+All numeric values participating in feasibility comparison or ranking **must** be converted to `Decimal` as follows:
 
-| Field | Phase 2 type | Phase 3 consumption |
+```
+Decimal(str(finite_float)).normalize()
+```
+
+`normalize()` strips trailing zeros, so `Decimal("1.0")` and `Decimal("1")` both yield `Decimal("1")`, ensuring deterministic comparison.
+
+### 6.2 Per-field conversion
+
+| Field | Type in Phase 2 | Decimal conversion |
 |---|---|---|
-| `required_duty_w` | `float` (finite) | Consumed as `float` |
-| `duty_absolute_tolerance_w` | `float` (finite) | Consumed as `float` |
-| `duty_relative_tolerance` | `float` (finite) | Consumed as `float` |
-| `minimum_terminal_delta_t` | `float` (finite) | Consumed as `float` |
-| `heat_duty_w` | `float` (finite) | Consumed as `float` |
-| `area_outer_m2` | `float` (finite) | Consumed as `float` |
-| `energy_residual_w` | `float` (finite or None) | Consumed as `float` |
-| `ua_lmtd_residual_w` | `float` (finite or None) | Consumed as `float` |
+| `area_outer_m2` | `float` (finite) | `Decimal(str(area_outer_m2)).normalize()` |
+| `heat_duty_w` | `float` (finite) | `Decimal(str(heat_duty_w)).normalize()` |
+| `required_duty_w` | `float` (finite) | `Decimal(str(required_duty_w)).normalize()` |
+| `energy_residual_w` | `float` (finite or None) | `Decimal(str(v)).normalize()` if not None |
+| `ua_lmtd_residual_w` | `float` (finite or None) | `Decimal(str(v)).normalize()` if not None |
+| `effective_length_m_canonical` | `str` (Decimal string) | `Decimal(effective_length_m_canonical).normalize()` |
 
-All `float` inputs entering Phase 3 have already been validated as finite by the Phase 2 model validators. NaN, Inf, and -0.0 are rejected at the Phase 2 boundary.
+### 6.3 Finite check
 
-### 6.2 Optional Decimal conversion adapter
+Every numeric value consumed from Phase 2 **must** pass `math.isfinite()` at the Phase 3 consumer boundary before Decimal conversion. If a non-finite value (NaN, Inf, -Inf) is detected, raise `ValueError` with a fixed deterministic message. This is required because the review explicitly requires Phase 3 to re-validate, not trust Phase 2 implicitly.
 
-Phase 3 may optionally convert these `float` values to `Decimal` for ranking comparison. If such a conversion is implemented, it must follow exactly:
+### 6.4 Rejected types
 
-1. **Conversion:** `Decimal(str(finite_float))` — round-trip exact via string representation
-2. **Quantization:** Normalised to remove trailing zeros using `Decimal.normalize()`
-3. **NaN/Inf rejection:** Already guaranteed by Phase 2; any unexpected NaN/Inf raises before ranking
-4. **-0.0 handling:** Phase 2 model validators reject `-0.0`; no special handling needed
-5. **Hash consistency:** If conversion is used, the `canonical_json` representation must use `Decimal(str(f))` with normalized form, **not** the raw float — ensuring Python 3.11/3.12 consistency
-6. All comparisons use `Decimal` comparison operators, not `float` comparison (avoids precision surprises)
-7. If no conversion is implemented, ranking uses float comparison with the understanding that Phase 2 metrics are deterministic finite floats produced by the same TASK-008 solver — determinism is guaranteed
+- `bool` is rejected: `raise TypeError("bool is not a valid numeric type")` — never auto-convert `True`→1 or `False`→0
+- `-0.0`: `Decimal(str(-0.0))` produces `Decimal("-0")` and `normalize()` produces `Decimal("-0")`. Phase 3 must treat `-0` and `0` as equal: use `normalize()` + `abs()` for comparisons, or rely on `Decimal("0") == Decimal("-0")` being `True` (Python Decimal equality already treats `-0 == 0` as True).
+
+### 6.5 Canonical string representation
+
+For hash/provenance, the canonical representation of each numeric value is `str(decimal.normalize())` (stripped of trailing zeros, no exponent unless necessary).
+
+Canonical zero: `Decimal("0")` → string `"0"`.
+
+### 6.6 Python 3.11/3.12 consistency
+
+`Decimal(str(finite_float)).normalize()` produces identical results across Python 3.11 and 3.12, as verified by the existing `Decimal` specification.
 
 ---
 
-## 7. Optimization objective registry (P0-6)
+## 7. Ranking registry (P0-5)
 
-### 7.1 Typed enum
+### 7.1 Source fields
+
+`effective_length_m_canonical` comes from `ManufacturableCandidate.effective_length_m_canonical` (a `str`). The record↔candidate binding (step 9 of `verify_or_raise()`) must be completed **before** reading this field. The `ManufacturableCandidate` at index `i` in `materialization_result.candidates` corresponds to `evaluation_records[i]`.
+
+`area_outer_m2` comes from `VerifiedRatingEvidenceSnapshot.area_outer_m2` (a finite `float`).
+
+### 7.2 Non-null invariant for FEASIBLE candidates
+
+For any candidate with `Phase3Disposition.FEASIBLE`, all fields participating in ranking **must** be non-null and finite:
+
+- `area_outer_m2`: must be non-null (verified evidence has non-null `area_outer_m2`)
+- `effective_length_m_canonical`: must be non-null (every `ManufacturableCandidate` has it)
+- `heat_duty_w`: required for duty feasibility check
+- `hot_outlet_temperature_k`: required for terminal delta-T (if SUCCEEDED)
+- `cold_outlet_temperature_k`: required for terminal delta-T (if SUCCEEDED)
+
+If any required field is null or non-finite for a VERIFIED+SUCCEEDED record, this is an artifact invariant failure — the record does not receive FEASIBLE and the Phase 3 implementation must raise or block at the input verification boundary (step 10), not silently skip.
+
+### 7.3 RankedCandidateRecord non-null fields
+
+`RankedCandidateRecord` is only created for FEASIBLE candidates. Therefore:
+
+- `primary_objective_value`: non-null `Decimal` (normalized)
+- `secondary_tie_break_value`: non-null `Decimal` (normalized)
+- `source_qualified_candidate_id`: non-null `str`
+- All digests: non-null `str`
+
+### 7.4 Optimization objective enum
 
 ```python
 class OptimizationObjective(StrEnum):
@@ -243,169 +415,160 @@ class OptimizationObjective(StrEnum):
     MINIMUM_EFFECTIVE_LENGTH = "minimum_effective_length"
 ```
 
-These match the frozen Phase 2 `OptimizationObjective` in `context.py`.
-
-### 7.2 Per-objective ranking registry
+### 7.5 Per-objective complete sort keys
 
 #### MINIMUM_OUTER_HEAT_TRANSFER_AREA
 
-| Level | Field | Source | Unit | Direction | None handling |
-|---|---|---|---|---|---|
-| 1 | `area_outer_m2` | `VerifiedRatingEvidenceSnapshot.area_outer_m2` | m² | **Ascending** | None → last |
-| 2 | `effective_length_m` | (derived from `MaterializationResult` candidate geometry) | m | **Ascending** | None → last |
-| 3 | `source_qualified_candidate_id` | `CandidateEvaluationRecord.source_qualified_candidate_id` | ASCII | **Ascending** | Not nullable |
+```
+sort_key = (
+    Decimal(str(area_outer_m2)).normalize(),
+    Decimal(effective_length_m_canonical).normalize(),
+    source_qualified_candidate_id,   # ASCII ascending, final tie-break
+)
+```
+
+| Level | Field | Decimal source | Direction | Non-null? |
+|---|---|---|---|---|
+| 1 | `area_outer_m2` | `Decimal(str(area_outer_m2)).normalize()` | Ascending | Yes (FEASIBLE invariant) |
+| 2 | `effective_length_m_canonical` | `Decimal(effective_length_m_canonical).normalize()` | Ascending | Yes (FEASIBLE invariant) |
+| 3 | `source_qualified_candidate_id` | — | ASCII ascending | Yes |
 
 #### MINIMUM_EFFECTIVE_LENGTH
 
-| Level | Field | Source | Unit | Direction | None handling |
-|---|---|---|---|---|---|
-| 1 | `effective_length_m` | (derived from `MaterializationResult` candidate geometry) | m | **Ascending** | None → last |
-| 2 | `area_outer_m2` | `VerifiedRatingEvidenceSnapshot.area_outer_m2` | m² | **Ascending** | None → last |
-| 3 | `source_qualified_candidate_id` | `CandidateEvaluationRecord.source_qualified_candidate_id` | ASCII | **Ascending** | Not nullable |
-
-### 7.3 None handling details
-
-- `None` values sort **after** all finite values of the same type
-- This ensures candidates with missing engineering metrics are ranked below those with valid values, without silently discarding invalid data
-- If `area_outer_m2` is `None` (should not happen for a `VERIFIED` record with `RatingStatus.SUCCEEDED`), such candidates cannot participate in ranking — they receive `INFEASIBLE` disposition
-
-### 7.4 Non-finite value handling
-
-- Already rejected at Phase 2 input boundary
-- If a non-finite value (NaN, Inf) is detected during Phase 3 consumption, ranking raises `ValueError` with a fixed deterministic message
-
-### 7.5 Final tie-break
-
-The final tie-break (`source_qualified_candidate_id` ASCII ascending) guarantees deterministic ordering for every pair of candidates that have identical objective and tie-break values. This is the **only** tie-break that is independent of the optimization objective.
-
----
-
-## 8. Top-N contract (P0-7)
-
-### 8.1 Source field
-
-`requested_top_n` is bound directly to `SizingRequestIdentity.top_n`.
-
-```python
-requested_top_n == sizing_request_identity.top_n
+```
+sort_key = (
+    Decimal(effective_length_m_canonical).normalize(),
+    Decimal(str(area_outer_m2)).normalize(),
+    source_qualified_candidate_id,   # ASCII ascending, final tie-break
+)
 ```
 
-### 8.2 Validation
+| Level | Field | Decimal source | Direction | Non-null? |
+|---|---|---|---|---|
+| 1 | `effective_length_m_canonical` | `Decimal(effective_length_m_canonical).normalize()` | Ascending | Yes (FEASIBLE invariant) |
+| 2 | `area_outer_m2` | `Decimal(str(area_outer_m2)).normalize()` | Ascending | Yes (FEASIBLE invariant) |
+| 3 | `source_qualified_candidate_id` | — | ASCII ascending | Yes |
 
-- `SizingRequestIdentity.top_n` is validated as `strict int >= 1` at the Phase 2 boundary
-- If `requested_top_n < 1` is somehow received in Phase 3, `Phase3EvaluationInput.verify_or_raise()` must reject it — no branch returning an empty successful result
+### 7.6 RankedCandidateRecord payload
 
-### 8.3 Selection rules
+```python
+class RankedCandidateRecord(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
-- Top-N candidates are selected **only** from candidates with `Phase3Disposition.FEASIBLE`
-- Selection occurs **after** full deterministic sort — all FEASIBLE candidates are sorted, then the first `N` are taken
-- If feasible count < `N`: all feasible candidates are returned (no padding with inferior candidates)
-- If feasible count == 0: empty `ordered_top_n_record_digests`, `feasible_candidate_count == 0`
-- Top-N selection does **not** alter candidate identity, hash, evaluation record, or disposition
-- Full ranked ordered list is preserved in `ordered_ranked_record_digests`; Top-N is a strict subset
-- Top-N selection itself is recorded as a provenance node
+    rank: int                                              # 1-based rank
+    source_qualified_candidate_id: str
+    optimization_objective: OptimizationObjective          # typed enum, not string
+    primary_objective_value: str                           # Decimal.normalize() canonical string
+    primary_objective_field: str                           # e.g. "area_outer_m2"
+    secondary_tie_break_value: str                         # Decimal canonical string
+    secondary_tie_break_field: str                         # e.g. "effective_length_m_canonical"
+    candidate_evaluation_identity_digest: str
+    verified_rating_evidence_digest: str
+    feasibility_digest: str                                # SHA-256 of CandidateDispositionRecord payload
+    ranked_record_digest: str                              # SHA-256 of this record's canonical payload
+```
+
+All `*_value` fields for FEASIBLE candidates are non-null. Non-null invariant is enforced at ranking entry, not at the model level.
 
 ---
 
-## 9. Executable feasibility formulas (P0-8)
+## 8. Executable feasibility (P0-6)
 
-### 9.1 RatingStatus mapping
+### 8.1 Single normative rule: trust TASK-008 verdict
 
-`VerifiedRatingEvidenceSnapshot.rating_status` maps to Phase 3 disposition as:
+`RatingStatus.SUCCEEDED` means TASK-008 accepted solver convergence, energy closure, final-state consistency, and UA-LMTD closure. Phase 3 **trusts** this verdict and does **not** recompute those closures.
 
-| Phase 2 `rating_status` | Phase 3 outcome |
+This is the **single normative rule**. There is no "Option B".
+
+### 8.2 RatingStatus → disposition
+
+| `rating_status` value | Phase 3 disposition |
 |---|---|
-| `RatingStatus.SUCCEEDED` | Continues to feasibility checks |
+| `RatingStatus.SUCCEEDED` | Continues to duty / delta-T feasibility checks |
 | `RatingStatus.BLOCKED` | **INFEASIBLE** — diagnostic: `RATING_BLOCKED` |
 | `RatingStatus.FAILED` | **INFEASIBLE** — diagnostic: `RATING_FAILED` |
-| `None` (UNEVALUATED/RUNTIME_FAILED/INTEGRITY_INVALID) | Per state mapping in §4.4 |
+| `None` | As per state mapping (§4.6) |
 
-### 9.2 Duty satisfaction
+Phase 3 verifies: `record.rating_status == evidence.rating_status.value`. Any mismatch is an input verification failure (step 10).
+
+### 8.3 Required fields for SUCCEEDED
+
+For `VERIFIED + rating_status == SUCCEEDED`, the following must be non-null and finite:
+
+- `heat_duty_w`
+- `hot_outlet_temperature_k`
+- `cold_outlet_temperature_k`
+- `area_outer_m2`
+
+If any is null or non-finite, this is an artifact invariant failure — raise at step 10 of `verify_or_raise()`. Do not "skip terminal delta-T check".
+
+### 8.4 Duty satisfaction
 
 ```
 duty_tolerance_w = max(
-    duty_absolute_tolerance_w,
-    duty_relative_tolerance * abs(required_duty_w),
+    duty_absolute_tolerance_w,                                          # float from SizingRequestIdentity
+    duty_relative_tolerance * abs(required_duty_w),                     # relative fraction
 )
 
-duty_error_w = abs(verified_heat_duty_w - required_duty_w)
+duty_tolerance_decimal = Decimal(str(duty_tolerance_w)).normalize()
+duty_error_decimal = abs(Decimal(str(heat_duty_w)).normalize() - Decimal(str(required_duty_w)).normalize())
 
-duty_satisfied = duty_error_w <= duty_tolerance_w
+duty_satisfied = duty_error_decimal <= duty_tolerance_decimal
 ```
 
 Where:
-- `verified_heat_duty_w` = `VerifiedRatingEvidenceSnapshot.heat_duty_w` (finite float, verified Phase 2)
-- `required_duty_w` = `SizingRequestIdentity.required_duty_w`
-- `duty_absolute_tolerance_w` = `SizingRequestIdentity.duty_absolute_tolerance_w`
-- `duty_relative_tolerance` = `SizingRequestIdentity.duty_relative_tolerance`
+- `heat_duty_w` from `VerifiedRatingEvidenceSnapshot.heat_duty_w` (finite float, TASK-008 output)
+- `required_duty_w`, `duty_absolute_tolerance_w`, `duty_relative_tolerance` from `SizingRequestIdentity`
 
-**Heat duty sign convention:** TASK-008 returns `heat_duty_w` as positive for cooling duty (consistent with `required_duty_w`). The absolute value comparison ensures the magnitude check is sign-independent.
+**Sign convention:** positive heat transfer from hot side to cold side. The absolute value ensures magnitude check is sign-independent.
 
-### 9.3 Terminal delta-T
+### 8.5 Terminal delta-T
 
-Define two flow arrangement formulas:
+Flow arrangement tokens (from `FlowArrangement` StrEnum):
 
-**Co-current:**
 ```
-delta_t_1 = hot_inlet_temperature_k - cold_inlet_temperature_k
-delta_t_2 = hot_outlet_temperature_k - cold_outlet_temperature_k
-```
+parallel:          # FlowArrangement.PARALLEL = "parallel"
+    delta_t_1 = hot_inlet - cold_inlet
+    delta_t_2 = hot_outlet - cold_outlet
 
-**Counter-current:**
-```
-delta_t_1 = hot_inlet_temperature_k - cold_outlet_temperature_k
-delta_t_2 = hot_outlet_temperature_k - cold_inlet_temperature_k
-```
-
-Then:
-```
-minimum_actual_terminal_delta_t = min(delta_t_1, delta_t_2)
-terminal_delta_t_satisfied = minimum_actual_terminal_delta_t >= minimum_terminal_delta_t
+counterflow:       # FlowArrangement.COUNTERFLOW = "counterflow"
+    delta_t_1 = hot_inlet - cold_outlet
+    delta_t_2 = hot_outlet - cold_inlet
 ```
 
 Where:
-- `hot_inlet_temperature_k` = `SizingRequestIdentity.hot_inlet_temperature_k`
-- `hot_outlet_temperature_k` = `VerifiedRatingEvidenceSnapshot.hot_outlet_temperature_k`
-- `cold_inlet_temperature_k` = `SizingRequestIdentity.cold_inlet_temperature_k`
-- `cold_outlet_temperature_k` = `VerifiedRatingEvidenceSnapshot.cold_outlet_temperature_k`
-- `minimum_terminal_delta_t` = `SizingRequestIdentity.minimum_terminal_delta_t`
+- `hot_inlet` = `SizingRequestIdentity.hot_inlet_temperature_k`
+- `cold_inlet` = `SizingRequestIdentity.cold_inlet_temperature_k`
+- `hot_outlet` = `VerifiedRatingEvidenceSnapshot.hot_outlet_temperature_k` (SUCCEEDED: non-null)
+- `cold_outlet` = `VerifiedRatingEvidenceSnapshot.cold_outlet_temperature_k` (SUCCEEDED: non-null)
 
-If outlet temperatures are `None` (rating_status != SUCCEEDED), the terminal delta-T check is skipped (feasibility dictated by rating status alone).
+```
+minimum_actual_terminal_delta_t = min(delta_t_1_decimal, delta_t_2_decimal)
+terminal_delta_t_satisfied = minimum_actual_terminal_delta_t >= Decimal(str(minimum_terminal_delta_t)).normalize()
+```
 
-### 9.4 Energy closure
+All temperatures are `Decimal(str(float)).normalize()`.
 
-**Option A (preferred): Trust Phase 2 verdict**
+### 8.6 Energy closure and UA-LMTD closure
 
-`VerifiedRatingEvidenceSnapshot` is only constructed after Phase 2 hash + provenance verification passed. The energy balance was already accepted by TASK-008's internal convergence criteria when `RatingStatus.SUCCEEDED` was set. Phase 3 trusts this verdict and does **not** re-check energy closure for SUCCEEDED ratings.
+**Trusted:** `RatingStatus.SUCCEEDED` implies TASK-008 accepted energy balance and UA-LMTD consistency. Phase 3 does not recompute these.
 
-This avoids re-implementing an energy-balance criterion that TASK-008 already enforced.
+### 8.7 Diagnostic precedence
 
-### 9.5 UA-LMTD closure
+Multiple infeasibility conditions → single deterministic diagnostic:
 
-**Option A (preferred): Trust Phase 2 verdict**
-
-Same reasoning as energy closure: TASK-008's successful convergence implies `UA` × `LMTD` ≈ `Q`. Phase 3 trusts this for `RatingStatus.SUCCEEDED`.
-
-### 9.6 Diagnostic precedence
-
-When multiple feasibility conditions fail simultaneously, the deterministic precedence is:
-
-| Priority | Diagnostic key | Condition |
+| Priority | DiagnosticKey | Condition |
 |---|---|---|
-| 1 | `PROVIDER_IDENTITY_MISMATCH` | `provider_identity_matches == False` |
+| 1 | `PROVIDER_IDENTITY_MISMATCH` | `record.provider_identity_matches == False` |
 | 2 | `RATING_BLOCKED` | `rating_status == BLOCKED` |
 | 3 | `RATING_FAILED` | `rating_status == FAILED` |
-| 4 | `MISSING_TRUSTED_METRIC` | `area_outer_m2 is None` or `heat_duty_w is None` (despite VERIFIED + SUCCEEDED — invariant violation) |
+| 4 | `MISSING_TRUSTED_METRIC` | Required SUCCEEDED field is null/non-finite |
 | 5 | `DUTY_SHORTFALL` | `duty_satisfied == False` |
 | 6 | `TERMINAL_DELTA_T_INADEQUATE` | `terminal_delta_t_satisfied == False` |
 
-Only the highest-priority failing diagnostic is recorded as the `infeasibility_diagnostic` for that candidate.
-
-### 9.7 Feasibility diagnostic key enum
-
 ```python
 class FeasibilityDiagnosticKey(StrEnum):
-    NONE = "none"                              # FEASIBLE — no infeasibility reason
+    NONE = "none"
     PROVIDER_IDENTITY_MISMATCH = "provider_identity_mismatch"
     RATING_BLOCKED = "rating_blocked"
     RATING_FAILED = "rating_failed"
@@ -414,89 +577,113 @@ class FeasibilityDiagnosticKey(StrEnum):
     TERMINAL_DELTA_T_INADEQUATE = "terminal_delta_t_inadequate"
 ```
 
+### 8.8 Exception boundaries
+
+| Exception scope | Behaviour |
+|---|---|
+| Per-candidate feasibility check raises `Exception` (not `BaseException`) | Candidate receives `RUNTIME_FAILED` disposition; batch continues |
+| Entire feasibility phase raises unexpected `Exception` | Batch terminates; `TerminationStatus.FAILED` |
+| Input verification raises (step 1-11) | No `OptimizationResult` produced; exception propagates upward |
+| `BaseException` | Never caught; propagates. `KeyboardInterrupt`, `SystemExit`, `GeneratorExit` are not silenced |
+
+There is no "per-candidate unless prevents continuation" — the exact rules above replace that.
+
 ---
 
-## 10. Data model (P0-9, P0-10)
+## 9. Top-N (P0-7)
 
-### 10.1 `CandidateDispositionRecord` (complete audit)
+### 9.1 Source and validation
+
+`requested_top_n` = `SizingRequestIdentity.top_n` (validated as `strict int >= 1` at Phase 2 boundary).
+
+If `requested_top_n < 1` at Phase 3 input, `verify_or_raise()` rejects.
+
+### 9.2 Selection
+
+- Top-N is selected **only** from FEASIBLE candidates
+- Selection occurs **after** full deterministic sort of all FEASIBLE candidates
+- If feasible count < N: all feasible candidates returned (no padding)
+- If feasible count == 0: empty `ordered_top_n_record_digests`
+- Top-N does not alter candidate identity, hash, evaluation record, or disposition
+- Full ranked list preserved in `ordered_ranked_record_digests`; Top-N is a strict subset
+
+---
+
+## 10. Termination invariants (P0-3)
+
+### 10.1 Typed enum
+
+```python
+class TerminationStatus(StrEnum):
+    COMPLETE = "complete"    # No strict-stop. All records processed for feasibility/ranking.
+    PARTIAL = "partial"      # Strict-stop occurred (stop_index is not None).
+                              # Records before stop_index processed normally.
+                              # Top-N from indices < stop_index only.
+    FAILED = "failed"        # Unrecoverable: input verification failed or global Phase 3 exception.
+```
+
+### 10.2 Exact predicates
+
+| Status | Condition | Has ranked records? | Has Top-N? | Has result_hash? | Has provenance? |
+|---|---|---|---|---|---|
+| **COMPLETE** | `stop_index is None` (no strict-stop) | Yes (may be empty if 0 FEASIBLE) | Yes (may be empty) | Yes | Yes |
+| **PARTIAL** | `stop_index is not None` | Yes (from indices < stop_index only) | Yes (from FEASIBLE with index < stop_index only) | Yes | Yes; strict-stop warning included in `warnings` |
+| **FAILED** | Input verification failure (step 1-11) or global Phase 3 exception | No | No | No (if input verify failed); Yes (if global exception after successful input verify) | Conditional on having result |
+
+### 10.3 Failed + Top-N rules
+
+If `TerminationStatus.PARTIAL`, Top-N may be selected from FEASIBLE candidates with index `< stop_index`. The result hash covers those records, and a strict-stop warning must be included.
+
+If `TerminationStatus.FAILED` due to global exception after input verification succeeded, the `OptimizationResult` carries the partial components but `Top-N` is empty and `ordered_ranked_record_digests` contains whatever was computed before the failure.
+
+---
+
+## 11. Data models (P0-9)
+
+### 11.1 CandidateDispositionRecord
 
 ```python
 class CandidateDispositionRecord(BaseModel):
-    """Complete audit/disposition for every Phase 2 record — one per candidate.
-
     model_config = ConfigDict(frozen=True, extra="forbid")
-    """
 
     source_qualified_candidate_id: str
     evaluation_order_index: int
-
     candidate_evaluation_state: CandidateEvaluationState
     disposition: Phase3Disposition
-    infeasibility_diagnostic: FeasibilityDiagnosticKey  # NONE if FEASIBLE or non-engineering
-
-    candidate_evaluation_identity_digest: str | None     # None for non-VERIFIED
-    verified_rating_evidence_digest: str | None           # None for non-VERIFIED
-
-    engineering_objective_value: float | None             # area_outer_m2 or effective_length; None if non-rank-eligible
-    objective_tie_break_value: float | None               # secondary field; None if non-rank-eligible
-
-    feasibility_digest: str                               # SHA-256 of canonical disposition payload
-
+    infeasibility_diagnostic: FeasibilityDiagnosticKey  # NONE if FEASIBLE or non-rank-eligible
+    candidate_evaluation_identity_digest: str | None
+    verified_rating_evidence_digest: str | None
+    engineering_objective_value: str | None  # Decimal canonical string; non-null only for FEASIBLE
+    tie_break_value: str | None              # Decimal canonical string; non-null only for FEASIBLE
+    feasibility_digest: str                  # SHA-256 of canonical disposition payload
     warnings: tuple[EngineeringMessage, ...]
     blockers: tuple[EngineeringMessage, ...]
     failure: RunFailure | None
 ```
 
-### 10.2 `RankedCandidateRecord` (engineering-rank-eligible only)
+### 11.2 RankedCandidateRecord
 
-```python
-class RankedCandidateRecord(BaseModel):
-    """Only created for engineering-rank-eligible candidates (FEASIBLE disposition).
+Only created for FEASIBLE candidates (see §7.6).
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    """
-
-    rank: int                                               # 1-based, assigned after full sort
-    source_qualified_candidate_id: str
-    candidate_evaluation_identity_digest: str
-    verified_rating_evidence_digest: str
-    disposition: Phase3Disposition                          # Always FEASIBLE
-    feasibility_digest: str                                 # Link to CandidateDispositionRecord
-    engineering_objective_value: float | None               # Primary objective
-    ranked_record_digest: str                               # SHA-256 of canonical payload
-```
-
-### 10.3 `TerminationStatus` (P0-13)
-
-```python
-class TerminationStatus(StrEnum):
-    COMPLETE = "complete"       # All processing finished without unrecoverable error
-    PARTIAL = "partial"         # Phase 2 strict-stop occurred; earlier results still valid
-    FAILED = "failed"           # Unrecoverable error: artifact verification failed or Phase 3 exception
-```
-
-### 10.4 `OptimizationResult` (P0-10)
+### 11.3 OptimizationResult
 
 ```python
 class OptimizationResult(BaseModel):
-    """Complete typed result of Phase 3 optimization.
-
     model_config = ConfigDict(frozen=True, extra="forbid")
-    """
 
     schema_version: int
 
     # Upstream bindings
     sizing_request_identity_digest: str
     passed_gate_digest: str
-    materialized_candidate_set_digest: str
+    candidate_set_digest: str
     evaluation_input_digest: str
 
     # Objective
-    optimization_objective: OptimizationObjective
+    optimization_objective: OptimizationObjective   # typed enum
     requested_top_n: int
 
-    # Counts (non-overlapping, sum-invariant)
+    # Counts (disjoint, sum = total)
     total_candidate_count: int
     verified_candidate_count: int
     feasible_candidate_count: int
@@ -507,222 +694,235 @@ class OptimizationResult(BaseModel):
     unevaluated_count: int
     provenance_failed_count: int
 
-    # Record digests (ordered)
-    ordered_disposition_record_digests: tuple[str, ...]        # All candidates, Phase 2 order
-    ordered_ranked_record_digests: tuple[str, ...]             # FEASIBLE only, ranking order
-    ordered_top_n_record_digests: tuple[str, ...]              # Top-N subset of ranked
+    # Ordered record digests
+    ordered_disposition_record_digests: tuple[str, ...]   # Full Phase 2 order
+    ordered_ranked_record_digests: tuple[str, ...]         # FEASIBLE only, ranking order
+    ordered_top_n_record_digests: tuple[str, ...]          # Top-N subset of ranked
 
-    # Termination
     termination_status: TerminationStatus
 
-    # Messages (typed, not free-form)
+    # Typed messages (not free-form strings)
     warnings: tuple[EngineeringMessage, ...]
     blockers: tuple[EngineeringMessage, ...]
     failure: RunFailure | None
 
-    # Integrity
-    result_hash: str                                           # SHA-256 of canonical payload (excludes derived fields)
-    provenance_digest: str                                     # Root digest of provenance DAG
+    # Identifiers (non-circular — see §12)
+    optimization_result_id: str                 # UUID5(PHASE3_NAMESPACE, result_hash)
+    result_core_hash: str                       # SHA-256 of core payload (excludes derived fields)
+    provenance_digest: str                      # SHA-256 of provenance graph
+    result_hash: str                            # SHA-256 of {core_hash, provenance_digest}
 ```
 
-### 10.5 Count equations (P0-10)
+### 11.4 Count equations
 
 ```
-total_candidate_count == evaluation_record_count
-                         == len(ordered_disposition_record_digests)
+total = verified + integrity_failed + runtime_failed + unevaluated
 
-verified_candidate_count == feasible_candidate_count
-                           + infeasible_candidate_count
-                           + provider_mismatch_count
-                           + provenance_failed_count
-
-total_candidate_count == verified_candidate_count
-                        + integrity_failed_count
-                        + runtime_failed_count
-                        + unevaluated_count
+verified = feasible + infeasible + provider_mismatch + provenance_failed
 ```
 
-Each quadrant:
-- `verified_candidate_count` = candidates with `CandidateEvaluationState.VERIFIED`
-- `integrity_failed_count` = candidates with `CandidateEvaluationState.INTEGRITY_INVALID`
-- `runtime_failed_count` = candidates with `CandidateEvaluationState.RUNTIME_FAILED`
-- `unevaluated_count` = candidates with `CandidateEvaluationState.UNEVALUATED`
-
-The verified sub-counts:
-- `feasible_candidate_count` = FEASIBLE disposition
-- `infeasible_candidate_count` = INFEASIBLE disposition
-- `provider_mismatch_count` = PROVIDER_IDENTITY_MISMATCH disposition
-- `provenance_failed_count` = PROVENANCE_FAILED disposition
-
-These sets are disjoint and their sum equals `verified_candidate_count`.
-
-### 10.6 Termination status invariants (P0-13)
-
-| Status | Condition | Has ranked records? | Has Top-N? | Has result_hash? | Has provenance? | blockers/failure? |
-|---|---|---|---|---|---|---|
-| **COMPLETE** | No Phase 2 strict-stop; no Phase 3 unrecoverable error | Yes (may be empty if 0 FEASIBLE) | Yes (may be empty) | Yes | Yes | May be present (individual disposition warnings/blockers) |
-| **PARTIAL** | Phase 2 strict-stop occurred (some UNEVALUATED); earlier VERIFIED records processed normally | Yes (from earlier candidates only) | Yes (from earlier FEASIBLE candidates only) | Yes | Yes | Must include strict-stop warning |
-| **FAILED** | Input artifact verification failed before feasibility; or global Phase 3 exception | No | No | Yes (if artifact verification succeeded but later fail) | Yes (partial if possible) | Must include a failure |
-
-**PARTIAL + Top-N:** For a Phase 2 strict-stop batch where one or more earlier candidates are VERIFIED and FEASIBLE, Top-N may be selected from those FEASIBLE candidates. The `PARTIAL` termination status indicates that not all candidates were evaluated, but the available FEASIBLE results are valid.
-
-**FAILED + no hash:** If `Phase3EvaluationInput.verify_or_raise()` fails, no `OptimizationResult` is produced — the exception propagates upward.
+No overlap: each candidate is counted exactly once in `total`. Within `verified`, each candidate is counted exactly once in one of the four sub-categories.
 
 ---
 
-## 11. Hash contract (P0-11)
+## 12. Three-layer hash scheme (P0-7)
 
-### 11.1 Non-circular canonical payload
-
-The `optimization_result_id` and `result_hash` are **excluded** from the canonical payload used for hash computation:
+### 12.1 Construction order (no cycles)
 
 ```
-CanonicalPayload:
-  schema_version
-  sizing_request_identity_digest
-  passed_gate_digest
-  materialized_candidate_set_digest
-  evaluation_input_digest
-  optimization_objective.value
-  requested_top_n
-  total_candidate_count
-  verified_candidate_count
-  feasible_candidate_count
-  infeasible_candidate_count
-  provider_mismatch_count
-  integrity_failed_count
-  runtime_failed_count
-  unevaluated_count
-  provenance_failed_count
-  ordered_disposition_record_digests (ordered string list)
-  ordered_ranked_record_digests (ordered string list)
-  ordered_top_n_record_digests (ordered string list)
-  termination_status.value
-  warnings (ordered list of canonical warning digests)
-  blockers (ordered list of canonical blocker digests)
-  failure (canonical failure digest, or "null")
-  provenance_digest
+Step 1: result_core_payload (excludes optimization_result_id, result_core_hash, provenance_digest, result_hash)
+Step 2: result_core_hash = sha256(canonical_json(result_core_payload))
+
+Step 3: provenance graph built; each node's payload_hash uses result_core_hash for the result node
+Step 4: provenance_digest = ProvenanceGraph.compute_hash()  # uses existing method
+
+Step 5: result_hash = sha256(canonical_json({
+            "result_core_hash": result_core_hash,
+            "provenance_digest": provenance_digest,
+        }))
+
+Step 6: optimization_result_id = uuid5(PHASE3_RESULT_NAMESPACE, result_hash)
 ```
 
-### 11.2 Derived fields
-
-```
-result_hash = sha256(canonical_payload_json).hexdigest()
-optimization_result_id = result_hash  # or deterministic UUID5 from result_hash
-provenance_digest = <root digest of provenance DAG>
-```
-
-### 11.3 Digest binding
-
-The `result_hash` binds:
-
-| Digest | Source |
-|---|---|
-| Each `CandidateDispositionRecord` | `feasibility_digest` |
-| Each `RankedCandidateRecord` | `ranked_record_digest` |
-| Top-N membership | Through `ordered_top_n_record_digests` |
-| Feasibility/disposition | Through disposition record digests |
-| Objective/tie-break values | Through ranked record digests |
-| Rank | Through ranked record digests |
-| Warnings/blockers/failure | Through canonical message digests |
-| All counts | Direct integer fields |
-| Termination status | Direct string field |
-| Upstream artifact digests | `sizing_request_identity_digest`, `passed_gate_digest`, `materialized_candidate_set_digest`, `evaluation_input_digest` |
-
-### 11.4 Digest distinction
-
-| Concept | Identifier |
-|---|---|
-| Source-qualified candidate ID | `CandidateEvaluationRecord.source_qualified_candidate_id` → `str` |
-| Candidate evaluation identity | `CandidateEvaluationRecord.candidate_evaluation_identity` → `str \| None` |
-| Candidate disposition digest | `CandidateDispositionRecord.feasibility_digest` → `str` |
-| Ranked record digest | `RankedCandidateRecord.ranked_record_digest` → `str` |
-
----
-
-## 12. Provenance contract (P0-12)
-
-Phase 3 reuses the repository's existing `ProvenanceGraph`, `ProvenanceNode`, and `ProvenanceEdge` from `hexagent.domain.provenance`.
-
-### 12.1 Node types
-
-| Node type | `ProvenanceNodeType` | Payload |
-|---|---|---|
-| Sizing request | `PROVENANCE_NODE_TYPE` (e.g. `INPUT_FILE` or `RESULT`) | `sizing_request_identity_digest` |
-| Passed sizing gate | `PROVENANCE_NODE_TYPE` (e.g. `CALCULATION_RUN`) | `passed_gate_digest` |
-| Materialization result | `PROVENANCE_NODE_TYPE` (e.g. `CALCULATION_RUN`) | `materialized_candidate_set_digest` |
-| Evaluation input | `INTERMEDIATE` | `evaluation_input_digest` |
-| Each disposition record | `INTERMEDIATE` | `feasibility_digest` |
-| Each ranked record | `INTERMEDIATE` | `ranked_record_digest` |
-| Top-N selection | `INTERMEDIATE` | Ordered Top-N ID list digest |
-| Result payload | `RESULT` | `result_hash` |
-| Result context | `OPTIMIZER` | Full `OptimizationResult` metadata |
-
-### 12.2 Node payload rules
-
-- Each `ProvenanceNode.node_id` is a deterministic `UUID5` derived from the content digest
-- Each `ProvenanceNode.payload_hash` is `"sha256:" + content_digest`
-- `label` = node type description (e.g. `"Phase 3 evaluation input"`, `"Disposition record for {candidate_id}"`)
-
-### 12.3 Edge structure
-
-| Edge | From | To | Relation |
-|---|---|---|---|
-| Sizing request → Gate | sizing request node | gate node | `"validated_by"` |
-| Gate → Materialization | gate node | materialization node | `"produced"` |
-| Materialization → Eval input | materialization node | evaluation input node | `"consumed_by"` |
-| Eval input → Disposition records | evaluation input node | each disposition node | `"evaluated"` |
-| Disposition → Ranked records | each disposition node | its ranked record (if any) | `"ranked"` |
-| Ranked records → Top-N | each ranked record node | Top-N selection node | `"selected"` |
-| Top-N → Result | Top-N selection node | result payload node | `"produced"` |
-| Result → Provenance root | result payload node | provenance root (aggregate) | `"provenance_of"` |
-
-### 12.4 Verification algorithm
-
-1. Recompute each node's `payload_hash` from its content
-2. Recompute each edge's endpoint node IDs
-3. Build a `ProvenanceGraph` from nodes + edges
-4. Validate DAG (acyclic, unique node IDs, all edges reference existing nodes)
-5. Compute `root_digest` as `sha256(canonical(nodes) + canonical(edges))`
-6. Compare `root_digest` against `OptimizationResult.provenance_digest`
-7. Any mismatch → fail closed
-
----
-
-## 13. Error model (P0-14)
-
-### 13.1 Typed diagnostics
-
-All feasibility diagnostics use `FeasibilityDiagnosticKey` enum (§9.7).
-
-All errors use existing `ErrorCode` from `hexagent.domain.messages`, or Phase 3-specific additions:
+### 12.2 Namespace UUID
 
 ```python
-class Phase3ErrorCode(StrEnum):
-    INPUT_VERIFICATION_FAILED = "phase3_input_verification_failed"
-    NON_FINITE_NUMERIC_DETECTED = "phase3_non_finite_numeric_detected"
-    FEASIBILITY_RUNTIME_FAILURE = "phase3_feasibility_runtime_failure"
-    RANKING_RUNTIME_FAILURE = "phase3_ranking_runtime_failure"
-    RESULT_CONSTRUCTION_FAILED = "phase3_result_construction_failed"
-    HASH_VERIFICATION_FAILED = "phase3_hash_verification_failed"
-    PROVENANCE_VERIFICATION_FAILED = "phase3_provenance_verification_failed"
+PHASE3_RESULT_NAMESPACE = uuid.UUID("6ba7b811-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
 ```
 
-### 13.2 Fixed error messages
+The UUID5 name is the `result_hash` string. `optimization_result_id = uuid.uuid5(PHASE3_RESULT_NAMESPACE, result_hash)`.
 
-All messages entering hash, provenance, or user-visible artifact must be deterministic fixed strings:
+### 12.3 result_core_payload
+
+The `result_core_payload` is the canonical dict of:
+
+```
+schema_version
+sizing_request_identity_digest
+passed_gate_digest
+candidate_set_digest
+evaluation_input_digest
+optimization_objective.value
+requested_top_n
+total_candidate_count
+verified_candidate_count
+feasible_candidate_count
+infeasible_candidate_count
+provider_mismatch_count
+integrity_failed_count
+runtime_failed_count
+unevaluated_count
+provenance_failed_count
+ordered_disposition_record_digests     (ordered string list)
+ordered_ranked_record_digests          (ordered string list)
+ordered_top_n_record_digests           (ordered string list)
+termination_status.value
+warnings                                (ordered canonical warning digests)
+blockers                                (ordered canonical blocker digests)
+failure                                 (canonical failure digest or null)
+```
+
+### 12.4 What each hash binds
+
+| Hash | Binds |
+|---|---|
+| `result_core_hash` | All upstream digests, all counts, all disposition/ranked/Top-N digests, termination status, messages. Does **not** include `provenance_digest`. |
+| `provenance_digest` | Full provenance graph including a node whose payload_hash = `"sha256:" + result_core_hash`. |
+| `result_hash` | Both `result_core_hash` and `provenance_digest`. |
+
+### 12.5 Verification order
+
+1. Recompute `result_core_payload` → `result_core_hash`' (compare to stored)
+2. Rebuild provenance graph → `provenance_digest`' (compare to stored)
+3. Recompute `result_hash`' (compare to stored, includes both digests)
+4. Recompute `optimization_result_id` (compare to stored)
+
+The result provenance node's payload uses `result_core_hash` (not `result_hash`), so that the provenance graph can be verified independently of the outer envelope.
+
+---
+
+## 13. Executable provenance topology (P0-8)
+
+### 13.1 Node types (exact `ProvenanceNodeType` values)
+
+| Node role | `ProvenanceNodeType` | payload_hash content |
+|---|---|---|
+| Root (with design case) | `CASE_REVISION` | `sha256:{design_case_revision_id}` |
+| Root (without design case) | `EXTERNAL` | `sha256:{sizing_request_identity_digest}` |
+| Sizing request | `INPUT_FILE` | `sha256:{sizing_request_identity_digest}` |
+| Passed sizing gate | `CALCULATION_RUN` | `sha256:{gate_digest}` |
+| Materialized candidate set | `CALCULATION_RUN` | `sha256:{candidate_set_digest}` |
+| Evaluation input | `INTERMEDIATE` | `sha256:{evaluation_input_digest}` |
+| Each disposition record | `INTERMEDIATE` | `sha256:{feasibility_digest}` |
+| Each ranked record | `INTERMEDIATE` | `sha256:{ranked_record_digest}` |
+| Top-N selection | `INTERMEDIATE` | `sha256:{ordered_top_n_digests_list}` |
+| Result core | `RESULT` | `"sha256:" + result_core_hash` |
+| Calculation run / optimizer | `OPTIMIZER` | `sha256:{full_optimization_result_metadata}` |
+
+### 13.2 UUID5 for node_id
+
+Every node uses a deterministic UUID5:
+```python
+node_id = uuid5(PROVENANCE_NAMESPACE, node_type.value + ":" + payload_hash)
+```
+Where `PROVENANCE_NAMESPACE = uuid.UUID("6ba7b811-9dad-11d1-80b4-00c04fd430c8")` (DNS namespace).
+
+This ensures reprodcibility: identical inputs produce identical provenance graph.
+
+### 13.3 Edge topology
+
+```
+Root──regulates──►Sizing Request──consumed_by──►Passed Sizing Gate
+                                                      │
+                                                      │ produced
+                                                      ▼
+                                              Materialized Candidate Set
+                                                      │
+                                                      │ consumed_by
+                                                      ▼
+                                              Evaluation Input
+                                                      │
+                                                      │ evaluated
+                                                      ▼
+                                              Disposition Records (one per candidate)
+                                                      │
+                                                      │ ranked (only FEASIBLE)
+                                                      ▼
+                                              Ranked Records
+                                                      │
+                                                      │ selected (only first N FEASIBLE)
+                                                      ▼
+                                              Top-N Selection──produced──►Result Core
+                                                                              │
+                                                                              │ executed_by
+                                                                              ▼
+                                                                      OPTIMIZER node
+```
+
+### 13.4 Edge relations
+
+| Source | Target | `relation` |
+|---|---|---|
+| Root | Sizing Request | `"regulates"` |
+| Sizing Request | Passed Sizing Gate | `"consumed_by"` |
+| Passed Sizing Gate | Materialized Candidate Set | `"produced"` |
+| Materialized Candidate Set | Evaluation Input | `"consumed_by"` |
+| Evaluation Input | each Disposition Record | `"evaluated"` |
+| each Disposition Record | corresponding Ranked Record (if FEASIBLE) | `"ranked"` |
+| each Ranked Record (only selected ones) | Top-N Selection | `"selected"` |
+| Top-N Selection | Result Core | `"produced"` |
+| Result Core | OPTIMIZER node | `"executed_by"` |
+
+Not all ranked records connect to Top-N — only the selected N FEASIBLE candidates.
+
+### 13.5 Canonical node/edge ordering
+
+Use `ProvenanceGraph._canonical_node_key` and `_canonical_edge_key` for deterministic sorting.
+
+### 13.6 Graph hash
+
+Use `ProvenanceGraph.compute_hash()` directly. This ensures the graph's hash includes all node payloads, edges, and structure in a deterministic manner.
+
+### 13.7 Root rule
+
+- If `design_case_revision_id is not None`: root is `CASE_REVISION` with `node_id = uuid5(NS, "CASE_REVISION:" + str(design_case_revision_id))`
+- If `design_case_revision_id is None`: root is `EXTERNAL` with `node_id = uuid5(NS, "EXTERNAL:" + sizing_request_identity_digest)`
+
+---
+
+## 14. Error model (P0-9)
+
+### 14.1 Choice: Option A — extend existing ErrorCode
+
+Phase 3 extends the existing `ErrorCode` enum in `src/hexagent/domain/messages.py` with Phase 3-specific error codes. This ensures full compatibility with existing `EngineeringMessage` and `RunFailure` models.
+
+Implementation boundary is updated to allow adding codes to `messages.py`.
+
+```python
+# Added to ErrorCode:
+PHASE3_INPUT_VERIFICATION_FAILED = "phase3_input_verification_failed"
+PHASE3_NON_FINITE_NUMERIC = "phase3_non_finite_numeric"
+PHASE3_FEASIBILITY_RUNTIME_FAILURE = "phase3_feasibility_runtime_failure"
+PHASE3_RANKING_RUNTIME_FAILURE = "phase3_ranking_runtime_failure"
+PHASE3_RESULT_CONSTRUCTION_FAILED = "phase3_result_construction_failed"
+PHASE3_HASH_VERIFICATION_FAILED = "phase3_hash_verification_failed"
+PHASE3_PROVENANCE_VERIFICATION_FAILED = "phase3_provenance_verification_failed"
+```
+
+### 14.2 Fixed error messages
 
 | ErrorCode | Fixed message |
 |---|---|
-| `INPUT_VERIFICATION_FAILED` | "Phase 3 input artifact verification failed." |
-| `NON_FINITE_NUMERIC_DETECTED` | "Non-finite numeric value detected in ranking." |
-| `FEASIBILITY_RUNTIME_FAILURE` | "Runtime failure during feasibility classification." |
-| `RANKING_RUNTIME_FAILURE` | "Runtime failure during ranking." |
-| `RESULT_CONSTRUCTION_FAILED` | "Runtime failure during result construction." |
-| `HASH_VERIFICATION_FAILED` | "Result hash verification failed." |
-| `PROVENANCE_VERIFICATION_FAILED` | "Result provenance verification failed." |
+| `PHASE3_INPUT_VERIFICATION_FAILED` | "Phase 3 input artifact verification failed." |
+| `PHASE3_NON_FINITE_NUMERIC` | "Non-finite numeric value detected in Phase 3 input." |
+| `PHASE3_FEASIBILITY_RUNTIME_FAILURE` | "Runtime failure during feasibility classification." |
+| `PHASE3_RANKING_RUNTIME_FAILURE` | "Runtime failure during ranking." |
+| `PHASE3_RESULT_CONSTRUCTION_FAILED` | "Runtime failure during result construction." |
+| `PHASE3_HASH_VERIFICATION_FAILED` | "Result hash verification failed." |
+| `PHASE3_PROVENANCE_VERIFICATION_FAILED` | "Result provenance verification failed." |
 
-Prohibited in any hash/provenance/artifact field:
+### 14.3 Prohibited in hash/provenance/artifact
+
 - `str(exc)`
 - `repr(exc)`
 - `traceback.format_exc()`
@@ -731,19 +931,25 @@ Prohibited in any hash/provenance/artifact field:
 
 ---
 
-## 14. Implementation boundary
+## 15. Implementation boundary
 
-Phase 3 implementation (when authorized) is limited to:
+### Modified existing files
+
+| Path | Change |
+|---|---|
+| `src/hexagent/domain/messages.py` | Add 7 `PHASE3_*` error codes to `ErrorCode` enum |
+
+### New files
 
 | Path | Contents |
 |---|---|
 | `src/hexagent/optimization/phase3_input.py` | `Phase3EvaluationInput` + `verify_or_raise()` |
 | `src/hexagent/optimization/feasibility.py` | Feasibility classification + `CandidateDispositionRecord` |
-| `src/hexagent/optimization/ranking.py` | Deterministic ranking + tie-breaking + `RankedCandidateRecord` |
-| `src/hexagent/optimization/result.py` | `OptimizationResult` construction + hash + provenance |
+| `src/hexagent/optimization/ranking.py` | Deterministic ranking + `RankedCandidateRecord` |
+| `src/hexagent/optimization/result.py` | `OptimizationResult` construction + three-layer hash + provenance |
 | `tests/unit/test_task009_phase3_*.py` | Phase 3 tests |
 
-Phase 3 implementation does **not** modify:
+### Untouched files
 
 - `src/hexagent/optimization/evaluation.py`
 - `src/hexagent/optimization/identities.py`
@@ -756,123 +962,144 @@ Phase 3 implementation does **not** modify:
 - `src/hexagent/optimization/_quantum.py`
 - `src/hexagent/optimization/errors.py`
 - Any TASK-008 modules
-- Any catalog-schema modules
+- Any catalog schema modules
 - Phase 1 or Phase 2 tests
 
 ---
 
-## 15. Test matrix
+## 16. Test matrix
 
-The following test scenarios must be covered when implementation is authorized:
+### 16.1 Valid constructible Phase 2 records
 
-### 15.1 State/outcome combinations
+- [ ] Each valid record combination from §4.4 produces correct `Phase3Disposition`
+- [ ] `VERIFIED + provider_matches=False` → `PROVIDER_IDENTITY_MISMATCH`
+- [ ] `VERIFIED + SUCCEEDED` → FEASIBLE or INFEASIBLE (by feasibility check)
+- [ ] `VERIFIED + BLOCKED` → INFEASIBLE (RATING_BLOCKED)
+- [ ] `VERIFIED + FAILED` → INFEASIBLE (RATING_FAILED)
+- [ ] `INTEGRITY_INVALID` → INTEGRITY_FAILED
+- [ ] `RUNTIME_FAILED` → RUNTIME_FAILED
+- [ ] `UNEVALUATED` → UNEVALUATED
 
-- [ ] Every `CandidateEvaluationState` × `VerificationOutcome` × provider match combination in §4.4
-- [ ] `VerificationOutcome.ERROR` for both hash and provenance
-- [ ] Each of the 7 `Phase3Disposition` values produced correctly
-- [ ] `PROVIDER_IDENTITY_MISMATCH` never receives engineering rank
-- [ ] `PROVIDER_IDENTITY_MISMATCH` never enters Top-N
+### 16.2 Invalid cross-field combinations rejected
 
-### 15.2 Strict-stop
+- [ ] VERIFIED + identity=None → input verification failure
+- [ ] VERIFIED + evidence=None → input verification failure
+- [ ] VERIFIED + invalid_evidence present → input verification failure
+- [ ] INTEGRITY_INVALID + invalid_evidence=None → input verification failure
+- [ ] INTEGRITY_INVALID + identity present → input verification failure
+- [ ] RUNTIME_FAILED + evaluation_failure=None → input verification failure
+- [ ] UNEVALUATED + identity present → input verification failure
+- [ ] record.rating_status != evidence.rating_status.value → input verification failure
 
-- [ ] `UNEVALUATED` disposition for candidates after strict-stop
+### 16.3 Strict-stop
+
+- [ ] Strict-stop on first candidate (index 0) → PARTIAL, all later UNEVALUATED
+- [ ] Strict-stop on middle candidate → earlier records VERIFIED, later UNEVALUATED
+- [ ] Strict-stop on last candidate → earlier records VERIFIED, 0 UNEVALUATED after
+- [ ] No strict-stop → COMPLETE
+- [ ] VERIFIED record after stop index → input rejected
 - [ ] Phase 3 does not call TASK-008 for any candidate
 - [ ] Phase 3 does not modify any Phase 2 artifact
-- [ ] Subsequent records after strict-stop remain `UNEVALUATED` in disposition
+- [ ] Stop invariant verification rejects invalid phase-2 record ordering
 
-### 15.3 Optimization objective ranking
+### 16.4 Ranking and objectives
 
-- [ ] `MINIMUM_OUTER_HEAT_TRANSFER_AREA` — primary field `area_outer_m2` ascending
-- [ ] `MINIMUM_EFFECTIVE_LENGTH` — primary field `effective_length_m` ascending
-- [ ] Objective ties resolved by secondary field
-- [ ] Final ASCII `source_qualified_candidate_id` tie-break
-- [ ] Non-finite numeric value → `ValueError`
+- [ ] `MINIMUM_OUTER_HEAT_TRANSFER_AREA` complete sort key (area → length → ID)
+- [ ] `MINIMUM_EFFECTIVE_LENGTH` complete sort key (length → area → ID)
+- [ ] Objective ties → resolved by secondary field
+- [ ] Final ASCII candidate ID tie-break
+- [ ] Non-finite numeric → `ValueError` at consumer boundary
+- [ ] -0.0 normalized to 0
 
-### 15.4 Top-N
+### 16.5 Top-N
 
-- [ ] Zero feasible → empty Top-N
-- [ ] Fewer feasible than N → all feasible returned
-- [ ] Exactly N feasible → all returned
-- [ ] More than N feasible → only first N returned
+- [ ] Zero FEASIBLE → empty Top-N
+- [ ] Fewer FEASIBLE than N → all FEASIBLE returned
+- [ ] Exactly N FEASIBLE → all returned
+- [ ] More than N FEASIBLE → first N returned
 - [ ] Top-N does not mutate candidate identity/hash/evaluation record
-- [ ] Top-N order = ranking order (strict subset)
+- [ ] Top-N order = ranking order
 
-### 15.5 Input permutations
+### 16.6 Input verification
 
-- [ ] Input artifact with different `CandidateEvaluationRecord` orders (Phase 2 order preserved)
-- [ ] Warning/blocker permutations produce identical result hash
-- [ ] Duplicate `source_qualified_candidate_id` → input verification failure
-- [ ] Missing record count mismatch → input verification failure
+- [ ] Record↔candidate one-to-one binding passes for valid input
+- [ ] Displaced record → input verification failure
+- [ ] Missing record → input verification failure
+- [ ] Extra record → input verification failure
+- [ ] Duplicate source_qualified_candidate_id → input verification failure
+- [ ] `evaluation_order_index` mismatch → input verification failure
+- [ ] Every `evaluation_record_descriptor` field mutation changes `evaluation_input_digest`
+- [ ] Tampered `candidate_set_digest` → input verification failure
+- [ ] Tampered `gate_digest` → input verification failure
 
-### 15.6 Tampering
+### 16.7 Three-layer hash
 
-- [ ] Tampered `sizing_request_identity_digest` → fail closed
-- [ ] Tampered `passed_gate_digest` → fail closed
-- [ ] Tampered `materialized_result_digest` → fail closed
-- [ ] Tampered `evaluation_input_digest` → fail closed
-- [ ] Tampered `CandidateEvaluationRecord` identity → fail closed
-- [ ] Tampered `VerifiedRatingEvidenceSnapshot` hash → fail closed
-- [ ] Extra/displaced/count-mismatched record → fail closed
-- [ ] `CandidateDispositionRecord` feasibility_digest mutation → result hash mismatch
-- [ ] `RankedCandidateRecord` ranked_record_digest mutation → result hash mismatch
+- [ ] `result_core_hash` does not include `provenance_digest` or `result_hash`
+- [ ] `result_hash` changes when `provenance_digest` changes
+- [ ] `result_core_hash` is insensitive to `provenance_digest` changes
+- [ ] `optimization_result_id` is deterministic UUID5 from `result_hash`
+- [ ] Python 3.11/3.12 hash equality for all three hash layers
+- [ ] `result_core_payload` mutation (any digest field) changes `result_core_hash`
+- [ ] Derived/excluded fields (`optimization_result_id`, `provenance_digest`, `result_hash`) do not participate in `result_core_hash`
 
-### 15.7 Result and hash
+### 16.8 Provenance
 
-- [ ] Result replay equality — identical Phase 2 inputs → identical `result_hash`
-- [ ] `result_hash` changes when any digest field changes
-- [ ] `result_hash` does not change when derived fields (`optimization_result_id`, `provenance_digest`) are excluded
-- [ ] Python 3.11 / 3.12 hash equality
-- [ ] Every field of `OptimizationResult` produces different hash when mutated
-
-### 15.8 Provenance
-
-- [ ] Each provenance node payload_hash is correct
-- [ ] Edge structure matches §12.3
-- [ ] DAG is acyclic
-- [ ] Tampered provenance node → root digest mismatch
-- [ ] Tampered provenance edge → root digest mismatch
-- [ ] Missing provenance node → root digest mismatch
+- [ ] Each node uses correct `ProvenanceNodeType` from §13.1
+- [ ] Node IDs deterministically reproducible (UUID5)
+- [ ] Root: CASE_REVISION when design_case_revision_id present; EXTERNAL when absent
+- [ ] CALCULATION_RUN node present
+- [ ] Graph is acyclic (validates on construction)
+- [ ] Only selected FEASIBLE records connect to Top-N node
+- [ ] Not all ranked records connect to Top-N (when count > N)
+- [ ] Tampered node payload_hash → root digest mismatch
+- [ ] Tampered edge → root digest mismatch
 - [ ] Provenance verification: fail closed
 
-### 15.9 Termination invariants
+### 16.9 Termination invariants
 
-- [ ] `COMPLETE`: all candidates processed, counts sum correctly
-- [ ] `PARTIAL`: strict-stop with UNEVALUATED; earlier FEASIBLE may be top-N'ed
-- [ ] `FAILED`: artifact verification failure → no `OptimizationResult`
-- [ ] Count equation invariants (§10.5) hold for all scenarios
-- [ ] Count equations do not overlap: each candidate counted exactly once
+- [ ] COMPLETE: counts sum correctly, ranked/Top-N present
+- [ ] PARTIAL: strict-stop warning, Top-N from indices < stop_index only
+- [ ] FAILED: input verification failure → no OptimizationResult
+- [ ] Count equation invariants (§11.4) hold for all scenarios
 
-### 15.10 Error model
+### 16.10 Error model
 
-- [ ] Feasibility software exception → runtime failure, not engineering INFEASIBLE
+- [ ] Feasibility exception → RUNTIME_FAILED per candidate, batch continues
 - [ ] Global exception → FAILED termination
 - [ ] All error messages in hash/provenance/artifact are fixed deterministic strings
+- [ ] Phase 3 ErrorCode values are valid members of `ErrorCode`
+- [ ] EngineeringMessage/RunFailure accept Phase 3 error codes
 - [ ] No `str(exc)`, `repr(exc)`, traceback, or memory address in any output
+
+### 16.11 Warning/blocker permutation
+
+- [ ] Warnings/blockers are canonicalized (sorted by stable key) before digesting
+- [ ] Sort key: `(severity.value, code.value, message)` — deterministic
+- [ ] Duplicate identical warnings: deduplicated or preserved — exact rule frozen at implementation
+- [ ] Digests change only when canonicalized warning/blocker content changes
 
 ---
 
-## 16. Acceptance criteria
+## 17. Acceptance criteria
 
-1. All Phase 3 tests pass on Python 3.11 and 3.12
+1. All tests pass on Python 3.11 and 3.12
 2. `result_hash` is deterministic and reproducible from identical Phase 2 inputs
-3. Provenance DAG verification detects any tampered node or edge
-4. Input verification fails closed for all failure modes
+3. Provenance DAG verification detects tampered nodes or edges
+4. Input verification fails closed for all 11 steps
 5. Top-N selection never exceeds feasible candidate count
 6. No Phase 2 artifact is mutated
 7. `PROVIDER_IDENTITY_MISMATCH` candidates never enter ranking or Top-N
-8. `UNEVALUATED` candidates (strict-stop) never enter feasibility analysis
-9. Ruff check, format check, mypy strict, coverage all pass
-10. Pip-audit passes
+8. `UNEVALUATED` candidates never enter feasibility analysis
+9. Ruff check, format check, mypy strict, coverage pass
+10. `pip-audit` passes
 11. Design review passes before implementation is authorized
 
 ---
 
-## 17. Review and authorization
+## 18. Review and authorization
 
-This document is **DRAFT — NOT AUTHORIZED FOR IMPLEMENTATION**.
+**Status:** DRAFT — NOT AUTHORIZED FOR IMPLEMENTATION
+**Design Review:** CHANGES REQUIRED
+**Frozen Phase 3 contract SHA:** NOT ESTABLISHED
 
-- Current design review: **CHANGES REQUIRED**
-- Frozen Phase 3 contract SHA: **NOT ESTABLISHED**
-- Implementation must not begin until a separate engineering design review passes and a frozen contract commit SHA is established
-
-> ⚠️ Until then, all Phase 3 content in this file is subject to change by design review findings.
+Implementation must not begin until a separate engineering design review passes and a frozen contract commit SHA is established.

@@ -17,8 +17,9 @@
 | **Phase 3 frozen contract SHA** | NOT ESTABLISHED |
 
 Round 53 Engineering Design Review passed.
-TASK-009 is approved for implementation from frozen contract commit
+TASK-009 **Phase 1-2** implementation was authorized from the frozen Phase 1-2 contract commit
 7e4522ab5be740fb6af759743c1c1f79801312fc.
+That authorization does **not** extend to Phase 3. Phase 3 remains under separate design review (Issue #25).
 
 ---
 
