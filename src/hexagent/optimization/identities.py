@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from hexagent.core.canonical import sha256_digest
 from hexagent.optimization._quantum import canonicalize_length_quantum
+from hexagent.optimization.catalog import catalog_identity_key, compute_catalog_content_hash
 from hexagent.optimization.context import (
     _MATERIALIZATION_TOKEN,
     MaterializedCandidateSet,
@@ -279,6 +280,133 @@ def build_candidate(
 
 
 # ---------------------------------------------------------------------------
+# ReplayedMaterialization and replay function
+# ---------------------------------------------------------------------------
+
+
+@dataclasses.dataclass(frozen=True)
+class ReplayedMaterialization:
+    """Result of replaying materialization from source artifacts."""
+
+    replayed_candidates: tuple[ManufacturableCandidate, ...]
+    replayed_catalog_snapshot_identities: tuple[CatalogSnapshotRef, ...]
+    replayed_raw_combination_count: int
+    replayed_unique_candidate_count: int
+    replayed_ordered_candidate_ids: tuple[str, ...]
+
+
+def _replay_materialization(
+    *,
+    catalogs: tuple[CompleteDoublePipeCatalogSnapshot, ...],
+    sizing_gate: PassedSizingGate,
+    minimum_effective_length_m: float | None,
+    maximum_effective_length_m: float | None,
+) -> ReplayedMaterialization:
+    """Pure function that replays the full materialization pipeline.
+
+    1. Verifies catalog content hashes (recomputes each)
+    2. Confirms canonical catalog order
+    3. Matches gate records to catalog options (7-field key)
+    4. Materializes lengths per option with bounds
+    5. Builds candidates
+    6. Deduplicates and orders
+    """
+    errors: list[str] = []
+
+    # Step 1: Recompute catalog content hashes
+    for cat in catalogs:
+        expected_hash = compute_catalog_content_hash(
+            catalog_id=cat.catalog_id,
+            catalog_version=cat.catalog_version,
+            source_identity=cat.source_identity,
+            schema_version=cat.schema_version,
+            assembly_options=cat.assembly_options,
+        )
+        if expected_hash != cat.catalog_content_hash:
+            errors.append(
+                f"Catalog {cat.catalog_id}: recomputed hash {expected_hash} "
+                f"!= stored {cat.catalog_content_hash}"
+            )
+
+    if errors:
+        raise ValueError("Catalog hash verification failed:\n  - " + "\n  - ".join(errors))
+
+    # Step 2: Build catalog refs in canonical order
+    sorted_catalogs = tuple(sorted(catalogs, key=catalog_identity_key))
+    replayed_refs = tuple(catalog_snapshot_ref(cat) for cat in sorted_catalogs)
+
+    # Step 3: Build gate record lookup (7-field key)
+    record_map: dict[tuple[str, str, str, str, str, str, str], OptionRawCountRecord] = {}
+    for rec in sizing_gate.per_option_records:
+        key = option_raw_count_record_identity_key(rec)
+        if key in record_map:
+            errors.append(f"Duplicate gate record key: {key}")
+        record_map[key] = rec
+
+    if errors:
+        raise ValueError("; ".join(errors))
+
+    # Step 4 & 5: Materialize lengths and build candidates
+    all_candidates: list[ManufacturableCandidate] = []
+    total_materialized = 0
+
+    for cat in sorted_catalogs:
+        for opt in cat.assembly_options:
+            quantum = canonicalize_length_quantum(opt.length_source.length_quantum_m)
+            lookup_record = OptionRawCountRecord(
+                catalog_id=cat.catalog_id,
+                catalog_version=cat.catalog_version,
+                catalog_content_hash=cat.catalog_content_hash,
+                source_identity=cat.source_identity,
+                schema_version=cat.schema_version,
+                assembly_option_id=opt.assembly_option_id,
+                canonical_length_quantum_m=quantum,
+                raw_count=0,
+            )
+            lookup_key = option_raw_count_record_identity_key(lookup_record)
+
+            try:
+                rec = record_map.pop(lookup_key)
+            except KeyError:
+                errors.append(f"Missing gate record: {lookup_key}")
+                continue
+
+            lengths = materialize_lengths_for_option(
+                opt,
+                minimum_effective_length_m=minimum_effective_length_m,
+                maximum_effective_length_m=maximum_effective_length_m,
+            )
+
+            if len(lengths) != rec.raw_count:
+                errors.append(
+                    f"Option {opt.assembly_option_id}: materialized {len(lengths)} "
+                    f"!= expected {rec.raw_count}"
+                )
+
+            for length_str in lengths:
+                all_candidates.append(build_candidate(cat, opt, length_str))
+            total_materialized += len(lengths)
+
+    if record_map:
+        unconsumed = sorted(record_map.keys())
+        errors.append(f"Unconsumed gate records: {unconsumed}")
+
+    if errors:
+        raise ValueError("Materialization replay failed:\n  - " + "\n  - ".join(errors))
+
+    # Step 6: Deduplicate and order
+    deduped = deduplicate_and_order_candidates(tuple(all_candidates))
+
+    return ReplayedMaterialization(
+        replayed_candidates=deduped,
+        replayed_catalog_snapshot_identities=replayed_refs,
+        replayed_raw_combination_count=total_materialized,
+        replayed_unique_candidate_count=len(deduped),
+        replayed_ordered_candidate_ids=tuple(c.source_qualified_candidate_id for c in deduped),
+    )
+
+
+# ---------------------------------------------------------------------------
 # MaterializationResult — binds candidates + MaterializedCandidateSet
 # ---------------------------------------------------------------------------
 
@@ -503,117 +631,76 @@ class MaterializationResult:
         """
         errors: list[str] = []
 
-        # Gate verification
-        if not self.sizing_gate.verify_digest():
-            errors.append("sizing_gate.verify_digest() failed")
+        # Replay materialization from source artifacts
+        try:
+            replay = _replay_materialization(
+                catalogs=self.catalog_snapshots,
+                sizing_gate=self.sizing_gate,
+                minimum_effective_length_m=self.minimum_effective_length_m,
+                maximum_effective_length_m=self.maximum_effective_length_m,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"MaterializationResult verification failed: replay error: {exc}"
+            ) from exc
 
-        # Candidate-set verification
+        # Compare replay results with stored artifacts
+        # 1. Catalog identities
+        if (
+            replay.replayed_catalog_snapshot_identities
+            != self.candidate_set.catalog_snapshot_identities
+        ):
+            errors.append(
+                "replayed catalog identities != candidate_set.catalog_snapshot_identities"
+            )
+
+        # 2. Raw combination count
+        if replay.replayed_raw_combination_count != self.candidate_set.raw_combination_count:
+            errors.append(
+                f"replayed raw count {replay.replayed_raw_combination_count} "
+                f"!= candidate_set {self.candidate_set.raw_combination_count}"
+            )
+
+        # 3. Unique candidate count
+        if replay.replayed_unique_candidate_count != self.candidate_set.unique_candidate_count:
+            errors.append(
+                f"replayed unique count {replay.replayed_unique_candidate_count} "
+                f"!= candidate_set {self.candidate_set.unique_candidate_count}"
+            )
+
+        # 4. Ordered candidate IDs
+        if replay.replayed_ordered_candidate_ids != self.candidate_set.ordered_candidate_ids:
+            errors.append("replayed ordered IDs != candidate_set.ordered_candidate_ids")
+
+        # 5. Deduped candidates (exact match)
+        if len(replay.replayed_candidates) != len(self.candidates):
+            errors.append("replayed candidate count != stored candidate count")
+        else:
+            for i, (rc, sc) in enumerate(
+                zip(replay.replayed_candidates, self.candidates, strict=True)
+            ):
+                if rc.source_qualified_candidate_id != sc.source_qualified_candidate_id:
+                    errors.append(f"candidate[{i}] ID mismatch")
+                    break
+                if rc.physical_identity_digest != sc.physical_identity_digest:
+                    errors.append(f"candidate[{i}] physical ID mismatch")
+                    break
+                if rc.effective_length_m_canonical != sc.effective_length_m_canonical:
+                    errors.append(
+                        f"candidate[{i}] length mismatch: "
+                        f"{rc.effective_length_m_canonical} != {sc.effective_length_m_canonical}"
+                    )
+                    break
+                if rc.manufacturing_option_identity != sc.manufacturing_option_identity:
+                    errors.append(f"candidate[{i}] manufacturing identity mismatch")
+                    break
+                if rc.assembly_option_id != sc.assembly_option_id:
+                    errors.append(f"candidate[{i}] assembly_option_id mismatch")
+                    break
+
+        # 6. candidate_set digest
         if not self.candidate_set.verify_digest():
             errors.append("candidate_set.verify_digest() failed")
-
-        # Digest chain: gate -> candidate_set
-        if (
-            self.sizing_gate.sizing_request_identity_digest
-            != self.candidate_set.sizing_request_identity_digest
-        ):
-            errors.append("digest chain: gate sizing_request_identity_digest != candidate_set")
-        if self.sizing_gate.gate_digest != self.candidate_set.passed_gate_digest:
-            errors.append("gate.gate_digest != candidate_set.passed_gate_digest")
-        if self.sizing_gate.raw_combination_count != self.candidate_set.raw_combination_count:
-            errors.append("gate raw_combination_count != candidate_set raw_combination_count")
-
-        # Catalog ref exact match
-        gate_catalog_keys = set()
-        for rec in self.sizing_gate.per_option_records:
-            gate_catalog_keys.add(
-                (
-                    rec.catalog_id,
-                    rec.catalog_version,
-                    rec.catalog_content_hash,
-                    rec.source_identity,
-                    rec.schema_version,
-                )
-            )
-        set_catalog_keys = set()
-        for ref in self.candidate_set.catalog_snapshot_identities:
-            set_catalog_keys.add(
-                (
-                    ref.catalog_id,
-                    ref.catalog_version,
-                    ref.catalog_content_hash,
-                    ref.source_identity,
-                    ref.schema_version,
-                )
-            )
-        if gate_catalog_keys != set_catalog_keys:
-            errors.append(
-                f"catalog ref mismatch: gate {gate_catalog_keys} vs set {set_catalog_keys}"
-            )
-
-        # Bounds match
-        if self.candidate_set.minimum_effective_length_m != self.minimum_effective_length_m:
-            errors.append(
-                f"bounds: candidate_set.min ({self.candidate_set.minimum_effective_length_m})"
-                f" != manifest ({self.minimum_effective_length_m})"
-            )
-        if self.candidate_set.maximum_effective_length_m != self.maximum_effective_length_m:
-            errors.append(
-                f"bounds: candidate_set.max ({self.candidate_set.maximum_effective_length_m})"
-                f" != manifest ({self.maximum_effective_length_m})"
-            )
-
-        # Replay materialization: for each catalog + option, check gate has a record
-        gate_option_keys = set()
-        for rec in self.sizing_gate.per_option_records:
-            gate_option_keys.add(
-                (
-                    rec.catalog_id,
-                    rec.catalog_version,
-                    rec.catalog_content_hash,
-                    rec.source_identity,
-                    rec.schema_version,
-                    rec.assembly_option_id,
-                )
-            )
-
-        for c in self.candidates:
-            ref = c.catalog_snapshot_ref
-            cand_key = (
-                ref.catalog_id,
-                ref.catalog_version,
-                ref.catalog_content_hash,
-                ref.source_identity,
-                ref.schema_version,
-                c.assembly_option_id,
-            )
-            if cand_key not in gate_option_keys:
-                errors.append(
-                    f"candidate {c.source_qualified_candidate_id!r}: option key not in gate"
-                )
-
-        # Candidate ordering and count
-        actual_ids = tuple(c.source_qualified_candidate_id for c in self.candidates)
-        if actual_ids != self.candidate_set.ordered_candidate_ids:
-            errors.append("candidate ordering mismatch with candidate_set")
-        if len(self.candidates) != self.candidate_set.unique_candidate_count:
-            errors.append("candidate count != unique_candidate_count")
-        if self.candidate_set.raw_combination_count < self.candidate_set.unique_candidate_count:
-            errors.append("raw_combination_count < unique_candidate_count")
-
-        # Each candidate self-consistency
-        for i, c in enumerate(self.candidates):
-            if c.evaluation_order_index != i:
-                errors.append(f"candidate[{i}] order index {c.evaluation_order_index} != {i}")
-            # Verify physical_identity -> source-qualified chain
-            if c.physical_identity_digest != c.physical_identity.physical_identity_digest:
-                errors.append(f"candidate[{i}]: physical_identity_digest mismatch")
-            if (
-                c.source_qualified_candidate_id
-                != c.source_qualified_identity.source_qualified_candidate_id
-            ):
-                errors.append(f"candidate[{i}]: source_qualified_candidate_id mismatch")
-            if c.source_qualified_identity.physical_identity_digest != c.physical_identity_digest:
-                errors.append(f"candidate[{i}]: physical digest chain broken")
 
         if errors:
             raise ValueError(
@@ -642,74 +729,17 @@ def materialize_all_candidates(
     if not sizing_gate.verify_digest():
         raise ValueError("PassedSizingGate digest verification failed")
 
-    # Build a lookup for per-option records
-    record_map: dict[tuple[str, str, str, str, str, str, str], OptionRawCountRecord] = {}
-    for rec in sizing_gate.per_option_records:
-        key = option_raw_count_record_identity_key(rec)
-        if key in record_map:
-            raise ValueError("Duplicate per-option record key")
-        record_map[key] = rec
+    # Replay using the pure replay function
+    replay = _replay_materialization(
+        catalogs=catalogs,
+        sizing_gate=sizing_gate,
+        minimum_effective_length_m=minimum_effective_length_m,
+        maximum_effective_length_m=maximum_effective_length_m,
+    )
 
-    all_candidates: list[ManufacturableCandidate] = []
-    total_materialized = 0
-
-    for cat in catalogs:
-        for opt in cat.assembly_options:
-            # Build key using shared identity-key helper
-            quantum = canonicalize_length_quantum(opt.length_source.length_quantum_m)
-            lookup_record = OptionRawCountRecord(
-                catalog_id=cat.catalog_id,
-                catalog_version=cat.catalog_version,
-                catalog_content_hash=cat.catalog_content_hash,
-                source_identity=cat.source_identity,
-                schema_version=cat.schema_version,
-                assembly_option_id=opt.assembly_option_id,
-                canonical_length_quantum_m=quantum,
-                raw_count=0,
-            )
-            lookup_key = option_raw_count_record_identity_key(lookup_record)
-
-            try:
-                rec = record_map.pop(lookup_key)
-            except KeyError:
-                raise ValueError(f"Missing per-option record for key {lookup_key}") from None
-
-            lengths = materialize_lengths_for_option(
-                opt,
-                minimum_effective_length_m=minimum_effective_length_m,
-                maximum_effective_length_m=maximum_effective_length_m,
-            )
-
-            if len(lengths) != rec.raw_count:
-                raise ValueError(
-                    f"Option {opt.assembly_option_id}: materialized count "
-                    f"{len(lengths)} != expected {rec.raw_count}"
-                )
-
-            for length_str in lengths:
-                all_candidates.append(build_candidate(cat, opt, length_str))
-
-            total_materialized += len(lengths)
-
-    # --- P0-2: verify no unconsumed records remain ---
-    if record_map:
-        unconsumed = sorted(record_map.keys())
-        raise ValueError(
-            f"Unconsumed per-option records in gate (not matched to any "
-            f"catalog/option): {unconsumed}"
-        )
-
-    # Verify aggregate count
-    if total_materialized != sizing_gate.raw_combination_count:
-        raise ValueError(
-            f"Aggregate materialized count {total_materialized} "
-            f"!= gate raw_combination_count {sizing_gate.raw_combination_count}"
-        )
-
-    deduped_candidates = deduplicate_and_order_candidates(tuple(all_candidates))
-
-    # Build catalog_snapshot_identities from catalogs
-    catalog_snapshot_identities = tuple(catalog_snapshot_ref(cat) for cat in catalogs)
+    # Build candidate_set from replayed data
+    sorted_catalogs = tuple(sorted(catalogs, key=catalog_identity_key))
+    catalog_snapshot_identities = tuple(catalog_snapshot_ref(cat) for cat in sorted_catalogs)
 
     candidate_set = _create_materialized_candidate_set(
         sizing_request_identity_digest=sizing_gate.sizing_request_identity_digest,
@@ -718,11 +748,11 @@ def materialize_all_candidates(
         minimum_effective_length_m=minimum_effective_length_m,
         maximum_effective_length_m=maximum_effective_length_m,
         raw_combination_count=sizing_gate.raw_combination_count,
-        ordered_candidates=deduped_candidates,
+        ordered_candidates=replay.replayed_candidates,
     )
 
     return MaterializationResult(
-        candidates=deduped_candidates,
+        candidates=replay.replayed_candidates,
         candidate_set=candidate_set,
         sizing_gate=sizing_gate,
         catalog_snapshots=catalogs,
@@ -735,6 +765,7 @@ def materialize_all_candidates(
 __all__ = [
     "MaterializationResult",
     "PhysicalCandidateIdentity",
+    "ReplayedMaterialization",
     "SourceQualifiedCandidateIdentity",
     "ManufacturableCandidate",
     "build_candidate",

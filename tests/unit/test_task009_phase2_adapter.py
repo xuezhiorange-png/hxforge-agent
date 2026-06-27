@@ -523,6 +523,7 @@ class TestAdapterSpy:
         object.__setattr__(bad_mat_result, "candidates", mat_result.candidates)
         object.__setattr__(bad_mat_result, "candidate_set", bad_set)
         object.__setattr__(bad_mat_result, "sizing_gate", mat_result.sizing_gate)
+        object.__setattr__(bad_mat_result, "catalog_snapshots", mat_result.catalog_snapshots)
         calls, spy_fn = make_spy()
 
         with pytest.raises(ValueError, match="MaterializationResult verification failed"):
@@ -670,6 +671,7 @@ class TestAdapterSpy:
         object.__setattr__(mat_result, "candidates", deduped)
         object.__setattr__(mat_result, "candidate_set", mcs)
         object.__setattr__(mat_result, "sizing_gate", gate)
+        object.__setattr__(mat_result, "catalog_snapshots", (cat,))
 
         # Use a fluid WITH components, but identity says empty
         wrong_hot = FluidIdentifier(
@@ -1127,6 +1129,7 @@ class TestAdapterSpy:
         object.__setattr__(bad_mat_result, "candidates", reversed_candidates)
         object.__setattr__(bad_mat_result, "candidate_set", mat_result.candidate_set)
         object.__setattr__(bad_mat_result, "sizing_gate", mat_result.sizing_gate)
+        object.__setattr__(bad_mat_result, "catalog_snapshots", mat_result.catalog_snapshots)
 
         with pytest.raises(ValueError, match="MaterializationResult verification failed"):
             self._eval(
@@ -1228,6 +1231,30 @@ class TestAdapterSpy:
         assert failure_ctx["original_code"] == "input_inconsistent"
         assert failure_ctx["context_key"] == "bad"
         assert failure_ctx["failure_kind"] == "unsupported_type"
+        # P0-4: Exact 9-field assertions
+        assert "failure_stage" in failure_ctx
+        assert "owner_kind" in failure_ctx
+        assert "owner_id" in failure_ctx
+        assert "original_code" in failure_ctx
+        assert "context_key" in failure_ctx
+        assert "context_path_digest" in failure_ctx
+        assert "offending_type" in failure_ctx
+        assert "failure_kind" in failure_ctx
+        assert "safe_marker_digest" in failure_ctx
+        assert failure_ctx["failure_stage"] == "rating_verification"
+        assert failure_ctx["owner_kind"] == "warning"
+        assert failure_ctx["original_code"] == "input_inconsistent"
+        assert failure_ctx["context_key"] == "bad"
+        assert failure_ctx["failure_kind"] == "unsupported_type"
+        assert failure_ctx["offending_type"] == "builtins.bytes"
+        assert isinstance(failure_ctx["context_path_digest"], str)
+        assert len(failure_ctx["context_path_digest"]) == 71  # "sha256:" + 64 hex chars
+        assert isinstance(failure_ctx["safe_marker_digest"], str)
+        assert len(failure_ctx["safe_marker_digest"]) == 71  # "sha256:" + 64 hex chars
+        assert isinstance(failure_ctx["owner_id"], str)
+        assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
+        assert records[0].evaluation_failure.traceback is None
         assert records[0].candidate_evaluation_identity is None
         assert records[0].verified_rating_evidence is None
         assert records[0].invalid_rating_evidence is None
@@ -1284,6 +1311,30 @@ class TestAdapterSpy:
         assert failure_ctx["original_code"] == "blocker"
         assert failure_ctx["context_key"] == "bad"
         assert failure_ctx["failure_kind"] == "unsupported_type"
+        # P0-4: Exact 9-field assertions
+        assert "failure_stage" in failure_ctx
+        assert "owner_kind" in failure_ctx
+        assert "owner_id" in failure_ctx
+        assert "original_code" in failure_ctx
+        assert "context_key" in failure_ctx
+        assert "context_path_digest" in failure_ctx
+        assert "offending_type" in failure_ctx
+        assert "failure_kind" in failure_ctx
+        assert "safe_marker_digest" in failure_ctx
+        assert failure_ctx["failure_stage"] == "rating_verification"
+        assert failure_ctx["owner_kind"] == "blocker"
+        assert failure_ctx["original_code"] == "blocker"
+        assert failure_ctx["context_key"] == "bad"
+        assert failure_ctx["failure_kind"] == "unsupported_type"
+        assert failure_ctx["offending_type"] == "builtins.bytes"
+        assert isinstance(failure_ctx["context_path_digest"], str)
+        assert len(failure_ctx["context_path_digest"]) == 71  # "sha256:" + 64 hex chars
+        assert isinstance(failure_ctx["safe_marker_digest"], str)
+        assert len(failure_ctx["safe_marker_digest"]) == 71  # "sha256:" + 64 hex chars
+        assert isinstance(failure_ctx["owner_id"], str)
+        assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
+        assert records[0].evaluation_failure.traceback is None
         assert records[0].candidate_evaluation_identity is None
         assert records[0].verified_rating_evidence is None
         assert records[0].invalid_rating_evidence is None
@@ -1339,6 +1390,30 @@ class TestAdapterSpy:
         assert failure_ctx["original_code"] == "calculation_blocked"
         assert failure_ctx["context_key"] == "bad"
         assert failure_ctx["failure_kind"] == "unsupported_type"
+        # P0-4: Exact 9-field assertions
+        assert "failure_stage" in failure_ctx
+        assert "owner_kind" in failure_ctx
+        assert "owner_id" in failure_ctx
+        assert "original_code" in failure_ctx
+        assert "context_key" in failure_ctx
+        assert "context_path_digest" in failure_ctx
+        assert "offending_type" in failure_ctx
+        assert "failure_kind" in failure_ctx
+        assert "safe_marker_digest" in failure_ctx
+        assert failure_ctx["failure_stage"] == "rating_verification"
+        assert failure_ctx["owner_kind"] == "run_failure"
+        assert failure_ctx["original_code"] == "calculation_blocked"
+        assert failure_ctx["context_key"] == "bad"
+        assert failure_ctx["failure_kind"] == "unsupported_type"
+        assert failure_ctx["offending_type"] == "builtins.bytes"
+        assert isinstance(failure_ctx["context_path_digest"], str)
+        assert len(failure_ctx["context_path_digest"]) == 71  # "sha256:" + 64 hex chars
+        assert isinstance(failure_ctx["safe_marker_digest"], str)
+        assert len(failure_ctx["safe_marker_digest"]) == 71  # "sha256:" + 64 hex chars
+        assert isinstance(failure_ctx["owner_id"], str)
+        assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
+        assert records[0].evaluation_failure.traceback is None
         assert records[0].candidate_evaluation_identity is None
         assert records[0].verified_rating_evidence is None
         assert records[0].invalid_rating_evidence is None

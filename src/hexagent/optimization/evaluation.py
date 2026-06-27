@@ -1007,9 +1007,9 @@ def build_canonical_context_entries(
     except Exception as exc:
         raise ContextCanonicalizationError(
             failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
-            context_key="<invalid-context-entry>",
+            context_key="<context-outer-iterator>",
             context_path=(),
-            offending_type=qualified_type_name(exc),
+            offending_type=qualified_type_name(context),
         ) from exc
 
     entries.sort(key=lambda e: (e.key, e.value_digest))
@@ -1032,6 +1032,43 @@ def engineering_message_sort_key(
         message.source_module,
         tuple(message.affected_paths),
         digest,
+    )
+
+
+def safe_context_owner_marker(context: tuple[tuple[str, object], ...]) -> str:
+    """Deterministic primitive-only marker for safe owner sorting.
+
+    Never calls engineering_message_payload() or str/repr on values.
+    Only uses tuple length and key-count to produce a stable marker
+    that is NOT affected by context VALUE content (which may be
+    non-canonicalizable).
+    """
+    # Only use things that don't require canonicalization:
+    # - tuple length (number of entries)
+    # - list of keys (extracted with type check, no value access for hostile values)
+    keys: list[str] = []
+    for pair in context:
+        if type(pair) is tuple and len(pair) >= 1 and type(pair[0]) is str:
+            keys.append(pair[0])
+    marker_dict = {"entry_count": len(context), "keys": tuple(keys)}
+    return sha256_digest(marker_dict)
+
+
+def engineering_message_safe_owner_sort_key(
+    message: EngineeringMessage,
+) -> tuple[str, str, str, str, tuple[str, ...], str]:
+    """Safe sort key for EngineeringMessage that never calls payload canonicalization.
+
+    Only uses scalar fields and a context-outer-structure marker
+    that does NOT canonicalize context values.
+    """
+    return (
+        message.severity.value,
+        message.code.value,
+        message.message,
+        message.source_module,
+        tuple(message.affected_paths),
+        safe_context_owner_marker(message.context),
     )
 
 
@@ -1978,12 +2015,7 @@ def verify_and_evaluate_candidate(
     evidence = revalidate_verified_rating_evidence(evidence)
 
     # P0-3: Canonicalize each warning individually, sorted for deterministic owner IDs
-    try:
-        sorted_warnings = sorted(evidence.warnings, key=engineering_message_sort_key)
-    except ContextCanonicalizationError:
-        # Sorting may raise if a warning has non-canonicalizable context.
-        # Fall back to original order — per-element handling below catches it.
-        sorted_warnings = list(evidence.warnings)
+    sorted_warnings = sorted(evidence.warnings, key=engineering_message_safe_owner_sort_key)
     for w_idx, w_msg in enumerate(sorted_warnings):
         try:
             _ = engineering_message_payload(w_msg)
@@ -2019,12 +2051,7 @@ def verify_and_evaluate_candidate(
             )
 
     # P0-3: Canonicalize each blocker individually, sorted for deterministic owner IDs
-    try:
-        sorted_blockers = sorted(evidence.blockers, key=engineering_message_sort_key)
-    except ContextCanonicalizationError:
-        # Sorting may raise if a blocker has non-canonicalizable context.
-        # Fall back to original order — per-element handling below catches it.
-        sorted_blockers = list(evidence.blockers)
+    sorted_blockers = sorted(evidence.blockers, key=engineering_message_safe_owner_sort_key)
     for b_idx, b_msg in enumerate(sorted_blockers):
         try:
             _ = engineering_message_payload(b_msg)
@@ -2229,8 +2256,10 @@ __all__ = [
     "ContextCanonicalizationError",
     "ContextCanonicalizationErrorData",
     "ContextCanonicalizationFailureKind",
+    "engineering_message_safe_owner_sort_key",
     "FeasibilityStatus",
     "InvalidRatingEvidenceRecord",
+    "safe_context_owner_marker",
     "VerificationOutcome",
     "VerifiedRatingEvidenceSnapshot",
     "check_provider_consistency",
