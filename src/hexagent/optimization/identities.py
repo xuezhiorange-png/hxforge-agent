@@ -290,8 +290,13 @@ class MaterializationResult:
     ``candidates`` and ``candidate_set`` are bound together
     at construction time and cannot be separately provided later.
 
-    Must be constructed with the module-private ``_MATERIALIZATION_TOKEN``
-    to prevent external forgery.
+    Construction requires the module-private ``_MATERIALIZATION_TOKEN``
+    to reduce accidental misuse.  Full semantic validation is performed
+    in ``_validate()`` to ensure candidates-to-set invariants hold.
+
+    Note: The token is a Python-level convention, not a security boundary.
+    Production code should always obtain a ``MaterializationResult``
+    from ``materialize_all_candidates()``.
     """
 
     candidates: tuple[ManufacturableCandidate, ...]
@@ -312,7 +317,7 @@ class MaterializationResult:
         self._validate()
 
     def _validate(self) -> None:
-        """Validate invariants at construction (P0-2)."""
+        """Validate invariants at construction (P0-12 — full semantic validation)."""
         errors: list[str] = []
 
         # unique_candidate_count == len(candidates)
@@ -352,7 +357,55 @@ class MaterializationResult:
         ):
             errors.append("candidate IDs not in canonical sorted order")
 
-        # Each candidate's self-consistency is already validated by its model_validator
+        # candidate_set.verify_digest() must be True (P0-12)
+        if not self.candidate_set.verify_digest():
+            errors.append("candidate_set.verify_digest() returned False")
+
+        # Every candidate's catalog_snapshot_ref must appear in candidate_set refs
+        set_refs = {
+            (
+                ref.catalog_id,
+                ref.catalog_version,
+                ref.catalog_content_hash,
+                ref.source_identity,
+                ref.schema_version,
+            )
+            for ref in self.candidate_set.catalog_snapshot_identities
+        }
+        for c in self.candidates:
+            ref = c.catalog_snapshot_ref
+            ref_key = (
+                ref.catalog_id,
+                ref.catalog_version,
+                ref.catalog_content_hash,
+                ref.source_identity,
+                ref.schema_version,
+            )
+            if ref_key not in set_refs:
+                errors.append(
+                    f"candidate {c.source_qualified_candidate_id!r}: "
+                    f"catalog ref {ref_key} not found in candidate_set refs"
+                )
+
+        # raw_combination_count >= unique candidate count (gate invariant)
+        if self.candidate_set.raw_combination_count < self.candidate_set.unique_candidate_count:
+            errors.append(
+                f"raw_combination_count ({self.candidate_set.raw_combination_count}) < "
+                f"unique_candidate_count ({self.candidate_set.unique_candidate_count})"
+            )
+
+        # Each candidate must have valid source/schema fields matching candidate_set
+        for c in self.candidates:
+            ref = c.catalog_snapshot_ref
+            if not ref.source_identity:
+                errors.append(
+                    f"candidate {c.source_qualified_candidate_id!r}: source_identity is empty"
+                )
+            if not ref.schema_version:
+                errors.append(
+                    f"candidate {c.source_qualified_candidate_id!r}: schema_version is empty"
+                )
+
         if errors:
             raise ValueError("; ".join(errors))
 

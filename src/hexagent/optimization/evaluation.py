@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import dataclasses
 import math
-from datetime import datetime
+from collections.abc import Mapping as CollectionsABCMapping
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Self
 from uuid import UUID
@@ -397,8 +398,33 @@ class CandidateEvaluationRecord(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Context canonicalization (P0-5)
+# Context canonicalization (P0-5) — frozen executable contract
 # ---------------------------------------------------------------------------
+
+NON_STRING_MAPPING_KEY_MARKER = "<non-string-mapping-key>"
+
+
+def qualified_type_name(value: object) -> str:
+    """Exact type name — never calls str/repr on the value."""
+    return f"{type(value).__module__}.{type(value).__qualname__}"
+
+
+class ContextCanonicalizationFailureKind(StrEnum):
+    UNSUPPORTED_TYPE = "unsupported_type"
+    NON_FINITE_FLOAT = "non_finite_float"
+    CYCLIC_REFERENCE = "cyclic_reference"
+    NAIVE_DATETIME = "naive_datetime"
+    NON_STRING_KEY = "non_string_key"
+    CANONICALIZATION_EXCEPTION = "canonicalization_exception"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ContextCanonicalizationErrorData:
+    failure_kind: ContextCanonicalizationFailureKind
+    context_key: str
+    context_path: tuple[str, ...]
+    offending_type: str
+
 
 CanonicalValue = (
     None | bool | int | float | str | list["CanonicalValue"] | dict[str, "CanonicalValue"]
@@ -411,116 +437,351 @@ class ContextCanonicalizationError(Exception):
     def __init__(
         self,
         *,
+        failure_kind: ContextCanonicalizationFailureKind,
         context_key: str,
-        context_path: str,
+        context_path: tuple[str, ...],
         offending_type: str,
-        failure_kind: str,
     ) -> None:
-        self.context_key = context_key
-        self.context_path = context_path
-        self.offending_type = offending_type
-        self.failure_kind = failure_kind
+        self.data = ContextCanonicalizationErrorData(
+            failure_kind=failure_kind,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=offending_type,
+        )
         safe = {
             "context_key": context_key,
-            "context_path": context_path,
+            "context_path": list(context_path),
             "offending_type": offending_type,
-            "failure_kind": failure_kind,
+            "failure_kind": failure_kind.value,
         }
         self.safe_marker_digest = sha256_digest(safe)
-        super().__init__(failure_kind)
+        super().__init__(failure_kind.value)
 
 
-def canonicalize_value(value: object, _path: str = "") -> CanonicalValue:
+@dataclasses.dataclass(frozen=True, slots=True)
+class CanonicalContextEntry:
+    key: str
+    value: CanonicalValue
+    value_digest: str
+
+
+def _is_repository_quantity(value: object) -> bool:
+    """Check for four static attributes: value, unit, kind, to_si."""
+    from inspect import getattr_static
+
+    for attr in ("value", "unit", "kind", "to_si"):
+        try:
+            getattr_static(value, attr)
+        except AttributeError:
+            return False
+    return True
+
+
+def _adapt_repository_quantity(
+    value: object,
+    *,
+    context_key: str,
+    context_path: tuple[str, ...],
+    ancestor_ids: frozenset[int],
+) -> dict[str, CanonicalValue]:
+    """Canonicalise a Repository Quantity-like object as SI value + kind."""
+    try:
+        raw_to_si = getattr(value, "to_si")  # noqa: B009  # try/except needed
+        raw_kind = getattr(value, "kind")  # noqa: B009
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+
+    if not callable(raw_to_si):
+        raise ContextCanonicalizationError(
+            failure_kind=ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        )
+    try:
+        si_quantity = raw_to_si()
+        si_value = si_quantity.value
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+
+    kind_value: str | None = None
+    if raw_kind is not None:
+        try:
+            kind_value = raw_kind.value
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
+
+    return {
+        "si_value": canonicalize_trusted_context_value(
+            si_value,
+            context_key=context_key,
+            context_path=context_path + ("si_value",),
+            ancestor_ids=ancestor_ids,
+        ),
+        "kind": kind_value,
+    }
+
+
+def canonicalize_trusted_context_value(
+    value: object,
+    *,
+    context_key: str,
+    context_path: tuple[str, ...] = (),
+    ancestor_ids: frozenset[int] = frozenset(),
+) -> CanonicalValue:
     """Canonicalize a context value for deterministic digest computation.
 
     Must fail-closed: unsupported types, non-finite floats, cyclic
-    references, naive datetimes, non-string mapping keys all raise
-    ``ContextCanonicalizationError``.
+    references, naive datetimes, non-string mapping keys, and bytes
+    all raise ``ContextCanonicalizationError``.
+
+    Never calls ``str()``, ``repr()``, ``hasattr()``, ``model_dump()``,
+    or ``__dict__`` on the value — only exact type checks and safe
+    attribute access through the frozen contract.
     """
+    # --- Atomic types ---
     if value is None:
         return None
-    if isinstance(value, bool):
+    if type(value) is bool:
         return value
-    if isinstance(value, int):
+    if type(value) is int:
         return value
-    if isinstance(value, float):
+    if type(value) is float:
         if not math.isfinite(value):
             raise ContextCanonicalizationError(
-                context_key=_path.rsplit(".", 1)[-1] if "." in _path else _path or "<root>",
-                context_path=_path or "<root>",
-                offending_type=type(value).__name__,
-                failure_kind="non_finite_float",
+                failure_kind=ContextCanonicalizationFailureKind.NON_FINITE_FLOAT,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
             )
         return value
-    if isinstance(value, str):
+    if type(value) is str:
         return value
+
+    # --- Bytes are forbidden (non-injective decode) ---
     if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    if isinstance(value, UUID):
+        raise ContextCanonicalizationError(
+            failure_kind=ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        )
+
+    # --- UUID ---
+    if type(value) is UUID:
         return str(value)
+
+    # --- timezone-aware datetime only ---
     if isinstance(value, datetime):
-        if value.tzinfo is None:
+        offset = value.utcoffset()
+        if value.tzinfo is None or offset is None:
             raise ContextCanonicalizationError(
-                context_key=_path.rsplit(".", 1)[-1] if "." in _path else _path or "<root>",
-                context_path=_path or "<root>",
-                offending_type=type(value).__name__,
-                failure_kind="naive_datetime",
+                failure_kind=ContextCanonicalizationFailureKind.NAIVE_DATETIME,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
             )
-        return value.isoformat()
-    if hasattr(value, "value") and hasattr(type(value), "__members__"):
-        # Enum / StrEnum
-        return str(value.value) if isinstance(value.value, str) else value.value
+        utc_value = value.astimezone(UTC)
+        return utc_value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+    # --- Enum / StrEnum → .value then recurse ---
+    from enum import Enum as EnumBase
+
+    if isinstance(value, EnumBase):
+        return canonicalize_trusted_context_value(
+            value.value,
+            context_key=context_key,
+            context_path=context_path,
+            ancestor_ids=ancestor_ids,
+        )
+
+    # --- tuple / list (cycle detected checked) ---
     if isinstance(value, (tuple, list)):
+        obj_id = id(value)
+        if obj_id in ancestor_ids:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CYCLIC_REFERENCE,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            )
+        updated_ancestors = ancestor_ids | {obj_id}
         result: list[CanonicalValue] = []
         for i, item in enumerate(value):
-            child_path = f"{_path}[{i}]" if _path else f"[{i}]"
-            result.append(canonicalize_value(item, child_path))
+            child_path = context_path + (f"[{i}]",)
+            result.append(
+                canonicalize_trusted_context_value(
+                    item,
+                    context_key=context_key,
+                    context_path=child_path,
+                    ancestor_ids=updated_ancestors,
+                )
+            )
         return result
-    if isinstance(value, dict):
+
+    # --- dict (exact ``dict`` type) ---
+    if type(value) is dict:
+        obj_id = id(value)
+        if obj_id in ancestor_ids:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CYCLIC_REFERENCE,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            )
+        updated_ancestors = ancestor_ids | {obj_id}
         result_dict: dict[str, CanonicalValue] = {}
         for k, v in value.items():
-            if not isinstance(k, str):
+            if type(k) is not str:
                 raise ContextCanonicalizationError(
-                    context_key=str(k),
-                    context_path=f"{_path}[{k}]",
-                    offending_type=type(k).__name__,
-                    failure_kind="non_string_key",
+                    failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
+                    context_key=context_key,
+                    context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
+                    offending_type=qualified_type_name(k),
                 )
-            child_path = f"{_path}.{k}" if _path else k
-            result_dict[k] = canonicalize_value(v, child_path)
+            child_path = context_path + (k,)
+            result_dict[k] = canonicalize_trusted_context_value(
+                v,
+                context_key=context_key,
+                context_path=child_path,
+                ancestor_ids=updated_ancestors,
+            )
         return result_dict
-    if hasattr(value, "model_dump"):
-        # Pydantic BaseModel
-        return canonicalize_value(value.model_dump(), _path)
-    # Fallback for dataclass-like objects with __dict__
-    if hasattr(value, "__dict__"):
-        return canonicalize_value(dict(value.__dict__), _path)
+
+    # --- collections.abc.Mapping (not dict) ---
+    if isinstance(value, CollectionsABCMapping):
+        obj_id = id(value)
+        if obj_id in ancestor_ids:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CYCLIC_REFERENCE,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            )
+        updated_ancestors = ancestor_ids | {obj_id}
+        mapping_result: dict[str, CanonicalValue] = {}
+        for k, v in value.items():
+            if type(k) is not str:
+                raise ContextCanonicalizationError(
+                    failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
+                    context_key=context_key,
+                    context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
+                    offending_type=qualified_type_name(k),
+                )
+            child_path = context_path + (k,)
+            mapping_result[k] = canonicalize_trusted_context_value(
+                v,
+                context_key=context_key,
+                context_path=child_path,
+                ancestor_ids=updated_ancestors,
+            )
+        return mapping_result
+
+    # --- Repository Quantity-like adapter (P0-7) ---
+    if _is_repository_quantity(value):
+        return _adapt_repository_quantity(
+            value,
+            context_key=context_key,
+            context_path=context_path,
+            ancestor_ids=ancestor_ids,
+        )
+
+    # --- Pydantic BaseModel field-level traversal (P0-8) ---
+    from pydantic import BaseModel as PydanticBaseModel
+
+    if isinstance(value, PydanticBaseModel):
+        obj_id = id(value)
+        if obj_id in ancestor_ids:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CYCLIC_REFERENCE,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            )
+        updated_ancestors = ancestor_ids | {obj_id}
+        model_fields = type(value).model_fields
+        pydantic_result: dict[str, CanonicalValue] = {}
+        for field_name in model_fields:
+            try:
+                field_value = getattr(value, field_name)
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                    context_key=context_key,
+                    context_path=context_path + (field_name,),
+                    offending_type=qualified_type_name(value),
+                ) from exc
+            child_path = context_path + (field_name,)
+            pydantic_result[field_name] = canonicalize_trusted_context_value(
+                field_value,
+                context_key=context_key,
+                context_path=child_path,
+                ancestor_ids=updated_ancestors,
+            )
+        return pydantic_result
+
+    # --- Unsupported type ---
     raise ContextCanonicalizationError(
-        context_key=_path.rsplit(".", 1)[-1] if "." in _path else _path or "<root>",
-        context_path=_path or "<root>",
-        offending_type=type(value).__name__,
-        failure_kind="unsupported_type",
+        failure_kind=ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE,
+        context_key=context_key,
+        context_path=context_path,
+        offending_type=qualified_type_name(value),
     )
 
 
 def build_canonical_context_entries(
-    context: tuple[object, ...] | list[object],
-) -> list[dict[str, object]]:
-    """Build canonical context entries from a context field.
+    context: tuple[tuple[str, object], ...],
+) -> tuple[CanonicalContextEntry, ...]:
+    """Build canonical context entries from a ``tuple[tuple[str, object], ...]``.
 
-    Each entry is a dict with ``key``, ``value``, ``value_digest``.
+    Each entry is a ``CanonicalContextEntry`` with ``key``, ``value``,
+    ``value_digest``.
     Sorted by (key, value_digest).  Duplicate entries are preserved.
-    This is the public version used by run_failure_payload.
     """
-    entries: list[dict[str, object]] = []
-    for entry in context:
-        key = str(entry.key) if hasattr(entry, "key") else str(entry)
-        val = entry.value if hasattr(entry, "value") else entry
-        val_canon = canonicalize_value(val, key)
-        val_digest = sha256_digest({"value": val_canon})
-        entries.append({"key": key, "value": val_canon, "value_digest": val_digest})
-    entries.sort(key=lambda e: (e["key"], e["value_digest"]))
-    return entries
+    entries: list[CanonicalContextEntry] = []
+    for pair in context:
+        if type(pair) is not tuple or len(pair) != 2:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE,
+                context_key="<invalid-context-entry>",
+                context_path=(),
+                offending_type=qualified_type_name(pair),
+            )
+        key, raw_value = pair
+        if type(key) is not str:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
+                context_key="<non-string-context-key>",
+                context_path=(),
+                offending_type=qualified_type_name(key),
+            )
+
+        can_val = canonicalize_trusted_context_value(
+            raw_value,
+            context_key=key,
+            context_path=(),
+            ancestor_ids=frozenset(),
+        )
+        val_digest = sha256_digest({"value": can_val})
+        entries.append(CanonicalContextEntry(key=key, value=can_val, value_digest=val_digest))
+
+    entries.sort(key=lambda e: (e.key, e.value_digest))
+    return tuple(entries)
 
 
 def engineering_message_sort_key(
@@ -630,6 +891,20 @@ def selected_correlation_snapshot_payload(
     }
 
 
+def _context_entries_to_payload(
+    entries: tuple[CanonicalContextEntry, ...],
+) -> list[dict[str, object]]:
+    """Convert CanonicalContextEntry tuple to payload-safe list of dicts."""
+    return [
+        {
+            "key": entry.key,
+            "value": entry.value,
+            "value_digest": entry.value_digest,
+        }
+        for entry in entries
+    ]
+
+
 def engineering_message_payload(message: EngineeringMessage) -> dict[str, object]:
     """Exact frozen payload for EngineeringMessage.
 
@@ -656,6 +931,8 @@ def engineering_message_payload(message: EngineeringMessage) -> dict[str, object
             f"({sev.value}): expected {expected_continuation}"
         )
 
+    entries = build_canonical_context_entries(message.context)
+
     return {
         "schema_version": message.schema_version,
         "code": code.value,
@@ -663,27 +940,8 @@ def engineering_message_payload(message: EngineeringMessage) -> dict[str, object
         "message": message.message,
         "source_module": message.source_module,
         "affected_paths": list(message.affected_paths),
-        "context_entries": _build_canonical_context_entries_list(message.context),
+        "context_entries": _context_entries_to_payload(entries),
     }
-
-
-def _build_canonical_context_entries_list(
-    context: tuple[object, ...] | list[object],
-) -> list[dict[str, object]]:
-    """Build canonical context entries list from a context field.
-
-    Each entry is a dict with ``key``, ``value``, ``value_digest``.
-    Sorted by (key, value_digest).  Duplicate entries are preserved.
-    """
-    entries: list[dict[str, object]] = []
-    for entry in context:
-        key = entry.key if hasattr(entry, "key") else str(entry)
-        val = entry.value if hasattr(entry, "value") else entry
-        val_canon = canonicalize_value(val)
-        val_digest = sha256_digest({"value": val_canon})
-        entries.append({"key": str(key), "value": val_canon, "value_digest": val_digest})
-    entries.sort(key=lambda e: (e["key"], e["value_digest"]))
-    return entries
 
 
 def run_failure_payload(failure: RunFailure) -> dict[str, object]:
@@ -695,12 +953,13 @@ def run_failure_payload(failure: RunFailure) -> dict[str, object]:
     code = failure.code
     if type(code) is not ErrorCode:
         raise TypeError(f"code must be ErrorCode, got {type(code).__name__}")
+    entries = build_canonical_context_entries(failure.context)
     return {
         "schema_version": failure.schema_version,
         "code": code.value,
         "message": failure.message,
         "traceback": failure.traceback,
-        "context_entries": build_canonical_context_entries(failure.context),
+        "context_entries": _context_entries_to_payload(entries),
     }
 
 
@@ -1456,9 +1715,20 @@ def verify_and_evaluate_candidate(
         )
 
     # Step 3: Both passed — build trusted evidence (fail-closed)
+    # Also trigger warning/blocker/failure canonicalization so that
+    # ContextCanonicalizationError is caught as RUNTIME_FAILED (P0-11)
     try:
         evidence = _extract_trusted_evidence(result, tube_in_hot)
-    except (TypeError, ValueError, RuntimeError, AttributeError) as exc:
+        # Trigger canonicalization now — any ContextCanonicalizationError
+        # from warning/blocker/failure context is caught here
+        evidence.compute_explicit_evidence_digest()
+    except (
+        TypeError,
+        ValueError,
+        RuntimeError,
+        AttributeError,
+        ContextCanonicalizationError,
+    ) as exc:
         audit = _build_audit_snapshot(
             source_qualified_candidate_id,
             candidate_index,
@@ -1602,11 +1872,17 @@ def verify_and_evaluate_candidates(
 
 
 __all__ = [
+    "build_canonical_context_entries",
+    "CanonicalContextEntry",
+    "canonicalize_trusted_context_value",
     "CandidateEvaluationIdentity",
     "CandidateEvaluationRecord",
     "CandidateEvaluationState",
     "ClaimedRatingResultAuditSnapshot",
     "ClaimedRatingResultState",
+    "ContextCanonicalizationError",
+    "ContextCanonicalizationErrorData",
+    "ContextCanonicalizationFailureKind",
     "FeasibilityStatus",
     "InvalidRatingEvidenceRecord",
     "VerificationOutcome",
