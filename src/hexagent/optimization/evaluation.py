@@ -219,6 +219,66 @@ class VerifiedRatingEvidenceSnapshot(BaseModel):
             raise ValueError(f"{info.field_name} must be finite positive, got {parsed}")
         return parsed
 
+    # ------------------------------------------------------------------
+    # P0-6: Model-level binding — verify digests match their payloads
+    # ------------------------------------------------------------------
+
+    @model_validator(mode="after")
+    def _verify_digest_bindings(self) -> Self:
+        """Verify that digest fields match their corresponding payloads.
+
+        Raises ``ValueError`` on any mismatch so that construction
+        fails closed.
+        """
+        errors: list[str] = []
+
+        # rating_request_identity_digest must match payload
+        expected_ri_digest = sha256_digest(
+            rating_request_identity_payload(self.rating_request_identity)
+        )
+        if self.rating_request_identity_digest != expected_ri_digest:
+            errors.append(
+                f"rating_request_identity_digest mismatch: "
+                f"{self.rating_request_identity_digest!r} != {expected_ri_digest!r}"
+            )
+
+        # rating_execution_context_digest must match payload
+        expected_ec_digest = sha256_digest(
+            execution_context_snapshot_payload(self.rating_execution_context)
+        )
+        if self.rating_execution_context_digest != expected_ec_digest:
+            errors.append(
+                f"rating_execution_context_digest mismatch: "
+                f"{self.rating_execution_context_digest!r} != {expected_ec_digest!r}"
+            )
+
+        # rating_result_hash must match sha256: pattern
+        import re
+
+        if not re.match(r"^sha256:[0-9a-f]{64}$", self.rating_result_hash):
+            errors.append(
+                f"rating_result_hash must match sha256:hex pattern, got {self.rating_result_hash!r}"
+            )
+
+        # rating_provenance_digest must be non-empty
+        if not self.rating_provenance_digest:
+            errors.append("rating_provenance_digest must be non-empty")
+
+        # hash/provenance outcomes must be PASSED
+        if self.hash_verification_outcome is not VerificationOutcome.PASSED:
+            errors.append(
+                f"hash_verification_outcome must be PASSED, got {self.hash_verification_outcome}"
+            )
+        if self.provenance_verification_outcome is not VerificationOutcome.PASSED:
+            errors.append(
+                f"provenance_verification_outcome must be PASSED, "
+                f"got {self.provenance_verification_outcome}"
+            )
+
+        if errors:
+            raise ValueError("; ".join(errors))
+        return self
+
 
 # ---------------------------------------------------------------------------
 # Standalone 26-field evidence payload (P0-7)
@@ -431,7 +491,7 @@ CanonicalValue = (
 )
 
 
-class ContextCanonicalizationError(Exception):
+class ContextCanonicalizationError(ValueError):
     """Raised when a context value cannot be canonicalized."""
 
     def __init__(
@@ -484,10 +544,43 @@ def _adapt_repository_quantity(
     context_path: tuple[str, ...],
     ancestor_ids: frozenset[int],
 ) -> dict[str, CanonicalValue]:
-    """Canonicalise a Repository Quantity-like object as SI value + kind."""
+    """Canonicalise a Repository Quantity-like object as SI value + kind.
+
+    Reads all four attributes individually with try/except so that
+    a single failing descriptor does not block the others.  When
+    ``kind`` is not None, ``to_si()`` is called to obtain the SI
+    value; when kind is None, the raw ``value`` attribute is used
+    directly without calling ``to_si()``.
+    """
     try:
-        raw_to_si = getattr(value, "to_si")  # noqa: B009  # try/except needed
-        raw_kind = getattr(value, "kind")  # noqa: B009
+        raw_value = value.value  # type: ignore[attr-defined]
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+    try:
+        value.unit  # type: ignore[attr-defined]  # noqa: B018
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+    try:
+        kind = value.kind  # type: ignore[attr-defined]
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+            context_key=context_key,
+            context_path=context_path,
+            offending_type=qualified_type_name(value),
+        ) from exc
+    try:
+        to_si = value.to_si  # type: ignore[attr-defined]
     except Exception as exc:
         raise ContextCanonicalizationError(
             failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
@@ -496,28 +589,25 @@ def _adapt_repository_quantity(
             offending_type=qualified_type_name(value),
         ) from exc
 
-    if not callable(raw_to_si):
-        raise ContextCanonicalizationError(
-            failure_kind=ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE,
-            context_key=context_key,
-            context_path=context_path,
-            offending_type=qualified_type_name(value),
-        )
-    try:
-        si_quantity = raw_to_si()
-        si_value = si_quantity.value
-    except Exception as exc:
-        raise ContextCanonicalizationError(
-            failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
-            context_key=context_key,
-            context_path=context_path,
-            offending_type=qualified_type_name(value),
-        ) from exc
-
-    kind_value: str | None = None
-    if raw_kind is not None:
+    if kind is not None:
+        if not callable(to_si):
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            )
         try:
-            kind_value = raw_kind.value
+            si_quantity = to_si()
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
+        try:
+            si_value = si_quantity.value
         except Exception as exc:
             raise ContextCanonicalizationError(
                 failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
@@ -526,15 +616,35 @@ def _adapt_repository_quantity(
                 offending_type=qualified_type_name(value),
             ) from exc
 
-    return {
-        "si_value": canonicalize_trusted_context_value(
+        kind_value: str | None = None
+        try:
+            kind_value = kind.value
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
+
+        result_si = canonicalize_trusted_context_value(
             si_value,
             context_key=context_key,
             context_path=context_path + ("si_value",),
             ancestor_ids=ancestor_ids,
-        ),
-        "kind": kind_value,
-    }
+        )
+    else:
+        # kind is None: use raw_value directly, do NOT call to_si()
+        si_value = raw_value
+        kind_value = None
+        result_si = canonicalize_trusted_context_value(
+            si_value,
+            context_key=context_key,
+            context_path=context_path + ("raw_value",),
+            ancestor_ids=ancestor_ids,
+        )
+
+    return {"si_value": result_si, "kind": kind_value}
 
 
 def canonicalize_trusted_context_value(
@@ -588,7 +698,15 @@ def canonicalize_trusted_context_value(
 
     # --- timezone-aware datetime only ---
     if isinstance(value, datetime):
-        offset = value.utcoffset()
+        try:
+            offset = value.utcoffset()
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
         if value.tzinfo is None or offset is None:
             raise ContextCanonicalizationError(
                 failure_kind=ContextCanonicalizationFailureKind.NAIVE_DATETIME,
@@ -596,7 +714,15 @@ def canonicalize_trusted_context_value(
                 context_path=context_path,
                 offending_type=qualified_type_name(value),
             )
-        utc_value = value.astimezone(UTC)
+        try:
+            utc_value = value.astimezone(UTC)
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
         return utc_value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
     # --- Enum / StrEnum → .value then recurse ---
@@ -646,7 +772,16 @@ def canonicalize_trusted_context_value(
             )
         updated_ancestors = ancestor_ids | {obj_id}
         result_dict: dict[str, CanonicalValue] = {}
-        for k, v in value.items():
+        try:
+            dict_items_view: Any = value.items()
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
+        for k, v in dict_items_view:
             if type(k) is not str:
                 raise ContextCanonicalizationError(
                     failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
@@ -675,7 +810,16 @@ def canonicalize_trusted_context_value(
             )
         updated_ancestors = ancestor_ids | {obj_id}
         mapping_result: dict[str, CanonicalValue] = {}
-        for k, v in value.items():
+        try:
+            items_view: Any = value.items()
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
+        for k, v in items_view:
             if type(k) is not str:
                 raise ContextCanonicalizationError(
                     failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
@@ -714,7 +858,15 @@ def canonicalize_trusted_context_value(
                 offending_type=qualified_type_name(value),
             )
         updated_ancestors = ancestor_ids | {obj_id}
-        model_fields = type(value).model_fields
+        try:
+            model_fields = type(value).model_fields
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
         pydantic_result: dict[str, CanonicalValue] = {}
         for field_name in model_fields:
             try:
@@ -1722,13 +1874,38 @@ def verify_and_evaluate_candidate(
         # Trigger canonicalization now — any ContextCanonicalizationError
         # from warning/blocker/failure context is caught here
         evidence.compute_explicit_evidence_digest()
-    except (
-        TypeError,
-        ValueError,
-        RuntimeError,
-        AttributeError,
-        ContextCanonicalizationError,
-    ) as exc:
+    except ContextCanonicalizationError as cce:
+        # P0-3: Build structured RunFailure from error data
+        context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
+        cfail = RunFailure(
+            code=ErrorCode.PROVENANCE_INCOMPLETE,
+            message="context canonicalization failure during evidence extraction",
+            traceback=None,
+            context=(
+                ("failure_stage", "rating_verification"),
+                ("owner_kind", "candidate_evaluation"),
+                ("owner_id", source_qualified_candidate_id),
+                ("original_code", cce.data.failure_kind.value),
+                ("context_key", cce.data.context_key),
+                ("context_path_digest", context_path_digest),
+                ("offending_type", cce.data.offending_type),
+                ("failure_kind", cce.data.failure_kind.value),
+                ("safe_marker_digest", cce.safe_marker_digest),
+            ),
+        )
+        return CandidateEvaluationRecord(
+            source_qualified_candidate_id=source_qualified_candidate_id,
+            evaluation_order_index=candidate_index,
+            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+            feasible=False,
+            hash_verification_outcome=VerificationOutcome.PASSED,
+            provenance_verification_outcome=VerificationOutcome.PASSED,
+            candidate_evaluation_identity=None,
+            verified_rating_evidence=None,
+            invalid_rating_evidence=None,
+            evaluation_failure=cfail,
+        )
+    except (TypeError, ValueError, RuntimeError, AttributeError) as exc:
         audit = _build_audit_snapshot(
             source_qualified_candidate_id,
             candidate_index,

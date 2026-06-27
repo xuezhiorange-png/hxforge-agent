@@ -517,6 +517,7 @@ class TestAdapterSpy:
         bad_mat_result = object.__new__(type(mat_result))
         object.__setattr__(bad_mat_result, "candidates", mat_result.candidates)
         object.__setattr__(bad_mat_result, "candidate_set", bad_set)
+        object.__setattr__(bad_mat_result, "sizing_gate", mat_result.sizing_gate)
         calls, spy_fn = make_spy()
 
         with pytest.raises(ValueError, match="digest verification failed"):
@@ -663,6 +664,7 @@ class TestAdapterSpy:
         mat_result = object.__new__(MaterializationResult)
         object.__setattr__(mat_result, "candidates", deduped)
         object.__setattr__(mat_result, "candidate_set", mcs)
+        object.__setattr__(mat_result, "sizing_gate", gate)
 
         # Use a fluid WITH components, but identity says empty
         wrong_hot = FluidIdentifier(
@@ -1119,6 +1121,7 @@ class TestAdapterSpy:
         bad_mat_result = object.__new__(type(mat_result))
         object.__setattr__(bad_mat_result, "candidates", reversed_candidates)
         object.__setattr__(bad_mat_result, "candidate_set", mat_result.candidate_set)
+        object.__setattr__(bad_mat_result, "sizing_gate", mat_result.sizing_gate)
 
         with pytest.raises(ValueError, match="Candidate ordering mismatch"):
             self._eval(

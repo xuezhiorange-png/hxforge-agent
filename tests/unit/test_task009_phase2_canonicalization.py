@@ -190,9 +190,9 @@ def _baseline_evidence() -> VerifiedRatingEvidenceSnapshot:
         hash_verification_outcome=VerificationOutcome.PASSED,
         provenance_verification_outcome=VerificationOutcome.PASSED,
         rating_request_identity=rri,
-        rating_request_identity_digest="sha256:" + "c" * 64,
+        rating_request_identity_digest=sha256_digest(rating_request_identity_payload(rri)),
         rating_execution_context=ec,
-        rating_execution_context_digest="sha256:" + "d" * 64,
+        rating_execution_context_digest=sha256_digest(execution_context_snapshot_payload(ec)),
     )
 
 

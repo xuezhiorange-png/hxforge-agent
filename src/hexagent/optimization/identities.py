@@ -287,12 +287,12 @@ def build_candidate(
 class MaterializationResult:
     """Result of materialize_all_candidates().
 
-    ``candidates`` and ``candidate_set`` are bound together
-    at construction time and cannot be separately provided later.
+    ``candidates``, ``candidate_set``, and ``sizing_gate`` are bound
+    together at construction time and cannot be separately provided later.
 
     Construction requires the module-private ``_MATERIALIZATION_TOKEN``
     to reduce accidental misuse.  Full semantic validation is performed
-    in ``_validate()`` to ensure candidates-to-set invariants hold.
+    in ``_validate()`` to ensure candidates-to-set-and-gate invariants hold.
 
     Note: The token is a Python-level convention, not a security boundary.
     Production code should always obtain a ``MaterializationResult``
@@ -301,12 +301,14 @@ class MaterializationResult:
 
     candidates: tuple[ManufacturableCandidate, ...]
     candidate_set: MaterializedCandidateSet
+    sizing_gate: PassedSizingGate  # P0-5: full gate binding
 
     def __init__(
         self,
         *,
         candidates: tuple[ManufacturableCandidate, ...],
         candidate_set: MaterializedCandidateSet,
+        sizing_gate: PassedSizingGate,
         _token: object,
     ) -> None:
         if _token is not _MATERIALIZATION_TOKEN:
@@ -314,6 +316,7 @@ class MaterializationResult:
         # Use object.__setattr__ to bypass frozen dataclass
         object.__setattr__(self, "candidates", candidates)
         object.__setattr__(self, "candidate_set", candidate_set)
+        object.__setattr__(self, "sizing_gate", sizing_gate)
         self._validate()
 
     def _validate(self) -> None:
@@ -405,6 +408,22 @@ class MaterializationResult:
                 errors.append(
                     f"candidate {c.source_qualified_candidate_id!r}: schema_version is empty"
                 )
+
+        # NEW: Gate binding checks (P0-5)
+        if not self.sizing_gate.verify_digest():
+            errors.append("sizing_gate.verify_digest() returned False")
+        if (
+            self.sizing_gate.sizing_request_identity_digest
+            != self.candidate_set.sizing_request_identity_digest
+        ):
+            errors.append(
+                "gate sizing_request_identity_digest"
+                " != candidate_set sizing_request_identity_digest"
+            )
+        if self.sizing_gate.raw_combination_count != self.candidate_set.raw_combination_count:
+            errors.append("gate raw_combination_count != candidate_set raw_combination_count")
+        if self.sizing_gate.gate_digest != self.candidate_set.passed_gate_digest:
+            errors.append("gate.gate_digest != candidate_set.passed_gate_digest")
 
         if errors:
             raise ValueError("; ".join(errors))
@@ -513,6 +532,7 @@ def materialize_all_candidates(
     return MaterializationResult(
         candidates=deduped_candidates,
         candidate_set=candidate_set,
+        sizing_gate=sizing_gate,
         _token=_MATERIALIZATION_TOKEN,
     )
 
