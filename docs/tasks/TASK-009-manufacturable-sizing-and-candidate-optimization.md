@@ -4,14 +4,14 @@
 
 | Aspect | Status |
 |---|---|
-| **TASK-009 overall** | Phase 1-2: COMPLETE; Phase 3 design: IN PROGRESS; Phase 3 implementation: NOT STARTED |
+| **TASK-009 overall** | Phase 1-2: DONE; Phase 3 design: IN PROGRESS; Phase 3 implementation: NOT STARTED |
 | **Milestone** | M2 |
 | **Priority** | P0 |
 | **Depends on** | TASK-005, TASK-008 |
 | **GitHub Issue** | #23 (Phase 1-2); #25 (Phase 3 design) |
 | **Implementation branch** | codex/task-009-manufacturable-sizing-optimization |
 | **Draft PR** | #24 — Draft |
-| **Phase 1-2 production implementation** | COMPLETE |
+| **Phase 1-2 production implementation** | DONE |
 | **Phase 3 production implementation** | NOT STARTED |
 | **Phase 3 design review** | CHANGES REQUIRED |
 | **Phase 3 frozen contract SHA** | NOT ESTABLISHED |
