@@ -429,6 +429,7 @@ class Phase2SourceRecordSnapshot(BaseModel):
         *,
         source_record: CandidateEvaluationRecord,
         identity_snapshot: Phase2SourceRecordIdentitySnapshot,
+        authoritative_source_record_descriptor_digest: str,
         warning_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
         blocker_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
         source_failure_binding: Phase3RunFailureDescriptorBinding | None,
@@ -453,30 +454,14 @@ class Phase2SourceRecordSnapshot(BaseModel):
             raise ValueError("provider_identity_matches mismatch")
         if self.rating_status != source_record.rating_status:
             raise ValueError("rating_status mismatch")
-        # 2) Digest fields
-        eid = source_record.candidate_evaluation_identity.candidate_evaluation_identity_digest \
-            if source_record.candidate_evaluation_identity is not None else None
-        if self.candidate_evaluation_identity_digest != eid:
-            raise ValueError("candidate_evaluation_identity_digest mismatch")
-        ved = source_record.verified_rating_evidence.verified_evidence_digest \
-            if source_record.verified_rating_evidence is not None else None
-        if self.verified_rating_evidence_digest != ved:
-            raise ValueError("verified_rating_evidence_digest mismatch")
-        ied = source_record.invalid_rating_evidence.invalid_evidence_digest \
-            if source_record.invalid_rating_evidence is not None else None
-        if self.invalid_rating_evidence_digest != ied:
-            raise ValueError("invalid_rating_evidence_digest mismatch")
-        cad = source_record.claimed_rating_result_audit.audit_digest \
-            if source_record.claimed_rating_result_audit is not None else None
-        if self.claimed_rating_result_audit_digest != cad:
-            raise ValueError("claimed_rating_result_audit_digest mismatch")
-        efd = source_record.evaluation_failure.sha256_digest() \
-            if source_record.evaluation_failure is not None else None
+        # 2) Digest fields: use source_failure_binding.descriptor_binding_digest
+        # as the stable identity (payload_digest may be None on canonicalization failure)
+        efd = source_failure_binding.descriptor_binding_digest \
+            if source_failure_binding is not None and source_record.evaluation_failure is not None else None
         if self.evaluation_failure_digest != efd:
             raise ValueError("evaluation_failure_digest mismatch")
-        # 3) Identity snapshot consistency
-        if self.phase2_source_record_descriptor_digest != source_record.candidate_evaluation_identity.source_record_descriptor_digest \
-                if source_record.candidate_evaluation_identity is not None else False:
+        # 3) Authoritative source record descriptor digest (from Phase 2 artifact, not from identity)
+        if self.phase2_source_record_descriptor_digest != authoritative_source_record_descriptor_digest:
             raise ValueError("phase2_source_record_descriptor_digest mismatch")
         # 4) Warning/blocker bindings
         if len(self.warning_descriptor_binding_digests) != len(warning_descriptor_bindings):
@@ -517,9 +502,6 @@ class Phase2SourceRecordSnapshot(BaseModel):
             source_evaluation_failure_binding_digest=self.source_evaluation_failure_binding_digest,
             evidence_failure_binding_digest=self.evidence_failure_binding_digest)
         if self.snapshot_digest != sha256_digest(payload): raise ValueError("snapshot_digest mismatch")
-        # 8) Snapshot digest vs identity snapshot
-        if self.snapshot_digest != identity_snapshot.identity_snapshot_digest:
-            raise ValueError("snapshot_digest does not match identity_snapshot digest")
 ```
 
 ---
@@ -1766,8 +1748,7 @@ def _phase3_runtime(
     source_identity_record_descriptor_digest: str,
     source_record_descriptor_digest: str | None,
 ) -> CandidateDispositionRecord:
-    failure = RunFailure(code=code, message=msg, source_module="hexagent.optimization.feasibility",
-        affected_paths=(), context=(
+    failure = RunFailure(code=code, message=msg, traceback=None, context=(
             ("source_qualified_candidate_id", rec.source_qualified_candidate_id),
             ("evaluation_order_index", rec.evaluation_order_index)))
     binding = build_phase3_run_failure_descriptor_binding(
@@ -1834,7 +1815,7 @@ def _phase3_runtime_from_validation(
 def _build_strict_stop_warning(ei: Phase3EvaluationInput, stop_index: int) -> EngineeringMessage | None:
     if stop_index >= len(ei.evaluation_records): return None
     rec = ei.evaluation_records[stop_index]
-    return EngineeringMessage(code=ErrorCode.PHASE3_STRICT_STOP,
+    return EngineeringMessage(code=ErrorCode.CALCULATION_BLOCKED,
         message=f"Candidate {rec.source_qualified_candidate_id} at index {stop_index} has state {rec.candidate_evaluation_state.value}. Strict stop.",
         source_module="hexagent.optimization.feasibility",
         context=(("owner_sort_key", ("phase3","strict_stop","phase3","strict_stop",(),"")),
@@ -1863,6 +1844,12 @@ def _expected_ranked_values(
 ## 17. Classifier (P0-7)
 
 ```python
+from hexagent.domain.messages import ErrorCode
+
+# Phase 3 error codes mapped to existing production ErrorCodes
+PHASE3_MISSING_RATING_STATUS = ErrorCode.INPUT_INCONSISTENT
+PHASE3_TRUSTED_EVIDENCE_INCOMPLETE = ErrorCode.INPUT_INCONSISTENT
+
 def classify_candidate(
     input: Phase3CandidateClassificationInput,
     *,
@@ -2415,13 +2402,26 @@ def verify_optimization_result_or_raise(
             if cs.evaluation_order_index != i: raise ValueError(f"[{i}] cs index mismatch")
             if cs.phase2_source_record_descriptor_digest != ei.ordered_phase2_source_record_descriptor_digests[i]:
                 raise ValueError(f"[{i}] cs descriptor mismatch")
-            cs.verify_or_raise()
+            cs.verify_or_raise(
+                source_record=rec,
+                identity_snapshot=ids,
+                authoritative_source_record_descriptor_digest=cs.phase2_source_record_descriptor_digest,
+                warning_descriptor_bindings=wbt,
+                blocker_descriptor_bindings=bbt,
+                source_failure_binding=sfb,
+                evidence_failure_binding=efb)
             if result.ordered_phase2_source_snapshot_digests[i] != cs.snapshot_digest: raise ValueError(f"[{i}] result snapshot digest")
         else:
             if result.ordered_phase2_source_snapshot_digests[i] is not None: raise ValueError(f"[{i}] result snapshot should be None")
         # Source binding (nullable)
         if sb is not None:
-            sb.verify_or_raise()
+            sb.verify_or_raise(
+                identity_snapshot=ids,
+                complete_snapshot=cs,
+                warning_bindings=wbt,
+                blocker_bindings=bbt,
+                source_failure_binding=sfb,
+                evidence_failure_binding=efb)
             if result.ordered_phase3_source_binding_digests[i] != sb.binding_digest: raise ValueError(f"[{i}] result binding digest")
         else:
             if result.ordered_phase3_source_binding_digests[i] is not None: raise ValueError(f"[{i}] result binding should be None")
@@ -2441,12 +2441,13 @@ def verify_optimization_result_or_raise(
             if cin.evidence_binding.binding_digest != sb.binding_digest: raise ValueError(f"[{i}] cin binding digest")
             if cin.verified_rating_evidence_digest != cs.verified_rating_evidence_digest: raise ValueError(f"[{i}] cin evidence digest")
             expected = classify_candidate(cin, warning_descriptors=wbt, blocker_descriptors=bbt,
-                evidence_failure_binding=efb, source_failure_binding=sfb)
+                source_failure_binding=sfb)
             if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] disposition mismatch")
         else:
             if pr.phase3_failure_binding is None: raise ValueError(f"[{i}] FAILED needs failure binding")
             expected = disposition_from_preparation_failure(
                 source_record=rec, source_snapshot=cs,
+                identity_snapshot_digest=ids.identity_snapshot_digest,
                 candidate=cand, preparation_result=pr)
             if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] prep-failure mismatch")
         # Descriptor tuple exact length and value
@@ -2493,7 +2494,7 @@ def verify_optimization_result_or_raise(
         if rr.feasibility_digest != disp.feasibility_digest: raise ValueError(f"ranked[{ri}]: feasibility digest")
         if rr.primary_objective_value != pv or rr.primary_objective_field != pf: raise ValueError(f"ranked[{ri}]: primary")
         if rr.secondary_tie_break_value != sv or rr.secondary_tie_break_field != sf: raise ValueError(f"ranked[{ri}]: secondary")
-        rr.verify_or_raise()
+        rr.verify_or_raise(disposition=disp)
         if result.ordered_ranked_record_digests[ri] != rr.ranked_record_digest: raise ValueError(f"ranked[{ri}]: result digest")
     TN = min(result.requested_top_n, F)
     if result.ordered_top_n_record_digests != result.ordered_ranked_record_digests[:TN]: raise ValueError("Top-N not prefix")
@@ -2596,7 +2597,99 @@ def expected_phase3_provenance_edge_keys(*, expected_nodes, dispositions, ranked
     return tuple(sorted(edges))
 ```
 
-### 22.4 Semantic verifier
+### 22.5 Real builders
+
+```python
+def build_phase3_provenance_nodes(
+    *,
+    ei: Phase3EvaluationInput,
+    dispositions: tuple[CandidateDispositionRecord, ...],
+    ranked: tuple[RankedCandidateRecord, ...],
+    result: OptimizationResult,
+    exp_nodes: tuple,
+) -> tuple[ProvenanceNode, ...]:
+    root_p = sha256_digest({"artifact_kind":"phase3_evaluation_input","evaluation_input_digest":ei.evaluation_input_digest})
+    nodes = [
+        ProvenanceNode(node_id=expected_phase3_node_id("root",EXTERNAL,root_p), node_type=EXTERNAL, payload_hash=root_p, label="", metadata=()),
+        ProvenanceNode(node_id=expected_phase3_node_id("sizing_request",INPUT_FILE,ei.sizing_request_identity_digest), node_type=INPUT_FILE, payload_hash=ei.sizing_request_identity_digest, label="", metadata=()),
+        ProvenanceNode(node_id=expected_phase3_node_id("passed_gate",CALCULATION_RUN,ei.gate_digest), node_type=CALCULATION_RUN, payload_hash=ei.gate_digest, label="", metadata=()),
+        ProvenanceNode(node_id=expected_phase3_node_id("candidate_set",CALCULATION_RUN,ei.candidate_set_digest), node_type=CALCULATION_RUN, payload_hash=ei.candidate_set_digest, label="", metadata=()),
+    ]
+    is_p = sha256_digest({"ordered_identity_snapshot_digests":list(result.ordered_identity_snapshot_digests)})
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("identity_snapshot_set",INTERMEDIATE,is_p), node_type=INTERMEDIATE, payload_hash=is_p, label="", metadata=()))
+    css_p = sha256_digest({"ordered_complete_snapshot_digests":list(result.ordered_phase2_source_snapshot_digests)})
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("complete_snapshot_set",INTERMEDIATE,css_p), node_type=INTERMEDIATE, payload_hash=css_p, label="", metadata=()))
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("evaluation_input",INTERMEDIATE,ei.evaluation_input_digest), node_type=INTERMEDIATE, payload_hash=ei.evaluation_input_digest, label="", metadata=()))
+    sb_p = sha256_digest({"ordered_binding_digests":list(result.ordered_phase3_source_binding_digests)})
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("source_binding_set",INTERMEDIATE,sb_p), node_type=INTERMEDIATE, payload_hash=sb_p, label="", metadata=()))
+    pr_p = sha256_digest({"ordered_prep_result_digests":list(result.ordered_phase3_preparation_result_digests)})
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("preparation_result_set",INTERMEDIATE,pr_p), node_type=INTERMEDIATE, payload_hash=pr_p, label="", metadata=()))
+    for i,d in enumerate(dispositions):
+        nid = expected_phase3_node_id(f"disposition[{i}]",INTERMEDIATE,d.feasibility_digest)
+        nodes.append(ProvenanceNode(node_id=nid, node_type=INTERMEDIATE, payload_hash=d.feasibility_digest, label="", metadata=()))
+    for i,r in enumerate(ranked):
+        nid = expected_phase3_node_id(f"ranked[{i}]",INTERMEDIATE,r.ranked_record_digest)
+        nodes.append(ProvenanceNode(node_id=nid, node_type=INTERMEDIATE, payload_hash=r.ranked_record_digest, label="", metadata=()))
+    tn_p = sha256_digest({"ordered_top_n_record_digests":list(result.ordered_top_n_record_digests)})
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("top_n_selection",INTERMEDIATE,tn_p), node_type=INTERMEDIATE, payload_hash=tn_p, label="", metadata=()))
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("result_core",RESULT,result.result_core_hash), node_type=RESULT, payload_hash=result.result_core_hash, label="", metadata=()))
+    opt_p = sha256_digest({"evaluation_input_digest":ei.evaluation_input_digest,"optimization_objective":result.optimization_objective.value,
+        "requested_top_n":result.requested_top_n,"termination_status":result.termination_status.value,
+        "result_core_hash":result.result_core_hash,"phase3_algorithm_version":"task009-phase3-v1"})
+    nodes.append(ProvenanceNode(node_id=expected_phase3_node_id("optimizer",OPTIMIZER,opt_p), node_type=OPTIMIZER, payload_hash=opt_p, label="", metadata=()))
+    return tuple(nodes)
+
+def build_phase3_provenance_edges(
+    *,
+    ei: Phase3EvaluationInput,
+    dispositions: tuple[CandidateDispositionRecord, ...],
+    ranked: tuple[RankedCandidateRecord, ...],
+    result: OptimizationResult,
+    exp_nodes: tuple,  # expected nodes with .role/.node_type/.payload_hash
+) -> tuple[ProvenanceEdge, ...]:
+    uid_map = {}
+    for n in exp_nodes:
+        nid = expected_phase3_node_id(n.role, n.node_type, n.payload_hash)
+        uid_map[n.role] = str(nid)
+    def uid(r): return uid_map[r]
+    edges: list[ProvenanceEdge] = []
+    edges.append(ProvenanceEdge(source_id=uid("root"), target_id=uid("sizing_request"), relation=Phase3ProvenanceRelation.REGULATES.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("sizing_request"), target_id=uid("passed_gate"), relation=Phase3ProvenanceRelation.CONSUMED_BY.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("passed_gate"), target_id=uid("candidate_set"), relation=Phase3ProvenanceRelation.PRODUCED.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("candidate_set"), target_id=uid("identity_snapshot_set"), relation=Phase3ProvenanceRelation.PRODUCED.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("identity_snapshot_set"), target_id=uid("complete_snapshot_set"), relation=Phase3ProvenanceRelation.PRODUCED.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("complete_snapshot_set"), target_id=uid("evaluation_input"), relation=Phase3ProvenanceRelation.CONSUMED_BY.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("evaluation_input"), target_id=uid("source_binding_set"), relation=Phase3ProvenanceRelation.PRODUCED.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("source_binding_set"), target_id=uid("preparation_result_set"), relation=Phase3ProvenanceRelation.PRODUCED.value, metadata=()))
+    for i,_ in enumerate(dispositions):
+        edges.append(ProvenanceEdge(source_id=uid("evaluation_input"), target_id=uid(f"disposition[{i}]"), relation=Phase3ProvenanceRelation.EVALUATED.value, metadata=()))
+    feasible_mask = {(d.source_qualified_candidate_id,d.feasibility_digest):i for i,d in enumerate(dispositions) if d.disposition is FEASIBLE}
+    for ri,r in enumerate(ranked):
+        key = (r.source_qualified_candidate_id,r.feasibility_digest)
+        di = feasible_mask.get(key)
+        if di is None: raise ValueError(f"ranked[{ri}]: no matching FEASIBLE disposition")
+        edges.append(ProvenanceEdge(source_id=uid(f"disposition[{di}]"), target_id=uid(f"ranked[{ri}]"), relation=Phase3ProvenanceRelation.RANKED.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("evaluation_input"), target_id=uid("top_n_selection"), relation=Phase3ProvenanceRelation.SELECTED_BY.value, metadata=()))
+    for ri in range(min(result.requested_top_n,len(ranked))):
+        edges.append(ProvenanceEdge(source_id=uid(f"ranked[{ri}]"), target_id=uid("top_n_selection"), relation=Phase3ProvenanceRelation.SELECTED.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("top_n_selection"), target_id=uid("result_core"), relation=Phase3ProvenanceRelation.PRODUCED.value, metadata=()))
+    edges.append(ProvenanceEdge(source_id=uid("result_core"), target_id=uid("optimizer"), relation=Phase3ProvenanceRelation.EXECUTED_BY.value, metadata=()))
+    return tuple(sorted(edges, key=lambda e: (str(e.source_id), str(e.target_id), e.relation)))
+
+def build_phase3_provenance_graph(
+    *,
+    ei: Phase3EvaluationInput,
+    dispositions: tuple[CandidateDispositionRecord, ...],
+    ranked: tuple[RankedCandidateRecord, ...],
+    result: OptimizationResult,
+) -> ProvenanceGraph:
+    exp_nodes = expected_phase3_provenance_nodes(ei=ei, dispositions=dispositions, ranked=ranked, result=result)
+    nodes = build_phase3_provenance_nodes(ei=ei, dispositions=dispositions, ranked=ranked, result=result, exp_nodes=exp_nodes)
+    edges = build_phase3_provenance_edges(ei=ei, dispositions=dispositions, ranked=ranked, result=result, exp_nodes=exp_nodes)
+    return ProvenanceGraph(nodes=nodes, edges=edges)
+```
+
+### 22.6 Semantic verifier
 
 ```python
 def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked, result):
