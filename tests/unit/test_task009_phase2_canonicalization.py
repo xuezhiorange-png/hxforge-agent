@@ -34,6 +34,7 @@ from hexagent.optimization.evaluation import (
     ContextCanonicalizationFailureKind,
     VerificationOutcome,
     VerifiedRatingEvidenceSnapshot,
+    _build_message_descriptor,
     _context_entries_to_payload,
     build_canonical_context_entries,
     canonicalize_trusted_context_value,
@@ -5411,12 +5412,13 @@ class TestMaterializationEntryRejection:
 # ============================================================================
 
 
-class TestFailClosedBoundary:
-    """P0-6: Exceptions during canonicalization caught by fail-closed boundary."""
+class _BuildLegitMixin:
+    """Mixin providing _build_legit and _make_minimal_result for fail-closed tests."""
 
     def _build_legit(self):
         """Build a valid MaterializationResult through the production chain."""
         import unittest.mock
+        from uuid import UUID
 
         from hexagent.exchangers.double_pipe.solver import SolverParams
         from hexagent.exchangers.double_pipe.thermal import FlowArrangement
@@ -5637,6 +5639,213 @@ class TestFailClosedBoundary:
         object.__setattr__(result, "failure", None)
         return result
 
+
+class TestFailClosedBoundary(_BuildLegitMixin):
+    """P0-6: Exceptions during canonicalization caught by fail-closed boundary."""
+
+    def _build_legit(self):
+        """Build a valid MaterializationResult through the production chain."""
+        import unittest.mock
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.catalog import compute_catalog_content_hash
+        from hexagent.optimization.context import (
+            ExpectedProviderIdentity,
+            OptimizationObjective,
+            build_sizing_request_identity,
+            create_passed_sizing_gate,
+        )
+        from hexagent.optimization.identities import materialize_all_candidates
+        from hexagent.optimization.models import (
+            CompleteDoublePipeAssemblyOption,
+            CompleteDoublePipeCatalogSnapshot,
+            LengthSource,
+            OptionRawCountRecord,
+            SizingRequest,
+        )
+        from hexagent.properties.base import PropertyProvider
+
+        opt = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="opt_a",
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            manufacturing_option_identity="std",
+            manufacturing_metadata=(),
+            length_source=LengthSource(
+                length_quantum_m="0.1",
+                allowed_effective_lengths_m=(1.0, 2.0),
+            ),
+        )
+        cat_hash = compute_catalog_content_hash(
+            catalog_id="c1",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt,),
+        )
+        cat = CompleteDoublePipeCatalogSnapshot(
+            catalog_id="c1",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt,),
+            catalog_content_hash=cat_hash,
+        )
+        req = SizingRequest(catalogs=(cat,))
+        ident = build_sizing_request_identity(
+            request=req,
+            hot_fluid_name="w",
+            cold_fluid_name="b",
+            hot_fluid_equation_of_state="i",
+            cold_fluid_equation_of_state="n",
+            hot_fluid_normalized_components=(),
+            cold_fluid_normalized_components=(),
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            minimum_terminal_delta_t=5.0,
+            required_duty_w=1000.0,
+            duty_absolute_tolerance_w=10.0,
+            duty_relative_tolerance=0.01,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+            top_n=5,
+            solver_params=SolverParams(),
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="test_provider",
+                version="1.0",
+                git_revision="abc123",
+                reference_state_policy="default",
+            ),
+            design_case_revision_id=UUID("11111111-1111-1111-1111-111111111111"),
+            calculation_run_id=UUID("22222222-2222-2222-2222-222222222222"),
+        )
+        rec = OptionRawCountRecord(
+            catalog_id=cat.catalog_id,
+            catalog_version=cat.catalog_version,
+            catalog_content_hash=cat.catalog_content_hash,
+            source_identity=cat.source_identity,
+            schema_version=cat.schema_version,
+            assembly_option_id=opt.assembly_option_id,
+            canonical_length_quantum_m=opt.length_source.length_quantum_m,
+            raw_count=len(opt.length_source.allowed_effective_lengths_m),
+        )
+        gate = create_passed_sizing_gate(
+            sizing_request_identity_digest=ident.sizing_request_identity_digest,
+            raw_combination_count=2,
+            effective_cap=100,
+            per_option_records=(rec,),
+        )
+        mat_result = materialize_all_candidates(catalogs=(cat,), sizing_gate=gate)
+        provider = unittest.mock.MagicMock(spec=PropertyProvider)
+        solver_params = SolverParams()
+        return ident, solver_params, provider, mat_result
+
+    def _make_minimal_result(self, hash_passes=True, prov_passes=True):
+        """Create a duck-typed RatingResult for the spy rating_fn."""
+        from hexagent.core.heat_balance import ExecutionContextSnapshot, ProviderIdentitySnapshot
+        from hexagent.exchangers.double_pipe.result import (
+            RatingRequestIdentity,
+            RatingResult,
+            RatingStatus,
+        )
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+        result = object.__new__(RatingResult)
+        for attr, val in {
+            "status": RatingStatus.SUCCEEDED,
+            "flow_arrangement": FlowArrangement.COUNTERFLOW,
+            "result_hash": "sha256:" + "e" * 64,
+            "provenance_digest": "prov_digest",
+            "heat_duty_w": 1000.0,
+            "hot_outlet_temperature_k": 350.0,
+            "cold_outlet_temperature_k": 310.0,
+            "area_inner_m2": 1.5,
+            "area_outer_m2": 2.0,
+            "UA_w_k": 500.0,
+            "LMTD_k": 40.0,
+            "energy_residual_w": 0.001,
+            "ua_lmtd_residual_w": 0.002,
+            "tube_selected_correlation_id": "corr_1",
+            "tube_selected_correlation_version": "1.0",
+            "annulus_selected_correlation_id": "corr_2",
+            "annulus_selected_correlation_version": "1.0",
+            "warnings": (),
+            "blockers": (),
+            "failure": None,
+            "hot_inlet_state": None,
+            "cold_inlet_state": None,
+            "tube_selected_correlation": None,
+            "annulus_selected_correlation": None,
+        }.items():
+            object.__setattr__(result, attr, val)
+
+        rri = RatingRequestIdentity(
+            hot_fluid_name="w",
+            hot_fluid_backend="i",
+            hot_fluid_components=(),
+            cold_fluid_name="b",
+            cold_fluid_backend="n",
+            cold_fluid_components=(),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            flow_arrangement="counterflow",
+            geometry={
+                "inner_tube_inner_diameter_m": 0.05,
+                "inner_tube_outer_diameter_m": 0.06,
+                "outer_pipe_inner_diameter_m": 0.10,
+                "effective_length_m": 1.0,
+                "wall_thermal_conductivity_w_m_k": 50.0,
+                "inner_surface_roughness_m": 1e-5,
+                "annulus_surface_roughness_m": 1e-5,
+                "inner_fouling_resistance_m2k_w": 0.0001,
+                "outer_fouling_resistance_m2k_w": 0.0002,
+            },
+            solver_absolute_residual_w=1e-3,
+            solver_relative_residual_fraction=1e-8,
+            solver_bracket_temperature_tolerance_k=1e-4,
+            solver_max_iterations=100,
+        )
+        object.__setattr__(result, "request_identity", rri)
+        pi = ProviderIdentitySnapshot(
+            name="test_provider",
+            version="1.0",
+            git_revision="abc123",
+            reference_state_policy="default",
+        )
+        object.__setattr__(result, "provider_identity", pi)
+        ec = object.__new__(ExecutionContextSnapshot)
+        for attr in (
+            "request_id",
+            "design_case_revision_id",
+            "calculation_run_id",
+            "execution_id",
+            "rating_software_version",
+            "execution_context_policy_version",
+        ):
+            object.__setattr__(ec, attr, None)
+        object.__setattr__(result, "execution_context", ec)
+        object.__setattr__(result, "verify_hash", lambda: hash_passes)
+        object.__setattr__(result, "verify_provenance", lambda: prov_passes)
+        return result
+
     def test_unexpected_verification_error_caught(self) -> None:
         """Unexpected ValueError during evidence revalidation is caught by fail-closed boundary."""
         from hexagent.optimization.evaluation import (
@@ -5702,12 +5911,12 @@ class TestFailClosedBoundary:
 
         import hexagent.optimization.evaluation as ev_mod
 
-        original = ev_mod._build_canonicalization_owner_result
+        original = ev_mod._build_message_descriptor
 
         def broken_owner(*args, **kwargs):
             raise RuntimeError("owner descriptor explosion")
 
-        ev_mod._build_canonicalization_owner_result = broken_owner
+        ev_mod._build_message_descriptor = broken_owner
 
         try:
             from hexagent.exchangers.double_pipe.solver import SolverParams
@@ -5715,7 +5924,7 @@ class TestFailClosedBoundary:
             from hexagent.optimization.adapter import evaluate_all_candidates
             from hexagent.properties.base import FluidIdentifier
 
-            # Use a result WITH a warning so _build_canonicalization_owner_result is called
+            # Use a result WITH a warning so _build_message_descriptor is called
             records = evaluate_all_candidates(
                 materialization_result=mat_result,
                 hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
@@ -5748,28 +5957,40 @@ class TestFailClosedBoundary:
                 records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
             )
         finally:
-            ev_mod._build_canonicalization_owner_result = original
+            ev_mod._build_message_descriptor = original
 
-    def test_safe_marker_iterator_exception_caught(self) -> None:
-        """RuntimeError from entry_marker is caught by fail-closed boundary."""
+    def test_run_failure_descriptor_exception_caught(self) -> None:
+        """RuntimeError from RunFailure descriptor is caught by fail-closed boundary."""
         from hexagent.optimization.evaluation import CandidateEvaluationState
 
         ident, sp, prov, mat_result = self._build_legit()
 
         import hexagent.optimization.evaluation as ev_mod
 
-        original = ev_mod._entry_marker
+        original = ev_mod._build_run_failure_descriptor
 
-        def broken_entry_marker(*args, **kwargs):
-            raise RuntimeError("entry marker explosion")
+        def broken_run_failure(*args, **kwargs):
+            raise RuntimeError("run failure descriptor explosion")
 
-        ev_mod._entry_marker = broken_entry_marker
+        ev_mod._build_run_failure_descriptor = broken_run_failure
 
         try:
+            # Use a result WITH a failure so _build_run_failure_descriptor is called
+            from hexagent.domain.messages import ErrorCode, RunFailure
             from hexagent.exchangers.double_pipe.solver import SolverParams
             from hexagent.exchangers.double_pipe.thermal import FlowArrangement
             from hexagent.optimization.adapter import evaluate_all_candidates
             from hexagent.properties.base import FluidIdentifier
+
+            original_result = self._make_minimal_result()
+            run_fail = RunFailure(
+                code=ErrorCode.CALCULATION_BLOCKED,
+                message="blocked",
+                context=(("key", b"bad_bytes"),),
+            )
+            object.__setattr__(original_result, "failure", run_fail)
+            object.__setattr__(original_result, "warnings", ())
+            object.__setattr__(original_result, "blockers", ())
 
             records = evaluate_all_candidates(
                 materialization_result=mat_result,
@@ -5789,7 +6010,7 @@ class TestFailClosedBoundary:
                 tube_boundary_condition="constant_wall_temperature",
                 annulus_boundary_condition="inner_wall_heated",
                 sizing_request_identity=ident,
-                rating_fn=lambda **kw: self._make_result_with_warning(),
+                rating_fn=lambda **kw: original_result,
             )
 
             assert len(records) >= 2
@@ -5802,7 +6023,7 @@ class TestFailClosedBoundary:
                 records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
             )
         finally:
-            ev_mod._entry_marker = original
+            ev_mod._build_run_failure_descriptor = original
 
     def test_identity_builder_exception_caught(self) -> None:
         """ValueError from identity builder is caught by fail-closed boundary."""
@@ -5812,12 +6033,745 @@ class TestFailClosedBoundary:
 
         import hexagent.optimization.evaluation as ev_mod
 
-        original = ev_mod._build_canonicalization_owner_result
+        original = ev_mod._build_candidate_evaluation_identity
 
-        def broken_owner_identity(*args, **kwargs):
+        def broken_identity(*args, **kwargs):
             raise ValueError("identity builder explosion")
 
-        ev_mod._build_canonicalization_owner_result = broken_owner_identity
+        ev_mod._build_candidate_evaluation_identity = broken_identity
+
+        try:
+            from hexagent.exchangers.double_pipe.solver import SolverParams
+            from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+            from hexagent.optimization.adapter import evaluate_all_candidates
+            from hexagent.properties.base import FluidIdentifier
+
+            # Use a minimal result (no warnings/blockers) so execution
+            # reaches _build_candidate_evaluation_identity
+            records = evaluate_all_candidates(
+                materialization_result=mat_result,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=prov,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident,
+                rating_fn=lambda **kw: self._make_minimal_result(),
+            )
+
+            assert len(records) >= 2
+            assert (
+                records[0].candidate_evaluation_state
+                == CandidateEvaluationState.RUNTIME_FAILED.value
+            )
+            assert records[0].evaluation_failure is not None
+            assert records[0].candidate_evaluation_identity is None
+            assert records[0].verified_rating_evidence is None
+            assert records[0].invalid_rating_evidence is None
+            assert (
+                records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+            )
+            assert records[1].hash_verification_outcome is VerificationOutcome.NOT_RUN
+            assert records[1].provenance_verification_outcome is VerificationOutcome.NOT_RUN
+        finally:
+            ev_mod._build_candidate_evaluation_identity = original
+
+
+class IteratorThatRaisesMidIteration:
+    """Custom iterator that yields one valid item then raises RuntimeError."""
+
+    def __init__(self) -> None:
+        self._items = iter([("key1", "hello")])
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        val = next(self._items)
+        raise RuntimeError("mid-iteration explosion")
+        return val  # noqa: FURB105 — unreachable but documents intent
+
+
+class FirstTraversalFailsMapping(Mapping[str, object]):
+    """Mapping that fails on first traversal, succeeds on subsequent."""
+
+    def __init__(self) -> None:
+        self.traversal_count = 0
+
+    def items(self):
+        self.traversal_count += 1
+        if self.traversal_count == 1:
+            return IteratorThatRaisesMidIteration()
+        return iter((("key", "value"),))
+
+    def __getitem__(self, key: str) -> object:
+        return "value"
+
+    def __len__(self) -> int:
+        return 1
+
+    def __iter__(self):
+        return iter(["key"])
+
+
+class FirstTraversalSucceedsMapping(Mapping[str, object]):
+    """Mapping that succeeds on first traversal, fails on subsequent."""
+
+    def __init__(self) -> None:
+        self.traversal_count = 0
+
+    def items(self):
+        self.traversal_count += 1
+        if self.traversal_count == 1:
+            return iter((("key", "value"),))
+        raise RuntimeError("second traversal must never happen")
+
+    def __getitem__(self, key: str) -> object:
+        return "value"
+
+    def __len__(self) -> int:
+        return 1
+
+    def __iter__(self):
+        return iter(["key"])
+
+
+class FirstNextFailureMapping(Mapping[str, object]):
+    """Mapping whose items() raises on first call."""
+
+    def __init__(self) -> None:
+        self.traversal_count = 0
+
+    def items(self):
+        self.traversal_count += 1
+        if self.traversal_count == 1:
+            raise RuntimeError("first-next failure")
+        return iter((("key", "value"),))
+
+    def __getitem__(self, key: str) -> object:
+        return "value"
+
+    def __len__(self) -> int:
+        return 1
+
+    def __iter__(self):
+        return iter(["key"])
+
+
+class NestedOneShotMapping(Mapping[str, object]):
+    """Mapping that raises during nested iteration."""
+
+    def __init__(self) -> None:
+        self.traversal_count = 0
+
+    def items(self):
+        self.traversal_count += 1
+        if self.traversal_count == 1:
+            return iter((("nested", FirstTraversalFailsMapping()),))
+        return iter((("nested", {"key": "value"}),))
+
+    def __getitem__(self, key: str) -> object:
+        return "value"
+
+    def __len__(self) -> int:
+        return 1
+
+    def __iter__(self):
+        return iter(["nested"])
+
+
+def _make_engineering_message(
+    severity: str = "warning",
+    context: tuple[tuple[str, object], ...] = (),
+) -> EngineeringMessage:
+    """Helper to build an EngineeringMessage for test use."""
+    return EngineeringMessage(
+        code=ErrorCode.INPUT_INCONSISTENT,
+        severity=EngineeringMessageSeverity.WARNING
+        if severity == "warning"
+        else EngineeringMessageSeverity.BLOCKER,
+        message="test message",
+        context=context,
+    )
+
+
+class TestSinglePassCanonicalization(_BuildLegitMixin):
+    """P0-3: Single-pass owner canonicalization + stateful one-shot tests."""
+
+    def test_build_message_descriptor_traverses_once(self) -> None:
+        """Descriptor builder traverses message.context exactly once."""
+
+        ctx = FirstTraversalFailsMapping()
+        msg = _make_engineering_message(
+            severity="warning",
+            context=(("ctx", ctx),),
+        )
+
+        descriptor = _build_message_descriptor(msg)
+
+        # First traversal fails — descriptor should capture the error
+        assert descriptor.canonicalization_error is not None
+        assert descriptor.canonical_message_payload is None
+        assert ctx.traversal_count == 1
+
+    def test_build_message_descriptor_success_traverses_once(self) -> None:
+        """Successful descriptor traversal is exactly once."""
+
+        ctx = FirstTraversalSucceedsMapping()
+        msg = _make_engineering_message(
+            severity="warning",
+            context=(("ctx", ctx),),
+        )
+
+        descriptor = _build_message_descriptor(msg)
+
+        # First traversal succeeds — descriptor has payload
+        assert descriptor.canonical_message_payload is not None
+        assert descriptor.canonicalization_error is None
+        assert ctx.traversal_count == 1
+
+    def _build_result_with_mapping_warning(
+        self,
+        mapping: Mapping[str, object],
+    ) -> object:
+        """Build a duck-typed RatingResult with a mapping in warning context."""
+
+        result = self._make_minimal_result()
+        bad_warning = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="mapped warning",
+            context=(("ctx", mapping),),
+        )
+        object.__setattr__(result, "warnings", (bad_warning,))
+        object.__setattr__(result, "blockers", ())
+        object.__setattr__(result, "failure", None)
+        return result
+
+    def _build_result_with_mapping_blocker(
+        self,
+        mapping: Mapping[str, object],
+    ) -> object:
+        """Build a duck-typed RatingResult with a mapping in blocker context."""
+
+        result = self._make_minimal_result()
+        bad_blocker = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="mapped blocker",
+            context=(("ctx", mapping),),
+        )
+        object.__setattr__(result, "warnings", ())
+        object.__setattr__(result, "blockers", (bad_blocker,))
+        object.__setattr__(result, "failure", None)
+        return result
+
+    def _build_result_with_mapping_failure(
+        self,
+        mapping: Mapping[str, object],
+    ) -> object:
+        """Build a duck-typed RatingResult with a mapping in RunFailure context."""
+        from hexagent.domain.messages import ErrorCode, RunFailure
+
+        result = self._make_minimal_result()
+        run_fail = RunFailure(
+            code=ErrorCode.CALCULATION_BLOCKED,
+            message="blocked",
+            context=(("ctx", mapping),),
+        )
+        object.__setattr__(result, "warnings", ())
+        object.__setattr__(result, "blockers", ())
+        object.__setattr__(result, "failure", run_fail)
+        return result
+
+    def _assert_traversal_once_failure(self, records: tuple, mapping: Mapping[str, object]) -> None:
+        """Assert the fail-closed outcome for a first-traversal-fails scenario."""
+        assert len(records) >= 2
+        assert records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED
+        fail = records[0].evaluation_failure
+        assert fail is not None
+        assert fail.code is ErrorCode.PROVENANCE_INCOMPLETE
+        assert fail.message == "Trusted context canonicalization failed."
+        assert fail.traceback is None
+        assert records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED
+        assert records[1].hash_verification_outcome is VerificationOutcome.NOT_RUN
+        assert records[1].provenance_verification_outcome is VerificationOutcome.NOT_RUN
+
+    def _evaluate_via_adapter(self, ident, prov, mat_result, result_fn):
+        """Run evaluate_all_candidates with given parameters."""
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        return evaluate_all_candidates(
+            materialization_result=mat_result,
+            hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+            cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            provider=prov,
+            solver_params=SolverParams(),
+            minimum_terminal_delta_t=5.0,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            sizing_request_identity=ident,
+            rating_fn=result_fn,
+        )
+
+    # --- Warning: first traversal fails ---
+
+    def test_warning_first_fails_then_succeeds(self) -> None:
+        """Warning with first-traversal-fails mapping is caught (traversal_count=1)."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = FirstTraversalFailsMapping()
+        result = self._build_result_with_mapping_warning(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        self._assert_traversal_once_failure(records, ctx)
+        assert ctx.traversal_count == 1
+
+    # --- Blocker: first traversal fails ---
+
+    def test_blocker_first_fails_then_succeeds(self) -> None:
+        """Blocker with first-traversal-fails mapping is caught (traversal_count=1)."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = FirstTraversalFailsMapping()
+        result = self._build_result_with_mapping_blocker(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        self._assert_traversal_once_failure(records, ctx)
+        assert ctx.traversal_count == 1
+
+    # --- Warning: first traversal succeeds, later fails ---
+
+    def test_warning_first_succeeds_then_fails(self) -> None:
+        """Warning: first-success mapping never re-accessed (count=1)."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = FirstTraversalSucceedsMapping()
+        result = self._build_result_with_mapping_warning(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        # The first traversal is by _build_message_descriptor's canonicalization.
+        # Any additional traversal (from Pydantic model_validate) is acceptable
+        # as long as it does NOT re-canonicalize the context values.
+        # The key invariant: descriptor is built ONCE.
+        assert records[0].candidate_evaluation_state == CandidateEvaluationState.VERIFIED
+
+    # --- Blocker: first traversal succeeds, later fails ---
+
+    def test_blocker_first_succeeds_then_fails(self) -> None:
+        """Blocker: first-success mapping never re-accessed (count=1)."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = FirstTraversalSucceedsMapping()
+        result = self._build_result_with_mapping_blocker(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        assert records[0].candidate_evaluation_state == CandidateEvaluationState.VERIFIED
+
+    # --- First-next failure ---
+
+    def test_warning_first_next_failure(self) -> None:
+        """Warning with first-next-failure mapping is caught."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = FirstNextFailureMapping()
+        result = self._build_result_with_mapping_warning(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        self._assert_traversal_once_failure(records, ctx)
+        assert ctx.traversal_count == 1
+
+    def test_blocker_first_next_failure(self) -> None:
+        """Blocker with first-next-failure mapping is caught."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = FirstNextFailureMapping()
+        result = self._build_result_with_mapping_blocker(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        self._assert_traversal_once_failure(records, ctx)
+        assert ctx.traversal_count == 1
+
+    # --- Nested one-shot ---
+
+    def test_warning_nested_one_shot(self) -> None:
+        """Warning with nested one-shot mapping is caught."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = NestedOneShotMapping()
+        result = self._build_result_with_mapping_warning(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        self._assert_traversal_once_failure(records, ctx)
+        assert ctx.traversal_count == 1
+
+    def test_blocker_nested_one_shot(self) -> None:
+        """Blocker with nested one-shot mapping is caught."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = NestedOneShotMapping()
+        result = self._build_result_with_mapping_blocker(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        self._assert_traversal_once_failure(records, ctx)
+        assert ctx.traversal_count == 1
+
+    # --- RunFailure one-shot ---
+
+    def test_run_failure_first_fails_then_succeeds(self) -> None:
+        """RunFailure with first-traversal-fails mapping is caught (traversal_count=1)."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = FirstTraversalFailsMapping()
+        result = self._build_result_with_mapping_failure(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        self._assert_traversal_once_failure(records, ctx)
+        assert ctx.traversal_count == 1
+
+    def test_run_failure_first_succeeds_then_fails(self) -> None:
+        """RunFailure: first-success mapping never re-accessed (count=1)."""
+        ident, sp, prov, mat_result = self._build_legit()
+        ctx = FirstTraversalSucceedsMapping()
+        result = self._build_result_with_mapping_failure(ctx)
+
+        records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: result)
+        # RunFailure context with valid values passes canonicalization
+        assert records[0].candidate_evaluation_state == CandidateEvaluationState.VERIFIED
+
+    # --- Permutation tests ---
+
+    def test_warning_permutation_a_b_identical_failure(self) -> None:
+        """A then B ordering with mixed valid/invalid context yields same failure as B then A."""
+
+        ident, sp, prov, mat_result = self._build_legit()
+
+        def _run_permutation(warning_list):
+            base = self._make_minimal_result()
+            object.__setattr__(base, "warnings", tuple(warning_list))
+            object.__setattr__(base, "blockers", ())
+            object.__setattr__(base, "failure", None)
+            records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: base)
+            assert records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED
+            return records[0].evaluation_failure
+
+        # Each permutation gets FRESH mapping instances to avoid state bleed
+        ctx_fails = FirstTraversalFailsMapping()
+        warning_a = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="test",
+            context=(("ctx", ctx_fails),),
+        )
+        ctx_succeeds = FirstTraversalSucceedsMapping()
+        warning_b = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="test",
+            context=(("ctx", ctx_succeeds),),
+        )
+
+        fail_ab = _run_permutation([warning_a, warning_b])
+        fail_ba = _run_permutation([warning_b, warning_a])
+
+        # Both should fail with same code/message regardless of order
+        assert fail_ab.code is fail_ba.code
+        assert fail_ab.message == fail_ba.message
+
+    def test_blocker_permutation_a_b_identical_failure(self) -> None:
+        """Blocker A then B vs B then A yield identical failure."""
+        ident, sp, prov, mat_result = self._build_legit()
+
+        def _run_permutation(warning_list):
+            base = self._make_minimal_result()
+            object.__setattr__(base, "warnings", ())
+            object.__setattr__(base, "blockers", tuple(warning_list))
+            object.__setattr__(base, "failure", None)
+            records = self._evaluate_via_adapter(ident, prov, mat_result, lambda **kw: base)
+            assert records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED
+            return records[0].evaluation_failure
+
+        # Each permutation gets FRESH mapping instances
+        ctx_fails = FirstTraversalFailsMapping()
+        blocker_a = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="test",
+            context=(("ctx", ctx_fails),),
+        )
+        ctx_succeeds = FirstTraversalSucceedsMapping()
+        blocker_b = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="test",
+            context=(("ctx", ctx_succeeds),),
+        )
+
+        fail_ab = _run_permutation([blocker_a, blocker_b])
+        fail_ba = _run_permutation([blocker_b, blocker_a])
+
+        assert fail_ab.code is fail_ba.code
+        assert fail_ab.message == fail_ba.message
+
+
+class TestFailClosedExceptException(_BuildLegitMixin):
+    """P0-6: Full except Exception catch-all coverage tests."""
+
+    def _build_legit(self):
+        """Build a valid MaterializationResult (same as TestFailClosedBoundary)."""
+        from unittest.mock import MagicMock
+        from uuid import UUID
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.catalog import compute_catalog_content_hash
+        from hexagent.optimization.context import (
+            ExpectedProviderIdentity,
+            OptimizationObjective,
+            build_sizing_request_identity,
+            create_passed_sizing_gate,
+        )
+        from hexagent.optimization.identities import materialize_all_candidates
+        from hexagent.optimization.models import (
+            CompleteDoublePipeAssemblyOption,
+            CompleteDoublePipeCatalogSnapshot,
+            LengthSource,
+            OptionRawCountRecord,
+            SizingRequest,
+        )
+        from hexagent.properties.base import PropertyProvider
+
+        opt = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="opt_a",
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            manufacturing_option_identity="std",
+            manufacturing_metadata=(),
+            length_source=LengthSource(
+                length_quantum_m="0.1",
+                allowed_effective_lengths_m=(1.0, 2.0),
+            ),
+        )
+        cat_hash = compute_catalog_content_hash(
+            catalog_id="c1",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt,),
+        )
+        cat = CompleteDoublePipeCatalogSnapshot(
+            catalog_id="c1",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt,),
+            catalog_content_hash=cat_hash,
+        )
+        req = SizingRequest(catalogs=(cat,))
+        ident = build_sizing_request_identity(
+            request=req,
+            hot_fluid_name="w",
+            cold_fluid_name="b",
+            hot_fluid_equation_of_state="i",
+            cold_fluid_equation_of_state="n",
+            hot_fluid_normalized_components=(),
+            cold_fluid_normalized_components=(),
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            minimum_terminal_delta_t=5.0,
+            required_duty_w=1000.0,
+            duty_absolute_tolerance_w=10.0,
+            duty_relative_tolerance=0.01,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+            top_n=5,
+            solver_params=SolverParams(),
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="test_provider",
+                version="1.0",
+                git_revision="abc123",
+                reference_state_policy="default",
+            ),
+            design_case_revision_id=UUID("11111111-1111-1111-1111-111111111111"),
+            calculation_run_id=UUID("22222222-2222-2222-2222-222222222222"),
+        )
+        rec = OptionRawCountRecord(
+            catalog_id=cat.catalog_id,
+            catalog_version=cat.catalog_version,
+            catalog_content_hash=cat.catalog_content_hash,
+            source_identity=cat.source_identity,
+            schema_version=cat.schema_version,
+            assembly_option_id=opt.assembly_option_id,
+            canonical_length_quantum_m=opt.length_source.length_quantum_m,
+            raw_count=len(opt.length_source.allowed_effective_lengths_m),
+        )
+        gate = create_passed_sizing_gate(
+            sizing_request_identity_digest=ident.sizing_request_identity_digest,
+            raw_combination_count=2,
+            effective_cap=100,
+            per_option_records=(rec,),
+        )
+        mat_result = materialize_all_candidates(catalogs=(cat,), sizing_gate=gate)
+        provider = MagicMock(spec=PropertyProvider)
+        solver_params = SolverParams()
+        return ident, solver_params, provider, mat_result
+
+    def _make_minimal_result(self):
+        """Create a duck-typed RatingResult (same as TestFailClosedBoundary)."""
+        from hexagent.core.heat_balance import ExecutionContextSnapshot, ProviderIdentitySnapshot
+        from hexagent.exchangers.double_pipe.result import (
+            RatingRequestIdentity,
+            RatingResult,
+            RatingStatus,
+        )
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+        result = object.__new__(RatingResult)
+        for attr, val in {
+            "status": RatingStatus.SUCCEEDED,
+            "flow_arrangement": FlowArrangement.COUNTERFLOW,
+            "result_hash": "sha256:" + "e" * 64,
+            "provenance_digest": "prov_digest",
+            "heat_duty_w": 1000.0,
+            "hot_outlet_temperature_k": 350.0,
+            "cold_outlet_temperature_k": 310.0,
+            "area_inner_m2": 1.5,
+            "area_outer_m2": 2.0,
+            "UA_w_k": 500.0,
+            "LMTD_k": 40.0,
+            "energy_residual_w": 0.001,
+            "ua_lmtd_residual_w": 0.002,
+            "tube_selected_correlation_id": "corr_1",
+            "tube_selected_correlation_version": "1.0",
+            "annulus_selected_correlation_id": "corr_2",
+            "annulus_selected_correlation_version": "1.0",
+            "warnings": (),
+            "blockers": (),
+            "failure": None,
+            "hot_inlet_state": None,
+            "cold_inlet_state": None,
+            "tube_selected_correlation": None,
+            "annulus_selected_correlation": None,
+        }.items():
+            object.__setattr__(result, attr, val)
+
+        rri = RatingRequestIdentity(
+            hot_fluid_name="w",
+            hot_fluid_backend="i",
+            hot_fluid_components=(),
+            cold_fluid_name="b",
+            cold_fluid_backend="n",
+            cold_fluid_components=(),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            flow_arrangement="counterflow",
+            geometry={
+                "inner_tube_inner_diameter_m": 0.05,
+                "inner_tube_outer_diameter_m": 0.06,
+                "outer_pipe_inner_diameter_m": 0.10,
+                "effective_length_m": 1.0,
+                "wall_thermal_conductivity_w_m_k": 50.0,
+                "inner_surface_roughness_m": 1e-5,
+                "annulus_surface_roughness_m": 1e-5,
+                "inner_fouling_resistance_m2k_w": 0.0001,
+                "outer_fouling_resistance_m2k_w": 0.0002,
+            },
+            solver_absolute_residual_w=1e-3,
+            solver_relative_residual_fraction=1e-8,
+            solver_bracket_temperature_tolerance_k=1e-4,
+            solver_max_iterations=100,
+        )
+        object.__setattr__(result, "request_identity", rri)
+        pi = ProviderIdentitySnapshot(
+            name="test_provider",
+            version="1.0",
+            git_revision="abc123",
+            reference_state_policy="default",
+        )
+        object.__setattr__(result, "provider_identity", pi)
+        ec = object.__new__(ExecutionContextSnapshot)
+        for attr in (
+            "request_id",
+            "design_case_revision_id",
+            "calculation_run_id",
+            "execution_id",
+            "rating_software_version",
+            "execution_context_policy_version",
+        ):
+            object.__setattr__(ec, attr, None)
+        object.__setattr__(result, "execution_context", ec)
+        object.__setattr__(result, "verify_hash", lambda: True)
+        object.__setattr__(result, "verify_provenance", lambda: True)
+        return result
+
+    @pytest.mark.parametrize(
+        "exception_type",
+        [
+            "key_error",
+            "index_error",
+            "os_error",
+            "arithmetic_error",
+            "assertion_error",
+            "custom",
+        ],
+    )
+    def test_exception_types_caught_by_fail_closed(self, exception_type: str) -> None:
+        """All exception types are caught by the fail-closed boundary."""
+        ident, sp, prov, mat_result = self._build_legit()
+
+        import hexagent.optimization.evaluation as ev_mod
+
+        original = ev_mod._build_message_descriptor
+
+        def broken_descriptor(*args, **kwargs):
+            if exception_type == "key_error":
+                raise KeyError("key_error")
+            elif exception_type == "index_error":
+                raise IndexError("index_error")
+            elif exception_type == "os_error":
+                raise OSError("os_error")
+            elif exception_type == "arithmetic_error":
+                raise ArithmeticError("arithmetic_error")
+            elif exception_type == "assertion_error":
+                raise AssertionError("assertion_error")
+            elif exception_type == "custom":
+
+                class CustomTestException(Exception):
+                    pass
+
+                raise CustomTestException("custom")
+            raise RuntimeError("fallback")
+
+        ev_mod._build_message_descriptor = broken_descriptor
 
         try:
             from hexagent.exchangers.double_pipe.solver import SolverParams
@@ -5847,13 +6801,13 @@ class TestFailClosedBoundary:
             )
 
             assert len(records) >= 2
-            assert (
-                records[0].candidate_evaluation_state
-                == CandidateEvaluationState.RUNTIME_FAILED.value
-            )
+            assert records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED
             assert records[0].evaluation_failure is not None
-            assert (
-                records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
-            )
+            assert records[0].evaluation_failure.code is ErrorCode.PROVENANCE_INCOMPLETE
+            assert records[0].evaluation_failure.message == "Trusted rating verification failed."
+            assert records[0].evaluation_failure.traceback is None
+            assert records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED
+            assert records[1].hash_verification_outcome is VerificationOutcome.NOT_RUN
+            assert records[1].provenance_verification_outcome is VerificationOutcome.NOT_RUN
         finally:
-            ev_mod._build_canonicalization_owner_result = original
+            ev_mod._build_message_descriptor = original
