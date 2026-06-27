@@ -6528,7 +6528,7 @@ class TestSinglePassCanonicalization(_BuildLegitMixin):
         fail_ab = _run_permutation([a_fail, b_success], fail_ab_ctx, success_ab_ctx)
 
         # B/A: succeeding warning first, failing warning second — FRESH instances
-        b_success2, a_fail2, success_ba_ctx, fail_ba_ctx = _make_warning_pair()
+        a_fail2, b_success2, fail_ba_ctx, success_ba_ctx = _make_warning_pair()
         fail_ba = _run_permutation([b_success2, a_fail2], fail_ba_ctx, success_ba_ctx)
 
         # Full RunFailure comparison
@@ -6575,7 +6575,7 @@ class TestSinglePassCanonicalization(_BuildLegitMixin):
         fail_ab = _run_permutation([a_fail, b_success], fail_ab_ctx, success_ab_ctx)
 
         # B/A: succeeding blocker first, failing blocker second — FRESH instances
-        b_success2, a_fail2, success_ba_ctx, fail_ba_ctx = _make_blocker_pair()
+        a_fail2, b_success2, fail_ba_ctx, success_ba_ctx = _make_blocker_pair()
         fail_ba = _run_permutation([b_success2, a_fail2], fail_ba_ctx, success_ba_ctx)
 
         assert fail_ab == fail_ba
@@ -6834,6 +6834,13 @@ class TestFailClosedExceptException(_BuildLegitMixin):
             from hexagent.optimization.adapter import evaluate_all_candidates
             from hexagent.properties.base import FluidIdentifier
 
+            rating_calls: int = 0
+
+            def rating_fn(**kwargs):
+                nonlocal rating_calls
+                rating_calls += 1
+                return self._make_result_with_warning()
+
             records = evaluate_all_candidates(
                 materialization_result=mat_result,
                 hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
@@ -6852,10 +6859,11 @@ class TestFailClosedExceptException(_BuildLegitMixin):
                 tube_boundary_condition="constant_wall_temperature",
                 annulus_boundary_condition="inner_wall_heated",
                 sizing_request_identity=ident,
-                rating_fn=lambda **kw: self._make_result_with_warning(),
+                rating_fn=rating_fn,
             )
 
             assert len(records) >= 2
+            assert rating_calls == 1
             candidate_id = records[0].source_qualified_candidate_id
             expected_safe_marker_digest = sha256_digest(
                 {
