@@ -126,16 +126,15 @@ def build_phase3_message_descriptor_binding(desc: Phase3MessageDescriptor) -> Ph
 ### 5.1 RunFailure canonicalization
 
 ```python
-def _canonicalize_run_failure(failure: RunFailure) -> CanonicalizedRunFailureDescriptor:
-    """Produce authoritative CanonicalizedRunFailureDescriptor from a RunFailure.
-    Supports both success (cached payload) and failure (canonicalization error) paths.
-    Phase 2 production code provides the actual implementation."""
-    return _canonicalize_run_failure_impl(failure)
+from hexagent.optimization.canonicalization import (
+    canonicalize_run_failure as _canonicalize_run_failure,
+)
 
-# _canonicalize_run_failure_impl is provided by Phase 2 production code
-# (hexagent.optimization.canonicalization). It returns a CanonicalizedRunFailureDescriptor
-# with: original_code, canonical_payload, payload_digest (success),
-# or canonicalization_error, context_path_digest, safe_marker_digest (failure).
+# canonicalize_run_failure is the authoritative Phase 2 function.
+# It returns a CanonicalizedRunFailureDescriptor with:
+# - SUCCESS: original_code, canonical_payload, payload_digest (non-None)
+# - CANONICALIZATION_FAILED: original_code, canonicalization_error,
+#   context_path_digest, safe_marker_digest, payload_digest=None
 ```
 
 ### 5.2 Binding model
@@ -1079,6 +1078,7 @@ def disposition_from_preparation_failure(
     *,
     source_record: CandidateEvaluationRecord,
     source_snapshot: Phase2SourceRecordSnapshot | None,
+    identity_snapshot_digest: str,
     candidate: ManufacturableCandidate,
     preparation_result: Phase3CandidatePreparationResult,
 ) -> CandidateDispositionRecord:
@@ -1103,7 +1103,7 @@ def disposition_from_preparation_failure(
         source_hash_verification_outcome=source_record.hash_verification_outcome,
         source_provenance_verification_outcome=source_record.provenance_verification_outcome,
         source_record_descriptor_digest=src_desc_digest,
-        source_identity_record_descriptor_digest=source_record.source_qualified_candidate_id,
+        source_identity_record_descriptor_digest=identity_snapshot_digest,
         disposition=RUNTIME_FAILED, diagnostic=PHASE3_RUNTIME_FAILED,
         provider_identity_matches=source_record.provider_identity_matches,
         rating_status=source_record.rating_status,
@@ -1857,8 +1857,71 @@ def build_optimization_result(
         result_core_hash=result_core_hash, provenance_digest=provenance_digest,
         result_hash=result_hash)
 
-def result_core_payload_from_values(**kwargs) -> dict[str, object]:
-    return result_core_payload(OptimizationResult(**kwargs, result_core_hash="", provenance_digest="", result_hash="", optimization_result_id=""))
+def result_core_payload_from_values(
+    *,
+    schema_version: Literal[1] = 1,
+    sizing_request_identity_digest: str,
+    passed_gate_digest: str,
+    candidate_set_digest: str,
+    evaluation_input_digest: str,
+    optimization_objective: OptimizationObjective,
+    requested_top_n: int,
+    total_candidate_count: int,
+    feasible_candidate_count: int,
+    infeasible_candidate_count: int,
+    provider_mismatch_count: int,
+    integrity_failed_count: int,
+    provenance_failed_count: int,
+    runtime_failed_count: int,
+    unevaluated_count: int,
+    phase2_verified_record_count: int,
+    phase2_integrity_invalid_record_count: int,
+    phase2_runtime_failed_record_count: int,
+    phase2_unevaluated_record_count: int,
+    runtime_failed_from_phase2_verified_count: int,
+    runtime_failed_from_phase2_runtime_failed_count: int,
+    ordered_disposition_record_digests: tuple[str, ...],
+    ordered_ranked_record_digests: tuple[str, ...],
+    ordered_top_n_record_digests: tuple[str, ...],
+    ordered_identity_snapshot_digests: tuple[str, ...],
+    ordered_phase2_source_snapshot_digests: tuple[str | None, ...],
+    ordered_phase3_source_binding_digests: tuple[str | None, ...],
+    ordered_phase3_preparation_result_digests: tuple[str, ...],
+    termination_status: TerminationStatus,
+    ordered_warning_digests: tuple[str, ...],
+    ordered_blocker_digests: tuple[str, ...],
+) -> dict[str, object]:
+    return {"schema_version": schema_version,
+        "sizing_request_identity_digest": sizing_request_identity_digest,
+        "passed_gate_digest": passed_gate_digest,
+        "candidate_set_digest": candidate_set_digest,
+        "evaluation_input_digest": evaluation_input_digest,
+        "optimization_objective": optimization_objective.value,
+        "requested_top_n": requested_top_n,
+        "total_candidate_count": total_candidate_count,
+        "feasible_candidate_count": feasible_candidate_count,
+        "infeasible_candidate_count": infeasible_candidate_count,
+        "provider_mismatch_count": provider_mismatch_count,
+        "integrity_failed_count": integrity_failed_count,
+        "provenance_failed_count": provenance_failed_count,
+        "runtime_failed_count": runtime_failed_count,
+        "unevaluated_count": unevaluated_count,
+        "phase2_verified_record_count": phase2_verified_record_count,
+        "phase2_integrity_invalid_record_count": phase2_integrity_invalid_record_count,
+        "phase2_runtime_failed_record_count": phase2_runtime_failed_record_count,
+        "phase2_unevaluated_record_count": phase2_unevaluated_record_count,
+        "runtime_failed_from_phase2_verified_count": runtime_failed_from_phase2_verified_count,
+        "runtime_failed_from_phase2_runtime_failed_count": runtime_failed_from_phase2_runtime_failed_count,
+        "ordered_disposition_record_digests": list(ordered_disposition_record_digests),
+        "ordered_ranked_record_digests": list(ordered_ranked_record_digests),
+        "ordered_top_n_record_digests": list(ordered_top_n_record_digests),
+        "ordered_identity_snapshot_digests": list(ordered_identity_snapshot_digests),
+        "ordered_phase2_source_snapshot_digests": list(ordered_phase2_source_snapshot_digests),
+        "ordered_phase3_source_binding_digests": list(ordered_phase3_source_binding_digests),
+        "ordered_phase3_preparation_result_digests": list(ordered_phase3_preparation_result_digests),
+        "termination_status": termination_status.value,
+        "ordered_warning_digests": list(ordered_warning_digests),
+        "ordered_blocker_digests": list(ordered_blocker_digests)}
 ```
 
 ### 19.2 Model
