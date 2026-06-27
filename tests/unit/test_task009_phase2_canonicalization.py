@@ -38,9 +38,11 @@ from hexagent.optimization.evaluation import (
     build_canonical_context_entries,
     canonicalize_trusted_context_value,
     engineering_message_payload,
+    engineering_message_sort_key,
     execution_context_snapshot_payload,
     provider_identity_snapshot_payload,
     rating_request_identity_payload,
+    revalidate_verified_rating_evidence,
     run_failure_payload,
     selected_correlation_snapshot_payload,
     verified_rating_evidence_payload,
@@ -656,6 +658,19 @@ class TestQuantityAdapter:
             def to_si(self) -> None:
                 raise RuntimeError("conversion failed")
 
+        with pytest.raises(ContextCanonicalizationError) as exc_info:
+            _canon(_BadQ())
+        err = exc_info.value
+        assert (
+            err.data.failure_kind is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert err.data.context_key == "test"
+        assert err.data.context_path == ()
+        assert "RuntimeError" in err.data.offending_type or "_BadQ" in err.data.offending_type
+        assert err.safe_marker_digest is not None
+        assert len(err.safe_marker_digest) > 20
+
+        # Stability
         _assert_canon_error(_BadQ(), ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION)
 
     def test_to_si_not_callable(self) -> None:
@@ -667,6 +682,17 @@ class TestQuantityAdapter:
             kind = type("Kind", (), {"value": "length"})()
             to_si = "not_callable"
 
+        with pytest.raises(ContextCanonicalizationError) as exc_info:
+            _canon(_NoCallQ())
+        err = exc_info.value
+        assert err.data.failure_kind is ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE
+        assert err.data.context_key == "test"
+        assert err.data.context_path == ()
+        assert "_NoCallQ" in err.data.offending_type
+        assert err.safe_marker_digest is not None
+        assert len(err.safe_marker_digest) > 20
+
+        # Stability
         _assert_canon_error(_NoCallQ(), ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE)
 
     def test_kind_getter_raises(self) -> None:
@@ -683,6 +709,19 @@ class TestQuantityAdapter:
             def to_si(self) -> _BadKindQ:
                 return self
 
+        with pytest.raises(ContextCanonicalizationError) as exc_info:
+            _canon(_BadKindQ())
+        err = exc_info.value
+        assert (
+            err.data.failure_kind is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert err.data.context_key == "test"
+        assert err.data.context_path == ()
+        assert "RuntimeError" in err.data.offending_type or "_BadKindQ" in err.data.offending_type
+        assert err.safe_marker_digest is not None
+        assert len(err.safe_marker_digest) > 20
+
+        # Stability
         _assert_canon_error(
             _BadKindQ(),
             ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
@@ -697,13 +736,18 @@ class TestQuantityAdapter:
         q = self._QuantityMock(value_raises=True)
         with pytest.raises(ContextCanonicalizationError) as exc:
             _canon(q)
+        err = exc.value
         assert (
-            exc.value.data.failure_kind
-            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+            err.data.failure_kind is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
         )
-        assert exc.value.data.context_key == "test"
-        assert exc.value.data.context_path == ()
-        assert "QuantityMock" in exc.value.data.offending_type
+        assert err.data.context_key == "test"
+        assert err.data.context_path == ()
+        assert "QuantityMock" in err.data.offending_type
+        assert err.safe_marker_digest is not None
+        assert len(err.safe_marker_digest) > 20
+
+        # Stability
+        _assert_canon_error(q, ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION)
 
     def test_unit_getter_failure(self) -> None:
         """unit getter raises → CANONICALIZATION_EXCEPTION."""
@@ -716,6 +760,12 @@ class TestQuantityAdapter:
         )
         assert exc.value.data.context_key == "test"
         assert exc.value.data.context_path == ()
+        assert "QuantityMock" in exc.value.data.offending_type
+        assert exc.value.safe_marker_digest is not None
+        assert len(exc.value.safe_marker_digest) > 20
+
+        # Stability
+        _assert_canon_error(q, ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION)
 
     def test_kind_getter_failure(self) -> None:
         """kind getter raises → CANONICALIZATION_EXCEPTION."""
@@ -728,6 +778,12 @@ class TestQuantityAdapter:
         )
         assert exc.value.data.context_key == "test"
         assert exc.value.data.context_path == ()
+        assert "QuantityMock" in exc.value.data.offending_type
+        assert exc.value.safe_marker_digest is not None
+        assert len(exc.value.safe_marker_digest) > 20
+
+        # Stability
+        _assert_canon_error(q, ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION)
 
     def test_to_si_getter_failure(self) -> None:
         """to_si access raises → CANONICALIZATION_EXCEPTION."""
@@ -740,6 +796,12 @@ class TestQuantityAdapter:
         )
         assert exc.value.data.context_key == "test"
         assert exc.value.data.context_path == ()
+        assert "QuantityMock" in exc.value.data.offending_type
+        assert exc.value.safe_marker_digest is not None
+        assert len(exc.value.safe_marker_digest) > 20
+
+        # Stability
+        _assert_canon_error(q, ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION)
 
     def test_kind_none_skips_to_si(self) -> None:
         """kind=None → to_si() is never called (even if to_si would raise)."""
@@ -753,41 +815,70 @@ class TestQuantityAdapter:
         q = self._QuantityMock(to_si_not_callable=True)
         with pytest.raises(ContextCanonicalizationError) as exc:
             _canon(q)
-        assert exc.value.data.failure_kind is ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE
-        assert exc.value.data.context_key == "test"
+        err = exc.value
+        assert err.data.failure_kind is ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE
+        assert err.data.context_key == "test"
+        assert err.data.context_path == ()
+        assert "QuantityMock" in err.data.offending_type
+        assert err.safe_marker_digest is not None
+        assert len(err.safe_marker_digest) > 20
+
+        # Stability
+        _assert_canon_error(q, ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE)
 
     def test_to_si_call_failure(self) -> None:
         """to_si() raises → CANONICALIZATION_EXCEPTION."""
         q = self._QuantityMock(to_si_raises=True)
         with pytest.raises(ContextCanonicalizationError) as exc:
             _canon(q)
+        err = exc.value
         assert (
-            exc.value.data.failure_kind
-            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+            err.data.failure_kind is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
         )
-        assert exc.value.data.context_key == "test"
+        assert err.data.context_key == "test"
+        assert err.data.context_path == ()
+        assert "QuantityMock" in err.data.offending_type
+        assert err.safe_marker_digest is not None
+        assert len(err.safe_marker_digest) > 20
+
+        # Stability
+        _assert_canon_error(q, ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION)
 
     def test_si_result_value_failure(self) -> None:
         """to_si() returns an object whose .value property raises → CANONICALIZATION_EXCEPTION."""
         q = self._QuantityMock(si_value_raises=True)
         with pytest.raises(ContextCanonicalizationError) as exc:
             _canon(q)
+        err = exc.value
         assert (
-            exc.value.data.failure_kind
-            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+            err.data.failure_kind is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
         )
-        assert exc.value.data.context_key == "test"
+        assert err.data.context_key == "test"
+        assert err.data.context_path == ()
+        assert "QuantityMock" in err.data.offending_type
+        assert err.safe_marker_digest is not None
+        assert len(err.safe_marker_digest) > 20
+
+        # Stability
+        _assert_canon_error(q, ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION)
 
     def test_kind_value_failure(self) -> None:
         """kind is not None but kind.value raises → CANONICALIZATION_EXCEPTION."""
         q = self._QuantityMock(kind_value_raises=True)
         with pytest.raises(ContextCanonicalizationError) as exc:
             _canon(q)
+        err = exc.value
         assert (
-            exc.value.data.failure_kind
-            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+            err.data.failure_kind is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
         )
-        assert exc.value.data.context_key == "test"
+        assert err.data.context_key == "test"
+        assert err.data.context_path == ()
+        assert "QuantityMock" in err.data.offending_type
+        assert err.safe_marker_digest is not None
+        assert len(err.safe_marker_digest) > 20
+
+        # Stability
+        _assert_canon_error(q, ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION)
 
     def test_si_equivalence_different_units(self) -> None:
         """Different raw units that yield same SI value produce same canonical payload."""
@@ -802,6 +893,134 @@ class TestQuantityAdapter:
         result2 = _canon(q2)
         assert result1["si_value"] == result2["si_value"]
         assert result1["kind"] == result2["kind"]
+
+    def test_kind_none_to_si_not_called_proof(self) -> None:
+        """kind=None → to_si() is never called, even if to_si would raise AssertionError."""
+
+        class _NoCallProof:
+            value = 100.0
+            unit = "m"
+            kind = None
+
+            def to_si(self) -> None:
+                raise AssertionError("must not be called")
+
+        result = _canon(_NoCallProof())
+        assert result["si_value"] == 100.0
+        assert result["kind"] is None
+
+    def test_si_equivalence_identical_payload_and_digest(self) -> None:
+        """SI equivalent raw values produce identical canonical payloads and digests."""
+        q1 = self._QuantityMock(value=373.15, unit="K", kind_name="absolute_temperature")
+        q2 = self._QuantityMock(
+            value=100.0,
+            unit="degC",
+            kind_name="absolute_temperature",
+            si_value=373.15,
+        )
+        result1 = _canon(q1)
+        result2 = _canon(q2)
+        assert result1 == result2
+        d1 = sha256_digest(result1)
+        d2 = sha256_digest(result2)
+        assert d1 == d2
+
+
+class TestCanonicalFailurePermutation:
+    """P0-3: Canonical ordering for warning/blocker failures must be permutation-stable."""
+
+    def test_warning_sort_key_deterministic(self) -> None:
+        """engineering_message_sort_key produces deterministic ordering for valid warnings."""
+        w1 = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="first",
+            context=(("good", "value"),),
+        )
+        w2 = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="second",
+            context=(("good", "value"),),
+        )
+        # Both orderings should produce the same sorted result
+        sorted_a = tuple(sorted((w1, w2), key=engineering_message_sort_key))
+        sorted_b = tuple(sorted((w2, w1), key=engineering_message_sort_key))
+        assert sorted_a == sorted_b
+
+    def test_blocker_sort_key_deterministic(self) -> None:
+        """engineering_message_sort_key produces deterministic ordering for valid blockers."""
+        b1 = EngineeringMessage(
+            code=ErrorCode.BLOCKER,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="first",
+            context=(("good", "value"),),
+        )
+        b2 = EngineeringMessage(
+            code=ErrorCode.BLOCKER,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="second",
+            context=(("good", "value"),),
+        )
+        sorted_a = tuple(sorted((b1, b2), key=engineering_message_sort_key))
+        sorted_b = tuple(sorted((b2, b1), key=engineering_message_sort_key))
+        assert sorted_a == sorted_b
+
+    def test_bad_context_warning_fails_deterministically(self) -> None:
+        """A warning with bad context always fails on the same context_key regardless of order."""
+        w_good = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="good",
+            context=(("good", "value"),),
+        )
+        w_bad = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="bad",
+            context=(("bad", b"bytes_data"),),
+        )
+        # Both orderings call engineering_message_payload on each warning
+        # The bad warning should always fail on "bad" context_key
+        for msgs in ((w_good, w_bad), (w_bad, w_good)):
+            for msg in msgs:
+                try:
+                    engineering_message_payload(msg)
+                except ContextCanonicalizationError as exc:
+                    assert exc.data.context_key == "bad"
+                    assert (
+                        exc.data.failure_kind is ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE
+                    )
+                    break
+            else:
+                pytest.fail("Expected at least one canonicalization failure")
+
+    def test_bad_context_blocker_fails_deterministically(self) -> None:
+        """A blocker with bad context always fails on the same context_key regardless of order."""
+        b_good = EngineeringMessage(
+            code=ErrorCode.BLOCKER,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="good",
+            context=(("good", "value"),),
+        )
+        b_bad = EngineeringMessage(
+            code=ErrorCode.BLOCKER,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="bad",
+            context=(("bad", b"bytes_data"),),
+        )
+        for msgs in ((b_good, b_bad), (b_bad, b_good)):
+            for msg in msgs:
+                try:
+                    engineering_message_payload(msg)
+                except ContextCanonicalizationError as exc:
+                    assert exc.data.context_key == "bad"
+                    assert (
+                        exc.data.failure_kind is ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE
+                    )
+                    break
+            else:
+                pytest.fail("Expected at least one canonicalization failure")
 
 
 class TestPydanticFieldLevel:
@@ -1698,3 +1917,881 @@ class TestEvidenceNegativeConstruction:
         assert sha256_digest(verified_rating_evidence_payload(ev)) == sha256_digest(
             verified_rating_evidence_payload(ev2)
         )
+
+    # ------------------------------------------------------------------
+    # P0-6: Uppercase hash and model_copy revalidation tests
+    # ------------------------------------------------------------------
+
+    def test_uppercase_hash_rejected(self) -> None:
+        """Uppercase hex chars in rating_result_hash are rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_result_hash"] = "sha256:ABCDEF" + "a" * 58
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_short_hash_rejected(self) -> None:
+        """Hash with fewer than 64 hex chars is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_result_hash"] = "sha256:" + "a" * 63
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_long_hash_rejected(self) -> None:
+        """Hash with more than 64 hex chars is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_result_hash"] = "sha256:" + "a" * 65
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_missing_prefix_hash_rejected(self) -> None:
+        """Hash without sha256: prefix is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_result_hash"] = "a" * 64
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_model_copy_bypasses_validator(self) -> None:
+        """model_copy bypasses validator — this is expected behavior but must be documented."""
+        kwargs = self._valid_evidence_kwargs()
+        ev = VerifiedRatingEvidenceSnapshot(**kwargs)
+        # model_copy does NOT re-validate — use an invalid hash to prove it
+        invalid_hash = "not_a_hash"
+        ev_mut = ev.model_copy(update={"rating_result_hash": invalid_hash})
+        # The copy still works (model_copy bypasses validators)
+        assert ev_mut.rating_result_hash == invalid_hash
+        # But revalidation must fail because the hash format is invalid
+        with pytest.raises((ValueError, TypeError)):
+            revalidate_verified_rating_evidence(ev_mut)
+
+
+# ============================================================================
+# P0-5: 8 entry-point negative tests — MaterializationResult forgery
+# ============================================================================
+
+
+class TestMaterializationEntryRejection:
+    """P0-5: Forged aggregates rejected at evaluate_all_candidates entry."""
+
+    def _make_minimal_result(
+        self,
+        hash_passes: bool = True,
+        prov_passes: bool = True,
+    ) -> Any:
+        """Create a duck-typed RatingResult for the spy rating_fn."""
+        from hexagent.exchangers.double_pipe.result import RatingResult, RatingStatus
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+        result = object.__new__(RatingResult)
+        object.__setattr__(result, "status", RatingStatus.SUCCEEDED)
+        object.__setattr__(result, "flow_arrangement", FlowArrangement.COUNTERFLOW)
+        object.__setattr__(result, "result_hash", "sha256:" + "e" * 64)
+        object.__setattr__(result, "provenance_digest", "prov_digest")
+        object.__setattr__(result, "heat_duty_w", 1000.0)
+        object.__setattr__(result, "hot_outlet_temperature_k", 350.0)
+        object.__setattr__(result, "cold_outlet_temperature_k", 310.0)
+        object.__setattr__(result, "area_inner_m2", 1.5)
+        object.__setattr__(result, "area_outer_m2", 2.0)
+        object.__setattr__(result, "UA_w_k", 500.0)
+        object.__setattr__(result, "LMTD_k", 40.0)
+        object.__setattr__(result, "energy_residual_w", 0.001)
+        object.__setattr__(result, "ua_lmtd_residual_w", 0.002)
+        object.__setattr__(result, "tube_selected_correlation_id", "corr_1")
+        object.__setattr__(result, "tube_selected_correlation_version", "1.0")
+        object.__setattr__(result, "annulus_selected_correlation_id", "corr_2")
+        object.__setattr__(result, "annulus_selected_correlation_version", "1.0")
+        object.__setattr__(result, "warnings", ())
+        object.__setattr__(result, "blockers", ())
+        object.__setattr__(result, "failure", None)
+        object.__setattr__(result, "hot_inlet_state", None)
+        object.__setattr__(result, "cold_inlet_state", None)
+        object.__setattr__(result, "tube_selected_correlation", None)
+        object.__setattr__(result, "annulus_selected_correlation", None)
+
+        from hexagent.exchangers.double_pipe.result import RatingRequestIdentity
+
+        rri = RatingRequestIdentity(
+            hot_fluid_name="w",
+            hot_fluid_backend="i",
+            hot_fluid_components=(),
+            cold_fluid_name="b",
+            cold_fluid_backend="n",
+            cold_fluid_components=(),
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=1e5,
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            flow_arrangement="counterflow",
+            geometry={
+                "inner_tube_inner_diameter_m": 0.05,
+                "inner_tube_outer_diameter_m": 0.06,
+                "outer_pipe_inner_diameter_m": 0.10,
+                "effective_length_m": 1.0,
+                "wall_thermal_conductivity_w_m_k": 50.0,
+                "inner_surface_roughness_m": 1e-5,
+                "annulus_surface_roughness_m": 1e-5,
+                "inner_fouling_resistance_m2k_w": 0.0001,
+                "outer_fouling_resistance_m2k_w": 0.0002,
+            },
+            solver_absolute_residual_w=1e-3,
+            solver_relative_residual_fraction=1e-8,
+            solver_bracket_temperature_tolerance_k=1e-4,
+            solver_max_iterations=100,
+        )
+        object.__setattr__(result, "request_identity", rri)
+
+        from hexagent.core.heat_balance import (
+            ExecutionContextSnapshot,
+            ProviderIdentitySnapshot,
+        )
+
+        pi = ProviderIdentitySnapshot(
+            name="test_provider",
+            version="1.0",
+            git_revision="abc123",
+            reference_state_policy="default",
+        )
+        object.__setattr__(result, "provider_identity", pi)
+
+        ec = object.__new__(ExecutionContextSnapshot)
+        object.__setattr__(ec, "request_id", None)
+        object.__setattr__(ec, "design_case_revision_id", None)
+        object.__setattr__(ec, "calculation_run_id", None)
+        object.__setattr__(ec, "execution_id", None)
+        object.__setattr__(ec, "rating_software_version", None)
+        object.__setattr__(ec, "execution_context_policy_version", None)
+        object.__setattr__(result, "execution_context", ec)
+
+        def _verify_hash() -> bool:
+            return hash_passes
+
+        def _verify_provenance() -> bool:
+            return prov_passes
+
+        object.__setattr__(result, "verify_hash", _verify_hash)
+        object.__setattr__(result, "verify_provenance", _verify_provenance)
+
+        return result
+
+    def _build_legit(
+        self,
+        catalog_id: str = "c1",
+        option_id: str = "opt_a",
+        length: float = 1.0,
+    ) -> tuple[Any, Any, Any, Any]:
+        """Build a valid MaterializationResult through the production chain.
+
+        Returns (sizing_request_identity, solver_params, provider, materialization_result).
+        """
+        import unittest.mock
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.catalog import compute_catalog_content_hash
+        from hexagent.optimization.context import (
+            OptimizationObjective,
+            build_sizing_request_identity,
+            create_passed_sizing_gate,
+        )
+        from hexagent.optimization.identities import (
+            materialize_all_candidates,
+        )
+        from hexagent.optimization.models import (
+            CompleteDoublePipeAssemblyOption,
+            CompleteDoublePipeCatalogSnapshot,
+            LengthSource,
+            OptionRawCountRecord,
+            SizingRequest,
+        )
+        from hexagent.properties.base import PropertyProvider
+
+        opt = CompleteDoublePipeAssemblyOption(
+            assembly_option_id=option_id,
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            manufacturing_option_identity="std",
+            manufacturing_metadata=(),
+            length_source=LengthSource(
+                length_quantum_m="0.1",
+                allowed_effective_lengths_m=(length,),
+            ),
+        )
+
+        cat_hash = compute_catalog_content_hash(
+            catalog_id=catalog_id,
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt,),
+        )
+
+        cat = CompleteDoublePipeCatalogSnapshot(
+            catalog_id=catalog_id,
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(opt,),
+            catalog_content_hash=cat_hash,
+        )
+
+        req = SizingRequest(catalogs=(cat,))
+
+        ident = build_sizing_request_identity(
+            request=req,
+            hot_fluid_name="w",
+            cold_fluid_name="b",
+            hot_fluid_equation_of_state="i",
+            cold_fluid_equation_of_state="n",
+            hot_fluid_normalized_components=(),
+            cold_fluid_normalized_components=(),
+            hot_inlet_temperature_k=300.0,
+            cold_inlet_temperature_k=280.0,
+            hot_inlet_pressure_pa=1e5,
+            cold_inlet_pressure_pa=2e5,
+            hot_mass_flow_kg_s=5.0,
+            cold_mass_flow_kg_s=5.0,
+            tube_in_hot=True,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
+            minimum_terminal_delta_t=5.0,
+            required_duty_w=1000.0,
+            duty_absolute_tolerance_w=10.0,
+            duty_relative_tolerance=0.01,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+            top_n=5,
+            solver_params=SolverParams(),
+            expected_provider_identity=self._default_expected_provider(),
+            design_case_revision_id=UUID("11111111-1111-1111-1111-111111111111"),
+            calculation_run_id=UUID("22222222-2222-2222-2222-222222222222"),
+        )
+
+        rec = OptionRawCountRecord(
+            catalog_id=cat.catalog_id,
+            catalog_version=cat.catalog_version,
+            catalog_content_hash=cat.catalog_content_hash,
+            source_identity=cat.source_identity,
+            schema_version=cat.schema_version,
+            assembly_option_id=opt.assembly_option_id,
+            canonical_length_quantum_m=opt.length_source.length_quantum_m,
+            raw_count=len(opt.length_source.allowed_effective_lengths_m),
+        )
+
+        gate = create_passed_sizing_gate(
+            sizing_request_identity_digest=ident.sizing_request_identity_digest,
+            raw_combination_count=1,
+            effective_cap=100,
+            per_option_records=(rec,),
+        )
+
+        mat_result = materialize_all_candidates(
+            catalogs=(cat,),
+            sizing_gate=gate,
+        )
+
+        provider = unittest.mock.MagicMock(spec=PropertyProvider)
+        solver_params = SolverParams()
+
+        return ident, solver_params, provider, mat_result
+
+    def _default_expected_provider(self) -> Any:
+        from hexagent.optimization.context import ExpectedProviderIdentity
+
+        return ExpectedProviderIdentity(
+            name="test_provider",
+            version="1.0",
+            git_revision="abc123",
+            reference_state_policy="default",
+        )
+
+    # ------------------------------------------------------------------
+    # Test 1: Unrelated gate and candidate set
+    # ------------------------------------------------------------------
+
+    def test_unrelated_gate_and_candidate_set_rejected(self) -> None:
+        """Forged: mr1's candidates + mr2's gate → rejected before any rating call."""
+        ident1, sp1, prov1, mr1 = self._build_legit()
+        ident2, sp2, prov2, mr2 = self._build_legit(catalog_id="c2", option_id="opt_z")
+
+        # Create forged: mr1's candidates + mr2's gate
+        forged = object.__new__(type(mr1))
+        object.__setattr__(forged, "candidates", mr1.candidates)
+        object.__setattr__(forged, "candidate_set", mr1.candidate_set)
+        object.__setattr__(forged, "sizing_gate", mr2.sizing_gate)
+        object.__setattr__(forged, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged, "minimum_effective_length_m", mr1.minimum_effective_length_m)
+        object.__setattr__(forged, "maximum_effective_length_m", mr1.maximum_effective_length_m)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0  # No TASK-008 call
+
+    # ------------------------------------------------------------------
+    # Test 2: Unrelated candidates
+    # ------------------------------------------------------------------
+
+    def test_unrelated_candidates_rejected(self) -> None:
+        """Valid gate + candidates from a different materialization → rejected."""
+        ident1, sp1, prov1, mr1 = self._build_legit()
+        ident2, sp2, prov2, mr2 = self._build_legit(catalog_id="c2", option_id="opt_z")
+
+        forged = object.__new__(type(mr1))
+        object.__setattr__(forged, "candidates", mr2.candidates)
+        object.__setattr__(forged, "candidate_set", mr2.candidate_set)
+        object.__setattr__(forged, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged, "minimum_effective_length_m", mr1.minimum_effective_length_m)
+        object.__setattr__(forged, "maximum_effective_length_m", mr1.maximum_effective_length_m)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    # ------------------------------------------------------------------
+    # Test 3: Candidate_set has extra catalog ref not in gate
+    # ------------------------------------------------------------------
+
+    def test_candidate_set_extra_catalog_rejected(self) -> None:
+        """Candidate_set has a catalog ref not in sizing_gate."""
+        from hexagent.optimization.context import MaterializedCandidateSet
+        from hexagent.optimization.identities import catalog_snapshot_ref
+
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        # Create a bogus catalog snapshot for the extra ref
+        from hexagent.optimization.catalog import compute_catalog_content_hash
+        from hexagent.optimization.models import (
+            CompleteDoublePipeAssemblyOption,
+            CompleteDoublePipeCatalogSnapshot,
+            LengthSource,
+        )
+
+        bogus_opt = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="bogus_opt",
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            manufacturing_option_identity="std",
+            manufacturing_metadata=(),
+            length_source=LengthSource(
+                length_quantum_m="0.1",
+                allowed_effective_lengths_m=(2.0,),
+            ),
+        )
+        bogus_hash = compute_catalog_content_hash(
+            catalog_id="bogus_cat",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(bogus_opt,),
+        )
+        bogus_cat = CompleteDoublePipeCatalogSnapshot(
+            catalog_id="bogus_cat",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(bogus_opt,),
+            catalog_content_hash=bogus_hash,
+        )
+        # Build a bogus catalog ref from the bogus catalog
+        bogus_ref = catalog_snapshot_ref(bogus_cat)
+        extra_refs = mr1.candidate_set.catalog_snapshot_identities + (bogus_ref,)
+
+        # Use object.__new__ to bypass MaterializedCandidateSet validation (catalog ordering check)
+        cs = mr1.candidate_set
+        bad_set = object.__new__(MaterializedCandidateSet)
+        settr = object.__setattr__
+        settr(bad_set, "sizing_request_identity_digest", cs.sizing_request_identity_digest)
+        settr(bad_set, "passed_gate_digest", cs.passed_gate_digest)
+        settr(bad_set, "catalog_snapshot_identities", extra_refs)
+        settr(bad_set, "minimum_effective_length_m", cs.minimum_effective_length_m)
+        settr(bad_set, "maximum_effective_length_m", cs.maximum_effective_length_m)
+        settr(bad_set, "raw_combination_count", cs.raw_combination_count)
+        settr(bad_set, "unique_candidate_count", cs.unique_candidate_count)
+        settr(bad_set, "ordered_candidate_ids", cs.ordered_candidate_ids)
+        settr(bad_set, "candidate_set_digest", cs.candidate_set_digest)
+
+        forged = object.__new__(type(mr1))
+        object.__setattr__(forged, "candidates", mr1.candidates)
+        object.__setattr__(forged, "candidate_set", bad_set)
+        object.__setattr__(forged, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged, "minimum_effective_length_m", mr1.minimum_effective_length_m)
+        object.__setattr__(forged, "maximum_effective_length_m", mr1.maximum_effective_length_m)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    # ------------------------------------------------------------------
+    # Test 4: Candidate_set missing a catalog ref that IS in gate
+    # ------------------------------------------------------------------
+
+    def test_candidate_set_missing_catalog_rejected(self) -> None:
+        """Candidate_set missing a catalog ref that IS in sizing_gate."""
+        from hexagent.optimization.context import _create_materialized_candidate_set
+
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        # Remove the first catalog ref from candidate_set
+        reduced_refs = mr1.candidate_set.catalog_snapshot_identities[1:]
+        bad_set = _create_materialized_candidate_set(
+            sizing_request_identity_digest=mr1.candidate_set.sizing_request_identity_digest,
+            passed_gate_digest=mr1.candidate_set.passed_gate_digest,
+            catalog_snapshot_identities=reduced_refs,
+            minimum_effective_length_m=mr1.candidate_set.minimum_effective_length_m,
+            maximum_effective_length_m=mr1.candidate_set.maximum_effective_length_m,
+            raw_combination_count=mr1.candidate_set.raw_combination_count,
+            ordered_candidates=mr1.candidates,
+        )
+
+        forged = object.__new__(type(mr1))
+        object.__setattr__(forged, "candidates", mr1.candidates)
+        object.__setattr__(forged, "candidate_set", bad_set)
+        object.__setattr__(forged, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged, "minimum_effective_length_m", mr1.minimum_effective_length_m)
+        object.__setattr__(forged, "maximum_effective_length_m", mr1.maximum_effective_length_m)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    # ------------------------------------------------------------------
+    # Test 5: Bounds mismatch
+    # ------------------------------------------------------------------
+
+    def test_bounds_mismatch_rejected(self) -> None:
+        """Different bounds in manifest vs candidate_set."""
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        # Build a tampered candidate_set using object.__new__ to bypass
+        # model validation (which enforces min <= max).
+        from hexagent.optimization.context import MaterializedCandidateSet
+
+        cs = mr1.candidate_set
+        bad_set = object.__new__(MaterializedCandidateSet)
+        settr = object.__setattr__
+        settr(bad_set, "sizing_request_identity_digest", cs.sizing_request_identity_digest)
+        settr(bad_set, "passed_gate_digest", cs.passed_gate_digest)
+        settr(bad_set, "catalog_snapshot_identities", cs.catalog_snapshot_identities)
+        settr(bad_set, "minimum_effective_length_m", 999.0)
+        settr(bad_set, "maximum_effective_length_m", 888.0)
+        settr(bad_set, "raw_combination_count", cs.raw_combination_count)
+        settr(bad_set, "unique_candidate_count", cs.unique_candidate_count)
+        settr(bad_set, "ordered_candidate_ids", cs.ordered_candidate_ids)
+        settr(bad_set, "candidate_set_digest", cs.candidate_set_digest)
+
+        forged = object.__new__(type(mr1))
+        object.__setattr__(forged, "candidates", mr1.candidates)
+        object.__setattr__(forged, "candidate_set", bad_set)
+        object.__setattr__(forged, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged, "minimum_effective_length_m", mr1.minimum_effective_length_m)
+        object.__setattr__(forged, "maximum_effective_length_m", mr1.maximum_effective_length_m)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    # ------------------------------------------------------------------
+    # Test 6: Candidate option not in gate
+    # ------------------------------------------------------------------
+
+    def test_candidate_option_not_in_gate_rejected(self) -> None:
+        """Candidate from an option the sizing_gate doesn't know about."""
+        from hexagent.optimization.identities import build_candidate
+
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        # Build a candidate from a different catalog/option
+        from hexagent.optimization.models import (
+            CompleteDoublePipeAssemblyOption,
+            LengthSource,
+        )
+
+        bogus_opt = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="bogus_opt",
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            manufacturing_option_identity="std",
+            manufacturing_metadata=(),
+            length_source=LengthSource(
+                length_quantum_m="0.1",
+                allowed_effective_lengths_m=(2.0,),
+            ),
+        )
+        from hexagent.optimization.catalog import compute_catalog_content_hash
+
+        bogus_hash = compute_catalog_content_hash(
+            catalog_id="bogus_cat",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(bogus_opt,),
+        )
+        from hexagent.optimization.models import CompleteDoublePipeCatalogSnapshot
+
+        bogus_cat = CompleteDoublePipeCatalogSnapshot(
+            catalog_id="bogus_cat",
+            catalog_version="v1",
+            source_identity="test",
+            schema_version="1.0",
+            assembly_options=(bogus_opt,),
+            catalog_content_hash=bogus_hash,
+        )
+
+        bogus_candidate = build_candidate(bogus_cat, bogus_opt, "2.0")
+        bad_candidates = mr1.candidates + (bogus_candidate,)
+
+        forged = object.__new__(type(mr1))
+        object.__setattr__(forged, "candidates", bad_candidates)
+        object.__setattr__(forged, "candidate_set", mr1.candidate_set)
+        object.__setattr__(forged, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged, "minimum_effective_length_m", mr1.minimum_effective_length_m)
+        object.__setattr__(forged, "maximum_effective_length_m", mr1.maximum_effective_length_m)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    # ------------------------------------------------------------------
+    # Test 7: Candidate identity forged
+    # ------------------------------------------------------------------
+
+    def test_candidate_identity_forged_rejected(self) -> None:
+        """Candidate with mangled physical_identity_digest → rejected."""
+        import copy
+
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        # Mangle the physical_identity_digest of the first candidate
+        bad_candidates = tuple(copy.deepcopy(c) for c in mr1.candidates)
+        object.__setattr__(bad_candidates[0], "physical_identity_digest", "tampered_digest")
+
+        forged = object.__new__(type(mr1))
+        object.__setattr__(forged, "candidates", bad_candidates)
+        object.__setattr__(forged, "candidate_set", mr1.candidate_set)
+        object.__setattr__(forged, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged, "minimum_effective_length_m", mr1.minimum_effective_length_m)
+        object.__setattr__(forged, "maximum_effective_length_m", mr1.maximum_effective_length_m)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0
+
+    # ------------------------------------------------------------------
+    # Test 8: Candidate length tampered
+    # ------------------------------------------------------------------
+
+    def test_candidate_length_tampered_rejected(self) -> None:
+        """Length tampering detected via source_qualified_candidate_id mismatch."""
+        import copy
+
+        ident1, sp1, prov1, mr1 = self._build_legit()
+
+        # Mangle the effective_length_m_canonical AND the source_qualified_candidate_id
+        # so that the candidate ordering check in evaluate_all_candidates fails.
+        bad_candidates = tuple(copy.deepcopy(c) for c in mr1.candidates)
+        object.__setattr__(bad_candidates[0], "effective_length_m_canonical", 999.0)
+        object.__setattr__(
+            bad_candidates[0],
+            "source_qualified_candidate_id",
+            "tampered_candidate_id",
+        )
+
+        forged = object.__new__(type(mr1))
+        object.__setattr__(forged, "candidates", bad_candidates)
+        object.__setattr__(forged, "candidate_set", mr1.candidate_set)
+        object.__setattr__(forged, "sizing_gate", mr1.sizing_gate)
+        object.__setattr__(forged, "catalog_snapshots", mr1.catalog_snapshots)
+        object.__setattr__(forged, "minimum_effective_length_m", mr1.minimum_effective_length_m)
+        object.__setattr__(forged, "maximum_effective_length_m", mr1.maximum_effective_length_m)
+
+        import unittest.mock as um
+
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+        from hexagent.optimization.adapter import evaluate_all_candidates
+        from hexagent.properties.base import FluidIdentifier
+
+        provider = um.MagicMock()
+        calls: list[dict] = []
+
+        def spy(**kw: Any) -> Any:
+            calls.append(dict(kw))
+            return self._make_minimal_result()
+
+        with pytest.raises((ValueError, TypeError)):
+            evaluate_all_candidates(
+                materialization_result=forged,
+                hot_fluid=FluidIdentifier(name="w", equation_of_state_backend="i"),
+                cold_fluid=FluidIdentifier(name="b", equation_of_state_backend="n"),
+                hot_mass_flow_kg_s=5.0,
+                cold_mass_flow_kg_s=5.0,
+                hot_inlet_temperature_k=300.0,
+                cold_inlet_temperature_k=280.0,
+                hot_inlet_pressure_pa=1e5,
+                cold_inlet_pressure_pa=2e5,
+                tube_in_hot=True,
+                flow_arrangement=FlowArrangement.COUNTERFLOW,
+                provider=provider,
+                solver_params=SolverParams(),
+                minimum_terminal_delta_t=5.0,
+                tube_boundary_condition="constant_wall_temperature",
+                annulus_boundary_condition="inner_wall_heated",
+                sizing_request_identity=ident1,
+                rating_fn=spy,
+            )
+        assert len(calls) == 0

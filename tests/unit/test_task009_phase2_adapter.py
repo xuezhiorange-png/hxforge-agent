@@ -525,7 +525,7 @@ class TestAdapterSpy:
         object.__setattr__(bad_mat_result, "sizing_gate", mat_result.sizing_gate)
         calls, spy_fn = make_spy()
 
-        with pytest.raises(ValueError, match="digest verification failed"):
+        with pytest.raises(ValueError, match="MaterializationResult verification failed"):
             self._eval(
                 mat_result=bad_mat_result,
                 ident=ident,
@@ -1128,7 +1128,7 @@ class TestAdapterSpy:
         object.__setattr__(bad_mat_result, "candidate_set", mat_result.candidate_set)
         object.__setattr__(bad_mat_result, "sizing_gate", mat_result.sizing_gate)
 
-        with pytest.raises(ValueError, match="Candidate ordering mismatch"):
+        with pytest.raises(ValueError, match="MaterializationResult verification failed"):
             self._eval(
                 mat_result=bad_mat_result,
                 ident=ident,
@@ -1220,6 +1220,14 @@ class TestAdapterSpy:
         )
         assert records[0].evaluation_failure is not None
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        # P0-4: Structured payload assertions for warning path
+        failure_ctx = dict(records[0].evaluation_failure.context)
+        assert failure_ctx["failure_stage"] == "rating_verification"
+        assert failure_ctx["owner_kind"] == "warning"
+        assert "warning:0" in failure_ctx["owner_id"] or "warning" in str(failure_ctx["owner_id"])
+        assert failure_ctx["original_code"] == "input_inconsistent"
+        assert failure_ctx["context_key"] == "bad"
+        assert failure_ctx["failure_kind"] == "unsupported_type"
         assert records[0].candidate_evaluation_identity is None
         assert records[0].verified_rating_evidence is None
         assert records[0].invalid_rating_evidence is None
@@ -1270,6 +1278,12 @@ class TestAdapterSpy:
         )
         assert records[0].evaluation_failure is not None
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        # P0-4: Structured payload assertions for blocker path
+        failure_ctx = dict(records[0].evaluation_failure.context)
+        assert failure_ctx["owner_kind"] == "blocker"
+        assert failure_ctx["original_code"] == "blocker"
+        assert failure_ctx["context_key"] == "bad"
+        assert failure_ctx["failure_kind"] == "unsupported_type"
         assert records[0].candidate_evaluation_identity is None
         assert records[0].verified_rating_evidence is None
         assert records[0].invalid_rating_evidence is None
@@ -1317,6 +1331,14 @@ class TestAdapterSpy:
         )
         assert records[0].evaluation_failure is not None
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        # P0-4: Structured payload assertions for RunFailure path
+        failure_ctx = dict(records[0].evaluation_failure.context)
+        assert failure_ctx["owner_kind"] == "run_failure"
+        owner_id_str = str(failure_ctx["owner_id"])
+        assert "run_failure:0" in owner_id_str or "run_failure" in owner_id_str
+        assert failure_ctx["original_code"] == "calculation_blocked"
+        assert failure_ctx["context_key"] == "bad"
+        assert failure_ctx["failure_kind"] == "unsupported_type"
         assert records[0].candidate_evaluation_identity is None
         assert records[0].verified_rating_evidence is None
         assert records[0].invalid_rating_evidence is None

@@ -285,23 +285,27 @@ def build_candidate(
 
 @dataclasses.dataclass(frozen=True)
 class MaterializationResult:
-    """Result of materialize_all_candidates().
+    """Bundled result of materialize_all_candidates().
 
-    ``candidates``, ``candidate_set``, and ``sizing_gate`` are bound
-    together at construction time and cannot be separately provided later.
+    ``candidates``, ``candidate_set``, ``sizing_gate``, and
+    ``catalog_snapshots`` are bound together at construction time and
+    cannot be separately provided later.
 
     Construction requires the module-private ``_MATERIALIZATION_TOKEN``
-    to reduce accidental misuse.  Full semantic validation is performed
-    in ``_validate()`` to ensure candidates-to-set-and-gate invariants hold.
+    as an accidental-misuse guard — it is not a security or provenance
+    boundary.  Full semantic validation is performed in ``_validate()``
+    to ensure candidates-to-set-and-gate invariants hold.
 
-    Note: The token is a Python-level convention, not a security boundary.
-    Production code should always obtain a ``MaterializationResult``
-    from ``materialize_all_candidates()``.
+    Use ``verify_or_raise()`` before any TASK-008 evaluation to
+    confirm full provenance verification of the materialization result.
     """
 
     candidates: tuple[ManufacturableCandidate, ...]
     candidate_set: MaterializedCandidateSet
     sizing_gate: PassedSizingGate  # P0-5: full gate binding
+    catalog_snapshots: tuple[CompleteDoublePipeCatalogSnapshot, ...]
+    minimum_effective_length_m: float | None = None
+    maximum_effective_length_m: float | None = None
 
     def __init__(
         self,
@@ -309,6 +313,9 @@ class MaterializationResult:
         candidates: tuple[ManufacturableCandidate, ...],
         candidate_set: MaterializedCandidateSet,
         sizing_gate: PassedSizingGate,
+        catalog_snapshots: tuple[CompleteDoublePipeCatalogSnapshot, ...],
+        minimum_effective_length_m: float | None = None,
+        maximum_effective_length_m: float | None = None,
         _token: object,
     ) -> None:
         if _token is not _MATERIALIZATION_TOKEN:
@@ -317,6 +324,9 @@ class MaterializationResult:
         object.__setattr__(self, "candidates", candidates)
         object.__setattr__(self, "candidate_set", candidate_set)
         object.__setattr__(self, "sizing_gate", sizing_gate)
+        object.__setattr__(self, "catalog_snapshots", catalog_snapshots)
+        object.__setattr__(self, "minimum_effective_length_m", minimum_effective_length_m)
+        object.__setattr__(self, "maximum_effective_length_m", maximum_effective_length_m)
         self._validate()
 
     def _validate(self) -> None:
@@ -486,6 +496,130 @@ class MaterializationResult:
         if errors:
             raise ValueError("; ".join(errors))
 
+    def verify_or_raise(self) -> None:
+        """Full provenance verification of the materialization result.
+
+        Must be called before any TASK-008 evaluation.
+        """
+        errors: list[str] = []
+
+        # Gate verification
+        if not self.sizing_gate.verify_digest():
+            errors.append("sizing_gate.verify_digest() failed")
+
+        # Candidate-set verification
+        if not self.candidate_set.verify_digest():
+            errors.append("candidate_set.verify_digest() failed")
+
+        # Digest chain: gate -> candidate_set
+        if (
+            self.sizing_gate.sizing_request_identity_digest
+            != self.candidate_set.sizing_request_identity_digest
+        ):
+            errors.append("digest chain: gate sizing_request_identity_digest != candidate_set")
+        if self.sizing_gate.gate_digest != self.candidate_set.passed_gate_digest:
+            errors.append("gate.gate_digest != candidate_set.passed_gate_digest")
+        if self.sizing_gate.raw_combination_count != self.candidate_set.raw_combination_count:
+            errors.append("gate raw_combination_count != candidate_set raw_combination_count")
+
+        # Catalog ref exact match
+        gate_catalog_keys = set()
+        for rec in self.sizing_gate.per_option_records:
+            gate_catalog_keys.add(
+                (
+                    rec.catalog_id,
+                    rec.catalog_version,
+                    rec.catalog_content_hash,
+                    rec.source_identity,
+                    rec.schema_version,
+                )
+            )
+        set_catalog_keys = set()
+        for ref in self.candidate_set.catalog_snapshot_identities:
+            set_catalog_keys.add(
+                (
+                    ref.catalog_id,
+                    ref.catalog_version,
+                    ref.catalog_content_hash,
+                    ref.source_identity,
+                    ref.schema_version,
+                )
+            )
+        if gate_catalog_keys != set_catalog_keys:
+            errors.append(
+                f"catalog ref mismatch: gate {gate_catalog_keys} vs set {set_catalog_keys}"
+            )
+
+        # Bounds match
+        if self.candidate_set.minimum_effective_length_m != self.minimum_effective_length_m:
+            errors.append(
+                f"bounds: candidate_set.min ({self.candidate_set.minimum_effective_length_m})"
+                f" != manifest ({self.minimum_effective_length_m})"
+            )
+        if self.candidate_set.maximum_effective_length_m != self.maximum_effective_length_m:
+            errors.append(
+                f"bounds: candidate_set.max ({self.candidate_set.maximum_effective_length_m})"
+                f" != manifest ({self.maximum_effective_length_m})"
+            )
+
+        # Replay materialization: for each catalog + option, check gate has a record
+        gate_option_keys = set()
+        for rec in self.sizing_gate.per_option_records:
+            gate_option_keys.add(
+                (
+                    rec.catalog_id,
+                    rec.catalog_version,
+                    rec.catalog_content_hash,
+                    rec.source_identity,
+                    rec.schema_version,
+                    rec.assembly_option_id,
+                )
+            )
+
+        for c in self.candidates:
+            ref = c.catalog_snapshot_ref
+            cand_key = (
+                ref.catalog_id,
+                ref.catalog_version,
+                ref.catalog_content_hash,
+                ref.source_identity,
+                ref.schema_version,
+                c.assembly_option_id,
+            )
+            if cand_key not in gate_option_keys:
+                errors.append(
+                    f"candidate {c.source_qualified_candidate_id!r}: option key not in gate"
+                )
+
+        # Candidate ordering and count
+        actual_ids = tuple(c.source_qualified_candidate_id for c in self.candidates)
+        if actual_ids != self.candidate_set.ordered_candidate_ids:
+            errors.append("candidate ordering mismatch with candidate_set")
+        if len(self.candidates) != self.candidate_set.unique_candidate_count:
+            errors.append("candidate count != unique_candidate_count")
+        if self.candidate_set.raw_combination_count < self.candidate_set.unique_candidate_count:
+            errors.append("raw_combination_count < unique_candidate_count")
+
+        # Each candidate self-consistency
+        for i, c in enumerate(self.candidates):
+            if c.evaluation_order_index != i:
+                errors.append(f"candidate[{i}] order index {c.evaluation_order_index} != {i}")
+            # Verify physical_identity -> source-qualified chain
+            if c.physical_identity_digest != c.physical_identity.physical_identity_digest:
+                errors.append(f"candidate[{i}]: physical_identity_digest mismatch")
+            if (
+                c.source_qualified_candidate_id
+                != c.source_qualified_identity.source_qualified_candidate_id
+            ):
+                errors.append(f"candidate[{i}]: source_qualified_candidate_id mismatch")
+            if c.source_qualified_identity.physical_identity_digest != c.physical_identity_digest:
+                errors.append(f"candidate[{i}]: physical digest chain broken")
+
+        if errors:
+            raise ValueError(
+                "MaterializationResult verification failed:\n  - " + "\n  - ".join(errors)
+            )
+
 
 # ---------------------------------------------------------------------------
 # Materialize all candidates for a request (aggregate pipeline step)
@@ -591,6 +725,9 @@ def materialize_all_candidates(
         candidates=deduped_candidates,
         candidate_set=candidate_set,
         sizing_gate=sizing_gate,
+        catalog_snapshots=catalogs,
+        minimum_effective_length_m=minimum_effective_length_m,
+        maximum_effective_length_m=maximum_effective_length_m,
         _token=_MATERIALIZATION_TOKEN,
     )
 

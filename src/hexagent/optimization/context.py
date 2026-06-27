@@ -28,7 +28,8 @@ if TYPE_CHECKING:
 # Frozen namespace for TASK-009 deterministic UUID5 generation.
 TASK009_CONTEXT_NAMESPACE = UUID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")
 
-# Private token for unforgeable MaterializationResult construction.
+# Private token used only as an accidental-misuse guard.
+# It is not a security or provenance boundary.
 _MATERIALIZATION_TOKEN = object()
 
 # ---------------------------------------------------------------------------

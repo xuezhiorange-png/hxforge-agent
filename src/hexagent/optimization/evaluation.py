@@ -345,6 +345,17 @@ def verified_rating_evidence_payload(
     }
 
 
+def revalidate_verified_rating_evidence(
+    evidence: VerifiedRatingEvidenceSnapshot,
+) -> VerifiedRatingEvidenceSnapshot:
+    """Re-validate a VerifiedRatingEvidenceSnapshot through model_validate.
+
+    This ensures the evidence passes all model validators, including
+    digest binding checks. Must be called before any production decision.
+    """
+    return VerifiedRatingEvidenceSnapshot.model_validate(evidence.model_dump(mode="python"))
+
+
 # ---------------------------------------------------------------------------
 # InvalidRatingEvidenceRecord — for integrity-failure paths
 # ---------------------------------------------------------------------------
@@ -757,8 +768,8 @@ def canonicalize_trusted_context_value(
             )
         updated_ancestors = ancestor_ids | {obj_id}
         result: list[CanonicalValue] = []
-        for i, item in enumerate(value):
-            try:
+        try:
+            for i, item in enumerate(value):
                 child_path = context_path + (f"[{i}]",)
                 result.append(
                     canonicalize_trusted_context_value(
@@ -768,15 +779,15 @@ def canonicalize_trusted_context_value(
                         ancestor_ids=updated_ancestors,
                     )
                 )
-            except ContextCanonicalizationError:
-                raise
-            except Exception as exc:
-                raise ContextCanonicalizationError(
-                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
-                    context_key=context_key,
-                    context_path=child_path,
-                    offending_type=qualified_type_name(item),
-                ) from exc
+        except ContextCanonicalizationError:
+            raise
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
         return result
 
     # --- dict (exact ``dict`` type) ---
@@ -800,8 +811,8 @@ def canonicalize_trusted_context_value(
                 context_path=context_path,
                 offending_type=qualified_type_name(value),
             ) from exc
-        for k, v in dict_items_view:
-            try:
+        try:
+            for k, v in dict_items_view:
                 if type(k) is not str:
                     raise ContextCanonicalizationError(
                         failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
@@ -816,15 +827,15 @@ def canonicalize_trusted_context_value(
                     context_path=child_path,
                     ancestor_ids=updated_ancestors,
                 )
-            except ContextCanonicalizationError:
-                raise
-            except Exception as exc:
-                raise ContextCanonicalizationError(
-                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
-                    context_key=context_key,
-                    context_path=context_path,
-                    offending_type=qualified_type_name(value),
-                ) from exc
+        except ContextCanonicalizationError:
+            raise
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
         return result_dict
 
     # --- collections.abc.Mapping (not dict) ---
@@ -848,8 +859,8 @@ def canonicalize_trusted_context_value(
                 context_path=context_path,
                 offending_type=qualified_type_name(value),
             ) from exc
-        for k, v in items_view:
-            try:
+        try:
+            for k, v in items_view:
                 if type(k) is not str:
                     raise ContextCanonicalizationError(
                         failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
@@ -864,15 +875,15 @@ def canonicalize_trusted_context_value(
                     context_path=child_path,
                     ancestor_ids=updated_ancestors,
                 )
-            except ContextCanonicalizationError:
-                raise
-            except Exception as exc:
-                raise ContextCanonicalizationError(
-                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
-                    context_key=context_key,
-                    context_path=context_path,
-                    offending_type=qualified_type_name(value),
-                ) from exc
+        except ContextCanonicalizationError:
+            raise
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
         return mapping_result
 
     # --- Repository Quantity-like adapter (P0-7) ---
@@ -917,33 +928,33 @@ def canonicalize_trusted_context_value(
                 offending_type=qualified_type_name(value),
             ) from exc
         pydantic_result: dict[str, CanonicalValue] = {}
-        for field_name in model_fields:
-            try:
-                field_value = getattr(value, field_name)
-            except Exception as exc:
-                raise ContextCanonicalizationError(
-                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
-                    context_key=context_key,
-                    context_path=context_path + (field_name,),
-                    offending_type=qualified_type_name(value),
-                ) from exc
-            child_path = context_path + (field_name,)
-            try:
+        try:
+            for field_name in model_fields:
+                try:
+                    field_value = getattr(value, field_name)
+                except Exception as exc:
+                    raise ContextCanonicalizationError(
+                        failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                        context_key=context_key,
+                        context_path=context_path + (field_name,),
+                        offending_type=qualified_type_name(value),
+                    ) from exc
+                child_path = context_path + (field_name,)
                 pydantic_result[field_name] = canonicalize_trusted_context_value(
                     field_value,
                     context_key=context_key,
                     context_path=child_path,
                     ancestor_ids=updated_ancestors,
                 )
-            except ContextCanonicalizationError:
-                raise
-            except Exception as exc:
-                raise ContextCanonicalizationError(
-                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
-                    context_key=context_key,
-                    context_path=child_path,
-                    offending_type=qualified_type_name(value),
-                ) from exc
+        except ContextCanonicalizationError:
+            raise
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
         return pydantic_result
 
     # --- Unsupported type ---
@@ -965,31 +976,41 @@ def build_canonical_context_entries(
     Sorted by (key, value_digest).  Duplicate entries are preserved.
     """
     entries: list[CanonicalContextEntry] = []
-    for pair in context:
-        if type(pair) is not tuple or len(pair) != 2:
-            raise ContextCanonicalizationError(
-                failure_kind=ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE,
-                context_key="<invalid-context-entry>",
-                context_path=(),
-                offending_type=qualified_type_name(pair),
-            )
-        key, raw_value = pair
-        if type(key) is not str:
-            raise ContextCanonicalizationError(
-                failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
-                context_key="<non-string-context-key>",
-                context_path=(),
-                offending_type=qualified_type_name(key),
-            )
+    try:
+        for pair in context:
+            if type(pair) is not tuple or len(pair) != 2:
+                raise ContextCanonicalizationError(
+                    failure_kind=ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE,
+                    context_key="<invalid-context-entry>",
+                    context_path=(),
+                    offending_type=qualified_type_name(pair),
+                )
+            key, raw_value = pair
+            if type(key) is not str:
+                raise ContextCanonicalizationError(
+                    failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
+                    context_key="<non-string-context-key>",
+                    context_path=(),
+                    offending_type=qualified_type_name(key),
+                )
 
-        can_val = canonicalize_trusted_context_value(
-            raw_value,
-            context_key=key,
+            can_val = canonicalize_trusted_context_value(
+                raw_value,
+                context_key=key,
+                context_path=(),
+                ancestor_ids=frozenset(),
+            )
+            val_digest = sha256_digest({"value": can_val})
+            entries.append(CanonicalContextEntry(key=key, value=can_val, value_digest=val_digest))
+    except ContextCanonicalizationError:
+        raise
+    except Exception as exc:
+        raise ContextCanonicalizationError(
+            failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+            context_key="<invalid-context-entry>",
             context_path=(),
-            ancestor_ids=frozenset(),
-        )
-        val_digest = sha256_digest({"value": can_val})
-        entries.append(CanonicalContextEntry(key=key, value=can_val, value_digest=val_digest))
+            offending_type=qualified_type_name(exc),
+        ) from exc
 
     entries.sort(key=lambda e: (e.key, e.value_digest))
     return tuple(entries)
@@ -1953,8 +1974,17 @@ def verify_and_evaluate_candidate(
             ),
         )
 
-    # P0-3: Canonicalize each warning individually
-    for w_idx, w_msg in enumerate(evidence.warnings):
+    # P0-6: Re-validate through model_validate to ensure all validators pass
+    evidence = revalidate_verified_rating_evidence(evidence)
+
+    # P0-3: Canonicalize each warning individually, sorted for deterministic owner IDs
+    try:
+        sorted_warnings = sorted(evidence.warnings, key=engineering_message_sort_key)
+    except ContextCanonicalizationError:
+        # Sorting may raise if a warning has non-canonicalizable context.
+        # Fall back to original order — per-element handling below catches it.
+        sorted_warnings = list(evidence.warnings)
+    for w_idx, w_msg in enumerate(sorted_warnings):
         try:
             _ = engineering_message_payload(w_msg)
         except ContextCanonicalizationError as cce:
@@ -1988,8 +2018,14 @@ def verify_and_evaluate_candidate(
                 evaluation_failure=cfail,
             )
 
-    # P0-3: Canonicalize each blocker individually
-    for b_idx, b_msg in enumerate(evidence.blockers):
+    # P0-3: Canonicalize each blocker individually, sorted for deterministic owner IDs
+    try:
+        sorted_blockers = sorted(evidence.blockers, key=engineering_message_sort_key)
+    except ContextCanonicalizationError:
+        # Sorting may raise if a blocker has non-canonicalizable context.
+        # Fall back to original order — per-element handling below catches it.
+        sorted_blockers = list(evidence.blockers)
+    for b_idx, b_msg in enumerate(sorted_blockers):
         try:
             _ = engineering_message_payload(b_msg)
         except ContextCanonicalizationError as cce:
@@ -2202,6 +2238,7 @@ __all__ = [
     "execution_context_snapshot_payload",
     "provider_identity_snapshot_payload",
     "rating_request_identity_payload",
+    "revalidate_verified_rating_evidence",
     "run_failure_payload",
     "selected_correlation_snapshot_payload",
     "verified_rating_evidence_payload",

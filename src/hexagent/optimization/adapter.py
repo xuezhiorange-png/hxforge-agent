@@ -357,6 +357,11 @@ def evaluate_all_candidates(
     """
 
     # ------------------------------------------------------------------
+    # P0-5: Verify full provenance before any TASK-008 calls
+    # ------------------------------------------------------------------
+    materialization_result.verify_or_raise()
+
+    # ------------------------------------------------------------------
     # P0-3: Verify MaterializedCandidateSet
     # ------------------------------------------------------------------
     candidate_set = materialization_result.candidate_set
