@@ -1223,35 +1223,26 @@ class TestAdapterSpy:
         )
         assert records[0].evaluation_failure is not None
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
-        # P0-4: Structured payload assertions for warning path
+        # P0-4: Exact 9-field assertions with independently computed digests
         failure_ctx = dict(records[0].evaluation_failure.context)
-        assert failure_ctx["failure_stage"] == "rating_verification"
-        assert failure_ctx["owner_kind"] == "warning"
-        assert "warning:0" in failure_ctx["owner_id"] or "warning" in str(failure_ctx["owner_id"])
-        assert failure_ctx["original_code"] == "input_inconsistent"
-        assert failure_ctx["context_key"] == "bad"
-        assert failure_ctx["failure_kind"] == "unsupported_type"
-        # P0-4: Exact 9-field assertions
-        assert "failure_stage" in failure_ctx
-        assert "owner_kind" in failure_ctx
-        assert "owner_id" in failure_ctx
-        assert "original_code" in failure_ctx
-        assert "context_key" in failure_ctx
-        assert "context_path_digest" in failure_ctx
-        assert "offending_type" in failure_ctx
-        assert "failure_kind" in failure_ctx
-        assert "safe_marker_digest" in failure_ctx
+        expected_context_path_digest = sha256_digest({"context_path": []})
+        expected_safe_marker_payload = {
+            "context_key": "bad",
+            "context_path": [],
+            "offending_type": "builtins.bytes",
+            "failure_kind": "unsupported_type",
+        }
+        expected_safe_marker_digest = sha256_digest(expected_safe_marker_payload)
+
         assert failure_ctx["failure_stage"] == "rating_verification"
         assert failure_ctx["owner_kind"] == "warning"
         assert failure_ctx["original_code"] == "input_inconsistent"
         assert failure_ctx["context_key"] == "bad"
-        assert failure_ctx["failure_kind"] == "unsupported_type"
         assert failure_ctx["offending_type"] == "builtins.bytes"
-        assert isinstance(failure_ctx["context_path_digest"], str)
-        assert len(failure_ctx["context_path_digest"]) == 71  # "sha256:" + 64 hex chars
-        assert isinstance(failure_ctx["safe_marker_digest"], str)
-        assert len(failure_ctx["safe_marker_digest"]) == 71  # "sha256:" + 64 hex chars
-        assert isinstance(failure_ctx["owner_id"], str)
+        assert failure_ctx["failure_kind"] == "unsupported_type"
+        assert failure_ctx["context_path_digest"] == expected_context_path_digest
+        assert failure_ctx["safe_marker_digest"] == expected_safe_marker_digest
+        assert failure_ctx["owner_id"].startswith(records[0].source_qualified_candidate_id)
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
         assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
         assert records[0].evaluation_failure.traceback is None
@@ -1305,33 +1296,26 @@ class TestAdapterSpy:
         )
         assert records[0].evaluation_failure is not None
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
-        # P0-4: Structured payload assertions for blocker path
+        # P0-4: Exact 9-field assertions with independently computed digests
         failure_ctx = dict(records[0].evaluation_failure.context)
-        assert failure_ctx["owner_kind"] == "blocker"
-        assert failure_ctx["original_code"] == "blocker"
-        assert failure_ctx["context_key"] == "bad"
-        assert failure_ctx["failure_kind"] == "unsupported_type"
-        # P0-4: Exact 9-field assertions
-        assert "failure_stage" in failure_ctx
-        assert "owner_kind" in failure_ctx
-        assert "owner_id" in failure_ctx
-        assert "original_code" in failure_ctx
-        assert "context_key" in failure_ctx
-        assert "context_path_digest" in failure_ctx
-        assert "offending_type" in failure_ctx
-        assert "failure_kind" in failure_ctx
-        assert "safe_marker_digest" in failure_ctx
+        expected_context_path_digest = sha256_digest({"context_path": []})
+        expected_safe_marker_payload = {
+            "context_key": "bad",
+            "context_path": [],
+            "offending_type": "builtins.bytes",
+            "failure_kind": "unsupported_type",
+        }
+        expected_safe_marker_digest = sha256_digest(expected_safe_marker_payload)
+
         assert failure_ctx["failure_stage"] == "rating_verification"
         assert failure_ctx["owner_kind"] == "blocker"
         assert failure_ctx["original_code"] == "blocker"
         assert failure_ctx["context_key"] == "bad"
-        assert failure_ctx["failure_kind"] == "unsupported_type"
         assert failure_ctx["offending_type"] == "builtins.bytes"
-        assert isinstance(failure_ctx["context_path_digest"], str)
-        assert len(failure_ctx["context_path_digest"]) == 71  # "sha256:" + 64 hex chars
-        assert isinstance(failure_ctx["safe_marker_digest"], str)
-        assert len(failure_ctx["safe_marker_digest"]) == 71  # "sha256:" + 64 hex chars
-        assert isinstance(failure_ctx["owner_id"], str)
+        assert failure_ctx["failure_kind"] == "unsupported_type"
+        assert failure_ctx["context_path_digest"] == expected_context_path_digest
+        assert failure_ctx["safe_marker_digest"] == expected_safe_marker_digest
+        assert failure_ctx["owner_id"].startswith(records[0].source_qualified_candidate_id)
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
         assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
         assert records[0].evaluation_failure.traceback is None
@@ -1382,35 +1366,26 @@ class TestAdapterSpy:
         )
         assert records[0].evaluation_failure is not None
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
-        # P0-4: Structured payload assertions for RunFailure path
+        # P0-4: Exact 9-field assertions with independently computed digests
         failure_ctx = dict(records[0].evaluation_failure.context)
-        assert failure_ctx["owner_kind"] == "run_failure"
-        owner_id_str = str(failure_ctx["owner_id"])
-        assert "run_failure:0" in owner_id_str or "run_failure" in owner_id_str
-        assert failure_ctx["original_code"] == "calculation_blocked"
-        assert failure_ctx["context_key"] == "bad"
-        assert failure_ctx["failure_kind"] == "unsupported_type"
-        # P0-4: Exact 9-field assertions
-        assert "failure_stage" in failure_ctx
-        assert "owner_kind" in failure_ctx
-        assert "owner_id" in failure_ctx
-        assert "original_code" in failure_ctx
-        assert "context_key" in failure_ctx
-        assert "context_path_digest" in failure_ctx
-        assert "offending_type" in failure_ctx
-        assert "failure_kind" in failure_ctx
-        assert "safe_marker_digest" in failure_ctx
+        expected_context_path_digest = sha256_digest({"context_path": []})
+        expected_safe_marker_payload = {
+            "context_key": "bad",
+            "context_path": [],
+            "offending_type": "builtins.bytes",
+            "failure_kind": "unsupported_type",
+        }
+        expected_safe_marker_digest = sha256_digest(expected_safe_marker_payload)
+
         assert failure_ctx["failure_stage"] == "rating_verification"
         assert failure_ctx["owner_kind"] == "run_failure"
         assert failure_ctx["original_code"] == "calculation_blocked"
         assert failure_ctx["context_key"] == "bad"
-        assert failure_ctx["failure_kind"] == "unsupported_type"
         assert failure_ctx["offending_type"] == "builtins.bytes"
-        assert isinstance(failure_ctx["context_path_digest"], str)
-        assert len(failure_ctx["context_path_digest"]) == 71  # "sha256:" + 64 hex chars
-        assert isinstance(failure_ctx["safe_marker_digest"], str)
-        assert len(failure_ctx["safe_marker_digest"]) == 71  # "sha256:" + 64 hex chars
-        assert isinstance(failure_ctx["owner_id"], str)
+        assert failure_ctx["failure_kind"] == "unsupported_type"
+        assert failure_ctx["context_path_digest"] == expected_context_path_digest
+        assert failure_ctx["safe_marker_digest"] == expected_safe_marker_digest
+        assert failure_ctx["owner_id"].startswith(records[0].source_qualified_candidate_id)
         assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
         assert records[0].evaluation_failure.message == "Trusted context canonicalization failed."
         assert records[0].evaluation_failure.traceback is None

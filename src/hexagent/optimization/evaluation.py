@@ -1035,23 +1035,66 @@ def engineering_message_sort_key(
     )
 
 
-def safe_context_owner_marker(context: tuple[tuple[str, object], ...]) -> str:
+def _entry_marker(pair: tuple[object, object]) -> dict[str, object]:
+    """Generate a deterministic marker for a single context entry.
+
+    Uses key + qualified value type + canonicalization state.
+    Never calls str/repr on values. Never depends on object IDs.
+    """
+    key, val = pair
+    entry_key: str = str(key) if type(key) is str else "<non-string-key>"
+    qtype = qualified_type_name(val)
+
+    # Attempt safe canonicalization to get a digest
+    try:
+        cval = canonicalize_trusted_context_value(
+            val,
+            context_key=entry_key,
+            context_path=(),
+            ancestor_ids=frozenset(),
+        )
+        digest = sha256_digest({"value": cval})
+        return {
+            "key": entry_key,
+            "value_type": qtype,
+            "state": "canonicalized",
+            "value_digest": digest,
+        }
+    except ContextCanonicalizationError as cce:
+        return {
+            "key": entry_key,
+            "value_type": qtype,
+            "state": "failed",
+            "failure_kind": cce.data.failure_kind.value,
+            "context_path_digest": sha256_digest({"context_path": list(cce.data.context_path)}),
+            "safe_marker_digest": cce.safe_marker_digest,
+        }
+
+
+def safe_context_owner_marker(
+    context: tuple[tuple[str, object], ...],
+) -> str:
     """Deterministic primitive-only marker for safe owner sorting.
 
-    Never calls engineering_message_payload() or str/repr on values.
-    Only uses tuple length and key-count to produce a stable marker
-    that is NOT affected by context VALUE content (which may be
-    non-canonicalizable).
+    Per-entry marker uses key + qualified value type + canonicalization
+    state digest. Never calls str/repr on values. Same semantic input
+    always produces same marker. Collision-safe: different values even
+    with same keys produce different markers.
     """
-    # Only use things that don't require canonicalization:
-    # - tuple length (number of entries)
-    # - list of keys (extracted with type check, no value access for hostile values)
-    keys: list[str] = []
+    entry_markers: list[dict[str, object]] = []
     for pair in context:
-        if type(pair) is tuple and len(pair) >= 1 and type(pair[0]) is str:
-            keys.append(pair[0])
-    marker_dict = {"entry_count": len(context), "keys": tuple(keys)}
-    return sha256_digest(marker_dict)
+        if type(pair) is not tuple or len(pair) < 2:
+            entry_markers.append(
+                {
+                    "key": "<invalid-entry>",
+                    "value_type": qualified_type_name(pair),
+                    "state": "invalid_format",
+                }
+            )
+        else:
+            entry_markers.append(_entry_marker(pair))
+
+    return sha256_digest({"entries": entry_markers})
 
 
 def engineering_message_safe_owner_sort_key(

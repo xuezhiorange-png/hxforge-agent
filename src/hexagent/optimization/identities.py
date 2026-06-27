@@ -627,11 +627,49 @@ class MaterializationResult:
     def verify_or_raise(self) -> None:
         """Full provenance verification of the materialization result.
 
+        1. Gate self-verification (BEFORE replay)
+        2. Gate→candidate-set digest chain
+        3. Gate aggregate raw-count consistency
+        4. Candidate-set self-verification
+        5. Replay materialization from source artifacts
+        6. Replay → candidate_set binding
+        7. Full candidate model revalidation
+
         Must be called before any TASK-008 evaluation.
         """
         errors: list[str] = []
 
-        # Replay materialization from source artifacts
+        # 1. Gate self-verification (BEFORE replay)
+        if not self.sizing_gate.verify_digest():
+            errors.append("sizing_gate.verify_digest() failed")
+
+        # 2. Gate→candidate-set digest chain
+        if self.sizing_gate.gate_digest != self.candidate_set.passed_gate_digest:
+            errors.append("gate.gate_digest != candidate_set.passed_gate_digest")
+        if (
+            self.sizing_gate.sizing_request_identity_digest
+            != self.candidate_set.sizing_request_identity_digest
+        ):
+            errors.append("gate sizing_request_identity_digest != candidate_set")
+
+        # 3. Gate aggregate raw-count consistency
+        per_option_sum = sum(r.raw_count for r in self.sizing_gate.per_option_records)
+        if per_option_sum != self.sizing_gate.raw_combination_count:
+            errors.append(
+                f"gate per-option sum ({per_option_sum}) "
+                f"!= gate.raw_combination_count ({self.sizing_gate.raw_combination_count})"
+            )
+
+        # 4. Candidate-set self-verification
+        if not self.candidate_set.verify_digest():
+            errors.append("candidate_set.verify_digest() failed")
+
+        if errors:
+            raise ValueError(
+                "MaterializationResult verification failed:\n  - " + "\n  - ".join(errors)
+            )
+
+        # 5. Replay materialization from source artifacts
         try:
             replay = _replay_materialization(
                 catalogs=self.catalog_snapshots,
@@ -644,8 +682,23 @@ class MaterializationResult:
                 f"MaterializationResult verification failed: replay error: {exc}"
             ) from exc
 
-        # Compare replay results with stored artifacts
-        # 1. Catalog identities
+        # 6. Replay → candidate_set binding
+        self._compare_replay_to_set(replay, errors)
+
+        # 7. Full candidate model comparison
+        self._compare_replay_candidates(replay, errors)
+
+        if errors:
+            raise ValueError(
+                "MaterializationResult verification failed:\n  - " + "\n  - ".join(errors)
+            )
+
+    def _compare_replay_to_set(
+        self,
+        replay: ReplayedMaterialization,
+        errors: list[str],
+    ) -> None:
+        """Compare replay results with stored candidate_set."""
         if (
             replay.replayed_catalog_snapshot_identities
             != self.candidate_set.catalog_snapshot_identities
@@ -654,58 +707,88 @@ class MaterializationResult:
                 "replayed catalog identities != candidate_set.catalog_snapshot_identities"
             )
 
-        # 2. Raw combination count
         if replay.replayed_raw_combination_count != self.candidate_set.raw_combination_count:
             errors.append(
-                f"replayed raw count {replay.replayed_raw_combination_count} "
+                f"replayed raw_count {replay.replayed_raw_combination_count} "
                 f"!= candidate_set {self.candidate_set.raw_combination_count}"
             )
 
-        # 3. Unique candidate count
+        if replay.replayed_raw_combination_count != self.sizing_gate.raw_combination_count:
+            errors.append(
+                f"replayed raw_count {replay.replayed_raw_combination_count} "
+                f"!= gate {self.sizing_gate.raw_combination_count}"
+            )
+
         if replay.replayed_unique_candidate_count != self.candidate_set.unique_candidate_count:
             errors.append(
                 f"replayed unique count {replay.replayed_unique_candidate_count} "
                 f"!= candidate_set {self.candidate_set.unique_candidate_count}"
             )
 
-        # 4. Ordered candidate IDs
         if replay.replayed_ordered_candidate_ids != self.candidate_set.ordered_candidate_ids:
             errors.append("replayed ordered IDs != candidate_set.ordered_candidate_ids")
 
-        # 5. Deduped candidates (exact match)
-        if len(replay.replayed_candidates) != len(self.candidates):
-            errors.append("replayed candidate count != stored candidate count")
-        else:
-            for i, (rc, sc) in enumerate(
-                zip(replay.replayed_candidates, self.candidates, strict=True)
-            ):
-                if rc.source_qualified_candidate_id != sc.source_qualified_candidate_id:
-                    errors.append(f"candidate[{i}] ID mismatch")
-                    break
-                if rc.physical_identity_digest != sc.physical_identity_digest:
-                    errors.append(f"candidate[{i}] physical ID mismatch")
-                    break
-                if rc.effective_length_m_canonical != sc.effective_length_m_canonical:
-                    errors.append(
-                        f"candidate[{i}] length mismatch: "
-                        f"{rc.effective_length_m_canonical} != {sc.effective_length_m_canonical}"
-                    )
-                    break
-                if rc.manufacturing_option_identity != sc.manufacturing_option_identity:
-                    errors.append(f"candidate[{i}] manufacturing identity mismatch")
-                    break
-                if rc.assembly_option_id != sc.assembly_option_id:
-                    errors.append(f"candidate[{i}] assembly_option_id mismatch")
-                    break
+    def _compare_replay_candidates(
+        self,
+        replay: ReplayedMaterialization,
+        errors: list[str],
+    ) -> None:
+        """Re-validate stored candidates and compare full models with replay."""
+        # Re-validate each stored candidate through model_validate
+        validated_stored: list[ManufacturableCandidate] = []
+        for i, c in enumerate(self.candidates):
+            try:
+                validated = ManufacturableCandidate.model_validate(c.model_dump(mode="python"))
+                validated_stored.append(validated)
+            except Exception as exc:
+                errors.append(f"stored candidate[{i}] model_validate failed: {exc}")
+                return  # cannot continue comparison
 
-        # 6. candidate_set digest
-        if not self.candidate_set.verify_digest():
-            errors.append("candidate_set.verify_digest() failed")
-
-        if errors:
-            raise ValueError(
-                "MaterializationResult verification failed:\n  - " + "\n  - ".join(errors)
+        if len(validated_stored) != len(replay.replayed_candidates):
+            errors.append(
+                f"candidate count: stored {len(validated_stored)} "
+                f"!= replayed {len(replay.replayed_candidates)}"
             )
+            return
+
+        for i, (stored, replayed) in enumerate(
+            zip(validated_stored, replay.replayed_candidates, strict=True)
+        ):
+            # Full model equality
+            if stored != replayed:
+                # Diagnose specific field mismatches
+                if stored.source_qualified_candidate_id != replayed.source_qualified_candidate_id:
+                    errors.append(
+                        f"candidate[{i}] ID mismatch: "
+                        f"{stored.source_qualified_candidate_id} "
+                        f"!= {replayed.source_qualified_candidate_id}"
+                    )
+                elif stored.physical_identity_digest != replayed.physical_identity_digest:
+                    errors.append(f"candidate[{i}] physical digest mismatch")
+                elif stored.effective_length_m_canonical != replayed.effective_length_m_canonical:
+                    errors.append(
+                        f"candidate[{i}] length: "
+                        f"{stored.effective_length_m_canonical} "
+                        f"!= {replayed.effective_length_m_canonical}"
+                    )
+                elif stored.manufacturing_option_identity != replayed.manufacturing_option_identity:
+                    errors.append(f"candidate[{i}] manufacturing identity mismatch")
+                elif stored.manufacturing_metadata != replayed.manufacturing_metadata:
+                    errors.append(f"candidate[{i}] manufacturing metadata mismatch")
+                elif stored.assembly_option_id != replayed.assembly_option_id:
+                    errors.append(f"candidate[{i}] assembly_option_id mismatch")
+                elif stored.catalog_snapshot_ref != replayed.catalog_snapshot_ref:
+                    errors.append(f"candidate[{i}] catalog_snapshot_ref mismatch")
+                elif stored.physical_identity != replayed.physical_identity:
+                    errors.append(f"candidate[{i}] physical_identity mismatch")
+                elif stored.evaluation_order_index != replayed.evaluation_order_index:
+                    errors.append(
+                        f"candidate[{i}] order_index: "
+                        f"{stored.evaluation_order_index} "
+                        f"!= {replayed.evaluation_order_index}"
+                    )
+                else:
+                    errors.append(f"candidate[{i}] model mismatch (unexpected field)")
 
 
 # ---------------------------------------------------------------------------
