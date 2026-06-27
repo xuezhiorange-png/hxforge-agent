@@ -729,8 +729,17 @@ def canonicalize_trusted_context_value(
     from enum import Enum as EnumBase
 
     if isinstance(value, EnumBase):
+        try:
+            enum_val = value.value
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
         return canonicalize_trusted_context_value(
-            value.value,
+            enum_val,
             context_key=context_key,
             context_path=context_path,
             ancestor_ids=ancestor_ids,
@@ -749,15 +758,25 @@ def canonicalize_trusted_context_value(
         updated_ancestors = ancestor_ids | {obj_id}
         result: list[CanonicalValue] = []
         for i, item in enumerate(value):
-            child_path = context_path + (f"[{i}]",)
-            result.append(
-                canonicalize_trusted_context_value(
-                    item,
+            try:
+                child_path = context_path + (f"[{i}]",)
+                result.append(
+                    canonicalize_trusted_context_value(
+                        item,
+                        context_key=context_key,
+                        context_path=child_path,
+                        ancestor_ids=updated_ancestors,
+                    )
+                )
+            except ContextCanonicalizationError:
+                raise
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
                     context_key=context_key,
                     context_path=child_path,
-                    ancestor_ids=updated_ancestors,
-                )
-            )
+                    offending_type=qualified_type_name(item),
+                ) from exc
         return result
 
     # --- dict (exact ``dict`` type) ---
@@ -782,20 +801,30 @@ def canonicalize_trusted_context_value(
                 offending_type=qualified_type_name(value),
             ) from exc
         for k, v in dict_items_view:
-            if type(k) is not str:
-                raise ContextCanonicalizationError(
-                    failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
+            try:
+                if type(k) is not str:
+                    raise ContextCanonicalizationError(
+                        failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
+                        context_key=context_key,
+                        context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
+                        offending_type=qualified_type_name(k),
+                    )
+                child_path = context_path + (k,)
+                result_dict[k] = canonicalize_trusted_context_value(
+                    v,
                     context_key=context_key,
-                    context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
-                    offending_type=qualified_type_name(k),
+                    context_path=child_path,
+                    ancestor_ids=updated_ancestors,
                 )
-            child_path = context_path + (k,)
-            result_dict[k] = canonicalize_trusted_context_value(
-                v,
-                context_key=context_key,
-                context_path=child_path,
-                ancestor_ids=updated_ancestors,
-            )
+            except ContextCanonicalizationError:
+                raise
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                    context_key=context_key,
+                    context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                ) from exc
         return result_dict
 
     # --- collections.abc.Mapping (not dict) ---
@@ -820,30 +849,50 @@ def canonicalize_trusted_context_value(
                 offending_type=qualified_type_name(value),
             ) from exc
         for k, v in items_view:
-            if type(k) is not str:
-                raise ContextCanonicalizationError(
-                    failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
+            try:
+                if type(k) is not str:
+                    raise ContextCanonicalizationError(
+                        failure_kind=ContextCanonicalizationFailureKind.NON_STRING_KEY,
+                        context_key=context_key,
+                        context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
+                        offending_type=qualified_type_name(k),
+                    )
+                child_path = context_path + (k,)
+                mapping_result[k] = canonicalize_trusted_context_value(
+                    v,
                     context_key=context_key,
-                    context_path=context_path + (NON_STRING_MAPPING_KEY_MARKER,),
-                    offending_type=qualified_type_name(k),
+                    context_path=child_path,
+                    ancestor_ids=updated_ancestors,
                 )
-            child_path = context_path + (k,)
-            mapping_result[k] = canonicalize_trusted_context_value(
-                v,
-                context_key=context_key,
-                context_path=child_path,
-                ancestor_ids=updated_ancestors,
-            )
+            except ContextCanonicalizationError:
+                raise
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                    context_key=context_key,
+                    context_path=context_path,
+                    offending_type=qualified_type_name(value),
+                ) from exc
         return mapping_result
 
     # --- Repository Quantity-like adapter (P0-7) ---
     if _is_repository_quantity(value):
-        return _adapt_repository_quantity(
-            value,
-            context_key=context_key,
-            context_path=context_path,
-            ancestor_ids=ancestor_ids,
-        )
+        try:
+            return _adapt_repository_quantity(
+                value,
+                context_key=context_key,
+                context_path=context_path,
+                ancestor_ids=ancestor_ids,
+            )
+        except ContextCanonicalizationError:
+            raise
+        except Exception as exc:
+            raise ContextCanonicalizationError(
+                failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                context_key=context_key,
+                context_path=context_path,
+                offending_type=qualified_type_name(value),
+            ) from exc
 
     # --- Pydantic BaseModel field-level traversal (P0-8) ---
     from pydantic import BaseModel as PydanticBaseModel
@@ -879,12 +928,22 @@ def canonicalize_trusted_context_value(
                     offending_type=qualified_type_name(value),
                 ) from exc
             child_path = context_path + (field_name,)
-            pydantic_result[field_name] = canonicalize_trusted_context_value(
-                field_value,
-                context_key=context_key,
-                context_path=child_path,
-                ancestor_ids=updated_ancestors,
-            )
+            try:
+                pydantic_result[field_name] = canonicalize_trusted_context_value(
+                    field_value,
+                    context_key=context_key,
+                    context_path=child_path,
+                    ancestor_ids=updated_ancestors,
+                )
+            except ContextCanonicalizationError:
+                raise
+            except Exception as exc:
+                raise ContextCanonicalizationError(
+                    failure_kind=ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
+                    context_key=context_key,
+                    context_path=child_path,
+                    offending_type=qualified_type_name(value),
+                ) from exc
         return pydantic_result
 
     # --- Unsupported type ---
@@ -1650,7 +1709,7 @@ def check_provider_consistency(
             continue
         pi = ev.provider_identity
         # Compute digest from canonical dump
-        pi_digest = sha256_digest(dataclasses.asdict(pi))
+        pi_digest = sha256_digest(provider_identity_snapshot_payload(pi))
 
         if baseline_pi is None:
             baseline_pi = pi
@@ -1867,44 +1926,10 @@ def verify_and_evaluate_candidate(
         )
 
     # Step 3: Both passed — build trusted evidence (fail-closed)
-    # Also trigger warning/blocker/failure canonicalization so that
-    # ContextCanonicalizationError is caught as RUNTIME_FAILED (P0-11)
+    # P0-3: Canonicalize each warning/blocker/failure individually
+    # so that the specific owner is identified on failure.
     try:
         evidence = _extract_trusted_evidence(result, tube_in_hot)
-        # Trigger canonicalization now — any ContextCanonicalizationError
-        # from warning/blocker/failure context is caught here
-        evidence.compute_explicit_evidence_digest()
-    except ContextCanonicalizationError as cce:
-        # P0-3: Build structured RunFailure from error data
-        context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
-        cfail = RunFailure(
-            code=ErrorCode.PROVENANCE_INCOMPLETE,
-            message="context canonicalization failure during evidence extraction",
-            traceback=None,
-            context=(
-                ("failure_stage", "rating_verification"),
-                ("owner_kind", "candidate_evaluation"),
-                ("owner_id", source_qualified_candidate_id),
-                ("original_code", cce.data.failure_kind.value),
-                ("context_key", cce.data.context_key),
-                ("context_path_digest", context_path_digest),
-                ("offending_type", cce.data.offending_type),
-                ("failure_kind", cce.data.failure_kind.value),
-                ("safe_marker_digest", cce.safe_marker_digest),
-            ),
-        )
-        return CandidateEvaluationRecord(
-            source_qualified_candidate_id=source_qualified_candidate_id,
-            evaluation_order_index=candidate_index,
-            candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
-            feasible=False,
-            hash_verification_outcome=VerificationOutcome.PASSED,
-            provenance_verification_outcome=VerificationOutcome.PASSED,
-            candidate_evaluation_identity=None,
-            verified_rating_evidence=None,
-            invalid_rating_evidence=None,
-            evaluation_failure=cfail,
-        )
     except (TypeError, ValueError, RuntimeError, AttributeError) as exc:
         audit = _build_audit_snapshot(
             source_qualified_candidate_id,
@@ -1927,6 +1952,114 @@ def verify_and_evaluate_candidate(
                 message=f"Failed to extract trusted evidence: {exc}",
             ),
         )
+
+    # P0-3: Canonicalize each warning individually
+    for w_idx, w_msg in enumerate(evidence.warnings):
+        try:
+            _ = engineering_message_payload(w_msg)
+        except ContextCanonicalizationError as cce:
+            context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
+            cfail = RunFailure(
+                code=ErrorCode.PROVENANCE_INCOMPLETE,
+                message="Trusted context canonicalization failed.",
+                traceback=None,
+                context=(
+                    ("failure_stage", "rating_verification"),
+                    ("owner_kind", "warning"),
+                    ("owner_id", f"{source_qualified_candidate_id}:warning:{w_idx}"),
+                    ("original_code", w_msg.code.value),
+                    ("context_key", cce.data.context_key),
+                    ("context_path_digest", context_path_digest),
+                    ("offending_type", cce.data.offending_type),
+                    ("failure_kind", cce.data.failure_kind.value),
+                    ("safe_marker_digest", cce.safe_marker_digest),
+                ),
+            )
+            return CandidateEvaluationRecord(
+                source_qualified_candidate_id=source_qualified_candidate_id,
+                evaluation_order_index=candidate_index,
+                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                feasible=False,
+                hash_verification_outcome=VerificationOutcome.PASSED,
+                provenance_verification_outcome=VerificationOutcome.PASSED,
+                candidate_evaluation_identity=None,
+                verified_rating_evidence=None,
+                invalid_rating_evidence=None,
+                evaluation_failure=cfail,
+            )
+
+    # P0-3: Canonicalize each blocker individually
+    for b_idx, b_msg in enumerate(evidence.blockers):
+        try:
+            _ = engineering_message_payload(b_msg)
+        except ContextCanonicalizationError as cce:
+            context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
+            cfail = RunFailure(
+                code=ErrorCode.PROVENANCE_INCOMPLETE,
+                message="Trusted context canonicalization failed.",
+                traceback=None,
+                context=(
+                    ("failure_stage", "rating_verification"),
+                    ("owner_kind", "blocker"),
+                    ("owner_id", f"{source_qualified_candidate_id}:blocker:{b_idx}"),
+                    ("original_code", b_msg.code.value),
+                    ("context_key", cce.data.context_key),
+                    ("context_path_digest", context_path_digest),
+                    ("offending_type", cce.data.offending_type),
+                    ("failure_kind", cce.data.failure_kind.value),
+                    ("safe_marker_digest", cce.safe_marker_digest),
+                ),
+            )
+            return CandidateEvaluationRecord(
+                source_qualified_candidate_id=source_qualified_candidate_id,
+                evaluation_order_index=candidate_index,
+                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                feasible=False,
+                hash_verification_outcome=VerificationOutcome.PASSED,
+                provenance_verification_outcome=VerificationOutcome.PASSED,
+                candidate_evaluation_identity=None,
+                verified_rating_evidence=None,
+                invalid_rating_evidence=None,
+                evaluation_failure=cfail,
+            )
+
+    # P0-3: Canonicalize failure if present
+    if evidence.failure is not None:
+        try:
+            _ = run_failure_payload(evidence.failure)
+        except ContextCanonicalizationError as cce:
+            context_path_digest = sha256_digest({"context_path": list(cce.data.context_path)})
+            cfail = RunFailure(
+                code=ErrorCode.PROVENANCE_INCOMPLETE,
+                message="Trusted context canonicalization failed.",
+                traceback=None,
+                context=(
+                    ("failure_stage", "rating_verification"),
+                    ("owner_kind", "run_failure"),
+                    ("owner_id", f"{source_qualified_candidate_id}:run_failure"),
+                    ("original_code", evidence.failure.code.value),
+                    ("context_key", cce.data.context_key),
+                    ("context_path_digest", context_path_digest),
+                    ("offending_type", cce.data.offending_type),
+                    ("failure_kind", cce.data.failure_kind.value),
+                    ("safe_marker_digest", cce.safe_marker_digest),
+                ),
+            )
+            return CandidateEvaluationRecord(
+                source_qualified_candidate_id=source_qualified_candidate_id,
+                evaluation_order_index=candidate_index,
+                candidate_evaluation_state=CandidateEvaluationState.RUNTIME_FAILED,
+                feasible=False,
+                hash_verification_outcome=VerificationOutcome.PASSED,
+                provenance_verification_outcome=VerificationOutcome.PASSED,
+                candidate_evaluation_identity=None,
+                verified_rating_evidence=None,
+                invalid_rating_evidence=None,
+                evaluation_failure=cfail,
+            )
+
+    # All canonicalization passed — compute full evidence digest
+    evidence.compute_explicit_evidence_digest()
 
     # Provider matching (from exact result.provider_identity)
     try:

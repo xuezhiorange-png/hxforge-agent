@@ -29,7 +29,12 @@ from hexagent.core.heat_balance import (
     ExecutionContextSnapshot,
     ProviderIdentitySnapshot,
 )
-from hexagent.domain.messages import ErrorCode
+from hexagent.domain.messages import (
+    EngineeringMessage,
+    EngineeringMessageSeverity,
+    ErrorCode,
+    RunFailure,
+)
 from hexagent.exchangers.double_pipe.result import (
     RatingRequestIdentity,
     RatingResult,
@@ -1133,6 +1138,197 @@ class TestAdapterSpy:
             )
 
         assert len(calls) == 0
+
+    # ------------------------------------------------------------------
+    # P0-4: 3 batch production strict-stop tests — context canonicalization
+    # ------------------------------------------------------------------
+
+    def _make_result_with_warning_bytes(self) -> Any:
+        """Create a RatingResult with bytes in warning context."""
+        obj = _make_minimal_result(hash_passes=True, prov_passes=True)
+        bad_warning = EngineeringMessage(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            severity=EngineeringMessageSeverity.WARNING,
+            message="bad warning",
+            context=(("bad", b"bytes_data"),),
+        )
+        object.__setattr__(obj, "warnings", (bad_warning,))
+        object.__setattr__(obj, "blockers", ())
+        object.__setattr__(obj, "failure", None)
+        return obj
+
+    def _make_result_with_blocker_bytes(self) -> Any:
+        """Create a RatingResult with bytes in blocker context."""
+        obj = _make_minimal_result(hash_passes=True, prov_passes=True)
+        bad_blocker = EngineeringMessage(
+            code=ErrorCode.BLOCKER,
+            severity=EngineeringMessageSeverity.BLOCKER,
+            message="bad blocker",
+            context=(("bad", b"bytes_data"),),
+        )
+        object.__setattr__(obj, "warnings", ())
+        object.__setattr__(obj, "blockers", (bad_blocker,))
+        object.__setattr__(obj, "failure", None)
+        return obj
+
+    def _make_result_with_failure_bytes(self) -> Any:
+        """Create a RatingResult with bytes in RunFailure context."""
+        obj = _make_minimal_result(hash_passes=True, prov_passes=True)
+        bad_failure = RunFailure(
+            code=ErrorCode.CALCULATION_BLOCKED,
+            message="bad failure",
+            context=(("bad", b"bytes_data"),),
+        )
+        object.__setattr__(obj, "warnings", ())
+        object.__setattr__(obj, "blockers", ())
+        object.__setattr__(obj, "failure", bad_failure)
+        return obj
+
+    def test_invalid_warning_context_stops_pipeline(
+        self,
+        solver_params: SolverParams,
+        provider: PropertyProvider,
+    ) -> None:
+        """Bytes in warning context cause RUNTIME_FAILED for first candidate."""
+        ident, cat, mat_result = _build_and_materialize(
+            _make_opt("a", lengths=(1.0,)),
+            _make_opt("b", lengths=(2.0,)),
+        )
+        candidates = mat_result.candidates
+        assert len(candidates) >= 2
+
+        call_idx = [0]
+
+        def spy_with_bytes(**kwargs: Any) -> Any:
+            call_idx[0] += 1
+            return self._make_result_with_warning_bytes()
+
+        records = self._eval(
+            mat_result=mat_result,
+            ident=ident,
+            solver_params=solver_params,
+            provider=provider,
+            rating_fn=spy_with_bytes,
+        )
+
+        assert len(records) == 2
+        # Only first candidate was rated
+        assert call_idx[0] == 1
+        # Candidate 0: RUNTIME_FAILED
+        assert (
+            records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED.value
+        )
+        assert records[0].evaluation_failure is not None
+        assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert records[0].candidate_evaluation_identity is None
+        assert records[0].verified_rating_evidence is None
+        assert records[0].invalid_rating_evidence is None
+        # Candidate 1: UNEVALUATED
+        assert records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+        # Verification outcomes
+        assert records[0].hash_verification_outcome == VerificationOutcome.PASSED.value
+        assert records[0].provenance_verification_outcome == VerificationOutcome.PASSED.value
+        assert records[1].hash_verification_outcome == VerificationOutcome.NOT_RUN.value
+        assert records[1].provenance_verification_outcome == VerificationOutcome.NOT_RUN.value
+        # Records order matches mat_result.candidates order
+        for i, candidate in enumerate(candidates):
+            assert (
+                records[i].source_qualified_candidate_id == candidate.source_qualified_candidate_id
+            )
+
+    def test_invalid_blocker_context_stops_pipeline(
+        self,
+        solver_params: SolverParams,
+        provider: PropertyProvider,
+    ) -> None:
+        """Bytes in blocker context cause RUNTIME_FAILED for first candidate."""
+        ident, cat, mat_result = _build_and_materialize(
+            _make_opt("a", lengths=(1.0,)),
+            _make_opt("b", lengths=(2.0,)),
+        )
+        candidates = mat_result.candidates
+        assert len(candidates) >= 2
+
+        call_idx = [0]
+
+        def spy_with_bytes(**kwargs: Any) -> Any:
+            call_idx[0] += 1
+            return self._make_result_with_blocker_bytes()
+
+        records = self._eval(
+            mat_result=mat_result,
+            ident=ident,
+            solver_params=solver_params,
+            provider=provider,
+            rating_fn=spy_with_bytes,
+        )
+
+        assert len(records) == 2
+        assert call_idx[0] == 1
+        assert (
+            records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED.value
+        )
+        assert records[0].evaluation_failure is not None
+        assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert records[0].candidate_evaluation_identity is None
+        assert records[0].verified_rating_evidence is None
+        assert records[0].invalid_rating_evidence is None
+        assert records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+        assert records[0].hash_verification_outcome == VerificationOutcome.PASSED.value
+        assert records[0].provenance_verification_outcome == VerificationOutcome.PASSED.value
+        assert records[1].hash_verification_outcome == VerificationOutcome.NOT_RUN.value
+        assert records[1].provenance_verification_outcome == VerificationOutcome.NOT_RUN.value
+        for i, candidate in enumerate(candidates):
+            assert (
+                records[i].source_qualified_candidate_id == candidate.source_qualified_candidate_id
+            )
+
+    def test_invalid_failure_context_stops_pipeline(
+        self,
+        solver_params: SolverParams,
+        provider: PropertyProvider,
+    ) -> None:
+        """Bytes in RunFailure context cause RUNTIME_FAILED for first candidate."""
+        ident, cat, mat_result = _build_and_materialize(
+            _make_opt("a", lengths=(1.0,)),
+            _make_opt("b", lengths=(2.0,)),
+        )
+        candidates = mat_result.candidates
+        assert len(candidates) >= 2
+
+        call_idx = [0]
+
+        def spy_with_bytes(**kwargs: Any) -> Any:
+            call_idx[0] += 1
+            return self._make_result_with_failure_bytes()
+
+        records = self._eval(
+            mat_result=mat_result,
+            ident=ident,
+            solver_params=solver_params,
+            provider=provider,
+            rating_fn=spy_with_bytes,
+        )
+
+        assert len(records) == 2
+        assert call_idx[0] == 1
+        assert (
+            records[0].candidate_evaluation_state == CandidateEvaluationState.RUNTIME_FAILED.value
+        )
+        assert records[0].evaluation_failure is not None
+        assert records[0].evaluation_failure.code == ErrorCode.PROVENANCE_INCOMPLETE
+        assert records[0].candidate_evaluation_identity is None
+        assert records[0].verified_rating_evidence is None
+        assert records[0].invalid_rating_evidence is None
+        assert records[1].candidate_evaluation_state == CandidateEvaluationState.UNEVALUATED.value
+        assert records[0].hash_verification_outcome == VerificationOutcome.PASSED.value
+        assert records[0].provenance_verification_outcome == VerificationOutcome.PASSED.value
+        assert records[1].hash_verification_outcome == VerificationOutcome.NOT_RUN.value
+        assert records[1].provenance_verification_outcome == VerificationOutcome.NOT_RUN.value
+        for i, candidate in enumerate(candidates):
+            assert (
+                records[i].source_qualified_candidate_id == candidate.source_qualified_candidate_id
+            )
 
 
 # ============================================================================

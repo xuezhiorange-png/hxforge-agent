@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import types
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta, timezone
@@ -147,6 +148,34 @@ def _make_blocker_msg(text: str) -> EngineeringMessage:
         message=text,
         source_module="test_module",
     )
+
+
+def _rebuild_evidence(
+    baseline: VerifiedRatingEvidenceSnapshot,
+    **overrides: Any,
+) -> VerifiedRatingEvidenceSnapshot:
+    """Rebuild evidence with field overrides, computing correct digests.
+
+    Uses model_dump()/model_validate() and then recomputes digest fields
+    so that the result passes the model_validator checks.
+    """
+    # Collect current field values
+    data: dict[str, Any] = {}
+    for name in type(baseline).model_fields:
+        data[name] = getattr(baseline, name)
+    data.update(overrides)
+
+    # Recompute identity/context digests unless explicitly overridden
+    if "rating_request_identity_digest" not in overrides:
+        data["rating_request_identity_digest"] = sha256_digest(
+            rating_request_identity_payload(data["rating_request_identity"])
+        )
+    if "rating_execution_context_digest" not in overrides:
+        data["rating_execution_context_digest"] = sha256_digest(
+            execution_context_snapshot_payload(data["rating_execution_context"])
+        )
+
+    return VerifiedRatingEvidenceSnapshot(**data)
 
 
 def _baseline_evidence() -> VerifiedRatingEvidenceSnapshot:
@@ -459,7 +488,115 @@ class TestUTCDatetime:
 
 
 class TestQuantityAdapter:
-    """P0-11: Repository Quantity-like object adaptation."""
+    """P0-11/P0-2: Repository Quantity-like object adaptation."""
+
+    # ------------------------------------------------------------------
+    # Helper mock classes for P0-2
+    # ------------------------------------------------------------------
+
+    class _KindMock:
+        def __init__(self, kind_name: str = "temperature", value_raises: bool = False):
+            self._value = kind_name
+            self._value_raises = value_raises
+
+        @property
+        def value(self) -> str:
+            if self._value_raises:
+                raise RuntimeError("kind.value failed")
+            return self._value
+
+    class _ToSiResult:
+        def __init__(self, value: float = 100.0, si_value_raises: bool = False):
+            self._value = value
+            self._si_value_raises = si_value_raises
+
+        @property
+        def value(self) -> float:
+            if self._si_value_raises:
+                raise RuntimeError("si_value failed")
+            return self._value
+
+    class _ToSiCallable:
+        def __init__(
+            self,
+            value: float = 100.0,
+            raises: bool = False,
+            si_value_raises: bool = False,
+        ):
+            self._value = value
+            self._raises = raises
+            self._si_value_raises = si_value_raises
+
+        def __call__(self) -> TestQuantityAdapter._ToSiResult:
+            if self._raises:
+                raise RuntimeError("to_si failed")
+            return TestQuantityAdapter._ToSiResult(self._value, self._si_value_raises)
+
+    class _QuantityMock:
+        def __init__(
+            self,
+            value: float = 100.0,
+            unit: str = "degC",
+            kind_name: str | None = "temperature",
+            to_si_raises: bool = False,
+            to_si_not_callable: bool = False,
+            value_raises: bool = False,
+            unit_raises: bool = False,
+            kind_raises: bool = False,
+            to_si_raises_on_access: bool = False,
+            si_value_raises: bool = False,
+            kind_value_raises: bool = False,
+            si_value: float | None = None,
+        ):
+            self._value = value
+            self._unit = unit
+            self._kind = (
+                TestQuantityAdapter._KindMock(kind_name, value_raises=kind_value_raises)
+                if kind_name
+                else None
+            )
+            self._to_si_value = si_value if si_value is not None else value
+            self._to_si = (
+                "not_callable"
+                if to_si_not_callable
+                else TestQuantityAdapter._ToSiCallable(
+                    self._to_si_value,
+                    raises=to_si_raises,
+                    si_value_raises=si_value_raises,
+                )
+            )
+            self._value_raises = value_raises
+            self._unit_raises = unit_raises
+            self._kind_raises = kind_raises
+            self._to_si_raises_on_access = to_si_raises_on_access
+
+        @property
+        def value(self) -> float:
+            if self._value_raises:
+                raise RuntimeError("value failed")
+            return self._value
+
+        @property
+        def unit(self) -> str:
+            if self._unit_raises:
+                raise RuntimeError("unit failed")
+            return self._unit
+
+        @property
+        def kind(self) -> Any | None:
+            if self._kind_raises:
+                raise RuntimeError("kind failed")
+            return self._kind
+
+        @property
+        def to_si(self) -> Any:
+            if self._to_si_raises_on_access:
+                raise RuntimeError("to_si access failed")
+            return self._to_si
+
+    # ------------------------------------------------------------------
+    # Existing tests (P0-11)
+    # ------------------------------------------------------------------
 
     def test_temperature_celsius(self) -> None:
         """100°C converts to si_value=373.15."""
@@ -550,6 +687,121 @@ class TestQuantityAdapter:
             _BadKindQ(),
             ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION,
         )
+
+    # ------------------------------------------------------------------
+    # P0-2: 10 specific Quantity adapter tests using _QuantityMock
+    # ------------------------------------------------------------------
+
+    def test_value_getter_failure(self) -> None:
+        """value getter raises → CANONICALIZATION_EXCEPTION."""
+        q = self._QuantityMock(value_raises=True)
+        with pytest.raises(ContextCanonicalizationError) as exc:
+            _canon(q)
+        assert (
+            exc.value.data.failure_kind
+            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert exc.value.data.context_key == "test"
+        assert exc.value.data.context_path == ()
+        assert "QuantityMock" in exc.value.data.offending_type
+
+    def test_unit_getter_failure(self) -> None:
+        """unit getter raises → CANONICALIZATION_EXCEPTION."""
+        q = self._QuantityMock(unit_raises=True)
+        with pytest.raises(ContextCanonicalizationError) as exc:
+            _canon(q)
+        assert (
+            exc.value.data.failure_kind
+            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert exc.value.data.context_key == "test"
+        assert exc.value.data.context_path == ()
+
+    def test_kind_getter_failure(self) -> None:
+        """kind getter raises → CANONICALIZATION_EXCEPTION."""
+        q = self._QuantityMock(kind_raises=True)
+        with pytest.raises(ContextCanonicalizationError) as exc:
+            _canon(q)
+        assert (
+            exc.value.data.failure_kind
+            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert exc.value.data.context_key == "test"
+        assert exc.value.data.context_path == ()
+
+    def test_to_si_getter_failure(self) -> None:
+        """to_si access raises → CANONICALIZATION_EXCEPTION."""
+        q = self._QuantityMock(to_si_raises_on_access=True)
+        with pytest.raises(ContextCanonicalizationError) as exc:
+            _canon(q)
+        assert (
+            exc.value.data.failure_kind
+            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert exc.value.data.context_key == "test"
+        assert exc.value.data.context_path == ()
+
+    def test_kind_none_skips_to_si(self) -> None:
+        """kind=None → to_si() is never called (even if to_si would raise)."""
+        q = self._QuantityMock(kind_name=None, to_si_raises=True)
+        result = _canon(q)
+        assert result["kind"] is None
+        assert result["si_value"] == 100.0
+
+    def test_kind_not_none_to_si_not_callable(self) -> None:
+        """kind not None but to_si is not callable → UNSUPPORTED_TYPE (freeze contract rule)."""
+        q = self._QuantityMock(to_si_not_callable=True)
+        with pytest.raises(ContextCanonicalizationError) as exc:
+            _canon(q)
+        assert exc.value.data.failure_kind is ContextCanonicalizationFailureKind.UNSUPPORTED_TYPE
+        assert exc.value.data.context_key == "test"
+
+    def test_to_si_call_failure(self) -> None:
+        """to_si() raises → CANONICALIZATION_EXCEPTION."""
+        q = self._QuantityMock(to_si_raises=True)
+        with pytest.raises(ContextCanonicalizationError) as exc:
+            _canon(q)
+        assert (
+            exc.value.data.failure_kind
+            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert exc.value.data.context_key == "test"
+
+    def test_si_result_value_failure(self) -> None:
+        """to_si() returns an object whose .value property raises → CANONICALIZATION_EXCEPTION."""
+        q = self._QuantityMock(si_value_raises=True)
+        with pytest.raises(ContextCanonicalizationError) as exc:
+            _canon(q)
+        assert (
+            exc.value.data.failure_kind
+            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert exc.value.data.context_key == "test"
+
+    def test_kind_value_failure(self) -> None:
+        """kind is not None but kind.value raises → CANONICALIZATION_EXCEPTION."""
+        q = self._QuantityMock(kind_value_raises=True)
+        with pytest.raises(ContextCanonicalizationError) as exc:
+            _canon(q)
+        assert (
+            exc.value.data.failure_kind
+            is ContextCanonicalizationFailureKind.CANONICALIZATION_EXCEPTION
+        )
+        assert exc.value.data.context_key == "test"
+
+    def test_si_equivalence_different_units(self) -> None:
+        """Different raw units that yield same SI value produce same canonical payload."""
+        q1 = self._QuantityMock(value=373.15, unit="K", kind_name="absolute_temperature")
+        q2 = self._QuantityMock(
+            value=100.0,
+            unit="degC",
+            kind_name="absolute_temperature",
+            si_value=373.15,
+        )
+        result1 = _canon(q1)
+        result2 = _canon(q2)
+        assert result1["si_value"] == result2["si_value"]
+        assert result1["kind"] == result2["kind"]
 
 
 class TestPydanticFieldLevel:
@@ -1085,87 +1337,87 @@ class TestEvidencePayloadMutationFull:
         [
             (
                 "rating_status",
-                lambda ev: ev.model_copy(update={"rating_status": RatingStatus.FAILED}),
+                lambda ev: _rebuild_evidence(ev, rating_status=RatingStatus.FAILED),
             ),
-            ("heat_duty_w", lambda ev: ev.model_copy(update={"heat_duty_w": 2000.0})),
+            ("heat_duty_w", lambda ev: _rebuild_evidence(ev, heat_duty_w=2000.0)),
             (
                 "hot_outlet_temperature_k",
-                lambda ev: ev.model_copy(update={"hot_outlet_temperature_k": 360.0}),
+                lambda ev: _rebuild_evidence(ev, hot_outlet_temperature_k=360.0),
             ),
             (
                 "cold_outlet_temperature_k",
-                lambda ev: ev.model_copy(update={"cold_outlet_temperature_k": 320.0}),
+                lambda ev: _rebuild_evidence(ev, cold_outlet_temperature_k=320.0),
             ),
-            ("area_inner_m2", lambda ev: ev.model_copy(update={"area_inner_m2": 3.0})),
-            ("area_outer_m2", lambda ev: ev.model_copy(update={"area_outer_m2": 4.0})),
-            ("UA_w_k", lambda ev: ev.model_copy(update={"UA_w_k": 600.0})),
-            ("LMTD_k", lambda ev: ev.model_copy(update={"LMTD_k": 50.0})),
-            ("energy_residual_w", lambda ev: ev.model_copy(update={"energy_residual_w": 0.01})),
-            ("ua_lmtd_residual_w", lambda ev: ev.model_copy(update={"ua_lmtd_residual_w": 0.02})),
+            ("area_inner_m2", lambda ev: _rebuild_evidence(ev, area_inner_m2=3.0)),
+            ("area_outer_m2", lambda ev: _rebuild_evidence(ev, area_outer_m2=4.0)),
+            ("UA_w_k", lambda ev: _rebuild_evidence(ev, UA_w_k=600.0)),
+            ("LMTD_k", lambda ev: _rebuild_evidence(ev, LMTD_k=50.0)),
+            ("energy_residual_w", lambda ev: _rebuild_evidence(ev, energy_residual_w=0.01)),
+            ("ua_lmtd_residual_w", lambda ev: _rebuild_evidence(ev, ua_lmtd_residual_w=0.02)),
             (
                 "tube_inlet_density_kg_m3",
-                lambda ev: ev.model_copy(update={"tube_inlet_density_kg_m3": 700.0}),
+                lambda ev: _rebuild_evidence(ev, tube_inlet_density_kg_m3=700.0),
             ),
             (
                 "annulus_inlet_density_kg_m3",
-                lambda ev: ev.model_copy(update={"annulus_inlet_density_kg_m3": 800.0}),
+                lambda ev: _rebuild_evidence(ev, annulus_inlet_density_kg_m3=800.0),
             ),
-            ("tube_flow_area_m2", lambda ev: ev.model_copy(update={"tube_flow_area_m2": 0.02})),
+            ("tube_flow_area_m2", lambda ev: _rebuild_evidence(ev, tube_flow_area_m2=0.02)),
             (
                 "annulus_flow_area_m2",
-                lambda ev: ev.model_copy(update={"annulus_flow_area_m2": 0.03}),
+                lambda ev: _rebuild_evidence(ev, annulus_flow_area_m2=0.03),
             ),
             (
                 "warnings",
-                lambda ev: ev.model_copy(update={"warnings": (_make_warning_msg("changed"),)}),
+                lambda ev: _rebuild_evidence(ev, warnings=(_make_warning_msg("changed"),)),
             ),
             (
                 "blockers",
-                lambda ev: ev.model_copy(update={"blockers": (_make_blocker_msg("changed"),)}),
+                lambda ev: _rebuild_evidence(ev, blockers=(_make_blocker_msg("changed"),)),
             ),
             (
                 "failure",
-                lambda ev: ev.model_copy(
-                    update={
-                        "failure": RunFailure(
-                            code=ErrorCode.CALCULATION_BLOCKED,
-                            message="test failure",
-                        )
-                    }
+                lambda ev: _rebuild_evidence(
+                    ev,
+                    failure=RunFailure(
+                        code=ErrorCode.CALCULATION_BLOCKED,
+                        message="test failure",
+                    ),
                 ),
             ),
             (
                 "provider_identity",
-                lambda ev: ev.model_copy(
-                    update={
-                        "provider_identity": ProviderIdentitySnapshot(
-                            name="other",
-                            version="2.0",
-                            git_revision="def",
-                            reference_state_policy="strict",
-                        )
-                    }
+                lambda ev: _rebuild_evidence(
+                    ev,
+                    provider_identity=ProviderIdentitySnapshot(
+                        name="other",
+                        version="2.0",
+                        git_revision="def",
+                        reference_state_policy="strict",
+                    ),
                 ),
             ),
             (
                 "tube_correlation",
-                lambda ev: ev.model_copy(
-                    update={"tube_correlation": _make_correlation("other_tube")}
+                lambda ev: _rebuild_evidence(
+                    ev,
+                    tube_correlation=_make_correlation("other_tube"),
                 ),
             ),
             (
                 "annulus_correlation",
-                lambda ev: ev.model_copy(
-                    update={"annulus_correlation": _make_correlation("other_ann")}
+                lambda ev: _rebuild_evidence(
+                    ev,
+                    annulus_correlation=_make_correlation("other_ann"),
                 ),
             ),
             (
                 "rating_result_hash",
-                lambda ev: ev.model_copy(update={"rating_result_hash": "sha256:" + "e" * 64}),
+                lambda ev: _rebuild_evidence(ev, rating_result_hash="sha256:" + "e" * 64),
             ),
             (
                 "rating_provenance_digest",
-                lambda ev: ev.model_copy(update={"rating_provenance_digest": "sha256:" + "f" * 64}),
+                lambda ev: _rebuild_evidence(ev, rating_provenance_digest="sha256:" + "f" * 64),
             ),
             (
                 "hash_verification_outcome",
@@ -1181,14 +1433,25 @@ class TestEvidencePayloadMutationFull:
             ),
             (
                 "rating_request_identity_digest",
-                lambda ev: ev.model_copy(
-                    update={"rating_request_identity_digest": "sha256:" + "g" * 64}
+                lambda ev: _rebuild_evidence(
+                    ev,
+                    rating_request_identity=(
+                        dataclasses.replace(
+                            ev.rating_request_identity,
+                            hot_mass_flow_kg_s=10.0,
+                        )
+                    ),
                 ),
             ),
             (
                 "rating_execution_context_digest",
-                lambda ev: ev.model_copy(
-                    update={"rating_execution_context_digest": "sha256:" + "h" * 64}
+                lambda ev: _rebuild_evidence(
+                    ev,
+                    rating_execution_context=(
+                        ev.rating_execution_context.model_copy(
+                            update={"request_id": UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")}
+                        )
+                    ),
                 ),
             ),
         ],
@@ -1207,8 +1470,8 @@ class TestEvidencePayloadMutationFull:
         """Reordering identical warnings yields same digest."""
         w1 = _make_warning_msg("same")
         w2 = _make_warning_msg("same")
-        ev1 = _baseline_evidence().model_copy(update={"warnings": (w1, w2)})
-        ev2 = _baseline_evidence().model_copy(update={"warnings": (w2, w1)})
+        ev1 = _rebuild_evidence(_baseline_evidence(), warnings=(w1, w2))
+        ev2 = _rebuild_evidence(_baseline_evidence(), warnings=(w2, w1))
         d1 = sha256_digest(verified_rating_evidence_payload(ev1))
         d2 = sha256_digest(verified_rating_evidence_payload(ev2))
         assert d1 == d2
@@ -1217,8 +1480,8 @@ class TestEvidencePayloadMutationFull:
         """Reordering identical blockers yields same digest."""
         b1 = _make_blocker_msg("same")
         b2 = _make_blocker_msg("same")
-        ev1 = _baseline_evidence().model_copy(update={"blockers": (b1, b2)})
-        ev2 = _baseline_evidence().model_copy(update={"blockers": (b2, b1)})
+        ev1 = _rebuild_evidence(_baseline_evidence(), blockers=(b1, b2))
+        ev2 = _rebuild_evidence(_baseline_evidence(), blockers=(b2, b1))
         d1 = sha256_digest(verified_rating_evidence_payload(ev1))
         d2 = sha256_digest(verified_rating_evidence_payload(ev2))
         assert d1 == d2
@@ -1299,3 +1562,139 @@ class TestNestedPayloadMutation:
         d1 = sha256_digest(payload)
         d2 = sha256_digest(deserialized)
         assert d1 == d2
+
+
+# ============================================================================
+# P0-6: Evidence negative construction tests
+# ============================================================================
+
+
+class TestEvidenceNegativeConstruction:
+    """P0-6: VerifiedRatingEvidenceSnapshot rejects invalid input."""
+
+    def _valid_rri(self) -> RatingRequestIdentity:
+        return _make_minimal_rri()
+
+    def _valid_ec(self) -> ExecutionContextSnapshot:
+        return ExecutionContextSnapshot(
+            request_id=UUID("11111111-1111-1111-1111-111111111111"),
+            design_case_revision_id=None,
+            calculation_run_id=None,
+        )
+
+    def _valid_pi(self) -> ProviderIdentitySnapshot:
+        return ProviderIdentitySnapshot(
+            name="test",
+            version="1.0",
+            git_revision="abc",
+            reference_state_policy="default",
+        )
+
+    def _valid_evidence_kwargs(self) -> dict[str, Any]:
+        rri = self._valid_rri()
+        ec = self._valid_ec()
+        pi = self._valid_pi()
+        rri_digest = sha256_digest(rating_request_identity_payload(rri))
+        ec_digest = sha256_digest(execution_context_snapshot_payload(ec))
+        return {
+            "rating_status": RatingStatus.SUCCEEDED,
+            "heat_duty_w": 1000.0,
+            "area_inner_m2": 1.5,
+            "area_outer_m2": 2.0,
+            "tube_flow_area_m2": 0.01,
+            "annulus_flow_area_m2": 0.02,
+            "rating_result_hash": "sha256:" + "a" * 64,
+            "rating_provenance_digest": "prov_digest",
+            "hash_verification_outcome": VerificationOutcome.PASSED,
+            "provenance_verification_outcome": VerificationOutcome.PASSED,
+            "rating_request_identity": rri,
+            "rating_request_identity_digest": rri_digest,
+            "rating_execution_context": ec,
+            "rating_execution_context_digest": ec_digest,
+            "provider_identity": pi,
+        }
+
+    def test_valid_construction_passes(self) -> None:
+        """Valid kwargs produce a valid VerifiedRatingEvidenceSnapshot."""
+        kwargs = self._valid_evidence_kwargs()
+        ev = VerifiedRatingEvidenceSnapshot(**kwargs)
+        assert ev is not None
+
+    def test_request_identity_mutation_rejected(self) -> None:
+        """Mutating rating_request_identity without updating digest is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        rri_mut = dataclasses.replace(
+            kwargs["rating_request_identity"],
+            hot_fluid_name="changed",
+        )
+        kwargs["rating_request_identity"] = rri_mut
+        # digest is now wrong for the mutated identity
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_request_digest_mutation_rejected(self) -> None:
+        """Mutating rating_request_identity_digest alone is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_request_identity_digest"] = "sha256:" + "f" * 64
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_context_mutation_rejected(self) -> None:
+        """Mutating rating_execution_context without updating digest is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        ec_mut = ExecutionContextSnapshot(request_id=UUID("00000000-0000-0000-0000-000000000001"))
+        kwargs["rating_execution_context"] = ec_mut
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_context_digest_mutation_rejected(self) -> None:
+        """Mutating rating_execution_context_digest alone is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_execution_context_digest"] = "sha256:" + "f" * 64
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_blank_result_hash_rejected(self) -> None:
+        """Empty rating_result_hash is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_result_hash"] = ""
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_malformed_result_hash_rejected(self) -> None:
+        """Non-sha256:hex rating_result_hash is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_result_hash"] = "not_a_hash"
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_blank_provenance_digest_rejected(self) -> None:
+        """Empty rating_provenance_digest is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["rating_provenance_digest"] = ""
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_hash_outcome_not_passed_rejected(self) -> None:
+        """hash_verification_outcome that is not PASSED is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["hash_verification_outcome"] = VerificationOutcome.FAILED
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_provenance_outcome_not_passed_rejected(self) -> None:
+        """provenance_verification_outcome that is not PASSED is rejected."""
+        kwargs = self._valid_evidence_kwargs()
+        kwargs["provenance_verification_outcome"] = VerificationOutcome.FAILED
+        with pytest.raises((ValueError, TypeError)):
+            VerifiedRatingEvidenceSnapshot(**kwargs)
+
+    def test_json_roundtrip(self) -> None:
+        """JSON roundtrip preserves the evidence payload digest."""
+        kwargs = self._valid_evidence_kwargs()
+        ev = VerifiedRatingEvidenceSnapshot(**kwargs)
+        json_str = ev.model_dump_json()
+        ev2 = VerifiedRatingEvidenceSnapshot.model_validate_json(json_str)
+        assert sha256_digest(verified_rating_evidence_payload(ev)) == sha256_digest(
+            verified_rating_evidence_payload(ev2)
+        )

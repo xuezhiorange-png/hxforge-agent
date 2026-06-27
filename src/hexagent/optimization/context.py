@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 from enum import StrEnum
-from typing import Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 from uuid import UUID, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -21,6 +21,9 @@ from hexagent.optimization.models import (
     OptionRawCountRecord,
     SizingRequest,
 )
+
+if TYPE_CHECKING:
+    from hexagent.core.heat_balance import CalculationContext
 
 # Frozen namespace for TASK-009 deterministic UUID5 generation.
 TASK009_CONTEXT_NAMESPACE = UUID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")
@@ -423,7 +426,7 @@ def build_sizing_request_identity(
 def build_candidate_calculation_context(
     sizing_request_identity: SizingRequestIdentity,
     source_qualified_candidate_id: str,
-) -> Any:
+) -> CalculationContext:
     """Build a typed ``CalculationContext`` for a single candidate.
 
     The ``request_id`` is a deterministic UUID5.

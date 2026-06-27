@@ -425,6 +425,64 @@ class MaterializationResult:
         if self.sizing_gate.gate_digest != self.candidate_set.passed_gate_digest:
             errors.append("gate.gate_digest != candidate_set.passed_gate_digest")
 
+        # P0-5: Gate catalog refs must exactly match candidate_set catalog refs
+        gate_catalog_keys: set[tuple[str, str, str, str, str]] = set()
+        for rec in self.sizing_gate.per_option_records:
+            key = (
+                rec.catalog_id,
+                rec.catalog_version,
+                rec.catalog_content_hash,
+                rec.source_identity,
+                rec.schema_version,
+            )
+            gate_catalog_keys.add(key)
+
+        set_catalog_keys: set[tuple[str, str, str, str, str]] = set()
+        for ref in self.candidate_set.catalog_snapshot_identities:
+            key = (
+                ref.catalog_id,
+                ref.catalog_version,
+                ref.catalog_content_hash,
+                ref.source_identity,
+                ref.schema_version,
+            )
+            set_catalog_keys.add(key)
+
+        if gate_catalog_keys != set_catalog_keys:
+            errors.append(
+                f"Gate catalog keys {gate_catalog_keys} != "
+                f"candidate_set catalog keys {set_catalog_keys}"
+            )
+
+        # P0-5: Each candidate must match a gate per-option record
+        gate_option_keys: set[tuple[str, str, str, str, str, str]] = set()
+        for rec in self.sizing_gate.per_option_records:
+            opt_key = (
+                rec.catalog_id,
+                rec.catalog_version,
+                rec.catalog_content_hash,
+                rec.source_identity,
+                rec.schema_version,
+                rec.assembly_option_id,
+            )
+            gate_option_keys.add(opt_key)
+
+        for c in self.candidates:
+            ref = c.catalog_snapshot_ref
+            cand_key = (
+                ref.catalog_id,
+                ref.catalog_version,
+                ref.catalog_content_hash,
+                ref.source_identity,
+                ref.schema_version,
+                c.assembly_option_id,
+            )
+            if cand_key not in gate_option_keys:
+                errors.append(
+                    f"Candidate {c.source_qualified_candidate_id!r}: "
+                    f"option key {cand_key} not found in gate records"
+                )
+
         if errors:
             raise ValueError("; ".join(errors))
 
