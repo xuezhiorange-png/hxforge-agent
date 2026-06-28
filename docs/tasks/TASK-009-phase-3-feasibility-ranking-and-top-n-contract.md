@@ -1297,6 +1297,7 @@ class Phase3CandidateClassificationInput(BaseModel):
         source_record: CandidateEvaluationRecord,
         identity_snapshot: Phase2SourceRecordIdentitySnapshot,
         complete_snapshot: Phase2SourceRecordSnapshot,
+        source_record_descriptor: Phase2SourceRecordDescriptor,
         source_binding: Phase3SourceRecordBinding,
         sizing_request: SizingRequest,
         candidate: ManufacturableCandidate,
@@ -1312,10 +1313,13 @@ class Phase3CandidateClassificationInput(BaseModel):
         # 2) Identity snapshot digest cross-check
         if self.source_identity_record_descriptor_digest != identity_snapshot.identity_snapshot_digest:
             raise ValueError("source_identity_record_descriptor_digest mismatch vs identity_snapshot")
-        # 3) Source record descriptor digest cross-check
+        # 3) Source record descriptor digest cross-check vs complete_snapshot
         expected_srd = complete_snapshot.phase2_source_record_descriptor_digest
         if self.source_record_descriptor_digest != expected_srd:
             raise ValueError("source_record_descriptor_digest mismatch vs complete_snapshot")
+        # 3b) Source record descriptor digest cross-check vs source_record_descriptor
+        if self.source_record_descriptor_digest != source_record_descriptor.descriptor_digest:
+            raise ValueError("source_record_descriptor_digest mismatch vs source_record_descriptor.descriptor_digest")
         # 4) Sizing request identity
         if self.sizing_request_identity_digest != sizing_request.sizing_request_identity_digest:
             raise ValueError("sizing_request_identity_digest mismatch")
@@ -3759,6 +3763,7 @@ def verify_phase3_result_semantics_or_raise(
                 source_record=rec_i,
                 identity_snapshot=ids_i,
                 complete_snapshot=cs_i,
+                source_record_descriptor=desc_i,
                 source_binding=sb_i,
                 sizing_request=artifacts.sizing_request,
                 candidate=artifacts.candidates[i])
@@ -3855,17 +3860,66 @@ def verify_phase3_result_semantics_or_raise(
         preparation_results=artifacts.preparation_results,
         source_bindings=artifacts.source_bindings)
 
-    # === 19) Result core hash recomputation ===
-    if result.result_core_hash != sha256_digest(result_core_payload(result)):
-        raise ValueError("core hash mismatch")
-
-    # === 20) Provenance semantic verifier ===
+    # === 19) Independent core_values derivation and core hash check ===
+    # Derive Phase 2 counts from evaluation records
+    recs = evaluation_input.evaluation_records
+    p2_v = sum(1 for r in recs if r.candidate_evaluation_state == VERIFIED)
+    p2_ii = sum(1 for r in recs if r.candidate_evaluation_state == INTEGRITY_INVALID)
+    p2_rf = sum(1 for r in recs if r.candidate_evaluation_state == RUNTIME_FAILED)
+    p2_u = sum(1 for r in recs if r.candidate_evaluation_state == UNEVALUATED)
+    # Derive disposition counts
+    vs = [d.disposition for d in dispositions]
+    f_c = vs.count(FEASIBLE)
+    inf_c = vs.count(INFEASIBLE)
+    pm_c = vs.count(PROVIDER_IDENTITY_MISMATCH)
+    int_c = vs.count(INTEGRITY_FAILED)
+    pf_c = vs.count(PROVENANCE_FAILED)
+    rf_c = vs.count(RUNTIME_FAILED)
+    u_c = vs.count(UNEVALUATED)
+    rf_v = sum(1 for d in dispositions if d.disposition is RUNTIME_FAILED and d.source_candidate_evaluation_state == VERIFIED)
+    rf_rf = sum(1 for d in dispositions if d.disposition is RUNTIME_FAILED and d.source_candidate_evaluation_state == RUNTIME_FAILED)
+    # Termination status
+    ts = TerminationStatus.PARTIAL if stop_index is not None else TerminationStatus.COMPLETE
+    # Ordered digest tuples
+    dd = tuple(d.feasibility_digest for d in dispositions)
+    rd = tuple(r.ranked_record_digest for r in ranked_records)
+    tn = rd[:min(evaluation_input.sizing_request_identity.top_n, F)]
     isd = tuple(evaluation_input.ordered_identity_snapshot_digests)
     ssd = tuple(cs.snapshot_digest if cs is not None else None for cs in evaluation_input.complete_snapshots)
     sbd = tuple(sb.binding_digest if sb is not None else None for sb in artifacts.source_bindings)
     prd = tuple(p.preparation_result_digest if p is not None else None for p in artifacts.preparation_results)
-    rd_tuple = tuple(r.ranked_record_digest for r in ranked_records)
-    tn_tuple = rd_tuple[:TN]
+    derived_core_values = OptimizationResultCoreValues(
+        schema_version=1,
+        sizing_request_identity_digest=evaluation_input.sizing_request_identity_digest,
+        passed_gate_digest=evaluation_input.gate_digest,
+        candidate_set_digest=evaluation_input.candidate_set_digest,
+        evaluation_input_digest=evaluation_input.evaluation_input_digest,
+        optimization_objective=evaluation_input.sizing_request_identity.optimization_objective,
+        requested_top_n=evaluation_input.sizing_request_identity.top_n,
+        total_candidate_count=N, feasible_candidate_count=f_c,
+        infeasible_candidate_count=inf_c, provider_mismatch_count=pm_c,
+        integrity_failed_count=int_c, provenance_failed_count=pf_c,
+        runtime_failed_count=rf_c, unevaluated_count=u_c,
+        phase2_verified_record_count=p2_v, phase2_integrity_invalid_record_count=p2_ii,
+        phase2_runtime_failed_record_count=p2_rf, phase2_unevaluated_record_count=p2_u,
+        runtime_failed_from_phase2_verified_count=rf_v,
+        runtime_failed_from_phase2_runtime_failed_count=rf_rf,
+        ordered_disposition_record_digests=dd,
+        ordered_ranked_record_digests=rd,
+        ordered_top_n_record_digests=tn,
+        ordered_identity_snapshot_digests=isd,
+        ordered_phase2_source_snapshot_digests=ssd,
+        ordered_phase3_source_binding_digests=sbd,
+        ordered_phase3_preparation_result_digests=prd,
+        termination_status=ts,
+        ordered_warning_digests=expected_w, ordered_blocker_digests=expected_b)
+    derived_core_hash = derived_core_values.compute_hash()
+    if result.result_core_hash != derived_core_hash:
+        raise ValueError("result_core_hash mismatch vs independently derived core values")
+
+    # === 20) Provenance semantic verifier ===
+    rd_tuple = rd
+    tn_tuple = tn
     verify_phase3_provenance_graph_or_raise(
         graph,
         ei=evaluation_input,
@@ -3886,7 +3940,13 @@ def verify_phase3_result_semantics_or_raise(
         evaluation_input_digest=result.evaluation_input_digest,
         source_records=evaluation_input.evaluation_records,
         preparation_results=artifacts.preparation_results,
-        source_bindings=artifacts.source_bindings)
+        source_bindings=artifacts.source_bindings,
+        core_values=derived_core_values)
+
+    # === 20b) Bind result.provenance_digest to actual graph hash ===
+    actual_provenance_digest = graph.compute_hash()
+    if result.provenance_digest != actual_provenance_digest:
+        raise ValueError("result.provenance_digest mismatch vs graph.compute_hash()")
 
     # === 21) Envelope hash and UUID recomputation ===
     expected_env = sha256_digest({"result_core_hash": result.result_core_hash, "provenance_digest": result.provenance_digest})
@@ -4149,8 +4209,8 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
     source_records: tuple[CandidateEvaluationRecord, ...],
     preparation_results: tuple[Phase3CandidatePreparationResult | None, ...],
     source_bindings: tuple[Phase3SourceRecordBinding | None, ...],
-    # Optional: accept core_values to independently compute result_core_hash
-    core_values: OptimizationResultCoreValues | None = None,
+    # Accept core_values to independently compute result_core_hash
+    core_values: OptimizationResultCoreValues,
 ):
     N = total_candidate_count
     # 0) Independent authority validation — mandatory, never bypassed
@@ -4200,11 +4260,22 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
     derived_feasible = sum(1 for d in dispositions if d.disposition is FEASIBLE)
     if feasible_candidate_count != derived_feasible:
         raise ValueError(f"provenance: feasible_candidate_count {feasible_candidate_count} != derived {derived_feasible}")
-    # 0c) Independent result_core_hash from core_values (when provided)
-    if core_values is not None:
-        derived_core_hash = core_values.compute_hash()
-        if result_core_hash != derived_core_hash:
-            raise ValueError(f"provenance: result_core_hash mismatch vs core_values.compute_hash()")
+    derived_requested_top_n = ei.sizing_request_identity.top_n
+    if requested_top_n != derived_requested_top_n:
+        raise ValueError(f"provenance: requested_top_n {requested_top_n} != derived {derived_requested_top_n}")
+    derived_objective = ei.sizing_request_identity.optimization_objective
+    if optimization_objective != derived_objective:
+        raise ValueError(f"provenance: optimization_objective mismatch vs independent derivation")
+    derived_termination = TerminationStatus.PARTIAL if _find_stop_index(ei) else TerminationStatus.COMPLETE
+    if termination_status != derived_termination:
+        raise ValueError(f"provenance: termination_status mismatch vs independent derivation")
+    derived_ei_digest = ei.evaluation_input_digest
+    if evaluation_input_digest != derived_ei_digest:
+        raise ValueError(f"provenance: evaluation_input_digest mismatch vs independent derivation")
+    # 0c) Independent result_core_hash from core_values
+    derived_core_hash = core_values.compute_hash()
+    if result_core_hash != derived_core_hash:
+        raise ValueError(f"provenance: result_core_hash mismatch vs core_values.compute_hash()")
     # Bind source_records to EvaluationInput records
     for i in range(N):
         if source_records[i].source_qualified_candidate_id != ei.evaluation_records[i].source_qualified_candidate_id:
@@ -4296,6 +4367,11 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
         if color[nid] == WHITE and dfs(nid): raise ValueError("cycle detected")
 
 ```
+
+### 22.7 Tamper test descriptions for provenance_digest binding
+
+- **PROV-DIGEST-TAMPER-1**: Modify `result.provenance_digest` to a different valid sha256 digest while keeping `graph` unchanged → `verify_phase3_result_semantics_or_raise()` raises "result.provenance_digest mismatch vs graph.compute_hash()"
+- **PROV-DIGEST-TAMPER-2**: Modify `graph` nodes or edges without updating `result.provenance_digest` → `verify_phase3_result_semantics_or_raise()` raises "result.provenance_digest mismatch vs graph.compute_hash()"
 
 ---
 
