@@ -1403,6 +1403,7 @@ def verify_preparation_stage_matrix(
 def verify_phase3_index_artifact_matrix(
     *,
     source_record: CandidateEvaluationRecord,
+    identity_snapshot: Phase2SourceRecordIdentitySnapshot | None,
     complete_snapshot: Phase2SourceRecordSnapshot | None,
     source_record_descriptor: Phase2SourceRecordDescriptor | None,
     source_binding: Phase3SourceRecordBinding | None,
@@ -1417,19 +1418,37 @@ def verify_phase3_index_artifact_matrix(
     Enforced BEFORE any nested verifier calls in both
     build_optimization_result() and verify_optimization_result_or_raise().
     Rejects any forbidden artifact on non-VERIFIED indices.
+
+    For VERIFIED source, delegates to PREPARATION_STAGE_MATRIX via
+    preparation_result.status and failure_stage — does NOT unconditionally
+    require complete_snapshot (early failure stages have it FORBIDDEN).
     """
     state = source_record.candidate_evaluation_state
 
     # === VERIFIED ===
     if state == VERIFIED:
-        if complete_snapshot is None:
-            raise ValueError("VERIFIED: complete_snapshot REQUIRED")
-        if source_record_descriptor is None:
-            raise ValueError("VERIFIED: source_record_descriptor REQUIRED")
         if preparation_result is None:
             raise ValueError("VERIFIED: preparation_result REQUIRED")
-        # READY vs FAILED governed by preparation pipeline (PREPARATION_STAGE_MATRIX)
-        # Builder/external verifier forward to per-artifact verify_or_raise()
+        if source_record_descriptor is None:
+            raise ValueError("VERIFIED: source_record_descriptor REQUIRED")
+        if source_failure_binding is not None:
+            raise ValueError("VERIFIED: source_failure_binding FORBIDDEN")
+        # Build artifact dict and delegate to authoritative preparation-stage matrix
+        artifacts: dict[str, object | None] = {
+            "identity_snapshot": identity_snapshot,
+            "complete_snapshot": complete_snapshot,
+            "source_binding": source_binding,
+            "classification_input": classification_input,
+            "evidence_failure_binding": evidence_failure_binding,
+            "source_failure_binding": source_failure_binding,
+            "phase3_failure_binding": phase3_failure_binding,
+        }
+        verify_preparation_stage_matrix(
+            status=preparation_result.status,
+            failure_stage=preparation_result.failure_stage,
+            artifacts=artifacts,
+            source_candidate_evaluation_state=state,
+        )
         return
 
     # === INTEGRITY_INVALID === (maps to INTEGRITY_FAILED or PROVENANCE_FAILED)
@@ -2960,6 +2979,7 @@ def build_optimization_result(
         p3fb_i = phase3_failure_bindings[i]
         verify_phase3_index_artifact_matrix(
             source_record=rec_i,
+            identity_snapshot=evaluation_input.identity_snapshots[i],
             complete_snapshot=cs_i,
             source_record_descriptor=desc_i,
             source_binding=sb_i,
@@ -3115,6 +3135,17 @@ def build_optimization_result(
         result_core_hash=result_core_hash, provenance_digest=provenance_digest,
         result_hash=result_hash), graph)
 
+    # Authoritative replay before return — builder must not return
+    # a result that hasn't passed independent authority replay
+    result.verify_or_raise(
+        dispositions=dispositions,
+        ranked_records=ranked_records,
+        source_records=evaluation_input.evaluation_records,
+        preparation_results=preparation_results,
+        source_bindings=source_bindings)
+    # Provenance already verified via builder's own graph construction;
+    # external provenance verifier receives independent authority at call site.
+    return (result, graph)
 def result_core_payload_from_values(
     *,
     schema_version: Literal[1] = 1,
@@ -3324,6 +3355,30 @@ class OptimizationResult(BaseModel):
 
 PHASE3_RESULT_NS = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
+# === Model validator / authoritative verifier boundary ===
+#
+# OptimizationResult._validate() (model validator) guarantees:
+#   - schema version
+#   - count non-negativity
+#   - count sum invariants
+#   - tuple exact lengths
+#   - digest format (sha256:* or None for nullable tuples)
+#   - Top-N prefix of ranked
+#   - result core self-hash
+#   - envelope hash
+#   - UUID
+#
+# OptimizationResult.verify_or_raise() (authoritative verifier) guarantees:
+#   - source-state positional nullability (VERIFIED → prep digest non-None,
+#     non-VERIFIED → prep digest None)
+#   - preparation digest equality with independent preparation_result artifact
+#   - source-binding digest equality with independent source_binding artifact
+#   - disposition/ranking/provenance semantic consistency
+#
+# Model validation is structural/self-integrity only.
+# Source-state semantic acceptance REQUIRES verify_or_raise()
+# with independent authority artifacts.
+
 def result_core_payload(r: OptimizationResult) -> dict[str, object]:
     return {"schema_version": r.schema_version, "sizing_request_identity_digest": r.sizing_request_identity_digest,
         "passed_gate_digest": r.passed_gate_digest, "candidate_set_digest": r.candidate_set_digest,
@@ -3458,6 +3513,7 @@ def verify_optimization_result_or_raise(
         desc_i = phase2_source_record_descriptors[i]
         verify_phase3_index_artifact_matrix(
             source_record=rec,
+            identity_snapshot=ids,
             complete_snapshot=cs,
             source_record_descriptor=desc_i,
             source_binding=sb,
@@ -3639,7 +3695,10 @@ def verify_optimization_result_or_raise(
         result_core_hash=result.result_core_hash,
         termination_status=result.termination_status,
         optimization_objective=result.optimization_objective,
-        evaluation_input_digest=result.evaluation_input_digest)
+        evaluation_input_digest=result.evaluation_input_digest,
+        source_records=source_records,
+        preparation_results=preparation_results,
+        source_bindings=source_bindings)
     if result.provenance_digest != graph.compute_hash(): raise ValueError("provenance digest mismatch")
     # 21. Envelope hash + UUID
     expected_env = sha256_digest({"result_core_hash": result.result_core_hash, "provenance_digest": result.provenance_digest})
@@ -3897,7 +3956,54 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
     ordered_identity_snapshot_digests, ordered_phase2_source_snapshot_digests,
     ordered_phase3_source_binding_digests, ordered_phase3_preparation_result_digests,
     ordered_ranked_record_digests, ordered_top_n_record_digests,
-    result_core_hash, termination_status, optimization_objective, evaluation_input_digest):
+    result_core_hash, termination_status, optimization_objective, evaluation_input_digest,
+    # Independent authority artifacts — validates nullable tuples against source
+    source_records: tuple[CandidateEvaluationRecord, ...] | None = None,
+    preparation_results: tuple[Phase3CandidatePreparationResult | None, ...] | None = None,
+    source_bindings: tuple[Phase3SourceRecordBinding | None, ...] | None = None,
+):
+    N = total_candidate_count
+    # 0) Independent authority validation — nullable tuples must derive from artifacts
+    if source_records is not None and preparation_results is not None and source_bindings is not None:
+        if len(source_records) != N:
+            raise ValueError(f"provenance: source_records length {len(source_records)} != N {N}")
+        if len(preparation_results) != N:
+            raise ValueError(f"provenance: preparation_results length {len(preparation_results)} != N {N}")
+        if len(source_bindings) != N:
+            raise ValueError(f"provenance: source_bindings length {len(source_bindings)} != N {N}")
+        if len(ordered_phase3_preparation_result_digests) != N:
+            raise ValueError(f"provenance: prep tuple length {len(ordered_phase3_preparation_result_digests)} != N {N}")
+        if len(ordered_phase3_source_binding_digests) != N:
+            raise ValueError(f"provenance: sb tuple length {len(ordered_phase3_source_binding_digests)} != N {N}")
+        # Derive expected tuples from independent artifacts
+        expected_prep_digests = tuple(
+            pr.preparation_result_digest if pr is not None else None
+            for pr in preparation_results
+        )
+        expected_sb_digests = tuple(
+            sb.binding_digest if sb is not None else None
+            for sb in source_bindings
+        )
+        if ordered_phase3_preparation_result_digests != expected_prep_digests:
+            raise ValueError("provenance: prep digest tuple mismatch vs independent preparation_results")
+        if ordered_phase3_source_binding_digests != expected_sb_digests:
+            raise ValueError("provenance: sb digest tuple mismatch vs independent source_bindings")
+        # Source-state positional nullability
+        for i in range(N):
+            rec = source_records[i]
+            pr = preparation_results[i]
+            prep_d = ordered_phase3_preparation_result_digests[i]
+            if rec.candidate_evaluation_state == VERIFIED:
+                if prep_d is None:
+                    raise ValueError(f"provenance[{i}]: VERIFIED must have non-None prep digest")
+                if pr is None:
+                    raise ValueError(f"provenance[{i}]: VERIFIED must have preparation_result")
+            else:
+                if prep_d is not None:
+                    raise ValueError(f"provenance[{i}]: non-VERIFIED must have None prep digest")
+                if pr is not None:
+                    raise ValueError(f"provenance[{i}]: non-VERIFIED must have None preparation_result")
+    # 1) Build expected nodes from validated tuples
     expected_nodes = expected_phase3_provenance_nodes(ei=ei,dispositions=dispositions,ranked=ranked,
         total_candidate_count=total_candidate_count, feasible_candidate_count=feasible_candidate_count,
         requested_top_n=requested_top_n,
@@ -3990,11 +4096,11 @@ Columns:
 | V-READY-FEASIBLE | VERIFIED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | READY | None | FORBIDDEN | FORBIDDEN | FORBIDDEN | sha256:… | sha256:… | NONE | FEASIBLE |
 | V-READY-INFEASIBLE | VERIFIED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | READY | None | FORBIDDEN | FORBIDDEN | FORBIDDEN | sha256:… | sha256:… | NONE | INFEASIBLE |
 | V-READY-PROVIDER-MISMATCH | VERIFIED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | READY | None | FORBIDDEN | FORBIDDEN | FORBIDDEN | sha256:… | sha256:… | NONE | PROVIDER_IDENTITY_MISMATCH |
-| V-P3-WARNING-DESCRIPTOR-FAIL | VERIFIED | REQUIRED | REQUIRED | FORBIDDEN | FORBIDDEN | REQUIRED | FAILED | WARNING_DESCRIPTOR | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | None | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
-| V-P3-BLOCKER-DESCRIPTOR-FAIL | VERIFIED | REQUIRED | REQUIRED | FORBIDDEN | FORBIDDEN | REQUIRED | FAILED | BLOCKER_DESCRIPTOR | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | None | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
-| V-P3-FAILURE-DESCRIPTOR-FAIL | VERIFIED | REQUIRED | REQUIRED | FORBIDDEN | FORBIDDEN | REQUIRED | FAILED | FAILURE_DESCRIPTOR | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | None | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
-| V-P3-EVIDENCE-DIGEST-FAIL | VERIFIED | REQUIRED | REQUIRED | FORBIDDEN | FORBIDDEN | REQUIRED | FAILED | EVIDENCE_DIGEST | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | None | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
-| V-P3-SOURCE-BINDING-FAIL | VERIFIED | REQUIRED | REQUIRED | REQUIRED | FORBIDDEN | REQUIRED | FAILED | SOURCE_BINDING | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | sha256:… | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
+| V-P3-WARNING-DESCRIPTOR-FAIL | VERIFIED | FORBIDDEN | REQUIRED | FORBIDDEN | FORBIDDEN | REQUIRED | FAILED | WARNING_DESCRIPTOR | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | None | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
+| V-P3-BLOCKER-DESCRIPTOR-FAIL | VERIFIED | FORBIDDEN | REQUIRED | FORBIDDEN | FORBIDDEN | REQUIRED | FAILED | BLOCKER_DESCRIPTOR | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | None | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
+| V-P3-FAILURE-DESCRIPTOR-FAIL | VERIFIED | FORBIDDEN | REQUIRED | FORBIDDEN | FORBIDDEN | REQUIRED | FAILED | FAILURE_DESCRIPTOR | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | None | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
+| V-P3-EVIDENCE-DIGEST-FAIL | VERIFIED | FORBIDDEN | REQUIRED | FORBIDDEN | FORBIDDEN | REQUIRED | FAILED | EVIDENCE_DIGEST | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | None | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
+| V-P3-SOURCE-BINDING-FAIL | VERIFIED | OPTIONAL_AUTHENTICATED | REQUIRED | REQUIRED | FORBIDDEN | REQUIRED | FAILED | SOURCE_BINDING | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | sha256:… | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
 | V-P3-CLASSIFICATION-INPUT-FAIL | VERIFIED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | FAILED | CLASSIFICATION_INPUT | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | sha256:… | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
 | V-P3-CLASSIFICATION-FAIL | VERIFIED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | REQUIRED | FAILED | CLASSIFICATION | REQUIRED | FORBIDDEN | REQUIRED | sha256:… | sha256:… | PHASE3_CLASSIFICATION | RUNTIME_FAILED |
 | II-INTEGRITY | INTEGRITY_INVALID | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | FORBIDDEN | N/A | N/A | FORBIDDEN | FORBIDDEN | FORBIDDEN | None | None | NONE | INTEGRITY_FAILED |
@@ -4012,9 +4118,9 @@ Columns:
 - `N/A`: not applicable (no preparation pipeline for non-VERIFIED)
 - `(per-index)`: position-dependent (mixed VERIFIED/non-VERIFIED sequences)
 
-**Builder verifier:** `verify_optimization_result_or_raise()` uses the same matrix via `verify_phase3_index_artifact_matrix()` BEFORE any nested verifier calls.
-**Result model verifier:** `OptimizationResult.verify_or_raise()` validates per-index preparation and source binding digests against independent authority tuples.
-**Provenance verifier:** `verify_phase3_provenance_graph_or_raise()` validates the full nullable tuple via canonical hash of `{"ordered_prep_result_digests": list(tuple)}` where `None` positions are included.
+**Builder verifier:** `verify_optimization_result_or_raise()` uses the shared gate via `verify_phase3_index_artifact_matrix()` BEFORE any nested verifier calls, and passes independent `source_records`, `preparation_results`, `source_bindings` to both `result.verify_or_raise()` and `verify_phase3_provenance_graph_or_raise()`.
+**Result model verifier:** `OptimizationResult._validate()` guarantees structural/self-integrity only (counts, lengths, format, self-hash). `OptimizationResult.verify_or_raise()` guarantees source-state positional nullability against independent authority artifacts.
+**Provenance verifier:** `verify_phase3_provenance_graph_or_raise()` derives expected preparation and source-binding digests from independent `preparation_results` and `source_bindings` tuples before constructing expected nodes. Validates source-state nullability per-index. The full nullable tuple participates in canonical hash via `{"ordered_prep_result_digests": list(tuple)}` where `None` positions are included.
 
 ---
 
