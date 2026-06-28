@@ -2990,6 +2990,34 @@ class OptimizationResultCoreValues:
     ordered_warning_digests: tuple[str, ...]
     ordered_blocker_digests: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        """Validate cardinality invariants — all counts must be self-consistent."""
+        total = self.total_candidate_count
+        if self.feasible_candidate_count + self.infeasible_candidate_count + \
+           self.provider_mismatch_count + self.integrity_failed_count + \
+           self.provenance_failed_count + self.runtime_failed_count + \
+           self.unevaluated_count != total:
+            raise ValueError("CoreValues: disposition counts don't sum to total")
+        if self.phase2_verified_record_count + self.phase2_integrity_invalid_record_count + \
+           self.phase2_runtime_failed_record_count + self.phase2_unevaluated_record_count != total:
+            raise ValueError("CoreValues: Phase 2 counts don't sum to total")
+        if len(self.ordered_disposition_record_digests) != total:
+            raise ValueError("CoreValues: disposition digest count != total")
+        if len(self.ordered_ranked_record_digests) != self.feasible_candidate_count:
+            raise ValueError("CoreValues: ranked digest count != feasible")
+        if len(self.ordered_top_n_record_digests) != min(self.requested_top_n, self.feasible_candidate_count):
+            raise ValueError("CoreValues: top-n digest count != min(N, F)")
+        if tuple(self.ordered_top_n_record_digests) != self.ordered_ranked_record_digests[:len(self.ordered_top_n_record_digests)]:
+            raise ValueError("CoreValues: top-n not prefix of ranked")
+        if len(self.ordered_identity_snapshot_digests) != total:
+            raise ValueError("CoreValues: identity snapshot digest count != total")
+        if len(self.ordered_phase2_source_snapshot_digests) != total:
+            raise ValueError("CoreValues: source snapshot digest count != total")
+        if len(self.ordered_phase3_source_binding_digests) != total:
+            raise ValueError("CoreValues: source binding digest count != total")
+        if len(self.ordered_phase3_preparation_result_digests) != total:
+            raise ValueError("CoreValues: preparation result digest count != total")
+
     def compute_hash(self) -> str:
         """Compute result core hash via canonical payload — no asdict() dependency."""
         return sha256_digest(result_core_payload_from_values(
@@ -3038,6 +3066,13 @@ def derive_optimization_result_core_values(
     preparation_results: tuple[Phase3CandidatePreparationResult | None, ...],
 ) -> OptimizationResultCoreValues:
     N = evaluation_input.evaluation_record_count
+    # 0) Cardinality gates — reject invalid tuples before any derivation
+    if N != len(dispositions):
+        raise ValueError("core_derivation: dispositions count != N")
+    if N != len(source_bindings):
+        raise ValueError("core_derivation: source_bindings count != N")
+    if N != len(preparation_results):
+        raise ValueError("core_derivation: preparation_results count != N")
     # Derive Phase 2 counts from evaluation records
     recs = evaluation_input.evaluation_records
     p2_v = sum(1 for r in recs if r.candidate_evaluation_state == VERIFIED)
@@ -3047,6 +3082,8 @@ def derive_optimization_result_core_values(
     # Derive disposition counts
     vs = [d.disposition for d in dispositions]
     f_c = vs.count(FEASIBLE)
+    if f_c != len(ranked_records):
+        raise ValueError("core_derivation: ranked_records count != FEASIBLE")
     inf_c = vs.count(INFEASIBLE)
     pm_c = vs.count(PROVIDER_IDENTITY_MISMATCH)
     int_c = vs.count(INTEGRITY_FAILED)
@@ -3159,46 +3196,6 @@ def build_optimization_result(
             evidence_failure_binding=efb_i,
             source_failure_binding=sfb_i,
             phase3_failure_binding=p3fb_i)
-    # 0c) Upstream verifier calls — separate N and F loops (no zip truncation)
-    for i in range(N):
-        rec_i = evaluation_input.evaluation_records[i]
-        pr = preparation_results[i]
-        dr = dispositions[i]
-        ids_i = evaluation_input.identity_snapshots[i]
-        cs_i = evaluation_input.complete_snapshots[i]
-        desc_i = phase2_source_record_descriptors[i]
-        # Descriptor authority replay
-        if desc_i is not None:
-            desc_i.verify_or_raise(
-                source_record=rec_i,
-                identity_snapshot=ids_i,
-                verified_evidence=rec_i.verified_rating_evidence,
-                source_failure_binding=source_failure_bindings[i])
-        if pr is not None:
-            pr.verify_or_raise(
-                source_record=rec_i,
-                identity_snapshot=ids_i,
-                complete_snapshot=cs_i,
-                source_binding=source_bindings[i],
-                classification_input=classification_inputs[i],
-                evidence_failure_binding=evidence_failure_bindings[i],
-                source_failure_binding=source_failure_bindings[i],
-                phase3_failure_binding=phase3_failure_bindings[i])
-        dr.verify_or_raise(
-            source_record=rec_i,
-            source_failure_binding=source_failure_bindings[i],
-            phase3_failure_binding=phase3_failure_bindings[i])
-    # Verify F ranked records independently matching by feasibility_digest
-    feasible_by_digest = {
-        d.feasibility_digest: d
-        for d in dispositions
-        if d.disposition is Phase3Disposition.FEASIBLE
-    }
-    for rr in ranked_records:
-        matched = feasible_by_digest.get(rr.feasibility_digest)
-        if matched is None:
-            raise ValueError(f"ranked record {rr.source_qualified_candidate_id} has no matching FEASIBLE disposition")
-        rr.verify_or_raise(disposition=matched)
     # Build core values via single normative helper
     core_values = derive_optimization_result_core_values(
         evaluation_input=evaluation_input,
@@ -3281,7 +3278,6 @@ def build_optimization_result(
     # Build authoritative artifacts container and delegate to shared semantic verifier
     artifacts = Phase3AuthoritativeArtifacts(
         sizing_request=sizing_request,
-        candidates=candidates,
         phase2_source_record_descriptors=phase2_source_record_descriptors,
         source_bindings=source_bindings,
         classification_inputs=classification_inputs,
@@ -3636,9 +3632,11 @@ def verify_optimization_result_or_raise(
         external_source_records=source_records,
         external_identity_snapshots=identity_snapshots,
         external_complete_snapshots=complete_snapshots)
+    # Candidates are owned by EvaluationInput; verify external candidates match
+    if candidates != ei.materialization_result.candidates:
+        raise ValueError("external candidates parity mismatch")
     artifacts = Phase3AuthoritativeArtifacts(
         sizing_request=sizing_request,
-        candidates=candidates,
         phase2_source_record_descriptors=phase2_source_record_descriptors,
         source_bindings=source_bindings,
         classification_inputs=classification_inputs,
@@ -3667,9 +3665,13 @@ def verify_optimization_result_or_raise(
 ```python
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Phase3AuthoritativeArtifacts:
-    """Container for all independent authority artifact tuples required by the shared verifier."""
+    """Container for all independent authority artifact tuples required by the shared verifier.
+
+    Note: EvaluationInput is the sole owner of source_records, identity_snapshots,
+    complete_snapshots, and materialization_result.candidates. These are consumed
+    directly from evaluation_input, not duplicated here.
+    """
     sizing_request: SizingRequest
-    candidates: tuple[ManufacturableCandidate, ...]
     phase2_source_record_descriptors: tuple[Phase2SourceRecordDescriptor | None, ...]
     source_bindings: tuple[Phase3SourceRecordBinding | None, ...]
     classification_inputs: tuple[Phase3CandidateClassificationInput | None, ...]
@@ -3721,7 +3723,7 @@ def verify_phase3_result_semantics_or_raise(
     # === 2) Phase3EvaluationInput.verify_or_raise() ===
     evaluation_input.verify_or_raise(
         sizing_request=artifacts.sizing_request,
-        candidates=artifacts.candidates,
+        candidates=evaluation_input.materialization_result.candidates,
         source_records=evaluation_input.evaluation_records,
         phase2_source_record_descriptors=artifacts.phase2_source_record_descriptors,
         warning_binding_tuples=artifacts.warning_binding_tuples,
@@ -3829,7 +3831,7 @@ def verify_phase3_result_semantics_or_raise(
                 source_record_descriptor=desc_i,
                 source_binding=sb_i,
                 sizing_request=artifacts.sizing_request,
-                candidate=artifacts.candidates[i])
+                candidate=evaluation_input.materialization_result.candidates[i])
             expected_disp = classify_candidate(cin_i,
                 warning_descriptors=wdt, blocker_descriptors=bdt,
                 source_failure_binding=sfb_i, evidence_failure_binding=efb_i)
@@ -3843,7 +3845,7 @@ def verify_phase3_result_semantics_or_raise(
             expected_disp = disposition_from_preparation_failure(
                 source_record=rec_i, source_snapshot=cs_i,
                 identity_snapshot_digest=ids_i.identity_snapshot_digest,
-                candidate=artifacts.candidates[i], preparation_result=pr,
+                candidate=evaluation_input.materialization_result.candidates[i], preparation_result=pr,
                 phase3_failure_binding=p3fb_i,
                 warning_descriptors=wdt, blocker_descriptors=bdt,
                 source_failure_binding=sfb_i, evidence_failure_binding=efb_i)
@@ -3951,7 +3953,6 @@ def verify_phase3_result_semantics_or_raise(
         termination_status=result.termination_status,
         optimization_objective=result.optimization_objective,
         evaluation_input_digest=result.evaluation_input_digest,
-        source_records=evaluation_input.evaluation_records,
         preparation_results=artifacts.preparation_results,
         source_bindings=artifacts.source_bindings,
         core_values=derived_core_values)
@@ -4218,25 +4219,34 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
     ordered_phase3_source_binding_digests, ordered_phase3_preparation_result_digests,
     ordered_ranked_record_digests, ordered_top_n_record_digests,
     result_core_hash, termination_status, optimization_objective, evaluation_input_digest,
-    # Independent authority artifacts — validates nullable tuples against source
-    source_records: tuple[CandidateEvaluationRecord, ...],
     preparation_results: tuple[Phase3CandidatePreparationResult | None, ...],
     source_bindings: tuple[Phase3SourceRecordBinding | None, ...],
     # Accept core_values to independently compute result_core_hash
     core_values: OptimizationResultCoreValues,
 ):
     N = total_candidate_count
-    # 0) Independent authority validation — mandatory, never bypassed
-    if len(source_records) != N:
-        raise ValueError(f"provenance: source_records length {len(source_records)} != N {N}")
+    F = feasible_candidate_count
+    # 0) Independent authority cardinality gates — mandatory, never bypassed
+    if len(dispositions) != N:
+        raise ValueError(f"provenance: dispositions length {len(dispositions)} != N {N}")
+    if len(ranked) != F:
+        raise ValueError(f"provenance: ranked length {len(ranked)} != F {F}")
     if len(preparation_results) != N:
         raise ValueError(f"provenance: preparation_results length {len(preparation_results)} != N {N}")
     if len(source_bindings) != N:
         raise ValueError(f"provenance: source_bindings length {len(source_bindings)} != N {N}")
+    if len(ordered_identity_snapshot_digests) != N:
+        raise ValueError(f"provenance: identity_snapshot_digests length {len(ordered_identity_snapshot_digests)} != N {N}")
+    if len(ordered_phase2_source_snapshot_digests) != N:
+        raise ValueError(f"provenance: source_snapshot_digests length {len(ordered_phase2_source_snapshot_digests)} != N {N}")
     if len(ordered_phase3_preparation_result_digests) != N:
         raise ValueError(f"provenance: prep tuple length {len(ordered_phase3_preparation_result_digests)} != N {N}")
     if len(ordered_phase3_source_binding_digests) != N:
         raise ValueError(f"provenance: sb tuple length {len(ordered_phase3_source_binding_digests)} != N {N}")
+    if len(ordered_ranked_record_digests) != F:
+        raise ValueError(f"provenance: ranked_record_digests length {len(ordered_ranked_record_digests)} != F {F}")
+    if len(ordered_top_n_record_digests) != min(requested_top_n, F):
+        raise ValueError(f"provenance: top_n_record_digests length {len(ordered_top_n_record_digests)} != min(N,F) {min(requested_top_n, F)}")
     # 0a) Independent tuple derivation — derive every tuple from authority artifacts, then compare
     derived_identity_digests = tuple(s.identity_snapshot_digest for s in ei.identity_snapshots)
     if ordered_identity_snapshot_digests != derived_identity_digests:
@@ -4262,7 +4272,6 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
     derived_ranked_digests = tuple(r.ranked_record_digest for r in ranked)
     if ordered_ranked_record_digests != derived_ranked_digests:
         raise ValueError("provenance: ranked_record_digests mismatch vs independent derivation")
-    F = len(ranked)
     derived_top_n = derived_ranked_digests[:min(requested_top_n, F)]
     if ordered_top_n_record_digests != derived_top_n:
         raise ValueError("provenance: top_n_record_digests mismatch vs independent derivation")
@@ -4297,17 +4306,9 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
     derived_core_hash = expected_core_values.compute_hash()
     if result_core_hash != derived_core_hash:
         raise ValueError(f"provenance: result_core_hash mismatch vs core_values.compute_hash()")
-    # Bind source_records to EvaluationInput records
-    for i in range(N):
-        if source_records[i].source_qualified_candidate_id != ei.evaluation_records[i].source_qualified_candidate_id:
-            raise ValueError(f"provenance[{i}]: candidate_id mismatch")
-        if source_records[i].evaluation_order_index != i:
-            raise ValueError(f"provenance[{i}]: index mismatch")
-        if source_records[i].candidate_evaluation_state != ei.evaluation_records[i].candidate_evaluation_state:
-            raise ValueError(f"provenance[{i}]: state mismatch")
     # Source-state positional nullability (prep/sb digests already validated via independent derivation above)
     for i in range(N):
-        rec = source_records[i]
+        rec = ei.evaluation_records[i]
         pr = preparation_results[i]
         prep_d = ordered_phase3_preparation_result_digests[i]
         sb_d = ordered_phase3_source_binding_digests[i]
@@ -4445,9 +4446,17 @@ Columns:
 - `N/A`: not applicable (no preparation pipeline for non-VERIFIED)
 - `(per-index)`: position-dependent (mixed VERIFIED/non-VERIFIED sequences)
 
-**Builder verifier:** `verify_optimization_result_or_raise()` uses the shared gate via `verify_phase3_index_artifact_matrix()` BEFORE any nested verifier calls, and passes independent `source_records`, `preparation_results`, `source_bindings` to both `result.verify_or_raise()` and `verify_phase3_provenance_graph_or_raise()`.
+**Builder verifier:** Builder is a construction-only path. It retains only length gates and the shared `verify_phase3_index_artifact_matrix()` per-index artifact gate, then delegates all authoritative semantic verification to `verify_phase3_result_semantics_or_raise()`.
+
+**External verifier:** `verify_optimization_result_or_raise()` runs full external-authority parity (source records, identity snapshots, complete snapshots, candidates) against EvaluationInput-owned tuples, then delegates all semantic verification to the shared `verify_phase3_result_semantics_or_raise()`.
+
 **Result model verifier:** `OptimizationResult._validate()` guarantees structural/self-integrity only (counts, lengths, format, self-hash). `OptimizationResult.verify_or_raise()` guarantees source-state positional nullability against independent authority artifacts.
-**Provenance verifier:** `verify_phase3_provenance_graph_or_raise()` derives expected preparation and source-binding digests from independent `preparation_results` and `source_bindings` tuples before constructing expected nodes. Validates source-state nullability per-index. The full nullable tuple participates in canonical hash via `{"ordered_prep_result_digests": list(tuple)}` where `None` positions are included.
+
+**Provenance verifier:** `verify_phase3_provenance_graph_or_raise()` consumes `ei.evaluation_records` directly (no separate `source_records` parameter). Derives expected preparation and source-binding digests from independent `preparation_results` and `source_bindings` tuples. Validates full cardinality gates (dispositions, ranked, all digest tuples) and source-state nullability per-index. The full nullable tuple participates in canonical hash via `{"ordered_prep_result_digests": list(tuple)}` where `None` positions are included.
+
+**Candidate authority:** `evaluation_input.materialization_result.candidates` is the single owner. External verifier validates parity at entry. The shared semantic acceptance function reads candidates directly from `evaluation_input`.
+
+**CoreValues invariants:** `OptimizationResultCoreValues.__post_init__()` validates all cardinality invariants — count sums, tuple lengths, top-n prefix — preventing construction of self-inconsistent core values.
 
 ---
 
