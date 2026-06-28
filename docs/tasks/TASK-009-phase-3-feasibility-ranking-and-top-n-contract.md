@@ -1358,23 +1358,21 @@ def verify_preparation_stage_matrix(
     status: Phase3PreparationStatus,
     failure_stage: Phase3PreparationFailureStage | None,
     artifacts: dict[str, object | None],
-    source_candidate_evaluation_state: CandidateEvaluationState | None = None,
+    source_candidate_evaluation_state: CandidateEvaluationState,
 ) -> None:
     """Enforce PREPARATION_STAGE_MATRIX rules on the given artifacts.
 
-    source_candidate_evaluation_state enables source-state-aware READY rules:
-    - When source is RUNTIME_FAILED, source_failure_binding is REQUIRED (not forbidden)
-    - When source is VERIFIED/INTEGRITY_INVALID/UNEVALUATED, READY forbids failure bindings
+    source_candidate_evaluation_state MUST be provided as independent authority.
+    READY is only valid for VERIFIED source records.
+    FAILED preparation is only valid for VERIFIED source records.
+    Non-VERIFIED records (INTEGRITY_INVALID, RUNTIME_FAILED, UNEVALUATED) MUST
+    NOT enter the preparation pipeline.
     """
+    if source_candidate_evaluation_state is not VERIFIED:
+        raise ValueError(f"Preparation only valid for VERIFIED source, got {source_candidate_evaluation_state}")
     if status is Phase3PreparationStatus.READY:
-        # READY: source-state-aware rules
         required_ready = ["identity_snapshot", "complete_snapshot", "source_binding", "classification_input"]
-        forbidden_ready = ["evidence_failure_binding", "phase3_failure_binding"]
-        # source_failure_binding: REQUIRED when source is RUNTIME_FAILED, FORBIDDEN otherwise
-        if source_candidate_evaluation_state is RUNTIME_FAILED:
-            required_ready.append("source_failure_binding")
-        else:
-            forbidden_ready.append("source_failure_binding")
+        forbidden_ready = ["evidence_failure_binding", "source_failure_binding", "phase3_failure_binding"]
         for name in required_ready:
             if artifacts.get(name) is None:
                 raise ValueError(f"READY: {name} required")
@@ -1434,6 +1432,10 @@ class Phase3CandidatePreparationResult(BaseModel):
     def _validate(self) -> typing.Self:
         if not self.source_qualified_candidate_id: raise ValueError("candidate_id required")
         if self.evaluation_order_index < 0: raise ValueError("index must be ≥ 0")
+        # 0) Preparation gate: only VERIFIED source records enter preparation
+        if self.identity_snapshot is not None:
+            if self.identity_snapshot.candidate_evaluation_state is not VERIFIED:
+                raise ValueError(f"Preparation only valid for VERIFIED source, got {self.identity_snapshot.candidate_evaluation_state}")
         # 1) Matrix enforcement
         artifacts: dict[str, object | None] = {
             "identity_snapshot": self.identity_snapshot,
@@ -1499,6 +1501,9 @@ class Phase3CandidatePreparationResult(BaseModel):
         phase3_failure_binding: Phase3RunFailureDescriptorBinding | None,
     ) -> None:
         """Authoritative verifier: validates artifact matrix, nested digest consistency, and self-hash."""
+        # 0) Source-state gate: preparation only for VERIFIED source records
+        if source_record.candidate_evaluation_state is not VERIFIED:
+            raise ValueError(f"Preparation only valid for VERIFIED source, got {source_record.candidate_evaluation_state}")
         # 1) Candidate/index identity
         if self.source_qualified_candidate_id != source_record.source_qualified_candidate_id:
             raise ValueError("candidate_id mismatch")
@@ -2814,7 +2819,7 @@ def build_optimization_result(
     *,
     evaluation_input: Phase3EvaluationInput,
     phase2_source_record_descriptors: tuple[Phase2SourceRecordDescriptor | None, ...],
-    preparation_results: tuple[Phase3CandidatePreparationResult, ...],
+    preparation_results: tuple[Phase3CandidatePreparationResult | None, ...],
     dispositions: tuple[CandidateDispositionRecord, ...],
     ranked_records: tuple[RankedCandidateRecord, ...],
     source_bindings: tuple[Phase3SourceRecordBinding | None, ...],
@@ -2837,10 +2842,19 @@ def build_optimization_result(
     if N != len(phase3_failure_bindings): raise ValueError("phase3_failure_bindings count != N")
     F = sum(1 for d in dispositions if d.disposition is FEASIBLE)
     if F != len(ranked_records): raise ValueError("ranked_records count != F")
-    # 0b) Upstream verifier calls — separate N and F loops (no zip truncation)
+    # 0b) Preparation nullability gate: VERIFIED → non-null, non-VERIFIED → None
     for i in range(N):
         rec_i = evaluation_input.evaluation_records[i]
-        pr = preparation_results[i]; dr = dispositions[i]
+        pr = preparation_results[i]
+        if rec_i.candidate_evaluation_state == VERIFIED:
+            if pr is None: raise ValueError(f"[{i}] VERIFIED must have preparation_result")
+        else:
+            if pr is not None: raise ValueError(f"[{i}] non-VERIFIED must have None preparation_result")
+    # 0c) Upstream verifier calls — separate N and F loops (no zip truncation)
+    for i in range(N):
+        rec_i = evaluation_input.evaluation_records[i]
+        pr = preparation_results[i]
+        dr = dispositions[i]
         ids_i = evaluation_input.identity_snapshots[i]
         cs_i = evaluation_input.complete_snapshots[i]
         desc_i = phase2_source_record_descriptors[i]
@@ -2851,15 +2865,16 @@ def build_optimization_result(
                 identity_snapshot=ids_i,
                 verified_evidence=rec_i.verified_rating_evidence,
                 source_failure_binding=source_failure_bindings[i])
-        pr.verify_or_raise(
-            source_record=rec_i,
-            identity_snapshot=ids_i,
-            complete_snapshot=cs_i,
-            source_binding=source_bindings[i],
-            classification_input=classification_inputs[i],
-            evidence_failure_binding=evidence_failure_bindings[i],
-            source_failure_binding=source_failure_bindings[i],
-            phase3_failure_binding=phase3_failure_bindings[i])
+        if pr is not None:
+            pr.verify_or_raise(
+                source_record=rec_i,
+                identity_snapshot=ids_i,
+                complete_snapshot=cs_i,
+                source_binding=source_bindings[i],
+                classification_input=classification_inputs[i],
+                evidence_failure_binding=evidence_failure_bindings[i],
+                source_failure_binding=source_failure_bindings[i],
+                phase3_failure_binding=phase3_failure_bindings[i])
         dr.verify_or_raise(
             source_record=rec_i,
             source_failure_binding=source_failure_bindings[i],
@@ -2905,8 +2920,8 @@ def build_optimization_result(
     tn = rd[:min(evaluation_input.sizing_request_identity.top_n, F)]
     isd = tuple(evaluation_input.ordered_identity_snapshot_digests)
     ssd = tuple(cs.snapshot_digest if cs is not None else None for cs in evaluation_input.complete_snapshots)
-    sbd = tuple(p.source_binding_digest if p.source_binding is not None else None for p in preparation_results)
-    prd = tuple(p.preparation_result_digest for p in preparation_results)
+    sbd = tuple(p.source_binding_digest if p is not None and p.source_binding is not None else None for p in preparation_results)
+    prd = tuple(p.preparation_result_digest if p is not None else None for p in preparation_results)
     # Build core values
     core_values = OptimizationResultCoreValues(
         schema_version=1,
@@ -3220,7 +3235,7 @@ def verify_optimization_result_or_raise(
     phase2_source_record_descriptors: tuple[Phase2SourceRecordDescriptor | None, ...],
     source_bindings: tuple[Phase3SourceRecordBinding | None, ...],
     classification_inputs: tuple[Phase3CandidateClassificationInput | None, ...],
-    preparation_results: tuple[Phase3CandidatePreparationResult, ...],
+    preparation_results: tuple[Phase3CandidatePreparationResult | None, ...],
     warning_descriptor_tuples: tuple[tuple[Phase3MessageDescriptor, ...], ...],
     blocker_descriptor_tuples: tuple[tuple[Phase3MessageDescriptor, ...], ...],
     warning_binding_tuples: tuple[tuple[Phase3MessageDescriptorBinding, ...], ...],
@@ -3330,43 +3345,50 @@ def verify_optimization_result_or_raise(
             if result.ordered_phase3_source_binding_digests[i] != sb.binding_digest: raise ValueError(f"[{i}] result binding digest")
         else:
             if result.ordered_phase3_source_binding_digests[i] is not None: raise ValueError(f"[{i}] result binding should be None")
-        # Preparation result authority replay
-        cin = classification_inputs[i]
-        pr.verify_or_raise(
-            source_record=rec,
-            identity_snapshot=ids,
-            complete_snapshot=cs,
-            source_binding=sb,
-            classification_input=cin,
-            evidence_failure_binding=efb,
-            source_failure_binding=sfb,
-            phase3_failure_binding=p3fb)
-        if pr.source_qualified_candidate_id != rec.source_qualified_candidate_id: raise ValueError(f"[{i}] pr candidate_id")
-        if pr.evaluation_order_index != i: raise ValueError(f"[{i}] pr index")
-        if pr.identity_snapshot_digest != ids.identity_snapshot_digest: raise ValueError(f"[{i}] pr identity digest")
-        if result.ordered_phase3_preparation_result_digests[i] != pr.preparation_result_digest: raise ValueError(f"[{i}] result prep digest")
-        if pr.status is Phase3PreparationStatus.READY:
-            if sb is None: raise ValueError(f"[{i}] READY needs binding")
-            if cs is None: raise ValueError(f"[{i}] READY needs snapshot")
-            if cin is None: raise ValueError(f"[{i}] READY needs cin")
-            if cin.source_identity_record_descriptor_digest != ids.identity_snapshot_digest: raise ValueError(f"[{i}] cin identity digest mismatch")
-            if cin.source_record_descriptor_digest != (cs.phase2_source_record_descriptor_digest if cs is not None else None): raise ValueError(f"[{i}] cin source desc mismatch")
-            if cin.sizing_request_identity_digest != ei.sizing_request_identity_digest: raise ValueError(f"[{i}] cin sizing digest")
-            if cin.evidence_binding.binding_digest != sb.binding_digest: raise ValueError(f"[{i}] cin binding digest")
-            if cin.verified_rating_evidence_digest != cs.verified_rating_evidence_digest: raise ValueError(f"[{i}] cin evidence digest")
-            expected = classify_candidate(cin, warning_descriptors=wdt, blocker_descriptors=bdt,
-                source_failure_binding=sfb, evidence_failure_binding=efb)
-            if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] disposition mismatch")
+        # Preparation result authority replay and nullability gate
+        if rec.candidate_evaluation_state == VERIFIED:
+            if pr is None: raise ValueError(f"[{i}] VERIFIED must have preparation_result")
         else:
-            if p3fb is None: raise ValueError(f"[{i}] FAILED needs failure binding")
-            expected = disposition_from_preparation_failure(
-                source_record=rec, source_snapshot=cs,
-                identity_snapshot_digest=ids.identity_snapshot_digest,
-                candidate=cand, preparation_result=pr,
-                phase3_failure_binding=p3fb,
-                warning_descriptors=wdt, blocker_descriptors=bdt,
-                source_failure_binding=sfb, evidence_failure_binding=efb)
-            if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] prep-failure mismatch")
+            if pr is not None: raise ValueError(f"[{i}] non-VERIFIED must have None preparation_result")
+            if result.ordered_phase3_preparation_result_digests[i] is not None:
+                raise ValueError(f"[{i}] non-VERIFIED must have None prep digest")
+        if pr is not None:
+            cin = classification_inputs[i]
+            pr.verify_or_raise(
+                source_record=rec,
+                identity_snapshot=ids,
+                complete_snapshot=cs,
+                source_binding=sb,
+                classification_input=cin,
+                evidence_failure_binding=efb,
+                source_failure_binding=sfb,
+                phase3_failure_binding=p3fb)
+            if pr.source_qualified_candidate_id != rec.source_qualified_candidate_id: raise ValueError(f"[{i}] pr candidate_id")
+            if pr.evaluation_order_index != i: raise ValueError(f"[{i}] pr index")
+            if pr.identity_snapshot_digest != ids.identity_snapshot_digest: raise ValueError(f"[{i}] pr identity digest")
+            if result.ordered_phase3_preparation_result_digests[i] != pr.preparation_result_digest: raise ValueError(f"[{i}] result prep digest")
+            if pr.status is Phase3PreparationStatus.READY:
+                if sb is None: raise ValueError(f"[{i}] READY needs binding")
+                if cs is None: raise ValueError(f"[{i}] READY needs snapshot")
+                if cin is None: raise ValueError(f"[{i}] READY needs cin")
+                if cin.source_identity_record_descriptor_digest != ids.identity_snapshot_digest: raise ValueError(f"[{i}] cin identity digest mismatch")
+                if cin.source_record_descriptor_digest != (cs.phase2_source_record_descriptor_digest if cs is not None else None): raise ValueError(f"[{i}] cin source desc mismatch")
+                if cin.sizing_request_identity_digest != ei.sizing_request_identity_digest: raise ValueError(f"[{i}] cin sizing digest")
+                if cin.evidence_binding.binding_digest != sb.binding_digest: raise ValueError(f"[{i}] cin binding digest")
+                if cin.verified_rating_evidence_digest != cs.verified_rating_evidence_digest: raise ValueError(f"[{i}] cin evidence digest")
+                expected = classify_candidate(cin, warning_descriptors=wdt, blocker_descriptors=bdt,
+                    source_failure_binding=sfb, evidence_failure_binding=efb)
+                if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] disposition mismatch")
+            else:
+                if p3fb is None: raise ValueError(f"[{i}] FAILED needs failure binding")
+                expected = disposition_from_preparation_failure(
+                    source_record=rec, source_snapshot=cs,
+                    identity_snapshot_digest=ids.identity_snapshot_digest,
+                    candidate=cand, preparation_result=pr,
+                    phase3_failure_binding=p3fb,
+                    warning_descriptors=wdt, blocker_descriptors=bdt,
+                    source_failure_binding=sfb, evidence_failure_binding=efb)
+                if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] prep-failure mismatch")
         # Authoritative disposition replay — independent failure authority
         dr.verify_or_raise(
             source_record=rec,
