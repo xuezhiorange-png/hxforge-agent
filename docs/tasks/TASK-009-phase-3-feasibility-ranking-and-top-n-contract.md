@@ -1326,7 +1326,7 @@ PREPARATION_STAGE_MATRIX: dict[Phase3PreparationFailureStage, dict[str, StageFie
         "source_binding": StageFieldRequirement.REQUIRED,
         "classification_input": StageFieldRequirement.FORBIDDEN,
         "evidence_failure_binding": StageFieldRequirement.REQUIRED,
-        "source_failure_binding": StageFieldRequirement.REQUIRED,
+        "source_failure_binding": StageFieldRequirement.FORBIDDEN,
         "phase3_failure_binding": StageFieldRequirement.REQUIRED,
     },
     Phase3PreparationFailureStage.CLASSIFICATION_INPUT: {
@@ -1335,7 +1335,7 @@ PREPARATION_STAGE_MATRIX: dict[Phase3PreparationFailureStage, dict[str, StageFie
         "source_binding": StageFieldRequirement.REQUIRED,
         "classification_input": StageFieldRequirement.REQUIRED,
         "evidence_failure_binding": StageFieldRequirement.REQUIRED,
-        "source_failure_binding": StageFieldRequirement.REQUIRED,
+        "source_failure_binding": StageFieldRequirement.FORBIDDEN,
         "phase3_failure_binding": StageFieldRequirement.REQUIRED,
     },
     Phase3PreparationFailureStage.CLASSIFICATION: {
@@ -1344,7 +1344,7 @@ PREPARATION_STAGE_MATRIX: dict[Phase3PreparationFailureStage, dict[str, StageFie
         "source_binding": StageFieldRequirement.REQUIRED,
         "classification_input": StageFieldRequirement.REQUIRED,
         "evidence_failure_binding": StageFieldRequirement.REQUIRED,
-        "source_failure_binding": StageFieldRequirement.OPTIONAL_AUTHENTICATED,
+        "source_failure_binding": StageFieldRequirement.FORBIDDEN,
         "phase3_failure_binding": StageFieldRequirement.REQUIRED,
     },
 }
@@ -1358,18 +1358,23 @@ def verify_preparation_stage_matrix(
     status: Phase3PreparationStatus,
     failure_stage: Phase3PreparationFailureStage | None,
     artifacts: dict[str, object | None],
+    source_candidate_evaluation_state: CandidateEvaluationState | None = None,
 ) -> None:
-    """Enforce PREPARATION_STAGE_MATRIX rules on the given artifacts."""
+    """Enforce PREPARATION_STAGE_MATRIX rules on the given artifacts.
+
+    source_candidate_evaluation_state enables source-state-aware READY rules:
+    - When source is RUNTIME_FAILED, source_failure_binding is REQUIRED (not forbidden)
+    - When source is VERIFIED/INTEGRITY_INVALID/UNEVALUATED, READY forbids failure bindings
+    """
     if status is Phase3PreparationStatus.READY:
-        # READY: all artifacts required, no failure
-        for name in ("identity_snapshot", "complete_snapshot", "source_binding", "classification_input",
-                     "evidence_failure_binding", "source_failure_binding", "phase3_failure_binding"):
-            if artifacts.get(name) is None:
-                # evidence_failure_binding, source_failure_binding, phase3_failure_binding are FORBIDDEN in READY
-                # identity_snapshot, complete_snapshot, source_binding, classification_input are REQUIRED
-                pass  # checked below
-        required_ready = ("identity_snapshot", "complete_snapshot", "source_binding", "classification_input")
-        forbidden_ready = ("evidence_failure_binding", "source_failure_binding", "phase3_failure_binding")
+        # READY: source-state-aware rules
+        required_ready = ["identity_snapshot", "complete_snapshot", "source_binding", "classification_input"]
+        forbidden_ready = ["evidence_failure_binding", "phase3_failure_binding"]
+        # source_failure_binding: REQUIRED when source is RUNTIME_FAILED, FORBIDDEN otherwise
+        if source_candidate_evaluation_state is RUNTIME_FAILED:
+            required_ready.append("source_failure_binding")
+        else:
+            forbidden_ready.append("source_failure_binding")
         for name in required_ready:
             if artifacts.get(name) is None:
                 raise ValueError(f"READY: {name} required")
@@ -1439,7 +1444,7 @@ class Phase3CandidatePreparationResult(BaseModel):
             "source_failure_binding": self.source_failure_binding,
             "phase3_failure_binding": self.phase3_failure_binding,
         }
-        verify_preparation_stage_matrix(status=self.status, failure_stage=self.failure_stage, artifacts=artifacts)
+        verify_preparation_stage_matrix(status=self.status, failure_stage=self.failure_stage, artifacts=artifacts, source_candidate_evaluation_state=self.identity_snapshot.candidate_evaluation_state if self.identity_snapshot is not None else None)
         # 2) Validate digest fields against nested artifacts (compare, don't assign — frozen model)
         expected_id_digest = self.identity_snapshot.identity_snapshot_digest if self.identity_snapshot is not None else None
         if self.identity_snapshot_digest != expected_id_digest:
@@ -1509,7 +1514,7 @@ class Phase3CandidatePreparationResult(BaseModel):
             "source_failure_binding": source_failure_binding,
             "phase3_failure_binding": phase3_failure_binding,
         }
-        verify_preparation_stage_matrix(status=self.status, failure_stage=self.failure_stage, artifacts=artifacts)
+        verify_preparation_stage_matrix(status=self.status, failure_stage=self.failure_stage, artifacts=artifacts, source_candidate_evaluation_state=source_record.candidate_evaluation_state)
         # 3) Nested digest consistency — compare stored digests against independent authority
         if identity_snapshot is not None:
             if self.identity_snapshot_digest != identity_snapshot.identity_snapshot_digest:
@@ -1570,7 +1575,7 @@ def build_phase3_candidate_preparation_result(
         "source_failure_binding": source_failure_binding,
         "phase3_failure_binding": phase3_failure_binding,
     }
-    verify_preparation_stage_matrix(status=status, failure_stage=failure_stage, artifacts=artifacts)
+    verify_preparation_stage_matrix(status=status, failure_stage=failure_stage, artifacts=artifacts, source_candidate_evaluation_state=identity_snapshot.candidate_evaluation_state)
     isnap_d = identity_snapshot.identity_snapshot_digest
     cs_d = complete_snapshot.snapshot_digest if complete_snapshot is not None else None
     sb_d = source_binding.binding_digest if source_binding is not None else None
@@ -1893,7 +1898,7 @@ def disposition_from_preparation_failure(
         primary_engineering_value=None, secondary_engineering_value=None,
         warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
         source_evaluation_failure_payload_digest=None,
-        source_evaluation_failure_binding_digest=source_failure_binding.descriptor_binding_digest if source_failure_binding is not None else None,
+        source_evaluation_failure_binding_digest=None,
         phase3_failure_payload_digest=phase3_failure_payload_digest,
         phase3_failure_binding_digest=phase3_failure_binding_digest,
         failure_origin=PHASE3_CLASSIFICATION,
