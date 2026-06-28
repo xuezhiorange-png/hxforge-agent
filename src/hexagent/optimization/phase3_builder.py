@@ -1119,7 +1119,8 @@ def _phase3_runtime(
         else None,
         verified_rating_evidence_digest=(
             eb.verified_rating_evidence_digest
-            if failure_stage in (
+            if failure_stage
+            in (
                 Phase3PreparationFailureStage.SOURCE_BINDING,
                 Phase3PreparationFailureStage.CLASSIFICATION_INPUT,
             )
