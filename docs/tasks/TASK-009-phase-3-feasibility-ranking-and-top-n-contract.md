@@ -1509,8 +1509,10 @@ def verify_phase3_index_artifact_matrix(
     Rejects any forbidden artifact on non-VERIFIED indices.
 
     For VERIFIED source, delegates to PREPARATION_STAGE_MATRIX via
-    preparation_result.status and failure_stage — does NOT unconditionally
-    require complete_snapshot (early failure stages have it FORBIDDEN).
+    preparation_result.status and failure_stage.
+    Design A: complete_snapshot is REQUIRED for ALL preparation failure stages
+    (identity/complete snapshot is established before the preparation pipeline).
+    The matrix is the single source of truth for per-stage field requirements.
     """
     state = source_record.candidate_evaluation_state
 
