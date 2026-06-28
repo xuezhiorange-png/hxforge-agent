@@ -67,6 +67,7 @@ class ErrorCode(StrEnum):
     PROVENANCE_INCOMPLETE = "provenance_incomplete"
     HASH_MISMATCH = "hash_mismatch"
     INVALID_STATE_TRANSITION = "invalid_state_transition"
+    TASK008_ADAPTER = "task008_adapter"
     BLOCKER = "blocker"
 
     # Correlation-specific error codes
@@ -96,6 +97,10 @@ class ErrorCode(StrEnum):
     SOLVER_BRACKET_NOT_FOUND = "solver_bracket_not_found"
     SOLVER_NON_CONVERGENCE = "solver_non_convergence"
     ENERGY_BALANCE_NOT_CLOSED = "energy_balance_not_closed"
+
+    # TASK-009 optimization error codes
+    CATALOG_INVALID = "catalog_invalid"
+    INVALID_SIZING_REQUEST = "invalid_sizing_request"
 
     @classmethod
     def is_valid_code(cls, code: str) -> bool:
