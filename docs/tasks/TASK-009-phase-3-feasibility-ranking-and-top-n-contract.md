@@ -175,7 +175,7 @@ class Phase2SourceRecordDescriptor:
             if source_record.candidate_evaluation_identity is not None else None
         if self.candidate_evaluation_identity_digest != expected_cei:
             raise ValueError("candidate_evaluation_identity_digest mismatch")
-        expected_evidence = verified_evidence.verified_evidence_digest \
+        expected_evidence = verified_evidence.compute_explicit_evidence_digest() \
             if verified_evidence is not None else None
         if self.verified_rating_evidence_digest != expected_evidence:
             raise ValueError("verified_rating_evidence_digest mismatch")
@@ -223,7 +223,7 @@ def build_phase2_source_record_descriptor(
     verified_evidence: VerifiedRatingEvidenceSnapshot | None,
     source_failure_binding: Phase3RunFailureDescriptorBinding | None,
 ) -> Phase2SourceRecordDescriptor:
-    verified_evidence_digest = verified_evidence.verified_evidence_digest \
+    verified_evidence_digest = verified_evidence.compute_explicit_evidence_digest() \
         if verified_evidence is not None else None
     evaluation_failure_digest = source_failure_binding.descriptor_binding_digest \
         if source_failure_binding is not None else None
@@ -650,7 +650,7 @@ class Phase2SourceRecordSnapshot(BaseModel):
             if source_record.candidate_evaluation_identity is not None else None
         if self.candidate_evaluation_identity_digest != expected_identity_digest:
             raise ValueError("candidate_evaluation_identity_digest mismatch")
-        expected_verified_digest = verified_evidence.verified_evidence_digest \
+        expected_verified_digest = verified_evidence.compute_explicit_evidence_digest() \
             if verified_evidence is not None else None
         if self.verified_rating_evidence_digest != expected_verified_digest:
             raise ValueError("verified_rating_evidence_digest mismatch")
@@ -1199,7 +1199,7 @@ class Phase3SourceRecordBinding(BaseModel):
         if self.evaluation_order_index != complete_snapshot.evaluation_order_index:
             raise ValueError("evaluation_index vs complete_snapshot mismatch")
         # 4) Verified evidence digest cross-check
-        expected_ve = verified_evidence.verified_evidence_digest if verified_evidence is not None else None
+        expected_ve = verified_evidence.compute_explicit_evidence_digest() if verified_evidence is not None else None
         if self.verified_rating_evidence_digest != expected_ve:
             raise ValueError("verified_rating_evidence_digest mismatch")
         # 5) Warning/blocker bindings
@@ -1475,7 +1475,7 @@ class Phase3CandidatePreparationResult(BaseModel):
         else:
             if self.phase3_failure_binding is None: raise ValueError("FAILED: failure_binding required")
             if self.failure_stage is None: raise ValueError("FAILED: failure_stage required")
-            if self.classification_input is not None: raise ValueError("FAILED: no cin")
+            # classification_input presence controlled by PREPARATION_STAGE_MATRIX
             if self.phase3_failure_binding_digest is None: raise ValueError("FAILED: failure_binding_digest required")
         expected = sha256_digest(_prep_result_payload(self))
         if self.preparation_result_digest != expected: raise ValueError("preparation_result_digest mismatch")
@@ -1747,6 +1747,16 @@ def build_candidate_disposition_record(
     failure_stage: Phase3PreparationFailureStage | None = None,
     phase3_failure_binding_digest: str | None = None,
 ) -> CandidateDispositionRecord:
+    # 0) Failure matrix enforcement — single authority for all three layers
+    verify_candidate_disposition_failure_matrix(
+        disposition=disposition,
+        failure_origin=failure_origin,
+        failure_stage=failure_stage,
+        source_failure_binding_digest=source_evaluation_failure_binding_digest,
+        source_failure_payload_digest=source_evaluation_failure_payload_digest,
+        phase3_failure_binding_digest=phase3_failure_binding_digest,
+        phase3_failure_payload_digest=phase3_failure_payload_digest,
+        source_identity_record_descriptor_digest=source_identity_record_descriptor_digest)
     wdd = tuple(d.message_payload_digest for d in warning_descriptors)
     bdd = tuple(d.message_payload_digest for d in blocker_descriptors)
     payload = candidate_disposition_payload_from_values(
@@ -1919,6 +1929,16 @@ class CandidateDispositionRecord(BaseModel):
         if not self.source_qualified_candidate_id: raise ValueError("candidate_id required")
         if self.evaluation_order_index < 0: raise ValueError("index must be ≥ 0")
         if not self.source_identity_record_descriptor_digest: raise ValueError("identity descriptor required")
+        # 0) Failure matrix — single authority shared with factory and verifier
+        verify_candidate_disposition_failure_matrix(
+            disposition=self.disposition,
+            failure_origin=self.failure_origin,
+            failure_stage=self.failure_stage,
+            source_failure_binding_digest=self.source_evaluation_failure_binding_digest,
+            source_failure_payload_digest=self.source_evaluation_failure_payload_digest,
+            phase3_failure_binding_digest=self.phase3_failure_binding_digest,
+            phase3_failure_payload_digest=self.phase3_failure_payload_digest,
+            source_identity_record_descriptor_digest=self.source_identity_record_descriptor_digest)
         for d,n in [(self.source_record_descriptor_digest,"source"),(self.feasibility_digest,"feasibility")]:
             if d is not None and not self.DIGEST_PATTERN.match(d): raise ValueError(f"invalid {n} digest")
         for d,n in [(self.candidate_evaluation_identity_digest,"identity"),(self.verified_rating_evidence_digest,"evidence"),
@@ -2100,7 +2120,7 @@ class CandidateDispositionRecord(BaseModel):
             if source_record.candidate_evaluation_identity is not None else None
         if self.candidate_evaluation_identity_digest != expected_identity_digest:
             raise ValueError("candidate_evaluation_identity_digest mismatch")
-        expected_evidence_digest = source_record.verified_rating_evidence.verified_evidence_digest \
+        expected_evidence_digest = source_record.verified_rating_evidence.compute_explicit_evidence_digest() \
             if source_record.verified_rating_evidence is not None else None
         if self.verified_rating_evidence_digest != expected_evidence_digest:
             raise ValueError("verified_rating_evidence_digest mismatch")
@@ -2474,44 +2494,58 @@ def classify_candidate(
     scd = input.source_record_descriptor_digest
     if rec.candidate_evaluation_state != VERIFIED:
         return _map_non_verified(rec, source_identity_record_descriptor_digest=sid,
-            source_record_descriptor_digest=scd, source_failure_binding=source_failure_binding)
+            source_record_descriptor_digest=scd, source_failure_binding=source_failure_binding,
+            warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
+            evidence_failure_binding=evidence_failure_binding)
     if not rec.provider_identity_matches:
         return _build_provider_mismatch(rec, evidence, eb, source_identity_record_descriptor_digest=sid,
             source_record_descriptor_digest=scd, warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors)
     if rec.rating_status is None:
         return _phase3_runtime(rec, eb, PHASE3_MISSING_RATING_STATUS, "No rating status.",
             failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
-            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd)
+            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding, evidence_failure_binding=evidence_failure_binding)
     if rec.rating_status == "blocked":
         vf = validate_blocked_evidence(rec, evidence, eb)
         if vf is not None:
             return _phase3_runtime_from_validation(rec, eb, vf, source_identity_record_descriptor_digest=sid,
-                source_record_descriptor_digest=scd)
+                source_record_descriptor_digest=scd, warning_descriptors=warning_descriptors,
+                blocker_descriptors=blocker_descriptors)
         return _build_infeasible(rec, eb, RATING_BLOCKED, source_identity_record_descriptor_digest=sid,
             source_record_descriptor_digest=scd, warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors)
     if rec.rating_status == "failed":
         vf = validate_failed_evidence(rec, evidence, eb)
         if vf is not None:
             return _phase3_runtime_from_validation(rec, eb, vf, source_identity_record_descriptor_digest=sid,
-                source_record_descriptor_digest=scd)
+                source_record_descriptor_digest=scd, warning_descriptors=warning_descriptors,
+                blocker_descriptors=blocker_descriptors)
         return _build_infeasible(rec, eb, RATING_FAILED, source_identity_record_descriptor_digest=sid,
             source_record_descriptor_digest=scd, warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors)
     if evidence is None:
         return _phase3_runtime(rec, eb, PHASE3_TRUSTED_EVIDENCE_INCOMPLETE, "No evidence.",
             failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
-            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd)
+            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding, evidence_failure_binding=evidence_failure_binding)
     if evidence.heat_duty_w is None or evidence.hot_outlet_temperature_k is None or evidence.cold_outlet_temperature_k is None:
         return _phase3_runtime(rec, eb, PHASE3_TRUSTED_EVIDENCE_INCOMPLETE, "Missing thermal metrics.",
             failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
-            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd)
+            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding, evidence_failure_binding=evidence_failure_binding)
     if evidence.area_outer_m2 is None or not (evidence.area_outer_m2 > 0) or evidence.area_inner_m2 is None or not (evidence.area_inner_m2 > 0):
         return _phase3_runtime(rec, eb, PHASE3_TRUSTED_EVIDENCE_INCOMPLETE, "Non-positive area.",
             failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
-            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd)
+            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding, evidence_failure_binding=evidence_failure_binding)
     if evidence.failure is not None:
         return _phase3_runtime(rec, eb, PHASE3_TRUSTED_EVIDENCE_INCOMPLETE, "Has failure.",
             failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
-            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd)
+            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding, evidence_failure_binding=evidence_failure_binding)
     try:
         heat_w = to_canonical_decimal(evidence.heat_duty_w)
         area_m2 = to_canonical_decimal(evidence.area_outer_m2)
@@ -2522,7 +2556,9 @@ def classify_candidate(
     except (ValueError, TypeError):
         return _phase3_runtime(rec, eb, PHASE3_TRUSTED_EVIDENCE_INCOMPLETE, "Non-finite metric.",
             failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
-            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd)
+            source_identity_record_descriptor_digest=sid, source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors, blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding, evidence_failure_binding=evidence_failure_binding)
     required = to_canonical_decimal(sizing.required_duty_w)
     duty_tol = max(to_canonical_decimal(sizing.duty_absolute_tolerance_w),
                    to_canonical_decimal(sizing.duty_relative_tolerance) * abs(required))
@@ -2749,6 +2785,9 @@ def build_optimization_result(
     preparation_results: tuple[Phase3CandidatePreparationResult, ...],
     dispositions: tuple[CandidateDispositionRecord, ...],
     ranked_records: tuple[RankedCandidateRecord, ...],
+    source_bindings: tuple[Phase3SourceRecordBinding | None, ...],
+    evidence_failure_bindings: tuple[Phase3RunFailureDescriptorBinding | None, ...],
+    source_failure_bindings: tuple[Phase3RunFailureDescriptorBinding | None, ...],
 ) -> tuple[OptimizationResult, ProvenanceGraph]:
     # 0) Length gates
     N = evaluation_input.evaluation_record_count
@@ -2761,15 +2800,26 @@ def build_optimization_result(
     if F != len(ranked_records): raise ValueError("ranked_records count != F")
     # 0b) Upstream verifier calls — separate N and F loops (no zip truncation)
     for i in range(N):
+        rec_i = evaluation_input.evaluation_records[i]
         pr = preparation_results[i]; dr = dispositions[i]
+        ids_i = evaluation_input.identity_snapshots[i]
+        cs_i = evaluation_input.complete_snapshots[i]
+        desc_i = phase2_source_record_descriptors[i]
+        # Descriptor authority replay
+        if desc_i is not None:
+            desc_i.verify_or_raise(
+                source_record=rec_i,
+                identity_snapshot=ids_i,
+                verified_evidence=rec_i.verified_rating_evidence,
+                source_failure_binding=source_failure_bindings[i] if i < len(source_failure_bindings) else None)
         pr.verify_or_raise(
-            source_record=evaluation_input.evaluation_records[i],
-            identity_snapshot=evaluation_input.identity_snapshots[i],
-            complete_snapshot=evaluation_input.complete_snapshots[i],
-            source_binding=pr.source_binding,
-            evidence_failure_binding=pr.evidence_failure_binding,
-            source_failure_binding=pr.source_failure_binding)
-        dr.verify_or_raise(source_record=evaluation_input.evaluation_records[i])
+            source_record=rec_i,
+            identity_snapshot=ids_i,
+            complete_snapshot=cs_i,
+            source_binding=source_bindings[i] if i < len(source_bindings) else None,
+            evidence_failure_binding=evidence_failure_bindings[i] if i < len(evidence_failure_bindings) else None,
+            source_failure_binding=source_failure_bindings[i] if i < len(source_failure_bindings) else None)
+        dr.verify_or_raise(source_record=rec_i)
     # Verify F ranked records independently matching by feasibility_digest
     feasible_by_digest = {
         d.feasibility_digest: d
@@ -3211,9 +3261,19 @@ def verify_optimization_result_or_raise(
             if result.ordered_phase2_source_snapshot_digests[i] != cs.snapshot_digest: raise ValueError(f"[{i}] result snapshot digest")
         else:
             if result.ordered_phase2_source_snapshot_digests[i] is not None: raise ValueError(f"[{i}] result snapshot should be None")
+        # Descriptor authority replay
+        desc_i = phase2_source_record_descriptors[i]
+        if desc_i is not None:
+            desc_i.verify_or_raise(
+                source_record=rec,
+                identity_snapshot=ids,
+                verified_evidence=rec.verified_rating_evidence,
+                source_failure_binding=sfb)
         # Source binding (nullable)
         if sb is not None:
             sb.verify_or_raise(
+                source_record=rec,
+                verified_evidence=rec.verified_rating_evidence,
                 identity_snapshot=ids,
                 complete_snapshot=cs,
                 source_record_descriptor=phase2_source_record_descriptors[i],
@@ -3224,7 +3284,14 @@ def verify_optimization_result_or_raise(
             if result.ordered_phase3_source_binding_digests[i] != sb.binding_digest: raise ValueError(f"[{i}] result binding digest")
         else:
             if result.ordered_phase3_source_binding_digests[i] is not None: raise ValueError(f"[{i}] result binding should be None")
-        # Preparation result
+        # Preparation result authority replay
+        pr.verify_or_raise(
+            source_record=rec,
+            identity_snapshot=ids,
+            complete_snapshot=cs,
+            source_binding=sb,
+            evidence_failure_binding=efb,
+            source_failure_binding=sfb)
         if pr.source_qualified_candidate_id != rec.source_qualified_candidate_id: raise ValueError(f"[{i}] pr candidate_id")
         if pr.evaluation_order_index != i: raise ValueError(f"[{i}] pr index")
         if pr.identity_snapshot_digest != ids.identity_snapshot_digest: raise ValueError(f"[{i}] pr identity digest")
