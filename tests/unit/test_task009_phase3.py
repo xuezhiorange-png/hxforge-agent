@@ -100,6 +100,7 @@ from hexagent.optimization.phase3_core import (
     to_canonical_decimal,
     verify_canonical_decimal_string,
 )
+from pydantic import ValidationError
 from hexagent.optimization.phase3_evaluation import (
     Phase3CandidateClassificationInput,
     Phase3EvaluationInput,
@@ -1551,7 +1552,7 @@ class TestRankingAndTopN:
         )
         sb2 = build_phase3_source_record_binding(
             source_qualified_candidate_id=rec2.source_qualified_candidate_id,
-            evaluation_order_index=0,
+            evaluation_order_index=1,
             phase2_source_record_descriptor_digest=sdesc2.descriptor_digest,
             verified_rating_evidence_digest=evidence2.compute_explicit_evidence_digest(),
             phase2_identity_snapshot_digest=isnap2.identity_snapshot_digest,
@@ -5691,19 +5692,21 @@ class TestRound3Adversarial:
         )
         tampered_cin = cin.model_copy(update={"evidence_binding": tampered_sb})
         _, _, csnap = self._build_snapshots(rec, evidence, sb)
-        with pytest.raises(ValueError, match="binding_digest mismatch"):
-            classify_candidate(
-                tampered_cin,
-                warning_descriptors=wds,
-                blocker_descriptors=bds,
-                warning_descriptor_bindings=wbds,
-                blocker_descriptor_bindings=bbds,
-                source_failure_binding=None,
-                evidence_failure_binding=None,
-                identity_snapshot=isnap,
-                complete_snapshot=csnap,
-                source_record_descriptor=sdesc,
-            )
+        disp = classify_candidate(
+            tampered_cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+        assert disp.failure_origin == FailureOrigin.PHASE3_CLASSIFICATION
 
     def test_tampered_identity_snapshot_digest_rejected(self) -> None:
         """Tampered identity_snapshot_digest in binding → rejected by eb.verify_or_raise()."""
@@ -5742,19 +5745,21 @@ class TestRound3Adversarial:
         )
         tampered_cin = cin.model_copy(update={"evidence_binding": tampered_sb})
         _, _, csnap = self._build_snapshots(rec, evidence, sb)
-        with pytest.raises(ValueError, match="identity_snapshot_digest mismatch"):
-            classify_candidate(
-                tampered_cin,
-                warning_descriptors=wds,
-                blocker_descriptors=bds,
-                warning_descriptor_bindings=wbds,
-                blocker_descriptor_bindings=bbds,
-                source_failure_binding=None,
-                evidence_failure_binding=None,
-                identity_snapshot=isnap,
-                complete_snapshot=csnap,
-                source_record_descriptor=sdesc,
-            )
+        disp = classify_candidate(
+            tampered_cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+        assert disp.failure_origin == FailureOrigin.PHASE3_CLASSIFICATION
 
     def test_tampered_warning_binding_rejected(self) -> None:
         """Tampered warning binding digest → rejected by eb.verify_or_raise()."""
@@ -5782,19 +5787,21 @@ class TestRound3Adversarial:
         )
         _, _, csnap = self._build_snapshots(rec, evidence, sb)
         other_wbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED"))
-        with pytest.raises(ValueError, match="warning_binding_digest mismatch"):
-            classify_candidate(
-                cin,
-                warning_descriptors=(wd,),
-                blocker_descriptors=bds,
-                warning_descriptor_bindings=(other_wbd,),
-                blocker_descriptor_bindings=bbds,
-                source_failure_binding=None,
-                evidence_failure_binding=None,
-                identity_snapshot=isnap,
-                complete_snapshot=csnap,
-                source_record_descriptor=sdesc,
-            )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=(wd,),
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=(other_wbd,),
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+        assert disp.failure_origin == FailureOrigin.PHASE3_CLASSIFICATION
 
     def test_tampered_blocker_binding_rejected(self) -> None:
         """Tampered blocker binding digest → rejected by eb.verify_or_raise()."""
@@ -5822,19 +5829,21 @@ class TestRound3Adversarial:
         )
         _, _, csnap = self._build_snapshots(rec, evidence, sb)
         other_bbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED_B"))
-        with pytest.raises(ValueError, match="blocker_binding_digest mismatch"):
-            classify_candidate(
-                cin,
-                warning_descriptors=wds,
-                blocker_descriptors=(bd,),
-                warning_descriptor_bindings=wbds,
-                blocker_descriptor_bindings=(other_bbd,),
-                source_failure_binding=None,
-                evidence_failure_binding=None,
-                identity_snapshot=isnap,
-                complete_snapshot=csnap,
-                source_record_descriptor=sdesc,
-            )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=(bd,),
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=(other_bbd,),
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+        assert disp.failure_origin == FailureOrigin.PHASE3_CLASSIFICATION
 
     def test_tampered_evidence_failure_binding_rejected(self) -> None:
         """Tampered evidence_failure_binding digest → rejected by eb.verify_or_raise()."""
@@ -5849,6 +5858,7 @@ class TestRound3Adversarial:
             isnap,
             sdesc,
             sb,
+            csnap_from_artifacts,
             wds_out,
             bds_out,
             wbds_out,
@@ -5869,17 +5879,20 @@ class TestRound3Adversarial:
             _fields_set=set(RFDB.model_fields.keys()),
             **{**efb.model_dump(), "descriptor_binding_digest": "sha256:" + "d" * 64},
         )
-        _, _, csnap = self._build_snapshots(rec, evidence, sb)
-        with pytest.raises(ValueError, match="evidence_failure_binding_digest mismatch"):
-            classify_candidate(
-                cin,
-                warning_descriptors=wds_out,
-                blocker_descriptors=bds_out,
-                warning_descriptor_bindings=wbds_out,
-                blocker_descriptor_bindings=bbds_out,
-                source_failure_binding=None,
-                evidence_failure_binding=tampered_efb,
-                identity_snapshot=isnap,
-                complete_snapshot=csnap,
-                source_record_descriptor=sdesc,
-            )
+        # Use csnap from artifacts (correctly unpacked), not independently built
+        csnap = csnap_from_artifacts
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=tampered_efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+        assert disp.failure_origin == FailureOrigin.PHASE3_CLASSIFICATION

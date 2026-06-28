@@ -1117,7 +1117,14 @@ def _phase3_runtime(
         candidate_evaluation_identity_digest=rec.candidate_evaluation_identity.candidate_evaluation_identity_digest
         if rec.candidate_evaluation_identity is not None
         else None,
-        verified_rating_evidence_digest=eb.verified_rating_evidence_digest,
+        verified_rating_evidence_digest=(
+            eb.verified_rating_evidence_digest
+            if failure_stage in (
+                Phase3PreparationFailureStage.SOURCE_BINDING,
+                Phase3PreparationFailureStage.CLASSIFICATION_INPUT,
+            )
+            else None
+        ),
         invalid_rating_evidence_digest=None,
         primary_engineering_value=None,
         secondary_engineering_value=None,
