@@ -124,6 +124,7 @@ MINIMUM_EFFECTIVE_LENGTH = OptimizationObjective.MINIMUM_EFFECTIVE_LENGTH
 # Phase 3 error codes mapped to existing production ErrorCodes
 PHASE3_MISSING_RATING_STATUS = ErrorCode.INPUT_INCONSISTENT
 PHASE3_TRUSTED_EVIDENCE_INCOMPLETE = ErrorCode.INPUT_INCONSISTENT
+PHASE3_MISSING_CLASSIFICATION_AUTHORITY = ErrorCode.INPUT_INCONSISTENT
 
 # Phase 3 result namespace UUID
 PHASE3_RESULT_NS = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
@@ -763,7 +764,6 @@ def validate_failed_evidence(
 class _ThermalFieldRule(StrEnum):
     MUST_BE_NONE = "must_be_none"
     REQUIRED_AND_BOUND = "required_and_bound"
-    CAN_BE_NONE_OR_BOUND = "can_be_none_or_bound"
 
 
 _BLOCKED_THERMAL_MATRIX: dict[str, _ThermalFieldRule] = {
@@ -778,10 +778,10 @@ _BLOCKED_THERMAL_MATRIX: dict[str, _ThermalFieldRule] = {
     "area_outer_m2": _ThermalFieldRule.REQUIRED_AND_BOUND,
     "tube_flow_area_m2": _ThermalFieldRule.REQUIRED_AND_BOUND,
     "annulus_flow_area_m2": _ThermalFieldRule.REQUIRED_AND_BOUND,
-    "tube_inlet_density_kg_m3": _ThermalFieldRule.CAN_BE_NONE_OR_BOUND,
-    "annulus_inlet_density_kg_m3": _ThermalFieldRule.CAN_BE_NONE_OR_BOUND,
-    "tube_correlation": _ThermalFieldRule.CAN_BE_NONE_OR_BOUND,
-    "annulus_correlation": _ThermalFieldRule.CAN_BE_NONE_OR_BOUND,
+    "tube_inlet_density_kg_m3": _ThermalFieldRule.MUST_BE_NONE,
+    "annulus_inlet_density_kg_m3": _ThermalFieldRule.MUST_BE_NONE,
+    "tube_correlation": _ThermalFieldRule.MUST_BE_NONE,
+    "annulus_correlation": _ThermalFieldRule.MUST_BE_NONE,
 }
 
 _FAILED_THERMAL_MATRIX: dict[str, _ThermalFieldRule] = dict(_BLOCKED_THERMAL_MATRIX)
@@ -828,7 +828,6 @@ def _check_thermal_field_matrix(
                 message=f"Blocked/failed evidence: {field_name} must be present",
                 context=ctx,
             )
-        # CAN_BE_NONE_OR_BOUND: no enforcement needed
     return None
 
 
@@ -1246,9 +1245,9 @@ def classify_candidate(
     blocker_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
     source_failure_binding: Phase3RunFailureDescriptorBinding | None,
     evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
-    identity_snapshot: Phase2SourceRecordIdentitySnapshot | None = None,
-    complete_snapshot: Phase2SourceRecordSnapshot | None = None,
-    source_record_descriptor: Phase2SourceRecordDescriptor | None = None,
+    identity_snapshot: Phase2SourceRecordIdentitySnapshot | None,
+    complete_snapshot: Phase2SourceRecordSnapshot | None,
+    source_record_descriptor: Phase2SourceRecordDescriptor | None,
 ) -> CandidateDispositionRecord:
     rec = input.source_record
     sizing = input.sizing_request_identity
@@ -1266,22 +1265,54 @@ def classify_candidate(
             blocker_descriptors=blocker_descriptors,
             evidence_failure_binding=evidence_failure_binding,
         )
-    if not rec.provider_identity_matches:
-        return _build_provider_mismatch(
+    # All VERIFIED branches share the same mandatory authority replay.
+    # Must fail closed if any authority artifact is missing.
+    if identity_snapshot is None:
+        return _phase3_runtime(
             rec,
-            evidence,
             eb,
+            PHASE3_MISSING_CLASSIFICATION_AUTHORITY,
+            "VERIFIED: identity_snapshot required.",
+            failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
             source_identity_record_descriptor_digest=sid,
             source_record_descriptor_digest=scd,
             warning_descriptors=warning_descriptors,
             blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding,
+            evidence_failure_binding=evidence_failure_binding,
         )
-    # P0-4: SourceRecordBinding verification before blocked/failed validators
-    if (
-        identity_snapshot is not None
-        and complete_snapshot is not None
-        and source_record_descriptor is not None
-    ):
+    if complete_snapshot is None:
+        return _phase3_runtime(
+            rec,
+            eb,
+            PHASE3_MISSING_CLASSIFICATION_AUTHORITY,
+            "VERIFIED: complete_snapshot required.",
+            failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
+            source_identity_record_descriptor_digest=sid,
+            source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors,
+            blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding,
+            evidence_failure_binding=evidence_failure_binding,
+        )
+    if source_record_descriptor is None:
+        return _phase3_runtime(
+            rec,
+            eb,
+            PHASE3_MISSING_CLASSIFICATION_AUTHORITY,
+            "VERIFIED: source_record_descriptor required.",
+            failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
+            source_identity_record_descriptor_digest=sid,
+            source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors,
+            blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding,
+            evidence_failure_binding=evidence_failure_binding,
+        )
+    # Mandatory SourceRecordBinding authority replay — must precede
+    # provider_identity_matches so tampered bindings are caught before
+    # any VERIFIED branch returns.
+    try:
         eb.verify_or_raise(
             source_record=rec,
             identity_snapshot=identity_snapshot,
@@ -1292,6 +1323,30 @@ def classify_candidate(
             blocker_bindings=blocker_descriptor_bindings,
             source_failure_binding=source_failure_binding,
             evidence_failure_binding=evidence_failure_binding,
+        )
+    except ValueError as exc:
+        return _phase3_runtime(
+            rec,
+            eb,
+            PHASE3_TRUSTED_EVIDENCE_INCOMPLETE,
+            f"SourceRecordBinding authority replay failed: {exc}",
+            failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
+            source_identity_record_descriptor_digest=sid,
+            source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors,
+            blocker_descriptors=blocker_descriptors,
+            source_failure_binding=source_failure_binding,
+            evidence_failure_binding=evidence_failure_binding,
+        )
+    if not rec.provider_identity_matches:
+        return _build_provider_mismatch(
+            rec,
+            evidence,
+            eb,
+            source_identity_record_descriptor_digest=sid,
+            source_record_descriptor_digest=scd,
+            warning_descriptors=warning_descriptors,
+            blocker_descriptors=blocker_descriptors,
         )
     if rec.rating_status is None:
         return _phase3_runtime(

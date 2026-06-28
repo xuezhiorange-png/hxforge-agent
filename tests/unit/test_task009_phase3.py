@@ -455,6 +455,52 @@ def _make_unevaluated_record(
     )
 
 
+def _make_csnap(
+    rec: CandidateEvaluationRecord,
+    sdesc: Phase2SourceRecordDescriptor,
+) -> Phase2SourceRecordSnapshot:
+    """Build a complete_snapshot from record + descriptor for testing."""
+    return build_phase2_source_record_snapshot(
+        source_qualified_candidate_id=rec.source_qualified_candidate_id,
+        evaluation_order_index=rec.evaluation_order_index,
+        candidate_evaluation_state=rec.candidate_evaluation_state,
+        feasible=rec.feasible,
+        feasibility_status=rec.feasibility_status,
+        hash_verification_outcome=rec.hash_verification_outcome,
+        provenance_verification_outcome=rec.provenance_verification_outcome,
+        provider_identity_matches=rec.provider_identity_matches,
+        rating_status=rec.rating_status,
+        candidate_evaluation_identity_digest=(
+            rec.candidate_evaluation_identity.candidate_evaluation_identity_digest
+            if rec.candidate_evaluation_identity is not None
+            else None
+        ),
+        verified_rating_evidence_digest=(
+            rec.verified_rating_evidence.compute_explicit_evidence_digest()
+            if rec.verified_rating_evidence is not None
+            else None
+        ),
+        invalid_rating_evidence_digest=(
+            rec.invalid_rating_evidence.invalid_evidence_digest
+            if rec.invalid_rating_evidence is not None
+            else None
+        ),
+        claimed_rating_result_audit_digest=(
+            rec.verified_rating_evidence.rating_result_hash
+            if rec.verified_rating_evidence is not None
+            else None
+        ),
+        evaluation_failure_digest=(
+            rec.evaluation_failure.failure_digest if rec.evaluation_failure is not None else None
+        ),
+        phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
+        warning_descriptor_binding_digests=(),
+        blocker_descriptor_binding_digests=(),
+        source_evaluation_failure_binding_digest=None,
+        evidence_failure_binding_digest=None,
+    )
+
+
 def _make_sizing_request_identity(
     *,
     optimization_objective: OptimizationObjective = (
@@ -618,6 +664,7 @@ class TestEndToEndFlow:
             verified_evidence=evidence,
             source_failure_binding=None,
         )
+        csnap = _make_csnap(rec, sdesc)
         wd = _make_message_descriptor()
         bd = _make_message_descriptor("BLOCK001")
         wbd = _make_message_descriptor_binding(wd)
@@ -642,6 +689,9 @@ class TestEndToEndFlow:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.FEASIBLE
         assert disp.diagnostic == FeasibilityDiagnosticKey.NONE
@@ -658,6 +708,7 @@ class TestEndToEndFlow:
             verified_evidence=evidence,
             source_failure_binding=None,
         )
+        csnap = _make_csnap(rec, sdesc)
         wd = _make_message_descriptor()
         bd = _make_message_descriptor("B01")
         wbd = _make_message_descriptor_binding(wd)
@@ -682,6 +733,9 @@ class TestEndToEndFlow:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.INFEASIBLE
         assert disp.diagnostic == FeasibilityDiagnosticKey.DUTY_SHORTFALL
@@ -713,6 +767,7 @@ class TestEndToEndFlow:
                 verified_evidence=recs[i].verified_rating_evidence,
                 source_failure_binding=None,
             )
+            csnap = _make_csnap(recs[i], sdesc)
             wd = _make_message_descriptor(f"W{i}")
             bd = _make_message_descriptor(f"B{i}")
             wbd = _make_message_descriptor_binding(wd)
@@ -740,6 +795,9 @@ class TestEndToEndFlow:
                 blocker_descriptor_bindings=(bbd,),
                 source_failure_binding=None,
                 evidence_failure_binding=None,
+                identity_snapshot=isnap,
+                complete_snapshot=csnap,
+                source_record_descriptor=sdesc,
             )
             dispositions.append(disp)
         feasible = [d for d in dispositions if d.disposition == Phase3Disposition.FEASIBLE]
@@ -759,6 +817,7 @@ class TestEndToEndFlow:
             verified_evidence=evidence,
             source_failure_binding=None,
         )
+        csnap = _make_csnap(rec, sdesc)
         # Evidence has no warnings/blockers, so descriptors and bindings must be empty
         sb = build_phase3_source_record_binding(
             source_qualified_candidate_id=rec.source_qualified_candidate_id,
@@ -780,6 +839,9 @@ class TestEndToEndFlow:
             blocker_descriptor_bindings=(),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.INFEASIBLE
         assert disp.diagnostic == FeasibilityDiagnosticKey.RATING_BLOCKED
@@ -800,6 +862,7 @@ class TestEndToEndFlow:
             verified_evidence=evidence,
             source_failure_binding=None,
         )
+        csnap = _make_csnap(rec, sdesc)
         wd = _make_message_descriptor()
         bd = _make_message_descriptor("B1")
         wbd = _make_message_descriptor_binding(wd)
@@ -824,6 +887,9 @@ class TestEndToEndFlow:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.INFEASIBLE
         assert disp.diagnostic == FeasibilityDiagnosticKey.TERMINAL_DELTA_T_INADEQUATE
@@ -844,6 +910,7 @@ class TestEndToEndFlow:
             verified_evidence=evidence,
             source_failure_binding=None,
         )
+        csnap = _make_csnap(rec, sdesc)
         wd = _make_message_descriptor()
         bd = _make_message_descriptor("B1")
         wbd = _make_message_descriptor_binding(wd)
@@ -868,6 +935,9 @@ class TestEndToEndFlow:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         # Should be feasible (hot_in=350, cold_in=290 → dt1=60, hot_out=320, cold_out=310 → dt2=10)
         assert disp.disposition == Phase3Disposition.FEASIBLE
@@ -1458,6 +1528,7 @@ class TestRankingAndTopN:
             source_evaluation_failure_binding_digest=None,
             evidence_failure_binding_digest=None,
         )
+        csnap1 = _make_csnap(rec1, sdesc1)
         cin1 = _build_cin(rec1, cand1, sri, isnap1, sdesc1, sb1)
         disp1 = classify_candidate(
             cin1,
@@ -1467,6 +1538,9 @@ class TestRankingAndTopN:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap1,
+            complete_snapshot=csnap1,
+            source_record_descriptor=sdesc1,
         )
         isnap2 = build_identity_snapshot(rec2)
         sdesc2 = build_phase2_source_record_descriptor(
@@ -1486,6 +1560,7 @@ class TestRankingAndTopN:
             source_evaluation_failure_binding_digest=None,
             evidence_failure_binding_digest=None,
         )
+        csnap2 = _make_csnap(rec2, sdesc2)
         cin2 = _build_cin(rec2, cand2, sri, isnap2, sdesc2, sb2)
         disp2 = classify_candidate(
             cin2,
@@ -1495,6 +1570,9 @@ class TestRankingAndTopN:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap2,
+            complete_snapshot=csnap2,
+            source_record_descriptor=sdesc2,
         )
         assert disp1.disposition == Phase3Disposition.FEASIBLE
         assert disp2.disposition == Phase3Disposition.FEASIBLE
@@ -1581,6 +1659,7 @@ class TestFailurePropagation:
             verified_evidence=evidence,
             source_failure_binding=None,
         )
+        csnap = _make_csnap(rec, sdesc)
         wd = _make_message_descriptor()
         bd = _make_message_descriptor("B1")
         wbd = _make_message_descriptor_binding(wd)
@@ -1605,6 +1684,9 @@ class TestFailurePropagation:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.PROVIDER_IDENTITY_MISMATCH
         assert disp.diagnostic == FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
@@ -1620,6 +1702,7 @@ class TestFailurePropagation:
             verified_evidence=evidence,
             source_failure_binding=None,
         )
+        csnap = _make_csnap(rec, sdesc)
         wd = _make_message_descriptor()
         bd = _make_message_descriptor("B1")
         wbd = _make_message_descriptor_binding(wd)
@@ -1644,6 +1727,9 @@ class TestFailurePropagation:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -2511,7 +2597,19 @@ class TestEvidenceValidators:
             ),
         )
         cin = _build_cin(rec, candidate, sri, isnap, sdesc, sb)
-        return cin, sri, isnap, sdesc, sb, warnings, blockers, warning_bindings, blocker_bindings
+        csnap = _make_csnap(rec, sdesc)
+        return (
+            cin,
+            sri,
+            isnap,
+            sdesc,
+            sb,
+            csnap,
+            warnings,
+            blockers,
+            warning_bindings,
+            blocker_bindings,
+        )
 
     @staticmethod
     def _build_failed_artifacts(
@@ -2578,7 +2676,19 @@ class TestEvidenceValidators:
             evidence_failure_binding_digest=ef_digest,
         )
         cin = _build_cin(rec, candidate, sri, isnap, sdesc, sb)
-        return cin, sri, isnap, sdesc, sb, warnings, blockers, warning_bindings, blocker_bindings
+        csnap = _make_csnap(rec, sdesc)
+        return (
+            cin,
+            sri,
+            isnap,
+            sdesc,
+            sb,
+            csnap,
+            warnings,
+            blockers,
+            warning_bindings,
+            blocker_bindings,
+        )
 
     @staticmethod
     def _make_msg_descriptors(
@@ -2722,7 +2832,7 @@ class TestEvidenceValidators:
         """Valid blocked evidence passes validation and classifies as INFEASIBLE/RATING_BLOCKED."""
         evidence = _make_blocked_evidence()  # no warnings, no blockers
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -2735,6 +2845,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.INFEASIBLE
         assert disp.diagnostic == FeasibilityDiagnosticKey.RATING_BLOCKED
@@ -2746,15 +2859,17 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -2764,6 +2879,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.INFEASIBLE
         assert disp.diagnostic == FeasibilityDiagnosticKey.RATING_FAILED
@@ -2810,7 +2928,7 @@ class TestEvidenceValidators:
         """Blocked path with evidence rating_status not 'blocked' → RUNTIME_FAILED."""
         evidence = _make_evidence(rating_status=RatingStatus.SUCCEEDED)
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -2824,6 +2942,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -2832,7 +2953,7 @@ class TestEvidenceValidators:
         """Blocked path with mismatched candidate ID in binding → RUNTIME_FAILED."""
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -2847,6 +2968,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -2855,7 +2979,7 @@ class TestEvidenceValidators:
         """Blocked path with mismatched evaluation index in binding → RUNTIME_FAILED."""
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -2870,6 +2994,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -2915,7 +3042,7 @@ class TestEvidenceValidators:
             rating_execution_context_digest=evidence.rating_execution_context_digest,
         )
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered_evidence})
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             tampered_rec,
             candidate,
             tampered_evidence,
@@ -2929,6 +3056,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -2939,7 +3069,7 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver(
             "c1", 0, evidence=evidence, rating_status="blocked", provider_identity_matches=False
         )
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -2952,6 +3082,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.PROVIDER_IDENTITY_MISMATCH
         assert disp.diagnostic == FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
@@ -2996,7 +3129,7 @@ class TestEvidenceValidators:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             tampered_rec,
             candidate,
             tampered,
@@ -3010,6 +3143,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3054,7 +3190,7 @@ class TestEvidenceValidators:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             tampered_rec,
             candidate,
             tampered,
@@ -3068,10 +3204,13 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             tampered_rec,
             candidate,
             tampered,
@@ -3085,6 +3224,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3107,7 +3249,7 @@ class TestEvidenceValidators:
             }
         )
         rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             tampered,
@@ -3121,6 +3263,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3131,7 +3276,7 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         wd = _make_message_descriptor()
         wbd = _make_message_descriptor_binding(wd)
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -3147,6 +3292,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3171,7 +3319,7 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
         wd_wrong = _make_message_descriptor()
         wbd_wrong = _make_message_descriptor_binding(wd_wrong)
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             tampered,
@@ -3187,6 +3335,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3209,7 +3360,7 @@ class TestEvidenceValidators:
             }
         )
         rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             tampered,
@@ -3223,6 +3374,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=(),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3233,7 +3387,7 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         bd = _make_message_descriptor("B01")
         bbd = _make_message_descriptor_binding(bd)
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -3249,6 +3403,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3273,7 +3430,7 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
         bd_wrong = _make_message_descriptor("B01")
         bbd_wrong = _make_message_descriptor_binding(bd_wrong)
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             tampered,
@@ -3289,6 +3446,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=(bbd_wrong,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3299,7 +3459,7 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         wd = _make_message_descriptor()
         wbd = _make_message_descriptor_binding(wd)
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -3316,6 +3476,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3326,7 +3489,7 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         bd = _make_message_descriptor("B01")
         bbd = _make_message_descriptor_binding(bd)
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -3343,6 +3506,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=(other_bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3351,7 +3517,7 @@ class TestEvidenceValidators:
         """Blocked path: evidence digest mismatch vs binding → RUNTIME_FAILED."""
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -3365,6 +3531,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3414,7 +3583,7 @@ class TestEvidenceValidators:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             tampered_rec,
             candidate,
             tampered,
@@ -3428,10 +3597,13 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             tampered_rec,
             candidate,
             tampered,
@@ -3445,6 +3617,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3489,7 +3664,7 @@ class TestEvidenceValidators:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             tampered_rec,
             candidate,
             tampered,
@@ -3503,6 +3678,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3511,7 +3689,7 @@ class TestEvidenceValidators:
         """Blocked path: evidence_failure_binding not None (must be None) → RUNTIME_FAILED."""
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -3526,6 +3704,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3535,7 +3716,7 @@ class TestEvidenceValidators:
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         other_id = "sha256:" + "a" * 64
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_blocked_artifacts(
             rec,
             candidate,
             evidence,
@@ -3550,6 +3731,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3596,7 +3780,7 @@ class TestEvidenceValidators:
         """Failed path with evidence not having FAILED status → RUNTIME_FAILED."""
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
-        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_failed_artifacts(
+        cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds = self._build_failed_artifacts(
             rec,
             candidate,
             evidence,
@@ -3612,6 +3796,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3623,17 +3810,19 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            tampered_src_id="sha256:" + "9" * 64,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                tampered_src_id="sha256:" + "9" * 64,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -3643,6 +3832,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3654,17 +3846,19 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            tampered_idx=999,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                tampered_idx=999,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -3674,6 +3868,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3721,16 +3918,18 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            tampered_rec,
-            candidate,
-            tampered,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                tampered_rec,
+                candidate,
+                tampered,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -3740,6 +3939,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3787,16 +3989,18 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            tampered_rec,
-            candidate,
-            tampered,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                tampered_rec,
+                candidate,
+                tampered,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -3806,6 +4010,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3822,16 +4029,18 @@ class TestEvidenceValidators:
         other_desc = _build_run_failure_descriptor(other_failure)
         efb = build_phase3_run_failure_descriptor_binding(other_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -3841,6 +4050,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3858,16 +4070,18 @@ class TestEvidenceValidators:
             **{**efb.model_dump(), "descriptor_binding_digest": "sha256:" + "b" * 64},
         )
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=tampered_efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=tampered_efb,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -3877,6 +4091,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=tampered_efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3895,16 +4112,18 @@ class TestEvidenceValidators:
         other_desc = _build_run_failure_descriptor(other_failure)
         other_efb = build_phase3_run_failure_descriptor_binding(other_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=other_efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=other_efb,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -3914,6 +4133,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3961,16 +4183,18 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            tampered_rec,
-            candidate,
-            tampered,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                tampered_rec,
+                candidate,
+                tampered,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -3980,6 +4204,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -3991,16 +4218,18 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4010,6 +4239,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4021,16 +4253,18 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4040,6 +4274,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=(),
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4051,16 +4288,18 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,  # None != actual
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,  # None != actual
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4070,6 +4309,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4081,16 +4323,18 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,
+            )
         )
         other_wbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED"))
         disp = classify_candidate(
@@ -4101,6 +4345,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4112,16 +4359,18 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                binding_evidence_digest=None,
+            )
         )
         other_bbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED_B"))
         disp = classify_candidate(
@@ -4132,6 +4381,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=(other_bbd,),
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4144,17 +4396,19 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         other_id = "sha256:" + "a" * 64
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
-        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec,
-            candidate,
-            evidence,
-            warnings=wds,
-            blockers=bds,
-            warning_bindings=wbds,
-            blocker_bindings=bbds,
-            evidence_failure_binding=efb,
-            tampered_src_id=other_id,
-            binding_evidence_digest=None,
+        cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out = (
+            self._build_failed_artifacts(
+                rec,
+                candidate,
+                evidence,
+                warnings=wds,
+                blockers=bds,
+                warning_bindings=wbds,
+                blocker_bindings=bbds,
+                evidence_failure_binding=efb,
+                tampered_src_id=other_id,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4164,6 +4418,9 @@ class TestEvidenceValidators:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4321,10 +4578,13 @@ class TestRound3Adversarial:
             binding_evidence_digest=None,
         )
         cin = _r[0]
-        wds_out = _r[5]
-        bds_out = _r[6]
-        wbds_out = _r[7]
-        bbds_out = _r[8]
+        isnap = _r[2]
+        sdesc = _r[3]
+        csnap = _r[5]
+        wds_out = _r[6]
+        bds_out = _r[7]
+        wbds_out = _r[8]
+        bbds_out = _r[9]
         disp = classify_candidate(
             cin,
             warning_descriptors=wds_out,
@@ -4333,6 +4593,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4386,7 +4649,7 @@ class TestRound3Adversarial:
         failure_desc = _build_run_failure_descriptor(tampered_evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(tampered_evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 tampered_rec,
                 candidate,
@@ -4407,6 +4670,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4429,7 +4695,7 @@ class TestRound3Adversarial:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 tampered_rec,
                 candidate,
@@ -4450,6 +4716,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4462,7 +4731,7 @@ class TestRound3Adversarial:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         other_id = "sha256:" + "f" * 64
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 rec,
                 candidate,
@@ -4484,6 +4753,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4498,7 +4770,7 @@ class TestRound3Adversarial:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 tampered_rec,
                 candidate,
@@ -4519,6 +4791,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4581,7 +4856,7 @@ class TestRound3Adversarial:
         failure_desc = _build_run_failure_descriptor(tampered_evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(tampered_evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 tampered_rec,
                 candidate,
@@ -4602,6 +4877,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4625,7 +4903,7 @@ class TestRound3Adversarial:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 tampered_rec,
                 candidate,
@@ -4646,6 +4924,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4674,7 +4955,7 @@ class TestRound3Adversarial:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 tampered_rec,
                 candidate,
@@ -4695,6 +4976,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4708,7 +4992,7 @@ class TestRound3Adversarial:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 rec,
                 candidate,
@@ -4728,6 +5012,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.PROVIDER_IDENTITY_MISMATCH
         assert disp.diagnostic == FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
@@ -4740,7 +5027,7 @@ class TestRound3Adversarial:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         other_id = "sha256:" + "b" * 64
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 rec,
                 candidate,
@@ -4762,6 +5049,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4820,11 +5110,13 @@ class TestRound3Adversarial:
                 "candidate_evaluation_identity": cei,
             }
         )
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            tampered_rec,
-            candidate,
-            tampered_evidence,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                tampered_rec,
+                candidate,
+                tampered_evidence,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4834,6 +5126,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4854,11 +5149,13 @@ class TestRound3Adversarial:
             tube_in_hot=rec.candidate_evaluation_identity.tube_in_hot,
         )
         tampered_rec = rec.model_copy(update={"candidate_evaluation_identity": tampered_cei})
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            tampered_rec,
-            candidate,
-            evidence,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                tampered_rec,
+                candidate,
+                evidence,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4868,6 +5165,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4892,11 +5192,13 @@ class TestRound3Adversarial:
                 "provider_identity_matches": True,
             }
         )
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            tampered_rec,
-            candidate,
-            evidence,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                tampered_rec,
+                candidate,
+                evidence,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4906,6 +5208,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4916,10 +5221,12 @@ class TestRound3Adversarial:
         rec, candidate = _make_ver(
             "c1", 0, evidence=evidence, rating_status="blocked", provider_identity_matches=False
         )
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            rec,
-            candidate,
-            evidence,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                rec,
+                candidate,
+                evidence,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4929,6 +5236,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.PROVIDER_IDENTITY_MISMATCH
         assert disp.diagnostic == FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
@@ -4938,12 +5248,14 @@ class TestRound3Adversarial:
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         other_id = "sha256:" + "b" * 64
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            rec,
-            candidate,
-            evidence,
-            tampered_src_id=other_id,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                rec,
+                candidate,
+                evidence,
+                tampered_src_id=other_id,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -4953,6 +5265,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -4999,11 +5314,13 @@ class TestRound3Adversarial:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            tampered_rec,
-            candidate,
-            tampered,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                tampered_rec,
+                candidate,
+                tampered,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -5013,6 +5330,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -5058,7 +5378,7 @@ class TestRound3Adversarial:
         failure_desc = _build_run_failure_descriptor(tampered.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(tampered)
-        (cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out) = (
+        (cin, _, isnap, sdesc, _, csnap, wds_out, bds_out, wbds_out, bbds_out) = (
             TestEvidenceValidators._build_failed_artifacts(
                 tampered_rec,
                 candidate,
@@ -5079,6 +5399,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds_out,
             source_failure_binding=None,
             evidence_failure_binding=efb,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -5121,11 +5444,13 @@ class TestRound3Adversarial:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            tampered_rec,
-            candidate,
-            tampered,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                tampered_rec,
+                candidate,
+                tampered,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -5135,6 +5460,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -5177,11 +5505,13 @@ class TestRound3Adversarial:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            tampered_rec,
-            candidate,
-            tampered,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                tampered_rec,
+                candidate,
+                tampered,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -5191,6 +5521,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -5233,11 +5566,13 @@ class TestRound3Adversarial:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            tampered_rec,
-            candidate,
-            tampered,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                tampered_rec,
+                candidate,
+                tampered,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -5247,6 +5582,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -5289,11 +5627,13 @@ class TestRound3Adversarial:
         )
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
-        (cin, _, _, _, _, wds, bds, wbds, bbds) = TestEvidenceValidators._build_blocked_artifacts(
-            tampered_rec,
-            candidate,
-            tampered,
-            binding_evidence_digest=None,
+        (cin, _, isnap, sdesc, _, csnap, wds, bds, wbds, bbds) = (
+            TestEvidenceValidators._build_blocked_artifacts(
+                tampered_rec,
+                candidate,
+                tampered,
+                binding_evidence_digest=None,
+            )
         )
         disp = classify_candidate(
             cin,
@@ -5303,6 +5643,9 @@ class TestRound3Adversarial:
             blocker_descriptor_bindings=bbds,
             source_failure_binding=None,
             evidence_failure_binding=None,
+            identity_snapshot=isnap,
+            complete_snapshot=csnap,
+            source_record_descriptor=sdesc,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
@@ -5321,6 +5664,7 @@ class TestRound3Adversarial:
             isnap,
             sdesc,
             sb,
+            csnap,
             wds,
             bds,
             wbds,
@@ -5371,6 +5715,7 @@ class TestRound3Adversarial:
             isnap,
             sdesc,
             sb,
+            csnap,
             wds,
             bds,
             wbds,
@@ -5423,6 +5768,7 @@ class TestRound3Adversarial:
             isnap,
             sdesc,
             sb,
+            csnap,
             wds,
             bds,
             wbds,
@@ -5462,6 +5808,7 @@ class TestRound3Adversarial:
             isnap,
             sdesc,
             sb,
+            csnap,
             wds,
             bds,
             wbds,
