@@ -225,8 +225,7 @@ def validate_blocked_evidence(
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message=(
-                "Blocked evidence: rating_request_identity_digest "
-                "mismatch vs recomputed payload"
+                "Blocked evidence: rating_request_identity_digest mismatch vs recomputed payload"
             ),
             context=ctx,
         )
@@ -508,8 +507,7 @@ def validate_failed_evidence(
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message=(
-                "Failed evidence: rating_request_identity_digest "
-                "mismatch vs recomputed payload"
+                "Failed evidence: rating_request_identity_digest mismatch vs recomputed payload"
             ),
             context=ctx,
         )
@@ -761,6 +759,7 @@ def validate_failed_evidence(
 # P0-3: Centralized thermal-state field matrix for blocked/failed validators
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class _ThermalFieldRule(StrEnum):
     MUST_BE_NONE = "must_be_none"
     REQUIRED_AND_BOUND = "required_and_bound"
@@ -824,11 +823,11 @@ def _check_thermal_field_matrix(
                     context=ctx,
                 )
         elif rule is _ThermalFieldRule.REQUIRED_AND_BOUND and val is None:
-                return RunFailure(
-                    code=ErrorCode.INPUT_INCONSISTENT,
-                    message=f"Blocked/failed evidence: {field_name} must be present",
-                    context=ctx,
-                )
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Blocked/failed evidence: {field_name} must be present",
+                context=ctx,
+            )
         # CAN_BE_NONE_OR_BOUND: no enforcement needed
     return None
 
