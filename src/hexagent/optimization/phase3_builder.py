@@ -201,9 +201,9 @@ def validate_blocked_evidence(
             return RunFailure(
                 code=ErrorCode.INPUT_INCONSISTENT,
                 message=(
-                "Blocked evidence: rating_request_identity_digest "
-                "mismatch vs candidate_evaluation_identity"
-            ),
+                    "Blocked evidence: rating_request_identity_digest "
+                    "mismatch vs candidate_evaluation_identity"
+                ),
                 context=ctx,
             )
 
@@ -220,8 +220,7 @@ def validate_blocked_evidence(
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message=(
-                f"Blocked evidence: hash_verification_outcome="
-                f"{evidence.hash_verification_outcome}"
+                f"Blocked evidence: hash_verification_outcome={evidence.hash_verification_outcome}"
             ),
             context=ctx,
         )
@@ -343,8 +342,7 @@ def validate_blocked_evidence(
             return RunFailure(
                 code=ErrorCode.INPUT_INCONSISTENT,
                 message=(
-                    f"Blocked evidence: warning_binding[{i}] "
-                    f"digest mismatch vs SourceRecordBinding"
+                    f"Blocked evidence: warning_binding[{i}] digest mismatch vs SourceRecordBinding"
                 ),
                 context=ctx,
             )
@@ -362,8 +360,7 @@ def validate_blocked_evidence(
             return RunFailure(
                 code=ErrorCode.INPUT_INCONSISTENT,
                 message=(
-                    f"Blocked evidence: blocker_binding[{i}] "
-                    f"digest mismatch vs SourceRecordBinding"
+                    f"Blocked evidence: blocker_binding[{i}] digest mismatch vs SourceRecordBinding"
                 ),
                 context=ctx,
             )
@@ -461,8 +458,7 @@ def validate_failed_evidence(
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message=(
-                f"Failed evidence: hash_verification_outcome="
-                f"{evidence.hash_verification_outcome}"
+                f"Failed evidence: hash_verification_outcome={evidence.hash_verification_outcome}"
             ),
             context=ctx,
         )
@@ -625,8 +621,7 @@ def validate_failed_evidence(
             return RunFailure(
                 code=ErrorCode.INPUT_INCONSISTENT,
                 message=(
-                    f"Failed evidence: warning_binding[{i}] "
-                    f"digest mismatch vs SourceRecordBinding"
+                    f"Failed evidence: warning_binding[{i}] digest mismatch vs SourceRecordBinding"
                 ),
                 context=ctx,
             )
@@ -644,8 +639,7 @@ def validate_failed_evidence(
             return RunFailure(
                 code=ErrorCode.INPUT_INCONSISTENT,
                 message=(
-                    f"Failed evidence: blocker_binding[{i}] "
-                    f"digest mismatch vs SourceRecordBinding"
+                    f"Failed evidence: blocker_binding[{i}] digest mismatch vs SourceRecordBinding"
                 ),
                 context=ctx,
             )

@@ -743,8 +743,8 @@ class TestEndToEndFlow:
                 warning_descriptors=(wd,),
                 blocker_descriptors=(bd,),
                 warning_descriptor_bindings=(wbd,),
-            blocker_descriptor_bindings=(bbd,),
-            source_failure_binding=None,
+                blocker_descriptor_bindings=(bbd,),
+                source_failure_binding=None,
                 evidence_failure_binding=None,
             )
             dispositions.append(disp)
@@ -2444,9 +2444,6 @@ class TestOptimizationResultCoreValues:
             )
 
 
-
-
-
 # ============================================================================
 # Section 13: EVIDENCE VALIDATORS
 # ============================================================================
@@ -2488,16 +2485,14 @@ class TestEvidenceValidators:
         )
 
         src_id = (
-            tampered_src_id if tampered_src_id is not None
-            else rec.source_qualified_candidate_id
+            tampered_src_id if tampered_src_id is not None else rec.source_qualified_candidate_id
         )
         eval_idx = tampered_idx if tampered_idx is not None else rec.evaluation_order_index
 
         # Compute evidence digest for binding
         if binding_evidence_digest is _SENTINEL:
             ev_digest = (
-                evidence.compute_explicit_evidence_digest()
-                if evidence is not None else None
+                evidence.compute_explicit_evidence_digest() if evidence is not None else None
             )
         else:
             ev_digest = binding_evidence_digest
@@ -2553,15 +2548,13 @@ class TestEvidenceValidators:
         )
 
         src_id = (
-            tampered_src_id if tampered_src_id is not None
-            else rec.source_qualified_candidate_id
+            tampered_src_id if tampered_src_id is not None else rec.source_qualified_candidate_id
         )
         eval_idx = tampered_idx if tampered_idx is not None else rec.evaluation_order_index
 
         if binding_evidence_digest is _SENTINEL:
             ev_digest = (
-                evidence.compute_explicit_evidence_digest()
-                if evidence is not None else None
+                evidence.compute_explicit_evidence_digest() if evidence is not None else None
             )
         else:
             ev_digest = binding_evidence_digest
@@ -2609,18 +2602,22 @@ class TestEvidenceValidators:
         bds: list[Phase3MessageDescriptor] = []
         for w in evidence.warnings:
             desc = bmd(w)
-            wds.append(Phase3MessageDescriptor(
-                owner_sort_key=desc.owner_sort_key,
-                original_code=desc.original_code,
-                message_payload_digest=desc.message_payload_digest,
-            ))
+            wds.append(
+                Phase3MessageDescriptor(
+                    owner_sort_key=desc.owner_sort_key,
+                    original_code=desc.original_code,
+                    message_payload_digest=desc.message_payload_digest,
+                )
+            )
         for b in evidence.blockers:
             desc = bmd(b)
-            bds.append(Phase3MessageDescriptor(
-                owner_sort_key=desc.owner_sort_key,
-                original_code=desc.original_code,
-                message_payload_digest=desc.message_payload_digest,
-            ))
+            bds.append(
+                Phase3MessageDescriptor(
+                    owner_sort_key=desc.owner_sort_key,
+                    original_code=desc.original_code,
+                    message_payload_digest=desc.message_payload_digest,
+                )
+            )
         wbds = tuple(build_phase3_message_descriptor_binding(d) for d in wds)
         bbds = tuple(build_phase3_message_descriptor_binding(d) for d in bds)
         return tuple(wds), tuple(bds), wbds, bbds
@@ -2676,21 +2673,29 @@ class TestEvidenceValidators:
         exec_ctx = _make_exec_ctx()
         rri_digest = sha256_digest(rating_request_identity_payload(rri))
         ec_digest = sha256_digest(execution_context_snapshot_payload(exec_ctx))
-        _warnings = warnings if warnings else (
-            EngineeringMessage(
-                code=ErrorCode.INPUT_INCONSISTENT,
-                severity=EngineeringMessageSeverity.WARNING,
-                message="test warning",
-                source_module="test",
-            ),
+        _warnings = (
+            warnings
+            if warnings
+            else (
+                EngineeringMessage(
+                    code=ErrorCode.INPUT_INCONSISTENT,
+                    severity=EngineeringMessageSeverity.WARNING,
+                    message="test warning",
+                    source_module="test",
+                ),
+            )
         )
-        _blockers = blockers if blockers else (
-            EngineeringMessage(
-                code=ErrorCode.INPUT_INCONSISTENT,
-                severity=EngineeringMessageSeverity.BLOCKER,
-                message="test blocker",
-                source_module="test",
-            ),
+        _blockers = (
+            blockers
+            if blockers
+            else (
+                EngineeringMessage(
+                    code=ErrorCode.INPUT_INCONSISTENT,
+                    severity=EngineeringMessageSeverity.BLOCKER,
+                    message="test blocker",
+                    source_module="test",
+                ),
+            )
         )
         return VerifiedRatingEvidenceSnapshot(
             rating_status=RatingStatus.FAILED,
@@ -2724,7 +2729,9 @@ class TestEvidenceValidators:
         evidence = _make_blocked_evidence()  # no warnings, no blockers
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
         )
         disp = classify_candidate(
             cin,
@@ -2746,9 +2753,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
         )
         disp = classify_candidate(
@@ -2772,8 +2783,10 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, rating_status="blocked")
         isnap = build_identity_snapshot(rec)
         sdesc = build_phase2_source_record_descriptor(
-            source_record=rec, identity_snapshot=isnap,
-            verified_evidence=None, source_failure_binding=None,
+            source_record=rec,
+            identity_snapshot=isnap,
+            verified_evidence=None,
+            source_failure_binding=None,
         )
         eb = build_phase3_source_record_binding(
             source_qualified_candidate_id=rec.source_qualified_candidate_id,
@@ -2787,7 +2800,9 @@ class TestEvidenceValidators:
             evidence_failure_binding_digest=None,
         )
         result = validate_blocked_evidence(
-            rec, None, eb,
+            rec,
+            None,
+            eb,
             warning_descriptors=(),
             blocker_descriptors=(),
             warning_descriptor_bindings=(),
@@ -2802,7 +2817,9 @@ class TestEvidenceValidators:
         evidence = _make_evidence(rating_status=RatingStatus.SUCCEEDED)
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
             binding_evidence_digest=None,  # required for CLASSIFICATION stage
         )
         disp = classify_candidate(
@@ -2822,7 +2839,9 @@ class TestEvidenceValidators:
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
             tampered_src_id="sha256:" + "9" * 64,
             binding_evidence_digest=None,
         )
@@ -2843,7 +2862,9 @@ class TestEvidenceValidators:
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
             tampered_idx=999,
             binding_evidence_digest=None,
         )
@@ -2866,6 +2887,7 @@ class TestEvidenceValidators:
         from hexagent.optimization.evaluation import (
             VerifiedRatingEvidenceSnapshot as VRES,
         )
+
         # model_construct with actual nested objects to avoid dict issues
         tampered_evidence = VRES.model_construct(
             _fields_set=set(VRES.model_fields.keys()),
@@ -2900,7 +2922,9 @@ class TestEvidenceValidators:
         )
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered_evidence})
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            tampered_rec, candidate, tampered_evidence,
+            tampered_rec,
+            candidate,
+            tampered_evidence,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -2918,10 +2942,13 @@ class TestEvidenceValidators:
     def test_blocked_provider_identity_mismatch(self) -> None:
         """Blocked path with rec.provider_identity_matches=False → PROVIDER_IDENTITY_MISMATCH."""
         evidence = _make_blocked_evidence()
-        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked",
-                                   provider_identity_matches=False)
+        rec, candidate = _make_ver(
+            "c1", 0, evidence=evidence, rating_status="blocked", provider_identity_matches=False
+        )
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
         )
         disp = classify_candidate(
             cin,
@@ -2941,6 +2968,7 @@ class TestEvidenceValidators:
         from hexagent.optimization.evaluation import (
             VerifiedRatingEvidenceSnapshot as VRES,
         )
+
         tampered = VRES.model_construct(
             _fields_set=set(VRES.model_fields.keys()),
             rating_status=evidence.rating_status,
@@ -2975,7 +3003,9 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            tampered_rec, candidate, tampered,
+            tampered_rec,
+            candidate,
+            tampered,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -2996,6 +3026,7 @@ class TestEvidenceValidators:
         from hexagent.optimization.evaluation import (
             VerifiedRatingEvidenceSnapshot as VRES,
         )
+
         tampered = VRES.model_construct(
             _fields_set=set(VRES.model_fields.keys()),
             rating_status=evidence.rating_status,
@@ -3030,7 +3061,9 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            tampered_rec, candidate, tampered,
+            tampered_rec,
+            candidate,
+            tampered,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3045,7 +3078,9 @@ class TestEvidenceValidators:
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            tampered_rec, candidate, tampered,
+            tampered_rec,
+            candidate,
+            tampered,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3065,17 +3100,23 @@ class TestEvidenceValidators:
         from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
 
         evidence = _make_blocked_evidence()
-        tampered = evidence.model_copy(update={"warnings": (
-            EngineeringMessage(
-                code=ErrorCode.INPUT_INCONSISTENT,
-                severity=EngineeringMessageSeverity.WARNING,
-                message="unexpected warning",
-                source_module="test",
-            ),
-        )})
+        tampered = evidence.model_copy(
+            update={
+                "warnings": (
+                    EngineeringMessage(
+                        code=ErrorCode.INPUT_INCONSISTENT,
+                        severity=EngineeringMessageSeverity.WARNING,
+                        message="unexpected warning",
+                        source_module="test",
+                    ),
+                )
+            }
+        )
         rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, tampered,
+            rec,
+            candidate,
+            tampered,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3097,8 +3138,11 @@ class TestEvidenceValidators:
         wd = _make_message_descriptor()
         wbd = _make_message_descriptor_binding(wd)
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
-            warnings=(wd,), warning_bindings=(wbd,),
+            rec,
+            candidate,
+            evidence,
+            warnings=(wd,),
+            warning_bindings=(wbd,),
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3118,20 +3162,27 @@ class TestEvidenceValidators:
         from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
 
         evidence = _make_blocked_evidence()
-        tampered = evidence.model_copy(update={"warnings": (
-            EngineeringMessage(
-                code=ErrorCode.INPUT_INCONSISTENT,
-                severity=EngineeringMessageSeverity.WARNING,
-                message="specific warning",
-                source_module="test",
-            ),
-        )})
+        tampered = evidence.model_copy(
+            update={
+                "warnings": (
+                    EngineeringMessage(
+                        code=ErrorCode.INPUT_INCONSISTENT,
+                        severity=EngineeringMessageSeverity.WARNING,
+                        message="specific warning",
+                        source_module="test",
+                    ),
+                )
+            }
+        )
         rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
         wd_wrong = _make_message_descriptor()
         wbd_wrong = _make_message_descriptor_binding(wd_wrong)
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, tampered,
-            warnings=(wd_wrong,), warning_bindings=(wbd_wrong,),
+            rec,
+            candidate,
+            tampered,
+            warnings=(wd_wrong,),
+            warning_bindings=(wbd_wrong,),
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3151,17 +3202,23 @@ class TestEvidenceValidators:
         from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
 
         evidence = _make_blocked_evidence()
-        tampered = evidence.model_copy(update={"blockers": (
-            EngineeringMessage(
-                code=ErrorCode.INPUT_INCONSISTENT,
-                severity=EngineeringMessageSeverity.BLOCKER,
-                message="unexpected blocker",
-                source_module="test",
-            ),
-        )})
+        tampered = evidence.model_copy(
+            update={
+                "blockers": (
+                    EngineeringMessage(
+                        code=ErrorCode.INPUT_INCONSISTENT,
+                        severity=EngineeringMessageSeverity.BLOCKER,
+                        message="unexpected blocker",
+                        source_module="test",
+                    ),
+                )
+            }
+        )
         rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, tampered,
+            rec,
+            candidate,
+            tampered,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3183,8 +3240,11 @@ class TestEvidenceValidators:
         bd = _make_message_descriptor("B01")
         bbd = _make_message_descriptor_binding(bd)
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
-            blockers=(bd,), blocker_bindings=(bbd,),
+            rec,
+            candidate,
+            evidence,
+            blockers=(bd,),
+            blocker_bindings=(bbd,),
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3204,20 +3264,27 @@ class TestEvidenceValidators:
         from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
 
         evidence = _make_blocked_evidence()
-        tampered = evidence.model_copy(update={"blockers": (
-            EngineeringMessage(
-                code=ErrorCode.INPUT_INCONSISTENT,
-                severity=EngineeringMessageSeverity.BLOCKER,
-                message="specific blocker",
-                source_module="test",
-            ),
-        )})
+        tampered = evidence.model_copy(
+            update={
+                "blockers": (
+                    EngineeringMessage(
+                        code=ErrorCode.INPUT_INCONSISTENT,
+                        severity=EngineeringMessageSeverity.BLOCKER,
+                        message="specific blocker",
+                        source_module="test",
+                    ),
+                )
+            }
+        )
         rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
         bd_wrong = _make_message_descriptor("B01")
         bbd_wrong = _make_message_descriptor_binding(bd_wrong)
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, tampered,
-            blockers=(bd_wrong,), blocker_bindings=(bbd_wrong,),
+            rec,
+            candidate,
+            tampered,
+            blockers=(bd_wrong,),
+            blocker_bindings=(bbd_wrong,),
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3239,8 +3306,11 @@ class TestEvidenceValidators:
         wd = _make_message_descriptor()
         wbd = _make_message_descriptor_binding(wd)
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
-            warnings=(wd,), warning_bindings=(wbd,),
+            rec,
+            candidate,
+            evidence,
+            warnings=(wd,),
+            warning_bindings=(wbd,),
             binding_evidence_digest=None,
         )
         other_wbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED"))
@@ -3263,8 +3333,11 @@ class TestEvidenceValidators:
         bd = _make_message_descriptor("B01")
         bbd = _make_message_descriptor_binding(bd)
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
-            blockers=(bd,), blocker_bindings=(bbd,),
+            rec,
+            candidate,
+            evidence,
+            blockers=(bd,),
+            blocker_bindings=(bbd,),
             binding_evidence_digest=None,
         )
         other_bbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED_B"))
@@ -3285,7 +3358,9 @@ class TestEvidenceValidators:
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
             binding_evidence_digest=None,  # None != actual → mismatch
         )
         disp = classify_candidate(
@@ -3311,6 +3386,7 @@ class TestEvidenceValidators:
         from hexagent.optimization.evaluation import (
             VerifiedRatingEvidenceSnapshot as VRES,
         )
+
         tampered = VRES.model_construct(
             _fields_set=set(VRES.model_fields.keys()),
             rating_status=evidence.rating_status,
@@ -3345,7 +3421,9 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            tampered_rec, candidate, tampered,
+            tampered_rec,
+            candidate,
+            tampered,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3360,7 +3438,9 @@ class TestEvidenceValidators:
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            tampered_rec, candidate, tampered,
+            tampered_rec,
+            candidate,
+            tampered,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3381,6 +3461,7 @@ class TestEvidenceValidators:
         from hexagent.optimization.evaluation import (
             VerifiedRatingEvidenceSnapshot as VRES,
         )
+
         tampered = VRES.model_construct(
             _fields_set=set(VRES.model_fields.keys()),
             rating_status=evidence.rating_status,
@@ -3415,7 +3496,9 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            tampered_rec, candidate, tampered,
+            tampered_rec,
+            candidate,
+            tampered,
             binding_evidence_digest=None,
         )
         disp = classify_candidate(
@@ -3435,7 +3518,9 @@ class TestEvidenceValidators:
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
             binding_evidence_digest=None,
         )
         efb = _make_failure_binding()
@@ -3457,7 +3542,9 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         other_id = "sha256:" + "a" * 64
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
             tampered_src_id=other_id,
             binding_evidence_digest=None,
         )
@@ -3482,8 +3569,10 @@ class TestEvidenceValidators:
         rec, candidate = _make_ver("c1", 0, rating_status="failed")
         isnap = build_identity_snapshot(rec)
         sdesc = build_phase2_source_record_descriptor(
-            source_record=rec, identity_snapshot=isnap,
-            verified_evidence=None, source_failure_binding=None,
+            source_record=rec,
+            identity_snapshot=isnap,
+            verified_evidence=None,
+            source_failure_binding=None,
         )
         eb = build_phase3_source_record_binding(
             source_qualified_candidate_id=rec.source_qualified_candidate_id,
@@ -3497,7 +3586,9 @@ class TestEvidenceValidators:
             evidence_failure_binding_digest=None,
         )
         result = validate_failed_evidence(
-            rec, None, eb,
+            rec,
+            None,
+            eb,
             warning_descriptors=(),
             blocker_descriptors=(),
             warning_descriptor_bindings=(),
@@ -3512,7 +3603,9 @@ class TestEvidenceValidators:
         evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
         cin, _, _, _, _, wds, bds, wbds, bbds = self._build_failed_artifacts(
-            rec, candidate, evidence,
+            rec,
+            candidate,
+            evidence,
             evidence_failure_binding=_make_failure_binding(),
             binding_evidence_digest=None,
         )
@@ -3537,9 +3630,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             tampered_src_id="sha256:" + "9" * 64,
             binding_evidence_digest=None,
@@ -3564,9 +3661,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             tampered_idx=999,
             binding_evidence_digest=None,
@@ -3589,6 +3690,7 @@ class TestEvidenceValidators:
         from hexagent.optimization.evaluation import (
             VerifiedRatingEvidenceSnapshot as VRES,
         )
+
         tampered = VRES.model_construct(
             _fields_set=set(VRES.model_fields.keys()),
             rating_status=evidence.rating_status,
@@ -3626,9 +3728,13 @@ class TestEvidenceValidators:
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            tampered_rec, candidate, tampered,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            tampered_rec,
+            candidate,
+            tampered,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,
         )
@@ -3650,6 +3756,7 @@ class TestEvidenceValidators:
         from hexagent.optimization.evaluation import (
             VerifiedRatingEvidenceSnapshot as VRES,
         )
+
         tampered = VRES.model_construct(
             _fields_set=set(VRES.model_fields.keys()),
             rating_status=evidence.rating_status,
@@ -3687,9 +3794,13 @@ class TestEvidenceValidators:
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            tampered_rec, candidate, tampered,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            tampered_rec,
+            candidate,
+            tampered,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,
         )
@@ -3718,9 +3829,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(other_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,
         )
@@ -3743,15 +3858,20 @@ class TestEvidenceValidators:
         failure_desc = _build_run_failure_descriptor(evidence.failure)
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         from hexagent.optimization.phase3_core import Phase3RunFailureDescriptorBinding as RFDB
+
         tampered_efb = RFDB.model_construct(
             _fields_set=set(RFDB.model_fields.keys()),
-            **{**efb.model_dump(), "descriptor_binding_digest": "sha256:" + "b" * 64}
+            **{**efb.model_dump(), "descriptor_binding_digest": "sha256:" + "b" * 64},
         )
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=tampered_efb,
             binding_evidence_digest=None,
         )
@@ -3782,9 +3902,13 @@ class TestEvidenceValidators:
         other_efb = build_phase3_run_failure_descriptor_binding(other_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=other_efb,
             binding_evidence_digest=None,
         )
@@ -3806,6 +3930,7 @@ class TestEvidenceValidators:
         from hexagent.optimization.evaluation import (
             VerifiedRatingEvidenceSnapshot as VRES,
         )
+
         tampered = VRES.model_construct(
             _fields_set=set(VRES.model_fields.keys()),
             rating_status=evidence.rating_status,
@@ -3843,9 +3968,13 @@ class TestEvidenceValidators:
         tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
         wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            tampered_rec, candidate, tampered,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            tampered_rec,
+            candidate,
+            tampered,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,
         )
@@ -3869,9 +3998,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,
         )
@@ -3895,9 +4028,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,
         )
@@ -3921,9 +4058,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,  # None != actual
         )
@@ -3947,9 +4088,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,
         )
@@ -3974,9 +4119,13 @@ class TestEvidenceValidators:
         efb = build_phase3_run_failure_descriptor_binding(failure_desc)
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             binding_evidence_digest=None,
         )
@@ -4002,9 +4151,13 @@ class TestEvidenceValidators:
         other_id = "sha256:" + "a" * 64
         wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
         cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
-            rec, candidate, evidence,
-            warnings=wds, blockers=bds,
-            warning_bindings=wbds, blocker_bindings=bbds,
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
             evidence_failure_binding=efb,
             tampered_src_id=other_id,
             binding_evidence_digest=None,
@@ -4020,6 +4173,3 @@ class TestEvidenceValidators:
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
-
-
-
