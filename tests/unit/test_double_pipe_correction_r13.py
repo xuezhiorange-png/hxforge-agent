@@ -672,7 +672,7 @@ class TestPinchToleranceArgument:
             cold_mass_flow_kg_s=1.5,
             minimum_terminal_delta_t=0.5,
             recorder=recorder_tight,
-            pinch_temperature_tolerance_k=1e-10,
+            pinch_temperature_tolerance_k=1e-8,
         )
 
         # Both converge (both tolerances are met)
@@ -682,7 +682,7 @@ class TestPinchToleranceArgument:
         assert result_tight.iterations >= result_default.iterations
         # Both stored tolerances match their arguments
         assert result_default.pinch_temperature_tolerance_k == 1e-6
-        assert result_tight.pinch_temperature_tolerance_k == 1e-10
+        assert result_tight.pinch_temperature_tolerance_k == 1e-8
 
     def test_invalid_tolerance_raises(self, provider: CoolPropProvider) -> None:
         """Non-finite or non-positive pinch_temperature_tolerance_k raises ValueError."""
