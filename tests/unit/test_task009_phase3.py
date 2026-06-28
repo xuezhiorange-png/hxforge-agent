@@ -49,6 +49,7 @@ from hexagent.optimization.evaluation import (
     VerifiedRatingEvidenceSnapshot,
     _build_run_failure_descriptor,
     execution_context_snapshot_payload,
+    provider_identity_snapshot_payload,
     rating_request_identity_payload,
 )
 from hexagent.optimization.identities import (
@@ -80,6 +81,7 @@ from hexagent.optimization.phase3_core import (
     FeasibilityDiagnosticKey,
     Phase2SourceRecordDescriptor,
     Phase2SourceRecordIdentitySnapshot,
+    Phase2SourceRecordSnapshot,
     Phase3Disposition,
     Phase3MessageDescriptor,
     Phase3MessageDescriptorBinding,
@@ -333,14 +335,8 @@ def _make_cei(
     evidence: VerifiedRatingEvidenceSnapshot,
 ) -> CandidateEvaluationIdentity:
     """Build a CandidateEvaluationIdentity from evidence fields."""
-    provider = evidence.provider_identity
     provider_digest = sha256_digest(
-        {
-            "name": provider.name,
-            "version": provider.version,
-            "git_revision": provider.git_revision,
-            "reference_state_policy": provider.reference_state_policy,
-        }
+        provider_identity_snapshot_payload(evidence.provider_identity)
     )
     return CandidateEvaluationIdentity(
         sizing_request_identity_digest=DUMMY_DIGEST,
@@ -4173,3 +4169,1339 @@ class TestEvidenceValidators:
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
         assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+
+# ============================================================================
+# Round 3 Adversarial Tests — new identity, thermal-state, and source binding
+# ============================================================================
+
+
+class TestRound3Adversarial:
+    """Adversarial tests for new Round 3 validations in validate_blocked_evidence,
+    validate_failed_evidence, and classify_candidate with eb.verify_or_raise()."""
+
+    # ── Shared helpers ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _build_snapshots(
+        rec: CandidateEvaluationRecord,
+        evidence: VerifiedRatingEvidenceSnapshot | None,
+        sb: Phase3SourceRecordBinding,
+    ) -> tuple[
+        Phase2SourceRecordIdentitySnapshot,
+        Phase2SourceRecordDescriptor,
+        Phase2SourceRecordSnapshot,
+    ]:
+        """Build identity snapshot, descriptor, and complete snapshot for eb.verify_or_raise()."""
+        isnap = build_identity_snapshot(rec)
+        sdesc = build_phase2_source_record_descriptor(
+            source_record=rec,
+            identity_snapshot=isnap,
+            verified_evidence=evidence,
+            source_failure_binding=None,
+        )
+        cei_digest = (
+            rec.candidate_evaluation_identity.candidate_evaluation_identity_digest
+            if rec.candidate_evaluation_identity is not None
+            else None
+        )
+        ev_digest = (
+            evidence.compute_explicit_evidence_digest() if evidence is not None else None
+        )
+        csnap = build_phase2_source_record_snapshot(
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
+            evaluation_order_index=rec.evaluation_order_index,
+            candidate_evaluation_state=rec.candidate_evaluation_state,
+            feasible=rec.feasible,
+            feasibility_status=rec.feasibility_status,
+            hash_verification_outcome=rec.hash_verification_outcome,
+            provenance_verification_outcome=rec.provenance_verification_outcome,
+            provider_identity_matches=rec.provider_identity_matches,
+            rating_status=rec.rating_status,
+            candidate_evaluation_identity_digest=cei_digest,
+            verified_rating_evidence_digest=ev_digest,
+            invalid_rating_evidence_digest=(
+                rec.invalid_rating_evidence.invalid_evidence_digest
+                if rec.invalid_rating_evidence is not None
+                else None
+            ),
+            claimed_rating_result_audit_digest=(
+                rec.claimed_rating_result_audit.audit_digest
+                if rec.claimed_rating_result_audit is not None
+                else None
+            ),
+            evaluation_failure_digest=None,
+            phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
+            warning_descriptor_binding_digests=sb.warning_descriptor_binding_digests,
+            blocker_descriptor_binding_digests=sb.blocker_descriptor_binding_digests,
+            source_evaluation_failure_binding_digest=sb.source_evaluation_failure_binding_digest,
+            evidence_failure_binding_digest=sb.evidence_failure_binding_digest,
+        )
+        return isnap, sdesc, csnap
+
+    # ══════════════════════════════════════════════════════════════════════
+    # FAILED REQUEST IDENTITY TESTS
+    # ══════════════════════════════════════════════════════════════════════
+
+    def test_failed_evidence_request_object_tampered(self) -> None:
+        """Failed evidence: rating_request_identity object tampered so recomputed
+        digest differs from evidence.rating_request_identity_digest → RUNTIME_FAILED."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        tampered_rri = RatingRequestIdentity(
+            hot_fluid_name=evidence.rating_request_identity.hot_fluid_name,
+            hot_fluid_backend=evidence.rating_request_identity.hot_fluid_backend,
+            hot_fluid_components=evidence.rating_request_identity.hot_fluid_components,
+            cold_fluid_name=evidence.rating_request_identity.cold_fluid_name,
+            cold_fluid_backend=evidence.rating_request_identity.cold_fluid_backend,
+            cold_fluid_components=evidence.rating_request_identity.cold_fluid_components,
+            hot_mass_flow_kg_s=evidence.rating_request_identity.hot_mass_flow_kg_s,
+            cold_mass_flow_kg_s=evidence.rating_request_identity.cold_mass_flow_kg_s,
+            hot_inlet_pressure_pa=evidence.rating_request_identity.hot_inlet_pressure_pa,
+            cold_inlet_pressure_pa=evidence.rating_request_identity.cold_inlet_pressure_pa,
+            hot_inlet_temperature_k=evidence.rating_request_identity.hot_inlet_temperature_k,
+            cold_inlet_temperature_k=evidence.rating_request_identity.cold_inlet_temperature_k,
+            flow_arrangement=evidence.rating_request_identity.flow_arrangement,
+            geometry={**evidence.rating_request_identity.geometry, "effective_length_m": 99.9},
+            solver_absolute_residual_w=evidence.rating_request_identity.solver_absolute_residual_w,
+            solver_relative_residual_fraction=evidence.rating_request_identity.solver_relative_residual_fraction,
+            solver_bracket_temperature_tolerance_k=evidence.rating_request_identity.solver_bracket_temperature_tolerance_k,
+            solver_max_iterations=evidence.rating_request_identity.solver_max_iterations,
+        )
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered_evidence = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=tampered_rri,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_rec = rec.model_copy(update={
+            "verified_rating_evidence": tampered_evidence,
+            "candidate_evaluation_identity": None,
+        })
+        rec2, _ = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        cei = _make_cei(rec2.source_qualified_candidate_id, tampered_evidence)
+        tampered_rec = tampered_rec.model_copy(update={"candidate_evaluation_identity": cei})
+        failure_desc = _build_run_failure_descriptor(tampered_evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(tampered_evidence)
+        _r = TestEvidenceValidators._build_failed_artifacts(
+            tampered_rec,
+            candidate,
+            tampered_evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        cin = _r[0]
+        wds_out = _r[5]
+        bds_out = _r[6]
+        wbds_out = _r[7]
+        bbds_out = _r[8]
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_evidence_request_digest_tampered(self) -> None:
+        """Failed evidence: rating_request_identity_digest tampered → RUNTIME_FAILED."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered_evidence = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest="sha256:" + "1" * 64,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_rec = rec.model_copy(update={
+            "verified_rating_evidence": tampered_evidence,
+            "candidate_evaluation_identity": None,
+        })
+        rec2, _ = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        cei = _make_cei(rec2.source_qualified_candidate_id, tampered_evidence)
+        tampered_rec = tampered_rec.model_copy(update={"candidate_evaluation_identity": cei})
+        failure_desc = _build_run_failure_descriptor(tampered_evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(tampered_evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            tampered_rec,
+            candidate,
+            tampered_evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_cei_request_digest_tampered(self) -> None:
+        """Failed evidence: CEI.rating_request_identity_digest tampered → RUNTIME_FAILED."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_cei = CandidateEvaluationIdentity(
+            sizing_request_identity_digest=rec.candidate_evaluation_identity.sizing_request_identity_digest,
+            source_qualified_candidate_id=rec.candidate_evaluation_identity.source_qualified_candidate_id,
+            rating_request_identity_digest="sha256:" + "2" * 64,
+            rating_result_hash=rec.candidate_evaluation_identity.rating_result_hash,
+            rating_provenance_digest=rec.candidate_evaluation_identity.rating_provenance_digest,
+            rating_execution_context_digest=rec.candidate_evaluation_identity.rating_execution_context_digest,
+            provider_identity_digest=rec.candidate_evaluation_identity.provider_identity_digest,
+            tube_in_hot=rec.candidate_evaluation_identity.tube_in_hot,
+        )
+        tampered_rec = rec.model_copy(update={"candidate_evaluation_identity": tampered_cei})
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            tampered_rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_evidence_belongs_to_another_candidate(self) -> None:
+        """Failed evidence: binding candidate ID differs from record → RUNTIME_FAILED."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        other_id = "sha256:" + "f" * 64
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            tampered_src_id=other_id,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_record_rating_status_not_failed(self) -> None:
+        """Failed evidence: rec.rating_status != 'failed' → RUNTIME_FAILED."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="succeeded")
+        tampered_rec = rec.model_copy(
+            update={"rating_status": "succeeded", "verified_rating_evidence": evidence}
+        )
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            tampered_rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    # ══════════════════════════════════════════════════════════════════════
+    # FAILED PROVIDER IDENTITY TESTS
+    # ══════════════════════════════════════════════════════════════════════
+
+    def test_failed_evidence_provider_object_tampered(self) -> None:
+        """Failed evidence: provider_identity object tampered → recomputed digest
+        differs from CEI → RUNTIME_FAILED."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        tampered_provider = ProviderIdentitySnapshot(
+            name="tampered_provider",
+            version="9.9",
+            git_revision="deadbeef",
+            reference_state_policy="altered",
+        )
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered_evidence = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=tampered_provider,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        cei = _make_cei(rec.source_qualified_candidate_id, evidence)
+        tampered_rec = rec.model_copy(update={
+            "verified_rating_evidence": tampered_evidence,
+            "candidate_evaluation_identity": cei,
+        })
+        failure_desc = _build_run_failure_descriptor(tampered_evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(tampered_evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            tampered_rec,
+            candidate,
+            tampered_evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_provider_digest_differs_from_cei(self) -> None:
+        """Failed evidence: CEI.provider_identity_digest differs from recomputed
+        → RUNTIME_FAILED."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_cei = CandidateEvaluationIdentity(
+            sizing_request_identity_digest=rec.candidate_evaluation_identity.sizing_request_identity_digest,
+            source_qualified_candidate_id=rec.candidate_evaluation_identity.source_qualified_candidate_id,
+            rating_request_identity_digest=rec.candidate_evaluation_identity.rating_request_identity_digest,
+            rating_result_hash=rec.candidate_evaluation_identity.rating_result_hash,
+            rating_provenance_digest=rec.candidate_evaluation_identity.rating_provenance_digest,
+            rating_execution_context_digest=rec.candidate_evaluation_identity.rating_execution_context_digest,
+            provider_identity_digest="sha256:" + "9" * 64,
+            tube_in_hot=rec.candidate_evaluation_identity.tube_in_hot,
+        )
+        tampered_rec = rec.model_copy(update={"candidate_evaluation_identity": tampered_cei})
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            tampered_rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_provider_matches_true_but_digest_mismatch(self) -> None:
+        """Failed evidence: provider_identity_matches=True but recomputed
+        provider digest differs from CEI → RUNTIME_FAILED (fail closed)."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_cei = CandidateEvaluationIdentity(
+            sizing_request_identity_digest=rec.candidate_evaluation_identity.sizing_request_identity_digest,
+            source_qualified_candidate_id=rec.candidate_evaluation_identity.source_qualified_candidate_id,
+            rating_request_identity_digest=rec.candidate_evaluation_identity.rating_request_identity_digest,
+            rating_result_hash=rec.candidate_evaluation_identity.rating_result_hash,
+            rating_provenance_digest=rec.candidate_evaluation_identity.rating_provenance_digest,
+            rating_execution_context_digest=rec.candidate_evaluation_identity.rating_execution_context_digest,
+            provider_identity_digest="sha256:" + "a" * 64,
+            tube_in_hot=rec.candidate_evaluation_identity.tube_in_hot,
+        )
+        tampered_rec = rec.model_copy(
+            update={
+                "candidate_evaluation_identity": tampered_cei,
+                "provider_identity_matches": True,
+            }
+        )
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            tampered_rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_provider_identity_matches_false(self) -> None:
+        """Failed evidence: provider_identity_matches=False → PROVIDER_IDENTITY_MISMATCH."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        rec, candidate = _make_ver(
+            "c1", 0, evidence=evidence, rating_status="failed", provider_identity_matches=False
+        )
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.PROVIDER_IDENTITY_MISMATCH
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
+
+    def test_failed_provider_artifact_from_another_candidate(self) -> None:
+        """Failed evidence: evidence belongs to another candidate → RUNTIME_FAILED."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        other_id = "sha256:" + "b" * 64
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            tampered_src_id=other_id,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    # ══════════════════════════════════════════════════════════════════════
+    # BLOCKED PROVIDER IDENTITY TESTS
+    # ══════════════════════════════════════════════════════════════════════
+
+    def test_blocked_provider_object_tampered(self) -> None:
+        """Blocked evidence: provider_identity object tampered → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        tampered_provider = ProviderIdentitySnapshot(
+            name="tampered_provider",
+            version="9.9",
+            git_revision="deadbeef",
+            reference_state_policy="altered",
+        )
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered_evidence = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=tampered_provider,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        cei = _make_cei(rec.source_qualified_candidate_id, evidence)
+        tampered_rec = rec.model_copy(update={
+            "verified_rating_evidence": tampered_evidence,
+            "candidate_evaluation_identity": cei,
+        })
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            tampered_rec,
+            candidate,
+            tampered_evidence,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_provider_digest_mismatch(self) -> None:
+        """Blocked evidence: CEI.provider_identity_digest differs from recomputed
+        → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_cei = CandidateEvaluationIdentity(
+            sizing_request_identity_digest=rec.candidate_evaluation_identity.sizing_request_identity_digest,
+            source_qualified_candidate_id=rec.candidate_evaluation_identity.source_qualified_candidate_id,
+            rating_request_identity_digest=rec.candidate_evaluation_identity.rating_request_identity_digest,
+            rating_result_hash=rec.candidate_evaluation_identity.rating_result_hash,
+            rating_provenance_digest=rec.candidate_evaluation_identity.rating_provenance_digest,
+            rating_execution_context_digest=rec.candidate_evaluation_identity.rating_execution_context_digest,
+            provider_identity_digest="sha256:" + "9" * 64,
+            tube_in_hot=rec.candidate_evaluation_identity.tube_in_hot,
+        )
+        tampered_rec = rec.model_copy(update={"candidate_evaluation_identity": tampered_cei})
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            tampered_rec,
+            candidate,
+            evidence,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_provider_matches_true_digest_mismatch(self) -> None:
+        """Blocked evidence: provider_identity_matches=True but digest mismatch → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_cei = CandidateEvaluationIdentity(
+            sizing_request_identity_digest=rec.candidate_evaluation_identity.sizing_request_identity_digest,
+            source_qualified_candidate_id=rec.candidate_evaluation_identity.source_qualified_candidate_id,
+            rating_request_identity_digest=rec.candidate_evaluation_identity.rating_request_identity_digest,
+            rating_result_hash=rec.candidate_evaluation_identity.rating_result_hash,
+            rating_provenance_digest=rec.candidate_evaluation_identity.rating_provenance_digest,
+            rating_execution_context_digest=rec.candidate_evaluation_identity.rating_execution_context_digest,
+            provider_identity_digest="sha256:" + "a" * 64,
+            tube_in_hot=rec.candidate_evaluation_identity.tube_in_hot,
+        )
+        tampered_rec = rec.model_copy(
+            update={
+                "candidate_evaluation_identity": tampered_cei,
+                "provider_identity_matches": True,
+            }
+        )
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            tampered_rec,
+            candidate,
+            evidence,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_provider_identity_matches_false(self) -> None:
+        """Blocked evidence: provider_identity_matches=False → PROVIDER_IDENTITY_MISMATCH."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver(
+            "c1", 0, evidence=evidence, rating_status="blocked", provider_identity_matches=False
+        )
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            rec,
+            candidate,
+            evidence,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.PROVIDER_IDENTITY_MISMATCH
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
+
+    def test_blocked_provider_artifact_from_another_candidate(self) -> None:
+        """Blocked evidence: evidence belongs to another candidate → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        other_id = "sha256:" + "b" * 64
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            rec,
+            candidate,
+            evidence,
+            tampered_src_id=other_id,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    # ══════════════════════════════════════════════════════════════════════
+    # THERMAL-STATE MATRIX TESTS
+    # ══════════════════════════════════════════════════════════════════════
+
+    def test_blocked_energy_residual_w_non_none(self) -> None:
+        """Blocked evidence: energy_residual_w non-None → RUNTIME_FAILED (thermal matrix)."""
+        evidence = _make_blocked_evidence()
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=42.0,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            tampered_rec,
+            candidate,
+            tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_energy_residual_w_non_none(self) -> None:
+        """Failed evidence: energy_residual_w non-None → RUNTIME_FAILED (thermal matrix)."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=42.0,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        failure_desc = _build_run_failure_descriptor(tampered.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(tampered)
+        (
+            cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            tampered_rec,
+            candidate,
+            tampered,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_ua_lmtd_residual_w_non_none(self) -> None:
+        """Blocked evidence: ua_lmtd_residual_w non-None → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=100.0,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            tampered_rec,
+            candidate,
+            tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_heat_duty_w_non_none(self) -> None:
+        """Blocked evidence: heat_duty_w non-None → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=5000.0,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            tampered_rec,
+            candidate,
+            tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_successful_outlet_temps(self) -> None:
+        """Blocked evidence: hot_outlet_temperature_k non-None → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=310.0,
+            cold_outlet_temperature_k=None,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            tampered_rec,
+            candidate,
+            tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_ua_lmtd_in_blocked(self) -> None:
+        """Blocked evidence: UA_w_k non-None → RUNTIME_FAILED (UA/LMTD in blocked)."""
+        evidence = _make_blocked_evidence()
+        from hexagent.optimization.evaluation import VerifiedRatingEvidenceSnapshot as VRES
+
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=150.0,
+            LMTD_k=50.0,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        (
+            cin, _, _, _, _, wds, bds, wbds, bbds
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            tampered_rec,
+            candidate,
+            tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SOURCE BINDING PRECONDITION TESTS (eb.verify_or_raise)
+    # ══════════════════════════════════════════════════════════════════════
+
+    def test_tampered_source_binding_digest_rejected(self) -> None:
+        """Tampered SourceRecordBinding.binding_digest → rejected by eb.verify_or_raise()."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        (
+            cin, sri, isnap, sdesc, sb,
+            wds, bds, wbds, bbds,
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            rec, candidate, evidence,
+        )
+        from hexagent.optimization.phase3_evaluation import Phase3SourceRecordBinding as PSB
+
+        tampered_sb = PSB.model_construct(
+            _fields_set=set(PSB.model_fields.keys()),
+            source_qualified_candidate_id=sb.source_qualified_candidate_id,
+            evaluation_order_index=sb.evaluation_order_index,
+            phase2_source_record_descriptor_digest=sb.phase2_source_record_descriptor_digest,
+            verified_rating_evidence_digest=sb.verified_rating_evidence_digest,
+            phase2_identity_snapshot_digest=sb.phase2_identity_snapshot_digest,
+            warning_descriptor_binding_digests=sb.warning_descriptor_binding_digests,
+            blocker_descriptor_binding_digests=sb.blocker_descriptor_binding_digests,
+            source_evaluation_failure_binding_digest=sb.source_evaluation_failure_binding_digest,
+            evidence_failure_binding_digest=sb.evidence_failure_binding_digest,
+            binding_digest="sha256:" + "b" * 64,
+        )
+        tampered_cin = cin.model_copy(update={"evidence_binding": tampered_sb})
+        _, _, csnap = self._build_snapshots(rec, evidence, sb)
+        with pytest.raises(ValueError, match="binding_digest mismatch"):
+            classify_candidate(
+                tampered_cin,
+                warning_descriptors=wds,
+                blocker_descriptors=bds,
+                warning_descriptor_bindings=wbds,
+                blocker_descriptor_bindings=bbds,
+                source_failure_binding=None,
+                evidence_failure_binding=None,
+                identity_snapshot=isnap,
+                complete_snapshot=csnap,
+                source_record_descriptor=sdesc,
+            )
+
+    def test_tampered_identity_snapshot_digest_rejected(self) -> None:
+        """Tampered identity_snapshot_digest in binding → rejected by eb.verify_or_raise()."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        (
+            cin, sri, isnap, sdesc, sb,
+            wds, bds, wbds, bbds,
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            rec, candidate, evidence,
+        )
+        from hexagent.optimization.phase3_evaluation import Phase3SourceRecordBinding as PSB
+
+        tampered_sb = PSB.model_construct(
+            _fields_set=set(PSB.model_fields.keys()),
+            source_qualified_candidate_id=sb.source_qualified_candidate_id,
+            evaluation_order_index=sb.evaluation_order_index,
+            phase2_source_record_descriptor_digest=sb.phase2_source_record_descriptor_digest,
+            verified_rating_evidence_digest=sb.verified_rating_evidence_digest,
+            phase2_identity_snapshot_digest="sha256:" + "c" * 64,
+            warning_descriptor_binding_digests=sb.warning_descriptor_binding_digests,
+            blocker_descriptor_binding_digests=sb.blocker_descriptor_binding_digests,
+            source_evaluation_failure_binding_digest=sb.source_evaluation_failure_binding_digest,
+            evidence_failure_binding_digest=sb.evidence_failure_binding_digest,
+            binding_digest=sb.binding_digest,
+        )
+        tampered_cin = cin.model_copy(update={"evidence_binding": tampered_sb})
+        _, _, csnap = self._build_snapshots(rec, evidence, sb)
+        with pytest.raises(ValueError, match="identity_snapshot_digest mismatch"):
+            classify_candidate(
+                tampered_cin,
+                warning_descriptors=wds,
+                blocker_descriptors=bds,
+                warning_descriptor_bindings=wbds,
+                blocker_descriptor_bindings=bbds,
+                source_failure_binding=None,
+                evidence_failure_binding=None,
+                identity_snapshot=isnap,
+                complete_snapshot=csnap,
+                source_record_descriptor=sdesc,
+            )
+
+    def test_tampered_warning_binding_rejected(self) -> None:
+        """Tampered warning binding digest → rejected by eb.verify_or_raise()."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        wd = _make_message_descriptor()
+        wbd = _make_message_descriptor_binding(wd)
+        (
+            cin, sri, isnap, sdesc, sb,
+            wds, bds, wbds, bbds,
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            rec, candidate, evidence, warnings=(wd,), warning_bindings=(wbd,),
+        )
+        _, _, csnap = self._build_snapshots(rec, evidence, sb)
+        other_wbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED"))
+        with pytest.raises(ValueError, match="warning_binding_digest mismatch"):
+            classify_candidate(
+                cin,
+                warning_descriptors=(wd,),
+                blocker_descriptors=bds,
+                warning_descriptor_bindings=(other_wbd,),
+                blocker_descriptor_bindings=bbds,
+                source_failure_binding=None,
+                evidence_failure_binding=None,
+                identity_snapshot=isnap,
+                complete_snapshot=csnap,
+                source_record_descriptor=sdesc,
+            )
+
+    def test_tampered_blocker_binding_rejected(self) -> None:
+        """Tampered blocker binding digest → rejected by eb.verify_or_raise()."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        bd = _make_message_descriptor("B01")
+        bbd = _make_message_descriptor_binding(bd)
+        (
+            cin, sri, isnap, sdesc, sb,
+            wds, bds, wbds, bbds,
+        ) = TestEvidenceValidators._build_blocked_artifacts(
+            rec, candidate, evidence, blockers=(bd,), blocker_bindings=(bbd,),
+        )
+        _, _, csnap = self._build_snapshots(rec, evidence, sb)
+        other_bbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED_B"))
+        with pytest.raises(ValueError, match="blocker_binding_digest mismatch"):
+            classify_candidate(
+                cin,
+                warning_descriptors=wds,
+                blocker_descriptors=(bd,),
+                warning_descriptor_bindings=wbds,
+                blocker_descriptor_bindings=(other_bbd,),
+                source_failure_binding=None,
+                evidence_failure_binding=None,
+                identity_snapshot=isnap,
+                complete_snapshot=csnap,
+                source_record_descriptor=sdesc,
+            )
+
+    def test_tampered_evidence_failure_binding_rejected(self) -> None:
+        """Tampered evidence_failure_binding digest → rejected by eb.verify_or_raise()."""
+        evidence = TestEvidenceValidators._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = TestEvidenceValidators._make_msg_descriptors(evidence)
+        (
+            cin, sri, isnap, sdesc, sb,
+            wds_out, bds_out, wbds_out, bbds_out,
+        ) = TestEvidenceValidators._build_failed_artifacts(
+            rec,
+            candidate,
+            evidence,
+            warnings=wds,
+            blockers=bds,
+            warning_bindings=wbds,
+            blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+        )
+        from hexagent.optimization.phase3_core import Phase3RunFailureDescriptorBinding as RFDB
+
+        tampered_efb = RFDB.model_construct(
+            _fields_set=set(RFDB.model_fields.keys()),
+            **{**efb.model_dump(), "descriptor_binding_digest": "sha256:" + "d" * 64},
+        )
+        _, _, csnap = self._build_snapshots(rec, evidence, sb)
+        with pytest.raises(ValueError, match="evidence_failure_binding_digest mismatch"):
+            classify_candidate(
+                cin,
+                warning_descriptors=wds_out,
+                blocker_descriptors=bds_out,
+                warning_descriptor_bindings=wbds_out,
+                blocker_descriptor_bindings=bbds_out,
+                source_failure_binding=None,
+                evidence_failure_binding=tampered_efb,
+                identity_snapshot=isnap,
+                complete_snapshot=csnap,
+                source_record_descriptor=sdesc,
+            )

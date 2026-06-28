@@ -478,6 +478,9 @@ def verify_phase3_result_semantics_or_raise(
                 blocker_descriptor_bindings=bbt,
                 source_failure_binding=sfb_i,
                 evidence_failure_binding=efb_i,
+                identity_snapshot=ids_i,
+                complete_snapshot=cs_i,
+                source_record_descriptor=desc_i,
             )
             dr = dispositions[i]
             if candidate_disposition_payload(dr) != candidate_disposition_payload(expected_disp):

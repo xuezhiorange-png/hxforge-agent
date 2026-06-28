@@ -12,6 +12,7 @@ import re
 import typing
 import uuid
 from decimal import Decimal
+from enum import StrEnum
 from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -24,6 +25,7 @@ from hexagent.domain.messages import (
     RunFailure,
 )
 from hexagent.domain.provenance import ProvenanceGraph
+from hexagent.exchangers.double_pipe.result import RatingStatus
 from hexagent.optimization.context import OptimizationObjective
 from hexagent.optimization.evaluation import (
     CandidateEvaluationRecord,
@@ -32,6 +34,8 @@ from hexagent.optimization.evaluation import (
     VerifiedRatingEvidenceSnapshot,
     _build_message_descriptor,
     _build_run_failure_descriptor,
+    provider_identity_snapshot_payload,
+    rating_request_identity_payload,
 )
 from hexagent.optimization.identities import ManufacturableCandidate
 from hexagent.optimization.models import SizingRequest
@@ -39,6 +43,8 @@ from hexagent.optimization.phase3_core import (
     FailureOrigin,
     FeasibilityDiagnosticKey,
     Phase2SourceRecordDescriptor,
+    Phase2SourceRecordIdentitySnapshot,
+    Phase2SourceRecordSnapshot,
     Phase3Disposition,
     Phase3MessageDescriptor,
     Phase3MessageDescriptorBinding,
@@ -142,13 +148,13 @@ def validate_blocked_evidence(
     Returns RunFailure if any inconsistency is found, None if valid.
 
     Contract checks:
-    1. evidence present, rating_status == BLOCKED
+    1. evidence present, rating_status == BLOCKED; rec.rating_status == "blocked"
     2. candidate ID, evaluation index match source_record
-    3. rating request identity matches candidate evaluation identity
-    4. provider identity matches rec.provider_identity_matches
+    3. rating request identity matches candidate evaluation identity (recompute payload)
+    4. provider identity matches rec.provider_identity_matches (recompute payload)
     5. hash/provenance outcomes both PASSED
     6. failure is None
-    7. No successful thermal results
+    7. Thermal field matrix check (centralized)
     8. Warning/blocker descriptors match evidence messages (count/content/order via digest)
     9. Warning/blocker descriptor bindings match SourceRecordBinding digests
     10. evidence digest matches SourceRecordBinding.verified_rating_evidence_digest
@@ -163,12 +169,21 @@ def validate_blocked_evidence(
             message="Blocked evidence missing: expected VerifiedRatingEvidenceSnapshot",
             context=ctx,
         )
-    if evidence.rating_status.value != "blocked":
+    if evidence.rating_status != RatingStatus.BLOCKED:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message=(
                 f"Blocked evidence rating_status mismatch: "
                 f"expected 'blocked', got '{evidence.rating_status.value}'"
+            ),
+            context=ctx,
+        )
+    if rec.rating_status != "blocked":
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Blocked evidence: rec.rating_status mismatch: "
+                f"expected 'blocked', got {rec.rating_status!r}"
             ),
             context=ctx,
         )
@@ -194,24 +209,63 @@ def validate_blocked_evidence(
             context=ctx,
         )
 
-    # 3) Rating request identity digest matches candidate evaluation identity
-    if rec.candidate_evaluation_identity is not None:
-        expected_rri_digest = rec.candidate_evaluation_identity.rating_request_identity_digest
-        if evidence.rating_request_identity_digest != expected_rri_digest:
-            return RunFailure(
-                code=ErrorCode.INPUT_INCONSISTENT,
-                message=(
-                    "Blocked evidence: rating_request_identity_digest "
-                    "mismatch vs candidate_evaluation_identity"
-                ),
-                context=ctx,
-            )
-
-    # 4) Provider identity matches
-    if not rec.provider_identity_matches:
+    # 3) Rating request identity digest — recompute from evidence payload and verify
+    #    matches BOTH evidence.rating_request_identity_digest AND
+    #    rec.candidate_evaluation_identity.rating_request_identity_digest
+    if rec.candidate_evaluation_identity is None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
-            message="Blocked evidence: rec.provider_identity_matches is False",
+            message="Blocked evidence: candidate_evaluation_identity is None",
+            context=ctx,
+        )
+    recomputed_rri_digest = sha256_digest(
+        rating_request_identity_payload(evidence.rating_request_identity)
+    )
+    if evidence.rating_request_identity_digest != recomputed_rri_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Blocked evidence: rating_request_identity_digest "
+                "mismatch vs recomputed payload"
+            ),
+            context=ctx,
+        )
+    if rec.candidate_evaluation_identity.rating_request_identity_digest != recomputed_rri_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Blocked evidence: candidate_evaluation_identity.rating_request_identity_digest "
+                "mismatch vs recomputed payload"
+            ),
+            context=ctx,
+        )
+
+    # 4) Provider identity — recompute from evidence payload and verify matches
+    #    rec.candidate_evaluation_identity.provider_identity_digest.
+    #    If provider_identity_matches==True but recomputed digest differs, FAIL CLOSED.
+    recomputed_provider_digest = sha256_digest(
+        provider_identity_snapshot_payload(evidence.provider_identity)
+    )
+    if rec.candidate_evaluation_identity.provider_identity_digest != recomputed_provider_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Blocked evidence: candidate_evaluation_identity.provider_identity_digest "
+                "mismatch vs recomputed payload"
+            ),
+            context=ctx,
+        )
+    if rec.provider_identity_matches:
+        # provider_identity_matches==True but recomputed digest vs CEI differs → FAIL CLOSED
+        pass  # already checked above
+    else:
+        # provider_identity_matches==False should not reach this validator
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Blocked evidence: provider_identity_matches is False "
+                "— should go to provider mismatch path"
+            ),
             context=ctx,
         )
 
@@ -242,40 +296,10 @@ def validate_blocked_evidence(
             context=ctx,
         )
 
-    # 7) No successful thermal results (heat_duty_w, outlet temps, UA, LMTD)
-    if evidence.heat_duty_w is not None:
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Blocked evidence: heat_duty_w must be None",
-            context=ctx,
-        )
-    if (
-        evidence.hot_outlet_temperature_k is not None
-        or evidence.cold_outlet_temperature_k is not None
-    ):
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Blocked evidence: outlet temperatures must be None",
-            context=ctx,
-        )
-    if evidence.UA_w_k is not None:
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Blocked evidence: UA_w_k must be None",
-            context=ctx,
-        )
-    if evidence.LMTD_k is not None:
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Blocked evidence: LMTD_k must be None",
-            context=ctx,
-        )
-    if evidence.area_outer_m2 is None:
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Blocked evidence: area_outer_m2 must be present",
-            context=ctx,
-        )
+    # 7) Thermal field matrix check (centralized P0-3)
+    tf = _check_thermal_field_matrix(evidence, _BLOCKED_THERMAL_MATRIX, ctx)
+    if tf is not None:
+        return tf
 
     # 8) Warning/blocker descriptors match evidence messages (count, content, order via digest)
     if len(warning_descriptors) != len(evidence.warnings):
@@ -401,17 +425,21 @@ def validate_failed_evidence(
     Returns RunFailure if any inconsistency is found, None if valid.
 
     Contract checks:
-    1. evidence present, rating_status == FAILED
-    2. candidate ID, evaluation index match source_record
-    3. hash/provenance outcomes both PASSED
-    4. failure is present, failure descriptor can be rebuilt from evidence.failure
-    5. failure payload digest matches
-    6. evidence_failure_binding exists and matches failure descriptor
-    7. failure binding's descriptor_binding_digest, payload_digest,
-       canonicalization_error_digest all match
-    8. Warning/blocker checks same as blocked
-    9. No successful thermal results
-    10. evidence digest matches
+    1. evidence present, rating_status == FAILED; rec.rating_status == "failed"
+    2. CandidateEvaluationIdentity is not None
+    3. Rating request identity recompute — must equal BOTH evidence digest AND cei digest
+    4. Provider identity recompute — must equal cei.provider_identity_digest
+    5. If provider_identity_matches==True but recomputed digest differs, FAIL CLOSED
+    6. If provider_identity_matches==False, provider mismatch path (fail closed)
+    7. Hash/provenance outcomes both PASSED
+    8. Failure is present, failure descriptor can be rebuilt from evidence.failure
+    9. Failure payload digest matches
+    10. evidence_failure_binding exists and matches failure descriptor
+    11. Failure binding's descriptor_binding_digest, payload_digest,
+        canonicalization_error_digest all match
+    12. Warning/blocker checks same as blocked
+    13. Thermal field matrix check (centralized)
+    14. Evidence digest matches
     """
     ctx = (("source_qualified_candidate_id", rec.source_qualified_candidate_id),)
 
@@ -422,7 +450,7 @@ def validate_failed_evidence(
             message="Failed evidence missing: expected VerifiedRatingEvidenceSnapshot",
             context=ctx,
         )
-    if evidence.rating_status.value != "failed":
+    if evidence.rating_status != RatingStatus.FAILED:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message=(
@@ -431,8 +459,25 @@ def validate_failed_evidence(
             ),
             context=ctx,
         )
+    if rec.rating_status != "failed":
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Failed evidence: rec.rating_status mismatch: "
+                f"expected 'failed', got {rec.rating_status!r}"
+            ),
+            context=ctx,
+        )
 
-    # 2) Candidate ID and evaluation index match vs source_record
+    # 2) CandidateEvaluationIdentity must not be None
+    if rec.candidate_evaluation_identity is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: candidate_evaluation_identity is None",
+            context=ctx,
+        )
+
+    # 3) Candidate ID and evaluation index match vs source_record
     if eb.source_qualified_candidate_id != rec.source_qualified_candidate_id:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
@@ -453,7 +498,58 @@ def validate_failed_evidence(
             context=ctx,
         )
 
-    # 3) Hash/provenance outcomes both PASSED
+    # 4) Rating request identity — recompute from evidence payload and verify
+    #    matches BOTH evidence.rating_request_identity_digest AND
+    #    rec.candidate_evaluation_identity.rating_request_identity_digest
+    recomputed_rri_digest = sha256_digest(
+        rating_request_identity_payload(evidence.rating_request_identity)
+    )
+    if evidence.rating_request_identity_digest != recomputed_rri_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Failed evidence: rating_request_identity_digest "
+                "mismatch vs recomputed payload"
+            ),
+            context=ctx,
+        )
+    if rec.candidate_evaluation_identity.rating_request_identity_digest != recomputed_rri_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Failed evidence: candidate_evaluation_identity."
+                "rating_request_identity_digest mismatch vs recomputed payload"
+            ),
+            context=ctx,
+        )
+
+    # 5) Provider identity — recompute from evidence payload and verify matches
+    #    rec.candidate_evaluation_identity.provider_identity_digest.
+    #    If provider_identity_matches==True but recomputed digest differs, FAIL CLOSED.
+    recomputed_provider_digest = sha256_digest(
+        provider_identity_snapshot_payload(evidence.provider_identity)
+    )
+    if rec.candidate_evaluation_identity.provider_identity_digest != recomputed_provider_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Failed evidence: candidate_evaluation_identity.provider_identity_digest "
+                "mismatch vs recomputed payload"
+            ),
+            context=ctx,
+        )
+    # 6) If provider_identity_matches==False, provider mismatch path (fail closed)
+    if not rec.provider_identity_matches:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Failed evidence: provider_identity_matches is False "
+                "— should go to provider mismatch path"
+            ),
+            context=ctx,
+        )
+
+    # 7) Hash/provenance outcomes both PASSED
     if evidence.hash_verification_outcome != VerificationOutcome.PASSED:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
@@ -472,7 +568,7 @@ def validate_failed_evidence(
             context=ctx,
         )
 
-    # 4) Failure must be present; failure descriptor can be rebuilt from evidence.failure
+    # 8) Failure must be present; failure descriptor can be rebuilt from evidence.failure
     if evidence.failure is None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
@@ -489,7 +585,7 @@ def validate_failed_evidence(
             context=ctx,
         )
 
-    # 5) Failure payload digest matches
+    # 9) Failure payload digest matches
     if failure_desc.payload_digest is None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
@@ -497,7 +593,7 @@ def validate_failed_evidence(
             context=ctx,
         )
 
-    # 6) evidence_failure_binding exists and matches failure descriptor
+    # 10) evidence_failure_binding exists and matches failure descriptor
     if evidence_failure_binding is None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
@@ -505,8 +601,8 @@ def validate_failed_evidence(
             context=ctx,
         )
 
-    # 7) failure binding's descriptor_binding_digest, payload_digest,
-    #    canonicalization_error_digest all match
+    # 11) failure binding's descriptor_binding_digest, payload_digest,
+    #     canonicalization_error_digest all match
     if evidence_failure_binding.payload_digest != failure_desc.payload_digest:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
@@ -556,7 +652,7 @@ def validate_failed_evidence(
             context=ctx,
         )
 
-    # 8) Warning/blocker checks — same as blocked
+    # 12) Warning/blocker checks — same as blocked
     if len(warning_descriptors) != len(evidence.warnings):
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
@@ -644,42 +740,12 @@ def validate_failed_evidence(
                 context=ctx,
             )
 
-    # 9) No successful thermal results
-    if evidence.heat_duty_w is not None:
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Failed evidence: heat_duty_w must be None",
-            context=ctx,
-        )
-    if (
-        evidence.hot_outlet_temperature_k is not None
-        or evidence.cold_outlet_temperature_k is not None
-    ):
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Failed evidence: outlet temperatures must be None",
-            context=ctx,
-        )
-    if evidence.UA_w_k is not None:
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Failed evidence: UA_w_k must be None",
-            context=ctx,
-        )
-    if evidence.LMTD_k is not None:
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Failed evidence: LMTD_k must be None",
-            context=ctx,
-        )
-    if evidence.area_outer_m2 is None:
-        return RunFailure(
-            code=ErrorCode.INPUT_INCONSISTENT,
-            message="Failed evidence: area_outer_m2 must be present",
-            context=ctx,
-        )
+    # 13) Thermal field matrix check (centralized P0-3)
+    tf = _check_thermal_field_matrix(evidence, _FAILED_THERMAL_MATRIX, ctx)
+    if tf is not None:
+        return tf
 
-    # 10) Evidence digest matches
+    # 14) Evidence digest matches
     expected_evidence_digest = evidence.compute_explicit_evidence_digest()
     if eb.verified_rating_evidence_digest != expected_evidence_digest:
         return RunFailure(
@@ -688,6 +754,82 @@ def validate_failed_evidence(
             context=ctx,
         )
 
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# P0-3: Centralized thermal-state field matrix for blocked/failed validators
+# ═══════════════════════════════════════════════════════════════════════════
+
+class _ThermalFieldRule(StrEnum):
+    MUST_BE_NONE = "must_be_none"
+    REQUIRED_AND_BOUND = "required_and_bound"
+    CAN_BE_NONE_OR_BOUND = "can_be_none_or_bound"
+
+
+_BLOCKED_THERMAL_MATRIX: dict[str, _ThermalFieldRule] = {
+    "energy_residual_w": _ThermalFieldRule.MUST_BE_NONE,
+    "ua_lmtd_residual_w": _ThermalFieldRule.MUST_BE_NONE,
+    "heat_duty_w": _ThermalFieldRule.MUST_BE_NONE,
+    "hot_outlet_temperature_k": _ThermalFieldRule.MUST_BE_NONE,
+    "cold_outlet_temperature_k": _ThermalFieldRule.MUST_BE_NONE,
+    "UA_w_k": _ThermalFieldRule.MUST_BE_NONE,
+    "LMTD_k": _ThermalFieldRule.MUST_BE_NONE,
+    "area_inner_m2": _ThermalFieldRule.REQUIRED_AND_BOUND,
+    "area_outer_m2": _ThermalFieldRule.REQUIRED_AND_BOUND,
+    "tube_flow_area_m2": _ThermalFieldRule.REQUIRED_AND_BOUND,
+    "annulus_flow_area_m2": _ThermalFieldRule.REQUIRED_AND_BOUND,
+    "tube_inlet_density_kg_m3": _ThermalFieldRule.CAN_BE_NONE_OR_BOUND,
+    "annulus_inlet_density_kg_m3": _ThermalFieldRule.CAN_BE_NONE_OR_BOUND,
+    "tube_correlation": _ThermalFieldRule.CAN_BE_NONE_OR_BOUND,
+    "annulus_correlation": _ThermalFieldRule.CAN_BE_NONE_OR_BOUND,
+}
+
+_FAILED_THERMAL_MATRIX: dict[str, _ThermalFieldRule] = dict(_BLOCKED_THERMAL_MATRIX)
+
+
+def _check_thermal_field_matrix(
+    evidence: VerifiedRatingEvidenceSnapshot,
+    matrix: dict[str, _ThermalFieldRule],
+    ctx: tuple[tuple[str, object], ...],
+) -> RunFailure | None:
+    """Validate all evidence fields against the given thermal field matrix.
+
+    Returns RunFailure on the first violation, None if all fields pass.
+    """
+    field_values: dict[str, object | None] = {
+        "energy_residual_w": evidence.energy_residual_w,
+        "ua_lmtd_residual_w": evidence.ua_lmtd_residual_w,
+        "heat_duty_w": evidence.heat_duty_w,
+        "hot_outlet_temperature_k": evidence.hot_outlet_temperature_k,
+        "cold_outlet_temperature_k": evidence.cold_outlet_temperature_k,
+        "UA_w_k": evidence.UA_w_k,
+        "LMTD_k": evidence.LMTD_k,
+        "area_inner_m2": evidence.area_inner_m2,
+        "area_outer_m2": evidence.area_outer_m2,
+        "tube_flow_area_m2": evidence.tube_flow_area_m2,
+        "annulus_flow_area_m2": evidence.annulus_flow_area_m2,
+        "tube_inlet_density_kg_m3": evidence.tube_inlet_density_kg_m3,
+        "annulus_inlet_density_kg_m3": evidence.annulus_inlet_density_kg_m3,
+        "tube_correlation": evidence.tube_correlation,
+        "annulus_correlation": evidence.annulus_correlation,
+    }
+    for field_name, rule in matrix.items():
+        val = field_values[field_name]
+        if rule is _ThermalFieldRule.MUST_BE_NONE:
+            if val is not None:
+                return RunFailure(
+                    code=ErrorCode.INPUT_INCONSISTENT,
+                    message=f"Blocked/failed evidence: {field_name} must be None",
+                    context=ctx,
+                )
+        elif rule is _ThermalFieldRule.REQUIRED_AND_BOUND and val is None:
+                return RunFailure(
+                    code=ErrorCode.INPUT_INCONSISTENT,
+                    message=f"Blocked/failed evidence: {field_name} must be present",
+                    context=ctx,
+                )
+        # CAN_BE_NONE_OR_BOUND: no enforcement needed
     return None
 
 
@@ -1105,6 +1247,9 @@ def classify_candidate(
     blocker_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
     source_failure_binding: Phase3RunFailureDescriptorBinding | None,
     evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
+    identity_snapshot: Phase2SourceRecordIdentitySnapshot | None = None,
+    complete_snapshot: Phase2SourceRecordSnapshot | None = None,
+    source_record_descriptor: Phase2SourceRecordDescriptor | None = None,
 ) -> CandidateDispositionRecord:
     rec = input.source_record
     sizing = input.sizing_request_identity
@@ -1131,6 +1276,23 @@ def classify_candidate(
             source_record_descriptor_digest=scd,
             warning_descriptors=warning_descriptors,
             blocker_descriptors=blocker_descriptors,
+        )
+    # P0-4: SourceRecordBinding verification before blocked/failed validators
+    if (
+        identity_snapshot is not None
+        and complete_snapshot is not None
+        and source_record_descriptor is not None
+    ):
+        eb.verify_or_raise(
+            source_record=rec,
+            identity_snapshot=identity_snapshot,
+            complete_snapshot=complete_snapshot,
+            source_record_descriptor=source_record_descriptor,
+            verified_evidence=evidence,
+            warning_bindings=warning_descriptor_bindings,
+            blocker_bindings=blocker_descriptor_bindings,
+            source_failure_binding=source_failure_binding,
+            evidence_failure_binding=evidence_failure_binding,
         )
     if rec.rating_status is None:
         return _phase3_runtime(
