@@ -876,6 +876,16 @@ def _find_stop_index(ei: Phase3EvaluationInput) -> int | None:
             return i
     return None
 
+def derive_termination_status(
+    evaluation_input: Phase3EvaluationInput,
+) -> TerminationStatus:
+    stop_index = _find_stop_index(evaluation_input)
+    return (
+        TerminationStatus.PARTIAL
+        if stop_index is not None
+        else TerminationStatus.COMPLETE
+    )
+
 ```
 
 ---
@@ -3016,6 +3026,76 @@ class OptimizationResultCoreValues:
             ordered_blocker_digests=self.ordered_blocker_digests))
 ```
 
+### 19.0b Core values independent derivation helper
+
+```python
+def derive_optimization_result_core_values(
+    *,
+    evaluation_input: Phase3EvaluationInput,
+    dispositions: tuple[CandidateDispositionRecord, ...],
+    ranked_records: tuple[RankedCandidateRecord, ...],
+    source_bindings: tuple[Phase3SourceRecordBinding | None, ...],
+    preparation_results: tuple[Phase3CandidatePreparationResult | None, ...],
+) -> OptimizationResultCoreValues:
+    N = evaluation_input.evaluation_record_count
+    # Derive Phase 2 counts from evaluation records
+    recs = evaluation_input.evaluation_records
+    p2_v = sum(1 for r in recs if r.candidate_evaluation_state == VERIFIED)
+    p2_ii = sum(1 for r in recs if r.candidate_evaluation_state == INTEGRITY_INVALID)
+    p2_rf = sum(1 for r in recs if r.candidate_evaluation_state == RUNTIME_FAILED)
+    p2_u = sum(1 for r in recs if r.candidate_evaluation_state == UNEVALUATED)
+    # Derive disposition counts
+    vs = [d.disposition for d in dispositions]
+    f_c = vs.count(FEASIBLE)
+    inf_c = vs.count(INFEASIBLE)
+    pm_c = vs.count(PROVIDER_IDENTITY_MISMATCH)
+    int_c = vs.count(INTEGRITY_FAILED)
+    pf_c = vs.count(PROVENANCE_FAILED)
+    rf_c = vs.count(RUNTIME_FAILED)
+    u_c = vs.count(UNEVALUATED)
+    rf_v = sum(1 for d in dispositions if d.disposition is RUNTIME_FAILED and d.source_candidate_evaluation_state == VERIFIED)
+    rf_rf = sum(1 for d in dispositions if d.disposition is RUNTIME_FAILED and d.source_candidate_evaluation_state == RUNTIME_FAILED)
+    # Termination status from independent derivation
+    ts = derive_termination_status(evaluation_input)
+    # Warning/blocker aggregation
+    stop_index = _find_stop_index(evaluation_input)
+    w_digests, b_digests = build_result_message_digest_tuples(evaluation_input, dispositions, stop_index)
+    # Ordered digest tuples
+    F = f_c
+    dd = tuple(d.feasibility_digest for d in dispositions)
+    rd = tuple(r.ranked_record_digest for r in ranked_records)
+    tn = rd[:min(evaluation_input.sizing_request_identity.top_n, F)]
+    isd = tuple(evaluation_input.ordered_identity_snapshot_digests)
+    ssd = tuple(cs.snapshot_digest if cs is not None else None for cs in evaluation_input.complete_snapshots)
+    sbd = tuple(sb.binding_digest if sb is not None else None for sb in source_bindings)
+    prd = tuple(p.preparation_result_digest if p is not None else None for p in preparation_results)
+    return OptimizationResultCoreValues(
+        schema_version=1,
+        sizing_request_identity_digest=evaluation_input.sizing_request_identity_digest,
+        passed_gate_digest=evaluation_input.gate_digest,
+        candidate_set_digest=evaluation_input.candidate_set_digest,
+        evaluation_input_digest=evaluation_input.evaluation_input_digest,
+        optimization_objective=evaluation_input.sizing_request_identity.optimization_objective,
+        requested_top_n=evaluation_input.sizing_request_identity.top_n,
+        total_candidate_count=N, feasible_candidate_count=f_c,
+        infeasible_candidate_count=inf_c, provider_mismatch_count=pm_c,
+        integrity_failed_count=int_c, provenance_failed_count=pf_c,
+        runtime_failed_count=rf_c, unevaluated_count=u_c,
+        phase2_verified_record_count=p2_v, phase2_integrity_invalid_record_count=p2_ii,
+        phase2_runtime_failed_record_count=p2_rf, phase2_unevaluated_record_count=p2_u,
+        runtime_failed_from_phase2_verified_count=rf_v,
+        runtime_failed_from_phase2_runtime_failed_count=rf_rf,
+        ordered_disposition_record_digests=dd,
+        ordered_ranked_record_digests=rd,
+        ordered_top_n_record_digests=tn,
+        ordered_identity_snapshot_digests=isd,
+        ordered_phase2_source_snapshot_digests=ssd,
+        ordered_phase3_source_binding_digests=sbd,
+        ordered_phase3_preparation_result_digests=prd,
+        termination_status=ts,
+        ordered_warning_digests=w_digests, ordered_blocker_digests=b_digests)
+```
+
 ### 19.1 Factory
 
 ```python
@@ -3119,65 +3199,38 @@ def build_optimization_result(
         if matched is None:
             raise ValueError(f"ranked record {rr.source_qualified_candidate_id} has no matching FEASIBLE disposition")
         rr.verify_or_raise(disposition=matched)
-    # Derive Phase 2 counts from evaluation records
-    recs = evaluation_input.evaluation_records
-    p2_v = sum(1 for r in recs if r.candidate_evaluation_state == VERIFIED)
-    p2_ii = sum(1 for r in recs if r.candidate_evaluation_state == INTEGRITY_INVALID)
-    p2_rf = sum(1 for r in recs if r.candidate_evaluation_state == RUNTIME_FAILED)
-    p2_u = sum(1 for r in recs if r.candidate_evaluation_state == UNEVALUATED)
-    # Derive disposition counts
-    vs = [d.disposition for d in dispositions]
-    f_c = vs.count(FEASIBLE)
-    inf_c = vs.count(INFEASIBLE)
-    pm_c = vs.count(PROVIDER_IDENTITY_MISMATCH)
-    int_c = vs.count(INTEGRITY_FAILED)
-    pf_c = vs.count(PROVENANCE_FAILED)
-    rf_c = vs.count(RUNTIME_FAILED)
-    u_c = vs.count(UNEVALUATED)
-    rf_v = sum(1 for d in dispositions if d.disposition is RUNTIME_FAILED and d.source_candidate_evaluation_state == VERIFIED)
-    rf_rf = sum(1 for d in dispositions if d.disposition is RUNTIME_FAILED and d.source_candidate_evaluation_state == RUNTIME_FAILED)
-    # Warning/blocker aggregation
-    stop_index = _find_stop_index(evaluation_input)
-    if stop_index is not None:
-        ts = TerminationStatus.PARTIAL
-    else:
-        ts = TerminationStatus.COMPLETE
-    w_digests, b_digests = build_result_message_digest_tuples(evaluation_input, dispositions, stop_index)
-    # Ordered digest tuples
-    dd = tuple(d.feasibility_digest for d in dispositions)
-    rd = tuple(r.ranked_record_digest for r in ranked_records)
-    tn = rd[:min(evaluation_input.sizing_request_identity.top_n, F)]
-    isd = tuple(evaluation_input.ordered_identity_snapshot_digests)
-    ssd = tuple(cs.snapshot_digest if cs is not None else None for cs in evaluation_input.complete_snapshots)
-    sbd = tuple(sb.binding_digest if sb is not None else None for sb in source_bindings)
-    prd = tuple(p.preparation_result_digest if p is not None else None for p in preparation_results)
-    # Build core values
-    core_values = OptimizationResultCoreValues(
-        schema_version=1,
-        sizing_request_identity_digest=evaluation_input.sizing_request_identity_digest,
-        passed_gate_digest=evaluation_input.gate_digest,
-        candidate_set_digest=evaluation_input.candidate_set_digest,
-        evaluation_input_digest=evaluation_input.evaluation_input_digest,
-        optimization_objective=evaluation_input.sizing_request_identity.optimization_objective,
-        requested_top_n=evaluation_input.sizing_request_identity.top_n,
-        total_candidate_count=N, feasible_candidate_count=f_c,
-        infeasible_candidate_count=inf_c, provider_mismatch_count=pm_c,
-        integrity_failed_count=int_c, provenance_failed_count=pf_c,
-        runtime_failed_count=rf_c, unevaluated_count=u_c,
-        phase2_verified_record_count=p2_v, phase2_integrity_invalid_record_count=p2_ii,
-        phase2_runtime_failed_record_count=p2_rf, phase2_unevaluated_record_count=p2_u,
-        runtime_failed_from_phase2_verified_count=rf_v,
-        runtime_failed_from_phase2_runtime_failed_count=rf_rf,
-        ordered_disposition_record_digests=dd,
-        ordered_ranked_record_digests=rd,
-        ordered_top_n_record_digests=tn,
-        ordered_identity_snapshot_digests=isd,
-        ordered_phase2_source_snapshot_digests=ssd,
-        ordered_phase3_source_binding_digests=sbd,
-        ordered_phase3_preparation_result_digests=prd,
-        termination_status=ts,
-        ordered_warning_digests=w_digests, ordered_blocker_digests=b_digests)
+    # Build core values via single normative helper
+    core_values = derive_optimization_result_core_values(
+        evaluation_input=evaluation_input,
+        dispositions=dispositions,
+        ranked_records=ranked_records,
+        source_bindings=source_bindings,
+        preparation_results=preparation_results)
     result_core_hash = core_values.compute_hash()
+    # Extract fields needed for provenance graph and OptimizationResult constructor
+    f_c = core_values.feasible_candidate_count
+    inf_c = core_values.infeasible_candidate_count
+    pm_c = core_values.provider_mismatch_count
+    int_c = core_values.integrity_failed_count
+    pf_c = core_values.provenance_failed_count
+    rf_c = core_values.runtime_failed_count
+    u_c = core_values.unevaluated_count
+    p2_v = core_values.phase2_verified_record_count
+    p2_ii = core_values.phase2_integrity_invalid_record_count
+    p2_rf = core_values.phase2_runtime_failed_record_count
+    p2_u = core_values.phase2_unevaluated_record_count
+    rf_v = core_values.runtime_failed_from_phase2_verified_count
+    rf_rf = core_values.runtime_failed_from_phase2_runtime_failed_count
+    dd = core_values.ordered_disposition_record_digests
+    rd = core_values.ordered_ranked_record_digests
+    isd = core_values.ordered_identity_snapshot_digests
+    ssd = core_values.ordered_phase2_source_snapshot_digests
+    sbd = core_values.ordered_phase3_source_binding_digests
+    prd = core_values.ordered_phase3_preparation_result_digests
+    tn = core_values.ordered_top_n_record_digests
+    ts = core_values.termination_status
+    w_digests = core_values.ordered_warning_digests
+    b_digests = core_values.ordered_blocker_digests
     # Build provenance
     graph = build_phase3_provenance_graph(
         ei=evaluation_input, dispositions=dispositions, ranked=ranked_records,
@@ -3229,9 +3282,6 @@ def build_optimization_result(
     artifacts = Phase3AuthoritativeArtifacts(
         sizing_request=sizing_request,
         candidates=candidates,
-        source_records=evaluation_input.evaluation_records,
-        identity_snapshots=evaluation_input.identity_snapshots,
-        complete_snapshots=evaluation_input.complete_snapshots,
         phase2_source_record_descriptors=phase2_source_record_descriptors,
         source_bindings=source_bindings,
         classification_inputs=classification_inputs,
@@ -3546,6 +3596,20 @@ def build_result_message_digest_tuples(ei, dispositions, stop_index):
 ## 21. External verifier (P0-11)
 
 ```python
+def _verify_external_authority_parity(
+    *,
+    evaluation_input: Phase3EvaluationInput,
+    external_source_records: tuple[CandidateEvaluationRecord, ...],
+    external_identity_snapshots: tuple[Phase2SourceRecordIdentitySnapshot, ...],
+    external_complete_snapshots: tuple[Phase2SourceRecordSnapshot | None, ...],
+) -> None:
+    if external_source_records != evaluation_input.evaluation_records:
+        raise ValueError("external source_records parity mismatch")
+    if external_identity_snapshots != evaluation_input.identity_snapshots:
+        raise ValueError("external identity_snapshots parity mismatch")
+    if external_complete_snapshots != evaluation_input.complete_snapshots:
+        raise ValueError("external complete_snapshots parity mismatch")
+
 def verify_optimization_result_or_raise(
     result, *, ei,
     sizing_request: SizingRequest,
@@ -3567,12 +3631,14 @@ def verify_optimization_result_or_raise(
     dispositions, ranked, graph,
 ):
     """Delegate all semantic verification to the shared acceptance function."""
+    _verify_external_authority_parity(
+        evaluation_input=ei,
+        external_source_records=source_records,
+        external_identity_snapshots=identity_snapshots,
+        external_complete_snapshots=complete_snapshots)
     artifacts = Phase3AuthoritativeArtifacts(
         sizing_request=sizing_request,
         candidates=candidates,
-        source_records=source_records,
-        identity_snapshots=identity_snapshots,
-        complete_snapshots=complete_snapshots,
         phase2_source_record_descriptors=phase2_source_record_descriptors,
         source_bindings=source_bindings,
         classification_inputs=classification_inputs,
@@ -3604,9 +3670,6 @@ class Phase3AuthoritativeArtifacts:
     """Container for all independent authority artifact tuples required by the shared verifier."""
     sizing_request: SizingRequest
     candidates: tuple[ManufacturableCandidate, ...]
-    source_records: tuple[CandidateEvaluationRecord, ...]
-    identity_snapshots: tuple[Phase2SourceRecordIdentitySnapshot, ...]
-    complete_snapshots: tuple[Phase2SourceRecordSnapshot | None, ...]
     phase2_source_record_descriptors: tuple[Phase2SourceRecordDescriptor | None, ...]
     source_bindings: tuple[Phase3SourceRecordBinding | None, ...]
     classification_inputs: tuple[Phase3CandidateClassificationInput | None, ...]
@@ -3641,8 +3704,8 @@ def verify_phase3_result_semantics_or_raise(
     if N != len(dispositions): raise ValueError("dispositions count != N")
     if N != len(artifacts.preparation_results): raise ValueError("preparation_results count != N")
     if N != len(artifacts.phase2_source_record_descriptors): raise ValueError("descriptors count != N")
-    if N != len(artifacts.identity_snapshots): raise ValueError("identity_snapshots count != N")
-    if N != len(artifacts.complete_snapshots): raise ValueError("complete_snapshots count != N")
+    if N != len(evaluation_input.identity_snapshots): raise ValueError("identity_snapshots count != N")
+    if N != len(evaluation_input.complete_snapshots): raise ValueError("complete_snapshots count != N")
     if N != len(artifacts.source_bindings): raise ValueError("source_bindings count != N")
     if N != len(artifacts.classification_inputs): raise ValueError("classification_inputs count != N")
     if N != len(artifacts.evidence_failure_bindings): raise ValueError("evidence_failure_bindings count != N")
@@ -3659,7 +3722,7 @@ def verify_phase3_result_semantics_or_raise(
     evaluation_input.verify_or_raise(
         sizing_request=artifacts.sizing_request,
         candidates=artifacts.candidates,
-        source_records=artifacts.source_records,
+        source_records=evaluation_input.evaluation_records,
         phase2_source_record_descriptors=artifacts.phase2_source_record_descriptors,
         warning_binding_tuples=artifacts.warning_binding_tuples,
         blocker_binding_tuples=artifacts.blocker_binding_tuples,
@@ -3669,8 +3732,8 @@ def verify_phase3_result_semantics_or_raise(
     # === 3-5) Per-index artifact matrix, descriptor, identity, complete snapshot replay ===
     for i in range(N):
         rec_i = evaluation_input.evaluation_records[i]
-        ids_i = artifacts.identity_snapshots[i]
-        cs_i = artifacts.complete_snapshots[i]
+        ids_i = evaluation_input.identity_snapshots[i]
+        cs_i = evaluation_input.complete_snapshots[i]
         desc_i = artifacts.phase2_source_record_descriptors[i]
         sb_i = artifacts.source_bindings[i]
         cin_i = artifacts.classification_inputs[i]
@@ -3814,10 +3877,8 @@ def verify_phase3_result_semantics_or_raise(
 
     # === 14) Strict-stop and termination status recomputation ===
     stop_index = _find_stop_index(evaluation_input)
-    if stop_index is None:
-        if result.termination_status is not TerminationStatus.COMPLETE: raise ValueError("must be COMPLETE")
-    else:
-        if result.termination_status is not TerminationStatus.PARTIAL: raise ValueError("must be PARTIAL")
+    expected_ts = derive_termination_status(evaluation_input)
+    if result.termination_status is not expected_ts: raise ValueError(f"termination_status {result.termination_status} != expected {expected_ts}")
 
     # === 15) Warning/blocker aggregation recomputation ===
     expected_w, expected_b = build_result_message_digest_tuples(evaluation_input, dispositions, stop_index)
@@ -3861,65 +3922,17 @@ def verify_phase3_result_semantics_or_raise(
         source_bindings=artifacts.source_bindings)
 
     # === 19) Independent core_values derivation and core hash check ===
-    # Derive Phase 2 counts from evaluation records
-    recs = evaluation_input.evaluation_records
-    p2_v = sum(1 for r in recs if r.candidate_evaluation_state == VERIFIED)
-    p2_ii = sum(1 for r in recs if r.candidate_evaluation_state == INTEGRITY_INVALID)
-    p2_rf = sum(1 for r in recs if r.candidate_evaluation_state == RUNTIME_FAILED)
-    p2_u = sum(1 for r in recs if r.candidate_evaluation_state == UNEVALUATED)
-    # Derive disposition counts
-    vs = [d.disposition for d in dispositions]
-    f_c = vs.count(FEASIBLE)
-    inf_c = vs.count(INFEASIBLE)
-    pm_c = vs.count(PROVIDER_IDENTITY_MISMATCH)
-    int_c = vs.count(INTEGRITY_FAILED)
-    pf_c = vs.count(PROVENANCE_FAILED)
-    rf_c = vs.count(RUNTIME_FAILED)
-    u_c = vs.count(UNEVALUATED)
-    rf_v = sum(1 for d in dispositions if d.disposition is RUNTIME_FAILED and d.source_candidate_evaluation_state == VERIFIED)
-    rf_rf = sum(1 for d in dispositions if d.disposition is RUNTIME_FAILED and d.source_candidate_evaluation_state == RUNTIME_FAILED)
-    # Termination status
-    ts = TerminationStatus.PARTIAL if stop_index is not None else TerminationStatus.COMPLETE
-    # Ordered digest tuples
-    dd = tuple(d.feasibility_digest for d in dispositions)
-    rd = tuple(r.ranked_record_digest for r in ranked_records)
-    tn = rd[:min(evaluation_input.sizing_request_identity.top_n, F)]
-    isd = tuple(evaluation_input.ordered_identity_snapshot_digests)
-    ssd = tuple(cs.snapshot_digest if cs is not None else None for cs in evaluation_input.complete_snapshots)
-    sbd = tuple(sb.binding_digest if sb is not None else None for sb in artifacts.source_bindings)
-    prd = tuple(p.preparation_result_digest if p is not None else None for p in artifacts.preparation_results)
-    derived_core_values = OptimizationResultCoreValues(
-        schema_version=1,
-        sizing_request_identity_digest=evaluation_input.sizing_request_identity_digest,
-        passed_gate_digest=evaluation_input.gate_digest,
-        candidate_set_digest=evaluation_input.candidate_set_digest,
-        evaluation_input_digest=evaluation_input.evaluation_input_digest,
-        optimization_objective=evaluation_input.sizing_request_identity.optimization_objective,
-        requested_top_n=evaluation_input.sizing_request_identity.top_n,
-        total_candidate_count=N, feasible_candidate_count=f_c,
-        infeasible_candidate_count=inf_c, provider_mismatch_count=pm_c,
-        integrity_failed_count=int_c, provenance_failed_count=pf_c,
-        runtime_failed_count=rf_c, unevaluated_count=u_c,
-        phase2_verified_record_count=p2_v, phase2_integrity_invalid_record_count=p2_ii,
-        phase2_runtime_failed_record_count=p2_rf, phase2_unevaluated_record_count=p2_u,
-        runtime_failed_from_phase2_verified_count=rf_v,
-        runtime_failed_from_phase2_runtime_failed_count=rf_rf,
-        ordered_disposition_record_digests=dd,
-        ordered_ranked_record_digests=rd,
-        ordered_top_n_record_digests=tn,
-        ordered_identity_snapshot_digests=isd,
-        ordered_phase2_source_snapshot_digests=ssd,
-        ordered_phase3_source_binding_digests=sbd,
-        ordered_phase3_preparation_result_digests=prd,
-        termination_status=ts,
-        ordered_warning_digests=expected_w, ordered_blocker_digests=expected_b)
+    derived_core_values = derive_optimization_result_core_values(
+        evaluation_input=evaluation_input,
+        dispositions=dispositions,
+        ranked_records=ranked_records,
+        source_bindings=artifacts.source_bindings,
+        preparation_results=artifacts.preparation_results)
     derived_core_hash = derived_core_values.compute_hash()
     if result.result_core_hash != derived_core_hash:
         raise ValueError("result_core_hash mismatch vs independently derived core values")
 
     # === 20) Provenance semantic verifier ===
-    rd_tuple = rd
-    tn_tuple = tn
     verify_phase3_provenance_graph_or_raise(
         graph,
         ei=evaluation_input,
@@ -3928,12 +3941,12 @@ def verify_phase3_result_semantics_or_raise(
         total_candidate_count=N,
         feasible_candidate_count=F,
         requested_top_n=result.requested_top_n,
-        ordered_identity_snapshot_digests=isd,
-        ordered_phase2_source_snapshot_digests=ssd,
-        ordered_phase3_source_binding_digests=sbd,
-        ordered_phase3_preparation_result_digests=prd,
-        ordered_ranked_record_digests=rd_tuple,
-        ordered_top_n_record_digests=tn_tuple,
+        ordered_identity_snapshot_digests=derived_core_values.ordered_identity_snapshot_digests,
+        ordered_phase2_source_snapshot_digests=derived_core_values.ordered_phase2_source_snapshot_digests,
+        ordered_phase3_source_binding_digests=derived_core_values.ordered_phase3_source_binding_digests,
+        ordered_phase3_preparation_result_digests=derived_core_values.ordered_phase3_preparation_result_digests,
+        ordered_ranked_record_digests=derived_core_values.ordered_ranked_record_digests,
+        ordered_top_n_record_digests=derived_core_values.ordered_top_n_record_digests,
         result_core_hash=result.result_core_hash,
         termination_status=result.termination_status,
         optimization_objective=result.optimization_objective,
@@ -4266,14 +4279,22 @@ def verify_phase3_provenance_graph_or_raise(graph, *, ei, dispositions, ranked,
     derived_objective = ei.sizing_request_identity.optimization_objective
     if optimization_objective != derived_objective:
         raise ValueError(f"provenance: optimization_objective mismatch vs independent derivation")
-    derived_termination = TerminationStatus.PARTIAL if _find_stop_index(ei) else TerminationStatus.COMPLETE
+    derived_termination = derive_termination_status(ei)
     if termination_status != derived_termination:
         raise ValueError(f"provenance: termination_status mismatch vs independent derivation")
     derived_ei_digest = ei.evaluation_input_digest
     if evaluation_input_digest != derived_ei_digest:
         raise ValueError(f"provenance: evaluation_input_digest mismatch vs independent derivation")
-    # 0c) Independent result_core_hash from core_values
-    derived_core_hash = core_values.compute_hash()
+    # 0c) Independent core_values derivation — validate ALL fields field-by-field
+    expected_core_values = derive_optimization_result_core_values(
+        evaluation_input=ei,
+        dispositions=dispositions,
+        ranked_records=ranked,
+        source_bindings=source_bindings,
+        preparation_results=preparation_results)
+    if core_values != expected_core_values:
+        raise ValueError("provenance: core_values mismatch vs independent derivation")
+    derived_core_hash = expected_core_values.compute_hash()
     if result_core_hash != derived_core_hash:
         raise ValueError(f"provenance: result_core_hash mismatch vs core_values.compute_hash()")
     # Bind source_records to EvaluationInput records
