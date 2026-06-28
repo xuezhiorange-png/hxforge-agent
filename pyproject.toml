@@ -44,6 +44,21 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/hexagent/optimization/phase3_*.py" = [
+    "E501",  # line-too-long — contract code uses compact style
+    "E701",  # multiple-statements-on-one-line-semicolon — contract pattern
+    "E702",  # multiple-statements-on-one-line — contract pattern
+    "SIM102", # collapsible-if — contract uses nested if for clarity
+    "B905",  # zip-without-explicit-strict — contract pattern
+    "B007",  # unused-loop-control-variable — contract pattern
+    "E402",  # module-level-import-not-at-top — circular import resolution in phase3_builder
+]
+"tests/unit/test_task009_phase3.py" = [
+    "E501",  # line-too-long — test patterns with long defaults
+    "F841",  # unused-variable — helper fixtures may have unused assignments during refactor
+]
+
 [tool.mypy]
 strict = true
 packages = ["hexagent"]
