@@ -60,6 +60,12 @@ from hexagent.optimization.phase3_evaluation import (
     build_candidate_disposition_record,
     verify_phase3_index_artifact_matrix,
 )
+from hexagent.optimization.phase3_verifier import (
+    Phase3AuthoritativeArtifacts,
+    build_phase3_provenance_graph,
+    build_result_message_digest_tuples,
+    verify_phase3_result_semantics_or_raise,
+)
 
 # ── Shorthand aliases for enum members used verbatim in contract code ──────
 
@@ -86,9 +92,10 @@ UNEVALUATED = Phase3Disposition.UNEVALUATED
 
 # FeasibilityDiagnosticKey (used in contract code as bare names)
 # NOTE: INTEGRITY_FAILED and PROVENANCE_FAILED share string values between
-# Phase3Disposition and FeasibilityDiagnosticKey; the bare names above work
-# for both contexts since both are StrEnum subclasses.
+# Phase3Disposition and FeasibilityDiagnosticKey.
 NONE = FeasibilityDiagnosticKey.NONE
+_INTEGRITY_FAILED_DIAG = FeasibilityDiagnosticKey.INTEGRITY_FAILED
+_PROVENANCE_FAILED_DIAG = FeasibilityDiagnosticKey.PROVENANCE_FAILED
 PROVIDER_IDENTITY_MISMATCH_DIAG = FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
 RATING_BLOCKED = FeasibilityDiagnosticKey.RATING_BLOCKED
 RATING_FAILED = FeasibilityDiagnosticKey.RATING_FAILED
@@ -125,9 +132,45 @@ def validate_blocked_evidence(
 ) -> RunFailure | None:
     """Validate blocked evidence consistency. Returns RunFailure if invalid, None if valid.
 
-    TODO: Implement full validation per contract. Currently returns None (pass-through).
-    Defined in phase3_builder as a forward stub; will be moved to phase3_evaluation or phase3_validation.
+    Contract: blocked evidence must be present, have rating_status == "blocked",
+    no failure, and no contradictory thermal results. Fails closed.
     """
+    if evidence is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence missing: expected VerifiedRatingEvidenceSnapshot",
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
+    if evidence.rating_status.value != "blocked":
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Blocked evidence rating_status mismatch: "
+                f"expected 'blocked', got '{evidence.rating_status.value}'"
+            ),
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
+    if evidence.failure is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence must not have failure",
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
+    # Blocked evidence must not carry usable thermal results
+    if evidence.heat_duty_w is not None or evidence.area_outer_m2 is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: heat_duty_w must be None, area_outer_m2 must be present",
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
+    # Evidence binding digest consistency
+    expected_evidence_digest = evidence.compute_explicit_evidence_digest()
+    if eb.verified_rating_evidence_digest != expected_evidence_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence digest mismatch vs binding",
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
     return None
 
 
@@ -138,19 +181,40 @@ def validate_failed_evidence(
 ) -> RunFailure | None:
     """Validate failed evidence consistency. Returns RunFailure if invalid, None if valid.
 
-    TODO: Implement full validation per contract. Currently returns None (pass-through).
-    Defined in phase3_builder as a forward stub; will be moved to phase3_evaluation or phase3_validation.
+    Contract: failed evidence must be present, have rating_status == "failed",
+    have a failure payload, and no contradictory thermal results. Fails closed.
     """
+    if evidence is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence missing: expected VerifiedRatingEvidenceSnapshot",
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
+    if evidence.rating_status.value != "failed":
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Failed evidence rating_status mismatch: "
+                f"expected 'failed', got '{evidence.rating_status.value}'"
+            ),
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
+    if evidence.failure is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence must have failure payload",
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
+    # Evidence binding digest consistency
+    expected_evidence_digest = evidence.compute_explicit_evidence_digest()
+    if eb.verified_rating_evidence_digest != expected_evidence_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence digest mismatch vs binding",
+            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+        )
     return None
 
-
-# ── Imports from phase3_verifier (sections 20-22) ──────────────────────────
-from hexagent.optimization.phase3_verifier import (
-    Phase3AuthoritativeArtifacts,
-    build_phase3_provenance_graph,
-    build_result_message_digest_tuples,
-    verify_phase3_result_semantics_or_raise,
-)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 16 — Builder helpers (P0-7)
@@ -172,10 +236,10 @@ def _map_non_verified(
     """map_non_verified: all params required — no defaults."""
     if rec.candidate_evaluation_state == INTEGRITY_INVALID:
         if rec.hash_verification_outcome == FAILED:
-            diag = INTEGRITY_FAILED
+            diag = _INTEGRITY_FAILED_DIAG
             disp = INTEGRITY_FAILED
         else:
-            diag = PROVENANCE_FAILED
+            diag = _PROVENANCE_FAILED_DIAG
             disp = PROVENANCE_FAILED
         return build_candidate_disposition_record(
             source_qualified_candidate_id=rec.source_qualified_candidate_id,
@@ -362,8 +426,12 @@ def _build_feasible(
     warning_descriptors: tuple[Phase3MessageDescriptor, ...],
     blocker_descriptors: tuple[Phase3MessageDescriptor, ...],
 ) -> CandidateDispositionRecord:
-    area_m2 = canonical_decimal_string(to_canonical_decimal(evidence.area_outer_m2))
-    heat_w = canonical_decimal_string(to_canonical_decimal(evidence.heat_duty_w))
+    _area = evidence.area_outer_m2
+    _heat = evidence.heat_duty_w
+    assert _area is not None, "area_outer_m2 must be non-None for feasible"
+    assert _heat is not None, "heat_duty_w must be non-None for feasible"
+    area_m2 = canonical_decimal_string(to_canonical_decimal(_area))
+    heat_w = canonical_decimal_string(to_canonical_decimal(_heat))
     return build_candidate_disposition_record(
         source_qualified_candidate_id=rec.source_qualified_candidate_id,
         evaluation_order_index=rec.evaluation_order_index,
@@ -508,7 +576,10 @@ def _build_strict_stop_warning(
     return EngineeringMessage(
         code=ErrorCode.CALCULATION_BLOCKED,
         severity=EngineeringMessageSeverity.WARNING,
-        message=f"Candidate {rec.source_qualified_candidate_id} at index {stop_index} has state {rec.candidate_evaluation_state.value}. Strict stop.",
+        message=(
+            f"Candidate {rec.source_qualified_candidate_id} at index {stop_index} "
+            f"has state {rec.candidate_evaluation_state.value}. Strict stop."
+        ),
         source_module="hexagent.optimization.feasibility",
         context=(
             ("owner_sort_key", ("phase3", "strict_stop", "phase3", "strict_stop", (), "")),
@@ -529,6 +600,7 @@ def _expected_ranked_values(
 ) -> tuple[str, str, str, str]:
     disp_area = disp.primary_engineering_value
     cand_len = candidate.effective_length_m_canonical
+    assert disp_area is not None, "primary_engineering_value must be non-None for ranked"
     if optimization_objective is MINIMUM_OUTER_HEAT_TRANSFER_AREA:
         return (
             disp_area,
@@ -1433,7 +1505,9 @@ def result_core_payload_from_values(
         "phase2_runtime_failed_record_count": phase2_runtime_failed_record_count,
         "phase2_unevaluated_record_count": phase2_unevaluated_record_count,
         "runtime_failed_from_phase2_verified_count": runtime_failed_from_phase2_verified_count,
-        "runtime_failed_from_phase2_runtime_failed_count": runtime_failed_from_phase2_runtime_failed_count,
+        "runtime_failed_from_phase2_runtime_failed_count": (
+            runtime_failed_from_phase2_runtime_failed_count
+        ),
         "ordered_disposition_record_digests": list(ordered_disposition_record_digests),
         "ordered_ranked_record_digests": list(ordered_ranked_record_digests),
         "ordered_top_n_record_digests": list(ordered_top_n_record_digests),
@@ -1699,7 +1773,9 @@ def result_core_payload(r: OptimizationResult) -> dict[str, object]:
         "phase2_runtime_failed_record_count": r.phase2_runtime_failed_record_count,
         "phase2_unevaluated_record_count": r.phase2_unevaluated_record_count,
         "runtime_failed_from_phase2_verified_count": r.runtime_failed_from_phase2_verified_count,
-        "runtime_failed_from_phase2_runtime_failed_count": r.runtime_failed_from_phase2_runtime_failed_count,
+        "runtime_failed_from_phase2_runtime_failed_count": (
+            r.runtime_failed_from_phase2_runtime_failed_count
+        ),
         "ordered_disposition_record_digests": list(r.ordered_disposition_record_digests),
         "ordered_ranked_record_digests": list(r.ordered_ranked_record_digests),
         "ordered_top_n_record_digests": list(r.ordered_top_n_record_digests),

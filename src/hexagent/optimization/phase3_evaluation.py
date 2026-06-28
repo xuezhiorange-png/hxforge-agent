@@ -68,12 +68,14 @@ PHASE3_RUNTIME_FAILED = FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
 
 # FeasibilityDiagnosticKey
 NONE = FeasibilityDiagnosticKey.NONE
+PROVIDER_IDENTITY_MISMATCH_DIAG = FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
 RATING_BLOCKED = FeasibilityDiagnosticKey.RATING_BLOCKED
 RATING_FAILED = FeasibilityDiagnosticKey.RATING_FAILED
 DUTY_SHORTFALL = FeasibilityDiagnosticKey.DUTY_SHORTFALL
 TERMINAL_DELTA_T_INADEQUATE = FeasibilityDiagnosticKey.TERMINAL_DELTA_T_INADEQUATE
 
 # FailureOrigin
+NONE_ORIGIN = FailureOrigin.NONE
 PHASE2_EVALUATION = FailureOrigin.PHASE2_EVALUATION
 PHASE3_CLASSIFICATION = FailureOrigin.PHASE3_CLASSIFICATION
 
@@ -164,7 +166,8 @@ class Phase3EvaluationInput(BaseModel):
                     raise ValueError(f"[{i}] VERIFIED must have non-None source snapshot digest")
                 if self.ordered_phase2_source_snapshot_digests[i] != cs.snapshot_digest:
                     raise ValueError(
-                        f"[{i}] source snapshot digest mismatch vs complete_snapshot.snapshot_digest"
+                        f"[{i}] source snapshot digest mismatch "
+                        f"vs complete_snapshot.snapshot_digest"
                     )
             else:
                 if cs is not None:
@@ -227,7 +230,10 @@ class Phase3EvaluationInput(BaseModel):
         m = self.materialization_result
         m.verify_or_raise()
         # 3) Sizing request identity
-        if self.sizing_request_identity_digest != sizing_request.sizing_request_identity_digest:
+        if (
+            self.sizing_request_identity_digest
+            != self.sizing_request_identity.sizing_request_identity_digest
+        ):
             raise ValueError("sizing_request_identity_digest mismatch")
         if (
             self.sizing_request_identity_digest
@@ -253,17 +259,20 @@ class Phase3EvaluationInput(BaseModel):
             if isnap.identity_snapshot_digest != self.ordered_identity_snapshot_digests[i]:
                 raise ValueError(f"[{i}] identity_snapshot_digest != ordered digest")
         # 7) Complete snapshot — verify via authoritative verifier
-        for i, (rec, cs) in enumerate(zip(source_records, self.complete_snapshots, strict=False)):
+        for i, (_rec, cs) in enumerate(zip(source_records, self.complete_snapshots, strict=False)):
             if cs is None:
                 if rec.candidate_evaluation_state == VERIFIED:
                     raise ValueError(f"[{i}] VERIFIED must have complete_snapshot")
                 continue
             if rec.candidate_evaluation_state != VERIFIED:
                 raise ValueError(f"[{i}] non-VERIFIED must not have complete_snapshot")
+            desc_i = phase2_source_record_descriptors[i]
+            if desc_i is None:
+                raise ValueError(f"[{i}] VERIFIED must have source_record_descriptor")
             cs.verify_or_raise(
                 source_record=rec,
                 identity_snapshot=self.identity_snapshots[i],
-                source_record_descriptor=phase2_source_record_descriptors[i],
+                source_record_descriptor=desc_i,
                 verified_evidence=rec.verified_rating_evidence,
                 warning_descriptor_bindings=warning_binding_tuples[i],
                 blocker_descriptor_bindings=blocker_binding_tuples[i],
@@ -274,10 +283,9 @@ class Phase3EvaluationInput(BaseModel):
             if cs.snapshot_digest != self.ordered_phase2_source_snapshot_digests[i]:
                 raise ValueError(f"[{i}] source snapshot digest mismatch vs ordered digest")
         # Also validate non-VERIFIED indices have None digest
-        for i, (rec, cs) in enumerate(zip(source_records, self.complete_snapshots, strict=False)):
-            if cs is None:
-                if self.ordered_phase2_source_snapshot_digests[i] is not None:
-                    raise ValueError(f"[{i}] non-VERIFIED must have None source snapshot digest")
+        for i, (_rec, cs) in enumerate(zip(source_records, self.complete_snapshots, strict=False)):
+            if cs is None and self.ordered_phase2_source_snapshot_digests[i] is not None:
+                raise ValueError(f"[{i}] non-VERIFIED must have None source snapshot digest")
         # 8) Ordered digest tuples vs actual artifacts
         for i, d in enumerate(phase2_source_record_descriptors):
             expected_desc_digest = self.ordered_phase2_source_record_descriptor_digests[i]
@@ -640,7 +648,10 @@ class Phase3CandidateClassificationInput(BaseModel):
                 "source_record_descriptor.descriptor_digest"
             )
         # 4) Sizing request identity
-        if self.sizing_request_identity_digest != sizing_request.sizing_request_identity_digest:
+        if (
+            self.sizing_request_identity_digest
+            != self.sizing_request_identity.sizing_request_identity_digest
+        ):
             raise ValueError("sizing_request_identity_digest mismatch")
         if (
             self.sizing_request_identity_digest
@@ -982,12 +993,14 @@ class Phase3CandidatePreparationResult(BaseModel):
         if self.evaluation_order_index < 0:
             raise ValueError("index must be ≥ 0")
         # 0) Preparation gate: only VERIFIED source records enter preparation
-        if self.identity_snapshot is not None:
-            if self.identity_snapshot.candidate_evaluation_state is not VERIFIED:
-                raise ValueError(
-                    f"Preparation only valid for VERIFIED source, "
-                    f"got {self.identity_snapshot.candidate_evaluation_state}"
-                )
+        if (
+            self.identity_snapshot is not None
+            and self.identity_snapshot.candidate_evaluation_state is not VERIFIED
+        ):
+            raise ValueError(
+                f"Preparation only valid for VERIFIED source, "
+                f"got {self.identity_snapshot.candidate_evaluation_state}"
+            )
         # 1) Matrix enforcement
         artifacts: dict[str, object | None] = {
             "identity_snapshot": self.identity_snapshot,
@@ -998,15 +1011,18 @@ class Phase3CandidatePreparationResult(BaseModel):
             "source_failure_binding": self.source_failure_binding,
             "phase3_failure_binding": self.phase3_failure_binding,
         }
+        source_eval_state = (
+            self.identity_snapshot.candidate_evaluation_state
+            if self.identity_snapshot is not None
+            else None
+        )
+        if source_eval_state is None:
+            raise ValueError("identity_snapshot required for preparation result")
         verify_preparation_stage_matrix(
             status=self.status,
             failure_stage=self.failure_stage,
             artifacts=artifacts,
-            source_candidate_evaluation_state=(
-                self.identity_snapshot.candidate_evaluation_state
-                if self.identity_snapshot is not None
-                else None
-            ),
+            source_candidate_evaluation_state=source_eval_state,
         )
         # 2) Validate digest fields against nested artifacts (compare, don't assign — frozen model)
         expected_id_digest = (
@@ -1097,7 +1113,8 @@ class Phase3CandidatePreparationResult(BaseModel):
         source_failure_binding: Phase3RunFailureDescriptorBinding | None,
         phase3_failure_binding: Phase3RunFailureDescriptorBinding | None,
     ) -> None:
-        """Authoritative verifier: validates artifact matrix, nested digest consistency, and self-hash."""
+        """Authoritative verifier: validates artifact matrix,
+        nested digest consistency, and self-hash."""
         # 0) Source-state gate: preparation only for VERIFIED source records
         if source_record.candidate_evaluation_state is not VERIFIED:
             raise ValueError(
@@ -1126,18 +1143,27 @@ class Phase3CandidatePreparationResult(BaseModel):
             source_candidate_evaluation_state=source_record.candidate_evaluation_state,
         )
         # 3) Nested digest consistency — compare stored digests against independent authority
-        if identity_snapshot is not None:
-            if self.identity_snapshot_digest != identity_snapshot.identity_snapshot_digest:
-                raise ValueError("identity_snapshot_digest mismatch")
-        if complete_snapshot is not None:
-            if self.complete_snapshot_digest != complete_snapshot.snapshot_digest:
-                raise ValueError("complete_snapshot_digest mismatch")
-        if source_binding is not None:
-            if self.source_binding_digest != source_binding.binding_digest:
-                raise ValueError("source_binding_digest mismatch")
-        if classification_input is not None and self.classification_input_digest is not None:
-            if self.classification_input_digest != classification_input.classification_input_digest:
-                raise ValueError("classification_input_digest mismatch")
+        if (
+            identity_snapshot is not None
+            and self.identity_snapshot_digest != identity_snapshot.identity_snapshot_digest
+        ):
+            raise ValueError("identity_snapshot_digest mismatch")
+        if (
+            complete_snapshot is not None
+            and self.complete_snapshot_digest != complete_snapshot.snapshot_digest
+        ):
+            raise ValueError("complete_snapshot_digest mismatch")
+        if (
+            source_binding is not None
+            and self.source_binding_digest != source_binding.binding_digest
+        ):
+            raise ValueError("source_binding_digest mismatch")
+        if (
+            classification_input is not None
+            and self.classification_input_digest is not None
+            and self.classification_input_digest != classification_input.classification_input_digest
+        ):
+            raise ValueError("classification_input_digest mismatch")
         if evidence_failure_binding is not None and (
             self.evidence_failure_binding_digest
             != evidence_failure_binding.descriptor_binding_digest
@@ -1147,12 +1173,13 @@ class Phase3CandidatePreparationResult(BaseModel):
             self.source_failure_binding_digest != source_failure_binding.descriptor_binding_digest
         ):
             raise ValueError("source_failure_binding_digest mismatch")
-        if phase3_failure_binding is not None and self.phase3_failure_binding_digest is not None:
-            if (
-                self.phase3_failure_binding_digest
-                != phase3_failure_binding.descriptor_binding_digest
-            ):
-                raise ValueError("phase3_failure_binding_digest mismatch")
+        if (
+            phase3_failure_binding is not None
+            and self.phase3_failure_binding_digest is not None
+            and self.phase3_failure_binding_digest
+            != phase3_failure_binding.descriptor_binding_digest
+        ):
+            raise ValueError("phase3_failure_binding_digest mismatch")
         # 4) Self-hash
         expected = sha256_digest(_prep_result_payload(self))
         if self.preparation_result_digest != expected:
@@ -1296,7 +1323,7 @@ def verify_candidate_disposition_failure_matrix(
             raise ValueError(f"{disposition}: phase3_failure_binding_digest must be None")
         if phase3_failure_payload_digest is not None:
             raise ValueError(f"{disposition}: phase3_failure_payload_digest must be None")
-        if failure_origin != NONE:
+        if failure_origin is not NONE_ORIGIN:
             raise ValueError(f"{disposition}: failure_origin must be NONE, got {failure_origin}")
         if failure_stage is not None:
             raise ValueError(f"{disposition}: failure_stage must be None")
@@ -1708,7 +1735,7 @@ class CandidateDispositionRecord(BaseModel):
                 raise ValueError("FEASIBLE: source failure must be None")
             if self.phase3_failure_payload_digest is not None:
                 raise ValueError("FEASIBLE: phase3 failure must be None")
-            if self.failure_origin != NONE:
+            if self.failure_origin is not NONE_ORIGIN:
                 raise ValueError("FEASIBLE: origin must be NONE")
         # PROVIDER_IDENTITY_MISMATCH
         elif self.disposition is PROVIDER_IDENTITY_MISMATCH:
@@ -1720,7 +1747,7 @@ class CandidateDispositionRecord(BaseModel):
                 raise ValueError("PROVIDER_MISMATCH: provenance must be PASSED")
             if self.provider_identity_matches:
                 raise ValueError("PROVIDER_MISMATCH: provider must NOT match")
-            if self.diagnostic != PROVIDER_IDENTITY_MISMATCH:
+            if self.diagnostic != PROVIDER_IDENTITY_MISMATCH_DIAG:
                 raise ValueError("PROVIDER_MISMATCH: diagnostic mismatch")
             if self.candidate_evaluation_identity_digest is None:
                 raise ValueError("PROVIDER_MISMATCH: identity required")
@@ -1736,7 +1763,7 @@ class CandidateDispositionRecord(BaseModel):
                 raise ValueError("PROVIDER_MISMATCH: source failure must be None")
             if self.phase3_failure_payload_digest is not None:
                 raise ValueError("PROVIDER_MISMATCH: phase3 failure must be None")
-            if self.failure_origin != NONE:
+            if self.failure_origin is not NONE_ORIGIN:
                 raise ValueError("PROVIDER_MISMATCH: origin must be NONE")
         # INFEASIBLE
         elif self.disposition is INFEASIBLE:
@@ -1758,7 +1785,7 @@ class CandidateDispositionRecord(BaseModel):
                 raise ValueError("INFEASIBLE: source failure must be None")
             if self.phase3_failure_payload_digest is not None:
                 raise ValueError("INFEASIBLE: phase3 failure must be None")
-            if self.failure_origin != NONE:
+            if self.failure_origin is not NONE_ORIGIN:
                 raise ValueError("INFEASIBLE: origin must be NONE")
             if self.rating_status == "succeeded":
                 if self.diagnostic not in (DUTY_SHORTFALL, TERMINAL_DELTA_T_INADEQUATE):
@@ -1803,7 +1830,7 @@ class CandidateDispositionRecord(BaseModel):
                 raise ValueError("INTEGRITY_FAILED: source failure must be None")
             if self.phase3_failure_payload_digest is not None:
                 raise ValueError("INTEGRITY_FAILED: phase3 failure must be None")
-            if self.failure_origin != NONE:
+            if self.failure_origin is not NONE_ORIGIN:
                 raise ValueError("INTEGRITY_FAILED: origin must be NONE")
         # PROVENANCE_FAILED
         elif self.disposition is _PROVENANCE_FAILED:
@@ -1835,7 +1862,7 @@ class CandidateDispositionRecord(BaseModel):
                 raise ValueError("PROVENANCE_FAILED: source failure must be None")
             if self.phase3_failure_payload_digest is not None:
                 raise ValueError("PROVENANCE_FAILED: phase3 failure must be None")
-            if self.failure_origin != NONE:
+            if self.failure_origin is not NONE_ORIGIN:
                 raise ValueError("PROVENANCE_FAILED: origin must be NONE")
         # UNEVALUATED
         elif self.disposition is _UNEVALUATED:
@@ -1865,7 +1892,7 @@ class CandidateDispositionRecord(BaseModel):
                 raise ValueError("UNEVALUATED: source failure must be None")
             if self.phase3_failure_payload_digest is not None:
                 raise ValueError("UNEVALUATED: phase3 failure must be None")
-            if self.failure_origin != NONE:
+            if self.failure_origin is not NONE_ORIGIN:
                 raise ValueError("UNEVALUATED: origin must be NONE")
         # RUNTIME_FAILED
         elif self.disposition is _RUNTIME_FAILED:
@@ -1946,7 +1973,8 @@ class CandidateDispositionRecord(BaseModel):
         source_failure_binding: Phase3RunFailureDescriptorBinding | None,
         phase3_failure_binding: Phase3RunFailureDescriptorBinding | None,
     ) -> None:
-        """Authoritative verifier: validates source identity, digest fields, independent failure authority, branch matrix, and self-hash."""
+        """Authoritative verifier: validates source identity, digest fields,
+        independent failure authority, branch matrix, and self-hash."""
         # 0) Validate independent source failure binding
         if self.failure_origin == PHASE2_EVALUATION:
             if source_failure_binding is None:

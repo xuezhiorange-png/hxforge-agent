@@ -121,7 +121,9 @@ def build_engineering_message_descriptor(
     if desc.canonicalization_error is not None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
-            message=f"Cannot build message descriptor: {desc.canonicalization_error.failure_kind.value}",
+            message=(
+                f"Cannot build message descriptor: {desc.canonicalization_error.failure_kind.value}"
+            ),
             context=(
                 ("original_code", desc.original_code),
                 ("failure_kind", desc.canonicalization_error.failure_kind.value),
@@ -387,25 +389,25 @@ def verify_phase3_result_semantics_or_raise(
         bbt = artifacts.blocker_binding_tuples[i]
         if len(wdt) != len(wbt):
             raise ValueError(f"[{i}] warning descriptor/binding count mismatch")
-        for j, (d, b) in enumerate(zip(wdt, wbt, strict=False)):
-            if d.owner_sort_key != b.owner_sort_key:
+        for j, (wd, wb) in enumerate(zip(wdt, wbt, strict=False)):
+            if wd.owner_sort_key != wb.owner_sort_key:
                 raise ValueError(f"[{i}] warn[{j}] sort_key mismatch")
-            if d.original_code != b.original_code:
+            if wd.original_code != wb.original_code:
                 raise ValueError(f"[{i}] warn[{j}] code mismatch")
-            if d.message_payload_digest != b.message_payload_digest:
+            if wd.message_payload_digest != wb.message_payload_digest:
                 raise ValueError(f"[{i}] warn[{j}] digest mismatch")
         if len(bdt) != len(bbt):
             raise ValueError(f"[{i}] blocker descriptor/binding count mismatch")
-        for j, (d, b) in enumerate(zip(bdt, bbt, strict=False)):
-            if d.owner_sort_key != b.owner_sort_key:
+        for j, (bd, bb) in enumerate(zip(bdt, bbt, strict=False)):
+            if bd.owner_sort_key != bb.owner_sort_key:
                 raise ValueError(f"[{i}] block[{j}] sort_key mismatch")
-            if d.original_code != b.original_code:
+            if bd.original_code != bb.original_code:
                 raise ValueError(f"[{i}] block[{j}] code mismatch")
-            if d.message_payload_digest != b.message_payload_digest:
+            if bd.message_payload_digest != bb.message_payload_digest:
                 raise ValueError(f"[{i}] block[{j}] digest mismatch")
 
         # Complete snapshot authoritative replay per-index
-        if cs_i is not None:
+        if cs_i is not None and desc_i is not None:
             cs_i.verify_or_raise(
                 source_record=rec_i,
                 identity_snapshot=ids_i,
@@ -427,7 +429,7 @@ def verify_phase3_result_semantics_or_raise(
             )
 
         # 8) Source binding authoritative replay per-index
-        if sb_i is not None:
+        if sb_i is not None and cs_i is not None and desc_i is not None:
             sb_i.verify_or_raise(
                 source_record=rec_i,
                 identity_snapshot=ids_i,
@@ -457,6 +459,8 @@ def verify_phase3_result_semantics_or_raise(
         if pr is not None and pr.status is READY:
             if cin_i is None:
                 raise ValueError(f"[{i}] READY needs cin")
+            if cs_i is None or desc_i is None or sb_i is None:
+                raise ValueError(f"[{i}] READY needs complete snapshot, descriptor, binding")
             cin_i.verify_or_raise(
                 source_record=rec_i,
                 identity_snapshot=ids_i,
@@ -508,23 +512,23 @@ def verify_phase3_result_semantics_or_raise(
         # Descriptor tuple exact length and value check
         if len(dr.warning_descriptors) != len(wdt):
             raise ValueError(f"[{i}] warning count mismatch")
-        for j, d in enumerate(dr.warning_descriptors):
+        for j, wd in enumerate(dr.warning_descriptors):
             b = wdt[j]
-            if d.owner_sort_key != b.owner_sort_key:
+            if wd.owner_sort_key != b.owner_sort_key:
                 raise ValueError(f"[{i}] warn[{j}] sort_key")
-            if d.original_code != b.original_code:
+            if wd.original_code != b.original_code:
                 raise ValueError(f"[{i}] warn[{j}] code")
-            if d.message_payload_digest != b.message_payload_digest:
+            if wd.message_payload_digest != b.message_payload_digest:
                 raise ValueError(f"[{i}] warn[{j}] digest")
         if len(dr.blocker_descriptors) != len(bdt):
             raise ValueError(f"[{i}] blocker count mismatch")
-        for j, d in enumerate(dr.blocker_descriptors):
+        for j, bd in enumerate(dr.blocker_descriptors):
             b = bdt[j]
-            if d.owner_sort_key != b.owner_sort_key:
+            if bd.owner_sort_key != b.owner_sort_key:
                 raise ValueError(f"[{i}] block[{j}] sort_key")
-            if d.original_code != b.original_code:
+            if bd.original_code != b.original_code:
                 raise ValueError(f"[{i}] block[{j}] code")
-            if d.message_payload_digest != b.message_payload_digest:
+            if bd.message_payload_digest != b.message_payload_digest:
                 raise ValueError(f"[{i}] block[{j}] digest")
 
     # === 13) Disposition count recomputation ===
@@ -556,7 +560,9 @@ def verify_phase3_result_semantics_or_raise(
         ci = d.evaluation_order_index
         cand = evaluation_input.materialization_result.candidates[ci]
         el = canonical_decimal(Decimal(cand.effective_length_m_canonical))
-        a = canonical_decimal(Decimal(d.primary_engineering_value))
+        pev = d.primary_engineering_value
+        assert pev is not None, "primary_engineering_value must be non-None for FEASIBLE"
+        a = canonical_decimal(Decimal(pev))
         if result.optimization_objective is MINIMUM_OUTER_HEAT_TRANSFER_AREA:
             key = (a, el, d.source_qualified_candidate_id)
         else:
@@ -1066,64 +1072,64 @@ def build_phase3_provenance_edges(
     edges: list[ProvenanceEdge] = []
     edges.append(
         ProvenanceEdge(
-            source_id=uid("root"),
-            target_id=uid("sizing_request"),
+            source_id=uuid.UUID(uid("root")),
+            target_id=uuid.UUID(uid("sizing_request")),
             relation=Phase3ProvenanceRelation.REGULATES.value,
             metadata=(),
         )
     )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("sizing_request"),
-            target_id=uid("passed_gate"),
+            source_id=uuid.UUID(uid("sizing_request")),
+            target_id=uuid.UUID(uid("passed_gate")),
             relation=Phase3ProvenanceRelation.CONSUMED_BY.value,
             metadata=(),
         )
     )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("passed_gate"),
-            target_id=uid("candidate_set"),
+            source_id=uuid.UUID(uid("passed_gate")),
+            target_id=uuid.UUID(uid("candidate_set")),
             relation=Phase3ProvenanceRelation.PRODUCED.value,
             metadata=(),
         )
     )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("candidate_set"),
-            target_id=uid("identity_snapshot_set"),
+            source_id=uuid.UUID(uid("candidate_set")),
+            target_id=uuid.UUID(uid("identity_snapshot_set")),
             relation=Phase3ProvenanceRelation.PRODUCED.value,
             metadata=(),
         )
     )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("identity_snapshot_set"),
-            target_id=uid("complete_snapshot_set"),
+            source_id=uuid.UUID(uid("identity_snapshot_set")),
+            target_id=uuid.UUID(uid("complete_snapshot_set")),
             relation=Phase3ProvenanceRelation.PRODUCED.value,
             metadata=(),
         )
     )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("complete_snapshot_set"),
-            target_id=uid("evaluation_input"),
+            source_id=uuid.UUID(uid("complete_snapshot_set")),
+            target_id=uuid.UUID(uid("evaluation_input")),
             relation=Phase3ProvenanceRelation.CONSUMED_BY.value,
             metadata=(),
         )
     )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("evaluation_input"),
-            target_id=uid("source_binding_set"),
+            source_id=uuid.UUID(uid("evaluation_input")),
+            target_id=uuid.UUID(uid("source_binding_set")),
             relation=Phase3ProvenanceRelation.PRODUCED.value,
             metadata=(),
         )
     )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("source_binding_set"),
-            target_id=uid("preparation_result_set"),
+            source_id=uuid.UUID(uid("source_binding_set")),
+            target_id=uuid.UUID(uid("preparation_result_set")),
             relation=Phase3ProvenanceRelation.PRODUCED.value,
             metadata=(),
         )
@@ -1131,8 +1137,8 @@ def build_phase3_provenance_edges(
     for i, _ in enumerate(dispositions):
         edges.append(
             ProvenanceEdge(
-                source_id=uid("evaluation_input"),
-                target_id=uid(f"disposition[{i}]"),
+                source_id=uuid.UUID(uid("evaluation_input")),
+                target_id=uuid.UUID(uid(f"disposition[{i}]")),
                 relation=Phase3ProvenanceRelation.EVALUATED.value,
                 metadata=(),
             )
@@ -1149,16 +1155,16 @@ def build_phase3_provenance_edges(
             raise ValueError(f"ranked[{ri}]: no matching FEASIBLE disposition")
         edges.append(
             ProvenanceEdge(
-                source_id=uid(f"disposition[{di}]"),
-                target_id=uid(f"ranked[{ri}]"),
+                source_id=uuid.UUID(uid(f"disposition[{di}]")),
+                target_id=uuid.UUID(uid(f"ranked[{ri}]")),
                 relation=Phase3ProvenanceRelation.RANKED.value,
                 metadata=(),
             )
         )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("evaluation_input"),
-            target_id=uid("top_n_selection"),
+            source_id=uuid.UUID(uid("evaluation_input")),
+            target_id=uuid.UUID(uid("top_n_selection")),
             relation=Phase3ProvenanceRelation.SELECTED_BY.value,
             metadata=(),
         )
@@ -1166,24 +1172,24 @@ def build_phase3_provenance_edges(
     for ri in range(min(requested_top_n, len(ranked))):
         edges.append(
             ProvenanceEdge(
-                source_id=uid(f"ranked[{ri}]"),
-                target_id=uid("top_n_selection"),
+                source_id=uuid.UUID(uid(f"ranked[{ri}]")),
+                target_id=uuid.UUID(uid("top_n_selection")),
                 relation=Phase3ProvenanceRelation.SELECTED.value,
                 metadata=(),
             )
         )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("top_n_selection"),
-            target_id=uid("result_core"),
+            source_id=uuid.UUID(uid("top_n_selection")),
+            target_id=uuid.UUID(uid("result_core")),
             relation=Phase3ProvenanceRelation.PRODUCED.value,
             metadata=(),
         )
     )
     edges.append(
         ProvenanceEdge(
-            source_id=uid("result_core"),
-            target_id=uid("optimizer"),
+            source_id=uuid.UUID(uid("result_core")),
+            target_id=uuid.UUID(uid("optimizer")),
             relation=Phase3ProvenanceRelation.EXECUTED_BY.value,
             metadata=(),
         )
@@ -1300,15 +1306,18 @@ def verify_phase3_provenance_graph_or_raise(
         raise ValueError(f"provenance: source_bindings length {len(source_bindings)} != N {N}")
     if len(ordered_identity_snapshot_digests) != N:
         raise ValueError(
-            f"provenance: identity_snapshot_digests length {len(ordered_identity_snapshot_digests)} != N {N}"
+            f"provenance: identity_snapshot_digests length "
+            f"{len(ordered_identity_snapshot_digests)} != N {N}"
         )
     if len(ordered_phase2_source_snapshot_digests) != N:
         raise ValueError(
-            f"provenance: source_snapshot_digests length {len(ordered_phase2_source_snapshot_digests)} != N {N}"
+            f"provenance: source_snapshot_digests length "
+            f"{len(ordered_phase2_source_snapshot_digests)} != N {N}"
         )
     if len(ordered_phase3_preparation_result_digests) != N:
         raise ValueError(
-            f"provenance: prep tuple length {len(ordered_phase3_preparation_result_digests)} != N {N}"
+            f"provenance: prep tuple length "
+            f"{len(ordered_phase3_preparation_result_digests)} != N {N}"
         )
     if len(ordered_phase3_source_binding_digests) != N:
         raise ValueError(
@@ -1316,11 +1325,14 @@ def verify_phase3_provenance_graph_or_raise(
         )
     if len(ordered_ranked_record_digests) != F:
         raise ValueError(
-            f"provenance: ranked_record_digests length {len(ordered_ranked_record_digests)} != F {F}"
+            f"provenance: ranked_record_digests length "
+            f"{len(ordered_ranked_record_digests)} != F {F}"
         )
     if len(ordered_top_n_record_digests) != min(requested_top_n, F):
         raise ValueError(
-            f"provenance: top_n_record_digests length {len(ordered_top_n_record_digests)} != min(N,F) {min(requested_top_n, F)}"
+            f"provenance: top_n_record_digests length "
+            f"{len(ordered_top_n_record_digests)} != min(N,F) "
+            f"{min(requested_top_n, F)}"
         )
     # 0a) Independent tuple derivation — derive every tuple from authority artifacts, then compare
     derived_identity_digests = tuple(s.identity_snapshot_digest for s in ei.identity_snapshots)
@@ -1356,7 +1368,8 @@ def verify_phase3_provenance_graph_or_raise(
     derived_feasible = sum(1 for d in dispositions if d.disposition is FEASIBLE)
     if feasible_candidate_count != derived_feasible:
         raise ValueError(
-            f"provenance: feasible_candidate_count {feasible_candidate_count} != derived {derived_feasible}"
+            f"provenance: feasible_candidate_count "
+            f"{feasible_candidate_count} != derived {derived_feasible}"
         )
     derived_requested_top_n = ei.sizing_request_identity.top_n
     if requested_top_n != derived_requested_top_n:
@@ -1385,7 +1398,8 @@ def verify_phase3_provenance_graph_or_raise(
     derived_core_hash = expected_core_values.compute_hash()
     if result_core_hash != derived_core_hash:
         raise ValueError("provenance: result_core_hash mismatch vs core_values.compute_hash()")
-    # Source-state positional nullability (prep/sb digests already validated via independent derivation above)
+    # Source-state positional nullability
+    # (prep/sb digests already validated via independent derivation above)
     for i in range(N):
         rec = ei.evaluation_records[i]
         pr = preparation_results[i]
@@ -1435,12 +1449,12 @@ def verify_phase3_provenance_graph_or_raise(
         if eid in expected_ids:
             raise ValueError(f"duplicate expected ID for role {n.role}")
         expected_ids[eid] = n
-    actual_by_id = {}
-    for n in graph.nodes:
-        aid = n.node_id
+    actual_by_id: dict[uuid.UUID, ProvenanceNode] = {}
+    for anode in graph.nodes:
+        aid = anode.node_id
         if aid in actual_by_id:
             raise ValueError("duplicate actual node ID")
-        actual_by_id[aid] = n
+        actual_by_id[aid] = anode
     for eid, exp in expected_ids.items():
         actual = actual_by_id.get(eid)
         if actual is None:
@@ -1477,7 +1491,7 @@ def verify_phase3_provenance_graph_or_raise(
         expected_nodes[0].node_type,
         expected_nodes[0].payload_hash,
     )
-    children = {n.node_id: [] for n in graph.nodes}
+    children: dict[uuid.UUID, list[uuid.UUID]] = {n.node_id: [] for n in graph.nodes}
     for e in graph.edges:
         children[e.source_id].append(e.target_id)
     visited: set[uuid.UUID] = set()

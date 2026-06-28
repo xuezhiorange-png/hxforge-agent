@@ -191,6 +191,62 @@ def _make_exec_ctx() -> ExecutionContextSnapshot:
     return ExecutionContextSnapshot()
 
 
+def _make_blocked_evidence() -> VerifiedRatingEvidenceSnapshot:
+    """Build blocked evidence (no thermal results, blocked status)."""
+    rri = RatingRequestIdentity(
+        hot_fluid_name="Water",
+        hot_fluid_backend="CP",
+        hot_fluid_components=(),
+        cold_fluid_name="Water",
+        cold_fluid_backend="CP",
+        cold_fluid_components=(),
+        hot_mass_flow_kg_s=1.0,
+        cold_mass_flow_kg_s=0.8,
+        hot_inlet_pressure_pa=2e5,
+        cold_inlet_pressure_pa=1.5e5,
+        hot_inlet_temperature_k=350.0,
+        cold_inlet_temperature_k=290.0,
+        flow_arrangement="counterflow",
+        geometry={
+            "inner_tube_inner_diameter_m": 0.05,
+            "inner_tube_outer_diameter_m": 0.06,
+            "outer_pipe_inner_diameter_m": 0.10,
+            "effective_length_m": 1.0,
+            "wall_thermal_conductivity_w_m_k": 50.0,
+            "inner_surface_roughness_m": 1e-5,
+            "annulus_surface_roughness_m": 1e-5,
+            "inner_fouling_resistance_m2k_w": 0.0001,
+            "outer_fouling_resistance_m2k_w": 0.0002,
+        },
+        solver_absolute_residual_w=1e-3,
+        solver_relative_residual_fraction=1e-8,
+        solver_bracket_temperature_tolerance_k=1e-4,
+        solver_max_iterations=100,
+    )
+    exec_ctx = _make_exec_ctx()
+    rri_digest = sha256_digest(rating_request_identity_payload(rri))
+    ec_digest = sha256_digest(execution_context_snapshot_payload(exec_ctx))
+    return VerifiedRatingEvidenceSnapshot(
+        rating_status=RatingStatus.BLOCKED,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        area_inner_m2=4.0,
+        area_outer_m2=5.0,
+        tube_flow_area_m2=0.002,
+        annulus_flow_area_m2=0.005,
+        provider_identity=_make_provider(),
+        rating_result_hash="sha256:" + "e" * 64,
+        rating_provenance_digest="sha256:" + "f" * 64,
+        hash_verification_outcome=VerificationOutcome.PASSED,
+        provenance_verification_outcome=VerificationOutcome.PASSED,
+        rating_request_identity=rri,
+        rating_request_identity_digest=rri_digest,
+        rating_execution_context=exec_ctx,
+        rating_execution_context_digest=ec_digest,
+    )
+
+
 def _make_evidence(
     *,
     heat_duty_w: float = 5000.0,
@@ -361,7 +417,7 @@ def _make_integrity_invalid_record(
         hash_verification_outcome=hash_outcome,
         provenance_verification_outcome=prov_outcome,
         invalid_rating_evidence=inv,
-        provider_identity_matches=True,
+        provider_identity_matches=False,
     )
 
 
@@ -405,7 +461,9 @@ def _make_unevaluated_record(
 
 def _make_sizing_request_identity(
     *,
-    optimization_objective: OptimizationObjective = OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+    optimization_objective: OptimizationObjective = (
+        OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA
+    ),
     top_n: int = 3,
 ) -> SizingRequestIdentity:
     cat = _make_catalog(options=(_make_opt(),))
@@ -441,7 +499,9 @@ def _make_sizing_request_identity(
 
 def _make_sizing_request_identity_parallel(
     *,
-    optimization_objective: OptimizationObjective = OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+    optimization_objective: OptimizationObjective = (
+        OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA
+    ),
     top_n: int = 3,
 ) -> SizingRequestIdentity:
     cat = _make_catalog(options=(_make_opt(),))
@@ -687,7 +747,7 @@ class TestEndToEndFlow:
 
     def test_all_blocked_candidates(self) -> None:
         """All candidates rated as 'blocked' → all infeasible."""
-        evidence = _make_evidence()
+        evidence = _make_blocked_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
         sri = _make_sizing_request_identity()
         isnap = build_identity_snapshot(rec)
@@ -872,26 +932,42 @@ class TestGateAndMaterialization:
             source_evaluation_failure_binding_digest=None,
             evidence_failure_binding_digest=None,
         )
-        cat = _make_catalog(options=(_make_opt(),))
-        from hexagent.optimization.identities import MaterializationResult
+        opt = _make_opt()
+        cat = _make_catalog(options=(opt,))
 
-        mat = MaterializationResult(
-            candidates=(_make_candidate(evaluation_order_index=0),),
-            catalog_snapshots=(cat,),
-            sizing_gate=None,
-            sizing_request=SizingRequest(catalogs=(cat,)),
+        from hexagent.optimization.context import (
+            OptionRawCountRecord,
+            create_passed_sizing_gate,
+        )
+        from hexagent.optimization.identities import materialize_all_candidates
+
+        por = OptionRawCountRecord(
+            catalog_id=cat.catalog_id,
+            catalog_version=cat.catalog_version,
             catalog_content_hash=cat.catalog_content_hash,
-            candidate_set_digest=sha256_digest({}),
+            source_identity=cat.source_identity,
+            schema_version=cat.schema_version,
+            assembly_option_id=opt.assembly_option_id,
+            canonical_length_quantum_m=opt.length_source.length_quantum_m,
+            raw_count=3,
+        )
+        gate = create_passed_sizing_gate(
+            sizing_request_identity_digest=sri.sizing_request_identity_digest,
+            raw_combination_count=3,
+            effective_cap=100,
+            per_option_records=(por,),
+        )
+        mat = materialize_all_candidates(
+            catalogs=(cat,),
+            sizing_gate=gate,
         )
         with pytest.raises(ValueError, match="count"):
             Phase3EvaluationInput(
                 sizing_request_identity=sri,
                 sizing_request_identity_digest=sri.sizing_request_identity_digest,
                 materialization_result=mat,
-                candidate_set_digest=mat.candidate_set_digest
-                if hasattr(mat, "candidate_set_digest")
-                else sha256_digest({}),
-                gate_digest="sha256:" + "a" * 64,
+                candidate_set_digest=mat.candidate_set.candidate_set_digest,
+                gate_digest=gate.gate_digest,
                 evaluation_records=(rec,),
                 evaluation_record_count=2,
                 identity_snapshots=(isnap,),
@@ -938,9 +1014,7 @@ class TestBatchInputConsistency:
     def test_candidate_identity(self) -> None:
         evidence = _make_evidence()
         rec, candidate = _make_ver("cand_xyz", 5, evidence=evidence)
-        assert (
-            rec.source_qualified_candidate_id == "cand_xyz"
-        )  # May differ due to auto-generated ID
+        assert DIGEST_RE.match(rec.source_qualified_candidate_id)
         assert rec.evaluation_order_index == 5
 
 
@@ -970,10 +1044,10 @@ class TestIntegrityAndProvenance:
 
     def test_wrong_source_record(self) -> None:
         evidence = _make_evidence()
-        rec1 = _make_ver("c1", 0, evidence=evidence)
-        rec2 = _make_ver("c2", 1, evidence=evidence)
+        rec1, _ = _make_ver("c1", 0, evidence=evidence)
+        rec2, _ = _make_ver("c2", 1, evidence=evidence)
         isnap = build_identity_snapshot(rec1)
-        with pytest.raises(ValueError, match="candidate_id"):
+        with pytest.raises(ValueError, match="evaluation_index"):
             isnap.verify_or_raise(source_record=rec2)
 
     def test_wrong_verified_evidence(self) -> None:
@@ -1066,6 +1140,7 @@ class TestVerifier:
     def test_source_record_snapshot_verify_or_raise(self) -> None:
         evidence = _make_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence)
+        sid = rec.source_qualified_candidate_id
         isnap = build_identity_snapshot(rec)
         sdesc = build_phase2_source_record_descriptor(
             source_record=rec,
@@ -1079,7 +1154,7 @@ class TestVerifier:
             else None
         )
         cs = build_phase2_source_record_snapshot(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=sid,
             evaluation_order_index=0,
             candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
             feasible=True,
@@ -1113,6 +1188,7 @@ class TestVerifier:
     def test_source_binding_verify_or_raise(self) -> None:
         evidence = _make_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence)
+        sid = rec.source_qualified_candidate_id
         isnap = build_identity_snapshot(rec)
         sdesc = build_phase2_source_record_descriptor(
             source_record=rec,
@@ -1126,7 +1202,7 @@ class TestVerifier:
             else None
         )
         cs = build_phase2_source_record_snapshot(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=sid,
             evaluation_order_index=0,
             candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
             feasible=True,
@@ -1149,7 +1225,7 @@ class TestVerifier:
         wbd = _make_message_descriptor_binding(_make_message_descriptor())
         bbd = _make_message_descriptor_binding(_make_message_descriptor("B99"))
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=sid,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -1174,6 +1250,7 @@ class TestVerifier:
     def test_preparation_result_verify_or_raise(self) -> None:
         evidence = _make_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence)
+        sid = rec.source_qualified_candidate_id
         isnap = build_identity_snapshot(rec)
         sdesc = build_phase2_source_record_descriptor(
             source_record=rec,
@@ -1187,7 +1264,7 @@ class TestVerifier:
             else None
         )
         cs = build_phase2_source_record_snapshot(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=sid,
             evaluation_order_index=0,
             candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
             feasible=True,
@@ -1210,7 +1287,7 @@ class TestVerifier:
         wbd = _make_message_descriptor_binding(_make_message_descriptor())
         bbd = _make_message_descriptor_binding(_make_message_descriptor("B99"))
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=sid,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -1225,7 +1302,7 @@ class TestVerifier:
         cin = _build_cin(rec, candidate, sri, isnap, sdesc, sb)
         prep = build_phase3_candidate_preparation_result(
             status=Phase3PreparationStatus.READY,
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=sid,
             evaluation_order_index=0,
             identity_snapshot=isnap,
             complete_snapshot=cs,
@@ -1348,9 +1425,11 @@ class TestRankingAndTopN:
     def test_same_rank_key_tie_break(self) -> None:
         evidence1 = _make_evidence(area_outer_m2=5.0)
         evidence2 = _make_evidence(area_outer_m2=5.0)
-        rec1, cand1 = _make_ver("c1", 0, evidence=evidence1)
-        rec2, cand2 = _make_ver("c2", 1, evidence=evidence2)
-        # cand1 and cand2 already unpacked from _make_ver above
+        # Build candidates with different effective lengths for tie-break
+        cand1 = _make_candidate(evaluation_order_index=0, effective_length_m=2.0)
+        cand2 = _make_candidate(evaluation_order_index=1, effective_length_m=1.0)
+        rec1 = _make_verified_record(cand1, evidence=evidence1)
+        rec2 = _make_verified_record(cand2, evidence=evidence2)
         sri = _make_sizing_request_identity()
         isnap1 = build_identity_snapshot(rec1)
         sdesc1 = build_phase2_source_record_descriptor(
@@ -1427,7 +1506,8 @@ class TestRankingAndTopN:
         # OptimizationResultCoreValues doesn't validate top_n; OptimizationResult does
         # This test verifies the contract specification
         pytest.skip(
-            "OptimizationResultCoreValues allows top_n=0; only OptimizationResult validates top_n >= 1"
+            "OptimizationResultCoreValues allows top_n=0; "
+            "only OptimizationResult validates top_n >= 1"
         )
 
     def test_boundary_n_value(self) -> None:
@@ -1531,7 +1611,7 @@ class TestFailurePropagation:
             source_qualified_candidate_id="test_id",
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
-            verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
+            verified_rating_evidence_digest=None,
             phase2_identity_snapshot_digest=isnap.identity_snapshot_digest,
             warning_descriptor_binding_digests=(wbd.descriptor_binding_digest,),
             blocker_descriptor_binding_digests=(bbd.descriptor_binding_digest,),
@@ -1556,16 +1636,14 @@ class TestFailurePropagation:
             hash_outcome=VerificationOutcome.FAILED,
             prov_outcome=VerificationOutcome.NOT_RUN,
         )
-        wd = _make_message_descriptor()
-        bd = _make_message_descriptor("B1")
         isnap = build_identity_snapshot(_make_ver("c1", 0)[0])
         disp = _map_non_verified(
             rec,
             source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
             source_record_descriptor_digest=None,
             source_failure_binding=None,
-            warning_descriptors=(wd,),
-            blocker_descriptors=(bd,),
+            warning_descriptors=(),
+            blocker_descriptors=(),
             evidence_failure_binding=None,
         )
         assert disp.disposition == Phase3Disposition.INTEGRITY_FAILED
@@ -1575,26 +1653,22 @@ class TestFailurePropagation:
             "c1",
             0,
             hash_outcome=VerificationOutcome.PASSED,
-            prov_outcome=VerificationOutcome.ERROR,
+            prov_outcome=VerificationOutcome.FAILED,
         )
-        wd = _make_message_descriptor()
-        bd = _make_message_descriptor("B1")
         isnap = build_identity_snapshot(_make_ver("c1", 0)[0])
         disp = _map_non_verified(
             rec,
             source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
             source_record_descriptor_digest=None,
             source_failure_binding=None,
-            warning_descriptors=(wd,),
-            blocker_descriptors=(bd,),
+            warning_descriptors=(),
+            blocker_descriptors=(),
             evidence_failure_binding=None,
         )
         assert disp.disposition == Phase3Disposition.PROVENANCE_FAILED
 
     def test_runtime_failed_mapped(self) -> None:
         rec = _make_runtime_failed_record("c1", 0)
-        wd = _make_message_descriptor()
-        bd = _make_message_descriptor("B1")
         fb = _make_failure_binding()
         isnap = build_identity_snapshot(_make_ver("c1", 0)[0])
         disp = _map_non_verified(
@@ -1602,8 +1676,8 @@ class TestFailurePropagation:
             source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
             source_record_descriptor_digest=None,
             source_failure_binding=fb,
-            warning_descriptors=(wd,),
-            blocker_descriptors=(bd,),
+            warning_descriptors=(),
+            blocker_descriptors=(),
             evidence_failure_binding=None,
         )
         assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
@@ -1612,16 +1686,14 @@ class TestFailurePropagation:
 
     def test_unevaluated_mapped(self) -> None:
         rec = _make_unevaluated_record("c1", 0)
-        wd = _make_message_descriptor()
-        bd = _make_message_descriptor("B1")
         isnap = build_identity_snapshot(_make_ver("c1", 0)[0])
         disp = _map_non_verified(
             rec,
             source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
             source_record_descriptor_digest=None,
             source_failure_binding=None,
-            warning_descriptors=(wd,),
-            blocker_descriptors=(bd,),
+            warning_descriptors=(),
+            blocker_descriptors=(),
             evidence_failure_binding=None,
         )
         assert disp.disposition == Phase3Disposition.UNEVALUATED
@@ -1629,7 +1701,6 @@ class TestFailurePropagation:
     def test_phase3_runtime_from_builder(self) -> None:
         evidence = _make_evidence()
         rec, candidate = _make_ver("c1", 0, evidence=evidence)
-        sri = _make_sizing_request_identity()
         isnap = build_identity_snapshot(rec)
         sdesc = build_phase2_source_record_descriptor(
             source_record=rec,
@@ -1653,7 +1724,7 @@ class TestFailurePropagation:
             sb,
             ErrorCode.INPUT_INCONSISTENT,
             "Test runtime",
-            failure_stage=Phase3PreparationFailureStage.CLASSIFICATION,
+            failure_stage=Phase3PreparationFailureStage.SOURCE_BINDING,
             source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
             source_record_descriptor_digest=sdesc.descriptor_digest,
             warning_descriptors=(),
@@ -1676,6 +1747,7 @@ class TestFailurePropagation:
             failure,
             source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
             source_record_descriptor_digest=sdesc.descriptor_digest,
+            failure_stage=Phase3PreparationFailureStage.SOURCE_BINDING,
             warning_descriptors=(),
             blocker_descriptors=(),
         )

@@ -34,7 +34,14 @@ from hexagent.optimization.evaluation import (
 # Phase3EvaluationInput is defined in Section 12 of the contract.
 # OptimizationResult / disposition types are defined in later sections.
 if typing.TYPE_CHECKING:
-    pass  # Phase3EvaluationInput used via string annotation
+    from hexagent.optimization.phase3_builder import (  # noqa: F401
+        OptimizationResult,
+        OptimizationResultCoreValues,
+    )
+    from hexagent.optimization.phase3_evaluation import (  # noqa: F401
+        CandidateDispositionRecord,
+        Phase3EvaluationInput,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -715,7 +722,7 @@ class Phase2SourceRecordSnapshot(BaseModel):
 
 def build_phase2_source_record_snapshot(
     *,
-    schema_version: int = 1,
+    schema_version: Literal[1] = 1,
     source_qualified_candidate_id: str,
     evaluation_order_index: int,
     candidate_evaluation_state: CandidateEvaluationState,
@@ -873,15 +880,15 @@ class Phase2SourceRecordDescriptor:
         ]:
             if not self.DIGEST_PATTERN.match(v):
                 raise ValueError(f"invalid {n} digest")
-        for v, n in [
+        for dv, dn in [
             (self.candidate_evaluation_identity_digest, "cei"),
             (self.verified_rating_evidence_digest, "evidence"),
             (self.invalid_rating_evidence_digest, "invalid"),
             (self.claimed_rating_result_audit_digest, "audit"),
             (self.evaluation_failure_digest, "failure"),
         ]:
-            if v is not None and not self.DIGEST_PATTERN.match(v):
-                raise ValueError(f"invalid {n} digest")
+            if dv is not None and not self.DIGEST_PATTERN.match(dv):
+                raise ValueError(f"invalid {dn} digest")
         payload = {
             "source_qualified_candidate_id": self.source_qualified_candidate_id,
             "evaluation_order_index": self.evaluation_order_index,
@@ -937,15 +944,30 @@ def build_phase2_source_record_descriptor(
         "evaluation_failure_digest": evaluation_failure_digest,
     }
     d = sha256_digest(payload)
+    cei_digest: str | None = (
+        source_record.candidate_evaluation_identity.candidate_evaluation_identity_digest
+        if source_record.candidate_evaluation_identity is not None
+        else None
+    )
+    invalid_digest: str | None = (
+        source_record.invalid_rating_evidence.invalid_evidence_digest
+        if source_record.invalid_rating_evidence is not None
+        else None
+    )
+    audit_digest: str | None = (
+        source_record.claimed_rating_result_audit.audit_digest
+        if source_record.claimed_rating_result_audit is not None
+        else None
+    )
     return Phase2SourceRecordDescriptor(
         source_qualified_candidate_id=source_record.source_qualified_candidate_id,
         evaluation_order_index=source_record.evaluation_order_index,
         candidate_evaluation_state=source_record.candidate_evaluation_state,
         identity_snapshot_digest=identity_snapshot.identity_snapshot_digest,
-        candidate_evaluation_identity_digest=payload["candidate_evaluation_identity_digest"],
+        candidate_evaluation_identity_digest=cei_digest,
         verified_rating_evidence_digest=verified_evidence_digest,
-        invalid_rating_evidence_digest=payload["invalid_rating_evidence_digest"],
-        claimed_rating_result_audit_digest=payload["claimed_rating_result_audit_digest"],
+        invalid_rating_evidence_digest=invalid_digest,
+        claimed_rating_result_audit_digest=audit_digest,
         evaluation_failure_digest=evaluation_failure_digest,
         descriptor_digest=d,
     )
@@ -1318,9 +1340,9 @@ def derive_termination_status(
 
 
 def _verify_all_counts(
-    result: object,
-    ei: Phase3EvaluationInput,  # noqa: F821, UP037
-    dispositions: tuple,
+    result: OptimizationResultCoreValues | OptimizationResult,
+    ei: Phase3EvaluationInput,
+    dispositions: tuple[CandidateDispositionRecord, ...],
 ) -> None:
     """Verify all Phase 2 and Phase 3 counts against source records and dispositions.
 
