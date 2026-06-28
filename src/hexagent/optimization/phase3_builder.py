@@ -30,6 +30,7 @@ from hexagent.optimization.evaluation import (
     CandidateEvaluationState,
     VerificationOutcome,
     VerifiedRatingEvidenceSnapshot,
+    _build_message_descriptor,
     _build_run_failure_descriptor,
 )
 from hexagent.optimization.identities import ManufacturableCandidate
@@ -129,17 +130,38 @@ def validate_blocked_evidence(
     rec: CandidateEvaluationRecord,
     evidence: VerifiedRatingEvidenceSnapshot | None,
     eb: Phase3SourceRecordBinding,
+    *,
+    warning_descriptors: tuple[Phase3MessageDescriptor, ...],
+    blocker_descriptors: tuple[Phase3MessageDescriptor, ...],
+    warning_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
+    blocker_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
+    evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
 ) -> RunFailure | None:
-    """Validate blocked evidence consistency. Returns RunFailure if invalid, None if valid.
+    """Validate blocked evidence consistency with ALL independent authority artifacts.
 
-    Contract: blocked evidence must be present, have rating_status == "blocked",
-    no failure, and no contradictory thermal results. Fails closed.
+    Returns RunFailure if any inconsistency is found, None if valid.
+
+    Contract checks:
+    1. evidence present, rating_status == BLOCKED
+    2. candidate ID, evaluation index match source_record
+    3. rating request identity matches candidate evaluation identity
+    4. provider identity matches rec.provider_identity_matches
+    5. hash/provenance outcomes both PASSED
+    6. failure is None
+    7. No successful thermal results
+    8. Warning/blocker descriptors match evidence messages (count/content/order via digest)
+    9. Warning/blocker descriptor bindings match SourceRecordBinding digests
+    10. evidence digest matches SourceRecordBinding.verified_rating_evidence_digest
+    11. evidence_failure_binding is None for blocked
     """
+    ctx = (("source_qualified_candidate_id", rec.source_qualified_candidate_id),)
+
+    # 1) Evidence must be present with BLOCKED status
     if evidence is None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message="Blocked evidence missing: expected VerifiedRatingEvidenceSnapshot",
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            context=ctx,
         )
     if evidence.rating_status.value != "blocked":
         return RunFailure(
@@ -148,29 +170,221 @@ def validate_blocked_evidence(
                 f"Blocked evidence rating_status mismatch: "
                 f"expected 'blocked', got '{evidence.rating_status.value}'"
             ),
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            context=ctx,
         )
+
+    # 2) Candidate ID and evaluation index match
+    if eb.source_qualified_candidate_id != rec.source_qualified_candidate_id:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Blocked evidence: candidate ID mismatch: "
+                f"binding={eb.source_qualified_candidate_id!r} "
+                f"vs record={rec.source_qualified_candidate_id!r}"
+            ),
+            context=ctx,
+        )
+    if eb.evaluation_order_index != rec.evaluation_order_index:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Blocked evidence: evaluation index mismatch: "
+                f"binding={eb.evaluation_order_index} vs record={rec.evaluation_order_index}"
+            ),
+            context=ctx,
+        )
+
+    # 3) Rating request identity digest matches candidate evaluation identity
+    if rec.candidate_evaluation_identity is not None:
+        expected_rri_digest = rec.candidate_evaluation_identity.rating_request_identity_digest
+        if evidence.rating_request_identity_digest != expected_rri_digest:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=(
+                "Blocked evidence: rating_request_identity_digest "
+                "mismatch vs candidate_evaluation_identity"
+            ),
+                context=ctx,
+            )
+
+    # 4) Provider identity matches
+    if not rec.provider_identity_matches:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: rec.provider_identity_matches is False",
+            context=ctx,
+        )
+
+    # 5) Hash/provenance outcomes both PASSED
+    if evidence.hash_verification_outcome != VerificationOutcome.PASSED:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Blocked evidence: hash_verification_outcome="
+                f"{evidence.hash_verification_outcome}"
+            ),
+            context=ctx,
+        )
+    if evidence.provenance_verification_outcome != VerificationOutcome.PASSED:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Blocked evidence: provenance_verification_outcome="
+                f"{evidence.provenance_verification_outcome}"
+            ),
+            context=ctx,
+        )
+
+    # 6) Failure must be None
     if evidence.failure is not None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message="Blocked evidence must not have failure",
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            context=ctx,
         )
-    # Blocked evidence must not carry usable thermal results
-    if evidence.heat_duty_w is not None or evidence.area_outer_m2 is None:
+
+    # 7) No successful thermal results (heat_duty_w, outlet temps, UA, LMTD)
+    if evidence.heat_duty_w is not None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
-            message="Blocked evidence: heat_duty_w must be None, area_outer_m2 must be present",
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            message="Blocked evidence: heat_duty_w must be None",
+            context=ctx,
         )
-    # Evidence binding digest consistency
+    if (
+        evidence.hot_outlet_temperature_k is not None
+        or evidence.cold_outlet_temperature_k is not None
+    ):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: outlet temperatures must be None",
+            context=ctx,
+        )
+    if evidence.UA_w_k is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: UA_w_k must be None",
+            context=ctx,
+        )
+    if evidence.LMTD_k is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: LMTD_k must be None",
+            context=ctx,
+        )
+    if evidence.area_outer_m2 is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: area_outer_m2 must be present",
+            context=ctx,
+        )
+
+    # 8) Warning/blocker descriptors match evidence messages (count, content, order via digest)
+    if len(warning_descriptors) != len(evidence.warnings):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Blocked evidence: warning descriptor count "
+                f"{len(warning_descriptors)} != evidence warnings "
+                f"{len(evidence.warnings)}"
+            ),
+            context=ctx,
+        )
+    for i, (wd, ew) in enumerate(zip(warning_descriptors, evidence.warnings, strict=False)):
+        rebuilt = _build_message_descriptor(ew)
+        if rebuilt.canonicalization_error is not None:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Blocked evidence: cannot canonicalize warning[{i}]",
+                context=ctx,
+            )
+        if wd.message_payload_digest != rebuilt.message_payload_digest:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Blocked evidence: warning[{i}] message_payload_digest mismatch",
+                context=ctx,
+            )
+
+    if len(blocker_descriptors) != len(evidence.blockers):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Blocked evidence: blocker descriptor count "
+                f"{len(blocker_descriptors)} != evidence blockers "
+                f"{len(evidence.blockers)}"
+            ),
+            context=ctx,
+        )
+    for i, (bd, eb_msg) in enumerate(zip(blocker_descriptors, evidence.blockers, strict=False)):
+        rebuilt = _build_message_descriptor(eb_msg)
+        if rebuilt.canonicalization_error is not None:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Blocked evidence: cannot canonicalize blocker[{i}]",
+                context=ctx,
+            )
+        if bd.message_payload_digest != rebuilt.message_payload_digest:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Blocked evidence: blocker[{i}] message_payload_digest mismatch",
+                context=ctx,
+            )
+
+    # 9) Warning/blocker descriptor bindings match SourceRecordBinding digests
+    if len(warning_descriptor_bindings) != len(eb.warning_descriptor_binding_digests):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: warning binding count mismatch vs SourceRecordBinding",
+            context=ctx,
+        )
+    for i, (wb, ed) in enumerate(
+        zip(warning_descriptor_bindings, eb.warning_descriptor_binding_digests, strict=False)
+    ):
+        if wb.descriptor_binding_digest != ed:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=(
+                    f"Blocked evidence: warning_binding[{i}] "
+                    f"digest mismatch vs SourceRecordBinding"
+                ),
+                context=ctx,
+            )
+
+    if len(blocker_descriptor_bindings) != len(eb.blocker_descriptor_binding_digests):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: blocker binding count mismatch vs SourceRecordBinding",
+            context=ctx,
+        )
+    for i, (bb, ed) in enumerate(
+        zip(blocker_descriptor_bindings, eb.blocker_descriptor_binding_digests, strict=False)
+    ):
+        if bb.descriptor_binding_digest != ed:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=(
+                    f"Blocked evidence: blocker_binding[{i}] "
+                    f"digest mismatch vs SourceRecordBinding"
+                ),
+                context=ctx,
+            )
+
+    # 10) evidence digest matches SourceRecordBinding.verified_rating_evidence_digest
     expected_evidence_digest = evidence.compute_explicit_evidence_digest()
     if eb.verified_rating_evidence_digest != expected_evidence_digest:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message="Blocked evidence digest mismatch vs binding",
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            context=ctx,
         )
+
+    # 11) evidence_failure_binding must be None for blocked
+    if evidence_failure_binding is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Blocked evidence: evidence_failure_binding must be None",
+            context=ctx,
+        )
+
     return None
 
 
@@ -178,17 +392,38 @@ def validate_failed_evidence(
     rec: CandidateEvaluationRecord,
     evidence: VerifiedRatingEvidenceSnapshot | None,
     eb: Phase3SourceRecordBinding,
+    *,
+    warning_descriptors: tuple[Phase3MessageDescriptor, ...],
+    blocker_descriptors: tuple[Phase3MessageDescriptor, ...],
+    warning_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
+    blocker_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
+    evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
 ) -> RunFailure | None:
-    """Validate failed evidence consistency. Returns RunFailure if invalid, None if valid.
+    """Validate failed evidence consistency with ALL independent authority artifacts.
 
-    Contract: failed evidence must be present, have rating_status == "failed",
-    have a failure payload, and no contradictory thermal results. Fails closed.
+    Returns RunFailure if any inconsistency is found, None if valid.
+
+    Contract checks:
+    1. evidence present, rating_status == FAILED
+    2. candidate ID, evaluation index match source_record
+    3. hash/provenance outcomes both PASSED
+    4. failure is present, failure descriptor can be rebuilt from evidence.failure
+    5. failure payload digest matches
+    6. evidence_failure_binding exists and matches failure descriptor
+    7. failure binding's descriptor_binding_digest, payload_digest,
+       canonicalization_error_digest all match
+    8. Warning/blocker checks same as blocked
+    9. No successful thermal results
+    10. evidence digest matches
     """
+    ctx = (("source_qualified_candidate_id", rec.source_qualified_candidate_id),)
+
+    # 1) Evidence must be present with FAILED status
     if evidence is None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message="Failed evidence missing: expected VerifiedRatingEvidenceSnapshot",
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            context=ctx,
         )
     if evidence.rating_status.value != "failed":
         return RunFailure(
@@ -197,22 +432,268 @@ def validate_failed_evidence(
                 f"Failed evidence rating_status mismatch: "
                 f"expected 'failed', got '{evidence.rating_status.value}'"
             ),
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            context=ctx,
         )
+
+    # 2) Candidate ID and evaluation index match vs source_record
+    if eb.source_qualified_candidate_id != rec.source_qualified_candidate_id:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Failed evidence: candidate ID mismatch: "
+                f"binding={eb.source_qualified_candidate_id!r} "
+                f"vs record={rec.source_qualified_candidate_id!r}"
+            ),
+            context=ctx,
+        )
+    if eb.evaluation_order_index != rec.evaluation_order_index:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Failed evidence: evaluation index mismatch: "
+                f"binding={eb.evaluation_order_index} vs record={rec.evaluation_order_index}"
+            ),
+            context=ctx,
+        )
+
+    # 3) Hash/provenance outcomes both PASSED
+    if evidence.hash_verification_outcome != VerificationOutcome.PASSED:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Failed evidence: hash_verification_outcome="
+                f"{evidence.hash_verification_outcome}"
+            ),
+            context=ctx,
+        )
+    if evidence.provenance_verification_outcome != VerificationOutcome.PASSED:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Failed evidence: provenance_verification_outcome="
+                f"{evidence.provenance_verification_outcome}"
+            ),
+            context=ctx,
+        )
+
+    # 4) Failure must be present; failure descriptor can be rebuilt from evidence.failure
     if evidence.failure is None:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message="Failed evidence must have failure payload",
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            context=ctx,
         )
-    # Evidence binding digest consistency
+
+    # Rebuild failure descriptor from evidence.failure to verify payload digest
+    failure_desc = _build_run_failure_descriptor(evidence.failure)
+    if failure_desc.canonicalization_error is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: cannot canonicalize failure descriptor",
+            context=ctx,
+        )
+
+    # 5) Failure payload digest matches
+    if failure_desc.payload_digest is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: rebuilt failure descriptor has no payload_digest",
+            context=ctx,
+        )
+
+    # 6) evidence_failure_binding exists and matches failure descriptor
+    if evidence_failure_binding is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: evidence_failure_binding is None but evidence has failure",
+            context=ctx,
+        )
+
+    # 7) failure binding's descriptor_binding_digest, payload_digest,
+    #    canonicalization_error_digest all match
+    if evidence_failure_binding.payload_digest != failure_desc.payload_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: evidence_failure_binding payload_digest mismatch",
+            context=ctx,
+        )
+    if evidence_failure_binding.canonicalization_error_digest is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Failed evidence: evidence_failure_binding "
+                "has canonicalization_error (expected success binding)"
+            ),
+            context=ctx,
+        )
+
+    # Verify descriptor_binding_digest by recomputing
+    rebuilt_binding = build_phase3_run_failure_descriptor_binding(failure_desc)
+    if (
+        evidence_failure_binding.descriptor_binding_digest
+        != rebuilt_binding.descriptor_binding_digest
+    ):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Failed evidence: evidence_failure_binding "
+                "descriptor_binding_digest mismatch vs rebuilt"
+            ),
+            context=ctx,
+        )
+
+    # Check evidence_failure_binding matches SourceRecordBinding
+    if eb.evidence_failure_binding_digest is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: SourceRecordBinding.evidence_failure_binding_digest is None",
+            context=ctx,
+        )
+    if evidence_failure_binding.descriptor_binding_digest != eb.evidence_failure_binding_digest:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                "Failed evidence: evidence_failure_binding "
+                "descriptor_binding_digest mismatch vs "
+                "SourceRecordBinding"
+            ),
+            context=ctx,
+        )
+
+    # 8) Warning/blocker checks — same as blocked
+    if len(warning_descriptors) != len(evidence.warnings):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Failed evidence: warning descriptor count "
+                f"{len(warning_descriptors)} != evidence warnings "
+                f"{len(evidence.warnings)}"
+            ),
+            context=ctx,
+        )
+    for i, (wd, ew) in enumerate(zip(warning_descriptors, evidence.warnings, strict=False)):
+        rebuilt_w = _build_message_descriptor(ew)
+        if rebuilt_w.canonicalization_error is not None:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Failed evidence: cannot canonicalize warning[{i}]",
+                context=ctx,
+            )
+        if wd.message_payload_digest != rebuilt_w.message_payload_digest:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Failed evidence: warning[{i}] message_payload_digest mismatch",
+                context=ctx,
+            )
+
+    if len(blocker_descriptors) != len(evidence.blockers):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=(
+                f"Failed evidence: blocker descriptor count "
+                f"{len(blocker_descriptors)} != evidence blockers "
+                f"{len(evidence.blockers)}"
+            ),
+            context=ctx,
+        )
+    for i, (bd, eb_msg) in enumerate(zip(blocker_descriptors, evidence.blockers, strict=False)):
+        rebuilt_b = _build_message_descriptor(eb_msg)
+        if rebuilt_b.canonicalization_error is not None:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Failed evidence: cannot canonicalize blocker[{i}]",
+                context=ctx,
+            )
+        if bd.message_payload_digest != rebuilt_b.message_payload_digest:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=f"Failed evidence: blocker[{i}] message_payload_digest mismatch",
+                context=ctx,
+            )
+
+    # Warning/blocker binding digests match SourceRecordBinding
+    if len(warning_descriptor_bindings) != len(eb.warning_descriptor_binding_digests):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: warning binding count mismatch vs SourceRecordBinding",
+            context=ctx,
+        )
+    for i, (wb, ed) in enumerate(
+        zip(warning_descriptor_bindings, eb.warning_descriptor_binding_digests, strict=False)
+    ):
+        if wb.descriptor_binding_digest != ed:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=(
+                    f"Failed evidence: warning_binding[{i}] "
+                    f"digest mismatch vs SourceRecordBinding"
+                ),
+                context=ctx,
+            )
+
+    if len(blocker_descriptor_bindings) != len(eb.blocker_descriptor_binding_digests):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: blocker binding count mismatch vs SourceRecordBinding",
+            context=ctx,
+        )
+    for i, (bb, ed) in enumerate(
+        zip(blocker_descriptor_bindings, eb.blocker_descriptor_binding_digests, strict=False)
+    ):
+        if bb.descriptor_binding_digest != ed:
+            return RunFailure(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                message=(
+                    f"Failed evidence: blocker_binding[{i}] "
+                    f"digest mismatch vs SourceRecordBinding"
+                ),
+                context=ctx,
+            )
+
+    # 9) No successful thermal results
+    if evidence.heat_duty_w is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: heat_duty_w must be None",
+            context=ctx,
+        )
+    if (
+        evidence.hot_outlet_temperature_k is not None
+        or evidence.cold_outlet_temperature_k is not None
+    ):
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: outlet temperatures must be None",
+            context=ctx,
+        )
+    if evidence.UA_w_k is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: UA_w_k must be None",
+            context=ctx,
+        )
+    if evidence.LMTD_k is not None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: LMTD_k must be None",
+            context=ctx,
+        )
+    if evidence.area_outer_m2 is None:
+        return RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="Failed evidence: area_outer_m2 must be present",
+            context=ctx,
+        )
+
+    # 10) Evidence digest matches
     expected_evidence_digest = evidence.compute_explicit_evidence_digest()
     if eb.verified_rating_evidence_digest != expected_evidence_digest:
         return RunFailure(
             code=ErrorCode.INPUT_INCONSISTENT,
             message="Failed evidence digest mismatch vs binding",
-            context=(("source_qualified_candidate_id", rec.source_qualified_candidate_id),),
+            context=ctx,
         )
+
     return None
 
 
@@ -626,6 +1107,8 @@ def classify_candidate(
     *,
     warning_descriptors: tuple[Phase3MessageDescriptor, ...],
     blocker_descriptors: tuple[Phase3MessageDescriptor, ...],
+    warning_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
+    blocker_descriptor_bindings: tuple[Phase3MessageDescriptorBinding, ...],
     source_failure_binding: Phase3RunFailureDescriptorBinding | None,
     evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
 ) -> CandidateDispositionRecord:
@@ -670,7 +1153,16 @@ def classify_candidate(
             evidence_failure_binding=evidence_failure_binding,
         )
     if rec.rating_status == "blocked":
-        vf = validate_blocked_evidence(rec, evidence, eb)
+        vf = validate_blocked_evidence(
+            rec,
+            evidence,
+            eb,
+            warning_descriptors=warning_descriptors,
+            blocker_descriptors=blocker_descriptors,
+            warning_descriptor_bindings=warning_descriptor_bindings,
+            blocker_descriptor_bindings=blocker_descriptor_bindings,
+            evidence_failure_binding=evidence_failure_binding,
+        )
         if vf is not None:
             return _phase3_runtime_from_validation(
                 rec,
@@ -691,7 +1183,16 @@ def classify_candidate(
             blocker_descriptors=blocker_descriptors,
         )
     if rec.rating_status == "failed":
-        vf = validate_failed_evidence(rec, evidence, eb)
+        vf = validate_failed_evidence(
+            rec,
+            evidence,
+            eb,
+            warning_descriptors=warning_descriptors,
+            blocker_descriptors=blocker_descriptors,
+            warning_descriptor_bindings=warning_descriptor_bindings,
+            blocker_descriptor_bindings=blocker_descriptor_bindings,
+            evidence_failure_binding=evidence_failure_binding,
+        )
         if vf is not None:
             return _phase3_runtime_from_validation(
                 rec,

@@ -72,6 +72,8 @@ from hexagent.optimization.phase3_builder import (
     _phase3_runtime_from_validation,
     build_ranked_candidate_record,
     classify_candidate,
+    validate_blocked_evidence,
+    validate_failed_evidence,
 )
 from hexagent.optimization.phase3_core import (
     FailureOrigin,
@@ -627,7 +629,7 @@ class TestEndToEndFlow:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -642,6 +644,8 @@ class TestEndToEndFlow:
             cin,
             warning_descriptors=(wd,),
             blocker_descriptors=(bd,),
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -665,7 +669,7 @@ class TestEndToEndFlow:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -680,6 +684,8 @@ class TestEndToEndFlow:
             cin,
             warning_descriptors=(wd,),
             blocker_descriptors=(bd,),
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -719,7 +725,7 @@ class TestEndToEndFlow:
             bbd = _make_message_descriptor_binding(bd)
             ev = recs[i].verified_rating_evidence
             sb = build_phase3_source_record_binding(
-                source_qualified_candidate_id="test_id",  # f"c{i+1}"
+                source_qualified_candidate_id=recs[i].source_qualified_candidate_id,  # f"c{i+1}"
                 evaluation_order_index=i,
                 phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
                 verified_rating_evidence_digest=ev.compute_explicit_evidence_digest()
@@ -736,7 +742,9 @@ class TestEndToEndFlow:
                 cin,
                 warning_descriptors=(wd,),
                 blocker_descriptors=(bd,),
-                source_failure_binding=None,
+                warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
+            source_failure_binding=None,
                 evidence_failure_binding=None,
             )
             dispositions.append(disp)
@@ -757,26 +765,25 @@ class TestEndToEndFlow:
             verified_evidence=evidence,
             source_failure_binding=None,
         )
-        wd = _make_message_descriptor()
-        bd = _make_message_descriptor("B")
-        wbd = _make_message_descriptor_binding(wd)
-        bbd = _make_message_descriptor_binding(bd)
+        # Evidence has no warnings/blockers, so descriptors and bindings must be empty
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
-            evaluation_order_index=0,
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
+            evaluation_order_index=rec.evaluation_order_index,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
             phase2_identity_snapshot_digest=isnap.identity_snapshot_digest,
-            warning_descriptor_binding_digests=(wbd.descriptor_binding_digest,),
-            blocker_descriptor_binding_digests=(bbd.descriptor_binding_digest,),
+            warning_descriptor_binding_digests=(),
+            blocker_descriptor_binding_digests=(),
             source_evaluation_failure_binding_digest=None,
             evidence_failure_binding_digest=None,
         )
         cin = _build_cin(rec, candidate, sri, isnap, sdesc, sb)
         disp = classify_candidate(
             cin,
-            warning_descriptors=(wd,),
-            blocker_descriptors=(bd,),
+            warning_descriptors=(),
+            blocker_descriptors=(),
+            warning_descriptor_bindings=(),
+            blocker_descriptor_bindings=(),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -804,7 +811,7 @@ class TestEndToEndFlow:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -819,6 +826,8 @@ class TestEndToEndFlow:
             cin,
             warning_descriptors=(wd,),
             blocker_descriptors=(bd,),
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -846,7 +855,7 @@ class TestEndToEndFlow:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -861,6 +870,8 @@ class TestEndToEndFlow:
             cin,
             warning_descriptors=(wd,),
             blocker_descriptors=(bd,),
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -908,7 +919,7 @@ class TestGateAndMaterialization:
             source_failure_binding=None,
         )
         cs = build_phase2_source_record_snapshot(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
             feasible=True,
@@ -1340,7 +1351,7 @@ class TestVerifier:
                 source_record=rec,
                 identity_snapshot=None,
                 complete_snapshot=build_phase2_source_record_snapshot(
-                    source_qualified_candidate_id="test_id",
+                    source_qualified_candidate_id=rec.source_qualified_candidate_id,
                     evaluation_order_index=0,
                     candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
                     feasible=True,
@@ -1443,7 +1454,7 @@ class TestRankingAndTopN:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb1 = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec1.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc1.descriptor_digest,
             verified_rating_evidence_digest=evidence1.compute_explicit_evidence_digest(),
@@ -1458,6 +1469,8 @@ class TestRankingAndTopN:
             cin1,
             warning_descriptors=(wd,),
             blocker_descriptors=(bd,),
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -1469,7 +1482,7 @@ class TestRankingAndTopN:
             source_failure_binding=None,
         )
         sb2 = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec2.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc2.descriptor_digest,
             verified_rating_evidence_digest=evidence2.compute_explicit_evidence_digest(),
@@ -1484,6 +1497,8 @@ class TestRankingAndTopN:
             cin2,
             warning_descriptors=(wd,),
             blocker_descriptors=(bd,),
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -1503,12 +1518,18 @@ class TestRankingAndTopN:
         assert Decimal(sv2) < Decimal(sv1)
 
     def test_illegal_n_rejected(self) -> None:
-        # OptimizationResultCoreValues doesn't validate top_n; OptimizationResult does
-        # This test verifies the contract specification
-        pytest.skip(
-            "OptimizationResultCoreValues allows top_n=0; "
-            "only OptimizationResult validates top_n >= 1"
-        )
+        """Top-N values of 0 or negative are rejected by the authoritative entry point."""
+        # top_n=0 rejected
+        with pytest.raises(ValueError, match="top_n must be >= 1"):
+            _make_sizing_request_identity(top_n=0)
+
+        # top_n negative rejected
+        with pytest.raises(ValueError, match="top_n must be >= 1"):
+            _make_sizing_request_identity(top_n=-1)
+
+        # top_n=-5 rejected
+        with pytest.raises(ValueError, match="top_n must be >= 1"):
+            _make_sizing_request_identity(top_n=-5)
 
     def test_boundary_n_value(self) -> None:
         core = OptimizationResultCoreValues(
@@ -1571,7 +1592,7 @@ class TestFailurePropagation:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -1586,6 +1607,8 @@ class TestFailurePropagation:
             cin,
             warning_descriptors=(wd,),
             blocker_descriptors=(bd,),
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -1608,7 +1631,7 @@ class TestFailurePropagation:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=None,
@@ -1623,6 +1646,8 @@ class TestFailurePropagation:
             cin,
             warning_descriptors=(wd,),
             blocker_descriptors=(bd,),
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=(bbd,),
             source_failure_binding=None,
             evidence_failure_binding=None,
         )
@@ -1709,7 +1734,7 @@ class TestFailurePropagation:
             source_failure_binding=None,
         )
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -1897,7 +1922,7 @@ class TestCoreTypes:
             else None
         )
         cs = build_phase2_source_record_snapshot(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
             feasible=True,
@@ -1917,7 +1942,7 @@ class TestCoreTypes:
             source_evaluation_failure_binding_digest=None,
             evidence_failure_binding_digest=None,
         )
-        assert cs.source_qualified_candidate_id == "test_id"
+        assert cs.source_qualified_candidate_id == rec.source_qualified_candidate_id
         assert DIGEST_RE.match(cs.snapshot_digest)
 
 
@@ -1944,7 +1969,7 @@ class TestBuilderHelpers:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -1982,7 +2007,7 @@ class TestBuilderHelpers:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -2019,7 +2044,7 @@ class TestBuilderHelpers:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -2117,7 +2142,7 @@ class TestBuilderHelpers:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -2162,7 +2187,7 @@ class TestBuilderHelpers:
         wbd = _make_message_descriptor_binding(wd)
         bbd = _make_message_descriptor_binding(bd)
         sb = build_phase3_source_record_binding(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
             evaluation_order_index=0,
             phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
             verified_rating_evidence_digest=evidence.compute_explicit_evidence_digest(),
@@ -2203,7 +2228,7 @@ class TestCandidateDispositionRecord:
         wd = _make_message_descriptor()
         bd = _make_message_descriptor("B1")
         record = build_candidate_disposition_record(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id="c1",
             evaluation_order_index=0,
             source_candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
             source_hash_verification_outcome=VerificationOutcome.PASSED,
@@ -2234,7 +2259,7 @@ class TestCandidateDispositionRecord:
         wd = _make_message_descriptor()
         bd = _make_message_descriptor("B1")
         record = build_candidate_disposition_record(
-            source_qualified_candidate_id="test_id",
+            source_qualified_candidate_id="c2",
             evaluation_order_index=0,
             source_candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
             source_hash_verification_outcome=VerificationOutcome.PASSED,
@@ -2259,7 +2284,7 @@ class TestCandidateDispositionRecord:
         )
         payload = candidate_disposition_payload(record)
         assert payload["disposition"] == "feasible"
-        assert payload["source_qualified_candidate_id"] == "test_id"
+        assert payload["source_qualified_candidate_id"] == "c2"
 
     def test_failure_matrix_non_failure_dispositions(self) -> None:
         with pytest.raises(ValueError, match="failure_origin must be NONE"):
@@ -2417,3 +2442,1584 @@ class TestOptimizationResultCoreValues:
                 ordered_warning_digests=(),
                 ordered_blocker_digests=(),
             )
+
+
+
+
+
+# ============================================================================
+# Section 13: EVIDENCE VALIDATORS
+# ============================================================================
+
+_SENTINEL = object()
+
+
+class TestEvidenceValidators:
+    """Comprehensive tests for validate_blocked_evidence and validate_failed_evidence
+    exercised via classify_candidate."""
+
+    # ── Helpers ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _build_blocked_artifacts(
+        rec: CandidateEvaluationRecord,
+        candidate: ManufacturableCandidate,
+        evidence: VerifiedRatingEvidenceSnapshot | None,
+        *,
+        sri: SizingRequestIdentity | None = None,
+        warnings: tuple[Phase3MessageDescriptor, ...] = (),
+        blockers: tuple[Phase3MessageDescriptor, ...] = (),
+        warning_bindings: tuple[Phase3MessageDescriptorBinding, ...] = (),
+        blocker_bindings: tuple[Phase3MessageDescriptorBinding, ...] = (),
+        tampered_src_id: str | None = None,
+        tampered_idx: int | None = None,
+        binding_evidence_digest: str | None = _SENTINEL,  # sentinel = compute from evidence
+        evidence_failure_binding: Phase3RunFailureDescriptorBinding | None = None,
+    ):
+        """Build all classification artifacts for blocked evidence."""
+        if sri is None:
+            sri = _make_sizing_request_identity()
+        isnap = build_identity_snapshot(rec)
+        sdesc = build_phase2_source_record_descriptor(
+            source_record=rec,
+            identity_snapshot=isnap,
+            verified_evidence=evidence,
+            source_failure_binding=None,
+        )
+
+        src_id = (
+            tampered_src_id if tampered_src_id is not None
+            else rec.source_qualified_candidate_id
+        )
+        eval_idx = tampered_idx if tampered_idx is not None else rec.evaluation_order_index
+
+        # Compute evidence digest for binding
+        if binding_evidence_digest is _SENTINEL:
+            ev_digest = (
+                evidence.compute_explicit_evidence_digest()
+                if evidence is not None else None
+            )
+        else:
+            ev_digest = binding_evidence_digest
+
+        sb = build_phase3_source_record_binding(
+            source_qualified_candidate_id=src_id,
+            evaluation_order_index=eval_idx,
+            phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
+            verified_rating_evidence_digest=ev_digest,
+            phase2_identity_snapshot_digest=isnap.identity_snapshot_digest,
+            warning_descriptor_binding_digests=tuple(
+                b.descriptor_binding_digest for b in warning_bindings
+            ),
+            blocker_descriptor_binding_digests=tuple(
+                b.descriptor_binding_digest for b in blocker_bindings
+            ),
+            source_evaluation_failure_binding_digest=None,
+            evidence_failure_binding_digest=(
+                evidence_failure_binding.descriptor_binding_digest
+                if evidence_failure_binding is not None
+                else None
+            ),
+        )
+        cin = _build_cin(rec, candidate, sri, isnap, sdesc, sb)
+        return cin, sri, isnap, sdesc, sb, warnings, blockers, warning_bindings, blocker_bindings
+
+    @staticmethod
+    def _build_failed_artifacts(
+        rec: CandidateEvaluationRecord,
+        candidate: ManufacturableCandidate,
+        evidence: VerifiedRatingEvidenceSnapshot | None,
+        *,
+        sri: SizingRequestIdentity | None = None,
+        warnings: tuple[Phase3MessageDescriptor, ...] = (),
+        blockers: tuple[Phase3MessageDescriptor, ...] = (),
+        warning_bindings: tuple[Phase3MessageDescriptorBinding, ...] = (),
+        blocker_bindings: tuple[Phase3MessageDescriptorBinding, ...] = (),
+        tampered_src_id: str | None = None,
+        tampered_idx: int | None = None,
+        binding_evidence_digest: str | None = _SENTINEL,
+        evidence_failure_binding: Phase3RunFailureDescriptorBinding | None = None,
+        binding_ef_digest: str | None = _SENTINEL,
+    ):
+        """Build all classification artifacts for failed evidence."""
+        if sri is None:
+            sri = _make_sizing_request_identity()
+        isnap = build_identity_snapshot(rec)
+        sdesc = build_phase2_source_record_descriptor(
+            source_record=rec,
+            identity_snapshot=isnap,
+            verified_evidence=evidence,
+            source_failure_binding=None,
+        )
+
+        src_id = (
+            tampered_src_id if tampered_src_id is not None
+            else rec.source_qualified_candidate_id
+        )
+        eval_idx = tampered_idx if tampered_idx is not None else rec.evaluation_order_index
+
+        if binding_evidence_digest is _SENTINEL:
+            ev_digest = (
+                evidence.compute_explicit_evidence_digest()
+                if evidence is not None else None
+            )
+        else:
+            ev_digest = binding_evidence_digest
+
+        if binding_ef_digest is _SENTINEL:
+            ef_digest = (
+                evidence_failure_binding.descriptor_binding_digest
+                if evidence_failure_binding is not None
+                else None
+            )
+        else:
+            ef_digest = binding_ef_digest
+
+        sb = build_phase3_source_record_binding(
+            source_qualified_candidate_id=src_id,
+            evaluation_order_index=eval_idx,
+            phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
+            verified_rating_evidence_digest=ev_digest,
+            phase2_identity_snapshot_digest=isnap.identity_snapshot_digest,
+            warning_descriptor_binding_digests=tuple(
+                b.descriptor_binding_digest for b in warning_bindings
+            ),
+            blocker_descriptor_binding_digests=tuple(
+                b.descriptor_binding_digest for b in blocker_bindings
+            ),
+            source_evaluation_failure_binding_digest=None,
+            evidence_failure_binding_digest=ef_digest,
+        )
+        cin = _build_cin(rec, candidate, sri, isnap, sdesc, sb)
+        return cin, sri, isnap, sdesc, sb, warnings, blockers, warning_bindings, blocker_bindings
+
+    @staticmethod
+    def _make_msg_descriptors(
+        evidence: VerifiedRatingEvidenceSnapshot,
+    ) -> tuple[
+        tuple[Phase3MessageDescriptor, ...],
+        tuple[Phase3MessageDescriptor, ...],
+        tuple[Phase3MessageDescriptorBinding, ...],
+        tuple[Phase3MessageDescriptorBinding, ...],
+    ]:
+        """Build warning/blocker descriptors and bindings matching evidence content."""
+        from hexagent.optimization.evaluation import _build_message_descriptor as bmd
+
+        wds: list[Phase3MessageDescriptor] = []
+        bds: list[Phase3MessageDescriptor] = []
+        for w in evidence.warnings:
+            desc = bmd(w)
+            wds.append(Phase3MessageDescriptor(
+                owner_sort_key=desc.owner_sort_key,
+                original_code=desc.original_code,
+                message_payload_digest=desc.message_payload_digest,
+            ))
+        for b in evidence.blockers:
+            desc = bmd(b)
+            bds.append(Phase3MessageDescriptor(
+                owner_sort_key=desc.owner_sort_key,
+                original_code=desc.original_code,
+                message_payload_digest=desc.message_payload_digest,
+            ))
+        wbds = tuple(build_phase3_message_descriptor_binding(d) for d in wds)
+        bbds = tuple(build_phase3_message_descriptor_binding(d) for d in bds)
+        return tuple(wds), tuple(bds), wbds, bbds
+
+    @staticmethod
+    def _failed_evidence(
+        *,
+        failure_msg: str = "test failure",
+        warnings: tuple = (),
+        blockers: tuple = (),
+    ) -> VerifiedRatingEvidenceSnapshot:
+        """Build failed evidence with a RunFailure payload and no thermal results."""
+        from hexagent.domain.messages import (
+            EngineeringMessage,
+            EngineeringMessageSeverity,
+        )
+
+        failure = RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message=failure_msg,
+            context=(("key", "val"),),
+        )
+        rri = RatingRequestIdentity(
+            hot_fluid_name="Water",
+            hot_fluid_backend="CP",
+            hot_fluid_components=(),
+            cold_fluid_name="Water",
+            cold_fluid_backend="CP",
+            cold_fluid_components=(),
+            hot_mass_flow_kg_s=1.0,
+            cold_mass_flow_kg_s=0.8,
+            hot_inlet_pressure_pa=2e5,
+            cold_inlet_pressure_pa=1.5e5,
+            hot_inlet_temperature_k=350.0,
+            cold_inlet_temperature_k=290.0,
+            flow_arrangement="counterflow",
+            geometry={
+                "inner_tube_inner_diameter_m": 0.05,
+                "inner_tube_outer_diameter_m": 0.06,
+                "outer_pipe_inner_diameter_m": 0.10,
+                "effective_length_m": 1.0,
+                "wall_thermal_conductivity_w_m_k": 50.0,
+                "inner_surface_roughness_m": 1e-5,
+                "annulus_surface_roughness_m": 1e-5,
+                "inner_fouling_resistance_m2k_w": 0.0001,
+                "outer_fouling_resistance_m2k_w": 0.0002,
+            },
+            solver_absolute_residual_w=1e-3,
+            solver_relative_residual_fraction=1e-8,
+            solver_bracket_temperature_tolerance_k=1e-4,
+            solver_max_iterations=100,
+        )
+        exec_ctx = _make_exec_ctx()
+        rri_digest = sha256_digest(rating_request_identity_payload(rri))
+        ec_digest = sha256_digest(execution_context_snapshot_payload(exec_ctx))
+        _warnings = warnings if warnings else (
+            EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="test warning",
+                source_module="test",
+            ),
+        )
+        _blockers = blockers if blockers else (
+            EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.BLOCKER,
+                message="test blocker",
+                source_module="test",
+            ),
+        )
+        return VerifiedRatingEvidenceSnapshot(
+            rating_status=RatingStatus.FAILED,
+            heat_duty_w=None,
+            hot_outlet_temperature_k=None,
+            cold_outlet_temperature_k=None,
+            area_inner_m2=4.0,
+            area_outer_m2=5.0,
+            tube_flow_area_m2=0.002,
+            annulus_flow_area_m2=0.005,
+            provider_identity=_make_provider(),
+            rating_result_hash="sha256:" + "e" * 64,
+            rating_provenance_digest="sha256:" + "f" * 64,
+            hash_verification_outcome=VerificationOutcome.PASSED,
+            provenance_verification_outcome=VerificationOutcome.PASSED,
+            rating_request_identity=rri,
+            rating_request_identity_digest=rri_digest,
+            rating_execution_context=exec_ctx,
+            rating_execution_context_digest=ec_digest,
+            failure=failure,
+            warnings=_warnings,
+            blockers=_blockers,
+        )
+
+    # ══════════════════════════════════════════════════════════════════════
+    # POSITIVE TESTS
+    # ══════════════════════════════════════════════════════════════════════
+
+    def test_valid_blocked_evidence_passes_validation(self) -> None:
+        """Valid blocked evidence passes validation and classifies as INFEASIBLE/RATING_BLOCKED."""
+        evidence = _make_blocked_evidence()  # no warnings, no blockers
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.INFEASIBLE
+        assert disp.diagnostic == FeasibilityDiagnosticKey.RATING_BLOCKED
+
+    def test_valid_failed_evidence_passes_validation(self) -> None:
+        """Valid failed evidence passes validation and classifies as INFEASIBLE/RATING_FAILED."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.INFEASIBLE
+        assert disp.diagnostic == FeasibilityDiagnosticKey.RATING_FAILED
+
+    # ══════════════════════════════════════════════════════════════════════
+    # NEGATIVE TESTS — BLOCKED EVIDENCE
+    # ══════════════════════════════════════════════════════════════════════
+
+    def test_blocked_missing_evidence_none__direct(self) -> None:
+        """Blocked path: validate_blocked_evidence returns RunFailure for None evidence."""
+        rec, candidate = _make_ver("c1", 0, rating_status="blocked")
+        isnap = build_identity_snapshot(rec)
+        sdesc = build_phase2_source_record_descriptor(
+            source_record=rec, identity_snapshot=isnap,
+            verified_evidence=None, source_failure_binding=None,
+        )
+        eb = build_phase3_source_record_binding(
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
+            evaluation_order_index=0,
+            phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
+            verified_rating_evidence_digest=None,
+            phase2_identity_snapshot_digest=isnap.identity_snapshot_digest,
+            warning_descriptor_binding_digests=(),
+            blocker_descriptor_binding_digests=(),
+            source_evaluation_failure_binding_digest=None,
+            evidence_failure_binding_digest=None,
+        )
+        result = validate_blocked_evidence(
+            rec, None, eb,
+            warning_descriptors=(),
+            blocker_descriptors=(),
+            warning_descriptor_bindings=(),
+            blocker_descriptor_bindings=(),
+            evidence_failure_binding=None,
+        )
+        assert isinstance(result, RunFailure)
+        assert "missing" in result.message.lower()
+
+    def test_blocked_rating_status_mismatch(self) -> None:
+        """Blocked path with evidence rating_status not 'blocked' → RUNTIME_FAILED."""
+        evidence = _make_evidence(rating_status=RatingStatus.SUCCEEDED)
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            binding_evidence_digest=None,  # required for CLASSIFICATION stage
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_candidate_id_mismatch(self) -> None:
+        """Blocked path with mismatched candidate ID in binding → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            tampered_src_id="sha256:" + "9" * 64,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_evaluation_index_mismatch(self) -> None:
+        """Blocked path with mismatched evaluation index in binding → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            tampered_idx=999,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_rating_request_identity_mismatch(self) -> None:
+        """Blocked path with mismatched RRI digest → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        from hexagent.optimization.evaluation import (
+            VerifiedRatingEvidenceSnapshot as VRES,
+        )
+        # model_construct with actual nested objects to avoid dict issues
+        tampered_evidence = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest="sha256:" + "1" * 64,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered_evidence})
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            tampered_rec, candidate, tampered_evidence,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_provider_identity_mismatch(self) -> None:
+        """Blocked path with rec.provider_identity_matches=False → PROVIDER_IDENTITY_MISMATCH."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked",
+                                   provider_identity_matches=False)
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.PROVIDER_IDENTITY_MISMATCH
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PROVIDER_IDENTITY_MISMATCH
+
+    def test_blocked_hash_outcome_not_passed(self) -> None:
+        """Blocked path with hash_verification_outcome not PASSED → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        from hexagent.optimization.evaluation import (
+            VerifiedRatingEvidenceSnapshot as VRES,
+        )
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=VerificationOutcome.FAILED,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            tampered_rec, candidate, tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_provenance_outcome_not_passed(self) -> None:
+        """Blocked path with provenance_verification_outcome not PASSED → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        from hexagent.optimization.evaluation import (
+            VerifiedRatingEvidenceSnapshot as VRES,
+        )
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=VerificationOutcome.FAILED,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            tampered_rec, candidate, tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            tampered_rec, candidate, tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_missing_warning_descriptor(self) -> None:
+        """Blocked path: evidence has warnings but no descriptors → RUNTIME_FAILED."""
+        from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
+
+        evidence = _make_blocked_evidence()
+        tampered = evidence.model_copy(update={"warnings": (
+            EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="unexpected warning",
+                source_module="test",
+            ),
+        )})
+        rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=(),
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=(),
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_extra_warning_descriptor(self) -> None:
+        """Blocked path: more descriptors than evidence warnings → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        wd = _make_message_descriptor()
+        wbd = _make_message_descriptor_binding(wd)
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            warnings=(wd,), warning_bindings=(wbd,),
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=(wd,),
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=(wbd,),
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_duplicate_warning_descriptor(self) -> None:
+        """Blocked path: descriptor digest mismatch vs evidence warning → RUNTIME_FAILED."""
+        from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
+
+        evidence = _make_blocked_evidence()
+        tampered = evidence.model_copy(update={"warnings": (
+            EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.WARNING,
+                message="specific warning",
+                source_module="test",
+            ),
+        )})
+        rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
+        wd_wrong = _make_message_descriptor()
+        wbd_wrong = _make_message_descriptor_binding(wd_wrong)
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, tampered,
+            warnings=(wd_wrong,), warning_bindings=(wbd_wrong,),
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=(wd_wrong,),
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=(wbd_wrong,),
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_missing_blocker_descriptor(self) -> None:
+        """Blocked path: evidence has blockers but no descriptors → RUNTIME_FAILED."""
+        from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
+
+        evidence = _make_blocked_evidence()
+        tampered = evidence.model_copy(update={"blockers": (
+            EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.BLOCKER,
+                message="unexpected blocker",
+                source_module="test",
+            ),
+        )})
+        rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=(),
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=(),
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_extra_blocker_descriptor(self) -> None:
+        """Blocked path: more blocker descriptors than evidence blockers → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        bd = _make_message_descriptor("B01")
+        bbd = _make_message_descriptor_binding(bd)
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            blockers=(bd,), blocker_bindings=(bbd,),
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=(bd,),
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=(bbd,),
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_duplicate_blocker_descriptor(self) -> None:
+        """Blocked path: blocker descriptor digest mismatch vs evidence blocker → RUNTIME_FAILED."""
+        from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
+
+        evidence = _make_blocked_evidence()
+        tampered = evidence.model_copy(update={"blockers": (
+            EngineeringMessage(
+                code=ErrorCode.INPUT_INCONSISTENT,
+                severity=EngineeringMessageSeverity.BLOCKER,
+                message="specific blocker",
+                source_module="test",
+            ),
+        )})
+        rec, candidate = _make_ver("c1", 0, evidence=tampered, rating_status="blocked")
+        bd_wrong = _make_message_descriptor("B01")
+        bbd_wrong = _make_message_descriptor_binding(bd_wrong)
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, tampered,
+            blockers=(bd_wrong,), blocker_bindings=(bbd_wrong,),
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=(bd_wrong,),
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=(bbd_wrong,),
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_warning_binding_tamper(self) -> None:
+        """Blocked path: warning binding digest mismatch vs SourceRecordBinding → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        wd = _make_message_descriptor()
+        wbd = _make_message_descriptor_binding(wd)
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            warnings=(wd,), warning_bindings=(wbd,),
+            binding_evidence_digest=None,
+        )
+        other_wbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED"))
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=(wd,),
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=(other_wbd,),
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_blocker_binding_tamper(self) -> None:
+        """Blocked path: blocker binding digest mismatch vs SourceRecordBinding → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        bd = _make_message_descriptor("B01")
+        bbd = _make_message_descriptor_binding(bd)
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            blockers=(bd,), blocker_bindings=(bbd,),
+            binding_evidence_digest=None,
+        )
+        other_bbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED_B"))
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=(bd,),
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=(other_bbd,),
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_evidence_digest_tamper(self) -> None:
+        """Blocked path: evidence digest mismatch vs binding → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            binding_evidence_digest=None,  # None != actual → mismatch
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_failure_not_none(self) -> None:
+        """Blocked path: evidence has failure (should be None for blocked) → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        failure = RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="bad",
+            context=(("k", "v"),),
+        )
+        from hexagent.optimization.evaluation import (
+            VerifiedRatingEvidenceSnapshot as VRES,
+        )
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            tampered_rec, candidate, tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            tampered_rec, candidate, tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_successful_thermal_values_mixed_in(self) -> None:
+        """Blocked path: evidence has thermal results (heat_duty_w set) → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        from hexagent.optimization.evaluation import (
+            VerifiedRatingEvidenceSnapshot as VRES,
+        )
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=5000.0,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            tampered_rec, candidate, tampered,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_evidence_failure_binding_not_none(self) -> None:
+        """Blocked path: evidence_failure_binding not None (must be None) → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            binding_evidence_digest=None,
+        )
+        efb = _make_failure_binding()
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_blocked_artifact_from_another_candidate(self) -> None:
+        """Blocked path: binding candidate ID differs from record ID → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="blocked")
+        other_id = "sha256:" + "a" * 64
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_blocked_artifacts(
+            rec, candidate, evidence,
+            tampered_src_id=other_id,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=None,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    # ══════════════════════════════════════════════════════════════════════
+    # NEGATIVE TESTS — FAILED EVIDENCE
+    # ══════════════════════════════════════════════════════════════════════
+
+    def test_failed_missing_evidence_none__direct(self) -> None:
+        """Failed path: validate_failed_evidence returns RunFailure for None evidence."""
+        rec, candidate = _make_ver("c1", 0, rating_status="failed")
+        isnap = build_identity_snapshot(rec)
+        sdesc = build_phase2_source_record_descriptor(
+            source_record=rec, identity_snapshot=isnap,
+            verified_evidence=None, source_failure_binding=None,
+        )
+        eb = build_phase3_source_record_binding(
+            source_qualified_candidate_id=rec.source_qualified_candidate_id,
+            evaluation_order_index=0,
+            phase2_source_record_descriptor_digest=sdesc.descriptor_digest,
+            verified_rating_evidence_digest=None,
+            phase2_identity_snapshot_digest=isnap.identity_snapshot_digest,
+            warning_descriptor_binding_digests=(),
+            blocker_descriptor_binding_digests=(),
+            source_evaluation_failure_binding_digest=None,
+            evidence_failure_binding_digest=None,
+        )
+        result = validate_failed_evidence(
+            rec, None, eb,
+            warning_descriptors=(),
+            blocker_descriptors=(),
+            warning_descriptor_bindings=(),
+            blocker_descriptor_bindings=(),
+            evidence_failure_binding=None,
+        )
+        assert isinstance(result, RunFailure)
+        assert "missing" in result.message.lower()
+
+    def test_failed_rating_status_mismatch(self) -> None:
+        """Failed path with evidence not having FAILED status → RUNTIME_FAILED."""
+        evidence = _make_blocked_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        cin, _, _, _, _, wds, bds, wbds, bbds = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            evidence_failure_binding=_make_failure_binding(),
+            binding_evidence_digest=None,
+        )
+        efb = _make_failure_binding()
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds,
+            blocker_descriptors=bds,
+            warning_descriptor_bindings=wbds,
+            blocker_descriptor_bindings=bbds,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_candidate_id_mismatch(self) -> None:
+        """Failed path: binding candidate ID mismatch → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            tampered_src_id="sha256:" + "9" * 64,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_evaluation_index_mismatch(self) -> None:
+        """Failed path: binding evaluation index mismatch → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            tampered_idx=999,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_hash_outcome_not_passed(self) -> None:
+        """Failed path: hash_verification_outcome not PASSED → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        from hexagent.optimization.evaluation import (
+            VerifiedRatingEvidenceSnapshot as VRES,
+        )
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=VerificationOutcome.FAILED,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        failure_desc = _build_run_failure_descriptor(tampered.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            tampered_rec, candidate, tampered,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_provenance_outcome_not_passed(self) -> None:
+        """Failed path: provenance_verification_outcome not PASSED → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        from hexagent.optimization.evaluation import (
+            VerifiedRatingEvidenceSnapshot as VRES,
+        )
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=evidence.heat_duty_w,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=VerificationOutcome.FAILED,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        failure_desc = _build_run_failure_descriptor(tampered.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            tampered_rec, candidate, tampered,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_failure_payload_digest_tamper(self) -> None:
+        """Failed path: failure payload digest mismatch → RUNTIME_FAILED."""
+        evidence = self._failed_evidence(failure_msg="original message")
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        other_failure = RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="tampered message",
+            context=(("k", "v"),),
+        )
+        other_desc = _build_run_failure_descriptor(other_failure)
+        efb = build_phase3_run_failure_descriptor_binding(other_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_failure_descriptor_binding_tamper(self) -> None:
+        """Failed path: evidence_failure_binding descriptor_binding_digest mismatch."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        from hexagent.optimization.phase3_core import Phase3RunFailureDescriptorBinding as RFDB
+        tampered_efb = RFDB.model_construct(
+            _fields_set=set(RFDB.model_fields.keys()),
+            **{**efb.model_dump(), "descriptor_binding_digest": "sha256:" + "b" * 64}
+        )
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=tampered_efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=tampered_efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_wrong_evidence_failure_binding(self) -> None:
+        """Failed path: evidence_failure_binding mismatch vs SourceRecordBinding."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        other_failure = RunFailure(
+            code=ErrorCode.INPUT_INCONSISTENT,
+            message="other",
+            context=(("k", "v"),),
+        )
+        other_desc = _build_run_failure_descriptor(other_failure)
+        other_efb = build_phase3_run_failure_descriptor_binding(other_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=other_efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_successful_thermal_values_mixed_in(self) -> None:
+        """Failed path: evidence has heat_duty_w (should not for failed) → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        from hexagent.optimization.evaluation import (
+            VerifiedRatingEvidenceSnapshot as VRES,
+        )
+        tampered = VRES.model_construct(
+            _fields_set=set(VRES.model_fields.keys()),
+            rating_status=evidence.rating_status,
+            heat_duty_w=5000.0,
+            hot_outlet_temperature_k=evidence.hot_outlet_temperature_k,
+            cold_outlet_temperature_k=evidence.cold_outlet_temperature_k,
+            area_inner_m2=evidence.area_inner_m2,
+            area_outer_m2=evidence.area_outer_m2,
+            UA_w_k=evidence.UA_w_k,
+            LMTD_k=evidence.LMTD_k,
+            energy_residual_w=evidence.energy_residual_w,
+            ua_lmtd_residual_w=evidence.ua_lmtd_residual_w,
+            tube_inlet_density_kg_m3=evidence.tube_inlet_density_kg_m3,
+            annulus_inlet_density_kg_m3=evidence.annulus_inlet_density_kg_m3,
+            tube_flow_area_m2=evidence.tube_flow_area_m2,
+            annulus_flow_area_m2=evidence.annulus_flow_area_m2,
+            warnings=evidence.warnings,
+            blockers=evidence.blockers,
+            failure=evidence.failure,
+            provider_identity=evidence.provider_identity,
+            tube_correlation=evidence.tube_correlation,
+            annulus_correlation=evidence.annulus_correlation,
+            rating_result_hash=evidence.rating_result_hash,
+            rating_provenance_digest=evidence.rating_provenance_digest,
+            hash_verification_outcome=evidence.hash_verification_outcome,
+            provenance_verification_outcome=evidence.provenance_verification_outcome,
+            rating_request_identity=evidence.rating_request_identity,
+            rating_request_identity_digest=evidence.rating_request_identity_digest,
+            rating_execution_context=evidence.rating_execution_context,
+            rating_execution_context_digest=evidence.rating_execution_context_digest,
+        )
+        failure_desc = _build_run_failure_descriptor(tampered.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        tampered_rec = rec.model_copy(update={"verified_rating_evidence": tampered})
+        wds, bds, wbds, bbds = self._make_msg_descriptors(tampered)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            tampered_rec, candidate, tampered,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_warning_descriptor_mismatch(self) -> None:
+        """Failed path: warning descriptor count mismatch → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=(),
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=(),
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_blocker_descriptor_mismatch(self) -> None:
+        """Failed path: blocker descriptor count mismatch → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=(),
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=(),
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_evidence_digest_tamper(self) -> None:
+        """Failed path: evidence digest mismatch vs binding → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,  # None != actual
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_warning_binding_tamper(self) -> None:
+        """Failed path: warning binding digest mismatch vs SourceRecordBinding."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        other_wbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED"))
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=(other_wbd,),
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_blocker_binding_tamper(self) -> None:
+        """Failed path: blocker binding digest mismatch vs SourceRecordBinding."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            binding_evidence_digest=None,
+        )
+        other_bbd = _make_message_descriptor_binding(_make_message_descriptor("ALTERED_B"))
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=(other_bbd,),
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+    def test_failed_artifact_from_another_candidate(self) -> None:
+        """Failed path: binding candidate ID differs from record ID → RUNTIME_FAILED."""
+        evidence = self._failed_evidence()
+        rec, candidate = _make_ver("c1", 0, evidence=evidence, rating_status="failed")
+        failure_desc = _build_run_failure_descriptor(evidence.failure)
+        efb = build_phase3_run_failure_descriptor_binding(failure_desc)
+        other_id = "sha256:" + "a" * 64
+        wds, bds, wbds, bbds = self._make_msg_descriptors(evidence)
+        cin, _, _, _, _, wds_out, bds_out, wbds_out, bbds_out = self._build_failed_artifacts(
+            rec, candidate, evidence,
+            warnings=wds, blockers=bds,
+            warning_bindings=wbds, blocker_bindings=bbds,
+            evidence_failure_binding=efb,
+            tampered_src_id=other_id,
+            binding_evidence_digest=None,
+        )
+        disp = classify_candidate(
+            cin,
+            warning_descriptors=wds_out,
+            blocker_descriptors=bds_out,
+            warning_descriptor_bindings=wbds_out,
+            blocker_descriptor_bindings=bbds_out,
+            source_failure_binding=None,
+            evidence_failure_binding=efb,
+        )
+        assert disp.disposition == Phase3Disposition.RUNTIME_FAILED
+        assert disp.diagnostic == FeasibilityDiagnosticKey.PHASE3_RUNTIME_FAILED
+
+
+

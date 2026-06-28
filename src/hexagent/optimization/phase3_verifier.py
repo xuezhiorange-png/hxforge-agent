@@ -474,6 +474,8 @@ def verify_phase3_result_semantics_or_raise(
                 cin_i,
                 warning_descriptors=wdt,
                 blocker_descriptors=bdt,
+                warning_descriptor_bindings=wbt,
+                blocker_descriptor_bindings=bbt,
                 source_failure_binding=sfb_i,
                 evidence_failure_binding=efb_i,
             )
