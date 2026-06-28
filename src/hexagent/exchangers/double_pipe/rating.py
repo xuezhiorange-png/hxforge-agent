@@ -751,6 +751,31 @@ class QMaxResult:
 
 
 # ---------------------------------------------------------------------------
+# Q-max convergence predicate (extracted for testability)
+# ---------------------------------------------------------------------------
+
+
+def _qmax_bisection_converged(
+    *,
+    q_low_w: float,
+    q_high_w: float,
+    pinch_residual_k: float,
+    q_tolerance_w: float,
+    pinch_temperature_tolerance_k: float,
+) -> bool:
+    """Return True when both the Q bracket and pinch residual have converged.
+
+    The bisection loop in ``_compute_q_max_parallel`` calls this single
+    predicate so that the *identical* logic can be tested directly without
+    mocking the property provider.
+    """
+    return (
+        q_high_w - q_low_w <= q_tolerance_w
+        and abs(pinch_residual_k) <= pinch_temperature_tolerance_k
+    )
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -2140,7 +2165,13 @@ def _compute_q_max_parallel(
             pinch_hi = pinch_mid  # noqa: F841
 
         # Check dual tolerance using tracked endpoint residuals
-        if q_hi - q_lo <= Q_MAX_Q_TOLERANCE_W and abs(pinch_lo) <= pinch_temperature_tolerance_k:
+        if _qmax_bisection_converged(
+            q_low_w=q_lo,
+            q_high_w=q_hi,
+            pinch_residual_k=pinch_lo,
+            q_tolerance_w=Q_MAX_Q_TOLERANCE_W,
+            pinch_temperature_tolerance_k=pinch_temperature_tolerance_k,
+        ):
             break
     else:
         # Max iterations reached without convergence

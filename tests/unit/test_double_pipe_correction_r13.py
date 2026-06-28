@@ -21,6 +21,7 @@ from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.rating import (
     Q_MAX_Q_TOLERANCE_W,
     _compute_q_max_parallel,
+    _qmax_bisection_converged,
     _qmax_diagnostics_snapshot,
     rate_double_pipe,
 )
@@ -639,17 +640,56 @@ class TestResistanceBreakdownValidation:
 class TestPinchToleranceArgument:
     """Verify _compute_q_max_parallel uses the argument, not module constant."""
 
-    def test_different_tolerance_changes_result(self, provider: CoolPropProvider) -> None:
-        """Different pinch_temperature_tolerance_k values are stored and accepted.
+    # -- Solver-predicate tests (direct proof the loop uses the argument) ---
 
-        Notes
-        -----
-        With this physical test case the pinch residual (~3.21e-10 K) is far
-        below all practical tolerances (1e-6, 1e-8), so convergence is
-        Q-bracket-limited and the iteration count is identical for both
-        tolerances.  The *controlled* deterministic proof that the tolerance
-        actually gates convergence is in
-        ``test_pinch_tolerance_controls_convergence_acceptance`` below.
+    @pytest.mark.parametrize(
+        "q_low, q_high, residual, q_tol, pinch_tol, expected",
+        [
+            # A: residual < loose tolerance → True
+            (10.0, 10.0000005, 5e-6, 1e-6, 1e-5, True),
+            # B: same inputs, tight tolerance → False
+            (10.0, 10.0000005, 5e-6, 1e-6, 1e-6, False),
+            # C: pinch OK but Q bracket too wide → False
+            (10.0, 10.000002, 1e-10, 1e-6, 1e-5, False),
+            # D: negative residual → abs() applied → True
+            (10.0, 10.0000005, -5e-6, 1e-6, 1e-5, True),
+            # E: residual == tolerance boundary → True
+            (10.0, 10.0000005, 1e-5, 1e-6, 1e-5, True),
+            # F: Q width == q tolerance boundary → True
+            (10.0, 10.000001, 1e-10, 1e-6, 1e-5, True),
+        ],
+    )
+    def test_qmax_bisection_converged_predicate(
+        self,
+        q_low: float,
+        q_high: float,
+        residual: float,
+        q_tol: float,
+        pinch_tol: float,
+        expected: bool,
+    ) -> None:
+        """The production convergence predicate uses the passed tolerance."""
+        result = _qmax_bisection_converged(
+            q_low_w=q_low,
+            q_high_w=q_high,
+            pinch_residual_k=residual,
+            q_tolerance_w=q_tol,
+            pinch_temperature_tolerance_k=pinch_tol,
+        )
+        assert result is expected, (
+            f"q_low={q_low} q_high={q_high} residual={residual} "
+            f"q_tol={q_tol} pinch_tol={pinch_tol} → expected {expected}, got {result}"
+        )
+
+    def test_physical_case_is_q_bracket_limited_for_practical_tolerances(
+        self, provider: CoolPropProvider
+    ) -> None:
+        """Physical Water/Water case: convergence is Q-bracket-limited.
+
+        The pinch residual (~3.21e-10 K) is far below all practical
+        tolerances, so both 1e-6 and 1e-8 converge at the same iteration.
+        The *solver predicate* is tested directly in
+        ``test_qmax_bisection_converged_predicate`` below.
         """
         recorder_default = EvaluationRecorder()
         result_default = _compute_q_max_parallel(
@@ -708,19 +748,14 @@ class TestPinchToleranceArgument:
         assert snap_tight.pinch_temperature_tolerance_k == 1e-8
         assert snap_default.final_pinch_residual_k == snap_tight.final_pinch_residual_k
 
-    def test_pinch_tolerance_controls_convergence_acceptance(self) -> None:
-        """Prove the bisection convergence predicate uses the tolerance argument.
+    def test_qmax_snapshot_enforces_pinch_tolerance_contract(self) -> None:
+        """QMaxDiagnosticsSnapshot.__post_init__ enforces |residual| <= tolerance.
 
-        The convergence check in the bisection loop (``rating.py`` line 2143)
-        requires::
-
-            q_hi - q_lo <= Q_MAX_Q_TOLERANCE_W
-            and abs(pinch_lo) <= pinch_temperature_tolerance_k
-
-        We prove the *tolerance* part by constructing ``QMaxDiagnosticsSnapshot``
-        objects with a known residual and checking that the post-hoc validator
-        (which enforces the same condition) accepts or rejects based on the
-        stored tolerance value — not on a module constant.
+        Constructing snapshots with a known residual proves that the stored
+        ``pinch_temperature_tolerance_k`` controls acceptance — a tighter
+        tolerance rejects the same residual that a looser tolerance accepts.
+        This is a *model-contract* test; the solver-loop predicate is tested
+        directly in ``test_qmax_bisection_converged_predicate``.
         """
         # Same bracket values as the real computation
         q_low = 77656.75374448084
