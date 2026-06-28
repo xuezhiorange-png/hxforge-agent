@@ -2100,9 +2100,37 @@ class CandidateDispositionRecord(BaseModel):
         self,
         *,
         source_record: CandidateEvaluationRecord,
+        source_failure_binding: Phase3RunFailureDescriptorBinding | None,
+        phase3_failure_binding: Phase3RunFailureDescriptorBinding | None,
     ) -> None:
-        """Authoritative verifier: validates source identity, digest fields, branch matrix, and self-hash."""
-        # 0) Failure matrix — single authority shared with factory and model validator
+        """Authoritative verifier: validates source identity, digest fields, independent failure authority, branch matrix, and self-hash."""
+        # 0) Validate independent source failure binding
+        if self.failure_origin == PHASE2_EVALUATION:
+            if source_failure_binding is None:
+                raise ValueError("RUNTIME_FAILED(P2): source_failure_binding required")
+            if self.source_evaluation_failure_binding_digest != source_failure_binding.descriptor_binding_digest:
+                raise ValueError("source_evaluation_failure_binding_digest vs binding.descriptor_binding_digest mismatch")
+            expected_payload = source_failure_binding.payload_digest
+            if self.source_evaluation_failure_payload_digest != expected_payload:
+                raise ValueError("source_evaluation_failure_payload_digest vs binding.payload_digest mismatch")
+            if phase3_failure_binding is not None:
+                raise ValueError("RUNTIME_FAILED(P2): phase3_failure_binding must be None")
+        elif self.failure_origin == PHASE3_CLASSIFICATION:
+            if phase3_failure_binding is None:
+                raise ValueError("RUNTIME_FAILED(P3): phase3_failure_binding required")
+            if self.phase3_failure_binding_digest != phase3_failure_binding.descriptor_binding_digest:
+                raise ValueError("phase3_failure_binding_digest vs binding.descriptor_binding_digest mismatch")
+            expected_payload = phase3_failure_binding.payload_digest
+            if self.phase3_failure_payload_digest != expected_payload:
+                raise ValueError("phase3_failure_payload_digest vs binding.payload_digest mismatch")
+            if source_failure_binding is not None:
+                raise ValueError("RUNTIME_FAILED(P3): source_failure_binding must be None")
+        else:
+            if source_failure_binding is not None:
+                raise ValueError(f"{self.disposition}: source_failure_binding must be None")
+            if phase3_failure_binding is not None:
+                raise ValueError(f"{self.disposition}: phase3_failure_binding must be None")
+        # 1) Unified failure matrix — single authority shared with factory and model validator
         verify_candidate_disposition_failure_matrix(
             disposition=self.disposition,
             failure_origin=self.failure_origin,
@@ -2112,7 +2140,7 @@ class CandidateDispositionRecord(BaseModel):
             phase3_failure_binding_digest=self.phase3_failure_binding_digest,
             phase3_failure_payload_digest=self.phase3_failure_payload_digest,
             source_identity_record_descriptor_digest=self.source_identity_record_descriptor_digest)
-        # 1) Source record cross-check
+        # 2) Source record cross-check
         if self.source_qualified_candidate_id != source_record.source_qualified_candidate_id:
             raise ValueError("candidate_id mismatch")
         if self.evaluation_order_index != source_record.evaluation_order_index:
@@ -2127,7 +2155,7 @@ class CandidateDispositionRecord(BaseModel):
             raise ValueError("provider_matches mismatch")
         if self.rating_status != source_record.rating_status:
             raise ValueError("rating_status mismatch")
-        # 2) Digest field cross-check with source_record
+        # 3) Digest field cross-check with source_record
         expected_identity_digest = source_record.candidate_evaluation_identity.candidate_evaluation_identity_digest \
             if source_record.candidate_evaluation_identity is not None else None
         if self.candidate_evaluation_identity_digest != expected_identity_digest:
@@ -2140,7 +2168,7 @@ class CandidateDispositionRecord(BaseModel):
             if source_record.invalid_rating_evidence is not None else None
         if self.invalid_rating_evidence_digest != expected_invalid_digest:
             raise ValueError("invalid_rating_evidence_digest mismatch")
-        # 3) Self-hash integrity
+        # 4) Self-hash integrity
         payload = candidate_disposition_payload_from_values(
             source_qualified_candidate_id=self.source_qualified_candidate_id,
             evaluation_order_index=self.evaluation_order_index,
@@ -2827,7 +2855,10 @@ def build_optimization_result(
             evidence_failure_binding=evidence_failure_bindings[i],
             source_failure_binding=source_failure_bindings[i],
             phase3_failure_binding=phase3_failure_bindings[i])
-        dr.verify_or_raise(source_record=rec_i)
+        dr.verify_or_raise(
+            source_record=rec_i,
+            source_failure_binding=source_failure_bindings[i],
+            phase3_failure_binding=phase3_failure_bindings[i])
     # Verify F ranked records independently matching by feasibility_digest
     feasible_by_digest = {
         d.feasibility_digest: d
@@ -3331,6 +3362,11 @@ def verify_optimization_result_or_raise(
                 warning_descriptors=wdt, blocker_descriptors=bdt,
                 source_failure_binding=sfb, evidence_failure_binding=efb)
             if candidate_disposition_payload(dr) != candidate_disposition_payload(expected): raise ValueError(f"[{i}] prep-failure mismatch")
+        # Authoritative disposition replay — independent failure authority
+        dr.verify_or_raise(
+            source_record=rec,
+            source_failure_binding=sfb,
+            phase3_failure_binding=p3fb)
         # Descriptor tuple exact length and value
         if len(dr.warning_descriptors) != len(wdt): raise ValueError(f"[{i}] warning count {len(dr.warning_descriptors)} != {len(wdt)}")
         for j,d in enumerate(dr.warning_descriptors):
