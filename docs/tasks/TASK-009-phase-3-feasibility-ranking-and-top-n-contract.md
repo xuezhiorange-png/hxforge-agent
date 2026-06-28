@@ -1313,13 +1313,11 @@ class Phase3CandidateClassificationInput(BaseModel):
         candidate: ManufacturableCandidate,
     ) -> None:
         """Authoritative verifier with independent authority params."""
-        # 1) Source record cross-validation
-        if self.source_record.source_qualified_candidate_id != source_record.source_qualified_candidate_id:
-            raise ValueError("source_record candidate_id mismatch")
-        if self.source_record.evaluation_order_index != source_record.evaluation_order_index:
-            raise ValueError("source_record index mismatch")
-        if self.source_record.candidate_evaluation_state != source_record.candidate_evaluation_state:
-            raise ValueError("source_record state mismatch")
+        # 1) Source record full-equality cross-validation — all frozen fields,
+        #    not just ID/index/state. Covers rating_status, provider outcomes,
+        #    verified/invalid evidence, failure, and strict-stop state.
+        if self.source_record != source_record:
+            raise ValueError("source_record full equality mismatch")
         # 2) Identity snapshot digest cross-check
         if self.source_identity_record_descriptor_digest != identity_snapshot.identity_snapshot_digest:
             raise ValueError("source_identity_record_descriptor_digest mismatch vs identity_snapshot")
@@ -1345,11 +1343,11 @@ class Phase3CandidateClassificationInput(BaseModel):
             if source_record.verified_rating_evidence is not None else None
         if self.verified_rating_evidence_digest != expected_ve:
             raise ValueError("verified_rating_evidence_digest mismatch")
-        # 7) Materialized candidate cross-check
-        if self.materialized_candidate.source_qualified_candidate_id != candidate.source_qualified_candidate_id:
-            raise ValueError("materialized_candidate candidate_id mismatch")
-        if self.materialized_candidate.evaluation_order_index != candidate.evaluation_order_index:
-            raise ValueError("materialized_candidate index mismatch")
+        # 7) Materialized candidate full-equality cross-validation — all frozen
+        #    fields (geometry, material, catalog identity, effective length, etc.),
+        #    not just ID/index. Must match the authoritative candidate from EvaluationInput.
+        if self.materialized_candidate != candidate:
+            raise ValueError("materialized_candidate full equality mismatch")
         # 8) Self-hash
         expected = sha256_digest(_classification_input_payload(self))
         if self.classification_input_digest != expected:
@@ -1358,7 +1356,7 @@ class Phase3CandidateClassificationInput(BaseModel):
 def _classification_input_payload(cin: Phase3CandidateClassificationInput) -> dict[str, object]:
     return {"schema_version": cin.schema_version, "source_identity_record_descriptor_digest": cin.source_identity_record_descriptor_digest,
         "source_record_descriptor_digest": cin.source_record_descriptor_digest,
-        "materialized_candidate_id": cin.materialized_candidate.source_qualified_candidate_id,
+        "materialized_candidate_digest": cin.materialized_candidate.source_qualified_candidate_id,
         "sizing_request_identity_digest": cin.sizing_request_identity_digest,
         "identity_snapshot_digest": cin.evidence_binding.phase2_identity_snapshot_digest,
         "source_binding_digest": cin.evidence_binding.binding_digest,
