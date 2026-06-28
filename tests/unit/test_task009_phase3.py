@@ -100,7 +100,6 @@ from hexagent.optimization.phase3_core import (
     to_canonical_decimal,
     verify_canonical_decimal_string,
 )
-from pydantic import ValidationError
 from hexagent.optimization.phase3_evaluation import (
     Phase3CandidateClassificationInput,
     Phase3EvaluationInput,
