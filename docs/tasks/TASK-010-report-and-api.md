@@ -261,7 +261,6 @@ class SizingApiRequest(StrictBaseModel):
 
 **All dimensional fields use typed `Quantity` subclasses.** No bare `float`:
 - `minimum_effective_length`, `maximum_effective_length` → `Length | None`
-- `required_duty` → `Power`
 - `duty_absolute_tolerance` → `Power`
 - `duty_relative_tolerance` → `Dimensionless` with `unit="dimensionless"` (not `""`)
 
@@ -297,21 +296,35 @@ The application service must, before computing `request_digest`:
 
 The orchestration layer extracts `.si_value` from each Quantity:
 
-```
-SizingApiRequest
-→ catalog resolution: CatalogSnapshotReference → CompleteDoublePipeCatalogSnapshot (hash verified)
-→ SizingRequest(
+```python
+# Sizing projection: api_request (SizingApiRequest) → domain (SizingRequest + identity)
+api_request: SizingApiRequest  # public DTO with case.target_duty
+
+# 1. Resolve duty from single authority
+required_duty_w: float = api_request.case.target_duty.si_value
+
+# 2. Build domain request (no case/duty — domain SizingRequest has no case field)
+domain_request = SizingRequest(
     catalogs=resolved_catalogs,
-    minimum_effective_length_m=minimum_effective_length.si_value if set else None,
-    maximum_effective_length_m=maximum_effective_length.si_value if set else None,
-    request_raw_combination_cap=request_raw_combination_cap,
+    minimum_effective_length_m=(
+        api_request.minimum_effective_length.si_value
+        if api_request.minimum_effective_length is not None
+        else None
+    ),
+    maximum_effective_length_m=(
+        api_request.maximum_effective_length.si_value
+        if api_request.maximum_effective_length is not None
+        else None
+    ),
+    request_raw_combination_cap=api_request.request_raw_combination_cap,
 )
-→ build_sizing_request_identity(
-    request,
-    ...,
-    required_duty_w=request.case.target_duty.si_value,
-    duty_absolute_tolerance_w=duty_absolute_tolerance.si_value,
-    duty_relative_tolerance=duty_relative_tolerance.si_value,
+
+# 3. Build identity (duty from api_request, not domain_request)
+identity = build_sizing_request_identity(
+    domain_request,
+    required_duty_w=required_duty_w,
+    duty_absolute_tolerance_w=api_request.duty_absolute_tolerance.si_value,
+    duty_relative_tolerance=api_request.duty_relative_tolerance.si_value,
     ...
 )
 ```
@@ -326,35 +339,55 @@ SizingApiRequest
 SizingApiRequest
 │
 ├─ 1. validate_public_request() → rejects at 422
-├─ 2. resolve catalog refs → verify hash → freeze snapshots
-├─ 3. canonicalize_request() → compute request_digest (binds full resolved catalogs)
-├─ 4. project_to_domain() → SizingRequest + SizingRequestIdentity
-├─ 5. sizing_gate() → PassedSizingGate
-├─ 6. candidate_materialization() → MaterializationResult
-├─ 7. phase2_candidate_evaluation() → tuple[CandidateEvaluationRecord, ...]
-├─ 8. phase3_evaluation_input() → Phase3EvaluationInput
-│      (materialization_result is already MaterializationResult)
-├─ 9. phase3_classification() → per-candidate
-├─ 10. deterministic_ranking()
-├─ 11. top_n_projection()
-├─ 12. build_optimization_result() → + authoritative verification + provenance
-├─ 13. build_sizing_run_artifacts()
-├─ 14. build_sizing_run_envelope()
-└─ 15. complete run in repository
+├─ 2. resolve provider authority (§3.3.3)
+│      → ResolvedProviderAuthority (or 422 if not found / identity mismatch)
+│      → verify ExpectedProviderIdentity.matches(actual)
+├─ 3. resolve catalog refs → verify hash → freeze snapshots
+├─ 4. construct canonical context (expected provider + actual provider + resolved catalogs)
+├─ 5. compute request_digest (binds full provider identity + catalogs + all inputs)
+├─ 6. claim idempotency namespace
+├─ 7. project_to_domain() → SizingRequest + SizingRequestIdentity
+├─ 8. sizing_gate() → PassedSizingGate
+├─ 9. candidate_materialization() → MaterializationResult
+├─ 10. phase2_candidate_evaluation() → tuple[CandidateEvaluationRecord, ...]
+├─ 11. phase3_evaluation_input() → Phase3EvaluationInput
+│       (materialization_result is already MaterializationResult)
+├─ 12. phase3_classification() → per-candidate
+├─ 13. deterministic_ranking()
+├─ 14. top_n_projection()
+├─ 15. build_optimization_result() → + authoritative verification + provenance
+├─ 16. build_sizing_run_artifacts()
+├─ 17. build_sizing_run_envelope()
+└─ 18. complete run in repository
 ```
+
+**Provider not found or identity mismatch → HTTP 422:** No run record generated, no namespace claimed, no catalog gate or rating execution started.
 
 ### 4.2 Rating Orchestration
 
 ```
 RatingApiRequest
 │
-├─ 1. validate + canonicalize
-├─ 2. project_to_domain() → DesignCase + DoublePipeGeometry + SolverParams
-├─ 3. DoublePipeRatingService.rate()
-├─ 4. build_rating_run_artifacts()
-├─ 5. build_rating_run_envelope()
-└─ 6. complete run in repository
+├─ 1. validate_public_request() → rejects at 422
+├─ 2. resolve provider_ref through immutable registry
+│      → ResolvedProviderAuthority (full ProviderIdentitySnapshot)
+│      → verify identity completeness (or 422 if not found)
+├─ 3. construct canonical request context
+│      (full provider identity + geometry + solver + case + flow arrangement)
+├─ 4. compute request_digest (binds full resolved provider identity — NOT just provider_ref string)
+├─ 5. claim idempotency namespace
+├─ 6. project_to_domain() → DesignCase + DoublePipeGeometry + SolverParams
+├─ 7. DoublePipeRatingService.rate() — execute with exactly the resolved provider
+├─ 8. build_rating_run_artifacts()
+├─ 9. build_rating_run_envelope()
+└─ 10. complete run in repository
 ```
+
+**Prohibitions:**
+- Computing `request_digest` before resolving provider
+- Including only `provider_ref` string in request digest
+- Claiming namespace then discovering provider does not exist
+- Executing with a different provider version than was resolved
 
 ### 4.3 Forbidden Paths
 
@@ -463,6 +496,9 @@ class RatingRunEnvelope(StrictBaseModel):
         recomputed = self.provenance.compute_hash()
         if self.provenance_digest != recomputed:
             raise ValueError("provenance_digest mismatch")
+        # P0-4: Three-way provenance parity
+        if self.provenance_digest != self.result.provenance_digest:
+            raise ValueError("envelope provenance_digest != result.provenance_digest")
         return self
 ```
 
@@ -506,10 +542,20 @@ class SizingRunEnvelope(StrictBaseModel):
         if self.blockers != expected_blockers:
             raise ValueError("blocker projection mismatch")
 
-        # P0-3: Failure authority — reconstruct from authoritative artifacts
-        expected_failure = reconstruct_sizing_failure(self.artifact_bundle)
-        if self.failure != expected_failure:
-            raise ValueError("failure projection mismatch")
+        # P0-3: Sizing failure is always None.
+        # OptimizationResult only has COMPLETE/PARTIAL termination_status.
+        # Candidate-level and run-level exceptions are expressed via
+        # blocker digests, dispositions, and failure bindings — NOT RunFailure.
+        if self.failure is not None:
+            raise ValueError("sizing envelope failure must be None")
+
+        # PARTIAL termination must have auditable authority
+        if self.result.termination_status == TerminationStatus.PARTIAL:
+            verify_partial_termination_authority(
+                result=self.result,
+                artifacts=self.artifact_bundle.phase3_authoritative_artifacts,
+                dispositions=self.artifact_bundle.dispositions,
+            )
 
         # P0-3: Provenance object parity — not just digest equality
         if self.provenance != self.artifact_bundle.provenance_graph:
@@ -542,34 +588,34 @@ def reconstruct_sizing_blockers(bundle: SizingRunArtifacts) -> tuple[Engineering
     )
 ```
 
-def reconstruct_sizing_failure(bundle: SizingRunArtifacts) -> RunFailure | None:
-    """Reconstruct failure from Phase3AuthoritativeArtifacts and OptimizationResult.
+def verify_partial_termination_authority(
+    *,
+    result: OptimizationResult,
+    artifacts: Phase3AuthoritativeArtifacts,
+    dispositions: tuple[CandidateDispositionRecord, ...],
+) -> None:
+    """Verify PARTIAL termination has an auditable explanation.
 
-    Sources (in priority order):
-    1. Phase3AuthoritativeArtifacts.source_failure_bindings — Phase 2 runtime failures
-    2. Phase3AuthoritativeArtifacts.evidence_failure_bindings — evidence failures
-    3. OptimizationResult.termination_status — FAILED/COMPLETE/PARTIAL
+    PARTIAL requires at least one of:
+    - non-empty blocker digests in OptimizationResult
+    - at least one non-FEASIBLE disposition record
+    - at least one source_failure_binding or evidence_failure_binding
 
-    Multiple conflicting authorities or unresolvable state → fail closed.
+    COMPLETE requires none of these (but may have them).
     """
-    artifacts = bundle.phase3_authoritative_artifacts
-    result = bundle.optimization_result
+    has_blockers = bool(result.ordered_blocker_digests)
+    has_non_feasible = any(
+        d.disposition != Phase3Disposition.FEASIBLE for d in dispositions
+    )
+    has_failure_bindings = bool(
+        artifacts.source_failure_bindings or artifacts.evidence_failure_bindings
+    )
 
-    # If result has explicit failure binding, use it
-    if result.failure is not None:
-        return result.failure
-
-    # Check Phase 2 source failure bindings
-    if artifacts.source_failure_bindings:
-        # Use the first (and should be only) source failure
-        return artifacts.source_failure_bindings[0].run_failure
-
-    # Check evidence failure bindings
-    if artifacts.evidence_failure_bindings:
-        return artifacts.evidence_failure_bindings[0].run_failure
-
-    # No failure found — consistent with COMPLETE/PARTIAL termination
-    return None
+    if not (has_blockers or has_non_feasible or has_failure_bindings):
+        raise ValueError(
+            "PARTIAL termination requires at least one blocker, "
+            "non-FEASIBLE disposition, or failure binding"
+        )
 ```
 
 **Rules:** Digest order from `OptimizationResult` — no manual reorder. Descriptor+tuple from same `Phase3AuthoritativeArtifacts`. Unresolved/conflicting → fail closed. Never re-derive authority from display text.
@@ -651,7 +697,8 @@ class RunRecord(StrictBaseModel):
 | STALE | claim(takeover=True) | CLAIMED | Atomic CAS takeover: new owner_token, record_version+1, refresh timestamps. Old owner_token immediately invalidated. |
 | COMPLETE | claim() same digest | COMPLETE (replay) | No state change, returns existing envelope |
 | COMPLETE | claim() different digest | 409 conflict | Namespace collision |
-| FAILED | claim() | CHOSEN: replay failure OR allow new claim | Must freeze one policy — default: replay failure |
+|| FAILED | claim() same digest | FAILED_REPLAY | Return existing failed result; no re-execution |
+|| FAILED | claim() different digest | 409 | IDEMPOTENCY_CONFLICT |
 | CLAIMED/RUNNING | heartbeat() | same state | CAS: owner_token + expected_version, refresh lease |
 
 **`claim()` return type:**
@@ -662,6 +709,7 @@ class ClaimOutcome(StrEnum):
     COMPLETE_REPLAY = "complete_replay"
     IN_PROGRESS = "in_progress"
     FAILED_REPLAY = "failed_replay"
+    STALE_REJECTED = "stale_rejected"
     STALE_TAKEOVER = "stale_takeover"
 
 @dataclass(frozen=True)
@@ -677,9 +725,10 @@ class ClaimResult:
 | Same namespace + COMPLETE + same digest | COMPLETE_REPLAY | Return existing envelope, 200 |
 | Same namespace + COMPLETE + different digest | 409 | Namespace conflict |
 | Same namespace + CLAIMED/RUNNING + lease valid | IN_PROGRESS | Return 409 + structured IN_PROGRESS |
-| Same namespace + STALE + takeover=False | STALE | Return 409 or explicit STALE response |
-| Same namespace + STALE + takeover=True | STALE_TAKEOVER | Atomic CAS: new owner_token, version+1, refresh timestamps |
-| Same namespace + FAILED | FAILED_REPLAY | Return failed envelope OR allow new claim (policy choice) |
+|| Same namespace + STALE + takeover=False | STALE_REJECTED | HTTP 409 structured error; record not modified |
+|| Same namespace + STALE + takeover=True | STALE_TAKEOVER | Atomic CAS: new owner_token, version+1, refresh timestamps |
+|| Same namespace + FAILED + same digest | FAILED_REPLAY | Return existing failed result; no re-execution |
+|| Same namespace + FAILED + different digest | 409 | IDEMPOTENCY_CONFLICT |
 | New namespace | NEW_CLAIM | Create record, new owner_token |
 
 **Takeover atomicity:**
@@ -710,7 +759,14 @@ HEARTBEAT_INTERVAL: timedelta = timedelta(seconds=10)
 
 
 class RunRepository(Protocol):
-    def claim(self, *, namespace_digest, request_digest, operation, takeover=False) -> tuple[RunRecord, bool]: ...
+    def claim(
+        self,
+        *,
+        namespace_digest: str,
+        request_digest: str,
+        operation: str,
+        takeover: bool = False,
+    ) -> ClaimResult: ...
     def start(self, *, owner_token, expected_version) -> RunRecord: ...
     def heartbeat(self, *, owner_token, expected_version) -> RunRecord: ...
     def complete(self, *, owner_token, expected_version, envelope, artifact_bundle) -> RunRecord: ...
@@ -741,7 +797,7 @@ class RunRepository(Protocol):
 
 ### 8.1 Design Decision: Quantity values as JSON strings
 
-All canonical scalar values are encoded as **JSON strings**, not JSON numbers, to avoid binary float serialization differences.
+**Canonical scalar type rules:** `Decimal`, `float`, and `Quantity` numeric values are encoded as **JSON strings** (to avoid binary float serialization differences). `int` remains JSON number. `bool` remains JSON boolean. `None` remains JSON null.
 
 ```python
 def canonical_decimal_string(value: Decimal) -> str:
@@ -781,7 +837,7 @@ def canonical_decimal_string(value: Decimal) -> str:
       0.00000000001 → "1E-11"
       0.000000000001 → "1E-12"
       99999999999 → "99999999999"
-      100000000000 → "100000000000"
+      100000000000 → "1E+11"
     """
     if not value.is_finite():
         raise ValueError("non-finite decimal")
@@ -867,7 +923,7 @@ def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
 || `0.00000000001` (Decimal) | `"1E-11"` |
 || `0.000000000001` (Decimal) | `"1E-12"` |
 || `99999999999` (Decimal) | `"99999999999"` |
-|| `100000000000` (Decimal) | `"100000000000"` |
+|| `100000000000` (Decimal) | `"1E+11"` |
 | `TemperatureDifference(5, "delta_degC")` | `{"value": "5", "unit": "K"}` |
 | `TemperatureDifference(5, "K")` | `{"value": "5", "unit": "K"}` |
 | `Length(250, "cm")` | `{"value": "2.5", "unit": "m"}` |
@@ -947,6 +1003,39 @@ def geometry_identity_payload(geometry: DoublePipeGeometry) -> dict[str, object]
     }
 
 
+def verify_rating_canonical_request_parity(
+    *,
+    snapshot: dict[str, object],
+    request_identity: RatingRequestIdentity,
+    geometry: DoublePipeGeometry,
+    solver: SolverParams,
+    provider: ProviderIdentitySnapshot,
+) -> None:
+    """Verify canonical request snapshot matches authoritative sources.
+
+    Validates: geometry, solver controls, provider identity, flow arrangement,
+    boundary conditions, minimum terminal delta-T, request identity payload.
+    Must be called by verify_rating_artifact_bundle() and envelope validator.
+    Prevents attack where snapshot is modified and bundle digest recomputed.
+    """
+    if snapshot.get("geometry") != geometry_identity_payload(geometry):
+        raise ValueError("canonical snapshot geometry mismatch")
+    if snapshot.get("solver_absolute_residual_w") != solver.absolute_residual_w:
+        raise ValueError("canonical snapshot solver absolute_residual_w mismatch")
+    if snapshot.get("solver_relative_residual_fraction") != solver.relative_residual_fraction:
+        raise ValueError("canonical snapshot solver relative_residual_fraction mismatch")
+    if snapshot.get("solver_bracket_temperature_tolerance_k") != solver.bracket_temperature_tolerance_k:
+        raise ValueError("canonical snapshot solver bracket_temperature_tolerance_k mismatch")
+    if snapshot.get("solver_max_iterations") != solver.max_iterations:
+        raise ValueError("canonical snapshot solver max_iterations mismatch")
+    if snapshot.get("provider_identity") != provider.model_dump():
+        raise ValueError("canonical snapshot provider identity mismatch")
+    if snapshot.get("flow_arrangement") != request_identity.flow_arrangement:
+        raise ValueError("canonical snapshot flow_arrangement mismatch")
+    if snapshot.get("minimum_terminal_delta_t") != request_identity.minimum_terminal_delta_t:
+        raise ValueError("canonical snapshot minimum_terminal_delta_t mismatch")
+
+
 def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
     # Reconstruct through real Pydantic validation
     reconstructed = RatingResult.model_validate(bundle.result.model_dump(mode="python"))
@@ -984,8 +1073,14 @@ def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
     if bundle.solver_settings.max_iterations != bundle.request_identity.solver_max_iterations:
         raise ValueError("solver max iterations mismatch")
 
-    # P0-4: Envelope provenance_digest must equal result.provenance_digest
-    # (validated in envelope validator, but bundle verifier also checks graph integrity)
+    # P0-4: Canonical request snapshot parity (not just bundle digest)
+    verify_rating_canonical_request_parity(
+        snapshot=bundle.canonical_request_snapshot,
+        request_identity=bundle.request_identity,
+        geometry=bundle.geometry_snapshot,
+        solver=bundle.solver_settings,
+        provider=bundle.provider_identity,
+    )
 
     # Digest
     recompute_and_check_bundle_digest(bundle)
@@ -1185,6 +1280,40 @@ class DoublePipeReportModel(StrictBaseModel):
         return self
 ```
 
+def validate_rfc6901_pointer(pointer: str) -> None:
+    """Validate a JSON Pointer per RFC 6901.
+
+    Allowed:
+    - "" (empty root pointer)
+    - "/" (root)
+    - "/geometry/inner~1outer" (~1 decodes to /)
+    - "/a~0b" (~0 decodes to ~)
+
+    Rejected:
+    - "a/b" (missing leading /)
+    - "/a~" (trailing ~)
+    - "/a~2b" (only ~0 and ~1 are valid escapes)
+    """
+    if pointer == "":
+        return
+    if not pointer.startswith("/"):
+        raise ValueError("JSON pointer must be empty or start with '/'")
+    for token in pointer.split("/")[1:]:
+        index = 0
+        while index < len(token):
+            if token[index] != "~":
+                index += 1
+                continue
+            if index + 1 >= len(token):
+                raise ValueError("trailing '~' in JSON pointer token")
+            escaped = token[index + 1]
+            if escaped not in {"0", "1"}:
+                raise ValueError(
+                    "JSON pointer permits only ~0 and ~1 escapes"
+                )
+            index += 2
+
+
 def verify_report_artifact_shape(artifact: ReportArtifact) -> None:
     """Validate PRESENT/non-PRESENT field invariants for a single artifact.
 
@@ -1200,9 +1329,8 @@ def verify_report_artifact_shape(artifact: ReportArtifact) -> None:
     """
     if artifact.kind == ReportArtifactKind.PRESENT:
         present = typing.cast(PresentReportArtifact, artifact)
-        # RFC 6901 pointer validation
-        if present.source_json_pointer and not present.source_json_pointer.startswith("/"):
-            raise ValueError(f"source_json_pointer must start with /: {present.source_json_pointer}")
+        # RFC 6901 pointer validation (full token-level validation)
+        validate_rfc6901_pointer(present.source_json_pointer)
         # All required fields present
         required = [
             present.source_document, present.source_document_digest,
@@ -1218,6 +1346,12 @@ def verify_report_artifact_shape(artifact: ReportArtifact) -> None:
         if hasattr(artifact, "canonical_raw_value") and getattr(artifact, "canonical_raw_value", None):
             raise ValueError("non-PRESENT artifact must not have canonical_raw_value")
 
+
+**Source pointer resolution rules (step 7 of pre-render chain):**
+- `~1` in pointer token decodes to `/`
+- `~0` in pointer token decodes to `~`
+- Pointer cannot be resolved → fail closed
+- Resolved canonical raw value differs from artifact's `canonical_raw_value` → fail closed
 
 **`verify_report_section_status_matrix()` is a mandatory pre-render verifier** called by the only report builder before returning the model. It is NOT optional, NOT a comment, and NOT skippable. It is invoked at step 6 of the pre-render chain (§10.5).
 
@@ -1516,7 +1650,7 @@ class ErrorDetail(StrictBaseModel):
 | T1 | `operation_id` unique and stable | 6 unique IDs |
 | T2 | Public request DTO JSON Schema exportable | Valid |
 | T3 | Dimensional bare `float` → `422` | Quantity validation |
-| T3b | Sizing bare `float` for required_duty → `422` | Quantity validation |
+|| T3b | Sizing bare `float` for `duty_absolute_tolerance` → `422` | Quantity validation |
 | T3c | Geometry DTO with fouling → `422` | Single-authority |
 | T3d | `Dimensionless(value=0, unit="")` → `422` | Unit non-empty |
 | T3e | `Dimensionless(value=0, unit="dimensionless")` → accepted | Valid unit |
@@ -1533,30 +1667,33 @@ class ErrorDetail(StrictBaseModel):
 | T9e | `TemperatureDifference(5, "delta_degC")` → `{"value":"5","unit":"K"}` | SI unit |
 | T9f | `TemperatureDifference(5, "K")` and `TemperatureDifference(5, "delta_degC")` → same digest | Unit equivalence |
 || T9g | SolverParams omitted → same defaults as explicit `SolverParamsSpec()` | Default projection |
-|| T60 | Sizing duty derived solely from `case.target_duty` — `SizingApiRequest` has no `required_duty` field | Single authority |
-|| T61 | SI-equivalent units allowed: `Power(100, "kW")` and `Power(100000, "W")` produce identical `required_duty_w` | Unit equivalence |
-|| T62 | If dual-field design is chosen, canonical mismatch → `422`; no idempotency namespace claimed | Mismatch rejection |
-|| T63 | Same `provider_ref`, different provider version → different `request_digest` | Provider identity binding |
-|| T64 | Same `provider_ref`, different `git_revision` → different `request_digest` | Provider identity binding |
-|| T65 | `configuration_fingerprint` change → different `request_digest` | Provider identity binding |
-|| T66 | `cache_policy_version` change → different `request_digest` | Provider identity binding |
-|| T67 | Expected provider identity does not match resolved provider → `422` | Fail closed |
-|| T68 | Provider not found in registry → `422`; no repository claim | Resolution failure |
+|| T60 | `SizingApiRequest` has no `required_duty` field; duty derived from `case.target_duty.si_value` | Single authority |
+|| T61 | `case.target_duty` SI-equivalent units: `Power(100, "kW")` and `Power(100000, "W")` → identical `required_duty_w` | Unit equivalence |
+|| T62 | Extra `required_duty` field submitted → rejected by `extra="forbid"` at `422`; no idempotency namespace claimed | Forbid rejection |
+|| T63 | Same `provider_ref`, different provider version → different `request_digest`; provider resolution occurs before digest computation | Provider identity binding + ordering |
+|| T64 | Same `provider_ref`, different `git_revision` → different `request_digest`; provider resolution occurs before digest computation | Provider identity binding + ordering |
+|| T65 | `configuration_fingerprint` change → different `request_digest`; provider resolution occurs before digest computation | Provider identity binding + ordering |
+|| T66 | `cache_policy_version` change → different `request_digest`; provider resolution occurs before digest computation | Provider identity binding + ordering |
+|| T67 | Expected provider identity does not match resolved provider → `422`; no run record, no namespace claim, no catalog/rating execution | Fail closed + ordering |
+|| T68 | Provider not found in registry → `422`; no run record, no namespace claim | Resolution failure + ordering |
 || T86 | `catalog_refs` input order different → same `request_digest` | Canonical ordering |
 || T87 | Completely duplicate catalog ref → rejected | Uniqueness |
 || T88 | Same identity, different content hash → rejected | Identity consistency |
 || T10–T12 | Envelope type enforcement | Cross-field |
 || T13 | Envelope `result_hash` mismatch → rejected | Cross-field |
 || T14 | Rating envelope cross-field mismatch → rejected | Cross-field |
-|| T14b–T14e | Sizing warning/blocker/failure/provenance parity | Cross-field |
+|| T14b–T14d | Sizing warning/blocker/provenance parity | Cross-field |
+|| T14e | Sizing provenance graph object parity | Cross-field |
 || T14f | Sizing envelope warning mismatch → rejected | Warning parity |
 || T14g | Sizing envelope blocker mismatch → rejected | Blocker parity |
-|| T14j | Sizing envelope failure mismatch → rejected | Failure parity |
+|| T14j | Sizing envelope failure non-None → rejected | Failure always None |
+|| T14l | PARTIAL termination with no blocker/disposition/failure-binding authority → rejected | PARTIAL authority |
+|| T14m | PARTIAL termination with authoritative blocker/disposition → accepted | PARTIAL authority |
 || T14k | Sizing provenance graph object mismatch (even with same digest) → rejected | Provenance object parity |
 || T69 | Tampered `geometry_snapshot` → rejected | Geometry binding |
 || T70 | Tampered `solver_settings` → rejected | Solver binding |
-|| T71 | Canonical request geometry differs from result identity → rejected | Cross-boundary |
-|| T72 | Envelope `provenance_digest` differs from `RatingResult.provenance_digest` → rejected | Provenance parity |
+|| T71 | Canonical request snapshot geometry/solver/provider mismatch → rejected | Snapshot parity |
+|| T72 | Envelope `provenance_digest` differs from `result.provenance_digest` → rejected; three-way parity: envelope.provenance_digest == result.provenance_digest == envelope.provenance.compute_hash() | Provenance three-way parity |
 || T73 | Two blockers represented and order stable | Collection identity |
 || T74 | Two warnings represented and order stable | Collection identity |
 || T75 | `requested_top_n=3` represents three candidates | Collection identity |
@@ -1569,7 +1706,15 @@ class ErrorDetail(StrictBaseModel):
 | T19–T22 | BLOCKED→200, 404, 500, 501 | Status code |
 | T23–T24 | Artifact bundle replay + digest cross-check | Verifier |
 | T24b | Bundle missing SizingRequest → rejected | Required field |
-| T25 | PresentReportArtifact pointer resolution | RFC 6901 + discriminator |
+|| T25 | PresentReportArtifact pointer resolution | RFC 6901 + discriminator |
+|| T25b | Valid pointer `""` (root) → accepted | RFC 6901 |
+|| T25c | Valid pointer `"/geometry/inner~1outer"` → accepted, decoded to `/geometry/inner/outer` | RFC 6901 ~1 decode |
+|| T25d | Valid pointer `"/a~0b"` → accepted, decoded to `/a~b` | RFC 6901 ~0 decode |
+|| T25e | Invalid pointer `"a/b"` (no leading /) → rejected | RFC 6901 |
+|| T25f | Invalid pointer `"/a~"` (trailing ~) → rejected | RFC 6901 |
+|| T25g | Invalid pointer `"/a~2b"` (invalid escape) → rejected | RFC 6901 |
+|| T25h | Source pointer cannot be resolved → fail closed | Pointer resolution |
+|| T25i | Resolved value differs from `canonical_raw_value` → fail closed | Pointer parity |
 | T26–T27 | PRESENT missing pointer → reject; non-PRESENT with source → reject | Invariant |
 | T28–T30 | Section uniqueness, mandatory, order → reject | Section contract |
 | T30b | Section/status matrix violations (see §10.5) | 12 cases |
@@ -1592,14 +1737,18 @@ class ErrorDetail(StrictBaseModel):
 | T57 | `SolverParamsSpec()` default values match production `SolverParams` defaults | Default alignment |
 | T58 | `complete()` rejects rating envelope with sizing bundle | Type mismatch |
 | T59 | `complete()` rejects sizing envelope with rating bundle | Type mismatch |
-|| T78 | claim new record → NEW_CLAIM | State machine |
-|| T79 | COMPLETE same digest → COMPLETE_REPLAY | Replay |
-|| T80 | RUNNING lease valid → IN_PROGRESS | In-progress response |
-|| T81 | STALE takeover atomic success | CAS takeover |
-|| T82 | Takeover → old owner heartbeat → CAS reject | Owner invalidation |
-|| T83 | Takeover → old owner complete → CAS reject | Owner invalidation |
-|| T84 | Illegal CLAIMED → COMPLETE transition → reject | State machine |
-|| T85 | complete() with bundle != envelope bundle → reject | Bundle parity |
+|| T78 | claim new record → ClaimResult(NEW_CLAIM, record) | State machine |
+|| T79 | COMPLETE same digest → ClaimResult(COMPLETE_REPLAY, record); no re-execution | Replay |
+|| T80 | RUNNING lease valid → ClaimResult(IN_PROGRESS, record); HTTP 409 | In-progress response |
+|| T81 | STALE takeover=True → ClaimResult(STALE_TAKEOVER, record); new owner_token, version+1 | CAS takeover |
+|| T82 | STALE takeover=False → ClaimResult(STALE_REJECTED, record); record not modified | Stale rejection |
+|| T83 | Takeover → old owner heartbeat → CAS reject (owner_token mismatch) | Owner invalidation |
+|| T84 | Takeover → old owner complete → CAS reject (owner_token mismatch) | Owner invalidation |
+|| T85 | Illegal CLAIMED → COMPLETE transition → reject | State machine |
+|| T86a | FAILED same digest → ClaimResult(FAILED_REPLAY, record); no re-execution | Failed replay |
+|| T86b | FAILED different digest → 409 IDEMPOTENCY_CONFLICT | Namespace conflict |
+|| T86c | complete() with bundle != envelope bundle → reject | Bundle parity |
+|| T86d | claim() returns ClaimResult, not tuple[RunRecord, bool] | Type contract |
 
 ---
 
