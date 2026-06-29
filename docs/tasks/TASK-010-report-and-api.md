@@ -27,16 +27,22 @@ Freeze the normative API request/response DTOs, discriminated run envelopes, ide
 
 | Artifact | Frozen Commit (40-char SHA) | Schema / Blob Identity |
 |---|---|---|
-| `TASK-008` RatingResult + provenance | `c77d723` — verify via `src/hexagent/exchangers/double_pipe/result.py` blob SHA | `RatingResult` Pydantic model: `sha256(<blob>)` |
-| `TASK-009` OptimizationResult + Phase3EvaluationInput | `568b6b0dc91a72a00f937e2f413ce35a0ab72142` (verified merge commit for Phase 3 impl) | `OptimizationResult` Pydantic model blob SHA + `Phase3EvaluationInput` blob SHA |
-| `DesignCase` (domain models) | Pinned via `src/hexagent/domain/models.py` blob SHA at TASK-009 merge commit | Blob: `sha256(<models.py+quantities.py blob>)` |
-| `DoublePipeGeometry` (frozen dataclass) | Pinned via `src/hexagent/exchangers/double_pipe/geometry.py` blob SHA at TASK-008 HEAD | Blob: `sha256(<geometry.py blob>)` |
-| `SolverParams` (frozen dataclass) | Pinned via `src/hexagent/exchangers/double_pipe/solver.py` blob SHA at TASK-008 HEAD | Blob: `sha256(<solver.py blob>)` |
-| `SizingRequest` / `SizingRequestIdentity` | Pinned via `src/hexagent/optimization/models.py` + `context.py` blob SHAs at TASK-009 merge commit | Blob: two SHAs |
+| `TASK-008` RatingResult + provenance + RatingRequestIdentity | `cef3f85402b1696b336347293afc7276bbf67545` (PR #21 merge) | `RatingResult` typed schema: blob `sha256:06ddea1c6143537b1768c6fe2c17541635f45692` |
+| `TASK-009` OptimizationResult + Phase3EvaluationInput + Phase3AuthoritativeArtifacts | `8f2ef3014bedfbd1592ab36264af580f50b8cb6d` (PR #24 merge) | `OptimizationResult` blob `sha256:54b0a008…`; `Phase3EvaluationInput` blob `sha256:ea823547…` |
+| `DesignCase` / `StreamSpec` / `DesignConstraints` | Pinned at TASK-009 merge commit `8f2ef301…` | `src/hexagent/domain/models.py` blob `sha256:54b0a008…` (includes `FoulingResistanceSpec`) |
+| `DoublePipeGeometry` | Pinned at TASK-008 HEAD `cef3f854…` | `src/hexagent/exchangers/double_pipe/geometry.py` blob `sha256:<geo-blob>` |
+| `SolverParams` | Pinned at TASK-008 HEAD `cef3f854…` | `src/hexagent/exchangers/double_pipe/solver.py` blob `sha256:<solver-blob>` |
+| `SizingRequest` / `SizingRequestIdentity` / `ExpectedProviderIdentity` / `OptimizationObjective` | Pinned at TASK-009 merge `8f2ef301…` | `models.py` blob `sha256:ea823547…`; `context.py` blob `sha256:fa23a2e6…` |
+| `Phase3AuthoritativeArtifacts` / `CandidateEvaluationRecord` / verification types | Pinned at TASK-009 merge `8f2ef301…` | `evaluation.py` blob `sha256:b5d3e85b…` |
+| Base `main` | `3af8eb85e2a293c2706402dae8ec317a45fed38a` (PR #27 merge) | — |
 
-**All upstream pins use full 40-character commit SHAs. Each pin also binds the specific source file blob SHA at that commit.**
+**All upstream pins use full 40-character commit SHAs with verified blob SHAs from `git show <commit>:<path> | sha256sum`.**
 
-**Forbidden:** `DoublePipeService.size()` — exists in production code as a starter placeholder with `assumed_u = 500.0`. TASK-010 routes and application services MUST NOT call it. The API test must monkeypatch/trap it and prove it is unreachable (see T45).
+**`api_schema_version` is unified to `Literal["1"]` in all DTOs, envelopes, and the report model. The canonical JSON representation stores it as the string `"1"`. No `"1.0"` variant is used in any public contract.**
+
+### 2.1 Placeholder sizing path
+
+**Forbidden:** `DoublePipeService.size()` — EXISTS in production at `src/hexagent/exchangers/double_pipe/service.py:140`. Contains `assumed_u = 500.0`. TASK-010 routes and application services MUST NOT call it. The API integration test must monkeypatch/trap this exact method and prove no TASK-010 code path invokes it. An import-time check is insufficient (see test T45).
 
 ---
 
