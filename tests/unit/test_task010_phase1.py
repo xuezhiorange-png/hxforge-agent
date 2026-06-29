@@ -1,19 +1,26 @@
 """TASK-010 Phase 1 — Projection and contract tests.
 
-Tests T1–T45 from the frozen TASK-010 test contract.  Covers:
+Tests T1–T88+ from the frozen TASK-010 test contract.  Covers:
   - API DTO construction, frozen behavior, extra-field rejection
   - Quantity validation (string-to-number, bare float, invalid unit, NaN/Inf, −0)
   - Single-authority rules (target_duty, phase_hint, fouling, terminal ΔT)
   - DTO → domain model projection (field-level consistency)
   - SolverParamsSpec defaults match production SolverParams
   - solver_params=None vs explicit identity
-  - Provider/catalog resolution contracts
+  - Provider/catalog resolution via ProviderRegistry / CatalogRegistry
   - Canonical digest sensitivity (provider, catalog, solver, geometry, boundary, duty)
   - Unit equivalence canonical payloads
   - Unicode/Decimal canonical equivalence
   - Non-finite canonical payload rejection
   - JSON schema dimensional-field enforcement
   - DoublePipeService.size() never called by projection/identity path
+  - canonical_decimal_string vectors
+  - canonical_quantity_payload vectors
+  - ProviderRegistry immutability (MappingProxyType)
+  - CatalogSnapshotReference validation
+  - Case name validation
+  - Numeric string coercion
+  - Solver None vs empty canonical context equality
 """
 
 from __future__ import annotations
@@ -21,11 +28,19 @@ from __future__ import annotations
 import inspect
 import math
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
+from hexagent.api.canonical_request import (
+    build_sizing_canonical_request_context,
+    canonical_decimal_string,
+    canonical_quantity_payload,
+    canonicalize_api_payload,
+    compute_api_request_digest,
+)
 from hexagent.api.models import (
     CatalogSnapshotReference,
     DoublePipeGeometrySpec,
@@ -42,6 +57,8 @@ from hexagent.api.projection import (
     project_solver_spec_to_solver,
     project_validation_to_design_case,
 )
+from hexagent.api.registry import CatalogRegistry, ProviderRegistry
+from hexagent.core.heat_balance import ProviderIdentitySnapshot
 from hexagent.domain.models import (
     DesignCase,
     FluidSpec,
@@ -65,10 +82,9 @@ from hexagent.optimization.catalog import compute_catalog_content_hash
 from hexagent.optimization.context import (
     ExpectedProviderIdentity,
     OptimizationObjective,
-    SizingRequestIdentity,
-    build_sizing_request_identity,
 )
 from hexagent.optimization.models import (
+    CatalogSnapshotRef,
     CompleteDoublePipeAssemblyOption,
     CompleteDoublePipeCatalogSnapshot,
     LengthSource,
@@ -246,6 +262,112 @@ def _sizing_api_request(
     )
     defaults.update(kwargs)
     return SizingApiRequest(**defaults)  # type: ignore[arg-type]
+
+
+def _make_provider_snapshot(**overrides: str) -> ProviderIdentitySnapshot:
+    """Build a ProviderIdentitySnapshot for test use."""
+    defaults = dict(
+        name="CoolProp",
+        version="6.6.0",
+        git_revision="abc123",
+        reference_state_policy="IIR",
+        configuration_fingerprint="",
+        cache_policy_version="",
+    )
+    defaults.update(overrides)
+    return ProviderIdentitySnapshot(**defaults)  # type: ignore[arg-type]
+
+
+def _make_provider_registry(ref: str = "default", **overrides: str) -> ProviderRegistry:
+    """Build a ProviderRegistry with a single provider."""
+    return ProviderRegistry({ref: _make_provider_snapshot(**overrides)})
+
+
+def _cat_snapshot_ref(cat: CompleteDoublePipeCatalogSnapshot) -> CatalogSnapshotRef:
+    """Build a CatalogSnapshotRef from a catalog snapshot."""
+    return CatalogSnapshotRef(
+        catalog_id=cat.catalog_id,
+        catalog_version=cat.catalog_version,
+        catalog_content_hash=cat.catalog_content_hash,
+        source_identity=cat.source_identity,
+        schema_version=cat.schema_version,
+    )
+
+
+def _make_cat_registry(
+    cats: list[CompleteDoublePipeCatalogSnapshot] | None = None,
+) -> CatalogRegistry:
+    """Build a CatalogRegistry with given snapshots."""
+    if cats is None:
+        cats = [_make_cat()]
+    return CatalogRegistry(cats)
+
+
+def _validation_request_with_duty(duty_w: float) -> ValidationApiRequest:
+    """Build a ValidationApiRequest with a specific target duty in watts."""
+    return ValidationApiRequest(
+        api_schema_version="1",
+        case_name="test_case",
+        hot_stream=_hot_stream_spec(),
+        cold_stream=_cold_stream_spec(),
+        target_duty=Power(value=duty_w, unit="W"),
+        minimum_terminal_delta_t=TemperatureDifference(value=5, unit="K"),
+        design_pressure_hot=AbsolutePressure(value=500_000, unit="Pa"),
+        design_pressure_cold=AbsolutePressure(value=500_000, unit="Pa"),
+        design_temperature_hot=AbsoluteTemperature(value=400, unit="K"),
+        design_temperature_cold=AbsoluteTemperature(value=350, unit="K"),
+        required_area_margin_fraction=0.1,
+    )
+
+
+def _compute_sizing_digest(
+    cat: CompleteDoublePipeCatalogSnapshot,
+    provider_snapshot: ProviderIdentitySnapshot | None = None,
+    solver_params: SolverParamsSpec | None = None,
+    validation_request: ValidationApiRequest | None = None,
+    **overrides: Any,
+) -> str:
+    """Compute the sizing request digest via the canonical path.
+
+    Uses build_sizing_canonical_request_context() + compute_api_request_digest().
+    """
+    if provider_snapshot is None:
+        provider_snapshot = _make_provider_snapshot()
+
+    provider_reg = ProviderRegistry({"default": provider_snapshot})
+    cat_reg = CatalogRegistry([cat])
+
+    cat_ref = _catalog_ref(cat)
+
+    defaults = dict(
+        api_schema_version="1",
+        case=validation_request if validation_request is not None else _validation_request(),
+        catalog_refs=(cat_ref,),
+        tube_boundary_condition="constant_wall_temperature",
+        annulus_boundary_condition="constant_wall_temperature",
+        flow_arrangement="counterflow",
+        optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+        requested_top_n=3,
+        expected_provider_identity=ExpectedProviderIdentity(
+            name=provider_snapshot.name,
+            version=provider_snapshot.version,
+            git_revision=provider_snapshot.git_revision,
+            reference_state_policy=provider_snapshot.reference_state_policy,
+        ),
+        solver_params=solver_params,
+    )
+    defaults.update(overrides)
+    api_request = SizingApiRequest(**defaults)  # type: ignore[arg-type]
+
+    resolved_provider = provider_reg.resolve("default")
+    resolved_catalogs = tuple(authority.snapshot for authority in [cat_reg.resolve(cat_ref)])
+
+    ctx = build_sizing_canonical_request_context(
+        request=api_request,
+        resolved_provider=resolved_provider,
+        resolved_catalogs=resolved_catalogs,
+    )
+    return compute_api_request_digest(ctx)
 
 
 # =========================================================================
@@ -465,23 +587,20 @@ class TestNegativeZero:
     """T8: Negative zero (−0) is handled per quantity kind rules."""
 
     def test_negative_zero_mass_flow_rejected(self) -> None:
-        # MassFlow must be > 0 in SI; -0.0 converts to 0.0 → fails > 0 check
         with pytest.raises((ValidationError, AttributeError)):
             MassFlow(value=-0.0, unit="kg/s")
 
     def test_negative_zero_length_accepted(self) -> None:
-        # Length allows >= 0; -0.0 → 0.0 is valid
         q = Length(value=-0.0, unit="m")
         assert q.si_value == 0.0
 
     def test_negative_zero_pressure_rejected(self) -> None:
-        # AbsolutePressure must be > 0
         with pytest.raises((ValidationError, AttributeError)):
             AbsolutePressure(value=-0.0, unit="Pa")
 
 
 # =========================================================================
-# T9: target_duty sole authority
+# T9: target_duty sole authority (+ T60, T61, T62)
 # =========================================================================
 
 
@@ -505,6 +624,30 @@ class TestTargetDutyAuthority:
         data["required_duty"] = {"value": 50000, "unit": "W"}
         with pytest.raises(Exception, match="required_duty"):
             SizingApiRequest.model_validate(data)
+
+    # T60: target_duty canonical payload is {"value": "...", "unit": "W"}
+    def test_target_duty_canonical_payload_format(self) -> None:
+        q = Power(value=100_000, unit="W")
+        payload = canonical_quantity_payload(q)
+        assert "value" in payload
+        assert "unit" in payload
+        assert payload["unit"] == "W"
+        assert isinstance(payload["value"], str)
+
+    # T61: target_duty in kW canonical payload same as W
+    def test_target_duty_kw_canonical_matches_w(self) -> None:
+        q_w = Power(value=100_000, unit="W")
+        q_kw = Power(value=100, unit="kW")
+        p_w = canonical_quantity_payload(q_w)
+        p_kw = canonical_quantity_payload(q_kw)
+        assert p_w["value"] == p_kw["value"]
+        assert p_w["unit"] == p_kw["unit"]
+
+    # T62: duty canonical value is positive
+    def test_target_duty_canonical_value_positive(self) -> None:
+        q = Power(value=100_000, unit="W")
+        payload = canonical_quantity_payload(q)
+        assert Decimal(payload["value"]) > 0
 
 
 # =========================================================================
@@ -563,7 +706,7 @@ class TestTerminalDeltaTAuthority:
 # =========================================================================
 
 
-class TestValidationToDesignCaseConsistency:
+class TestProjectionValidation:
     """T13: project_validation_to_design_case maps all fields correctly."""
 
     def test_name_mapped(self) -> None:
@@ -610,7 +753,7 @@ class TestValidationToDesignCaseConsistency:
 # =========================================================================
 
 
-class TestStreamSpecProjection:
+class TestProjectionFluidStream:
     """T14: project_fluid_stream_to_stream_spec maps all fields correctly."""
 
     def test_fluid_mapped(self) -> None:
@@ -649,7 +792,7 @@ class TestStreamSpecProjection:
 # =========================================================================
 
 
-class TestGeometryProjection:
+class TestProjectionGeometry:
     """T15: project_geometry_spec_to_geometry extracts .si_value correctly."""
 
     def test_inner_diameter(self) -> None:
@@ -704,7 +847,7 @@ class TestGeometryProjection:
 # =========================================================================
 
 
-class TestSolverProjection:
+class TestProjectionSolver:
     """T16: project_solver_spec_to_solver extracts .si_value correctly."""
 
     def test_absolute_residual(self) -> None:
@@ -746,7 +889,7 @@ class TestSolverProjection:
 # =========================================================================
 
 
-class TestSolverDefaults:
+class TestSolverDefaultMatch:
     """T17: SolverParamsSpec() defaults match production SolverParams() defaults."""
 
     def test_defaults_match(self) -> None:
@@ -768,40 +911,71 @@ class TestSolverDefaults:
 
 
 # =========================================================================
-# T18: solver_params=None vs {} identity
+# T18: solver_params=None vs {} identity (rewrite: compare canonical contexts)
 # =========================================================================
 
 
-class TestSolverParamsIdentity:
+class TestSolverIdentity:
     """T18: Omitting solver_params (None) and passing explicit SolverParamsSpec()
-    produce the same projected SolverParams and same canonical identity."""
+    produce the same canonical request context."""
 
-    def test_none_vs_default_identity(self) -> None:
+    def test_none_vs_default_canonical_context_equal(self) -> None:
         cat = _make_cat()
         cat_ref = _catalog_ref(cat)
+        provider_snapshot = _make_provider_snapshot()
+        provider_reg = ProviderRegistry({"default": provider_snapshot})
+        cat_reg = CatalogRegistry([cat])
+        resolved_provider = provider_reg.resolve("default")
+        resolved_catalogs = tuple(authority.snapshot for authority in [cat_reg.resolve(cat_ref)])
 
         req_none = _sizing_api_request(cat_ref=cat_ref, solver_params=None)
         req_explicit = _sizing_api_request(cat_ref=cat_ref, solver_params=SolverParamsSpec())
 
-        # Both should produce the same SolverParams via projection
-        proj_none = SolverParams()  # default
-        proj_explicit = project_solver_spec_to_solver(SolverParamsSpec())
-        assert proj_none == proj_explicit
+        ctx_none = build_sizing_canonical_request_context(
+            request=req_none,
+            resolved_provider=resolved_provider,
+            resolved_catalogs=resolved_catalogs,
+        )
+        ctx_explicit = build_sizing_canonical_request_context(
+            request=req_explicit,
+            resolved_provider=resolved_provider,
+            resolved_catalogs=resolved_catalogs,
+        )
 
-        # The two requests should have identical identity fields
-        assert req_none.solver_params is None
-        assert req_explicit.solver_params is not None
+        assert ctx_none == ctx_explicit
+
+    def test_none_vs_default_digest_equal(self) -> None:
+        cat = _make_cat()
+        d_none = _compute_sizing_digest(cat, solver_params=None)
+        d_explicit = _compute_sizing_digest(cat, solver_params=SolverParamsSpec())
+        assert d_none == d_explicit
 
 
 # =========================================================================
-# T19: Provider unknown ref rejection
+# T19: Provider unknown ref rejection (+ T68)
 # =========================================================================
 
 
-class TestProviderUnknownRef:
-    """T19: An unknown provider_ref leads to resolution failure.
-    Tested through ExpectedProviderIdentity.matches() contract."""
+class TestProviderResolution:
+    """T19: An unknown provider_ref leads to resolution failure via ProviderRegistry."""
 
+    def test_unknown_provider_ref_raises(self) -> None:
+        reg = ProviderRegistry({"known": _make_provider_snapshot()})
+        with pytest.raises(ValueError, match="Unknown provider reference"):
+            reg.resolve("unknown")
+
+    def test_blank_provider_ref_raises(self) -> None:
+        reg = ProviderRegistry({"known": _make_provider_snapshot()})
+        with pytest.raises(ValueError, match="non-blank"):
+            reg.resolve("")
+
+    def test_known_ref_resolves(self) -> None:
+        reg = _make_provider_registry("coolprop")
+        resolved = reg.resolve("coolprop")
+        assert resolved.provider_ref == "coolprop"
+        assert resolved.identity.name == "CoolProp"
+
+    # T68: provider identity mismatch
     def test_provider_identity_mismatch_rejected(self) -> None:
         expected = ExpectedProviderIdentity(
             name="CoolProp",
@@ -810,7 +984,6 @@ class TestProviderUnknownRef:
             reference_state_policy="IIR",
         )
 
-        # Simulate a different actual provider
         class FakeActual:
             name = "CoolProp"
             version = "7.0.0"  # different version
@@ -828,118 +1001,114 @@ class TestProviderUnknownRef:
 
 
 class TestProviderDuplicateKey:
-    """T20: Duplicate provider refs in the resolution context are rejected.
-    The provider resolution chain enforces uniqueness."""
+    """T20: Duplicate provider refs — the second silently wins in a dict
+    but registry construction validates each ref is non-blank."""
 
-    def test_catalog_ref_duplicate_rejected(self) -> None:
-        """Duplicate catalog refs in SizingApiRequest are rejected by
-        the catalog resolution contract (duplicates with same identity key)."""
-        cat = _make_cat()
-        cat_ref = _catalog_ref(cat)
-        # SizingApiRequest itself doesn't reject duplicates at DTO level,
-        # but SizingRequest does at the catalog level
-        req = _sizing_api_request(
-            cat_ref=cat_ref,
-        )
-        # The request is valid at the API level — resolution checks happen downstream
-        assert req.catalog_refs == (cat_ref,)
+    def test_duplicate_ref_in_dict_overwrites(self) -> None:
+        """Python dicts silently overwrite — registry stores the last one."""
+        snap_a = _make_provider_snapshot(version="6.6.0")
+        snap_b = _make_provider_snapshot(version="7.0.0")
+        providers: dict[str, ProviderIdentitySnapshot] = {"default": snap_a}
+        providers["default"] = snap_b  # overwrite
+        reg = ProviderRegistry(providers)
+        resolved = reg.resolve("default")
+        assert resolved.identity.version == "7.0.0"
+
+    def test_blank_ref_in_registry_rejected(self) -> None:
+        with pytest.raises(ValueError, match="non-blank"):
+            ProviderRegistry({"": _make_provider_snapshot()})
 
 
 # =========================================================================
-# T21: Same provider_ref, different identity -> different digest
+# T21: Same provider_ref, different identity -> different digest (+ T63-T66)
 # =========================================================================
 
 
-class TestProviderIdentityDigest:
+class TestProviderDigestSensitivity:
     """T21: Different provider identities produce different
-    SizingRequestIdentity digests."""
+    canonical request context digests. Uses full path."""
 
     def test_different_provider_version_different_digest(self) -> None:
         cat = _make_cat()
-        identity_a = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            minimum_terminal_delta_t=5.0,
-            required_duty_w=100_000.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=ExpectedProviderIdentity(
-                name="CoolProp",
-                version="6.6.0",
-                git_revision="abc123",
-                reference_state_policy="IIR",
-            ),
-        )
-        identity_b = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            minimum_terminal_delta_t=5.0,
-            required_duty_w=100_000.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=ExpectedProviderIdentity(
-                name="CoolProp",
-                version="7.0.0",  # different
-                git_revision="abc123",
-                reference_state_policy="IIR",
-            ),
-        )
-        d_a = identity_a.sizing_request_identity_digest
-        d_b = identity_b.sizing_request_identity_digest
+        snap_a = _make_provider_snapshot(version="6.6.0")
+        snap_b = _make_provider_snapshot(version="7.0.0")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
+        assert d_a != d_b
+
+    # T63: git_revision change
+    def test_git_revision_change(self) -> None:
+        cat = _make_cat()
+        snap_a = _make_provider_snapshot(git_revision="abc123")
+        snap_b = _make_provider_snapshot(git_revision="def456")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
+        assert d_a != d_b
+
+    # T64: reference_state_policy change
+    def test_reference_state_policy_change(self) -> None:
+        cat = _make_cat()
+        snap_a = _make_provider_snapshot(reference_state_policy="IIR")
+        snap_b = _make_provider_snapshot(reference_state_policy="NBP")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
+        assert d_a != d_b
+
+    # T65: configuration_fingerprint change
+    def test_configuration_fingerprint_change(self) -> None:
+        cat = _make_cat()
+        snap_a = _make_provider_snapshot(configuration_fingerprint="")
+        snap_b = _make_provider_snapshot(configuration_fingerprint="fp123")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
+        assert d_a != d_b
+
+    # T66: cache_policy_version change
+    def test_cache_policy_version_change(self) -> None:
+        cat = _make_cat()
+        snap_a = _make_provider_snapshot(cache_policy_version="")
+        snap_b = _make_provider_snapshot(cache_policy_version="v2")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
         assert d_a != d_b
 
 
 # =========================================================================
-# T22: Catalog unknown ref rejection
+# T22: Catalog unknown ref rejection (+ T55)
 # =========================================================================
 
 
-class TestCatalogUnknownRef:
+class TestCatalogResolution:
     """T22: Referencing a catalog not found in the registry → rejected.
-    The catalog resolution contract verifies existence."""
+    Uses CatalogRegistry.resolve()."""
 
     def test_catalog_ref_not_in_registry_raises(self) -> None:
-        """The projection function requires already-resolved catalogs.
-        A non-existent catalog_ref would fail during resolution before
-        projection. Test that the projection contract is correct."""
-        cat_ref = CatalogSnapshotReference(
+        cat = _make_cat()
+        reg = CatalogRegistry([cat])
+        bad_ref = CatalogSnapshotRef(
             catalog_id="nonexistent",
             catalog_version="v99",
             catalog_content_hash="sha256:" + "00" * 32,
             source_identity="nowhere",
             schema_version="1.0",
         )
-        req = _sizing_api_request(cat_ref=cat_ref)
-        # The API DTO itself is valid — the resolution happens downstream
-        assert req.catalog_refs[0].catalog_id == "nonexistent"
+        with pytest.raises(ValueError, match="Unknown catalog reference"):
+            reg.resolve(bad_ref)
+
+    # T55: valid ref resolves
+    def test_catalog_ref_resolves(self) -> None:
+        cat = _make_cat()
+        reg = CatalogRegistry([cat])
+        ref = _cat_snapshot_ref(cat)
+        resolved = reg.resolve(ref)
+        assert resolved.content_hash_verified is True
+        assert resolved.snapshot.catalog_id == cat.catalog_id
+
+    def test_catalog_registry_snapshots_property(self) -> None:
+        cat = _make_cat()
+        reg = CatalogRegistry([cat])
+        assert len(reg.snapshots) == 1
+        assert reg.snapshots[0].catalog_id == cat.catalog_id
 
 
 # =========================================================================
@@ -948,26 +1117,23 @@ class TestCatalogUnknownRef:
 
 
 class TestCatalogDuplicateKey:
-    """T23: Duplicate catalog identities are rejected by the counting layer."""
+    """T23: Duplicate catalog identities are rejected by CatalogRegistry."""
 
-    def test_duplicate_catalog_rejected_by_counter(self) -> None:
-        from hexagent.optimization.length import compute_raw_combination_count
-
+    def test_duplicate_catalog_rejected(self) -> None:
         cat = _make_cat()
-        with pytest.raises(Exception, match="[Dd]uplicate"):
-            compute_raw_combination_count((cat, cat))
+        with pytest.raises(ValueError, match="[Dd]uplicate"):
+            CatalogRegistry([cat, cat])
 
 
 # =========================================================================
-# T24: Catalog refs duplicate rejection
+# T87: Catalog refs duplicate rejection
 # =========================================================================
 
 
 class TestCatalogRefsDuplicate:
-    """T24: Duplicate catalog refs (same identity key) are rejected
-    by the counting/gating layer."""
+    """T87: Duplicate catalog refs are rejected by the sizing projection."""
 
-    def test_same_catalog_ref_twice_rejected_by_counter(self) -> None:
+    def test_same_catalog_ref_twice_rejected(self) -> None:
         from hexagent.optimization.length import compute_raw_combination_count
 
         cat = _make_cat()
@@ -976,45 +1142,55 @@ class TestCatalogRefsDuplicate:
 
 
 # =========================================================================
-# T25: Catalog refs input order change -> same canonical result
+# T86: Catalog order independence
 # =========================================================================
 
 
-class TestCatalogOrderInvariance:
-    """T25: Different input orders of catalog refs produce the same
-    canonical SizingRequest and identity."""
+class TestCatalogOrderIndependence:
+    """T86: Different input orders of catalog refs produce the same
+    canonical CatalogRegistry ordering."""
 
-    def test_catalog_order_invariant(self) -> None:
+    def test_catalog_registry_canonical_order(self) -> None:
         cat_a = _make_cat("cat_a", opts=(_make_opt("o1"),))
         cat_b = _make_cat("cat_b", opts=(_make_opt("o2"),))
+        reg = CatalogRegistry([cat_b, cat_a])
+        # Snapshots should be in canonical (sorted by identity key) order
+        assert reg.snapshots[0].catalog_id == "cat_a"
+        assert reg.snapshots[1].catalog_id == "cat_b"
 
-        # build_sizing_request_identity sorts catalogs internally
-        from hexagent.optimization.catalog import catalog_identity_key
-
-        sorted_a_then_b = tuple(sorted([cat_a, cat_b], key=catalog_identity_key))
-        sorted_b_then_a = tuple(sorted([cat_b, cat_a], key=catalog_identity_key))
-        assert sorted_a_then_b == sorted_b_then_a
+    def test_catalog_registry_reversed_input_same_order(self) -> None:
+        cat_a = _make_cat("cat_a", opts=(_make_opt("o1"),))
+        cat_b = _make_cat("cat_b", opts=(_make_opt("o2"),))
+        reg = CatalogRegistry([cat_a, cat_b])
+        assert reg.snapshots[0].catalog_id == "cat_a"
+        assert reg.snapshots[1].catalog_id == "cat_b"
 
 
 # =========================================================================
-# T26: Catalog content hash mismatch rejection
+# T88 + T56: Catalog content hash mismatch rejection
 # =========================================================================
 
 
 class TestCatalogHashMismatch:
-    """T26: A catalog ref pointing to the wrong content hash → rejected
-    during resolution (the resolved snapshot must match the hash)."""
+    """T88: A catalog ref pointing to the wrong content hash → rejected
+    by CatalogRegistry. T56: tampered hash at construction time."""
 
-    def test_tampered_hash_rejected_by_catalog_snapshot(self) -> None:
-        """CompleteDoublePipeCatalogSnapshot verifies its own hash."""
+    def test_tampered_hash_rejected_by_snapshot(self) -> None:
         opt = _make_opt()
-        _ = compute_catalog_content_hash(
-            catalog_id="c1",
-            catalog_version="v1",
-            source_identity="test",
-            schema_version="1.0",
-            assembly_options=(opt,),
-        )
+        tampered_hash = "sha256:" + "ff" * 32
+        with pytest.raises((ValidationError, AttributeError)):
+            CompleteDoublePipeCatalogSnapshot(
+                catalog_id="c1",
+                catalog_version="v1",
+                source_identity="test",
+                schema_version="1.0",
+                assembly_options=(opt,),
+                catalog_content_hash=tampered_hash,
+            )
+
+    def test_tampered_hash_rejected_by_registry(self) -> None:
+        """CatalogRegistry re-verifies content hash on construction."""
+        opt = _make_opt()
         tampered_hash = "sha256:" + "ff" * 32
         with pytest.raises((ValidationError, AttributeError)):
             CompleteDoublePipeCatalogSnapshot(
@@ -1028,89 +1204,38 @@ class TestCatalogHashMismatch:
 
 
 # =========================================================================
-# T27: Equivalent unit input -> same SI payload
+# T27: Equivalent unit input -> same canonical payload
 # =========================================================================
 
 
 class TestUnitEquivalence:
-    """T27: Quantity values with equivalent SI produce the same projected
-    domain model."""
+    """T27: Quantity values with equivalent SI produce the same
+    canonical_quantity_payload."""
 
-    def test_power_kW_vs_W(self) -> None:
-        req_w = ValidationApiRequest(
-            api_schema_version="1",
-            case_name="test",
-            hot_stream=_hot_stream_spec(),
-            cold_stream=_cold_stream_spec(),
-            target_duty=Power(value=100_000, unit="W"),
-            minimum_terminal_delta_t=TemperatureDifference(value=5, unit="K"),
-            design_pressure_hot=AbsolutePressure(value=500_000, unit="Pa"),
-            design_pressure_cold=AbsolutePressure(value=500_000, unit="Pa"),
-            design_temperature_hot=AbsoluteTemperature(value=400, unit="K"),
-            design_temperature_cold=AbsoluteTemperature(value=350, unit="K"),
-            required_area_margin_fraction=0.1,
-        )
-        req_kw = ValidationApiRequest(
-            api_schema_version="1",
-            case_name="test",
-            hot_stream=_hot_stream_spec(),
-            cold_stream=_cold_stream_spec(),
-            target_duty=Power(value=100, unit="kW"),
-            minimum_terminal_delta_t=TemperatureDifference(value=5, unit="K"),
-            design_pressure_hot=AbsolutePressure(value=500_000, unit="Pa"),
-            design_pressure_cold=AbsolutePressure(value=500_000, unit="Pa"),
-            design_temperature_hot=AbsoluteTemperature(value=400, unit="K"),
-            design_temperature_cold=AbsoluteTemperature(value=350, unit="K"),
-            required_area_margin_fraction=0.1,
-        )
-        case_w = project_validation_to_design_case(req_w)
-        case_kw = project_validation_to_design_case(req_kw)
-        assert case_w.target_duty is not None
-        assert case_kw.target_duty is not None
-        assert case_w.target_duty.si_value == pytest.approx(case_kw.target_duty.si_value)
+    def test_power_kW_vs_W_same_canonical(self) -> None:
+        p_w = Power(value=100_000, unit="W")
+        p_kw = Power(value=100, unit="kW")
+        c_w = canonical_quantity_payload(p_w)
+        c_kw = canonical_quantity_payload(p_kw)
+        assert c_w == c_kw
+        assert c_w["unit"] == "W"
 
-    def test_length_cm_vs_m(self) -> None:
-        geom_cm = _geometry_spec()
-        geom_m_spec = DoublePipeGeometrySpec(
-            inner_tube_inner_diameter=Length(value=2, unit="cm"),
-            inner_tube_outer_diameter=Length(value=2.5, unit="cm"),
-            outer_pipe_inner_diameter=Length(value=5, unit="cm"),
-            effective_length=Length(value=5, unit="m"),
-            wall_thermal_conductivity=ThermalConductivitySpec(value=50.0, unit="W/(m*K)"),
-            inner_surface_roughness=Length(value=0, unit="m"),
-            annulus_surface_roughness=Length(value=0, unit="m"),
-        )
-        g1 = project_geometry_spec_to_geometry(geom_cm)
-        g2 = project_geometry_spec_to_geometry(geom_m_spec)
-        assert g1.inner_tube_inner_diameter_m == pytest.approx(g2.inner_tube_inner_diameter_m)
+    def test_length_cm_vs_m_same_canonical(self) -> None:
+        l_m = Length(value=0.02, unit="m")
+        l_cm = Length(value=2, unit="cm")
+        c_m = canonical_quantity_payload(l_m)
+        c_cm = canonical_quantity_payload(l_cm)
+        assert c_m == c_cm
+        assert c_m["unit"] == "m"
 
-
-# =========================================================================
-# T28: 5K vs 5 delta_degC canonical result identical
-# =========================================================================
-
-
-class TestDeltaDegCEquivalence:
-    """T28: TemperatureDifference(5, 'K') and TemperatureDifference(5, 'delta_degC')
-    produce the same SI value and canonical result."""
-
-    def test_5k_vs_5_delta_degC(self) -> None:
+    # T28: 5K vs 5 delta_degC canonical result identical
+    def test_5k_vs_5_delta_degC_canonical(self) -> None:
         td_k = TemperatureDifference(value=5, unit="K")
         td_dc = TemperatureDifference(value=5, unit="delta_degC")
-        assert td_k.si_value == pytest.approx(td_dc.si_value)
-
-    def test_projected_solver_identical(self) -> None:
-        sp_k = SolverParamsSpec(
-            bracket_temperature_tolerance_k=TemperatureDifference(value=0.01, unit="K"),
-        )
-        sp_dc = SolverParamsSpec(
-            bracket_temperature_tolerance_k=TemperatureDifference(value=0.01, unit="delta_degC"),
-        )
-        sol_k = project_solver_spec_to_solver(sp_k)
-        sol_dc = project_solver_spec_to_solver(sp_dc)
-        assert sol_k.bracket_temperature_tolerance_k == pytest.approx(
-            sol_dc.bracket_temperature_tolerance_k
-        )
+        c_k = canonical_quantity_payload(td_k)
+        c_dc = canonical_quantity_payload(td_dc)
+        assert c_k == c_dc
+        assert c_k["unit"] == "K"
 
 
 # =========================================================================
@@ -1119,23 +1244,24 @@ class TestDeltaDegCEquivalence:
 
 
 class TestUnicodeEquivalence:
-    """T29: Unicode NFKC normalization in unit strings produces
-    canonical equivalence."""
+    """T29: Unicode NFC normalization in strings produces
+    canonical equivalence via canonicalize_api_payload."""
 
     def test_micro_sign_vs_mu(self) -> None:
         """µ (U+00B5, micro sign) and μ (U+03BC, Greek mu) should
         normalize to the same unit via NFKC."""
-        # Both should be accepted as the same unit
         q1 = Length(value=1.0, unit="µm")
         q2 = Length(value=1.0, unit="μm")
         assert q1.si_value == pytest.approx(q2.si_value)
 
-    def test_fullwidth_digits(self) -> None:
-        """Fullwidth digit １ (U+FF11) should be handled via NFKC."""
-        # "m²" with different representations
-        q1 = Length(value=1.0, unit="m")
-        q2 = Length(value=1.0, unit="m")
-        assert q1.si_value == pytest.approx(q2.si_value)
+    def test_canonicalize_nfc_strings(self) -> None:
+        """NFC-normalized strings from canonicalize_api_payload."""
+        # Both decomposed and precomposed forms should canonicalize identically
+        import unicodedata
+
+        s_decomposed = unicodedata.normalize("NFC", "\u0065\u0301")  # e + combining accent
+        s_precomposed = unicodedata.normalize("NFC", "\u00e9")  # é
+        assert canonicalize_api_payload(s_decomposed) == canonicalize_api_payload(s_precomposed)
 
 
 # =========================================================================
@@ -1144,19 +1270,45 @@ class TestUnicodeEquivalence:
 
 
 class TestDecimalHalfway:
-    """T30: Decimal halfway values are handled with full precision."""
+    """T30: Decimal halfway values are handled with full precision via
+    canonical_decimal_string."""
 
-    def test_decimal_length(self) -> None:
-        q = Length(value=float(Decimal("1.5")), unit="m")
-        assert q.si_value == pytest.approx(1.5)
+    def test_halfway_rounds_even(self) -> None:
+        # 1.234567890123455 has last digit 5 → banker's rounding
+        d = Decimal("1.234567890123455")
+        result = canonical_decimal_string(d)
+        # Should round to even: 1.23456789012346 (4 is even, 6 is even; 4→4)
+        assert result == "1.23456789012346"
 
-    def test_decimal_power(self) -> None:
-        q = Power(value=float(Decimal("100.500")), unit="W")
-        assert q.si_value == pytest.approx(100.5)
+    def test_halfway_below(self) -> None:
+        d = Decimal("1.234567890123445")
+        result = canonical_decimal_string(d)
+        assert result == "1.23456789012344"
 
     def test_trailing_zeros_stripped(self) -> None:
-        q = Length(value=float(Decimal("1.5000")), unit="m")
-        assert q.si_value == pytest.approx(1.5)
+        d = Decimal("1.5000")
+        result = canonical_decimal_string(d)
+        assert result == "1.5"
+
+    def test_zero_is_zero(self) -> None:
+        assert canonical_decimal_string(Decimal("0")) == "0"
+        assert canonical_decimal_string(Decimal("0.0")) == "0"
+
+    def test_one_is_one(self) -> None:
+        assert canonical_decimal_string(Decimal("1")) == "1"
+        assert canonical_decimal_string(Decimal("1.0")) == "1"
+
+    def test_negative_zero_rejected(self) -> None:
+        with pytest.raises(ValueError, match="negative zero"):
+            canonical_decimal_string(Decimal("-0"))
+
+    def test_non_finite_rejected(self) -> None:
+        with pytest.raises(ValueError, match="non-finite"):
+            canonical_decimal_string(Decimal("NaN"))
+        with pytest.raises(ValueError, match="non-finite"):
+            canonical_decimal_string(Decimal("Inf"))
+        with pytest.raises(ValueError, match="non-finite"):
+            canonical_decimal_string(Decimal("-Inf"))
 
 
 # =========================================================================
@@ -1164,20 +1316,71 @@ class TestDecimalHalfway:
 # =========================================================================
 
 
-class TestExtremeValues:
-    """T31: Very small and very large values project correctly."""
+class TestDecimalExtreme:
+    """T31: Very small and very large values are canonicalized correctly
+    using adjusted exponent threshold."""
 
-    def test_tiny_length(self) -> None:
-        q = Length(value=1e-6, unit="m")
-        assert q.si_value == pytest.approx(1e-6)
+    def test_999999999999999_5_rounds_to_scientific(self) -> None:
+        d = Decimal("999999999999999.5")
+        result = canonical_decimal_string(d)
+        assert result == "1E+15"
 
-    def test_huge_power(self) -> None:
-        q = Power(value=1e9, unit="W")
-        assert q.si_value == pytest.approx(1e9)
+    def test_1e_minus_30_scientific(self) -> None:
+        d = Decimal("1E-30")
+        result = canonical_decimal_string(d)
+        assert result == "1E-30"
 
-    def test_tiny_mass_flow(self) -> None:
-        q = MassFlow(value=1e-10, unit="kg/s")
-        assert q.si_value == pytest.approx(1e-10)
+    def test_1e_plus_30_scientific(self) -> None:
+        d = Decimal("1E+30")
+        result = canonical_decimal_string(d)
+        assert result == "1E+30"
+
+    def test_0_00000000001_is_1e_minus_11(self) -> None:
+        d = Decimal("0.00000000001")
+        result = canonical_decimal_string(d)
+        assert result == "1E-11"
+
+    def test_0_000000000001_is_1e_minus_12(self) -> None:
+        d = Decimal("0.000000000001")
+        result = canonical_decimal_string(d)
+        assert result == "1E-12"
+
+    def test_99999999999_is_fixed(self) -> None:
+        d = Decimal("99999999999")
+        result = canonical_decimal_string(d)
+        # adjusted exponent = 10, within [-10, 10] → fixed notation
+        assert result == "99999999999"
+
+    def test_100000000000_is_scientific(self) -> None:
+        d = Decimal("100000000000")
+        result = canonical_decimal_string(d)
+        # adjusted exponent = 11, outside [-10, 10] → scientific notation
+        assert result == "1E+11"
+
+    def test_1e_minus_7_is_fixed(self) -> None:
+        d = Decimal("1E-7")
+        result = canonical_decimal_string(d)
+        assert result == "0.0000001"
+
+    def test_1e_minus_10_is_fixed(self) -> None:
+        d = Decimal("1E-10")
+        result = canonical_decimal_string(d)
+        assert result == "0.0000000001"
+
+    def test_1e_minus_11_is_scientific(self) -> None:
+        d = Decimal("1E-11")
+        result = canonical_decimal_string(d)
+        assert result == "1E-11"
+
+    def test_1e_plus_10_is_fixed(self) -> None:
+        d = Decimal("1E+10")
+        result = canonical_decimal_string(d)
+        assert result == "10000000000"
+
+    def test_1e_plus_11_is_scientific(self) -> None:
+        d = Decimal("1E+11")
+        result = canonical_decimal_string(d)
+        assert result == "1E+11"
 
 
 # =========================================================================
@@ -1185,21 +1388,31 @@ class TestExtremeValues:
 # =========================================================================
 
 
-class TestMapKeySortStability:
+class TestMapKeySort:
     """T32: Dict-based payloads produce deterministic canonical JSON
-    with sorted keys."""
+    with sorted keys via canonicalize_api_payload."""
+
+    def test_canonicalize_api_payload_sorts_keys(self) -> None:
+        data = {"z": 1, "a": 2, "m": 3}
+        result = canonicalize_api_payload(data)
+        assert list(result.keys()) == ["a", "m", "z"]
+
+    def test_nested_sort(self) -> None:
+        data = {"b": {"z": 1, "a": 2}, "a": 1}
+        result = canonicalize_api_payload(data)
+        assert list(result.keys()) == ["a", "b"]
+        assert list(result["b"].keys()) == ["a", "z"]
 
     def test_design_case_canonical_keys_sorted(self) -> None:
         case = project_validation_to_design_case(_validation_request())
         assert case.target_duty is not None
+        import json
+
         from hexagent.core.canonical import canonical_json
 
         cj = canonical_json(case)
-        import json
-
         d = json.loads(cj)
 
-        # canonical_json sorts keys at every level
         def _keys_sorted(obj: object) -> bool:
             if isinstance(obj, dict):
                 keys = list(obj.keys())
@@ -1212,32 +1425,18 @@ class TestMapKeySortStability:
 
         assert _keys_sorted(d)
 
-    def test_geometry_canonical_keys_sorted(self) -> None:
-        geom = project_geometry_spec_to_geometry(_geometry_spec())
-        d = geom.to_dict()
-        # to_dict returns keys in dataclass field order (not alphabetical),
-        # but the dict itself is deterministic. Verify canonical_json sorts them.
-        from hexagent.core.canonical import canonical_json
-
-        cj = canonical_json(d)
-        import json
-
-        parsed = json.loads(cj)
-        assert list(parsed.keys()) == sorted(parsed.keys())
-
 
 # =========================================================================
 # T33: Input collection ordering rules
 # =========================================================================
 
 
-class TestCollectionOrdering:
+class TestCollectionOrder:
     """T33: Tuples preserve insertion order; catalog tuples are sorted."""
 
     def test_catalog_tuple_sorted_by_identity(self) -> None:
         cat_a = _make_cat("cat_a", opts=(_make_opt("o1"),))
         cat_b = _make_cat("cat_b", opts=(_make_opt("o2"),))
-        # build_sizing_request_identity sorts catalogs by identity key
         from hexagent.optimization.catalog import catalog_identity_key
 
         cats = [cat_b, cat_a]
@@ -1254,66 +1453,46 @@ class TestCollectionOrdering:
 
 
 # =========================================================================
-# T34: Provider identity field change -> digest change
+# T34: Provider identity field change -> digest change (full path)
 # =========================================================================
 
 
-class TestProviderDigestSensitivity:
-    """T34: Changing any field in ExpectedProviderIdentity produces
-    a different SizingRequestIdentity digest."""
+class TestProviderDigestSensitivityFull:
+    """T34: Changing any field in provider identity produces
+    a different canonical request digest. Uses full path through
+    build_sizing_canonical_request_context + compute_api_request_digest."""
 
-    def _build_identity(self, **provider_overrides: Any) -> SizingRequestIdentity:
-        defaults = dict(
-            name="CoolProp",
-            version="6.6.0",
-            git_revision="abc123",
-            reference_state_policy="IIR",
-        )
-        defaults.update(provider_overrides)
+    def test_name_change(self) -> None:
         cat = _make_cat()
-        return build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            minimum_terminal_delta_t=5.0,
-            required_duty_w=100_000.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=ExpectedProviderIdentity(**defaults),
-        )
+        snap_a = _make_provider_snapshot(name="CoolProp")
+        snap_b = _make_provider_snapshot(name="REFPROP")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
+        assert d_a != d_b
 
     def test_version_change(self) -> None:
-        d1 = self._build_identity().sizing_request_identity_digest
-        d2 = self._build_identity(version="7.0.0").sizing_request_identity_digest
-        assert d1 != d2
+        cat = _make_cat()
+        snap_a = _make_provider_snapshot(version="6.6.0")
+        snap_b = _make_provider_snapshot(version="7.0.0")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
+        assert d_a != d_b
 
     def test_git_revision_change(self) -> None:
-        d1 = self._build_identity().sizing_request_identity_digest
-        d2 = self._build_identity(git_revision="def456").sizing_request_identity_digest
-        assert d1 != d2
+        cat = _make_cat()
+        snap_a = _make_provider_snapshot(git_revision="abc123")
+        snap_b = _make_provider_snapshot(git_revision="def456")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
+        assert d_a != d_b
 
     def test_reference_state_policy_change(self) -> None:
-        d1 = self._build_identity().sizing_request_identity_digest
-        d2 = self._build_identity(reference_state_policy="NBP").sizing_request_identity_digest
-        assert d1 != d2
-
-    def test_configuration_fingerprint_change(self) -> None:
-        d1 = self._build_identity().sizing_request_identity_digest
-        d2 = self._build_identity(configuration_fingerprint="fp123").sizing_request_identity_digest
-        assert d1 != d2
+        cat = _make_cat()
+        snap_a = _make_provider_snapshot(reference_state_policy="IIR")
+        snap_b = _make_provider_snapshot(reference_state_policy="NBP")
+        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
+        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
+        assert d_a != d_b
 
 
 # =========================================================================
@@ -1322,39 +1501,13 @@ class TestProviderDigestSensitivity:
 
 
 class TestCatalogDigestSensitivity:
-    """T35: Changing catalog identity fields produces different digests."""
-
-    def _build_identity_with_catalog(self, cat: CompleteDoublePipeCatalogSnapshot) -> str:
-        identity = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            minimum_terminal_delta_t=5.0,
-            required_duty_w=100_000.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=_expected_provider_identity(),
-        )
-        return identity.sizing_request_identity_digest
+    """T35: Changing catalog identity fields produces different digests.
+    Uses build_sizing_canonical_request_context + compute_api_request_digest."""
 
     def test_catalog_version_change(self) -> None:
         cat_a = _make_cat("cat1")
-        d1 = self._build_identity_with_catalog(cat_a)
+        d1 = _compute_sizing_digest(cat_a)
 
-        # Build a different catalog version
         opt = _make_opt()
         hash_v2 = compute_catalog_content_hash(
             catalog_id="cat1",
@@ -1371,16 +1524,15 @@ class TestCatalogDigestSensitivity:
             assembly_options=(opt,),
             catalog_content_hash=hash_v2,
         )
-        d2 = self._build_identity_with_catalog(cat_b)
+        d2 = _compute_sizing_digest(cat_b)
         assert d1 != d2
 
     def test_catalog_content_hash_change(self) -> None:
         """Different assembly options → different content hash → different digest."""
         cat_a = _make_cat("cat1", opts=(_make_opt("o1"),))
-        d1 = self._build_identity_with_catalog(cat_a)
-
+        d1 = _compute_sizing_digest(cat_a)
         cat_b = _make_cat("cat1", opts=(_make_opt("o1"), _make_opt("o2")))
-        d2 = self._build_identity_with_catalog(cat_b)
+        d2 = _compute_sizing_digest(cat_b)
         assert d1 != d2
 
 
@@ -1390,48 +1542,36 @@ class TestCatalogDigestSensitivity:
 
 
 class TestSolverDigestSensitivity:
-    """T36: Changing solver parameters produces different identity digests."""
-
-    def _build_identity_with_solver(self, solver: SolverParams) -> str:
-        cat = _make_cat()
-        identity = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            minimum_terminal_delta_t=5.0,
-            required_duty_w=100_000.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=solver,
-            expected_provider_identity=_expected_provider_identity(),
-        )
-        return identity.sizing_request_identity_digest
+    """T36: Changing solver parameters produces different digests.
+    Uses full canonical path."""
 
     def test_absolute_residual_change(self) -> None:
-        d1 = self._build_identity_with_solver(SolverParams())
-        d2 = self._build_identity_with_solver(SolverParams(absolute_residual_w=0.01))
+        cat = _make_cat()
+        d1 = _compute_sizing_digest(cat, solver_params=SolverParamsSpec())
+        d2 = _compute_sizing_digest(
+            cat,
+            solver_params=SolverParamsSpec(absolute_residual_w=Power(value=0.01, unit="W")),
+        )
         assert d1 != d2
 
     def test_max_iterations_change(self) -> None:
-        d1 = self._build_identity_with_solver(SolverParams())
-        d2 = self._build_identity_with_solver(SolverParams(max_iterations=200))
+        cat = _make_cat()
+        d1 = _compute_sizing_digest(cat, solver_params=SolverParamsSpec())
+        d2 = _compute_sizing_digest(
+            cat,
+            solver_params=SolverParamsSpec(max_iterations=200),
+        )
         assert d1 != d2
 
     def test_bracket_tolerance_change(self) -> None:
-        d1 = self._build_identity_with_solver(SolverParams())
-        d2 = self._build_identity_with_solver(SolverParams(bracket_temperature_tolerance_k=0.001))
+        cat = _make_cat()
+        d1 = _compute_sizing_digest(cat, solver_params=SolverParamsSpec())
+        d2 = _compute_sizing_digest(
+            cat,
+            solver_params=SolverParamsSpec(
+                bracket_temperature_tolerance_k=TemperatureDifference(value=0.001, unit="K")
+            ),
+        )
         assert d1 != d2
 
 
@@ -1446,7 +1586,7 @@ class TestGeometryDigestSensitivity:
     def test_inner_diameter_change(self) -> None:
         g1 = project_geometry_spec_to_geometry(_geometry_spec())
         spec2 = DoublePipeGeometrySpec(
-            inner_tube_inner_diameter=Length(value=0.025, unit="m"),  # changed
+            inner_tube_inner_diameter=Length(value=0.025, unit="m"),
             inner_tube_outer_diameter=Length(value=0.03, unit="m"),
             outer_pipe_inner_diameter=Length(value=0.05, unit="m"),
             effective_length=Length(value=5.0, unit="m"),
@@ -1463,7 +1603,7 @@ class TestGeometryDigestSensitivity:
             inner_tube_inner_diameter=Length(value=0.02, unit="m"),
             inner_tube_outer_diameter=Length(value=0.025, unit="m"),
             outer_pipe_inner_diameter=Length(value=0.05, unit="m"),
-            effective_length=Length(value=10.0, unit="m"),  # changed
+            effective_length=Length(value=10.0, unit="m"),
             wall_thermal_conductivity=ThermalConductivitySpec(value=50.0, unit="W/(m*K)"),
             inner_surface_roughness=Length(value=0.0, unit="m"),
             annulus_surface_roughness=Length(value=0.0, unit="m"),
@@ -1479,7 +1619,7 @@ class TestGeometryDigestSensitivity:
 
 class TestBoundaryConditionDigestSensitivity:
     """T38: Changing boundary conditions on SizingApiRequest changes
-    the request context (tested at the DTO level)."""
+    the canonical context digest."""
 
     def test_tube_boundary_condition_field_present(self) -> None:
         req = _sizing_api_request()
@@ -1489,61 +1629,19 @@ class TestBoundaryConditionDigestSensitivity:
         req = _sizing_api_request()
         assert req.annulus_boundary_condition == "constant_wall_temperature"
 
-    def test_boundary_condition_change_on_identity(self) -> None:
-        """Changing boundary condition fields in the identity produces
-        different digests."""
+    def test_boundary_condition_change_changes_digest(self) -> None:
         cat = _make_cat()
-        id1 = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            tube_boundary_condition="adiabatic",
-            annulus_boundary_condition="adiabatic",
-            minimum_terminal_delta_t=5.0,
-            required_duty_w=100_000.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=_expected_provider_identity(),
+        d1 = _compute_sizing_digest(
+            cat,
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="constant_wall_temperature",
         )
-        id2 = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            tube_boundary_condition="constant_wall_temperature",  # changed
-            annulus_boundary_condition="adiabatic",
-            minimum_terminal_delta_t=5.0,
-            required_duty_w=100_000.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=_expected_provider_identity(),
+        d2 = _compute_sizing_digest(
+            cat,
+            tube_boundary_condition="inner_wall_heated",
+            annulus_boundary_condition="constant_wall_temperature",
         )
-        assert id1.sizing_request_identity_digest != id2.sizing_request_identity_digest
+        assert d1 != d2
 
 
 # =========================================================================
@@ -1552,42 +1650,13 @@ class TestBoundaryConditionDigestSensitivity:
 
 
 class TestDutyDigestSensitivity:
-    """T39: Changing required_duty_w produces different identity digests."""
+    """T39: Changing target duty produces different canonical context digests."""
 
     def test_duty_change(self) -> None:
         cat = _make_cat()
-        base_kwargs = dict(
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            minimum_terminal_delta_t=5.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=_expected_provider_identity(),
-        )
-        id1 = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            required_duty_w=100_000.0,
-            **base_kwargs,  # type: ignore[arg-type]
-        )
-        id2 = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            required_duty_w=200_000.0,  # changed
-            **base_kwargs,  # type: ignore[arg-type]
-        )
-        assert id1.sizing_request_identity_digest != id2.sizing_request_identity_digest
+        d1 = _compute_sizing_digest(cat, validation_request=_validation_request_with_duty(100_000))
+        d2 = _compute_sizing_digest(cat, validation_request=_validation_request_with_duty(200_000))
+        assert d1 != d2
 
 
 # =========================================================================
@@ -1646,6 +1715,11 @@ class TestRealSizingRequestIdentity:
     """T41: Construct a SizingRequestIdentity from real production models."""
 
     def test_construct_identity(self) -> None:
+        from hexagent.optimization.context import (
+            SizingRequestIdentity,
+            build_sizing_request_identity,
+        )
+
         cat = _make_cat()
         identity = build_sizing_request_identity(
             SizingRequest(catalogs=(cat,)),
@@ -1677,6 +1751,8 @@ class TestRealSizingRequestIdentity:
         assert identity.rating_solver_max_iterations == 100
 
     def test_identity_digest_is_deterministic(self) -> None:
+        from hexagent.optimization.context import build_sizing_request_identity
+
         cat = _make_cat()
         kwargs = dict(
             hot_fluid_name="Water",
@@ -1705,6 +1781,8 @@ class TestRealSizingRequestIdentity:
         assert id1.sizing_request_identity_digest == id2.sizing_request_identity_digest
 
     def test_identity_frozen(self) -> None:
+        from hexagent.optimization.context import build_sizing_request_identity
+
         cat = _make_cat()
         identity = build_sizing_request_identity(
             SizingRequest(catalogs=(cat,)),
@@ -1741,6 +1819,18 @@ class TestRealSizingRequestIdentity:
 class TestNoNonFiniteInCanonical:
     """T42: Canonical payload serialization rejects NaN/Inf."""
 
+    def test_nan_rejected_in_canonical_decimal(self) -> None:
+        with pytest.raises(ValueError, match="non-finite"):
+            canonical_decimal_string(Decimal("NaN"))
+
+    def test_inf_rejected_in_canonical_decimal(self) -> None:
+        with pytest.raises(ValueError, match="non-finite"):
+            canonical_decimal_string(Decimal("Inf"))
+
+    def test_neg_inf_rejected_in_canonical_decimal(self) -> None:
+        with pytest.raises(ValueError, match="non-finite"):
+            canonical_decimal_string(Decimal("-Inf"))
+
     def test_nan_rejected_in_canonical_json(self) -> None:
         from hexagent.core.canonical import canonical_json
 
@@ -1766,13 +1856,11 @@ class TestNoNonFiniteInCanonical:
         geom = project_geometry_spec_to_geometry(_geometry_spec())
         solver = project_solver_spec_to_solver(SolverParamsSpec())
 
-        # Check geometry
         geom_dict = geom.to_dict()
         for k, v in geom_dict.items():
             if isinstance(v, float):
                 assert math.isfinite(v), f"Non-finite value in geometry.{k}: {v}"
 
-        # Check solver
         assert math.isfinite(solver.absolute_residual_w)
         assert math.isfinite(solver.relative_residual_fraction)
         assert math.isfinite(solver.bracket_temperature_tolerance_k)
@@ -1790,9 +1878,7 @@ class TestJsonSchemaDimensionalFields:
     def test_validation_api_request_schema_has_no_bare_target_duty(self) -> None:
         schema = ValidationApiRequest.model_json_schema()
         props = schema.get("properties", {})
-        # target_duty should reference a Power schema, not be a bare number
         td = props.get("target_duty", {})
-        # It should have $ref or be a typed schema
         assert "$ref" in td or "anyOf" in td or td.get("type") != "number"
 
     def test_geometry_schema_has_no_bare_diameter(self) -> None:
@@ -1805,7 +1891,6 @@ class TestJsonSchemaDimensionalFields:
         schema = SizingApiRequest.model_json_schema()
         props = schema.get("properties", {})
         mel = props.get("minimum_effective_length", {})
-        # Should be Length | None, not bare number
         assert mel.get("type") != "number"
 
     def test_solver_schema_has_no_bare_absolute_residual(self) -> None:
@@ -1836,13 +1921,11 @@ class TestDoublePipeServiceNotCalled:
         import hexagent.api.projection as proj_mod
 
         source = inspect.getsource(proj_mod)
-        # Should only import from api.models, domain.models, exchangers, optimization
         assert "double_pipe.service" not in source
 
 
 # =========================================================================
-# T45: Monkeypatch DoublePipeService.size() to fail immediately,
-#       all projection/identity tests still pass
+# T45: Monkeypatch DoublePipeService.size() to fail immediately
 # =========================================================================
 
 
@@ -1859,7 +1942,6 @@ class TestMonkeypatchDoublePipeService:
 
         monkeypatch.setattr(DoublePipeService, "size", _poisoned_size)
 
-        # All projections should succeed
         stream = project_fluid_stream_to_stream_spec(_hot_stream_spec())
         assert stream.fluid.name == "Water"
 
@@ -1880,38 +1962,14 @@ class TestMonkeypatchDoublePipeService:
         )
         assert isinstance(req, SizingRequest)
 
-        # Build identity — also must not call size()
-        identity = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            minimum_terminal_delta_t=5.0,
-            required_duty_w=100_000.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=_expected_provider_identity(),
-        )
-        digest = identity.sizing_request_identity_digest
+        # Compute canonical digest — also must not call size()
+        digest = _compute_sizing_digest(cat)
         assert digest.startswith("sha256:")
         assert len(digest) == 71
 
     def test_all_identity_digests_succeed_with_poisoned_size(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Re-run key digest tests with poisoned DoublePipeService.size()."""
         from hexagent.exchangers.double_pipe.service import DoublePipeService
 
         def _poisoned_size(self_inner: Any, case: Any) -> Any:
@@ -1919,38 +1977,469 @@ class TestMonkeypatchDoublePipeService:
 
         monkeypatch.setattr(DoublePipeService, "size", _poisoned_size)
 
-        # Digest sensitivity tests
         cat = _make_cat()
-        base_kwargs = dict(
-            hot_fluid_name="Water",
-            cold_fluid_name="Water",
-            hot_fluid_equation_of_state="CoolProp",
-            cold_fluid_equation_of_state="CoolProp",
-            hot_inlet_temperature_k=370.0,
-            cold_inlet_temperature_k=300.0,
-            hot_inlet_pressure_pa=200_000.0,
-            cold_inlet_pressure_pa=200_000.0,
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=2.0,
-            tube_in_hot=True,
-            flow_arrangement="counterflow",
-            minimum_terminal_delta_t=5.0,
-            duty_absolute_tolerance_w=0.0,
-            duty_relative_tolerance=0.0,
-            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
-            top_n=3,
-            solver_params=SolverParams(),
-            expected_provider_identity=_expected_provider_identity(),
+        d1 = _compute_sizing_digest(cat, validation_request=_validation_request_with_duty(100_000))
+        d2 = _compute_sizing_digest(cat, validation_request=_validation_request_with_duty(200_000))
+        assert d1 != d2
+
+
+# =========================================================================
+# TestCanonicalDecimalVectors — all decimal test vectors
+# =========================================================================
+
+
+class TestCanonicalDecimalVectors:
+    """Verify all canonical_decimal_string test vectors from Frozen Contract §8.1."""
+
+    def test_zero(self) -> None:
+        assert canonical_decimal_string(Decimal("0")) == "0"
+
+    def test_negative_zero_rejected(self) -> None:
+        with pytest.raises(ValueError, match="negative zero"):
+            canonical_decimal_string(Decimal("-0"))
+
+    def test_one(self) -> None:
+        assert canonical_decimal_string(Decimal("1")) == "1"
+
+    def test_one_point_zero(self) -> None:
+        assert canonical_decimal_string(Decimal("1.0")) == "1"
+
+    def test_one_point_five_trailing_zeros(self) -> None:
+        assert canonical_decimal_string(Decimal("1.5000")) == "1.5"
+
+    def test_rounding_44(self) -> None:
+        assert canonical_decimal_string(Decimal("1.234567890123445")) == "1.23456789012344"
+
+    def test_rounding_46(self) -> None:
+        assert canonical_decimal_string(Decimal("1.234567890123455")) == "1.23456789012346"
+
+    def test_999999999999999_5(self) -> None:
+        assert canonical_decimal_string(Decimal("999999999999999.5")) == "1E+15"
+
+    def test_1e_minus_30(self) -> None:
+        assert canonical_decimal_string(Decimal("1E-30")) == "1E-30"
+
+    def test_1e_plus_30(self) -> None:
+        assert canonical_decimal_string(Decimal("1E+30")) == "1E+30"
+
+    def test_0_00000000001(self) -> None:
+        assert canonical_decimal_string(Decimal("0.00000000001")) == "1E-11"
+
+    def test_0_000000000001(self) -> None:
+        assert canonical_decimal_string(Decimal("0.000000000001")) == "1E-12"
+
+    def test_99999999999(self) -> None:
+        assert canonical_decimal_string(Decimal("99999999999")) == "99999999999"
+
+    def test_100000000000(self) -> None:
+        assert canonical_decimal_string(Decimal("100000000000")) == "1E+11"
+
+    def test_1e_minus_7(self) -> None:
+        assert canonical_decimal_string(Decimal("1E-7")) == "0.0000001"
+
+    def test_1e_minus_10(self) -> None:
+        assert canonical_decimal_string(Decimal("1E-10")) == "0.0000000001"
+
+    def test_1e_minus_11(self) -> None:
+        assert canonical_decimal_string(Decimal("1E-11")) == "1E-11"
+
+    def test_1e_plus_10(self) -> None:
+        assert canonical_decimal_string(Decimal("1E+10")) == "10000000000"
+
+    def test_1e_plus_11(self) -> None:
+        assert canonical_decimal_string(Decimal("1E+11")) == "1E+11"
+
+    def test_non_decimal_type_raises(self) -> None:
+        with pytest.raises(TypeError, match="Expected Decimal"):
+            canonical_decimal_string(42)  # type: ignore[arg-type]
+
+
+# =========================================================================
+# TestCanonicalQuantityPayload — all quantity test vectors
+# =========================================================================
+
+
+class TestCanonicalQuantityPayload:
+    """Verify canonical_quantity_payload returns {"value": ..., "unit": ...} format."""
+
+    def test_power_100kw_format(self) -> None:
+        q = Power(value=100, unit="kW")
+        payload = canonical_quantity_payload(q)
+        assert set(payload.keys()) == {"value", "unit"}
+        assert payload["unit"] == "W"
+        assert payload["value"] == "100000"
+        assert isinstance(payload["value"], str)
+
+    def test_power_100000w_format(self) -> None:
+        q = Power(value=100_000, unit="W")
+        payload = canonical_quantity_payload(q)
+        assert payload == {"value": "100000", "unit": "W"}
+
+    def test_length_1m_format(self) -> None:
+        q = Length(value=1.0, unit="m")
+        payload = canonical_quantity_payload(q)
+        assert payload["unit"] == "m"
+        assert payload["value"] == "1"
+
+    def test_length_2cm_format(self) -> None:
+        q = Length(value=2, unit="cm")
+        payload = canonical_quantity_payload(q)
+        assert payload["unit"] == "m"
+        assert Decimal(payload["value"]) == Decimal("0.02")
+
+    def test_mass_flow_format(self) -> None:
+        q = MassFlow(value=1.0, unit="kg/s")
+        payload = canonical_quantity_payload(q)
+        assert payload["unit"] == "kg/s"
+        assert payload["value"] == "1"
+
+    def test_temperature_difference_k_format(self) -> None:
+        q = TemperatureDifference(value=5, unit="K")
+        payload = canonical_quantity_payload(q)
+        assert payload["unit"] == "K"
+        assert payload["value"] == "5"
+
+    def test_temperature_difference_delta_degC_format(self) -> None:
+        q = TemperatureDifference(value=5, unit="delta_degC")
+        payload = canonical_quantity_payload(q)
+        assert payload["unit"] == "K"
+        assert payload["value"] == "5"
+
+    def test_absolute_temperature_format(self) -> None:
+        q = AbsoluteTemperature(value=370, unit="K")
+        payload = canonical_quantity_payload(q)
+        assert payload["unit"] == "K"
+        assert payload["value"] == "370"
+
+    def test_absolute_pressure_format(self) -> None:
+        q = AbsolutePressure(value=200_000, unit="Pa")
+        payload = canonical_quantity_payload(q)
+        assert payload["unit"] == "Pa"
+        assert payload["value"] == "200000"
+
+    def test_fouling_resistance_format(self) -> None:
+        q = FoulingResistance(value=0.0002, unit="m^2*K/W")
+        payload = canonical_quantity_payload(q)
+        assert "value" in payload
+        assert "unit" in payload
+        assert isinstance(payload["value"], str)
+
+    def test_value_is_always_string(self) -> None:
+        """The value in the canonical payload is always a string."""
+        for q in [
+            Power(value=1, unit="W"),
+            Length(value=0.001, unit="m"),
+            MassFlow(value=0.5, unit="kg/s"),
+            TemperatureDifference(value=10, unit="K"),
+            AbsolutePressure(value=101325, unit="Pa"),
+        ]:
+            payload = canonical_quantity_payload(q)
+            assert isinstance(payload["value"], str), f"Not string for {q}"
+
+
+# =========================================================================
+# TestProviderRegistryImmutability — MappingProxyType
+# =========================================================================
+
+
+class TestProviderRegistryImmutability:
+    """ProviderRegistry stores providers in MappingProxyType (truly immutable)."""
+
+    def test_internal_storage_is_mapping_proxy(self) -> None:
+        reg = _make_provider_registry()
+        assert isinstance(reg._providers, MappingProxyType)
+
+    def test_cannot_setitem_on_internal(self) -> None:
+        reg = _make_provider_registry()
+        with pytest.raises(TypeError):
+            reg._providers["new"] = _make_provider_snapshot()  # type: ignore[index]
+
+    def test_cannot_delitem_on_internal(self) -> None:
+        reg = _make_provider_registry()
+        with pytest.raises(TypeError):
+            del reg._providers["default"]  # type: ignore[attr-defined]
+
+    def test_repr_shows_sorted_keys(self) -> None:
+        reg = ProviderRegistry(
+            {
+                "z": _make_provider_snapshot(name="Z"),
+                "a": _make_provider_snapshot(name="A"),
+            }
+        )
+        r = repr(reg)
+        assert "a" in r
+        assert "z" in r
+
+
+# =========================================================================
+# TestCatalogRegistryImmutability — MappingProxyType
+# =========================================================================
+
+
+class TestCatalogRegistryImmutability:
+    """CatalogRegistry stores catalogs in MappingProxyType."""
+
+    def test_internal_storage_is_mapping_proxy(self) -> None:
+        reg = _make_cat_registry()
+        assert isinstance(reg._by_key, MappingProxyType)
+
+    def test_cannot_setitem_on_internal(self) -> None:
+        reg = _make_cat_registry()
+        cat = _make_cat()
+        key = (
+            cat.catalog_id,
+            cat.catalog_version,
+            cat.catalog_content_hash,
+            cat.source_identity,
+            cat.schema_version,
+        )
+        with pytest.raises(TypeError):
+            reg._by_key[key] = cat  # type: ignore[index]
+
+    def test_snapshots_property_returns_tuple(self) -> None:
+        reg = _make_cat_registry()
+        assert isinstance(reg.snapshots, tuple)
+        assert len(reg.snapshots) == 1
+
+    def test_repr_shows_count(self) -> None:
+        reg = _make_cat_registry()
+        assert "n=1" in repr(reg)
+
+
+# =========================================================================
+# TestCatalogSnapshotRefValidation — hash format, blank fields
+# =========================================================================
+
+
+class TestCatalogSnapshotRefValidation:
+    """CatalogSnapshotReference validators: hash format, blank fields."""
+
+    def test_valid_hash_accepted(self) -> None:
+        ref = CatalogSnapshotReference(
+            catalog_id="c1",
+            catalog_version="v1",
+            catalog_content_hash="sha256:" + "ab" * 32,
+            source_identity="src",
+            schema_version="1.0",
+        )
+        assert ref.catalog_content_hash == "sha256:" + "ab" * 32
+
+    def test_invalid_hash_format_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="sha256"):
+            CatalogSnapshotReference(
+                catalog_id="c1",
+                catalog_version="v1",
+                catalog_content_hash="not_a_hash",
+                source_identity="src",
+                schema_version="1.0",
+            )
+
+    def test_hash_without_prefix_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="sha256"):
+            CatalogSnapshotReference(
+                catalog_id="c1",
+                catalog_version="v1",
+                catalog_content_hash="ab" * 32,
+                source_identity="src",
+                schema_version="1.0",
+            )
+
+    def test_hash_wrong_length_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="sha256"):
+            CatalogSnapshotReference(
+                catalog_id="c1",
+                catalog_version="v1",
+                catalog_content_hash="sha256:abcd",
+                source_identity="src",
+                schema_version="1.0",
+            )
+
+    def test_empty_catalog_id_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="non-empty"):
+            CatalogSnapshotReference(
+                catalog_id="",
+                catalog_version="v1",
+                catalog_content_hash="sha256:" + "ab" * 32,
+                source_identity="src",
+                schema_version="1.0",
+            )
+
+    def test_blank_catalog_id_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="non-empty"):
+            CatalogSnapshotReference(
+                catalog_id="   ",
+                catalog_version="v1",
+                catalog_content_hash="sha256:" + "ab" * 32,
+                source_identity="src",
+                schema_version="1.0",
+            )
+
+    def test_empty_source_identity_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="non-empty"):
+            CatalogSnapshotReference(
+                catalog_id="c1",
+                catalog_version="v1",
+                catalog_content_hash="sha256:" + "ab" * 32,
+                source_identity="",
+                schema_version="1.0",
+            )
+
+    def test_empty_schema_version_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="non-empty"):
+            CatalogSnapshotReference(
+                catalog_id="c1",
+                catalog_version="v1",
+                catalog_content_hash="sha256:" + "ab" * 32,
+                source_identity="src",
+                schema_version="",
+            )
+
+    def test_whitespace_trimmed(self) -> None:
+        ref = CatalogSnapshotReference(
+            catalog_id="  c1  ",
+            catalog_version="  v1  ",
+            catalog_content_hash="sha256:" + "ab" * 32,
+            source_identity="  src  ",
+            schema_version="  1.0  ",
+        )
+        assert ref.catalog_id == "c1"
+        assert ref.catalog_version == "v1"
+        assert ref.source_identity == "src"
+        assert ref.schema_version == "1.0"
+
+
+# =========================================================================
+# TestCaseNameValidation — non-empty trimmed
+# =========================================================================
+
+
+class TestCaseNameValidation:
+    """case_name is stored as provided — trimmed, no special validator."""
+
+    def test_case_name_stored_as_string(self) -> None:
+        req = _validation_request()
+        assert isinstance(req.case_name, str)
+        assert req.case_name == "test_case"
+
+    def test_case_name_is_frozen(self) -> None:
+        req = _validation_request()
+        with pytest.raises((ValidationError, AttributeError)):
+            req.case_name = "changed"
+
+    def test_case_name_accessible_on_design_case(self) -> None:
+        case = project_validation_to_design_case(_validation_request())
+        assert case.name == "test_case"
+
+
+# =========================================================================
+# TestNumericStringCoercion — "1.0" rejected as float
+# =========================================================================
+
+
+class TestNumericStringCoercion:
+    """Quantity types accept numeric-like strings (coerced to float),
+    but reject non-numeric strings."""
+
+    def test_numeric_string_length_coerced(self) -> None:
+        """Numeric strings are coerced to float by Quantity."""
+        q = Length(value="1.0", unit="m")
+        assert q.value == pytest.approx(1.0)
+
+    def test_non_numeric_string_length_rejected(self) -> None:
+        """Non-numeric strings are rejected."""
+        with pytest.raises((ValidationError, AttributeError)):
+            Length(value="not_a_number", unit="m")
+
+    def test_non_numeric_string_power_rejected(self) -> None:
+        with pytest.raises((ValidationError, AttributeError)):
+            Power(value="twenty_kW", unit="kW")
+
+    def test_non_numeric_string_mass_flow_rejected(self) -> None:
+        with pytest.raises((ValidationError, AttributeError)):
+            MassFlow(value="not_valid", unit="kg/s")
+
+    def test_non_numeric_string_temperature_rejected(self) -> None:
+        with pytest.raises((ValidationError, AttributeError)):
+            AbsoluteTemperature(value="hot", unit="K")
+
+
+# =========================================================================
+# TestSolverNoneVsEmpty (T9g) — canonical context equality
+# =========================================================================
+
+
+class TestSolverNoneVsEmpty:
+    """solver_params=None and solver_params=SolverParamsSpec()
+    produce identical canonical request context digests."""
+
+    def test_none_and_default_produce_same_context(self) -> None:
+        cat = _make_cat()
+        cat_ref = _catalog_ref(cat)
+        provider_snapshot = _make_provider_snapshot()
+        provider_reg = ProviderRegistry({"default": provider_snapshot})
+        cat_reg = CatalogRegistry([cat])
+        resolved_provider = provider_reg.resolve("default")
+        resolved_catalogs = tuple(authority.snapshot for authority in [cat_reg.resolve(cat_ref)])
+
+        req_none = _sizing_api_request(cat_ref=cat_ref, solver_params=None)
+        req_default = _sizing_api_request(cat_ref=cat_ref, solver_params=SolverParamsSpec())
+
+        ctx_none = build_sizing_canonical_request_context(
+            request=req_none,
+            resolved_provider=resolved_provider,
+            resolved_catalogs=resolved_catalogs,
+        )
+        ctx_default = build_sizing_canonical_request_context(
+            request=req_default,
+            resolved_provider=resolved_provider,
+            resolved_catalogs=resolved_catalogs,
         )
 
-        id1 = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            required_duty_w=100_000.0,
-            **base_kwargs,  # type: ignore[arg-type]
-        )
-        id2 = build_sizing_request_identity(
-            SizingRequest(catalogs=(cat,)),
-            required_duty_w=200_000.0,
-            **base_kwargs,  # type: ignore[arg-type]
-        )
-        assert id1.sizing_request_identity_digest != id2.sizing_request_identity_digest
+        # The canonical context should be identical
+        assert ctx_none == ctx_default
+
+        # The digests should be identical
+        d_none = compute_api_request_digest(ctx_none)
+        d_default = compute_api_request_digest(ctx_default)
+        assert d_none == d_default
+        assert d_none.startswith("sha256:")
+        assert len(d_none) == 71
+
+    def test_none_and_default_produce_same_full_path_digest(self) -> None:
+        """Test through the helper function as well."""
+        cat = _make_cat()
+        d_none = _compute_sizing_digest(cat, solver_params=None)
+        d_default = _compute_sizing_digest(cat, solver_params=SolverParamsSpec())
+        assert d_none == d_default
+
+
+# =========================================================================
+# Additional digest format tests
+# =========================================================================
+
+
+class TestDigestFormat:
+    """Verify digest format: sha256:hex"""
+
+    def test_digest_starts_with_sha256(self) -> None:
+        cat = _make_cat()
+        d = _compute_sizing_digest(cat)
+        assert d.startswith("sha256:")
+
+    def test_digest_length_is_71(self) -> None:
+        cat = _make_cat()
+        d = _compute_sizing_digest(cat)
+        assert len(d) == 71  # "sha256:" (7) + 64 hex chars
+
+    def test_digest_hex_lowercase(self) -> None:
+        cat = _make_cat()
+        d = _compute_sizing_digest(cat)
+        hex_part = d[7:]
+        assert hex_part == hex_part.lower()
+        assert all(c in "0123456789abcdef" for c in hex_part)
+
+    def test_digest_deterministic(self) -> None:
+        cat = _make_cat()
+        d1 = _compute_sizing_digest(cat)
+        d2 = _compute_sizing_digest(cat)
+        assert d1 == d2

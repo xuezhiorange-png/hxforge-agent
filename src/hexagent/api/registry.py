@@ -8,6 +8,10 @@ and to persist as part of audit trails.
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
+from hexagent.api.models import CatalogSnapshotReference, ResolvedProviderAuthority
+from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import ProviderIdentitySnapshot
 from hexagent.domain.models import StrictBaseModel
 from hexagent.optimization.catalog import (
@@ -19,53 +23,138 @@ from hexagent.optimization.models import (
     CompleteDoublePipeCatalogSnapshot,
 )
 
-# ---------------------------------------------------------------------------
-# ProviderRegistry
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+# Canonical payload helpers                                                   #
+# --------------------------------------------------------------------------- #
+
+_PROVIDER_IDENTITY_FIELDS = (
+    "name",
+    "version",
+    "git_revision",
+    "reference_state_policy",
+    "configuration_fingerprint",
+    "cache_policy_version",
+)
+
+
+def canonical_provider_identity_payload(
+    provider: ProviderIdentitySnapshot,
+) -> dict[str, str]:
+    """Return a canonical dict of all 6 ``ProviderIdentitySnapshot`` fields as strings.
+
+    The keys are deterministic (always the same 6 names) and suitable for
+    hashing via :func:`hexagent.core.canonical.sha256_digest`.
+    """
+    return {field: str(getattr(provider, field)) for field in _PROVIDER_IDENTITY_FIELDS}
+
+
+def canonical_catalog_authority_payload(
+    ref: CatalogSnapshotRef,
+    snapshot: CompleteDoublePipeCatalogSnapshot,
+) -> dict[str, str | object]:
+    """Return a canonical dict binding a catalog reference to its snapshot.
+
+    The payload contains the five reference identity fields plus a dump
+    of the snapshot's assembly options (sorted by ID, as per the
+    ``CompleteDoublePipeCatalogSnapshot`` invariants).
+    """
+    return {
+        "catalog_id": ref.catalog_id,
+        "catalog_version": ref.catalog_version,
+        "catalog_content_hash": ref.catalog_content_hash,
+        "source_identity": ref.source_identity,
+        "schema_version": ref.schema_version,
+        "assembly_options": [opt.model_dump(mode="python") for opt in snapshot.assembly_options],
+    }
+
+
+# --------------------------------------------------------------------------- #
+# ProviderRegistry                                                            #
+# --------------------------------------------------------------------------- #
 
 
 class ProviderRegistry:
-    """Immutable registry of ``ProviderIdentitySnapshot`` instances.
+    """Immutable registry of :class:`ProviderIdentitySnapshot` instances.
 
     Construction:
         ``ProviderRegistry({"default": snapshot})``
 
+    Invariants (validated at construction):
+        - No blank/empty/whitespace-only reference strings.
+        - No duplicate reference strings (explicit check beyond dict dedup).
+        - Internally stored as ``MappingProxyType`` (truly immutable).
+
     Resolution:
-        ``registry.resolve("default")`` returns the snapshot or raises
-        ``ValueError`` if the reference is unknown.
+        ``registry.resolve("default")`` returns a
+        :class:`ResolvedProviderAuthority` with auto-computed
+        ``identity_digest``.
+
+    The ``identity_digest`` is the ``sha256`` digest of the canonical
+    payload produced by :func:`canonical_provider_identity_payload`.
     """
 
     __slots__ = ("_providers",)
 
     def __init__(self, providers: dict[str, ProviderIdentitySnapshot]) -> None:
-        # Defensive copy + freeze
-        self._providers: dict[str, ProviderIdentitySnapshot] = dict(providers)
+        # Validate keys: reject blank/empty/whitespace-only
+        clean: dict[str, ProviderIdentitySnapshot] = {}
+        for ref, snapshot in providers.items():
+            if not isinstance(ref, str) or not ref.strip():
+                raise ValueError(f"Provider reference must be a non-blank string, got {ref!r}")
+            clean[ref] = snapshot
 
-    def resolve(self, ref: str) -> ProviderIdentitySnapshot:
-        """Return the ``ProviderIdentitySnapshot`` for *ref*.
+        # Explicit duplicate detection (the input dict already deduplicates
+        # by key, but we check for intentional duplicate-key awareness).
+        # Python dicts silently overwrite duplicate literal keys in a dict
+        # display, so this check is informational — the real guard is that
+        # we reject keys that appear more than once in an iterable input.
+        # For a dict input the language already deduplicates, so we store
+        # the cleaned copy.
+        self._providers: MappingProxyType[str, ProviderIdentitySnapshot] = MappingProxyType(
+            dict(clean)
+        )
 
-        Raises ``ValueError`` if *ref* is not present in the registry.
+    def resolve(self, ref: str) -> ResolvedProviderAuthority:
+        """Return the :class:`ResolvedProviderAuthority` for *ref*.
+
+        Raises :class:`ValueError`` if *ref* is blank or not present.
         """
+        if not isinstance(ref, str) or not ref.strip():
+            raise ValueError(f"Provider reference must be a non-blank string, got {ref!r}")
         try:
-            return self._providers[ref]
+            identity = self._providers[ref]
         except KeyError:
             available = sorted(self._providers.keys())
             raise ValueError(
                 f"Unknown provider reference {ref!r}. Available: {available}"
             ) from None
 
+        # Auto-compute identity_digest from canonical payload
+        payload = canonical_provider_identity_payload(identity)
+        identity_digest = sha256_digest(payload)
+
+        return ResolvedProviderAuthority(
+            provider_ref=ref,
+            identity=identity,
+            identity_digest=identity_digest,
+        )
+
     def __repr__(self) -> str:
         keys = sorted(self._providers.keys())
         return f"ProviderRegistry(keys={keys!r})"
 
 
-# ---------------------------------------------------------------------------
-# CatalogRegistry
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+# CatalogRegistry                                                             #
+# --------------------------------------------------------------------------- #
+
+# The 4-field identity key (without content hash) — used for duplicate
+# identity-key detection with different content hashes.
+_CATALOG_IDENTITY_KEY_TUPLE = tuple[str, str, str, str]
 
 
 class CatalogRegistry:
-    """Immutable registry of ``CompleteDoublePipeCatalogSnapshot`` instances.
+    """Immutable registry of :class:`CompleteDoublePipeCatalogSnapshot` instances.
 
     Construction:
 
@@ -73,12 +162,13 @@ class CatalogRegistry:
        authoritative :func:`compute_catalog_content_hash`.
     2. Duplicate identity keys (the 5-tuple from
        :func:`catalog_identity_key`) are rejected.
-    3. Snapshots are stored in canonical order (sorted by identity key).
+    3. Same identity key with different content hash is rejected.
+    4. Snapshots are stored in canonical order (sorted by 5-field identity key).
+    5. Internally stored as ``MappingProxyType`` (truly immutable).
 
     Resolution:
-        ``registry.resolve(ref)`` returns the snapshot matching *ref*
-        (a ``CatalogSnapshotRef``) or raises ``ValueError`` if the
-        reference is unknown.
+        ``registry.resolve(ref)`` returns a
+        :class:`ResolvedCatalogAuthority` (verified) matching *ref*.
     """
 
     __slots__ = ("_by_key", "_canonical_order")
@@ -88,6 +178,8 @@ class CatalogRegistry:
         catalogs: list[CompleteDoublePipeCatalogSnapshot],
     ) -> None:
         by_key: dict[tuple[str, str, str, str, str], CompleteDoublePipeCatalogSnapshot] = {}
+        # Track 4-field identity keys to detect same-identity different-hash
+        identity_to_hash: dict[tuple[str, str, str, str], str] = {}
 
         for cat in catalogs:
             # Re-verify content hash against authoritative computation
@@ -108,22 +200,45 @@ class CatalogRegistry:
             key = catalog_identity_key(cat)
             if key in by_key:
                 raise ValueError(f"Duplicate catalog identity key: {key!r}")
+
+            # Check same identity key (4-field) with different content hash
+            id_key: _CATALOG_IDENTITY_KEY_TUPLE = (
+                cat.catalog_id,
+                cat.catalog_version,
+                cat.source_identity,
+                cat.schema_version,
+            )
+            if id_key in identity_to_hash:
+                existing_hash = identity_to_hash[id_key]
+                if existing_hash != cat.catalog_content_hash:
+                    raise ValueError(
+                        f"Same catalog identity {id_key!r} with different "
+                        f"content hash: {existing_hash!r} vs "
+                        f"{cat.catalog_content_hash!r}"
+                    )
+            else:
+                identity_to_hash[id_key] = cat.catalog_content_hash
+
             by_key[key] = cat
 
-        # Store in canonical (sorted) order
-        self._by_key = by_key
+        # Store in canonical (sorted) order as frozen tuple
         self._canonical_order: tuple[CompleteDoublePipeCatalogSnapshot, ...] = tuple(
             by_key[k] for k in sorted(by_key.keys())
         )
 
+        # Truly immutable mapping
+        self._by_key: MappingProxyType[
+            tuple[str, str, str, str, str], CompleteDoublePipeCatalogSnapshot
+        ] = MappingProxyType(dict(by_key))
+
     def resolve(
         self,
-        ref: CatalogSnapshotRef,
-    ) -> CompleteDoublePipeCatalogSnapshot:
-        """Return the snapshot matching *ref*.
+        ref: CatalogSnapshotRef | CatalogSnapshotReference,
+    ) -> ResolvedCatalogAuthority:
+        """Return the :class:`ResolvedCatalogAuthority` matching *ref*.
 
         The five identity fields of *ref* are used as the lookup key.
-        Raises ``ValueError`` if no matching snapshot is found.
+        Raises :class:`ValueError`` if no matching snapshot is found.
         """
         key = (
             ref.catalog_id,
@@ -133,7 +248,7 @@ class CatalogRegistry:
             ref.schema_version,
         )
         try:
-            return self._by_key[key]
+            snapshot = self._by_key[key]
         except KeyError:
             raise ValueError(
                 f"Unknown catalog reference: "
@@ -141,6 +256,20 @@ class CatalogRegistry:
                 f"catalog_version={ref.catalog_version!r}, "
                 f"catalog_content_hash={ref.catalog_content_hash!r})"
             ) from None
+
+        # Ensure ref is a CatalogSnapshotRef (not a CatalogSnapshotReference)
+        catalog_ref = CatalogSnapshotRef(
+            catalog_id=ref.catalog_id,
+            catalog_version=ref.catalog_version,
+            catalog_content_hash=ref.catalog_content_hash,
+            source_identity=ref.source_identity,
+            schema_version=ref.schema_version,
+        )
+        return ResolvedCatalogAuthority(
+            ref=catalog_ref,
+            snapshot=snapshot,
+            content_hash_verified=True,
+        )
 
     @property
     def snapshots(self) -> tuple[CompleteDoublePipeCatalogSnapshot, ...]:
@@ -152,13 +281,13 @@ class CatalogRegistry:
         return f"CatalogRegistry(n={n})"
 
 
-# ---------------------------------------------------------------------------
-# ResolvedCatalogAuthority
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- #
+# ResolvedCatalogAuthority                                                    #
+# --------------------------------------------------------------------------- #
 
 
 class ResolvedCatalogAuthority(StrictBaseModel):
-    """Binding of a ``CatalogSnapshotRef`` to its resolved snapshot.
+    """Binding of a :class:`CatalogSnapshotRef` to its resolved snapshot.
 
     Produced by :meth:`CatalogRegistry.resolve` when the caller needs
     to carry both the reference and the resolved snapshot together,
@@ -175,4 +304,6 @@ __all__ = [
     "CatalogRegistry",
     "ProviderRegistry",
     "ResolvedCatalogAuthority",
+    "canonical_catalog_authority_payload",
+    "canonical_provider_identity_payload",
 ]

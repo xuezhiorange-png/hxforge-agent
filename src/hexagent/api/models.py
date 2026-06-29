@@ -6,10 +6,11 @@ StrictBaseModel from hexagent.domain.models.
 
 from __future__ import annotations
 
-from typing import Literal
+import re
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from hexagent.core.heat_balance import ProviderIdentitySnapshot
 from hexagent.domain.models import (
@@ -159,6 +160,9 @@ class RatingApiRequest(StrictBaseModel):
 # ---------------------------------------------------------------------------
 
 
+_SHA256_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
 class CatalogSnapshotReference(StrictBaseModel):
     """Reference to a frozen catalog snapshot."""
 
@@ -169,6 +173,30 @@ class CatalogSnapshotReference(StrictBaseModel):
     catalog_content_hash: str
     source_identity: str
     schema_version: str
+
+    @field_validator(
+        "catalog_id",
+        "catalog_version",
+        "source_identity",
+        "schema_version",
+        mode="after",
+    )
+    @classmethod
+    def _non_blank_string(cls, value: str, info: Any) -> str:
+        """Reject empty or whitespace-only string fields."""
+        if not value or not value.strip():
+            raise ValueError(f"{info.field_name} must be a non-empty, non-whitespace string")
+        return value.strip()
+
+    @field_validator("catalog_content_hash", mode="after")
+    @classmethod
+    def _valid_hash_format(cls, value: str) -> str:
+        """Reject catalog_content_hash that doesn't match sha256:[0-9a-f]{64}."""
+        if not _SHA256_PATTERN.match(value):
+            raise ValueError(
+                f"catalog_content_hash must match sha256:[0-9a-f]{{64}}, got {value!r}"
+            )
+        return value
 
 
 # ---------------------------------------------------------------------------

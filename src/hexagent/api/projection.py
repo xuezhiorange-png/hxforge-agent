@@ -9,13 +9,22 @@ These functions are pure — no I/O, no property calls, no side effects.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
+from hexagent.api.canonical_request import (
+    build_sizing_canonical_request_context,
+    compute_api_request_digest,
+)
 from hexagent.api.models import (
     DoublePipeGeometrySpec,
     FluidStreamSpec,
+    ResolvedProviderAuthority,
     SizingApiRequest,
     SolverParamsSpec,
     ValidationApiRequest,
 )
+from hexagent.api.registry import CatalogRegistry, ProviderRegistry
 from hexagent.domain.models import (
     DesignCase,
     DesignConstraints,
@@ -23,7 +32,14 @@ from hexagent.domain.models import (
 )
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 from hexagent.exchangers.double_pipe.solver import SolverParams
-from hexagent.optimization.models import CompleteDoublePipeCatalogSnapshot, SizingRequest
+from hexagent.optimization.context import (
+    SizingRequestIdentity,
+    build_sizing_request_identity,
+)
+from hexagent.optimization.models import (
+    CompleteDoublePipeCatalogSnapshot,
+    SizingRequest,
+)
 
 
 def project_fluid_stream_to_stream_spec(spec: FluidStreamSpec) -> StreamSpec:
@@ -129,9 +145,210 @@ def project_sizing_to_sizing_request(
 
 
 __all__ = [
+    "ProjectedSizingRequest",
     "project_fluid_stream_to_stream_spec",
+    "project_sizing_api_request",
+    "project_sizing_to_sizing_request",
+    "project_solver_spec_to_solver",
     "project_validation_to_design_case",
     "project_geometry_spec_to_geometry",
-    "project_solver_spec_to_solver",
-    "project_sizing_to_sizing_request",
 ]
+
+
+# ---------------------------------------------------------------------------
+# ProjectedSizingRequest — frozen result of full projection
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ProjectedSizingRequest:
+    """Complete frozen result of SizingApiRequest projection.
+
+    Carries all domain models, identity, and digest produced by
+    :func:`project_sizing_api_request`.  This is the authoritative
+    projection — all downstream code must use this artifact rather
+    than re-projecting the API request.
+    """
+
+    design_case: DesignCase
+    sizing_request: SizingRequest
+    sizing_request_identity: SizingRequestIdentity
+    effective_solver_params: SolverParams
+    resolved_provider: ResolvedProviderAuthority
+    resolved_catalogs: tuple[CompleteDoublePipeCatalogSnapshot, ...]
+    canonical_request_snapshot: dict[str, Any]
+    request_digest: str
+
+
+def project_sizing_api_request(
+    api_request: SizingApiRequest,
+    provider_registry: ProviderRegistry,
+    catalog_registry: CatalogRegistry,
+) -> ProjectedSizingRequest:
+    """Authoritative projection of SizingApiRequest to domain models + identity + digest.
+
+    Steps:
+    1. Resolve provider via ProviderRegistry -> ResolvedProviderAuthority
+    2. Verify ExpectedProviderIdentity.matches(resolved_provider.identity)
+    3. Sort and validate catalog_refs
+    4. Resolve each catalog ref via CatalogRegistry
+    5. Verify catalog content hash matches
+    6. Build effective solver params (None -> SolverParams defaults)
+    7. Build design case
+    8. Build sizing request
+    9. Build sizing request identity
+    10. Build canonical request context
+    11. Compute request digest
+    12. Return frozen ProjectedSizingRequest
+
+    Raises ValueError on:
+    - Provider not found
+    - Provider identity mismatch
+    - Catalog not found
+    - Catalog hash mismatch
+    - Duplicate catalog refs
+    - Same identity key, different content hash
+    """
+    from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+    # Step 1: Resolve provider
+    # SizingApiRequest uses expected_provider_identity.name as the provider ref
+    # (unlike RatingApiRequest which has an explicit provider_ref field).
+    resolved_provider = provider_registry.resolve(
+        api_request.expected_provider_identity.name,
+    )
+
+    # Step 2: Verify provider identity matches
+    if not api_request.expected_provider_identity.matches(resolved_provider.identity):
+        raise ValueError(
+            f"Provider identity mismatch: expected "
+            f"(name={api_request.expected_provider_identity.name!r}, "
+            f"version={api_request.expected_provider_identity.version!r}), "
+            f"got (name={resolved_provider.identity.name!r}, "
+            f"version={resolved_provider.identity.version!r})"
+        )
+
+    # Step 3: Sort and validate catalog_refs
+    seen_keys: set[tuple[str, str, str, str, str]] = set()
+    for ref in api_request.catalog_refs:
+        key = (
+            ref.catalog_id,
+            ref.catalog_version,
+            ref.catalog_content_hash,
+            ref.source_identity,
+            ref.schema_version,
+        )
+        if key in seen_keys:
+            raise ValueError(f"Duplicate catalog ref: {key!r}")
+        seen_keys.add(key)
+
+    # Step 4: Resolve each catalog ref via CatalogRegistry
+    resolved_catalog_authorities = [
+        catalog_registry.resolve(ref) for ref in api_request.catalog_refs
+    ]
+
+    # Extract snapshots in the order they were resolved
+    resolved_catalogs = tuple(authority.snapshot for authority in resolved_catalog_authorities)
+
+    # Step 5: Verify catalog content hash matches (done by CatalogRegistry.resolve)
+
+    # Step 6: Build effective solver params
+    effective_solver_spec = (
+        api_request.solver_params if api_request.solver_params is not None else SolverParamsSpec()
+    )
+    effective_solver_params = project_solver_spec_to_solver(effective_solver_spec)
+
+    # Step 7: Build design case
+    design_case = project_validation_to_design_case(api_request.case)
+
+    # Step 8: Build sizing request
+    sizing_request = project_sizing_to_sizing_request(api_request, resolved_catalogs)
+
+    # Step 9: Build sizing request identity
+    case = api_request.case
+
+    # Extract fluid names
+    hot_fluid_name = case.hot_stream.fluid.name
+    cold_fluid_name = case.cold_stream.fluid.name
+    hot_fluid_eos = case.hot_stream.fluid.backend
+    cold_fluid_eos = case.cold_stream.fluid.backend
+
+    # Extract composition (normalized components)
+    hot_components: tuple[tuple[str, float], ...] = ()
+    if case.hot_stream.fluid.composition is not None:
+        hot_components = tuple(sorted(case.hot_stream.fluid.composition.items()))
+
+    cold_components: tuple[tuple[str, float], ...] = ()
+    if case.cold_stream.fluid.composition is not None:
+        cold_components = tuple(sorted(case.cold_stream.fluid.composition.items()))
+
+    # Extract SI values
+    hot_inlet_temp_k = case.hot_stream.inlet.temperature.si_value
+    cold_inlet_temp_k = case.cold_stream.inlet.temperature.si_value
+    hot_inlet_pressure_pa = case.hot_stream.inlet.pressure.si_value
+    cold_inlet_pressure_pa = case.cold_stream.inlet.pressure.si_value
+    hot_mass_flow_kg_s = case.hot_stream.mass_flow.si_value
+    cold_mass_flow_kg_s = case.cold_stream.mass_flow.si_value
+
+    # Use case.target_duty.si_value for required_duty_w
+    required_duty_w = case.target_duty.si_value
+
+    # Use case.minimum_terminal_delta_t.si_value for minimum_terminal_delta_t
+    minimum_terminal_delta_t = case.minimum_terminal_delta_t.si_value
+
+    # Parse flow arrangement
+    flow_arrangement = FlowArrangement(api_request.flow_arrangement)
+
+    sizing_request_identity = build_sizing_request_identity(
+        request=sizing_request,
+        hot_fluid_name=hot_fluid_name,
+        cold_fluid_name=cold_fluid_name,
+        hot_fluid_equation_of_state=hot_fluid_eos,
+        cold_fluid_equation_of_state=cold_fluid_eos,
+        hot_inlet_temperature_k=hot_inlet_temp_k,
+        cold_inlet_temperature_k=cold_inlet_temp_k,
+        hot_inlet_pressure_pa=hot_inlet_pressure_pa,
+        cold_inlet_pressure_pa=cold_inlet_pressure_pa,
+        hot_mass_flow_kg_s=hot_mass_flow_kg_s,
+        cold_mass_flow_kg_s=cold_mass_flow_kg_s,
+        tube_in_hot=api_request.tube_in_hot,
+        flow_arrangement=flow_arrangement,
+        tube_boundary_condition=api_request.tube_boundary_condition,
+        annulus_boundary_condition=api_request.annulus_boundary_condition,
+        minimum_terminal_delta_t=minimum_terminal_delta_t,
+        required_duty_w=required_duty_w,
+        duty_absolute_tolerance_w=api_request.duty_absolute_tolerance.si_value,
+        duty_relative_tolerance=api_request.duty_relative_tolerance.si_value,
+        optimization_objective=api_request.optimization_objective,
+        top_n=api_request.requested_top_n,
+        solver_params=effective_solver_params,
+        expected_provider_identity=api_request.expected_provider_identity,
+        rating_software_version=api_request.rating_software_version,
+        execution_context_policy_version=api_request.execution_context_policy_version,
+        hot_fluid_normalized_components=hot_components,
+        cold_fluid_normalized_components=cold_components,
+        design_case_revision_id=api_request.design_case_revision_id,
+        calculation_run_id=api_request.calculation_run_id,
+    )
+
+    # Step 10: Build canonical request context
+    canonical_request_snapshot = build_sizing_canonical_request_context(
+        request=api_request,
+        resolved_provider=resolved_provider,
+        resolved_catalogs=resolved_catalogs,
+    )
+
+    # Step 11: Compute request digest
+    request_digest = compute_api_request_digest(canonical_request_snapshot)
+
+    # Step 12: Return frozen ProjectedSizingRequest
+    return ProjectedSizingRequest(
+        design_case=design_case,
+        sizing_request=sizing_request,
+        sizing_request_identity=sizing_request_identity,
+        effective_solver_params=effective_solver_params,
+        resolved_provider=resolved_provider,
+        resolved_catalogs=resolved_catalogs,
+        canonical_request_snapshot=canonical_request_snapshot,
+        request_digest=request_digest,
+    )
