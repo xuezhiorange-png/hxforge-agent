@@ -39,7 +39,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-009 (Phase 3 design) | Deterministic feasibility, ranking and Top-N contract | DONE | TASK-009 Phase 2 |
 | TASK-009 (Phase 3 impl) | Deterministic feasibility, ranking and Top-N implementation | DONE | TASK-009 Phase 3 design |
 | TASK-009 (Issue #26) | Fix inherited heat-balance golden and rating test failures | DONE | TASK-009 Phase 3 |
-| TASK-010 (design) | Freeze versioned API and traceable report contract | IN_PROGRESS | TASK-009 |
+| TASK-010 (design) | Freeze versioned API and traceable report contract | READY_FOR_REVIEW | TASK-009 |
 | TASK-010 (impl) | Implement versioned API and traceable report | BLOCKED | TASK-010 design |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 | Add materials, mass and preliminary mechanical checks | PLANNED | TASK-012, TASK-013, TASK-016 |
