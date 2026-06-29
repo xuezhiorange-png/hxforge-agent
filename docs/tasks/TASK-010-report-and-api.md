@@ -170,6 +170,39 @@ Omitting `solver_params` or passing `{}` produces the same result and same canon
 
 **Single-authority rule:** The public `DoublePipeGeometrySpec` does NOT accept fouling fields. Fouling comes solely from `case.hot_stream.fouling` and `case.cold_stream.fouling` (both `FoulingResistanceSpec` with provenance). Any user-submitted fouling value on the geometry DTO is rejected at 422.
 
+### 3.3.3 Provider Resolution Chain (Rating)
+
+`RatingApiRequest.provider_ref` is resolved through an immutable provider registry **before** computing `request_digest`. The full resolved identity is bound into the canonical request.
+
+```python
+class ResolvedProviderAuthority(StrictBaseModel):
+    provider_ref: str                           # original lookup key
+    identity: ProviderIdentitySnapshot          # full immutable identity
+    identity_digest: str                        # sha256 of identity payload
+```
+
+Resolution chain:
+
+```
+RatingApiRequest.provider_ref
+→ resolve through immutable registry
+→ obtain full ProviderIdentitySnapshot (name, version, git_revision,
+  reference_state_policy, configuration_fingerprint, cache_policy_version)
+→ reject unresolved identity → 422
+→ construct ResolvedProviderAuthority
+→ include full resolved identity in canonical request context
+→ compute request_digest (binds full identity, NOT just provider_ref string)
+→ claim idempotency namespace
+→ execute rating with exactly that provider
+```
+
+**Prohibitions:**
+- Computing `request_digest` before resolving provider
+- Including only `provider_ref` string in request digest
+- Same `provider_ref` replaying across different backend/version
+
+**For Sizing:** `ExpectedProviderIdentity` is the caller's expectation. `ResolvedProviderAuthority.identity` is the actual configured provider. Actual identity must satisfy `ExpectedProviderIdentity.matches(actual)`. Canonical request binds both expected and actual resolved identity. Provider mismatch fails closed before execution. Actual provider identity changes produce different request digests.
+
 ### 3.4 `SizingApiRequest`
 
 ```python
@@ -200,8 +233,9 @@ class SizingApiRequest(StrictBaseModel):
     flow_arrangement: Literal["counterflow", "parallel"]
     tube_in_hot: bool = True
 
-    # Duty — unit-bearing
-    required_duty: Power
+    # Duty — SINGLE AUTHORITY: derived from case.target_duty
+    # required_duty removed — DesignCase.target_duty is the sole authority.
+    # SizingRequestIdentity.required_duty_w = case.target_duty.si_value
     duty_absolute_tolerance: Power = Field(default=Power(value=0, unit="W"))
     duty_relative_tolerance: Dimensionless = Field(
         default=Dimensionless(value=0, unit="dimensionless"))
@@ -231,6 +265,25 @@ class SizingApiRequest(StrictBaseModel):
 - `duty_absolute_tolerance` → `Power`
 - `duty_relative_tolerance` → `Dimensionless` with `unit="dimensionless"` (not `""`)
 
+**Catalog ref canonical ordering:**
+
+`catalog_refs` are sorted before resolution, digest computation, and domain projection:
+
+```python
+catalog_refs = tuple(sorted(
+    catalog_refs,
+    key=lambda r: (
+        r.catalog_id,
+        r.catalog_version,
+        r.catalog_content_hash,
+        r.source_identity,
+        r.schema_version,
+    ),
+))
+```
+
+Uniqueness key: `catalog_id + catalog_version + source_identity + schema_version`. Same key with different `content_hash` → reject. Completely duplicate reference → reject (no silent dedup). Resolved catalogs follow the same canonical order into `SizingRequest.catalogs`, `SizingRequestIdentity.catalog_snapshot_identities`, canonical request snapshot, and artifact bundle.
+
 **Catalog resolution contract:**
 The application service must, before computing `request_digest`:
 1. Look up each `CatalogSnapshotReference` in the immutable read-only registry.
@@ -256,7 +309,7 @@ SizingApiRequest
 → build_sizing_request_identity(
     request,
     ...,
-    required_duty_w=required_duty.si_value,
+    required_duty_w=request.case.target_duty.si_value,
     duty_absolute_tolerance_w=duty_absolute_tolerance.si_value,
     duty_relative_tolerance=duty_relative_tolerance.si_value,
     ...
@@ -453,6 +506,14 @@ class SizingRunEnvelope(StrictBaseModel):
         if self.blockers != expected_blockers:
             raise ValueError("blocker projection mismatch")
 
+        # P0-3: Failure authority — reconstruct from authoritative artifacts
+        expected_failure = reconstruct_sizing_failure(self.artifact_bundle)
+        if self.failure != expected_failure:
+            raise ValueError("failure projection mismatch")
+
+        # P0-3: Provenance object parity — not just digest equality
+        if self.provenance != self.artifact_bundle.provenance_graph:
+            raise ValueError("provenance != bundle.provenance_graph")
         recomputed_prov = self.provenance.compute_hash()
         if self.provenance_digest != recomputed_prov:
             raise ValueError("provenance_digest mismatch")
@@ -479,6 +540,36 @@ def reconstruct_sizing_blockers(bundle: SizingRunArtifacts) -> tuple[Engineering
         binding_tuples=artifacts.blocker_binding_tuples,
         descriptor_tuples=artifacts.blocker_descriptor_tuples,
     )
+```
+
+def reconstruct_sizing_failure(bundle: SizingRunArtifacts) -> RunFailure | None:
+    """Reconstruct failure from Phase3AuthoritativeArtifacts and OptimizationResult.
+
+    Sources (in priority order):
+    1. Phase3AuthoritativeArtifacts.source_failure_bindings — Phase 2 runtime failures
+    2. Phase3AuthoritativeArtifacts.evidence_failure_bindings — evidence failures
+    3. OptimizationResult.termination_status — FAILED/COMPLETE/PARTIAL
+
+    Multiple conflicting authorities or unresolvable state → fail closed.
+    """
+    artifacts = bundle.phase3_authoritative_artifacts
+    result = bundle.optimization_result
+
+    # If result has explicit failure binding, use it
+    if result.failure is not None:
+        return result.failure
+
+    # Check Phase 2 source failure bindings
+    if artifacts.source_failure_bindings:
+        # Use the first (and should be only) source failure
+        return artifacts.source_failure_bindings[0].run_failure
+
+    # Check evidence failure bindings
+    if artifacts.evidence_failure_bindings:
+        return artifacts.evidence_failure_bindings[0].run_failure
+
+    # No failure found — consistent with COMPLETE/PARTIAL termination
+    return None
 ```
 
 **Rules:** Digest order from `OptimizationResult` — no manual reorder. Descriptor+tuple from same `Phase3AuthoritativeArtifacts`. Unresolved/conflicting → fail closed. Never re-derive authority from display text.
@@ -546,7 +637,70 @@ class RunRecord(StrictBaseModel):
     failure: RunFailure | None = None
 ```
 
-**State transitions:** (new) → CLAIMED → RUNNING → COMPLETE/FAILED. STALE on lease expiry. STALE → CLAIMED with takeover.
+**State transition table:**
+
+| Current State | Event | Next State | Notes |
+|---|---|---|---|
+| ABSENT | claim() | CLAIMED | New record, new owner_token, record_version=1 |
+| CLAIMED | start() | RUNNING | CAS: owner_token + expected_version |
+| CLAIMED | fail() | FAILED | CAS: owner_token + expected_version |
+| CLAIMED | lease expired | STALE | No CAS — determined by clock |
+| RUNNING | complete() | COMPLETE | CAS: owner_token + expected_version |
+| RUNNING | fail() | FAILED | CAS: owner_token + expected_version |
+| RUNNING | lease expired | STALE | No CAS — determined by clock |
+| STALE | claim(takeover=True) | CLAIMED | Atomic CAS takeover: new owner_token, record_version+1, refresh timestamps. Old owner_token immediately invalidated. |
+| COMPLETE | claim() same digest | COMPLETE (replay) | No state change, returns existing envelope |
+| COMPLETE | claim() different digest | 409 conflict | Namespace collision |
+| FAILED | claim() | CHOSEN: replay failure OR allow new claim | Must freeze one policy — default: replay failure |
+| CLAIMED/RUNNING | heartbeat() | same state | CAS: owner_token + expected_version, refresh lease |
+
+**`claim()` return type:**
+
+```python
+class ClaimOutcome(StrEnum):
+    NEW_CLAIM = "new_claim"
+    COMPLETE_REPLAY = "complete_replay"
+    IN_PROGRESS = "in_progress"
+    FAILED_REPLAY = "failed_replay"
+    STALE_TAKEOVER = "stale_takeover"
+
+@dataclass(frozen=True)
+class ClaimResult:
+    outcome: ClaimOutcome
+    record: RunRecord
+```
+
+**`claim()` behavior by case:**
+
+| Condition | Outcome | Response |
+|---|---|---|
+| Same namespace + COMPLETE + same digest | COMPLETE_REPLAY | Return existing envelope, 200 |
+| Same namespace + COMPLETE + different digest | 409 | Namespace conflict |
+| Same namespace + CLAIMED/RUNNING + lease valid | IN_PROGRESS | Return 409 + structured IN_PROGRESS |
+| Same namespace + STALE + takeover=False | STALE | Return 409 or explicit STALE response |
+| Same namespace + STALE + takeover=True | STALE_TAKEOVER | Atomic CAS: new owner_token, version+1, refresh timestamps |
+| Same namespace + FAILED | FAILED_REPLAY | Return failed envelope OR allow new claim (policy choice) |
+| New namespace | NEW_CLAIM | Create record, new owner_token |
+
+**Takeover atomicity:**
+- Generates new `owner_token`
+- Increments `record_version`
+- Refreshes `claimed_at` and `lease_expires_at`
+- Old `owner_token` immediately invalidated
+- Old owner's subsequent heartbeat/complete/fail all CAS-fail
+
+**All mutating methods** (start, heartbeat, complete, fail) must check:
+- `owner_token` matches
+- `expected_version` matches
+- Current state is in the allowed set
+- Lease is valid (or call is a legal takeover)
+
+**`complete()` additional checks:**
+- `artifact_bundle == envelope.artifact_bundle` (object equality, not just type/digest)
+- `record.request_digest == envelope.request_digest`
+- `record.operation == envelope.operation`
+- Bundle result matches envelope result
+- Bundle digest matches envelope.artifact_bundle_digest
 
 ### 7.4 Run Repository Protocol
 
@@ -590,45 +744,83 @@ class RunRepository(Protocol):
 All canonical scalar values are encoded as **JSON strings**, not JSON numbers, to avoid binary float serialization differences.
 
 ```python
-def canonical_decimal_string(d: Decimal) -> str:
-    """Normalize Decimal to canonical string.
-
-    Rejects: NaN, Infinity, -Infinity, and signed negative zero
-      (Decimal("-0"), float("-0.0"), any value normalizing to -0).
+def canonical_decimal_string(value: Decimal) -> str:
+    """Normalize Decimal to canonical string with 15 significant digits.
 
     Algorithm:
-    1. Input → Decimal. Reject specials and signed negative zero.
-    2. Determine adjusted exponent for the Decimal value.
-    3. Quantizer: quantize to 15 significant digits via ROUND_HALF_EVEN.
-    4. If |adjusted exponent| <= 10: use fixed notation, strip trailing zeros.
-    5. If |adjusted exponent| > 10: use scientific notation.
-       Format as: sign digit "." digits "E" sign exponent.
-       Exponent always signed, two digits minimum (e.g. "E+00", "E-30").
-       No leading zeros in exponent (except zero exponent which is "+00").
-       Uppercase 'E'.
-    6. Never output "-0" — always "0".
-    7. Subnormal/small: convert to scientific with full precision.
+    1. Reject non-finite (NaN, Inf, -Inf).
+    2. Reject signed negative zero (Decimal("-0"), float("-0.0")).
+    3. Zero → "0".
+    4. Determine adjusted exponent.
+    5. Quantize to 15 significant digits via ROUND_HALF_EVEN.
+    6. If rounding produces negative zero → reject.
+    7. If |adjusted exponent| <= 10: fixed notation, strip trailing zeros and trailing dot.
+    8. Otherwise: scientific notation.
+       Format: mantissa "E" sign exponent (e.g. "E+15", "E-30").
+       No leading zeros in exponent. Uppercase 'E'.
+
+    Rules:
+    - All finite non-zero numbers use the same 15-digit rounding — no subnormal exception.
+    - Negative zero is ALWAYS rejected, never normalized to "0".
+    - Decimal and float canonical scalar outputs are JSON strings.
+    - int remains JSON number, bool remains JSON boolean.
+    - Float entry: Decimal(repr(float_value)) is the only conversion path.
+    - Quantity SI conversion uses exact Decimal factor, never binary float si_value.
 
     Test vectors:
-      1.234567890123445 → "1.234567890123445"
-      1.234567890123455 → "1.234567890123455"  (ROUND_HALF_EVEN rounds last digit)
-      0.00000000000000123456789012345 → "1.23456789012345E-15"
-      1234567890123450 → "1.23456789012345E+15"
-      999999999999999.5 → "1E+15"  (ROUND_HALF_EVEN)
+      0 → "0"
+      -0 → REJECTED
+      1 → "1"
+      1.0 → "1"
+      1.5000 → "1.5"
+      1.234567890123445 → "1.23456789012344"
+      1.234567890123455 → "1.23456789012346"
+      999999999999999.5 → "1E+15"
       1E-30 → "1E-30"
       1E+30 → "1E+30"
-      1.5000 → "1.5"
-      1.0 → "1"
+      0.00000000001 → "1E-11"
+      0.000000000001 → "1E-12"
+      99999999999 → "99999999999"
+      100000000000 → "100000000000"
     """
-    ...
+    if not value.is_finite():
+        raise ValueError("non-finite decimal")
+    if value.is_zero() and value.is_signed():
+        raise ValueError("negative zero")
+    if value.is_zero():
+        return "0"
+
+    precision = 15
+    adjusted = value.adjusted()
+    quantum = Decimal(1).scaleb(adjusted - precision + 1)
+    rounded = value.quantize(quantum, rounding=ROUND_HALF_EVEN)
+
+    if rounded.is_zero() and rounded.is_signed():
+        raise ValueError("rounding produced negative zero")
+
+    rounded_adjusted = rounded.adjusted()
+    if -10 <= rounded_adjusted <= 10:
+        result = format(rounded, "f")
+        if "." in result:
+            result = result.rstrip("0").rstrip(".")
+        return result
+
+    # Scientific notation: mantissa "E" sign exponent
+    normalized = rounded.normalize()
+    mantissa_str = format(normalized, "E")
+    # Split mantissa and exponent
+    parts = mantissa_str.split("E")
+    mantissa = parts[0]
+    exp = int(parts[1])
+    return f"{mantissa}E{exp:+d}"
 
 def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
     """Quantity → {"value": "<canonical SI string>", "unit": "<SI symbol>"}
 
     Conversion:
-    1. Input Quantity value → Decimal.
-    2. Convert to SI using Decimal factor via si_unit(q.quantity_kind).
-    3. Apply canonical_decimal_string() (round, normalize, reject -0).
+    1. Input Quantity value → Decimal(repr(value)) (exact binary-to-decimal).
+    2. Convert to SI using EXACT Decimal conversion factor (never binary float si_value).
+    3. Apply canonical_decimal_string() (15-digit rounding, reject -0).
     4. Output value as JSON string.
     5. Output unit as SI symbol — NOT the original input unit.
     """
@@ -646,10 +838,10 @@ def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
 | `Enum` | `.value` as string |
 | `UUID` | Canonical 36-char string |
 | `tuple` / `list` | JSON array |
-| `Decimal` | `canonical_decimal_string()` → JSON string |
-| `float` | Convert to `Decimal(repr(f))`, then `canonical_decimal_string()` |
-| `int` | JSON number |
-| `bool` | JSON boolean |
+|| `Decimal` | `canonical_decimal_string()` → JSON string (15 significant digits, ROUND_HALF_EVEN) |
+|| `float` | `Decimal(repr(f))` → `canonical_decimal_string()` → JSON string (no binary float intermediate for SI) |
+|| `int` | JSON number |
+|| `bool` | JSON boolean |
 | `Quantity` subtypes | `{"value": "<Decimal string>", "unit": "<SI symbol>"}` |
 | Unicode | NFC |
 | Negative zero | REJECTED (Decimal("-0"), float("-0.0"), any equivalent) |
@@ -665,8 +857,17 @@ def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
 | `0` (int) | `0` |
 | `-0` (Decimal) | REJECTED |
 | `float("-0.0")` | REJECTED |
-| `0.000001` (Decimal) | `"0.000001"` |
-| `1000000` (int) | `1000000` |
+|| `0.000001` (Decimal) | `"0.000001"` |
+|| `1000000` (int) | `1000000` |
+|| `1.234567890123445` (Decimal) | `"1.23456789012344"` |
+|| `1.234567890123455` (Decimal) | `"1.23456789012346"` |
+|| `999999999999999.5` (Decimal) | `"1E+15"` |
+|| `1E-30` (Decimal) | `"1E-30"` |
+|| `1E+30` (Decimal) | `"1E+30"` |
+|| `0.00000000001` (Decimal) | `"1E-11"` |
+|| `0.000000000001` (Decimal) | `"1E-12"` |
+|| `99999999999` (Decimal) | `"99999999999"` |
+|| `100000000000` (Decimal) | `"100000000000"` |
 | `TemperatureDifference(5, "delta_degC")` | `{"value": "5", "unit": "K"}` |
 | `TemperatureDifference(5, "K")` | `{"value": "5", "unit": "K"}` |
 | `Length(250, "cm")` | `{"value": "2.5", "unit": "m"}` |
@@ -698,7 +899,7 @@ class RatingRunArtifacts(StrictBaseModel):
 
     @model_validator(mode="after")
     def _validate_bundle_hash(self) -> typing.Self:
-        recomputed = compute_rating_artifact_bundle_hash(self)
+        recomputed = compute_rating_artifact_bundle_digest(self)
         if self.artifact_bundle_digest != recomputed:
             raise ValueError("artifact_bundle_digest mismatch")
         return self
@@ -727,6 +928,25 @@ class SizingRunArtifacts(StrictBaseModel):
 ### 9.3 Verifier Replay
 
 ```python
+def geometry_identity_payload(geometry: DoublePipeGeometry) -> dict[str, object]:
+    """Deterministic projection of DoublePipeGeometry to a dict for identity comparison.
+
+    Must match the complete geometry field set in RatingRequestIdentity.
+    Uses frozen production float values — no display string comparison.
+    """
+    return {
+        "inner_tube_inner_diameter_m": geometry.inner_tube_inner_diameter_m,
+        "inner_tube_outer_diameter_m": geometry.inner_tube_outer_diameter_m,
+        "outer_pipe_inner_diameter_m": geometry.outer_pipe_inner_diameter_m,
+        "effective_length_m": geometry.effective_length_m,
+        "wall_thermal_conductivity_w_m_k": geometry.wall_thermal_conductivity_w_m_k,
+        "inner_surface_roughness_m": geometry.inner_surface_roughness_m,
+        "annulus_surface_roughness_m": geometry.annulus_surface_roughness_m,
+        "inner_fouling_resistance_m2k_w": geometry.inner_fouling_resistance_m2k_w,
+        "outer_fouling_resistance_m2k_w": geometry.outer_fouling_resistance_m2k_w,
+    }
+
+
 def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
     # Reconstruct through real Pydantic validation
     reconstructed = RatingResult.model_validate(bundle.result.model_dump(mode="python"))
@@ -742,13 +962,31 @@ def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
     valid, issues = bundle.result.validate_integrity()
     if not valid:
         raise ValueError("RatingResult integrity verification failed: " + "; ".join(issues))
-    # Cross-check identity references
+    # P0-4: Cross-check identity references
     if bundle.result.request_identity != bundle.request_identity:
         raise ValueError("rating request identity mismatch")
     if bundle.result.provider_identity != bundle.provider_identity:
         raise ValueError("rating provider identity mismatch")
     if bundle.result.provenance_graph != bundle.provenance_graph:
         raise ValueError("rating provenance graph mismatch")
+
+    # P0-4: Geometry snapshot binding
+    if geometry_identity_payload(bundle.geometry_snapshot) != bundle.request_identity.geometry:
+        raise ValueError("geometry snapshot mismatch")
+
+    # P0-4: Solver settings binding (all four controls)
+    if bundle.solver_settings.absolute_residual_w != bundle.request_identity.solver_absolute_residual_w:
+        raise ValueError("solver absolute residual mismatch")
+    if bundle.solver_settings.relative_residual_fraction != bundle.request_identity.solver_relative_residual_fraction:
+        raise ValueError("solver relative residual mismatch")
+    if bundle.solver_settings.bracket_temperature_tolerance_k != bundle.request_identity.solver_bracket_temperature_tolerance_k:
+        raise ValueError("solver bracket tolerance mismatch")
+    if bundle.solver_settings.max_iterations != bundle.request_identity.solver_max_iterations:
+        raise ValueError("solver max iterations mismatch")
+
+    # P0-4: Envelope provenance_digest must equal result.provenance_digest
+    # (validated in envelope validator, but bundle verifier also checks graph integrity)
+
     # Digest
     recompute_and_check_bundle_digest(bundle)
 
@@ -922,11 +1160,66 @@ class DoublePipeReportModel(StrictBaseModel):
         if self.report_instance_hash != sha256_digest(self.report_instance_identity):
             raise ValueError("report_instance_hash mismatch")
 
-        # Section uniqueness + mandatory + order (see §10.3)
-        # Artifact uniqueness + mandatory + owner (see §10.4)
-        # PRESENT artifact pointer validation
+        # P0-5: Executable section uniqueness, ordering, and artifact validation
+        section_ids = tuple(section.section_id for section in self.sections)
+        if len(section_ids) != len(set(section_ids)):
+            raise ValueError("duplicate report section")
+        if section_ids != SECTION_ORDER:
+            raise ValueError("report section order mismatch")
+
+        artifact_owners: dict[ReportArtifactId, ReportSectionId] = {}
+        for section in self.sections:
+            for artifact in section.artifacts:
+                if artifact.artifact_id in artifact_owners:
+                    raise ValueError(f"duplicate artifact_id: {artifact.artifact_id}")
+                artifact_owners[artifact.artifact_id] = section.section_id
+                verify_report_artifact_shape(artifact)
+
+        for artifact_id, expected_owner in MANDATORY_ARTIFACT_OWNERS.items():
+            actual_owner = artifact_owners.get(artifact_id)
+            if actual_owner is None:
+                raise ValueError(f"mandatory artifact missing: {artifact_id}")
+            if actual_owner != expected_owner:
+                raise ValueError(f"mandatory artifact wrong owner: {artifact_id}")
+
         return self
 ```
+
+def verify_report_artifact_shape(artifact: ReportArtifact) -> None:
+    """Validate PRESENT/non-PRESENT field invariants for a single artifact.
+
+    PRESENT artifacts must have:
+    - source_document, source_document_digest, source_json_pointer,
+      authority_digest, canonical_raw_value, formatter_id, formatter_version,
+      rounding_mode, formatted_display_value all non-None
+    - source_json_pointer starts with "/" or is empty root pointer
+    - Pointer tokens only allow canonical ~0, ~1 escapes
+
+    Non-PRESENT artifacts must NOT have:
+    - source_json_pointer, canonical_raw_value, source_unit, formatter fields
+    """
+    if artifact.kind == ReportArtifactKind.PRESENT:
+        present = typing.cast(PresentReportArtifact, artifact)
+        # RFC 6901 pointer validation
+        if present.source_json_pointer and not present.source_json_pointer.startswith("/"):
+            raise ValueError(f"source_json_pointer must start with /: {present.source_json_pointer}")
+        # All required fields present
+        required = [
+            present.source_document, present.source_document_digest,
+            present.authority_digest, present.canonical_raw_value,
+            present.formatter_id, present.formatter_version,
+        ]
+        if any(v is None or (isinstance(v, str) and not v.strip()) for v in required):
+            raise ValueError("PRESENT artifact has empty required field")
+    else:
+        # Non-PRESENT must not carry source-only fields
+        if hasattr(artifact, "source_json_pointer") and getattr(artifact, "source_json_pointer", None):
+            raise ValueError("non-PRESENT artifact must not have source_json_pointer")
+        if hasattr(artifact, "canonical_raw_value") and getattr(artifact, "canonical_raw_value", None):
+            raise ValueError("non-PRESENT artifact must not have canonical_raw_value")
+
+
+**`verify_report_section_status_matrix()` is a mandatory pre-render verifier** called by the only report builder before returning the model. It is NOT optional, NOT a comment, and NOT skippable. It is invoked at step 6 of the pre-render chain (§10.5).
 
 ### 10.3 Section/Status Matrix
 
@@ -965,7 +1258,21 @@ class ReportSectionId(StrEnum):
     INTEGRITY = "integrity"
 
 
-SECTION_ORDER: tuple[ReportSectionId, ...] = (...)
+SECTION_ORDER: tuple[ReportSectionId, ...] = (
+    ReportSectionId.STATUS_BANNER,
+    ReportSectionId.RUN_IDENTITY,
+    ReportSectionId.INPUT_SUMMARY,
+    ReportSectionId.GEOMETRY,
+    ReportSectionId.HEAT_BALANCE,
+    ReportSectionId.THERMAL_PERFORMANCE,
+    ReportSectionId.SIZING_RANKING,
+    ReportSectionId.TOP_RANKED_CANDIDATES,
+    ReportSectionId.WARNINGS,
+    ReportSectionId.BLOCKERS,
+    ReportSectionId.FAILURE_DETAILS,
+    ReportSectionId.PROVENANCE,
+    ReportSectionId.INTEGRITY,
+)
 
 
 class ReportArtifactId(StrEnum):
@@ -992,9 +1299,9 @@ class ReportArtifactId(StrEnum):
     EFFECTIVENESS = "effectiveness"
     SIZING_RANK = "sizing_rank"
     OPTIMIZATION_OBJECTIVE = "optimization_objective"
-    TOP_CANDIDATE_RANK = "top_candidate_rank"
-    TOP_CANDIDATE_GEOMETRY = "top_candidate_geometry"
-    BLOCKER_MESSAGE = "blocker_message"
+    WARNING_MESSAGES = "warning_messages"
+    BLOCKER_MESSAGES = "blocker_messages"
+    TOP_RANKED_CANDIDATES = "top_ranked_candidates"
     FAILURE_REASON = "failure_reason"
     PROVENANCE_GRAPH = "provenance_graph"
     RESULT_HASH = "result_hash"
@@ -1005,6 +1312,39 @@ class ReportArtifactId(StrEnum):
     COST = "cost"
     MECHANICAL = "mechanical"
     PROCUREMENT = "procurement"
+
+
+class CanonicalBlockerItem(StrictBaseModel):
+    """Deterministic ordered item in a blocker collection artifact."""
+    occurrence_index: int
+    code: str
+    severity: str
+    message_payload_digest: str
+    source_binding_digest: str
+
+
+class CanonicalWarningItem(StrictBaseModel):
+    """Deterministic ordered item in a warning collection artifact."""
+    occurrence_index: int
+    code: str
+    severity: str
+    message_payload_digest: str
+    source_binding_digest: str
+
+
+class CanonicalRankedCandidateItem(StrictBaseModel):
+    """Deterministic ordered item in a Top-N collection artifact."""
+    rank: int
+    source_qualified_candidate_id: str
+    ranked_record_digest: str
+    geometry_identity_digest: str
+
+
+# Collection artifact canonical values are deterministic ordered tuples/lists.
+# Ordering authority:
+#   warnings/blockers: upstream result digest order
+#   Top-N: ranked_records prefix order
+# Prohibited: reordering by display text.
 
 
 MANDATORY_ARTIFACT_IDS: frozenset[ReportArtifactId] = frozenset({
@@ -1146,6 +1486,25 @@ class ApiError(StrictBaseModel):
     MAX_DISPLAYED_VALUE_LENGTH: ClassVar[int] = 200
 ```
 
+class ErrorDetail(StrictBaseModel):
+    path: tuple[str | int, ...]
+    code: str
+    message: str
+    rejected_value_preview: str | None = None
+
+    @field_validator("rejected_value_preview")
+    @classmethod
+    def limit_preview(cls, value: str | None) -> str | None:
+        if value is not None and len(value) > 200:
+            return value[:200]
+        return value
+```
+
+**ErrorDetail rules:**
+- No traceback, no absolute paths, no tokens, no env vars, no full sensitive input
+- `rejected_value_preview` max 200 characters
+- `details` sorted deterministically by `(path, code)`
+
 - 404 → `RUN_NOT_FOUND`, 409 → `IDEMPOTENCY_CONFLICT`, 422 → `VALIDATION_FAILED`, 500 → `INTERNAL_ERROR`, 501 → `PDF_NOT_AVAILABLE`.
 
 ---
@@ -1173,16 +1532,39 @@ class ApiError(StrictBaseModel):
 | T9d | `Decimal("1.5000")` → `"1.5"` | Trailing zero stripped |
 | T9e | `TemperatureDifference(5, "delta_degC")` → `{"value":"5","unit":"K"}` | SI unit |
 | T9f | `TemperatureDifference(5, "K")` and `TemperatureDifference(5, "delta_degC")` → same digest | Unit equivalence |
-| T9g | SolverParams omitted → same defaults as explicit `SolverParamsSpec()` | Default projection |
-| T10–T12 | Envelope type enforcement | Cross-field |
-| T13 | Envelope `result_hash` mismatch → rejected | Cross-field |
-| T14 | Rating envelope cross-field mismatch → rejected | Cross-field |
-| T14b–T14e | Sizing warning/blocker/failure/provenance parity | Cross-field |
-| T14f | Sizing envelope warning mismatch → rejected | Warning parity |
-| T14g | Sizing envelope blocker mismatch → rejected | Blocker parity |
-| T14h | Rating bundle digest mismatch → rejected | Bundle parity |
-| T14i | Rating bundle result mismatch → rejected | Bundle parity |
-| T15–T18 | Idempotency: replay, collision, isolation, concurrency | Various |
+|| T9g | SolverParams omitted → same defaults as explicit `SolverParamsSpec()` | Default projection |
+|| T60 | Sizing duty derived solely from `case.target_duty` — `SizingApiRequest` has no `required_duty` field | Single authority |
+|| T61 | SI-equivalent units allowed: `Power(100, "kW")` and `Power(100000, "W")` produce identical `required_duty_w` | Unit equivalence |
+|| T62 | If dual-field design is chosen, canonical mismatch → `422`; no idempotency namespace claimed | Mismatch rejection |
+|| T63 | Same `provider_ref`, different provider version → different `request_digest` | Provider identity binding |
+|| T64 | Same `provider_ref`, different `git_revision` → different `request_digest` | Provider identity binding |
+|| T65 | `configuration_fingerprint` change → different `request_digest` | Provider identity binding |
+|| T66 | `cache_policy_version` change → different `request_digest` | Provider identity binding |
+|| T67 | Expected provider identity does not match resolved provider → `422` | Fail closed |
+|| T68 | Provider not found in registry → `422`; no repository claim | Resolution failure |
+|| T86 | `catalog_refs` input order different → same `request_digest` | Canonical ordering |
+|| T87 | Completely duplicate catalog ref → rejected | Uniqueness |
+|| T88 | Same identity, different content hash → rejected | Identity consistency |
+|| T10–T12 | Envelope type enforcement | Cross-field |
+|| T13 | Envelope `result_hash` mismatch → rejected | Cross-field |
+|| T14 | Rating envelope cross-field mismatch → rejected | Cross-field |
+|| T14b–T14e | Sizing warning/blocker/failure/provenance parity | Cross-field |
+|| T14f | Sizing envelope warning mismatch → rejected | Warning parity |
+|| T14g | Sizing envelope blocker mismatch → rejected | Blocker parity |
+|| T14j | Sizing envelope failure mismatch → rejected | Failure parity |
+|| T14k | Sizing provenance graph object mismatch (even with same digest) → rejected | Provenance object parity |
+|| T69 | Tampered `geometry_snapshot` → rejected | Geometry binding |
+|| T70 | Tampered `solver_settings` → rejected | Solver binding |
+|| T71 | Canonical request geometry differs from result identity → rejected | Cross-boundary |
+|| T72 | Envelope `provenance_digest` differs from `RatingResult.provenance_digest` → rejected | Provenance parity |
+|| T73 | Two blockers represented and order stable | Collection identity |
+|| T74 | Two warnings represented and order stable | Collection identity |
+|| T75 | `requested_top_n=3` represents three candidates | Collection identity |
+|| T76 | Collection item digest tampered → rejected | Fail-closed |
+|| T77 | Collection order modified → rejected | Order authority |
+|| T14h | Rating bundle digest mismatch → rejected | Bundle parity |
+|| T14i | Rating bundle result mismatch → rejected | Bundle parity |
+|| T15–T18 | Idempotency: replay, collision, isolation, concurrency | Various |
 | T18b–T18e | RUNNING replay, stale takeover, CAS rejection | CAS |
 | T19–T22 | BLOCKED→200, 404, 500, 501 | Status code |
 | T23–T24 | Artifact bundle replay + digest cross-check | Verifier |
@@ -1210,6 +1592,14 @@ class ApiError(StrictBaseModel):
 | T57 | `SolverParamsSpec()` default values match production `SolverParams` defaults | Default alignment |
 | T58 | `complete()` rejects rating envelope with sizing bundle | Type mismatch |
 | T59 | `complete()` rejects sizing envelope with rating bundle | Type mismatch |
+|| T78 | claim new record → NEW_CLAIM | State machine |
+|| T79 | COMPLETE same digest → COMPLETE_REPLAY | Replay |
+|| T80 | RUNNING lease valid → IN_PROGRESS | In-progress response |
+|| T81 | STALE takeover atomic success | CAS takeover |
+|| T82 | Takeover → old owner heartbeat → CAS reject | Owner invalidation |
+|| T83 | Takeover → old owner complete → CAS reject | Owner invalidation |
+|| T84 | Illegal CLAIMED → COMPLETE transition → reject | State machine |
+|| T85 | complete() with bundle != envelope bundle → reject | Bundle parity |
 
 ---
 
