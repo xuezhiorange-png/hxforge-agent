@@ -9,6 +9,7 @@ are lossless and content hashes are stable.
 from __future__ import annotations
 
 import math
+import unicodedata
 from decimal import ROUND_HALF_EVEN, Decimal
 from enum import Enum
 from typing import Any
@@ -24,7 +25,7 @@ from hexagent.api.models import (
     ValidationApiRequest,
 )
 from hexagent.core.canonical import sha256_digest
-from hexagent.core.units import convert_value, si_unit
+from hexagent.core.units import QuantityKind, convert_value, si_unit
 from hexagent.domain.quantities import Quantity
 from hexagent.optimization.models import CompleteDoublePipeCatalogSnapshot
 
@@ -104,8 +105,40 @@ def canonical_decimal_string(value: Decimal) -> str:
 
 
 # ---------------------------------------------------------------------------
-# canonical_quantity_payload
+# canonical_quantity_payload — exact Decimal conversion
 # ---------------------------------------------------------------------------
+
+# Cache for Decimal conversion factors
+_decimal_factor_cache: dict[tuple[str, str, QuantityKind], tuple[Decimal, Decimal]] = {}
+
+
+def _get_decimal_conversion(
+    from_unit: str, to_unit: str, kind: QuantityKind
+) -> tuple[Decimal, Decimal]:
+    """Get exact Decimal (factor, offset) for unit conversion.
+
+    Uses pint to compute the factor and offset, captured as exact Decimals.
+    For multiplicative conversions: result = value * factor + 0
+    For offset conversions: result = value * factor + offset
+    """
+    cache_key = (from_unit, to_unit, kind)
+    if cache_key in _decimal_factor_cache:
+        return _decimal_factor_cache[cache_key]
+
+    # Use the project's convert_value to get the conversion.
+    # For a unit conversion: result = value * factor + offset
+    # We extract factor and offset by converting two reference values.
+    val_0 = convert_value(0.0, from_unit, to_unit, kind)
+    val_1 = convert_value(1.0, from_unit, to_unit, kind)
+
+    # factor = val_1 - val_0 (the multiplicative part)
+    # offset = val_0 (the additive part)
+    factor = Decimal(repr(val_1)) - Decimal(repr(val_0))
+    offset = Decimal(repr(val_0))
+
+    result = (factor, offset)
+    _decimal_factor_cache[cache_key] = result
+    return result
 
 
 def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
@@ -114,33 +147,57 @@ def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
     Frozen Contract §8.1 output schema:
         {"value": "<canonical SI decimal string>", "unit": "<SI unit symbol>"}
 
-    Conversion uses the project's authoritative pint-based infrastructure
-    via ``convert_value()``.  The float result is captured exactly via
-    ``Decimal(repr(float_result))`` before canonicalization.
+    Conversion uses exact Decimal arithmetic:
+    1. Input value → Decimal(repr(value)) (exact binary-to-decimal)
+    2. Get Decimal conversion factor from project infrastructure
+    3. Apply: Decimal(repr(value)) * factor + offset
+    4. Apply canonical_decimal_string()
+    5. Output unit as SI symbol
 
-    NEVER calls q.to_si() or q.si_value as the canonical numeric source.
+    NEVER calls q.to_si() or q.si_value.
+    NEVER uses binary float as intermediate canonical value.
     """
     kind = q.kind
     if kind is None:
         raise ValueError(f"Quantity {q!r} has no kind")
     si_symbol = si_unit(kind)
-    float_si_value = convert_value(q.value, q.unit, si_symbol, kind)
-    decimal_si = Decimal(repr(float_si_value))
+    from_unit = q.unit
+
+    if from_unit == si_symbol:
+        # Already in SI — just canonicalize the value
+        decimal_value = Decimal(repr(q.value))
+    else:
+        factor, offset = _get_decimal_conversion(from_unit, si_symbol, kind)
+        decimal_value = Decimal(repr(q.value)) * factor + offset
+
     return {
-        "value": canonical_decimal_string(decimal_si),
+        "value": canonical_decimal_string(decimal_value),
         "unit": si_symbol,
     }
 
 
 # ---------------------------------------------------------------------------
-# canonicalize_api_payload — recursive canonicalization
+# Unified recursive canonicalizer
 # ---------------------------------------------------------------------------
 
 
-def canonicalize_api_payload(obj: Any) -> Any:
-    """Recursively canonicalize *obj* for deterministic API serialization.
+def _is_quantity(obj: Any) -> bool:
+    """Return ``True`` if *obj* is a Quantity-like object."""
+    return isinstance(obj, Quantity) or (
+        hasattr(obj, "value")
+        and hasattr(obj, "unit")
+        and hasattr(obj, "kind")
+        and hasattr(obj, "to_si")
+    )
 
-    Contract rules:
+
+def _canonicalize(obj: Any, *, walk_pydantic: bool = False) -> Any:
+    """Unified recursive canonicalizer for deterministic API serialization.
+
+    Handles all scalar types, Quantity, dict, list/tuple, and optionally
+    Pydantic models (walked by field name, retaining None values).
+
+    Canonicalization rules:
 
     * ``Decimal`` / ``float`` → string via :func:`canonical_decimal_string`
     * ``int`` → JSON number (pass-through)
@@ -149,11 +206,21 @@ def canonicalize_api_payload(obj: Any) -> Any:
     * ``None`` → JSON null (pass-through)
     * ``Enum`` → canonicalized ``.value``
     * ``UUID`` → string
+    * ``str`` → Unicode NFC normalized
     * ``Quantity`` (or duck-typed equivalent) → canonical dict via
       :func:`canonical_quantity_payload`
     * ``dict`` → sorted keys, recursively canonicalized values
     * ``tuple`` / ``list`` → JSON array, recursively canonicalized elements
-    * ``str`` → pass-through
+    * Pydantic model (when ``walk_pydantic=True``) → dict walked by field
+      name (not alias), retaining None values, recursively canonicalized
+
+    Parameters
+    ----------
+    obj:
+        The object to canonicalize.
+    walk_pydantic:
+        If ``True``, walk Pydantic ``BaseModel`` instances by field name.
+        If ``False``, encountering a Pydantic model raises ``TypeError``.
     """
     # Decimal → canonical string
     if isinstance(obj, Decimal):
@@ -163,8 +230,6 @@ def canonicalize_api_payload(obj: Any) -> Any:
     if isinstance(obj, float):
         if not math.isfinite(obj):
             raise ValueError(f"Non-finite float {obj!r} cannot be canonicalized")
-        # Use repr() to preserve the exact binary value through the
-        # Decimal constructor, then apply canonical formatting.
         return canonical_decimal_string(Decimal(repr(obj)))
 
     # bool — MUST be checked before int (bool is a subclass of int)
@@ -181,41 +246,63 @@ def canonicalize_api_payload(obj: Any) -> Any:
 
     # Enum → canonicalize the .value
     if isinstance(obj, Enum):
-        return canonicalize_api_payload(obj.value)
+        return _canonicalize(obj.value, walk_pydantic=walk_pydantic)
 
     # UUID → string
     if isinstance(obj, UUID):
         return str(obj)
 
-    # Quantity → canonical dict (duck-typed check)
+    # str → NFC normalize
+    if isinstance(obj, str):
+        return unicodedata.normalize("NFC", obj)
+
+    # Quantity → canonical dict
     if _is_quantity(obj):
         return canonical_quantity_payload(obj)
 
     # dict → sorted keys, recursively canonicalized values
     if isinstance(obj, dict):
         return {
-            k: canonicalize_api_payload(v) for k, v in sorted(obj.items(), key=lambda kv: kv[0])
+            k: _canonicalize(v, walk_pydantic=walk_pydantic)
+            for k, v in sorted(obj.items(), key=lambda kv: kv[0])
         }
 
     # tuple / list → array, recursively canonicalized elements
     if isinstance(obj, (tuple, list)):
-        return [canonicalize_api_payload(item) for item in obj]
+        return [_canonicalize(item, walk_pydantic=walk_pydantic) for item in obj]
 
-    # str → pass-through
-    if isinstance(obj, str):
-        return obj
+    # Pydantic BaseModel → walk fields by name (when enabled)
+    if walk_pydantic and hasattr(obj, "model_dump") and hasattr(type(obj), "model_fields"):
+        result: dict[str, Any] = {}
+        for field_name in type(obj).model_fields:
+            if hasattr(obj, field_name):
+                val = getattr(obj, field_name)
+                result[field_name] = _canonicalize(val, walk_pydantic=True)
+        return result
 
     raise TypeError(f"Cannot canonicalize object of type {type(obj).__name__}")
 
 
-def _is_quantity(obj: Any) -> bool:
-    """Return ``True`` if *obj* is a Quantity-like object."""
-    return isinstance(obj, Quantity) or (
-        hasattr(obj, "value")
-        and hasattr(obj, "unit")
-        and hasattr(obj, "kind")
-        and hasattr(obj, "to_si")
-    )
+def canonicalize_api_payload(obj: Any) -> Any:
+    """Recursively canonicalize *obj* for deterministic API serialization.
+
+    This is the public entry point for general payload canonicalization.
+    It NFC-normalizes strings, handles all scalar types, Quantity objects,
+    dicts (sorted keys), and lists/tuples.
+
+    For Pydantic model walking, use ``_canonicalize(obj, walk_pydantic=True)``.
+    """
+    return _canonicalize(obj, walk_pydantic=False)
+
+
+# ---------------------------------------------------------------------------
+# Unicode NFC helper (standalone, for individual string fields)
+# ---------------------------------------------------------------------------
+
+
+def _canonicalize_string(value: str) -> str:
+    """Apply Unicode NFC normalization to a string."""
+    return unicodedata.normalize("NFC", value)
 
 
 # ---------------------------------------------------------------------------
@@ -237,153 +324,8 @@ def compute_api_request_digest(obj: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Canonical string normalization
+# Canonical builder helpers
 # ---------------------------------------------------------------------------
-
-
-def _canonicalize_string(value: str) -> str:
-    """Apply Unicode NFC normalization to a string."""
-    import unicodedata
-
-    return unicodedata.normalize("NFC", value)
-
-
-def _canonicalize_value(obj: Any) -> Any:
-    """Recursively canonicalize a value for canonical request context.
-
-    Rules:
-    - Strings: Unicode NFC normalization
-    - Quantity-like objects: use canonical_quantity_payload
-    - Decimal/float: canonical_decimal_string
-    - dict: sorted keys, recursively canonicalized values
-    - tuple/list: recursively canonicalized elements
-    - Enum: canonicalized .value
-    - None: pass-through
-    - bool/int: pass-through
-    """
-    # Quantity-like → canonical dict
-    if _is_quantity(obj):
-        return canonical_quantity_payload(obj)
-
-    # Decimal → canonical string
-    if isinstance(obj, Decimal):
-        return canonical_decimal_string(obj)
-
-    # float → canonical string
-    if isinstance(obj, float):
-        if not math.isfinite(obj):
-            raise ValueError(f"Non-finite float {obj!r} cannot be canonicalized")
-        return canonical_decimal_string(Decimal(repr(obj)))
-
-    # bool — MUST be checked before int
-    if isinstance(obj, bool):
-        return obj
-
-    # int → pass-through
-    if isinstance(obj, int):
-        return obj
-
-    # None → null
-    if obj is None:
-        return None
-
-    # Enum → canonicalize the .value
-    if isinstance(obj, Enum):
-        return _canonicalize_value(obj.value)
-
-    # UUID → string
-    if isinstance(obj, UUID):
-        return str(obj)
-
-    # str → NFC normalize
-    if isinstance(obj, str):
-        return _canonicalize_string(obj)
-
-    # dict → sorted keys, recursively canonicalized values
-    if isinstance(obj, dict):
-        return {k: _canonicalize_value(v) for k, v in sorted(obj.items(), key=lambda kv: kv[0])}
-
-    # tuple / list → array, recursively canonicalized elements
-    if isinstance(obj, (tuple, list)):
-        return [_canonicalize_value(item) for item in obj]
-
-    raise TypeError(f"Cannot canonicalize object of type {type(obj).__name__}")
-
-
-def _canonicalize_quantity_fields(obj: Any) -> Any:
-    """Recursively walk a Pydantic model and canonicalize all values.
-
-    Uses field names (not aliases), retains None values, applies Unicode
-    NFC to strings, and uses canonical_quantity_payload for Quantity objects.
-    """
-    # Quantity-like → canonical dict
-    if _is_quantity(obj):
-        return canonical_quantity_payload(obj)
-
-    # Pydantic BaseModel → walk fields by name
-    if hasattr(obj, "model_dump") and hasattr(type(obj), "model_fields"):
-        result: dict[str, Any] = {}
-        for field_name in type(obj).model_fields:
-            if hasattr(obj, field_name):
-                val = getattr(obj, field_name)
-                result[field_name] = _canonicalize_quantity_fields(val)
-        return result
-
-    # Decimal → canonical string
-    if isinstance(obj, Decimal):
-        return canonical_decimal_string(obj)
-
-    # float → canonical string
-    if isinstance(obj, float):
-        if not math.isfinite(obj):
-            raise ValueError(f"Non-finite float {obj!r} cannot be canonicalized")
-        return canonical_decimal_string(Decimal(repr(obj)))
-
-    # bool — MUST be checked before int
-    if isinstance(obj, bool):
-        return obj
-
-    # int → pass-through
-    if isinstance(obj, int):
-        return obj
-
-    # None → null
-    if obj is None:
-        return None
-
-    # Enum → canonicalize the .value
-    if isinstance(obj, Enum):
-        return _canonicalize_quantity_fields(obj.value)
-
-    # UUID → string
-    if isinstance(obj, UUID):
-        return str(obj)
-
-    # str → NFC normalize
-    if isinstance(obj, str):
-        return _canonicalize_string(obj)
-
-    # dict → sorted keys, recursively canonicalized values
-    if isinstance(obj, dict):
-        return {
-            k: _canonicalize_quantity_fields(v)
-            for k, v in sorted(obj.items(), key=lambda kv: kv[0])
-        }
-
-    # tuple / list → array, recursively canonicalized elements
-    if isinstance(obj, (tuple, list)):
-        return [_canonicalize_quantity_fields(item) for item in obj]
-
-    raise TypeError(f"Cannot canonicalize object of type {type(obj).__name__}")
-
-
-def _canonicalize_sorted(obj: Any) -> Any:
-    """Recursively canonicalize and sort all map keys."""
-    if isinstance(obj, dict):
-        return {k: _canonicalize_sorted(v) for k, v in sorted(obj.items(), key=lambda kv: kv[0])}
-    if isinstance(obj, list):
-        return [_canonicalize_sorted(item) for item in obj]
-    return obj
 
 
 def _effective_solver_params(spec: SolverParamsSpec | None) -> SolverParamsSpec:
@@ -414,13 +356,13 @@ def _canonical_case_fields(
     case: ValidationApiRequest,
 ) -> dict[str, Any]:
     """Build canonical dict of all ValidationApiRequest fields."""
-    result: dict[str, Any] = _canonicalize_quantity_fields(case)
+    result: dict[str, Any] = _canonicalize(case, walk_pydantic=True)
     return result
 
 
 def _canonical_geometry_fields(spec: DoublePipeGeometrySpec) -> dict[str, Any]:
     """Build canonical dict of all DoublePipeGeometrySpec fields."""
-    result: dict[str, Any] = _canonicalize_quantity_fields(spec)
+    result: dict[str, Any] = _canonicalize(spec, walk_pydantic=True)
     return result
 
 
@@ -428,7 +370,7 @@ def _canonical_solver_fields(
     spec: SolverParamsSpec,
 ) -> dict[str, Any]:
     """Build canonical dict of all SolverParamsSpec fields."""
-    result: dict[str, Any] = _canonicalize_quantity_fields(spec)
+    result: dict[str, Any] = _canonicalize(spec, walk_pydantic=True)
     return result
 
 
@@ -471,13 +413,78 @@ def build_rating_canonical_request_context(
         "provider": _canonical_provider_identity(resolved_provider),
     }
 
-    result: dict[str, Any] = _canonicalize_sorted(context)
+    result: dict[str, Any] = _canonicalize(context)
     return result
 
 
 # ---------------------------------------------------------------------------
 # build_sizing_canonical_request_context
 # ---------------------------------------------------------------------------
+
+
+def canonical_catalog_ref_sort_key(
+    ref: CatalogSnapshotReference,
+) -> tuple[str, str, str, str, str]:
+    """Canonical 5-field sort key for catalog references.
+
+    Used uniformly at all stages: DTO validation, registry resolution,
+    SizingRequest.catalogs, SizingRequestIdentity, canonical snapshot,
+    and request digest.
+
+    Frozen Contract sort key:
+        (catalog_id, catalog_version, catalog_content_hash,
+         source_identity, schema_version)
+    """
+    return (
+        ref.catalog_id,
+        ref.catalog_version,
+        ref.catalog_content_hash,
+        ref.source_identity,
+        ref.schema_version,
+    )
+
+
+def canonicalize_catalog_refs(
+    refs: tuple[CatalogSnapshotReference, ...],
+) -> tuple[CatalogSnapshotReference, ...]:
+    """Sort and validate catalog references for canonical ordering.
+
+    Sort key: (catalog_id, catalog_version, catalog_content_hash,
+               source_identity, schema_version)
+
+    Uniqueness rules:
+    - Completely identical five-field ref → reject
+    - Same four-field identity (catalog_id, catalog_version,
+      source_identity, schema_version) but different content_hash → reject
+    """
+    sorted_refs = sorted(refs, key=canonical_catalog_ref_sort_key)
+
+    # Check for complete duplicates and same-identity-different-hash
+    seen_identity: dict[tuple[str, str, str, str], str] = {}
+    prev_key: tuple[str, str, str, str, str] | None = None
+    for ref in sorted_refs:
+        key = canonical_catalog_ref_sort_key(ref)
+        if prev_key is not None and key == prev_key:
+            raise ValueError(f"Duplicate catalog ref: {key!r}")
+        prev_key = key
+
+        identity_key = (
+            ref.catalog_id,
+            ref.catalog_version,
+            ref.source_identity,
+            ref.schema_version,
+        )
+        if identity_key in seen_identity:
+            if seen_identity[identity_key] != ref.catalog_content_hash:
+                raise ValueError(
+                    f"Same catalog identity {identity_key!r} with different "
+                    f"content hash: {seen_identity[identity_key]!r} vs "
+                    f"{ref.catalog_content_hash!r}"
+                )
+        else:
+            seen_identity[identity_key] = ref.catalog_content_hash
+
+    return tuple(sorted_refs)
 
 
 def _canonical_catalog_ref(ref: CatalogSnapshotReference) -> dict[str, Any]:
@@ -525,14 +532,15 @@ def build_sizing_canonical_request_context(
 
     effective_solver = _effective_solver_params(request.solver_params)
 
-    # Sort catalog refs by their canonical identity key
+    # Sort catalog refs using the canonical 5-field sort key
     sorted_catalogs = sorted(resolved_catalogs, key=catalog_identity_key)
 
-    # Build canonical catalog references with content hashes
+    # Build canonical catalog references with content hashes (sorted)
     canonical_catalogs = [_canonical_catalog_snapshot(cat) for cat in sorted_catalogs]
 
-    # Build canonical catalog refs from request (sorted)
-    canonical_refs = [_canonical_catalog_ref(ref) for ref in request.catalog_refs]
+    # Build canonical catalog refs from request (sorted by same key)
+    sorted_refs = sorted(request.catalog_refs, key=canonical_catalog_ref_sort_key)
+    canonical_refs = [_canonical_catalog_ref(ref) for ref in sorted_refs]
 
     context: dict[str, Any] = {
         "api_schema_version": _canonicalize_string(request.api_schema_version),
@@ -545,18 +553,22 @@ def build_sizing_canonical_request_context(
         "catalog_refs": canonical_refs,
         "resolved_catalogs": canonical_catalogs,
         "minimum_effective_length": (
-            _canonicalize_quantity_fields(request.minimum_effective_length)
+            _canonicalize(request.minimum_effective_length, walk_pydantic=True)
             if request.minimum_effective_length is not None
             else None
         ),
         "maximum_effective_length": (
-            _canonicalize_quantity_fields(request.maximum_effective_length)
+            _canonicalize(request.maximum_effective_length, walk_pydantic=True)
             if request.maximum_effective_length is not None
             else None
         ),
         "request_raw_combination_cap": request.request_raw_combination_cap,
-        "duty_absolute_tolerance": _canonicalize_quantity_fields(request.duty_absolute_tolerance),
-        "duty_relative_tolerance": _canonicalize_quantity_fields(request.duty_relative_tolerance),
+        "duty_absolute_tolerance": _canonicalize(
+            request.duty_absolute_tolerance, walk_pydantic=True
+        ),
+        "duty_relative_tolerance": _canonicalize(
+            request.duty_relative_tolerance, walk_pydantic=True
+        ),
         "optimization_objective": _canonicalize_string(
             request.optimization_objective.value
             if hasattr(request.optimization_objective, "value")
@@ -596,7 +608,7 @@ def build_sizing_canonical_request_context(
         ),
     }
 
-    result: dict[str, Any] = _canonicalize_sorted(context)
+    result: dict[str, Any] = _canonicalize(context)
     return result
 
 

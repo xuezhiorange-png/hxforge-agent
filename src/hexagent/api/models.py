@@ -7,11 +7,13 @@ StrictBaseModel from hexagent.domain.models.
 from __future__ import annotations
 
 import re
+import typing
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
+from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import ProviderIdentitySnapshot
 from hexagent.domain.models import (
     FluidSpec,
@@ -84,6 +86,14 @@ class ValidationApiRequest(StrictBaseModel):
     design_temperature_hot: AbsoluteTemperature
     design_temperature_cold: AbsoluteTemperature
     required_area_margin_fraction: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("case_name", mode="after")
+    @classmethod
+    def _non_blank_case_name(cls, value: str) -> str:
+        """Reject empty or whitespace-only case names; trim leading/trailing whitespace."""
+        if not value or not value.strip():
+            raise ValueError("case_name must be a non-empty, non-whitespace string")
+        return value.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +246,31 @@ class SizingApiRequest(StrictBaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Provider identity canonical payload helpers
+# ---------------------------------------------------------------------------
+
+_PROVIDER_IDENTITY_FIELDS = (
+    "name",
+    "version",
+    "git_revision",
+    "reference_state_policy",
+    "configuration_fingerprint",
+    "cache_policy_version",
+)
+
+
+def canonical_provider_identity_payload(
+    provider: ProviderIdentitySnapshot,
+) -> dict[str, str]:
+    """Return a canonical dict of all 6 ``ProviderIdentitySnapshot`` fields as strings.
+
+    The keys are deterministic (always the same 6 names) and suitable for
+    hashing via :func:`hexagent.core.canonical.sha256_digest`.
+    """
+    return {field: str(getattr(provider, field)) for field in _PROVIDER_IDENTITY_FIELDS}
+
+
+# ---------------------------------------------------------------------------
 # Resolved provider authority
 # ---------------------------------------------------------------------------
 
@@ -249,6 +284,33 @@ class ResolvedProviderAuthority(StrictBaseModel):
     identity: ProviderIdentitySnapshot
     identity_digest: str
 
+    @field_validator("provider_ref", mode="after")
+    @classmethod
+    def _non_blank_ref(cls, value: str) -> str:
+        """Reject empty or whitespace-only provider_ref."""
+        if not value or not value.strip():
+            raise ValueError("provider_ref must be a non-empty, non-whitespace string")
+        return value.strip()
+
+    @field_validator("identity_digest", mode="after")
+    @classmethod
+    def _valid_digest_format(cls, value: str) -> str:
+        """Reject identity_digest that doesn't match sha256:[0-9a-f]{64}."""
+        if not _SHA256_PATTERN.match(value):
+            raise ValueError(f"identity_digest must match sha256:[0-9a-f]{{64}}, got {value!r}")
+        return value
+
+    @model_validator(mode="after")
+    def _verify_identity_digest(self) -> typing.Self:
+        """Recompute and verify identity_digest matches."""
+        payload = canonical_provider_identity_payload(self.identity)
+        expected = sha256_digest(payload)
+        if self.identity_digest != expected:
+            raise ValueError(
+                f"identity_digest mismatch: claimed {self.identity_digest!r}, expected {expected!r}"
+            )
+        return self
+
 
 __all__ = [
     "CatalogSnapshotReference",
@@ -260,4 +322,5 @@ __all__ = [
     "SolverParamsSpec",
     "ThermalConductivitySpec",
     "ValidationApiRequest",
+    "canonical_provider_identity_payload",
 ]

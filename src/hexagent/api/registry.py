@@ -8,9 +8,14 @@ and to persist as part of audit trails.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from types import MappingProxyType
 
-from hexagent.api.models import CatalogSnapshotReference, ResolvedProviderAuthority
+from hexagent.api.models import (
+    CatalogSnapshotReference,
+    ResolvedProviderAuthority,
+    canonical_provider_identity_payload,
+)
 from hexagent.core.canonical import sha256_digest
 from hexagent.core.heat_balance import ProviderIdentitySnapshot
 from hexagent.domain.models import StrictBaseModel
@@ -26,26 +31,6 @@ from hexagent.optimization.models import (
 # --------------------------------------------------------------------------- #
 # Canonical payload helpers                                                   #
 # --------------------------------------------------------------------------- #
-
-_PROVIDER_IDENTITY_FIELDS = (
-    "name",
-    "version",
-    "git_revision",
-    "reference_state_policy",
-    "configuration_fingerprint",
-    "cache_policy_version",
-)
-
-
-def canonical_provider_identity_payload(
-    provider: ProviderIdentitySnapshot,
-) -> dict[str, str]:
-    """Return a canonical dict of all 6 ``ProviderIdentitySnapshot`` fields as strings.
-
-    The keys are deterministic (always the same 6 names) and suitable for
-    hashing via :func:`hexagent.core.canonical.sha256_digest`.
-    """
-    return {field: str(getattr(provider, field)) for field in _PROVIDER_IDENTITY_FIELDS}
 
 
 def canonical_catalog_authority_payload(
@@ -95,21 +80,27 @@ class ProviderRegistry:
 
     __slots__ = ("_providers",)
 
-    def __init__(self, providers: dict[str, ProviderIdentitySnapshot]) -> None:
-        # Validate keys: reject blank/empty/whitespace-only
+    def __init__(
+        self,
+        providers: (
+            dict[str, ProviderIdentitySnapshot] | Sequence[tuple[str, ProviderIdentitySnapshot]]
+        ),
+    ) -> None:
+        # Normalize input to a list of (ref, snapshot) pairs for uniform processing
+        items = list(providers.items()) if isinstance(providers, dict) else list(providers)
+
+        # Validate keys: reject blank/empty/whitespace-only and detect duplicates
+        seen: set[str] = set()
         clean: dict[str, ProviderIdentitySnapshot] = {}
-        for ref, snapshot in providers.items():
+        for ref, snapshot in items:
             if not isinstance(ref, str) or not ref.strip():
                 raise ValueError(f"Provider reference must be a non-blank string, got {ref!r}")
-            clean[ref] = snapshot
+            clean_ref = ref.strip()
+            if clean_ref in seen:
+                raise ValueError(f"Duplicate provider reference: {clean_ref!r}")
+            seen.add(clean_ref)
+            clean[clean_ref] = snapshot
 
-        # Explicit duplicate detection (the input dict already deduplicates
-        # by key, but we check for intentional duplicate-key awareness).
-        # Python dicts silently overwrite duplicate literal keys in a dict
-        # display, so this check is informational — the real guard is that
-        # we reject keys that appear more than once in an iterable input.
-        # For a dict input the language already deduplicates, so we store
-        # the cleaned copy.
         self._providers: MappingProxyType[str, ProviderIdentitySnapshot] = MappingProxyType(
             dict(clean)
         )

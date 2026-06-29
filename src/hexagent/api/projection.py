@@ -228,26 +228,15 @@ def project_sizing_api_request(
             f"version={resolved_provider.identity.version!r})"
         )
 
-    # Step 3: Sort and validate catalog_refs
-    seen_keys: set[tuple[str, str, str, str, str]] = set()
-    for ref in api_request.catalog_refs:
-        key = (
-            ref.catalog_id,
-            ref.catalog_version,
-            ref.catalog_content_hash,
-            ref.source_identity,
-            ref.schema_version,
-        )
-        if key in seen_keys:
-            raise ValueError(f"Duplicate catalog ref: {key!r}")
-        seen_keys.add(key)
+    # Step 3: Sort and validate catalog refs using canonical helper
+    from hexagent.api.canonical_request import canonicalize_catalog_refs
 
-    # Step 4: Resolve each catalog ref via CatalogRegistry
-    resolved_catalog_authorities = [
-        catalog_registry.resolve(ref) for ref in api_request.catalog_refs
-    ]
+    sorted_catalog_refs = canonicalize_catalog_refs(api_request.catalog_refs)
 
-    # Extract snapshots in the order they were resolved
+    # Step 4: Resolve each catalog ref via CatalogRegistry (in sorted order)
+    resolved_catalog_authorities = [catalog_registry.resolve(ref) for ref in sorted_catalog_refs]
+
+    # Extract snapshots in the canonical sorted order
     resolved_catalogs = tuple(authority.snapshot for authority in resolved_catalog_authorities)
 
     # Step 5: Verify catalog content hash matches (done by CatalogRegistry.resolve)
