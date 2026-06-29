@@ -540,9 +540,9 @@ def _make_final_only_cold_ph_fail(provider: CoolPropProvider) -> MagicMock:
         # The final evaluation is the last PH call batch.
         # We detect it by checking if we've had enough prior calls.
         # With standard conditions: ~4 bracket probes + ~12 solver iterations
-        # = ~32 PH calls before final evaluation. Threshold of 33 ensures
+        # = ~35 PH calls before final evaluation. Threshold of 37 ensures
         # only the final evaluation's cold PH call triggers the failure.
-        if fluid.name == "Water" and P == 150000.0 and call_count[0] > 33:
+        if fluid.name == "Water" and P == 150000.0 and call_count[0] >= 37:
             from hexagent.properties.base import PropertyErrorCode
             from hexagent.properties.errors import PropertyServiceError
 
