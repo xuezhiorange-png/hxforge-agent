@@ -37,8 +37,8 @@ Freeze the normative API request/response DTOs, discriminated run envelopes, ide
 | `SizingRequest` / `CatalogSnapshotRef` | (at TASK-009 merge) | `src/hexagent/optimization/models.py` | `baeba79b9be42535ca33bcbb5048115dae1e9c67` | `ea8235473eb3e2c322d825ffe2bc739c3ceec15881c14da2612041a42c1a7379` |
 | `SizingRequestIdentity` / `OptimizationObjective` / `ExpectedProviderIdentity` / `PassedSizingGate` | (at TASK-009 merge) | `src/hexagent/optimization/context.py` | `076126034eaf4116506ecbae54b32e644b4fc1c8` | `fa23a2e6a6d0c1544bc522933fbf3d87c4baed2d42a4ab9e6da78f7dcbb2a14b` |
 | `Phase3AuthoritativeArtifacts` / `CandidateEvaluationRecord` / `CandidateDispositionRecord` / `RankedCandidateRecord` | (at TASK-009 merge) | `src/hexagent/optimization/evaluation.py` | `0f69d84f0a7a29ab1417d7b24dadc35bdcefaab1` | `b5d3e85b14873671956a88bcc050cf7bd16e952f40ebe35b1218794304c1943b` |
-| `Phase3` builder (`build_optimization_result`) | (at TASK-009 merge) | `src/hexagent/optimization/phase3_builder.py` | `6921bd2ef65a719e49cfec854fdf85e8c9009f5b` | (per blob SHA-1) |
-| `Phase3` verifier (`verify_phase3_result_semantics_or_raise`) | (at TASK-009 merge) | `src/hexagent/optimization/phase3_verifier.py` | `09b2020799ca2ef4cf1cbb9b15a6f88fea95c866` | (per blob SHA-1) |
+| `Phase3` builder (`build_optimization_result`) | (at TASK-009 merge) | `src/hexagent/optimization/phase3_builder.py` | `6921bd2ef65a719e49cfec854fdf85e8c9009f5b` | `388e027c9bc65f9ef0de6d5c7bf5340e55381d0731965124d5160f8029d5fca4` |
+| `Phase3` verifier (`verify_phase3_result_semantics_or_raise`) | (at TASK-009 merge) | `src/hexagent/optimization/phase3_verifier.py` | `09b2020799ca2ef4cf1cbb9b15a6f88fea95c866` | `4a0bfe69382d9ff927873e52051fdb3045a7e68738a2b5b0ad3d952aa0d489a0` |
 | Base `main` | `3af8eb85e2a293c2706402dae8ec317a45fed38a` (PR #27 merge) | — | — | — |
 
 **SHA-1 columns are 40-character hexadecimal git object hashes. SHA-256 columns are 64-character hexadecimal content hashes obtained via `sha256sum`.** No shortened or placeholder values are permitted.
@@ -433,20 +433,30 @@ class SizingRunEnvelope(StrictBaseModel):
 
 ```python
 def reconstruct_sizing_warnings(bundle: SizingRunArtifacts) -> tuple[EngineeringMessage, ...]:
-    ordered_digests = bundle.optimization_result.ordered_phase3_warning_digests
-    return _resolve_digests_to_messages(ordered_digests, bundle.warning_binding_tuples,
-                                         bundle.warning_descriptor_tuples)
+    artifacts = bundle.phase3_authoritative_artifacts
+    return resolve_phase3_message_digests(
+        ordered_digests=bundle.optimization_result.ordered_warning_digests,
+        binding_tuples=artifacts.warning_binding_tuples,
+        descriptor_tuples=artifacts.warning_descriptor_tuples,
+    )
 
 def reconstruct_sizing_blockers(bundle: SizingRunArtifacts) -> tuple[EngineeringMessage, ...]:
-    ordered_digests = bundle.optimization_result.ordered_phase3_blocker_digests
-    return _resolve_digests_to_messages(ordered_digests, bundle.blocker_binding_tuples,
-                                         bundle.blocker_descriptor_tuples)
+    artifacts = bundle.phase3_authoritative_artifacts
+    return resolve_phase3_message_digests(
+        ordered_digests=bundle.optimization_result.ordered_blocker_digests,
+        binding_tuples=artifacts.blocker_binding_tuples,
+        descriptor_tuples=artifacts.blocker_descriptor_tuples,
+    )
 
 def reconstruct_sizing_failure(bundle: SizingRunArtifacts) -> RunFailure | None:
     return derive_failure_from_dispositions(bundle.dispositions)
 ```
 
-No envelope is valid without passing this validator. Build-time reconstruction is the single normative path.
+**Rules:**
+- Digest order is taken directly from `OptimizationResult` — no manual reordering.
+- Descriptor and binding tuples come from the same `Phase3AuthoritativeArtifacts` instance.
+- Unresolved digests, duplicate-conflicting digests, or descriptor/binding inconsistency → fail closed.
+- Never re-derive authority from display text.
 
 ### 6.5 Cross-Field Invariants
 
@@ -618,10 +628,14 @@ class RunRepository(Protocol):
 
 All canonical scalar values are encoded as **JSON strings**, not JSON numbers, to avoid binary float serialization differences.
 
-```python
 def canonical_decimal_string(d: Decimal) -> str:
     """Normalize Decimal: strip trailing zeros, no scientific unless needed.
-    -0 → "0". 1.5000 → "1.5". 1e-6 → "0.000001"."""
+
+    Rejects: NaN, Infinity, -Infinity, and signed negative zero
+      (Decimal("-0"), float("-0.0"), any Quantity value that normalizes to -0).
+
+    1.5000 → "1.5".  0.000001 → "0.000001".
+    """
     ...
 
 def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
@@ -629,12 +643,13 @@ def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
 
     Conversion:
     1. Input Quantity value → Decimal.
-    2. Apply unit conversion factor as Decimal.
+    2. Convert to SI using Decimal conversion factor via si_unit(q.quantity_kind).
     3. Round with ROUND_HALF_EVEN.
     4. Quantize to 15 significant digits.
     5. Strip trailing zeros via normalize().
-    6. Reject NaN, Inf, -Inf, negative zero.
-    7. Output as normalized Decimal string.
+    6. Reject NaN, Inf, -Inf, negative zero (Decimal("-0") or any equivalent).
+    7. Output value as normalized Decimal JSON string.
+    8. Output unit as SI symbol string — NOT the original input unit.
     """
     ...
 
@@ -680,11 +695,14 @@ def canonical_api_request_context(request: StrictBaseModel) -> dict[str, object]
 | `1.5000` (Decimal) | `"1.5"` |
 | `0` (int) | `0` |
 | `-0` (Decimal) | REJECTED |
+| `float("-0.0")` | REJECTED |
 | `0.000001` (Decimal) | `"0.000001"` |
 | `1000000` (int) | `1000000` |
-| `TemperatureDifference(value=5, unit="delta_degC")` | `{"value": "5", "unit": "delta_degC"}` |
+| `TemperatureDifference(value=5, unit="delta_degC")` | `{"value": "5", "unit": "K"}` |
+| `Length(value=250, unit="cm")` | `{"value": "2.5", "unit": "m"}` |
+| `AbsolutePressure(value=1, unit="bar")` | `{"value": "100000", "unit": "Pa"}` |
+| `Power(value=2, unit="kW")` | `{"value": "2000", "unit": "W"}` |
 | `AbsolutePressure(value=101325, unit="Pa")` | `{"value": "101325", "unit": "Pa"}` |
-| `Length(value=2.5, unit="m")` | `{"value": "2.5", "unit": "m"}` |
 
 ### 8.4 Single Authority
 
@@ -746,29 +764,68 @@ def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
     verify_provenance_or_raise(bundle.provenance_graph, result=bundle.result)
     recompute_and_check_bundle_digest(bundle)
 
+
 def verify_sizing_artifact_bundle(bundle: SizingRunArtifacts) -> None:
-    # 1) SizingRequest structural validation
-    bundle.sizing_request.__class__.model_validate(bundle.sizing_request.model_dump())
-    # 2) SizingRequestIdentity structural validation
-    bundle.sizing_request_identity.__class__.model_validate(
-        bundle.sizing_request_identity.model_dump())
-    # 3) PassedSizingGate semantic validation
-    #    PassedSizingGate.__init__ validates status, counts, per_option_records
-    # 4) MaterializedCandidateSet structural validation
-    # 5) Phase3EvaluationInput.verify_or_raise(artifacts=bundle.phase3_authoritative_artifacts)
-    bundle.evaluation_input.verify_or_raise(
-        artifacts=bundle.phase3_authoritative_artifacts)
-    # 6) Phase3AuthoritativeArtifacts.verify_or_raise()
-    bundle.phase3_authoritative_artifacts.verify_or_raise()
-    # 7) verify_phase3_result_semantics_or_raise(
-    #        result=bundle.optimization_result,
-    #        artifacts=bundle.phase3_authoritative_artifacts,
-    #        evaluation_input=bundle.evaluation_input)
-    # 8) verify_provenance_or_raise(bundle.provenance_graph, ...)
-    # 9) Recompute artifact_bundle_digest and cross-check
+    artifacts = bundle.phase3_authoritative_artifacts
+    ei = bundle.evaluation_input
+
+    # 1) Structural validation of request models
+    SizingRequest.model_validate(bundle.sizing_request.model_dump(mode="python"))
+    SizingRequestIdentity.model_validate(
+        bundle.sizing_request_identity.model_dump(mode="python"))
+
+    # 2) MaterializedCandidateSet.verify_or_raise()
+    ei.materialization_result.verify_or_raise()
+
+    # 3) Phase3EvaluationInput.verify_or_raise() with real parameters
+    ei.verify_or_raise(
+        sizing_request=bundle.sizing_request,
+        candidates=ei.materialization_result.candidates,
+        source_records=ei.evaluation_records,
+        phase2_source_record_descriptors=artifacts.phase2_source_record_descriptors,
+        warning_binding_tuples=artifacts.warning_binding_tuples,
+        blocker_binding_tuples=artifacts.blocker_binding_tuples,
+        source_failure_bindings=artifacts.source_failure_bindings,
+        evidence_failure_bindings=artifacts.evidence_failure_bindings,
+    )
+
+    # 4) Semantic acceptance: verify_phase3_result_semantics_or_raise()
+    verify_phase3_result_semantics_or_raise(
+        result=bundle.optimization_result,
+        graph=bundle.provenance_graph,
+        evaluation_input=ei,
+        artifacts=artifacts,
+        dispositions=bundle.dispositions,
+        ranked_records=bundle.ranked_records,
+    )
+
+    # 5) Top-N prefix check
+    if bundle.top_n_records != bundle.ranked_records[: len(bundle.top_n_records)]:
+        raise ValueError("top_n_records are not ranked prefix")
+
+    # 6) Bundle digest recomputation
+    recompute_and_check_bundle_digest(bundle)
 ```
 
-Each verifier call specifies its real parameter sources. No "essentially a superset" language.
+**Authoritative parameter sources are fixed:**
+
+| Parameter | Source |
+|---|---|
+| `candidates` | `evaluation_input.materialization_result.candidates` |
+| `source_records` | `evaluation_input.evaluation_records` |
+| `identity_snapshots` | `evaluation_input.identity_snapshots` |
+| `complete_snapshots` | `evaluation_input.complete_snapshots` |
+| `phase2_source_record_descriptors` | `phase3_authoritative_artifacts.phase2_source_record_descriptors` |
+| `warning_binding_tuples` | `phase3_authoritative_artifacts.warning_binding_tuples` |
+| `blocker_binding_tuples` | `phase3_authoritative_artifacts.blocker_binding_tuples` |
+| `source_failure_bindings` | `phase3_authoritative_artifacts.source_failure_bindings` |
+| `evidence_failure_bindings` | `phase3_authoritative_artifacts.evidence_failure_bindings` |
+| `dispositions` | `bundle.dispositions` |
+| `ranked_records` | `bundle.ranked_records` |
+| `result` | `bundle.optimization_result` |
+| `graph` | `bundle.provenance_graph` |
+
+No parallel methods. No `verify_or_raise()` on `Phase3AuthoritativeArtifacts` (it is a frozen dataclass). No `artifacts` parameter on `Phase3EvaluationInput.verify_or_raise()`.
 
 ### 9.4 Bundle Digest Self-Hash Exclusion
 
@@ -1048,13 +1105,61 @@ MANDATORY_ARTIFACT_IDS: frozenset[ReportArtifactId] = frozenset({
 
 ### 10.5 Pre-Render Verification Chain
 
+```python
+def verify_report_section_status_matrix(
+    *,
+    report_model: DoublePipeReportModel,
+    source_envelope: RatingRunEnvelope | SizingRunEnvelope,
+) -> None:
+    """Every section's status MUST match the matrix for the source result state.
+
+    Authority comes from the source envelope's result, NOT from the report itself.
+    """
+    source_state = derive_source_state(source_envelope)
+    # source_state ∈ {SUCCEEDED, BLOCKED, FAILED} for rating
+    # source_state ∈ {COMPLETE, PARTIAL} for sizing
+
+    present_sections = {s.section_id for s in report_model.sections}
+    for sid in ReportSectionId:
+        expected = SECTION_STATUS_MATRIX[source_state].get(sid)
+        if expected is None:
+            continue  # section not in matrix — not required for this state
+        section = _find_section(report_model, sid)
+        if section is None:
+            if expected != ReportSectionStatus.NOT_APPLICABLE:
+                raise ValueError(f"required section {sid} missing (expected {expected})")
+        elif section.status != expected:
+            raise ValueError(
+                f"section {sid} status {section.status} != expected {expected}"
+            )
+
+# Rule: sections required by matrix MUST be present.
+#       NOT_APPLICABLE sections MUST be absent or explicitly NOT_APPLICABLE.
+#       EMPTY must not substitute BLOCKED, PARTIAL, or COMPLETE.
+#       The source envelope result is the sole status authority.
+```
+
+**Pre-render order:**
+
 1. Domain result verification
 2. Provenance verification (independent authority)
 3. Artifact bundle verification (§9.3)
-4. Envelope projection verification (warnings/blockers/failure parity)
-5. Report model verification (sections, artifacts, pointers, status consistency)
-6. Template identity verification (template_definition_hash matches)
-7. Any failure → render fails closed (no partial output)
+4. Envelope projection verification
+5. Report hash/section/artifact verification
+6. `verify_report_section_status_matrix(report_model, source_envelope)` ← new
+7. Source pointer resolution and digest parity
+8. Template identity verification
+9. Render (fail closed on any error)
+
+**T30b executable cases:**
+
+| Case | Condition | Expected |
+|---|---|---|
+| Rating SUCCEEDED + geometry BLOCKED | Manipulated section status | REJECT |
+| Rating BLOCKED + blockers EMPTY | blockers section should be COMPLETE | REJECT |
+| Rating FAILED + failure_details NOT_APPLICABLE | failure_details should be COMPLETE | REJECT |
+| Sizing COMPLETE + sizing_ranking NOT_APPLICABLE | should be COMPLETE | REJECT |
+| Sizing PARTIAL + top_ranked_candidates COMPLETE | should be PARTIAL | REJECT |
 
 ---
 
