@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import unicodedata
+from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
 from enum import Enum
 from fractions import Fraction
@@ -26,7 +27,11 @@ from hexagent.api.models import (
     ValidationApiRequest,
 )
 from hexagent.core.canonical import sha256_digest
-from hexagent.core.units import QuantityKind, convert_value, normalize_unit, si_unit, unit_registry
+from hexagent.core.units import (
+    UNIT_RULES,
+    QuantityKind,
+    normalize_unit,
+)
 from hexagent.domain.quantities import Quantity
 from hexagent.optimization.models import CompleteDoublePipeCatalogSnapshot
 
@@ -106,147 +111,194 @@ def canonical_decimal_string(value: Decimal) -> str:
 
 
 # ---------------------------------------------------------------------------
-# canonical_quantity_payload — exact Decimal conversion
+# ---------------------------------------------------------------------------
+# Exact unit conversion registry — immutable, auditable, zero runtime fallback
 # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Exact Decimal unit conversion via pint definition chain tracing
-# ---------------------------------------------------------------------------
 
-# Cache for exact Decimal conversion factors
-_exact_conversion_cache: dict[tuple[str, str], tuple[Decimal, Decimal]] = {}
+@dataclass(frozen=True, slots=True)
+class ExactUnitConversion:
+    """Immutable specification for converting a unit to its SI equivalent.
 
-_PINT_MAX_DEN = 10**9  # limit_denominator maximum for recovering exact rationals
-
-
-def _trace_simple_unit_chain(ureg: Any, unit_name: str) -> tuple[Fraction, Fraction, str] | None:
-    """Trace a simple (non-compound) unit through pint's definition chain to its base dimension.
-
-    Returns (total_scale, total_offset, base_dimension_name) or None if unresolvable.
-    Uses limit_denominator to recover exact rational factors from pint's float scales.
+    Conversion formula: si_value = input_value * scale + offset
+    Both scale and offset are exact Fraction values.
     """
-    visited: set[str] = set()
-    total_scale = Fraction(1)
-    total_offset = Fraction(0)
-    current = unit_name
 
-    while current and current not in visited:
-        visited.add(current)
-        try:
-            d = ureg._units[current]
-        except KeyError:
-            return None
-
-        scale = Fraction(d.converter.scale).limit_denominator(_PINT_MAX_DEN)
-        is_offset = hasattr(d.converter, "offset") and d.converter.offset != 0
-
-        if is_offset:
-            offset = Fraction(d.converter.offset).limit_denominator(_PINT_MAX_DEN)
-            total_offset = total_offset * scale + offset
-
-        total_scale *= scale
-
-        refs = d.reference
-        if refs is None:
-            return (total_scale, total_offset, current)
-
-        ref_keys = list(refs.keys())
-        if len(ref_keys) != 1:
-            return (total_scale, total_offset, current)
-
-        ref_name = ref_keys[0]
-        ref_power = refs[ref_name]
-
-        if ref_name.startswith("["):
-            return (total_scale, total_offset, ref_name)
-
-        if ref_power != 1:
-            return (total_scale, total_offset, ref_name)
-
-        current = ref_name
-
-    return None
+    si_unit: str
+    scale: Fraction
+    offset: Fraction = Fraction(0)
 
 
-def _get_exact_conversion(
-    from_unit: str, to_unit: str, kind: QuantityKind
-) -> tuple[Decimal, Decimal]:
-    """Get exact Decimal (factor, offset) for unit conversion.
+# Btu definition: pint uses 1055.056 J exactly (= 131882/125)
+_BTU_J = Fraction(131882, 125)
+_IN_M = Fraction(127, 5000)  # 1 inch = 0.0254 m exactly
+_FT_M = Fraction(381, 1250)  # 1 foot = 0.3048 m exactly
+_LB_KG = Fraction(45359237, 100000000)  # 1 lb = 0.45359237 kg (NIST)
+_GAL_M3 = Fraction(231, 1) * (_IN_M**3)  # 1 US gallon = 231 in^3
+_L_M3 = Fraction(1, 1000)  # 1 litre = 0.001 m^3
+_ATM_PA = Fraction(101325)  # 1 atm = 101325 Pa (exact)
 
-    Uses pint's definition chain to extract exact rational conversion factors.
-    All arithmetic is done with Fraction (exact rational) and only converted
-    to Decimal at the final step.
+# Fahrenheit absolute: K = °F × 5/9 + 45967/180
+_DEGF_OFFSET_K = Fraction(45967, 180)
 
-    Conversion formula: si_value = input_value * factor + offset
+# Compound unit conversion factors (precomputed from exact definitions)
+# 1 hour·ft²·°F/Btu = (3600 × ft² × 5/9) / Btu_W m²·K/W
+_FOULING_IMPERIAL_TO_SI = Fraction(3600) * (_FT_M**2) * Fraction(5, 9) / _BTU_J
+# 1 Btu/lb = Btu_J / lb_kg  J/kg
+_BTU_LB_J_KG = _BTU_J / _LB_KG
 
-    For simple units: traces the definition chain from from_unit to to_unit.
-    For compound units (like kg/h): decomposes into component units.
+_EXACT_UNIT_CONVERSIONS: dict[QuantityKind, dict[str, ExactUnitConversion]] = {
+    QuantityKind.MASS_FLOW: {
+        "kg/s": ExactUnitConversion("kg/s", Fraction(1)),
+        "kg/h": ExactUnitConversion("kg/s", Fraction(1, 3600)),
+        "g/s": ExactUnitConversion("kg/s", Fraction(1, 1000)),
+        "g/min": ExactUnitConversion("kg/s", Fraction(1, 60000)),
+        "lb/s": ExactUnitConversion("kg/s", _LB_KG),
+        "lb/h": ExactUnitConversion("kg/s", _LB_KG / 3600),
+    },
+    QuantityKind.VOLUME_FLOW: {
+        "m^3/s": ExactUnitConversion("m^3/s", Fraction(1)),
+        "m^3/h": ExactUnitConversion("m^3/s", Fraction(1, 3600)),
+        "L/s": ExactUnitConversion("m^3/s", _L_M3),
+        "L/min": ExactUnitConversion("m^3/s", _L_M3 / 60),
+        "L/h": ExactUnitConversion("m^3/s", _L_M3 / 3600),
+        "ft^3/min": ExactUnitConversion("m^3/s", _FT_M**3 / 60),
+        "gallon/minute": ExactUnitConversion("m^3/s", _GAL_M3 / 60),
+    },
+    QuantityKind.ABSOLUTE_TEMPERATURE: {
+        "K": ExactUnitConversion("K", Fraction(1), Fraction(0)),
+        "degC": ExactUnitConversion("K", Fraction(1), Fraction(27315, 100)),
+        "degF": ExactUnitConversion("K", Fraction(5, 9), _DEGF_OFFSET_K),
+        "degR": ExactUnitConversion("K", Fraction(5, 9), Fraction(0)),
+    },
+    QuantityKind.TEMPERATURE_DIFFERENCE: {
+        "K": ExactUnitConversion("K", Fraction(1)),
+        "delta_degC": ExactUnitConversion("K", Fraction(1)),
+        "delta_degF": ExactUnitConversion("K", Fraction(5, 9)),
+        "delta_degR": ExactUnitConversion("K", Fraction(5, 9)),
+    },
+    QuantityKind.ABSOLUTE_PRESSURE: {
+        "Pa": ExactUnitConversion("Pa", Fraction(1)),
+        "kPa": ExactUnitConversion("Pa", Fraction(1000)),
+        "MPa": ExactUnitConversion("Pa", Fraction(1000000)),
+        "bar": ExactUnitConversion("Pa", Fraction(100000)),
+        "psi": ExactUnitConversion("Pa", _LB_KG * Fraction(980665, 100000) / (_IN_M**2)),
+        "atm": ExactUnitConversion("Pa", _ATM_PA),
+    },
+    QuantityKind.PRESSURE_DIFFERENCE: {
+        "Pa": ExactUnitConversion("Pa", Fraction(1)),
+        "kPa": ExactUnitConversion("Pa", Fraction(1000)),
+        "MPa": ExactUnitConversion("Pa", Fraction(1000000)),
+        "bar": ExactUnitConversion("Pa", Fraction(100000)),
+        "psi": ExactUnitConversion("Pa", _LB_KG * Fraction(980665, 100000) / (_IN_M**2)),
+    },
+    QuantityKind.POWER: {
+        "W": ExactUnitConversion("W", Fraction(1)),
+        "kW": ExactUnitConversion("W", Fraction(1000)),
+        "MW": ExactUnitConversion("W", Fraction(1000000)),
+        "Btu/hour": ExactUnitConversion("W", _BTU_J / 3600),
+        "ton_refrigeration": ExactUnitConversion("W", 12000 * _BTU_J / 3600),
+    },
+    QuantityKind.AREA: {
+        "m^2": ExactUnitConversion("m^2", Fraction(1)),
+        "cm^2": ExactUnitConversion("m^2", Fraction(1, 10000)),
+        "mm^2": ExactUnitConversion("m^2", Fraction(1, 1000000)),
+        "ft^2": ExactUnitConversion("m^2", _FT_M**2),
+        "in^2": ExactUnitConversion("m^2", _IN_M**2),
+    },
+    QuantityKind.LENGTH: {
+        "m": ExactUnitConversion("m", Fraction(1)),
+        "cm": ExactUnitConversion("m", Fraction(1, 100)),
+        "mm": ExactUnitConversion("m", Fraction(1, 1000)),
+        "um": ExactUnitConversion("m", Fraction(1, 1000000)),
+        "ft": ExactUnitConversion("m", _FT_M),
+        "in": ExactUnitConversion("m", _IN_M),
+    },
+    QuantityKind.VELOCITY: {
+        "m/s": ExactUnitConversion("m/s", Fraction(1)),
+        "m/min": ExactUnitConversion("m/s", Fraction(1, 60)),
+        "m/h": ExactUnitConversion("m/s", Fraction(1, 3600)),
+        "ft/s": ExactUnitConversion("m/s", _FT_M),
+        "ft/min": ExactUnitConversion("m/s", _FT_M / 60),
+    },
+    QuantityKind.FOULING_RESISTANCE: {
+        "m^2*K/W": ExactUnitConversion("m^2*K/W", Fraction(1)),
+        "m^2*delta_degC/W": ExactUnitConversion("m^2*K/W", Fraction(1)),
+        "hour*ft^2*delta_degF/Btu": ExactUnitConversion("m^2*K/W", _FOULING_IMPERIAL_TO_SI),
+    },
+    QuantityKind.SPECIFIC_ENTHALPY: {
+        "J/kg": ExactUnitConversion("J/kg", Fraction(1)),
+        "kJ/kg": ExactUnitConversion("J/kg", Fraction(1000)),
+        "MJ/kg": ExactUnitConversion("J/kg", Fraction(1000000)),
+        "Btu/lb": ExactUnitConversion("J/kg", _BTU_LB_J_KG),
+    },
+    QuantityKind.DIMENSIONLESS: {
+        "dimensionless": ExactUnitConversion("dimensionless", Fraction(1)),
+        "percent": ExactUnitConversion("dimensionless", Fraction(1, 100)),
+    },
+}
 
-    Never uses convert_value(), q.to_si(), q.si_value, or any float intermediate
-    for the canonical conversion result.
+
+def verify_exact_unit_registry() -> None:
+    """Verify that the exact conversion registry covers all UNIT_RULES canonical units.
+
+    Called once at module import. Fails closed on any mismatch:
+    - UNIT_RULES allows a unit but exact registry is missing it
+    - exact registry has a unit not authorized by UNIT_RULES
+    - SI unit mismatch
+    - zero scale
+    - missing QuantityKind
     """
-    cache_key = (from_unit, to_unit)
-    if cache_key in _exact_conversion_cache:
-        return _exact_conversion_cache[cache_key]
+    for kind in QuantityKind:
+        if kind not in _EXACT_UNIT_CONVERSIONS:
+            raise RuntimeError(f"Exact unit registry missing QuantityKind {kind.value!r}")
+        allowed = set(UNIT_RULES[kind].aliases.values())
+        registered = set(_EXACT_UNIT_CONVERSIONS[kind].keys())
+        missing = allowed - registered
+        extra = registered - allowed
+        if missing:
+            raise RuntimeError(
+                f"QuantityKind {kind.value!r}: units in UNIT_RULES but not in "
+                f"exact registry: {sorted(missing)}"
+            )
+        if extra:
+            raise RuntimeError(
+                f"QuantityKind {kind.value!r}: units in exact registry but not "
+                f"in UNIT_RULES: {sorted(extra)}"
+            )
+        expected_si = UNIT_RULES[kind].si_unit
+        for unit_name, spec in _EXACT_UNIT_CONVERSIONS[kind].items():
+            if spec.si_unit != expected_si:
+                raise RuntimeError(
+                    f"{kind.value}/{unit_name}: si_unit is {spec.si_unit!r}, "
+                    f"expected {expected_si!r}"
+                )
+            if spec.scale == 0:
+                raise RuntimeError(f"{kind.value}/{unit_name}: scale is zero")
 
-    # Normalize unit names through project infrastructure
-    canonical_from = normalize_unit(kind, from_unit)
-    canonical_to = normalize_unit(kind, to_unit)
 
-    # If same unit, factor=1 offset=0
-    if canonical_from == canonical_to:
-        result = (Decimal(1), Decimal(0))
-        _exact_conversion_cache[cache_key] = result
-        return result
+verify_exact_unit_registry()
 
-    ureg = unit_registry()
 
-    # Try to trace both units through pint's chain
-    from_chain = _trace_simple_unit_chain(ureg, canonical_from)
-    to_chain = _trace_simple_unit_chain(ureg, canonical_to)
+def exact_decimal_conversion(
+    value: float,
+    unit: str,
+    kind: QuantityKind,
+) -> tuple[Decimal, str]:
+    """Convert a float value + unit to exact Decimal SI value + SI unit symbol.
 
-    if from_chain is not None and to_chain is not None:
-        from_scale, from_offset, from_base = from_chain
-        to_scale, to_offset, to_base = to_chain
+    Uses the immutable exact conversion registry. All arithmetic is performed
+    with exact Fraction → Decimal. No float intermediate. No pint. No fallback.
 
-        # Both must resolve to the same base dimension
-        if from_base == to_base:
-            # Convert: value_from -> base -> to_unit
-            # base = value_from * from_scale + from_offset
-            # value_to = (base - to_offset) / to_scale
-            # = value_from * (from_scale / to_scale) + (from_offset - to_offset) / to_scale
-            factor = from_scale / to_scale
-            offset = (from_offset - to_offset) / to_scale
-
-            decimal_factor = Decimal(factor.numerator) / Decimal(factor.denominator)
-            decimal_offset = Decimal(offset.numerator) / Decimal(offset.denominator)
-
-            result = (decimal_factor, decimal_offset)
-            _exact_conversion_cache[cache_key] = result
-            return result
-
-    # Fallback: use pint's Quantity to compute the conversion factor
-    # but verify it's exact by checking against Fraction recovery
-    float_factor = convert_value(1.0, canonical_from, canonical_to, kind)
-    float_offset = convert_value(0.0, canonical_from, canonical_to, kind)
-
-    frac_factor = Fraction(float_factor).limit_denominator(_PINT_MAX_DEN)
-    frac_offset = Fraction(float_offset).limit_denominator(_PINT_MAX_DEN)
-
-    # Verify the recovered fractions reproduce the float values exactly
-    if float(frac_factor) != float_factor or float(frac_offset) != float_offset:
-        raise ValueError(
-            f"Cannot recover exact conversion factor for {canonical_from} -> {canonical_to}: "
-            f"factor={float_factor}, recovered={float(frac_factor)}, "
-            f"offset={float_offset}, recovered_offset={float(frac_offset)}"
-        )
-
-    decimal_factor = Decimal(frac_factor.numerator) / Decimal(frac_factor.denominator)
-    decimal_offset = Decimal(frac_offset.numerator) / Decimal(frac_offset.denominator)
-
-    result = (decimal_factor, decimal_offset)
-    _exact_conversion_cache[cache_key] = result
-    return result
+    Returns (si_decimal_value, si_unit_symbol).
+    """
+    canonical_unit = normalize_unit(kind, unit)
+    spec = _EXACT_UNIT_CONVERSIONS[kind][canonical_unit]
+    input_decimal = Decimal(repr(value))
+    factor = Decimal(spec.scale.numerator) / Decimal(spec.scale.denominator)
+    offset = Decimal(spec.offset.numerator) / Decimal(spec.offset.denominator)
+    si_value = input_decimal * factor + offset
+    return si_value, spec.si_unit
 
 
 def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
@@ -255,30 +307,14 @@ def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
     Frozen Contract §8.1 output schema:
         {"value": "<canonical SI decimal string>", "unit": "<SI unit symbol>"}
 
-    Conversion uses exact Decimal arithmetic:
-    1. Input value → Decimal(repr(value)) (exact binary-to-decimal)
-    2. Get exact Decimal conversion factor from pint's definition chain
-    3. Apply: Decimal(repr(value)) * factor + offset
-    4. Apply canonical_decimal_string()
-    5. Output unit as SI symbol
-
-    NEVER calls q.to_si() or q.si_value.
-    NEVER uses binary float as intermediate canonical value.
+    Uses exact_decimal_conversion — no float intermediate, no pint, no fallback.
     """
     kind = q.kind
     if kind is None:
         raise ValueError(f"Quantity {q!r} has no kind")
-    si_symbol = si_unit(kind)
-    from_unit = q.unit
-
-    if from_unit == si_symbol:
-        decimal_value = Decimal(repr(q.value))
-    else:
-        factor, offset = _get_exact_conversion(from_unit, si_symbol, kind)
-        decimal_value = Decimal(repr(q.value)) * factor + offset
-
+    si_value, si_symbol = exact_decimal_conversion(q.value, q.unit, kind)
     return {
-        "value": canonical_decimal_string(decimal_value),
+        "value": canonical_decimal_string(si_value),
         "unit": si_symbol,
     }
 

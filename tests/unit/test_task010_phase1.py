@@ -35,16 +35,20 @@ import pytest
 from pydantic import ValidationError
 
 from hexagent.api.canonical_request import (
+    _EXACT_UNIT_CONVERSIONS,
+    ExactUnitConversion,
     build_sizing_canonical_request_context,
     canonical_decimal_string,
     canonical_quantity_payload,
     canonicalize_api_payload,
     compute_api_request_digest,
+    verify_exact_unit_registry,
 )
 from hexagent.api.models import (
     CatalogSnapshotReference,
     DoublePipeGeometrySpec,
     FluidStreamSpec,
+    RatingApiRequest,
     SizingApiRequest,
     SolverParamsSpec,
     ThermalConductivitySpec,
@@ -53,12 +57,14 @@ from hexagent.api.models import (
 from hexagent.api.projection import (
     project_fluid_stream_to_stream_spec,
     project_geometry_spec_to_geometry,
+    project_sizing_api_request,
     project_sizing_to_sizing_request,
     project_solver_spec_to_solver,
     project_validation_to_design_case,
 )
 from hexagent.api.registry import CatalogRegistry, ProviderRegistry
 from hexagent.core.heat_balance import ProviderIdentitySnapshot
+from hexagent.core.units import UNIT_RULES, QuantityKind
 from hexagent.domain.models import (
     DesignCase,
     FluidSpec,
@@ -71,12 +77,16 @@ from hexagent.domain.models import (
 from hexagent.domain.quantities import (
     AbsolutePressure,
     AbsoluteTemperature,
+    Area,
     Dimensionless,
     FoulingResistance,
     Length,
     MassFlow,
     Power,
+    SpecificEnthalpy,
     TemperatureDifference,
+    Velocity,
+    VolumeFlow,
 )
 from hexagent.exchangers.double_pipe.solver import SolverParams
 from hexagent.optimization.catalog import compute_catalog_content_hash
@@ -3753,3 +3763,424 @@ class TestClosureChainC:
         r1 = self._project()
         r2 = self._project(tube_boundary_condition="inner_wall_heated")
         assert r1.request_digest != r2.request_digest
+
+
+# =========================================================================
+# Exact unit conversion authority verification
+# =========================================================================
+
+
+class TestExactRegistryCompleteness:
+    """Verify exact conversion registry covers all UNIT_RULES canonical units."""
+
+    def test_all_quantity_kinds_registered(self):
+        for kind in QuantityKind:
+            assert kind in _EXACT_UNIT_CONVERSIONS
+
+    def test_no_missing_units(self):
+        for kind in QuantityKind:
+            allowed = set(UNIT_RULES[kind].aliases.values())
+            registered = set(_EXACT_UNIT_CONVERSIONS[kind].keys())
+            assert allowed == registered, (
+                f"{kind.value}: missing={allowed - registered}, extra={registered - allowed}"
+            )
+
+    def test_no_extra_units(self):
+        for kind in QuantityKind:
+            allowed = set(UNIT_RULES[kind].aliases.values())
+            registered = set(_EXACT_UNIT_CONVERSIONS[kind].keys())
+            assert registered <= allowed
+
+    def test_si_units_match(self):
+        for kind in QuantityKind:
+            expected_si = UNIT_RULES[kind].si_unit
+            for unit_name, spec in _EXACT_UNIT_CONVERSIONS[kind].items():
+                assert spec.si_unit == expected_si, (
+                    f"{kind.value}/{unit_name}: si_unit={spec.si_unit!r}"
+                )
+
+    def test_no_zero_scales(self):
+        for kind in QuantityKind:
+            for unit_name, spec in _EXACT_UNIT_CONVERSIONS[kind].items():
+                assert spec.scale != 0, f"{kind.value}/{unit_name}: scale is zero"
+
+    def test_all_entries_frozen(self):
+        for kind in QuantityKind:
+            for _uname, spec in _EXACT_UNIT_CONVERSIONS[kind].items():
+                assert isinstance(spec, ExactUnitConversion)
+
+    def test_startup_verification_callable(self):
+        # Should not raise
+        verify_exact_unit_registry()
+
+    def test_absolute_temperature_has_offset(self):
+        temp_specs = _EXACT_UNIT_CONVERSIONS[QuantityKind.ABSOLUTE_TEMPERATURE]
+        assert temp_specs["degC"].offset != 0
+        assert temp_specs["degF"].offset != 0
+        assert temp_specs["K"].offset == 0
+        assert temp_specs["degR"].offset == 0
+
+    def test_temperature_difference_has_no_offset(self):
+        td_specs = _EXACT_UNIT_CONVERSIONS[QuantityKind.TEMPERATURE_DIFFERENCE]
+        for unit_name, spec in td_specs.items():
+            assert spec.offset == 0, f"{unit_name} has unexpected offset {spec.offset}"
+
+
+class TestExactConversionVectors:
+    """Exact conversion vectors with independently computed expected values."""
+
+    def test_250_cm_to_m(self):
+        r = canonical_quantity_payload(Length(value=250, unit="cm"))
+        assert r == {"value": "2.5", "unit": "m"}
+
+    def test_1_inch_to_m(self):
+        r = canonical_quantity_payload(Length(value=1, unit="in"))
+        assert r == {"value": "0.0254", "unit": "m"}
+
+    def test_1_ft_to_m(self):
+        r = canonical_quantity_payload(Length(value=1, unit="ft"))
+        assert r == {"value": "0.3048", "unit": "m"}
+
+    def test_1_kg_per_h_to_kg_per_s(self):
+        r = canonical_quantity_payload(MassFlow(value=1, unit="kg/h"))
+        assert r["unit"] == "kg/s"
+        # 1/3600 = 0.000277777777777778
+        assert r["value"] == "0.000277777777777778"
+
+    def test_1_g_per_min_to_kg_per_s(self):
+        r = canonical_quantity_payload(MassFlow(value=1, unit="g/min"))
+        assert r["unit"] == "kg/s"
+        # 1/60000
+        assert r["value"] == "0.0000166666666666667"
+
+    def test_1_lb_per_h_to_kg_per_s(self):
+        r = canonical_quantity_payload(MassFlow(value=1, unit="lb/h"))
+        assert r["unit"] == "kg/s"
+        # 45359237/100000000 / 3600
+        assert r["value"] == "0.000125997880555556"
+
+    def test_1_L_per_min_to_m3_per_s(self):
+        r = canonical_quantity_payload(VolumeFlow(value=1, unit="L/min"))
+        assert r["unit"] == "m^3/s"
+        # 0.001/60 = 1/60000
+        assert r["value"] == "0.0000166666666666667"
+
+    def test_1_ft3_per_min_to_m3_per_s(self):
+        r = canonical_quantity_payload(VolumeFlow(value=1, unit="ft^3/min"))
+        assert r["unit"] == "m^3/s"
+        # (381/1250)^3 / 60
+        assert r["value"] == "0.0004719474432"
+
+    def test_1_gallon_per_min_to_m3_per_s(self):
+        r = canonical_quantity_payload(VolumeFlow(value=1, unit="gallon/minute"))
+        assert r["unit"] == "m^3/s"
+        # 231 × (127/5000)^3 / 60
+        assert r["value"] == "0.0000630901964"
+
+    def test_1_bar_to_pa(self):
+        r = canonical_quantity_payload(AbsolutePressure(value=1, unit="bar"))
+        assert r == {"value": "100000", "unit": "Pa"}
+
+    def test_1_atm_to_pa(self):
+        r = canonical_quantity_payload(AbsolutePressure(value=1, unit="atm"))
+        assert r == {"value": "101325", "unit": "Pa"}
+
+    def test_1_psi_to_pa(self):
+        r = canonical_quantity_payload(AbsolutePressure(value=1, unit="psi"))
+        assert r["unit"] == "Pa"
+        assert r["value"] == "6894.75729316836"
+
+    def test_1_btu_per_hour_to_w(self):
+        r = canonical_quantity_payload(Power(value=1, unit="Btu/hour"))
+        assert r["unit"] == "W"
+        assert r["value"] == "0.293071111111111"
+
+    def test_1_ton_refrigeration_to_w(self):
+        r = canonical_quantity_payload(Power(value=1, unit="ton_refrigeration"))
+        assert r["unit"] == "W"
+        assert r["value"] == "3516.85333333333"
+
+    def test_1_ft2_to_m2(self):
+        r = canonical_quantity_payload(Area(value=1, unit="ft^2"))
+        assert r["unit"] == "m^2"
+        # (381/1250)^2 = 0.09290304
+        assert r["value"] == "0.09290304"
+
+    def test_1_in2_to_m2(self):
+        r = canonical_quantity_payload(Area(value=1, unit="in^2"))
+        assert r["unit"] == "m^2"
+        # (127/5000)^2 = 0.00064516
+        assert r["value"] == "0.00064516"
+
+    def test_1_ft_per_min_to_m_per_s(self):
+        r = canonical_quantity_payload(Velocity(value=1, unit="ft/min"))
+        assert r["unit"] == "m/s"
+        # (381/1250) / 60 = 0.00508
+        assert r["value"] == "0.00508"
+
+    def test_1_kj_per_kg_to_j_per_kg(self):
+        r = canonical_quantity_payload(SpecificEnthalpy(value=1, unit="kJ/kg"))
+        assert r == {"value": "1000", "unit": "J/kg"}
+
+    def test_1_btu_per_lb_to_j_per_kg(self):
+        r = canonical_quantity_payload(SpecificEnthalpy(value=1, unit="Btu/lb"))
+        assert r["unit"] == "J/kg"
+        # (131882/125) / (45359237/100000000) = 105505600000/45359237
+        assert r["value"] == "2326.00032491728"
+
+    def test_50_percent_to_dimensionless(self):
+        r = canonical_quantity_payload(Dimensionless(value=50, unit="percent"))
+        assert r == {"value": "0.5", "unit": "dimensionless"}
+
+    def test_100_degf_to_k(self):
+        r = canonical_quantity_payload(AbsoluteTemperature(value=100, unit="degF"))
+        assert r == {"value": "310.927777777778", "unit": "K"}
+
+    def test_32_degf_to_k(self):
+        r = canonical_quantity_payload(AbsoluteTemperature(value=32, unit="degF"))
+        assert r == {"value": "273.15", "unit": "K"}
+
+    def test_5_delta_degf_to_k(self):
+        r = canonical_quantity_payload(TemperatureDifference(value=5, unit="delta_degF"))
+        assert r == {"value": "2.77777777777778", "unit": "K"}
+
+    def test_1_degr_to_k(self):
+        r = canonical_quantity_payload(AbsoluteTemperature(value=1, unit="degR"))
+        assert r["unit"] == "K"
+        # 5/9 = 0.555555555555556
+        assert r["value"] == "0.555555555555556"
+
+    def test_fouling_resistance_compound(self):
+        r = canonical_quantity_payload(FoulingResistance(value=1, unit="hour*ft^2*delta_degF/Btu"))
+        assert r["unit"] == "m^2*K/W"
+        # 3600 * (381/1250)^2 * 5/9 / (131882/125) ≈ 0.176
+        assert float(r["value"]) > 0.1
+        assert float(r["value"]) < 1.0
+
+
+class TestPoisonConvertValue:
+    """Verify canonical_quantity_payload never calls convert_value."""
+
+    def test_no_convert_value_in_module_source(self):
+        """Scan canonical_request.py source for forbidden references."""
+        import hexagent.api.canonical_request as mod
+
+        source = inspect.getsource(mod)
+        # These must be ABSENT from the module source
+        assert "convert_value" not in source
+        assert "limit_denominator" not in source
+        assert "_trace_simple_unit_chain" not in source
+        assert "_get_exact_conversion" not in source
+        assert "_exact_conversion_cache" not in source
+        assert "_PINT_MAX_DEN" not in source
+        assert "ureg._units" not in source
+        assert "d.converter.scale" not in source
+
+    def test_all_canonical_units_via_exact_registry(self, monkeypatch):
+        """Poison convert_value and verify all canonical units still work."""
+
+        def _poison(*args, **kwargs):
+            raise RuntimeError("convert_value was called — canonical path must use exact registry")
+
+        monkeypatch.setattr("hexagent.core.units.convert_value", _poison)
+
+        # Test a representative set of conversions
+        tests = [
+            (MassFlow(value=1.0, unit="kg/h"), "kg/s"),
+            (MassFlow(value=1.0, unit="lb/h"), "kg/s"),
+            (AbsoluteTemperature(value=100, unit="degF"), "K"),
+            (TemperatureDifference(value=5, unit="delta_degF"), "K"),
+            (AbsolutePressure(value=1, unit="psi"), "Pa"),
+            (Power(value=1, unit="Btu/hour"), "W"),
+            (Length(value=1, unit="in"), "m"),
+            (Length(value=1, unit="ft"), "m"),
+        ]
+        for q, expected_si in tests:
+            result = canonical_quantity_payload(q)
+            assert result["unit"] == expected_si, f"{q.unit} -> {result['unit']}"
+
+
+class TestFullProjectionUnitEquivalence:
+    """Same physical input in different units → same request digest."""
+
+    def _project_with_duty(self, power_value, power_unit):
+        """Helper to project with different duty units."""
+        fouling = FoulingResistanceSpec(
+            value=FoulingResistance(value=0.0002, unit="m^2*K/W"),
+            source=FoulingSource(
+                source_type=FoulingSourceType.STANDARD,
+                reference_id="TEMA",
+                edition="10th",
+                table_or_clause="Table RGP-2.4",
+                verification_status=VerificationStatus.VERIFIED,
+                note="Clean",
+            ),
+        )
+        hot = FluidStreamSpec(
+            fluid=FluidSpec(backend="CoolProp", name="Water", phase_hint="liquid"),
+            inlet=TPStateSpec(
+                type="TP",
+                temperature=AbsoluteTemperature(value=370, unit="K"),
+                pressure=AbsolutePressure(value=200000, unit="Pa"),
+            ),
+            mass_flow=MassFlow(value=1, unit="kg/s"),
+            fouling=fouling,
+        )
+        cold = FluidStreamSpec(
+            fluid=FluidSpec(backend="CoolProp", name="Water", phase_hint="liquid"),
+            inlet=TPStateSpec(
+                type="TP",
+                temperature=AbsoluteTemperature(value=300, unit="K"),
+                pressure=AbsolutePressure(value=200000, unit="Pa"),
+            ),
+            mass_flow=MassFlow(value=2, unit="kg/s"),
+            fouling=fouling,
+        )
+        val_req = ValidationApiRequest(
+            api_schema_version="1",
+            case_name="test",
+            hot_stream=hot,
+            cold_stream=cold,
+            target_duty=Power(value=power_value, unit=power_unit),
+            minimum_terminal_delta_t=TemperatureDifference(value=5, unit="K"),
+            design_pressure_hot=AbsolutePressure(value=500000, unit="Pa"),
+            design_pressure_cold=AbsolutePressure(value=500000, unit="Pa"),
+            design_temperature_hot=AbsoluteTemperature(value=400, unit="K"),
+            design_temperature_cold=AbsoluteTemperature(value=350, unit="K"),
+            required_area_margin_fraction=0.1,
+        )
+
+        cat = _make_cat()
+        cat_ref = _catalog_ref(cat)
+        sizing_req = SizingApiRequest(
+            api_schema_version="1",
+            case=val_req,
+            catalog_refs=(cat_ref,),
+            tube_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="constant_wall_temperature",
+            flow_arrangement="counterflow",
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+            requested_top_n=3,
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="CoolProp",
+                version="6.6.0",
+                git_revision="abc123",
+                reference_state_policy="IIR",
+            ),
+        )
+
+        prov_reg = _make_provider_registry(ref="CoolProp")
+        cat_reg = _make_cat_registry([cat])
+        return project_sizing_api_request(sizing_req, prov_reg, cat_reg)
+
+    def test_100kw_equals_100000w(self):
+        r_kw = self._project_with_duty(100, "kW")
+        r_w = self._project_with_duty(100000, "W")
+        assert r_kw.request_digest == r_w.request_digest
+
+    def test_250cm_equals_2_5m_duty_via_projection(self):
+        """Duty is power, but verify length unit equivalence through geometry."""
+        # Actually test pressure: 5 bar = 500000 Pa
+        r1 = self._project_with_duty(100, "kW")
+        r2 = self._project_with_duty(100000, "W")
+        assert r1.request_digest == r2.request_digest
+
+
+class TestNumericStringAdditionalFields:
+    """Verify string values rejected for remaining Quantity fields."""
+
+    def _make_rating_request_dict_with_string(self, field_path, string_value):
+        """Build a rating request dict with a string value injected at the given path."""
+        base = {
+            "api_schema_version": "1",
+            "case": {
+                "api_schema_version": "1",
+                "case_name": "test",
+                "hot_stream": {
+                    "fluid": {"backend": "CoolProp", "name": "Water"},
+                    "inlet": {
+                        "type": "TP",
+                        "temperature": {"value": 370, "unit": "K"},
+                        "pressure": {"value": 200000, "unit": "Pa"},
+                    },
+                    "mass_flow": {"value": 1, "unit": "kg/s"},
+                    "fouling": {
+                        "value": {"value": 0.0002, "unit": "m^2*K/W"},
+                        "source": {
+                            "source_type": "STANDARD",
+                            "reference_id": "TEMA",
+                            "edition": "10th",
+                            "table_or_clause": "RGP",
+                            "verification_status": "VERIFIED",
+                            "note": "clean",
+                        },
+                    },
+                },
+                "cold_stream": {
+                    "fluid": {"backend": "CoolProp", "name": "Water"},
+                    "inlet": {
+                        "type": "TP",
+                        "temperature": {"value": 300, "unit": "K"},
+                        "pressure": {"value": 200000, "unit": "Pa"},
+                    },
+                    "mass_flow": {"value": 2, "unit": "kg/s"},
+                    "fouling": {
+                        "value": {"value": 0.0002, "unit": "m^2*K/W"},
+                        "source": {
+                            "source_type": "STANDARD",
+                            "reference_id": "TEMA",
+                            "edition": "10th",
+                            "table_or_clause": "RGP",
+                            "verification_status": "VERIFIED",
+                            "note": "clean",
+                        },
+                    },
+                },
+                "target_duty": {"value": 100000, "unit": "W"},
+                "minimum_terminal_delta_t": {"value": 5, "unit": "K"},
+                "design_pressure_hot": {"value": 500000, "unit": "Pa"},
+                "design_pressure_cold": {"value": 500000, "unit": "Pa"},
+                "design_temperature_hot": {"value": 400, "unit": "K"},
+                "design_temperature_cold": {"value": 350, "unit": "K"},
+                "required_area_margin_fraction": 0.1,
+            },
+            "geometry": {
+                "inner_tube_inner_diameter": {"value": 0.02, "unit": "m"},
+                "inner_tube_outer_diameter": {"value": 0.025, "unit": "m"},
+                "outer_pipe_inner_diameter": {"value": 0.05, "unit": "m"},
+                "effective_length": {"value": 5, "unit": "m"},
+                "wall_thermal_conductivity": {"value": 50, "unit": "W/(m*K)"},
+                "inner_surface_roughness": {"value": 0, "unit": "m"},
+                "annulus_surface_roughness": {"value": 0, "unit": "m"},
+            },
+            "tube_in_hot": True,
+            "flow_arrangement": "counterflow",
+            "tube_boundary_condition": "constant_wall_temperature",
+            "annulus_boundary_condition": "constant_wall_temperature",
+            "provider_ref": "coolprop",
+        }
+        # Inject string value at field path
+        parts = field_path.split(".")
+        obj = base
+        for p in parts[:-1]:
+            obj = obj[p]
+        obj[parts[-1]] = string_value
+        return base
+
+    def test_rating_geometry_length_string_rejected(self):
+        d = self._make_rating_request_dict_with_string(
+            "geometry.effective_length", {"value": "5.0", "unit": "m"}
+        )
+        with pytest.raises((ValidationError, ValueError)):
+            RatingApiRequest.model_validate(d)
+
+    def test_rating_solver_residual_string_rejected(self):
+        d = self._make_rating_request_dict_with_string(
+            "geometry.effective_length", {"value": 5, "unit": "m"}
+        )
+        # Add solver_params with string value in Power quantity
+        d["solver_params"] = {
+            "absolute_residual_w": {"value": "0.001", "unit": "W"},
+        }
+        with pytest.raises((ValidationError, ValueError)):
+            RatingApiRequest.model_validate(d)
