@@ -599,7 +599,14 @@ def verify_partial_termination_authority(
     PARTIAL requires at least one of:
     - non-empty blocker digests in OptimizationResult
     - at least one non-FEASIBLE disposition record
-    - at least one source_failure_binding or evidence_failure_binding
+    - source_failure_bindings contains at least one non-None element
+    - evidence_failure_bindings contains at least one non-None element
+    - phase3_failure_bindings contains at least one non-None element
+
+    The failure-binding tuples are fixed-length (one slot per candidate),
+    filled with None for candidates without failure.  Therefore
+    bool(tuple) is NOT sufficient — each element must be checked
+    individually.
 
     COMPLETE requires none of these (but may have them).
     """
@@ -607,14 +614,26 @@ def verify_partial_termination_authority(
     has_non_feasible = any(
         d.disposition != Phase3Disposition.FEASIBLE for d in dispositions
     )
-    has_failure_bindings = bool(
-        artifacts.source_failure_bindings or artifacts.evidence_failure_bindings
+    has_source_failure = any(
+        binding is not None
+        for binding in artifacts.source_failure_bindings
+    )
+    has_evidence_failure = any(
+        binding is not None
+        for binding in artifacts.evidence_failure_bindings
+    )
+    has_phase3_failure = any(
+        binding is not None
+        for binding in artifacts.phase3_failure_bindings
+    )
+    has_failure_authority = (
+        has_source_failure or has_evidence_failure or has_phase3_failure
     )
 
-    if not (has_blockers or has_non_feasible or has_failure_bindings):
+    if not (has_blockers or has_non_feasible or has_failure_authority):
         raise ValueError(
             "PARTIAL termination requires at least one blocker, "
-            "non-FEASIBLE disposition, or failure binding"
+            "non-FEASIBLE disposition, or non-None failure binding"
         )
 ```
 
@@ -1003,6 +1022,25 @@ def geometry_identity_payload(geometry: DoublePipeGeometry) -> dict[str, object]
     }
 
 
+def provider_identity_payload(
+    provider: ProviderIdentitySnapshot,
+) -> dict[str, str]:
+    """Explicit canonical payload for ProviderIdentitySnapshot.
+
+    ProviderIdentitySnapshot is a frozen dataclass, NOT a Pydantic model.
+    model_dump() does not exist on dataclasses.  This helper provides the
+    canonical dict for snapshot parity comparison.
+    """
+    return {
+        "name": provider.name,
+        "version": provider.version,
+        "git_revision": provider.git_revision,
+        "reference_state_policy": provider.reference_state_policy,
+        "configuration_fingerprint": provider.configuration_fingerprint,
+        "cache_policy_version": provider.cache_policy_version,
+    }
+
+
 def verify_rating_canonical_request_parity(
     *,
     snapshot: dict[str, object],
@@ -1018,21 +1056,45 @@ def verify_rating_canonical_request_parity(
     Must be called by verify_rating_artifact_bundle() and envelope validator.
     Prevents attack where snapshot is modified and bundle digest recomputed.
     """
-    if snapshot.get("geometry") != geometry_identity_payload(geometry):
+    # All comparisons use canonical payloads — never raw float vs canonical string.
+    # The snapshot stores values in the same canonical form as compute_api_request_digest().
+
+    # Geometry: compare canonical payload dicts
+    expected_geometry = geometry_identity_payload(geometry)
+    if snapshot.get("geometry") != expected_geometry:
         raise ValueError("canonical snapshot geometry mismatch")
-    if snapshot.get("solver_absolute_residual_w") != solver.absolute_residual_w:
-        raise ValueError("canonical snapshot solver absolute_residual_w mismatch")
-    if snapshot.get("solver_relative_residual_fraction") != solver.relative_residual_fraction:
-        raise ValueError("canonical snapshot solver relative_residual_fraction mismatch")
-    if snapshot.get("solver_bracket_temperature_tolerance_k") != solver.bracket_temperature_tolerance_k:
-        raise ValueError("canonical snapshot solver bracket_temperature_tolerance_k mismatch")
-    if snapshot.get("solver_max_iterations") != solver.max_iterations:
-        raise ValueError("canonical snapshot solver max_iterations mismatch")
-    if snapshot.get("provider_identity") != provider.model_dump():
+
+    # Solver controls: compare via canonical numeric string
+    # (snapshot stores canonical Decimal strings, not raw floats)
+    solver_canonical = {
+        "absolute_residual_w": canonical_decimal_string(Decimal(repr(solver.absolute_residual_w))),
+        "relative_residual_fraction": canonical_decimal_string(Decimal(repr(solver.relative_residual_fraction))),
+        "bracket_temperature_tolerance_k": canonical_decimal_string(Decimal(repr(solver.bracket_temperature_tolerance_k))),
+        "max_iterations": solver.max_iterations,  # int → JSON number
+    }
+    if snapshot.get("solver") != solver_canonical:
+        raise ValueError("canonical snapshot solver mismatch")
+
+    # Provider identity: explicit payload (dataclass, NOT Pydantic model_dump)
+    expected_provider = provider_identity_payload(provider)
+    if snapshot.get("provider_identity") != expected_provider:
         raise ValueError("canonical snapshot provider identity mismatch")
+
+    # Flow arrangement
     if snapshot.get("flow_arrangement") != request_identity.flow_arrangement:
         raise ValueError("canonical snapshot flow_arrangement mismatch")
-    if snapshot.get("minimum_terminal_delta_t") != request_identity.minimum_terminal_delta_t:
+
+    # Boundary conditions (P0-4: must be checked)
+    if snapshot.get("tube_boundary_condition") != request_identity.tube_boundary_condition:
+        raise ValueError("canonical snapshot tube_boundary_condition mismatch")
+    if snapshot.get("annulus_boundary_condition") != request_identity.annulus_boundary_condition:
+        raise ValueError("canonical snapshot annulus_boundary_condition mismatch")
+
+    # Minimum terminal delta-T: compare via canonical numeric string
+    expected_delta_t = canonical_decimal_string(
+        Decimal(repr(request_identity.minimum_terminal_delta_t))
+    )
+    if snapshot.get("minimum_terminal_delta_t") != expected_delta_t:
         raise ValueError("canonical snapshot minimum_terminal_delta_t mismatch")
 
 
@@ -1687,12 +1749,22 @@ class ErrorDetail(StrictBaseModel):
 || T14f | Sizing envelope warning mismatch → rejected | Warning parity |
 || T14g | Sizing envelope blocker mismatch → rejected | Blocker parity |
 || T14j | Sizing envelope failure non-None → rejected | Failure always None |
-|| T14l | PARTIAL termination with no blocker/disposition/failure-binding authority → rejected | PARTIAL authority |
-|| T14m | PARTIAL termination with authoritative blocker/disposition → accepted | PARTIAL authority |
+|| T14l | PARTIAL, no blocker, all dispositions FEASIBLE, all three failure-binding tuples contain only None → rejected | PARTIAL authority |
+|| T14m | PARTIAL with blocker or non-FEASIBLE disposition → accepted | PARTIAL authority |
+|| T14n | PARTIAL with only phase3_failure_bindings containing non-None binding → accepted | PARTIAL authority |
+|| T14o | All three failure-binding tuples non-empty but every element is None, no blocker, all FEASIBLE → rejected | PARTIAL authority |
+|| T14p | COMPLETE does not execute PARTIAL authority rejection | COMPLETE authority |
 || T14k | Sizing provenance graph object mismatch (even with same digest) → rejected | Provenance object parity |
 || T69 | Tampered `geometry_snapshot` → rejected | Geometry binding |
 || T70 | Tampered `solver_settings` → rejected | Solver binding |
-|| T71 | Canonical request snapshot geometry/solver/provider mismatch → rejected | Snapshot parity |
+|| T71 | Canonical request snapshot geometry/solver/provider/flow/boundary mismatch → rejected | Snapshot parity |
+|| T71a | ProviderIdentitySnapshot uses explicit payload, not model_dump() | Dataclass parity |
+|| T71b | tube_boundary_condition tampered → rejected | Boundary parity |
+|| T71c | annulus_boundary_condition tampered → rejected | Boundary parity |
+|| T71d | Canonical "0.001" matches authoritative float 0.001 via unified canonicalization → accepted | Canonical parity |
+|| T71e | Snapshot uses raw float where contract requires canonical string → rejected | Type parity |
+|| T71f | Provider configuration_fingerprint tampered → rejected | Provider parity |
+|| T71g | minimum_terminal_delta_t canonical value tampered → rejected | Terminal delta-T parity |
 || T72 | Envelope `provenance_digest` differs from `result.provenance_digest` → rejected; three-way parity: envelope.provenance_digest == result.provenance_digest == envelope.provenance.compute_hash() | Provenance three-way parity |
 || T73 | Two blockers represented and order stable | Collection identity |
 || T74 | Two warnings represented and order stable | Collection identity |
