@@ -4025,10 +4025,26 @@ class TestPoisonConvertValue:
 
 
 class TestFullProjectionUnitEquivalence:
-    """Same physical input in different units → same request digest."""
+    """Same physical input in different units → same request digest.
 
-    def _make_projected(self, **sizing_overrides):
-        """Helper to build a ProjectedSizingRequest with given overrides."""
+    Full projection path:
+        SizingApiRequest → ProviderRegistry → CatalogRegistry
+        → project_sizing_api_request → canonical_request_snapshot → request_digest
+    """
+
+    def _make_projected(
+        self,
+        *,
+        target_duty: Power | None = None,
+        hot_inlet_pressure: AbsolutePressure | None = None,
+        hot_inlet_temperature: AbsoluteTemperature | None = None,
+        minimum_effective_length: Length | None = None,
+    ) -> object:
+        """Build a ProjectedSizingRequest with explicit field overrides.
+
+        Uses ``is None`` guards — never ``override or default`` — so that
+        Quantity values of zero are preserved correctly.
+        """
         from hexagent.api.models import (
             FluidStreamSpec,
             SizingApiRequest,
@@ -4055,6 +4071,13 @@ class TestFullProjectionUnitEquivalence:
             OptimizationObjective,
         )
 
+        if target_duty is None:
+            target_duty = Power(value=100000, unit="W")
+        if hot_inlet_pressure is None:
+            hot_inlet_pressure = AbsolutePressure(value=200000, unit="Pa")
+        if hot_inlet_temperature is None:
+            hot_inlet_temperature = AbsoluteTemperature(value=370, unit="K")
+
         fouling = FoulingResistanceSpec(
             value=FoulingResistance(value=0.0002, unit="m^2*K/W"),
             source=FoulingSource(
@@ -4070,8 +4093,8 @@ class TestFullProjectionUnitEquivalence:
             fluid=FluidSpec(backend="CoolProp", name="Water", phase_hint="liquid"),
             inlet=TPStateSpec(
                 type="TP",
-                temperature=AbsoluteTemperature(value=370, unit="K"),
-                pressure=AbsolutePressure(value=200000, unit="Pa"),
+                temperature=hot_inlet_temperature,
+                pressure=hot_inlet_pressure,
             ),
             mass_flow=MassFlow(value=1, unit="kg/s"),
             fouling=fouling,
@@ -4091,7 +4114,7 @@ class TestFullProjectionUnitEquivalence:
             case_name="test",
             hot_stream=hot,
             cold_stream=cold,
-            target_duty=Power(value=100000, unit="W"),
+            target_duty=target_duty,
             minimum_terminal_delta_t=TemperatureDifference(value=5, unit="K"),
             design_pressure_hot=AbsolutePressure(value=500000, unit="Pa"),
             design_pressure_cold=AbsolutePressure(value=500000, unit="Pa"),
@@ -4101,7 +4124,7 @@ class TestFullProjectionUnitEquivalence:
         )
         cat = _make_cat()
         cat_ref = _catalog_ref(cat)
-        sizing_defaults = dict(
+        sizing_kwargs: dict[str, object] = dict(
             api_schema_version="1",
             case=val_req,
             catalog_refs=(cat_ref,),
@@ -4117,42 +4140,76 @@ class TestFullProjectionUnitEquivalence:
                 reference_state_policy="IIR",
             ),
         )
-        sizing_defaults.update(sizing_overrides)
-        sizing_req = SizingApiRequest(**sizing_defaults)
+        if minimum_effective_length is not None:
+            sizing_kwargs["minimum_effective_length"] = minimum_effective_length
+        sizing_req = SizingApiRequest(**sizing_kwargs)  # type: ignore[arg-type]
         prov_reg = _make_provider_registry(ref="CoolProp")
         cat_reg = _make_cat_registry([cat])
         return project_sizing_api_request(sizing_req, prov_reg, cat_reg)
 
+    # --- 1. Power cross-unit equivalence ---
+
     def test_power_kW_vs_W(self):
-        """100 kW == 100000 W → same digest."""
-        r1 = self._make_projected()
-        r2 = self._make_projected()
-        assert r1.request_digest == r2.request_digest
+        """100 kW == 100000 W → identical snapshot and digest."""
+        q_kw = Power(value=100, unit="kW")
+        q_w = Power(value=100000, unit="W")
+        # Prove raw inputs are genuinely different
+        assert q_kw.unit != q_w.unit
+        assert q_kw.value != q_w.value
+
+        r_kw = self._make_projected(target_duty=q_kw)
+        r_w = self._make_projected(target_duty=q_w)
+        assert r_kw.canonical_request_snapshot == r_w.canonical_request_snapshot
+        assert r_kw.request_digest == r_w.request_digest
+
+    # --- 2. Pressure cross-unit equivalence ---
 
     def test_pressure_5bar_vs_500000Pa(self):
-        """5 bar == 500000 Pa for design_pressure_hot → same digest."""
-        r1 = self._make_projected()
-        r2 = self._make_projected()
-        assert r1.request_digest == r2.request_digest
+        """5 bar == 500000 Pa for hot inlet pressure → identical snapshot and digest."""
+        q_bar = AbsolutePressure(value=5, unit="bar")
+        q_pa = AbsolutePressure(value=500000, unit="Pa")
+        assert q_bar.unit != q_pa.unit
+        assert q_bar.value != q_pa.value
+
+        r_bar = self._make_projected(hot_inlet_pressure=q_bar)
+        r_pa = self._make_projected(hot_inlet_pressure=q_pa)
+        assert r_bar.canonical_request_snapshot == r_pa.canonical_request_snapshot
+        assert r_bar.request_digest == r_pa.request_digest
+
+    # --- 3. Temperature three-way cross-unit equivalence ---
 
     def test_temperature_0degC_273K_32degF(self):
-        """0 degC == 273.15 K == 32 degF → same canonical payload."""
-        from hexagent.api.canonical_request import canonical_quantity_payload
-        from hexagent.domain.quantities import AbsoluteTemperature
+        """0 degC == 273.15 K == 32 degF → identical snapshot and digest."""
+        q_c = AbsoluteTemperature(value=0, unit="degC")
+        q_k = AbsoluteTemperature(value=273.15, unit="K")
+        q_f = AbsoluteTemperature(value=32, unit="degF")
+        # Prove raw inputs are genuinely different
+        assert q_c.unit != q_k.unit != q_f.unit
+        assert q_c.value != q_k.value != q_f.value
 
-        c = canonical_quantity_payload(AbsoluteTemperature(value=0, unit="degC"))
-        k = canonical_quantity_payload(AbsoluteTemperature(value=273.15, unit="K"))
-        f = canonical_quantity_payload(AbsoluteTemperature(value=32, unit="degF"))
-        assert c == k == f
+        r_c = self._make_projected(hot_inlet_temperature=q_c)
+        r_k = self._make_projected(hot_inlet_temperature=q_k)
+        r_f = self._make_projected(hot_inlet_temperature=q_f)
+        assert (
+            r_c.canonical_request_snapshot
+            == r_k.canonical_request_snapshot
+            == r_f.canonical_request_snapshot
+        )
+        assert r_c.request_digest == r_k.request_digest == r_f.request_digest
+
+    # --- 4. Length cross-unit equivalence via sizing field ---
 
     def test_length_250cm_vs_2_5m(self):
-        """250 cm == 2.5 m → same canonical payload."""
-        from hexagent.api.canonical_request import canonical_quantity_payload
-        from hexagent.domain.quantities import Length
+        """250 cm == 2.5 m for minimum_effective_length → identical snapshot and digest."""
+        q_cm = Length(value=250, unit="cm")
+        q_m = Length(value=2.5, unit="m")
+        assert q_cm.unit != q_m.unit
+        assert q_cm.value != q_m.value
 
-        r_cm = canonical_quantity_payload(Length(value=250, unit="cm"))
-        r_m = canonical_quantity_payload(Length(value=2.5, unit="m"))
-        assert r_cm == r_m
+        r_cm = self._make_projected(minimum_effective_length=q_cm)
+        r_m = self._make_projected(minimum_effective_length=q_m)
+        assert r_cm.canonical_request_snapshot == r_m.canonical_request_snapshot
+        assert r_cm.request_digest == r_m.request_digest
 
 
 class TestNumericStringAdditionalFields:
