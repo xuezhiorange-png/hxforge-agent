@@ -35,13 +35,14 @@ Freeze the normative API request/response DTOs, discriminated run envelopes, ide
 | `DoublePipeGeometry` | (at TASK-008 merge) | `src/hexagent/exchangers/double_pipe/geometry.py` | `c6a4acfdf27c07685a8bdbf11838148b3f81eabc` | `aeaf79077b7de9f891fd889a2fad67cb780c1b3adf83925659530aaf6616fd8e` |
 | `SolverParams` | (at TASK-008 merge) | `src/hexagent/exchangers/double_pipe/solver.py` | `1ed290fd98fa877443cac57f3f59cc08038da01d` | `d8ed22aaea324534263e8950cd6e4bdc93ba0ec39899fa1ed8f4176bbc4b0737` |
 | `SizingRequest` / `CatalogSnapshotRef` | (at TASK-009 merge) | `src/hexagent/optimization/models.py` | `baeba79b9be42535ca33bcbb5048115dae1e9c67` | `ea8235473eb3e2c322d825ffe2bc739c3ceec15881c14da2612041a42c1a7379` |
-| `SizingRequestIdentity` / `OptimizationObjective` / `ExpectedProviderIdentity` / `PassedSizingGate` | (at TASK-009 merge) | `src/hexagent/optimization/context.py` | `076126034eaf4116506ecbae54b32e644b4fc1c8` | `fa23a2e6a6d0c1544bc522933fbf3d87c4baed2d42a4ab9e6da78f7dcbb2a14b` |
-| `Phase3AuthoritativeArtifacts` / `CandidateEvaluationRecord` / `CandidateDispositionRecord` / `RankedCandidateRecord` | (at TASK-009 merge) | `src/hexagent/optimization/evaluation.py` | `0f69d84f0a7a29ab1417d7b24dadc35bdcefaab1` | `b5d3e85b14873671956a88bcc050cf7bd16e952f40ebe35b1218794304c1943b` |
-| `Phase3` builder (`build_optimization_result`) | (at TASK-009 merge) | `src/hexagent/optimization/phase3_builder.py` | `6921bd2ef65a719e49cfec854fdf85e8c9009f5b` | `388e027c9bc65f9ef0de6d5c7bf5340e55381d0731965124d5160f8029d5fca4` |
-| `Phase3` verifier (`verify_phase3_result_semantics_or_raise`) | (at TASK-009 merge) | `src/hexagent/optimization/phase3_verifier.py` | `09b2020799ca2ef4cf1cbb9b15a6f88fea95c866` | `4a0bfe69382d9ff927873e52051fdb3045a7e68738a2b5b0ad3d952aa0d489a0` |
+| `SizingRequestIdentity` / `OptimizationObjective` / `ExpectedProviderIdentity` / `PassedSizingGate` / `MaterializedCandidateSet` | (at TASK-009 merge) | `src/hexagent/optimization/context.py` | `076126034eaf4116506ecbae54b32e644b4fc1c8` | `fa23a2e6a6d0c1544bc522933fbf3d87c4baed2d42a4ab9e6da78f7dcbb2a14b` |
+| `MaterializationResult` | (at TASK-009 merge) | `src/hexagent/optimization/identities.py` | `4b649d4f24a10ea04089483b1787bb5fbaa0d754` | `b450df49dffef9373b39f4b658870dc6eff507c02a09d71363b0b1c4b0d780e1` |
+| `CandidateEvaluationRecord` / `Phase3EvaluationInput` / `CandidateDispositionRecord` | (at TASK-009 merge) | `src/hexagent/optimization/phase3_evaluation.py` | `f5906ffd118fa2206bf026ed2680b6ae8c2d088a` | `b85d3245708ff325028d11577585ed42df50f05250a8426790f22986b81c1dcb` |
+| `RankedCandidateRecord` / `OptimizationResult` / `build_optimization_result` | (at TASK-009 merge) | `src/hexagent/optimization/phase3_builder.py` | `6921bd2ef65a719e49cfec854fdf85e8c9009f5b` | `388e027c9bc65f9ef0de6d5c7bf5340e55381d0731965124d5160f8029d5fca4` |
+| `Phase3AuthoritativeArtifacts` / `verify_phase3_result_semantics_or_raise` | (at TASK-009 merge) | `src/hexagent/optimization/phase3_verifier.py` | `09b2020799ca2ef4cf1cbb9b15a6f88fea95c866` | `4a0bfe69382d9ff927873e52051fdb3045a7e68738a2b5b0ad3d952aa0d489a0` |
 | Base `main` | `3af8eb85e2a293c2706402dae8ec317a45fed38a` (PR #27 merge) | — | — | — |
 
-**SHA-1 columns are 40-character hexadecimal git object hashes. SHA-256 columns are 64-character hexadecimal content hashes obtained via `sha256sum`.** No shortened or placeholder values are permitted.
+**SHA-1 columns are 40-character hexadecimal git object hashes. SHA-256 columns are 64-character hexadecimal content hashes.** No shortened or placeholder values.
 
 **`api_schema_version` is unified to `Literal["1"]` in all DTOs, envelopes, and the report model.**
 
@@ -59,6 +60,8 @@ Public HTTP requests are independent `StrictBaseModel`-based DTOs with explicit 
 
 **No public request uses bare unitless floats for dimensional quantities.** Every dimensional field uses a typed `Quantity` subclass.
 
+**Catalog models are server-side immutable. Public HTTP requests accept catalog references, not raw production catalog models with internal bare-float fields.** The application service resolves references through a read-only registry, verifies content hashes, and freezes resolved snapshots.
+
 All DTOs are `frozen`, `extra="forbid"`.
 
 ### 3.2 `ValidationApiRequest`
@@ -66,9 +69,9 @@ All DTOs are `frozen`, `extra="forbid"`.
 ```python
 class FluidStreamSpec(StrictBaseModel):
     fluid: FluidSpec                                    # backend + name + composition
+    # phase_hint is already on FluidSpec — NOT duplicated here
     inlet: TPStateSpec                                  # temperature + pressure (unit-bearing)
     mass_flow: MassFlow                                  # kg/s
-    phase_hint: PhaseHint = PhaseHint.AUTO
     fouling: FoulingResistanceSpec                       # with provenance
 
 
@@ -77,7 +80,7 @@ class ValidationApiRequest(StrictBaseModel):
     case_name: str                                       # non-empty, trimmed
     hot_stream: FluidStreamSpec
     cold_stream: FluidStreamSpec
-    target_duty: Power | None = None                     # W with unit metadata
+    target_duty: Power                                   # REQUIRED — unit-bearing
     minimum_terminal_delta_t: TemperatureDifference      # K with unit metadata
     design_pressure_hot: AbsolutePressure
     design_pressure_cold: AbsolutePressure
@@ -86,9 +89,11 @@ class ValidationApiRequest(StrictBaseModel):
     required_area_margin_fraction: float = Field(ge=0.0, le=1.0)
 ```
 
-**Rejection rules:**
-- `FluidSpec` already has `phase_hint` — if `FluidStreamSpec` re-declares it, the two must agree or the request is rejected.
-- `minimum_terminal_delta_t` is a single authoritative field; rating/sizing requests do not re-declare it.
+**`target_duty` is REQUIRED** (not optional). The TASK-010 double-pipe vertical slice always requires a target duty. Production `DesignCase` requires `target_duty` non-None OR at least one `outlet_temperature` — and the public DTO provides only the `target_duty` path.
+
+**Single authority rules:**
+- `FluidSpec.phase_hint` is the sole authority — `FluidStreamSpec` does NOT redeclare it.
+- `minimum_terminal_delta_t` is the sole authority — rating/sizing requests consume it from the case.
 
 #### 3.2.1 Projection to `DesignCase`
 
@@ -131,8 +136,7 @@ class DoublePipeGeometrySpec(StrictBaseModel):
     inner_surface_roughness: Length
     annulus_surface_roughness: Length
     # NOTE: fouling fields intentionally NOT present.
-    # Fouling authority is solely from stream-level FoulingResistanceSpec
-    # via case.hot_stream.fouling + case.cold_stream.fouling (§3.3.2).
+    # Fouling authority is solely from stream-level FoulingResistanceSpec.
 
 
 class ThermalConductivitySpec(StrictBaseModel):
@@ -142,42 +146,48 @@ class ThermalConductivitySpec(StrictBaseModel):
 
 
 class SolverParamsSpec(StrictBaseModel):
-    absolute_residual_w: Power = Field(default=Power(value=1e-6, unit="W"))
-    relative_residual_fraction: float = Field(default=1e-6, ge=0)
+    absolute_residual_w: Power = Field(default=Power(value=1e-3, unit="W"))
+    relative_residual_fraction: float = Field(default=1e-8, ge=0)
     bracket_temperature_tolerance_k: TemperatureDifference = Field(
-        default=TemperatureDifference(value=1e-6, unit="delta_degC")
+        default=TemperatureDifference(value=1e-4, unit="K")
     )
     max_iterations: int = Field(default=100, ge=1)
 ```
+
+**SolverParamsSpec defaults match production `SolverParams` exactly:**
+`absolute_residual_w=1e-3`, `relative_residual_fraction=1e-8`, `bracket_temperature_tolerance_k=1e-4`, `max_iterations=100`.
+Omitting `solver_params` or passing `{}` produces the same result and same canonical request identity.
 
 #### 3.3.1 Projection to domain models
 
 | RatingApiRequest field | Target |
 |---|---|
-| `case` → `ValidationApiRequest` | `DesignCase` (via §3.2.1 projection) |
-| `geometry` → `DoublePipeGeometrySpec` | `DoublePipeGeometry` (extract `.si_value` from each `Length`, `.value` from `ThermalConductivitySpec`) |
-| `solver_params` → `SolverParamsSpec` | `SolverParams` (extract `.si_value` from `Power` and `TemperatureDifference`) |
+| `case` → `ValidationApiRequest` | `DesignCase` (via §3.2.1) |
+| `geometry` → `DoublePipeGeometrySpec` | `DoublePipeGeometry` (`.si_value` from each `Length`, `.value` from `ThermalConductivitySpec`) |
+| `solver_params` → `SolverParamsSpec` | `SolverParams` (`.si_value` from `Power` and `TemperatureDifference`) |
 
 #### 3.3.2 Fouling authority
 
-**Single-authority rule:** The public `DoublePipeGeometrySpec` does NOT accept fouling fields. Fouling comes solely from `case.hot_stream.fouling` and `case.cold_stream.fouling` (both `FoulingResistanceSpec` with provenance). Any user-submitted fouling value on the geometry DTO is rejected at 422. The projection layer derives `DoublePipeGeometry` fouling fields automatically from stream values during orchestration:
-
-```
-hot_fouling = case.hot_stream.fouling_resistance.value.si_value
-cold_fouling = case.cold_stream.fouling_resistance.value.si_value
-inner_fouling = hot_fouling if tube_in_hot else cold_fouling
-outer_fouling = cold_fouling if tube_in_hot else hot_fouling
-```
+**Single-authority rule:** The public `DoublePipeGeometrySpec` does NOT accept fouling fields. Fouling comes solely from `case.hot_stream.fouling` and `case.cold_stream.fouling` (both `FoulingResistanceSpec` with provenance). Any user-submitted fouling value on the geometry DTO is rejected at 422.
 
 ### 3.4 `SizingApiRequest`
 
 ```python
+class CatalogSnapshotReference(StrictBaseModel):
+    """Server-side immutable catalog reference — NOT raw production catalog."""
+    catalog_id: str
+    catalog_version: str
+    catalog_content_hash: str                    # sha256:[0-9a-f]{64}
+    source_identity: str
+    schema_version: str
+
+
 class SizingApiRequest(StrictBaseModel):
     api_schema_version: Literal["1"]
     case: ValidationApiRequest
 
-    # Catalog — full immutable snapshots
-    catalogs: tuple[CompleteDoublePipeCatalogSnapshot, ...]
+    # Catalog — immutable references, not raw bare-float models
+    catalog_refs: tuple[CatalogSnapshotReference, ...]
 
     # Length bounds — unit-bearing
     minimum_effective_length: Length | None = None
@@ -193,7 +203,8 @@ class SizingApiRequest(StrictBaseModel):
     # Duty — unit-bearing
     required_duty: Power
     duty_absolute_tolerance: Power = Field(default=Power(value=0, unit="W"))
-    duty_relative_tolerance: Dimensionless = Field(default=Dimensionless(value=0, unit=""))
+    duty_relative_tolerance: Dimensionless = Field(
+        default=Dimensionless(value=0, unit="dimensionless"))
 
     # Optimization
     optimization_objective: OptimizationObjective
@@ -218,7 +229,16 @@ class SizingApiRequest(StrictBaseModel):
 - `minimum_effective_length`, `maximum_effective_length` → `Length | None`
 - `required_duty` → `Power`
 - `duty_absolute_tolerance` → `Power`
-- `duty_relative_tolerance` → `Dimensionless`
+- `duty_relative_tolerance` → `Dimensionless` with `unit="dimensionless"` (not `""`)
+
+**Catalog resolution contract:**
+The application service must, before computing `request_digest`:
+1. Look up each `CatalogSnapshotReference` in the immutable read-only registry.
+2. Resolved `CompleteDoublePipeCatalogSnapshot` must match `catalog_content_hash` — mismatch → `422`.
+3. Reference not found → `422`.
+4. After resolution, the snapshot is frozen and immutable.
+5. The canonical request context binds the full resolved snapshot + content hash.
+6. Same reference pointing to different content → fail closed.
 
 #### 3.4.1 Projection to `SizingRequest` + `SizingRequestIdentity`
 
@@ -226,16 +246,16 @@ The orchestration layer extracts `.si_value` from each Quantity:
 
 ```
 SizingApiRequest
+→ catalog resolution: CatalogSnapshotReference → CompleteDoublePipeCatalogSnapshot (hash verified)
 → SizingRequest(
-    catalogs=catalogs,
+    catalogs=resolved_catalogs,
     minimum_effective_length_m=minimum_effective_length.si_value if set else None,
     maximum_effective_length_m=maximum_effective_length.si_value if set else None,
     request_raw_combination_cap=request_raw_combination_cap,
 )
 → build_sizing_request_identity(
     request,
-    hot_fluid_name=case.hot_stream.fluid.name,
-    ...
+    ...,
     required_duty_w=required_duty.si_value,
     duty_absolute_tolerance_w=duty_absolute_tolerance.si_value,
     duty_relative_tolerance=duty_relative_tolerance.si_value,
@@ -249,25 +269,25 @@ SizingApiRequest
 
 ### 4.1 Sizing Orchestration
 
-The HTTP sizing handler MUST execute the following frozen chain using real TASK-009 production types:
-
 ```
 SizingApiRequest
 │
 ├─ 1. validate_public_request() → rejects at 422
-├─ 2. canonicalize_request() → compute request_digest
-├─ 3. project_to_domain() → SizingRequest + SizingRequestIdentity
-├─ 4. sizing_gate() → PassedSizingGate                 [TASK-009 Phase 1]
-├─ 5. candidate_materialization() → MaterializedCandidateSet   [TASK-009 Phase 1]
-├─ 6. phase2_candidate_evaluation() → tuple[CandidateEvaluationRecord, ...]
-├─ 7. phase3_evaluation_input() → Phase3EvaluationInput
-├─ 8. phase3_classification() → per-candidate
-├─ 9. deterministic_ranking()
-├─ 10. top_n_projection()
-├─ 11. build_optimization_result() → + authoritative verification + provenance
-├─ 12. build_sizing_run_artifacts()                    [§9]
-├─ 13. build_sizing_run_envelope()                     [§6]
-└─ 14. complete run in repository                      [§7]
+├─ 2. resolve catalog refs → verify hash → freeze snapshots
+├─ 3. canonicalize_request() → compute request_digest (binds full resolved catalogs)
+├─ 4. project_to_domain() → SizingRequest + SizingRequestIdentity
+├─ 5. sizing_gate() → PassedSizingGate
+├─ 6. candidate_materialization() → MaterializationResult
+├─ 7. phase2_candidate_evaluation() → tuple[CandidateEvaluationRecord, ...]
+├─ 8. phase3_evaluation_input() → Phase3EvaluationInput
+│      (materialization_result is already MaterializationResult)
+├─ 9. phase3_classification() → per-candidate
+├─ 10. deterministic_ranking()
+├─ 11. top_n_projection()
+├─ 12. build_optimization_result() → + authoritative verification + provenance
+├─ 13. build_sizing_run_artifacts()
+├─ 14. build_sizing_run_envelope()
+└─ 15. complete run in repository
 ```
 
 ### 4.2 Rating Orchestration
@@ -307,8 +327,9 @@ RatingApiRequest
 - `POST /v1/double-pipe/rating`: `SUCCEEDED`/`BLOCKED`/`FAILED` → `200`; unexpected → `500`. Idempotency required.
 - `POST /v1/double-pipe/sizing`: `COMPLETE`/`PARTIAL` → `200`; input rejection → `422`. Idempotency required.
 - `GET /v1/runs/{run_id}`: `200` (found); `404` (unknown).
-- `GET /v1/runs/{run_id}/report.html`: `200`; `404`; `500` (unexpected rendering failure).
-- `GET /v1/runs/{run_id}/report.pdf`: `application/pdf` or `501` (no adapter).
+- `GET /v1/runs/{run_id}/report.html` (rating/sizing only): `200`; `404`; `500`.
+- `GET /v1/runs/{validation_run_id}/report.html` → `404` (validation runs have no report).
+- `GET /v1/runs/{run_id}/report.pdf` (rating/sizing only): `application/pdf` or `501` (no adapter).
 
 ---
 
@@ -334,8 +355,10 @@ class ValidationRunEnvelope(StrictBaseModel):
     result_kind: Literal["validation"]
     result: None                                          # MUST be None
     validation_receipt_hash: str
-    report_links: ReportLinks | None = None
+    report_links: None = None                             # validation runs have no report
 ```
+
+Validation runs do NOT support report generation. `GET /v1/runs/{validation_run_id}/report.html` returns `404`.
 
 ### 6.3 `RatingRunEnvelope`
 
@@ -354,6 +377,7 @@ class RatingRunEnvelope(StrictBaseModel):
     failure: RunFailure | None
     provenance: ProvenanceGraph
     provenance_digest: str
+    artifact_bundle: RatingRunArtifacts                   # REQUIRED for self-verification
     artifact_bundle_digest: str
     report_links: ReportLinks
 
@@ -369,6 +393,20 @@ class RatingRunEnvelope(StrictBaseModel):
             raise ValueError("failure projection mismatch")
         if self.provenance != self.result.provenance_graph:
             raise ValueError("provenance != result.provenance_graph")
+
+        # Bundle parity
+        verify_rating_artifact_bundle(self.artifact_bundle)
+        if self.artifact_bundle.result != self.result:
+            raise ValueError("bundle.result != result")
+        if self.artifact_bundle.request_identity != self.result.request_identity:
+            raise ValueError("bundle.request_identity != result.request_identity")
+        if self.artifact_bundle.provider_identity != self.result.provider_identity:
+            raise ValueError("bundle.provider_identity != result.provider_identity")
+        if self.artifact_bundle.provenance_graph != self.result.provenance_graph:
+            raise ValueError("bundle.provenance_graph != result.provenance_graph")
+        if compute_rating_artifact_bundle_digest(self.artifact_bundle) != self.artifact_bundle_digest:
+            raise ValueError("artifact_bundle_digest mismatch")
+
         recomputed = self.provenance.compute_hash()
         if self.provenance_digest != recomputed:
             raise ValueError("provenance_digest mismatch")
@@ -392,7 +430,7 @@ class SizingRunEnvelope(StrictBaseModel):
     failure: RunFailure | None
     provenance: ProvenanceGraph
     provenance_digest: str
-    artifact_bundle: SizingRunArtifacts | None    # None only if stored in repository
+    artifact_bundle: SizingRunArtifacts                    # REQUIRED
     artifact_bundle_digest: str
     report_links: ReportLinks
 
@@ -401,25 +439,19 @@ class SizingRunEnvelope(StrictBaseModel):
         if self.result_hash != self.result.result_hash:
             raise ValueError("result_hash != result.result_hash")
 
-        if self.artifact_bundle is not None:
-            verify_sizing_artifact_bundle(self.artifact_bundle)
-            recomputed_digest = compute_artifact_bundle_digest(self.artifact_bundle)
-            if recomputed_digest != self.artifact_bundle_digest:
-                raise ValueError("artifact_bundle_digest mismatch")
-            if self.result != self.artifact_bundle.optimization_result:
-                raise ValueError("result != artifact_bundle.optimization_result")
+        verify_sizing_artifact_bundle(self.artifact_bundle)
+        recomputed_digest = compute_artifact_bundle_digest(self.artifact_bundle)
+        if recomputed_digest != self.artifact_bundle_digest:
+            raise ValueError("artifact_bundle_digest mismatch")
+        if self.result != self.artifact_bundle.optimization_result:
+            raise ValueError("result != bundle.optimization_result")
 
-            expected_warnings = reconstruct_sizing_warnings(self.artifact_bundle)
-            expected_blockers = reconstruct_sizing_blockers(self.artifact_bundle)
-            expected_failure = reconstruct_sizing_failure(self.artifact_bundle)
-            if self.warnings != expected_warnings:
-                raise ValueError("warning projection mismatch")
-            if self.blockers != expected_blockers:
-                raise ValueError("blocker projection mismatch")
-            if self.failure != expected_failure:
-                raise ValueError("failure projection mismatch")
-        else:
-            raise ValueError("artifact_bundle is required for envelope verification")
+        expected_warnings = reconstruct_sizing_warnings(self.artifact_bundle)
+        expected_blockers = reconstruct_sizing_blockers(self.artifact_bundle)
+        if self.warnings != expected_warnings:
+            raise ValueError("warning projection mismatch")
+        if self.blockers != expected_blockers:
+            raise ValueError("blocker projection mismatch")
 
         recomputed_prov = self.provenance.compute_hash()
         if self.provenance_digest != recomputed_prov:
@@ -429,7 +461,7 @@ class SizingRunEnvelope(StrictBaseModel):
         return self
 ```
 
-**`artifact_bundle` is the authoritative source for all projected messages.** Reconstruction functions:
+**Reconstruction functions:**
 
 ```python
 def reconstruct_sizing_warnings(bundle: SizingRunArtifacts) -> tuple[EngineeringMessage, ...]:
@@ -447,16 +479,9 @@ def reconstruct_sizing_blockers(bundle: SizingRunArtifacts) -> tuple[Engineering
         binding_tuples=artifacts.blocker_binding_tuples,
         descriptor_tuples=artifacts.blocker_descriptor_tuples,
     )
-
-def reconstruct_sizing_failure(bundle: SizingRunArtifacts) -> RunFailure | None:
-    return derive_failure_from_dispositions(bundle.dispositions)
 ```
 
-**Rules:**
-- Digest order is taken directly from `OptimizationResult` — no manual reordering.
-- Descriptor and binding tuples come from the same `Phase3AuthoritativeArtifacts` instance.
-- Unresolved digests, duplicate-conflicting digests, or descriptor/binding inconsistency → fail closed.
-- Never re-derive authority from display text.
+**Rules:** Digest order from `OptimizationResult` — no manual reorder. Descriptor+tuple from same `Phase3AuthoritativeArtifacts`. Unresolved/conflicting → fail closed. Never re-derive authority from display text.
 
 ### 6.5 Cross-Field Invariants
 
@@ -466,8 +491,7 @@ def reconstruct_sizing_failure(bundle: SizingRunArtifacts) -> RunFailure | None:
 | Sizing envelope MUST NOT carry `RatingResult` | Typed `result` field |
 | Validation `result` MUST be `None` | Explicit `None` type |
 | `result_hash` == `result.result_hash` | `@model_validator` |
-| `warnings`/`blockers`/`failure` == authority projection | Bundle-based reconstruction |
-| `provenance` == `result.provenance_graph` (rating) | `@model_validator` |
+| Bundle parity (result, identity, provider, provenance, digest) | `@model_validator` |
 | `provenance_digest` == graph recomputation | `@model_validator` |
 
 ---
@@ -510,7 +534,7 @@ class RunRecord(StrictBaseModel):
     request_digest: str
     operation: str
     state: RunState
-    record_version: int                  # CAS token — incremented on every mutation
+    record_version: int
     owner_token: str
     claimed_at: datetime
     started_at: datetime | None = None
@@ -522,17 +546,7 @@ class RunRecord(StrictBaseModel):
     failure: RunFailure | None = None
 ```
 
-**State transitions:**
-
-| From | To | Condition |
-|---|---|---|
-| (new) | CLAIMED | `claim()` succeeds |
-| CLAIMED | RUNNING | `start()` with matching owner_token + expected_version |
-| RUNNING | COMPLETE | `complete()` with matching owner_token + expected_version |
-| RUNNING | FAILED | `fail()` with matching owner_token + expected_version |
-| CLAIMED | STALE | `lease_expires_at` passed, no heartbeat |
-| RUNNING | STALE | `lease_expires_at` passed, no heartbeat |
-| STALE | CLAIMED | New `claim()` with `takeover=True` |
+**State transitions:** (new) → CLAIMED → RUNNING → COMPLETE/FAILED. STALE on lease expiry. STALE → CLAIMED with takeover.
 
 ### 7.4 Run Repository Protocol
 
@@ -542,83 +556,30 @@ HEARTBEAT_INTERVAL: timedelta = timedelta(seconds=10)
 
 
 class RunRepository(Protocol):
-    def claim(
-        self, *, namespace_digest: str, request_digest: str, operation: str,
-        takeover: bool = False,
-    ) -> tuple[RunRecord, bool]:
-        """Atomically claim a namespace.
-
-        Returns (record, is_new).
-        - New namespace → CLAIMED with owner_token (is_new=True), record_version=1.
-        - Same namespace + same request_digest + COMPLETE → existing (is_new=False).
-        - Same namespace + same request_digest + FAILED → existing (is_new=False).
-        - Same namespace + same request_digest + CLAIMED/RUNNING → existing.
-        - Same namespace + different request_digest → IdempotencyConflict (409).
-        - STALE + takeover=True → CLAIMED with new owner_token.
-        """
-        ...
-
-    def start(
-        self, *, owner_token: str, expected_version: int,
-    ) -> RunRecord:
-        """Transition CLAIMED → RUNNING. Validates owner_token + expected_version.
-        Sets started_at, heartbeat_at, lease_expires_at."""
-        ...
-
-    def heartbeat(
-        self, *, owner_token: str, expected_version: int,
-    ) -> RunRecord:
-        """Refresh heartbeat_at and lease_expires_at. CAS on expected_version."""
-        ...
-
-    def complete(
-        self, *, owner_token: str, expected_version: int,
-        envelope: AnyRunEnvelope,
-        artifact_bundle: RatingRunArtifacts | SizingRunArtifacts,
-    ) -> RunRecord:
-        """Transition RUNNING → COMPLETE. Records envelope + bundle.
-        Validates: record.request_digest == envelope.request_digest,
-        record.operation == envelope.operation,
-        bundle.optimization_result == envelope.result (for sizing),
-        bundle digest == envelope.artifact_bundle_digest.
-        Increments record_version."""
-        ...
-
-    def fail(
-        self, *, owner_token: str, expected_version: int, failure: RunFailure,
-    ) -> RunRecord:
-        """Transition RUNNING → FAILED. Records failure. Increments record_version."""
-        ...
-
+    def claim(self, *, namespace_digest, request_digest, operation, takeover=False) -> tuple[RunRecord, bool]: ...
+    def start(self, *, owner_token, expected_version) -> RunRecord: ...
+    def heartbeat(self, *, owner_token, expected_version) -> RunRecord: ...
+    def complete(self, *, owner_token, expected_version, envelope, artifact_bundle) -> RunRecord: ...
+    def fail(self, *, owner_token, expected_version, failure) -> RunRecord: ...
     def get_by_run_id(self, run_id: UUID) -> RunRecord | None: ...
     def get_by_namespace(self, namespace_digest: str) -> RunRecord | None: ...
 ```
 
-### 7.5 Behavior Matrix
+**`complete()` parity checks:**
+- `record.request_digest == envelope.request_digest`
+- `record.operation == envelope.operation`
+- `artifact_bundle` type matches `envelope.operation`: rating → `RatingRunArtifacts`, sizing → `SizingRunArtifacts`
+- Bundle result matches envelope result
+- Bundle digest == envelope.artifact_bundle_digest
+- Bundle canonical request digest == envelope.request_digest
+- Rating run MUST NOT store sizing bundle; sizing run MUST NOT store rating bundle.
 
-| Condition | Outcome |
-|---|---|
-| Same namespace + same request_digest, COMPLETE | Return stored record; no re-execution |
-| Same namespace + same request_digest, FAILED | Return stored record |
-| Same namespace + same request_digest, CLAIMED/RUNNING | Return stored record; caller polls or waits |
-| Same namespace + different request_digest | 409 IDEMPOTENCY_CONFLICT |
-| STALE record + takeover claim | New CLAIMED with new owner_token; old owner_token invalidated |
-| Old owner completes after takeover | Rejected: owner_token or expected_version mismatch |
-| CAS version mismatch on any mutation | Rejected |
+**Behavior:** Same namespace+same digest+COMPLETE → replay. Same namespace+different digest → 409. CAS via expected_version. Stale takeover handled.
 
-### 7.6 Concurrency Contract
-
-- `claim()` is serialized by `threading.Lock`.
-- Engineering execution (`start()` → `complete()`/`fail()`) occurs OUTSIDE the lock.
-- `heartbeat()` is called periodically by the execution owner.
-- CAS via `expected_version` + `record_version` prevents stale writes.
-- After takeover, old owner_token is invalid; all mutations from old owner fail.
-
-### 7.7 Scope Limitations
+### 7.5 Scope Limitations
 
 - Process-local only; not persistent; lost on restart.
-- Not suitable for multi-process or distributed deployments.
-- Report retrieval reads the stored `artifact_bundle`, not just `artifact_bundle_digest`.
+- Report retrieval reads stored `artifact_bundle`.
 
 ---
 
@@ -628,13 +589,36 @@ class RunRepository(Protocol):
 
 All canonical scalar values are encoded as **JSON strings**, not JSON numbers, to avoid binary float serialization differences.
 
+```python
 def canonical_decimal_string(d: Decimal) -> str:
-    """Normalize Decimal: strip trailing zeros, no scientific unless needed.
+    """Normalize Decimal to canonical string.
 
     Rejects: NaN, Infinity, -Infinity, and signed negative zero
-      (Decimal("-0"), float("-0.0"), any Quantity value that normalizes to -0).
+      (Decimal("-0"), float("-0.0"), any value normalizing to -0).
 
-    1.5000 → "1.5".  0.000001 → "0.000001".
+    Algorithm:
+    1. Input → Decimal. Reject specials and signed negative zero.
+    2. Determine adjusted exponent for the Decimal value.
+    3. Quantizer: quantize to 15 significant digits via ROUND_HALF_EVEN.
+    4. If |adjusted exponent| <= 10: use fixed notation, strip trailing zeros.
+    5. If |adjusted exponent| > 10: use scientific notation.
+       Format as: sign digit "." digits "E" sign exponent.
+       Exponent always signed, two digits minimum (e.g. "E+00", "E-30").
+       No leading zeros in exponent (except zero exponent which is "+00").
+       Uppercase 'E'.
+    6. Never output "-0" — always "0".
+    7. Subnormal/small: convert to scientific with full precision.
+
+    Test vectors:
+      1.234567890123445 → "1.234567890123445"
+      1.234567890123455 → "1.234567890123455"  (ROUND_HALF_EVEN rounds last digit)
+      0.00000000000000123456789012345 → "1.23456789012345E-15"
+      1234567890123450 → "1.23456789012345E+15"
+      999999999999999.5 → "1E+15"  (ROUND_HALF_EVEN)
+      1E-30 → "1E-30"
+      1E+30 → "1E+30"
+      1.5000 → "1.5"
+      1.0 → "1"
     """
     ...
 
@@ -643,25 +627,12 @@ def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
 
     Conversion:
     1. Input Quantity value → Decimal.
-    2. Convert to SI using Decimal conversion factor via si_unit(q.quantity_kind).
-    3. Round with ROUND_HALF_EVEN.
-    4. Quantize to 15 significant digits.
-    5. Strip trailing zeros via normalize().
-    6. Reject NaN, Inf, -Inf, negative zero (Decimal("-0") or any equivalent).
-    7. Output value as normalized Decimal JSON string.
-    8. Output unit as SI symbol string — NOT the original input unit.
+    2. Convert to SI using Decimal factor via si_unit(q.quantity_kind).
+    3. Apply canonical_decimal_string() (round, normalize, reject -0).
+    4. Output value as JSON string.
+    5. Output unit as SI symbol — NOT the original input unit.
     """
     ...
-
-def canonical_api_request_context(request: StrictBaseModel) -> dict[str, object]:
-    """Produce a deterministic canonical payload dict.
-
-    Preconditions:
-    1. Request has passed strict schema validation.
-    2. All Quantity fields resolved to their SI canonical form.
-    3. Provider identity fully resolved.
-    4. Catalog snapshots fully resolved.
-    """
 ```
 
 ### 8.2 Canonicalization Rules
@@ -675,16 +646,14 @@ def canonical_api_request_context(request: StrictBaseModel) -> dict[str, object]
 | `Enum` | `.value` as string |
 | `UUID` | Canonical 36-char string |
 | `tuple` / `list` | JSON array |
-| `Decimal` | `canonical_decimal_string()` → JSON string, e.g. `"1.5"` |
+| `Decimal` | `canonical_decimal_string()` → JSON string |
 | `float` | Convert to `Decimal(repr(f))`, then `canonical_decimal_string()` |
 | `int` | JSON number |
 | `bool` | JSON boolean |
 | `Quantity` subtypes | `{"value": "<Decimal string>", "unit": "<SI symbol>"}` |
-| Unicode | NFC normalized |
-| Catalog identity | Full canonical catalog snapshot payload → content hash |
-| Provider config | `name` + `version` + `git_revision` + `reference_state_policy` + `configuration_fingerprint` + `cache_policy_version` |
-| Negative zero | Forbidden (rejected at validation) |
-| NaN / Inf | Forbidden (rejected at validation) |
+| Unicode | NFC |
+| Negative zero | REJECTED (Decimal("-0"), float("-0.0"), any equivalent) |
+| NaN / Inf | REJECTED |
 
 ### 8.3 Test Vectors
 
@@ -698,11 +667,13 @@ def canonical_api_request_context(request: StrictBaseModel) -> dict[str, object]
 | `float("-0.0")` | REJECTED |
 | `0.000001` (Decimal) | `"0.000001"` |
 | `1000000` (int) | `1000000` |
-| `TemperatureDifference(value=5, unit="delta_degC")` | `{"value": "5", "unit": "K"}` |
-| `Length(value=250, unit="cm")` | `{"value": "2.5", "unit": "m"}` |
-| `AbsolutePressure(value=1, unit="bar")` | `{"value": "100000", "unit": "Pa"}` |
-| `Power(value=2, unit="kW")` | `{"value": "2000", "unit": "W"}` |
-| `AbsolutePressure(value=101325, unit="Pa")` | `{"value": "101325", "unit": "Pa"}` |
+| `TemperatureDifference(5, "delta_degC")` | `{"value": "5", "unit": "K"}` |
+| `TemperatureDifference(5, "K")` | `{"value": "5", "unit": "K"}` |
+| `Length(250, "cm")` | `{"value": "2.5", "unit": "m"}` |
+| `AbsolutePressure(1, "bar")` | `{"value": "100000", "unit": "Pa"}` |
+| `Power(2, "kW")` | `{"value": "2000", "unit": "W"}` |
+
+**Equivalence test:** `TemperatureDifference(5, "K")` and `TemperatureDifference(5, "delta_degC")` produce identical canonical payload and identical `request_digest`.
 
 ### 8.4 Single Authority
 
@@ -716,8 +687,8 @@ All idempotency identity, `request_digest`, and report input snapshot MUST call 
 
 ```python
 class RatingRunArtifacts(StrictBaseModel):
-    canonical_request_snapshot: dict[str, object]          # from canonical_api_request_context
-    request_identity: RatingRequestIdentity                # TASK-008 production type
+    canonical_request_snapshot: dict[str, object]
+    request_identity: RatingRequestIdentity
     geometry_snapshot: DoublePipeGeometry
     solver_settings: SolverParams
     provider_identity: ProviderIdentitySnapshot
@@ -738,12 +709,11 @@ class RatingRunArtifacts(StrictBaseModel):
 ```python
 class SizingRunArtifacts(StrictBaseModel):
     canonical_request_snapshot: dict[str, object]
-    sizing_request: SizingRequest                              # REQUIRED — full production model
-    sizing_request_identity: SizingRequestIdentity
-    passed_gate: PassedSizingGate
-    materialization_result: MaterializedCandidateSet
+    sizing_request: SizingRequest
     evaluation_input: Phase3EvaluationInput
-    phase3_authoritative_artifacts: Phase3AuthoritativeArtifacts  # embedded production type
+    # NOTE: materialization_result, sizing_request_identity, passed_gate,
+    # candidate_set are derived from evaluation_input — not duplicated.
+    phase3_authoritative_artifacts: Phase3AuthoritativeArtifacts
     dispositions: tuple[CandidateDispositionRecord, ...]
     ranked_records: tuple[RankedCandidateRecord, ...]
     top_n_records: tuple[RankedCandidateRecord, ...]
@@ -752,16 +722,34 @@ class SizingRunArtifacts(StrictBaseModel):
     artifact_bundle_digest: str
 ```
 
-**`Phase3AuthoritativeArtifacts` is directly embedded** — no hand-copied field list. It carries all production-required artifacts: evaluation records, identity snapshots, complete snapshots, source record descriptors, source bindings, classification inputs, preparation results, warning/blocker descriptor tuples, warning/blocker binding tuples, evidence/source/phase3 failure bindings, and preparatory auth artifacts.
-
-`SizingRequest` is a REQUIRED field — not only `SizingRequestIdentity`.
+**`Phase3EvaluationInput.materialization_result` is `MaterializationResult`** (production type from `identities.py`). It carries `candidates`, `candidate_set`, `sizing_gate`, `catalog_snapshots`, and length bounds. The bundle does NOT duplicate these as top-level fields — they are accessed via `evaluation_input.materialization_result.*`.
 
 ### 9.3 Verifier Replay
 
 ```python
 def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
-    bundle.result.__pydantic_validate_model__()
-    verify_provenance_or_raise(bundle.provenance_graph, result=bundle.result)
+    # Reconstruct through real Pydantic validation
+    reconstructed = RatingResult.model_validate(bundle.result.model_dump(mode="python"))
+    if reconstructed != bundle.result:
+        raise ValueError("RatingResult reconstruction mismatch")
+    # Verify result hash
+    if not bundle.result.verify_hash():
+        raise ValueError("RatingResult hash verification failed")
+    # Verify provenance
+    if not bundle.result.verify_provenance():
+        raise ValueError("RatingResult provenance verification failed")
+    # Validate integrity
+    valid, issues = bundle.result.validate_integrity()
+    if not valid:
+        raise ValueError("RatingResult integrity verification failed: " + "; ".join(issues))
+    # Cross-check identity references
+    if bundle.result.request_identity != bundle.request_identity:
+        raise ValueError("rating request identity mismatch")
+    if bundle.result.provider_identity != bundle.provider_identity:
+        raise ValueError("rating provider identity mismatch")
+    if bundle.result.provenance_graph != bundle.provenance_graph:
+        raise ValueError("rating provenance graph mismatch")
+    # Digest
     recompute_and_check_bundle_digest(bundle)
 
 
@@ -769,12 +757,10 @@ def verify_sizing_artifact_bundle(bundle: SizingRunArtifacts) -> None:
     artifacts = bundle.phase3_authoritative_artifacts
     ei = bundle.evaluation_input
 
-    # 1) Structural validation of request models
+    # 1) Structural validation
     SizingRequest.model_validate(bundle.sizing_request.model_dump(mode="python"))
-    SizingRequestIdentity.model_validate(
-        bundle.sizing_request_identity.model_dump(mode="python"))
 
-    # 2) MaterializedCandidateSet.verify_or_raise()
+    # 2) MaterializationResult.verify_or_raise()
     ei.materialization_result.verify_or_raise()
 
     # 3) Phase3EvaluationInput.verify_or_raise() with real parameters
@@ -789,7 +775,7 @@ def verify_sizing_artifact_bundle(bundle: SizingRunArtifacts) -> None:
         evidence_failure_bindings=artifacts.evidence_failure_bindings,
     )
 
-    # 4) Semantic acceptance: verify_phase3_result_semantics_or_raise()
+    # 4) Semantic acceptance
     verify_phase3_result_semantics_or_raise(
         result=bundle.optimization_result,
         graph=bundle.provenance_graph,
@@ -803,29 +789,17 @@ def verify_sizing_artifact_bundle(bundle: SizingRunArtifacts) -> None:
     if bundle.top_n_records != bundle.ranked_records[: len(bundle.top_n_records)]:
         raise ValueError("top_n_records are not ranked prefix")
 
-    # 6) Bundle digest recomputation
+    # 6) Bundle digest
     recompute_and_check_bundle_digest(bundle)
 ```
 
-**Authoritative parameter sources are fixed:**
-
-| Parameter | Source |
-|---|---|
-| `candidates` | `evaluation_input.materialization_result.candidates` |
-| `source_records` | `evaluation_input.evaluation_records` |
-| `identity_snapshots` | `evaluation_input.identity_snapshots` |
-| `complete_snapshots` | `evaluation_input.complete_snapshots` |
-| `phase2_source_record_descriptors` | `phase3_authoritative_artifacts.phase2_source_record_descriptors` |
-| `warning_binding_tuples` | `phase3_authoritative_artifacts.warning_binding_tuples` |
-| `blocker_binding_tuples` | `phase3_authoritative_artifacts.blocker_binding_tuples` |
-| `source_failure_bindings` | `phase3_authoritative_artifacts.source_failure_bindings` |
-| `evidence_failure_bindings` | `phase3_authoritative_artifacts.evidence_failure_bindings` |
-| `dispositions` | `bundle.dispositions` |
-| `ranked_records` | `bundle.ranked_records` |
-| `result` | `bundle.optimization_result` |
-| `graph` | `bundle.provenance_graph` |
-
-No parallel methods. No `verify_or_raise()` on `Phase3AuthoritativeArtifacts` (it is a frozen dataclass). No `artifacts` parameter on `Phase3EvaluationInput.verify_or_raise()`.
+**All verifier methods are real production APIs:**
+- `verify_hash()` — exists on `RatingResult`
+- `verify_provenance()` — exists on `RatingResult`
+- `validate_integrity()` — exists on `RatingResult`
+- `verify_or_raise()` — exists on `MaterializationResult` and `Phase3EvaluationInput`
+- `verify_phase3_result_semantics_or_raise()` — exists in `phase3_verifier.py`
+- `Phase3AuthoritativeArtifacts` is a frozen dataclass with NO `verify_or_raise()` method.
 
 ### 9.4 Bundle Digest Self-Hash Exclusion
 
@@ -853,10 +827,10 @@ class ReportArtifactKind(StrEnum):
 
 class PresentReportArtifact(StrictBaseModel):
     kind: Literal[ReportArtifactKind.PRESENT]
-    artifact_id: ReportArtifactId                       # typed enum, not bare str
+    artifact_id: ReportArtifactId
     source_document: ReportSourceDocument
     source_document_digest: str
-    source_json_pointer: str                            # RFC 6901
+    source_json_pointer: str
     authority_digest: str
     canonical_raw_value: str
     source_unit: str | None
@@ -892,8 +866,6 @@ ReportArtifact = Annotated[
     Discriminator("kind"),
 ]
 ```
-
-All artifact union members use `artifact_id: ReportArtifactId` — no bare `str`.
 
 ### 10.2 Report Model and Hashing
 
@@ -937,53 +909,22 @@ class DoublePipeReportModel(StrictBaseModel):
     def _validate_hashes(self) -> typing.Self:
         # Cross-binding
         if self.report_instance_identity.report_content_hash != self.report_content_hash:
-            raise ValueError("report_instance_identity.report_content_hash != report_content_hash")
+            raise ValueError("report_instance_identity.report_content_hash mismatch")
         if self.report_instance_identity.report_schema_version != self.report_schema_version:
             raise ValueError("report_schema_version mismatch in instance identity")
 
         # Content hash
-        expected_content = compute_report_content_hash(self.sections, self.report_schema_version)
-        if self.report_content_hash != expected_content:
+        expected = compute_report_content_hash(self.sections, self.report_schema_version)
+        if self.report_content_hash != expected:
             raise ValueError("report_content_hash mismatch")
 
         # Instance hash
-        expected_instance = sha256_digest(self.report_instance_identity)
-        if self.report_instance_hash != expected_instance:
+        if self.report_instance_hash != sha256_digest(self.report_instance_identity):
             raise ValueError("report_instance_hash mismatch")
 
-        # Section uniqueness
-        seen: set[str] = set()
-        for s in self.sections:
-            if s.section_id in seen:
-                raise ValueError(f"duplicate section_id: {s.section_id}")
-            seen.add(s.section_id)
-
-        # Mandatory sections
-        present = {s.section_id for s in self.sections}
-        missing = set(MANDATORY_SECTIONS) - present
-        if missing:
-            raise ValueError(f"missing mandatory sections: {missing}")
-
-        # Section order
-        ordered = [s.section_id for s in self.sections]
-        expected_order = [sid for sid in SECTION_ORDER if sid in ordered or sid in MANDATORY_SECTIONS]
-        actual_order = [sid for sid in ordered if sid in expected_order]
-        if actual_order != [sid for sid in expected_order if sid in ordered]:
-            raise ValueError("section order violation")
-
-        # Artifact ID uniqueness within section
-        for s in self.sections:
-            aids = [a.artifact_id for a in s.artifacts]
-            if len(aids) != len(set(aids)):
-                raise ValueError(f"duplicate artifact_id in section {s.section_id}")
-
-        # PRESENT artifact source resolution
-        for s in self.sections:
-            for a in s.artifacts:
-                if isinstance(a, PresentReportArtifact):
-                    if not a.source_json_pointer:
-                        raise ValueError(f"PRESENT artifact {a.artifact_id} missing pointer")
-
+        # Section uniqueness + mandatory + order (see §10.3)
+        # Artifact uniqueness + mandatory + owner (see §10.4)
+        # PRESENT artifact pointer validation
         return self
 ```
 
@@ -1005,7 +946,7 @@ class DoublePipeReportModel(StrictBaseModel):
 | `provenance` | COMPLETE | COMPLETE | COMPLETE | COMPLETE | COMPLETE |
 | `integrity` | COMPLETE | COMPLETE | COMPLETE | COMPLETE | COMPLETE |
 
-### 10.4 Report Section Enum and Ordering
+### 10.4 Section Enum, Ordering, and Mandatory Artifacts
 
 ```python
 class ReportSectionId(StrEnum):
@@ -1024,37 +965,9 @@ class ReportSectionId(StrEnum):
     INTEGRITY = "integrity"
 
 
-MANDATORY_SECTIONS: tuple[ReportSectionId, ...] = (
-    ReportSectionId.STATUS_BANNER,
-    ReportSectionId.RUN_IDENTITY,
-    ReportSectionId.BLOCKERS,
-    ReportSectionId.FAILURE_DETAILS,
-    ReportSectionId.INTEGRITY,
-)
+SECTION_ORDER: tuple[ReportSectionId, ...] = (...)
 
 
-SECTION_ORDER: tuple[ReportSectionId, ...] = (
-    ReportSectionId.STATUS_BANNER,
-    ReportSectionId.RUN_IDENTITY,
-    ReportSectionId.INPUT_SUMMARY,
-    ReportSectionId.GEOMETRY,
-    ReportSectionId.HEAT_BALANCE,
-    ReportSectionId.THERMAL_PERFORMANCE,
-    ReportSectionId.SIZING_RANKING,
-    ReportSectionId.TOP_RANKED_CANDIDATES,
-    ReportSectionId.WARNINGS,
-    ReportSectionId.BLOCKERS,
-    ReportSectionId.FAILURE_DETAILS,
-    ReportSectionId.PROVENANCE,
-    ReportSectionId.INTEGRITY,
-)
-```
-
-- Sections present MUST be in exact SECTION_ORDER sequence. No duplicates. Optional sections preserve relative order when present.
-
-#### 10.4.1 Artifact ID Enum
-
-```python
 class ReportArtifactId(StrEnum):
     STATUS = "status"
     TERMINATION_STATUS = "termination_status"
@@ -1101,65 +1014,66 @@ MANDATORY_ARTIFACT_IDS: frozenset[ReportArtifactId] = frozenset({
     ReportArtifactId.RESULT_HASH,
     ReportArtifactId.BUNDLE_HASH,
 })
+
+
+MANDATORY_ARTIFACT_OWNERS: dict[ReportArtifactId, ReportSectionId] = {
+    ReportArtifactId.STATUS: ReportSectionId.STATUS_BANNER,
+    ReportArtifactId.RUN_ID: ReportSectionId.RUN_IDENTITY,
+    ReportArtifactId.REQUEST_DIGEST: ReportSectionId.RUN_IDENTITY,
+    ReportArtifactId.RESULT_HASH: ReportSectionId.INTEGRITY,
+    ReportArtifactId.BUNDLE_HASH: ReportSectionId.INTEGRITY,
+}
 ```
+
+**Mandatory artifact rules:**
+- All `MANDATORY_ARTIFACT_IDS` must be present exactly once.
+- Each must reside in its designated section per `MANDATORY_ARTIFACT_OWNERS`.
+- Same `artifact_id` must NOT appear across multiple sections.
+- Missing mandatory artifact → fail closed.
 
 ### 10.5 Pre-Render Verification Chain
 
 ```python
 def verify_report_section_status_matrix(
-    *,
-    report_model: DoublePipeReportModel,
+    *, report_model: DoublePipeReportModel,
     source_envelope: RatingRunEnvelope | SizingRunEnvelope,
 ) -> None:
-    """Every section's status MUST match the matrix for the source result state.
-
-    Authority comes from the source envelope's result, NOT from the report itself.
-    """
     source_state = derive_source_state(source_envelope)
-    # source_state ∈ {SUCCEEDED, BLOCKED, FAILED} for rating
-    # source_state ∈ {COMPLETE, PARTIAL} for sizing
-
-    present_sections = {s.section_id for s in report_model.sections}
     for sid in ReportSectionId:
         expected = SECTION_STATUS_MATRIX[source_state].get(sid)
-        if expected is None:
-            continue  # section not in matrix — not required for this state
+        if expected is None: continue
         section = _find_section(report_model, sid)
         if section is None:
             if expected != ReportSectionStatus.NOT_APPLICABLE:
-                raise ValueError(f"required section {sid} missing (expected {expected})")
+                raise ValueError(f"required section {sid} missing")
         elif section.status != expected:
-            raise ValueError(
-                f"section {sid} status {section.status} != expected {expected}"
-            )
-
-# Rule: sections required by matrix MUST be present.
-#       NOT_APPLICABLE sections MUST be absent or explicitly NOT_APPLICABLE.
-#       EMPTY must not substitute BLOCKED, PARTIAL, or COMPLETE.
-#       The source envelope result is the sole status authority.
+            raise ValueError(f"section {sid} status {section.status} != {expected}")
 ```
 
-**Pre-render order:**
-
+Pre-render order:
 1. Domain result verification
-2. Provenance verification (independent authority)
+2. Provenance verification
 3. Artifact bundle verification (§9.3)
 4. Envelope projection verification
-5. Report hash/section/artifact verification
-6. `verify_report_section_status_matrix(report_model, source_envelope)` ← new
+5. Report hash/section/artifact verification (mandatory artifact presence + owner)
+6. `verify_report_section_status_matrix(report_model, source_envelope)`
 7. Source pointer resolution and digest parity
 8. Template identity verification
 9. Render (fail closed on any error)
 
 **T30b executable cases:**
-
-| Case | Condition | Expected |
-|---|---|---|
-| Rating SUCCEEDED + geometry BLOCKED | Manipulated section status | REJECT |
-| Rating BLOCKED + blockers EMPTY | blockers section should be COMPLETE | REJECT |
-| Rating FAILED + failure_details NOT_APPLICABLE | failure_details should be COMPLETE | REJECT |
-| Sizing COMPLETE + sizing_ranking NOT_APPLICABLE | should be COMPLETE | REJECT |
-| Sizing PARTIAL + top_ranked_candidates COMPLETE | should be PARTIAL | REJECT |
+- Rating SUCCEEDED + geometry BLOCKED → REJECT
+- Rating BLOCKED + blockers EMPTY → REJECT
+- Rating FAILED + failure_details NOT_APPLICABLE → REJECT
+- Sizing COMPLETE + sizing_ranking NOT_APPLICABLE → REJECT
+- Sizing PARTIAL + top_ranked_candidates COMPLETE → REJECT
+- Missing STATUS artifact → REJECT
+- Missing RUN_ID artifact → REJECT
+- Missing REQUEST_DIGEST artifact → REJECT
+- Missing RESULT_HASH artifact → REJECT
+- Missing BUNDLE_HASH artifact → REJECT
+- Mandatory artifact in wrong section → REJECT
+- Same artifact in two sections → REJECT
 
 ---
 
@@ -1182,30 +1096,30 @@ Section name: `top_ranked_candidates`. TASK-009 authorises deterministic ranking
 
 ## 13. Status and Risk Display
 
-- Every HTML page displays: `PRELIMINARY` / `NOT FOR PROCUREMENT` / `NOT FOR CONSTRUCTION` — in `@media print` header/footer DOM and in normal view.
-- Blockers appear above the status banner.
+- Every HTML page: `PRELIMINARY` / `NOT FOR PROCUREMENT` / `NOT FOR CONSTRUCTION`.
+- Blockers appear above status banner.
 - Not-implemented: `NOT_IMPLEMENTED`. Out-of-scope: `OUT_OF_SCOPE`.
 
 ---
 
 ## 14. HTML Security Contract
 
-- Autoescape enabled. No user-specified template paths. No external CDN/font/tracking resources.
-- User-provided input HTML-escaped. No absolute paths, tracebacks, tokens, environment variables in rendered output.
+- Autoescape enabled. No user-specified template paths. No external CDN/font/tracking.
+- User input HTML-escaped. No absolute paths, tracebacks, tokens, env vars in output.
 
 ---
 
 ## 15. PDF Boundary
 
-No adapter → `HTTP 501` with structured `ApiError`. No empty PDF, no fake link, no degraded fallback. Physical per-page verification deferred until PDF adapter is selected.
+No adapter → `HTTP 501` with structured `ApiError`. Physical per-page verification deferred until PDF adapter selected.
 
 ---
 
 ## 16. Determinism Contract
 
-- **Engineering content:** Same inputs → same `report_content_hash`.
-- **Run instance:** Same `run_id` → identical envelope + report.
-- **HTML byte:** Same canonical request + template + formatter → byte-identical HTML (test compares `bytes`).
+- Engineering content: same inputs → same `report_content_hash`.
+- Run instance: same `run_id` → identical envelope + report.
+- HTML byte: byte-identical HTML (test compares `bytes`).
 - Excluded: timestamp, random run_id, PID, host, trace, temp paths.
 
 ---
@@ -1230,12 +1144,6 @@ class ApiError(StrictBaseModel):
     request_digest: str | None
     details: tuple[ErrorDetail, ...]
     MAX_DISPLAYED_VALUE_LENGTH: ClassVar[int] = 200
-
-
-class ErrorDetail(StrictBaseModel):
-    field: str | None
-    reason: str
-    value: str | None                               # truncated
 ```
 
 - 404 → `RUN_NOT_FOUND`, 409 → `IDEMPOTENCY_CONFLICT`, 422 → `VALIDATION_FAILED`, 500 → `INTERNAL_ERROR`, 501 → `PDF_NOT_AVAILABLE`.
@@ -1246,52 +1154,62 @@ class ErrorDetail(StrictBaseModel):
 
 | # | Test | Outcome |
 |---|---|---|
-| T1 | `operation_id` values unique and stable | 6 unique IDs |
-| T2 | Public request DTO JSON Schema exportable | Valid JSON Schema |
-| T3 | Dimensional bare `float` in public request (e.g. `minimum_terminal_delta_t: 5.0` without unit) → `422` | Quantity validation |
-| T3b | Sizing bare `float` for `required_duty`, `minimum_effective_length` → `422` | Quantity validation |
-| T3c | Geometry DTO with `inner_fouling_resistance` → `422` (field not allowed) | Single-authority enforcement |
-| T4 | Invalid unit string → `422` | Unit enum validation |
+| T1 | `operation_id` unique and stable | 6 unique IDs |
+| T2 | Public request DTO JSON Schema exportable | Valid |
+| T3 | Dimensional bare `float` → `422` | Quantity validation |
+| T3b | Sizing bare `float` for required_duty → `422` | Quantity validation |
+| T3c | Geometry DTO with fouling → `422` | Single-authority |
+| T3d | `Dimensionless(value=0, unit="")` → `422` | Unit non-empty |
+| T3e | `Dimensionless(value=0, unit="dimensionless")` → accepted | Valid unit |
+| T3f | `Dimensionless(value=1, unit="%")` → canonicalized correctly | SI conversion |
+| T3g | `ValidationApiRequest` without `target_duty` → `422` | Required field |
+| T3h | `FluidStreamSpec` with `phase_hint` (not on FluidSpec) → rejected | No duplicate authority |
+| T4 | Invalid unit string → `422` | Unit validation |
 | T5 | Unknown field → `422` | `extra="forbid"` |
-| T6–T7 | Validation receipt hash determinism / discriminability | Hash equality / inequality |
-| T8–T9 | Canonical request key-order independence / value sensitivity | Digest equality / inequality |
-| T9b | Canonical Quantity vectors: `Length(value=2.5, unit="m")` → `{"value":"2.5","unit":"m"}` | Decimal string output |
-| T9c | Canonical `-0` → REJECTED | Negative zero rejected |
-| T9d | Canonical `Decimal("1.5000")` → `"1.5"` | Trailing zero stripped |
-| T9e | Canonical `TemperatureDifference(5, "delta_degC")` → `{"value":"5","unit":"delta_degC"}` | Unit preserved |
-| T10–T12 | Envelope type enforcement (RatingResult only, OptimizationResult only, result=None) | Type / cross-field |
+| T6–T7 | Validation receipt hash determinism / discriminability | Hash checks |
+| T8–T9 | Canonical key-order independence / value sensitivity | Digest checks |
+| T9b | Canonical Quantity: `Length(250, "cm")` → `{"value":"2.5","unit":"m"}` | SI conversion |
+| T9c | Canonical `-0` → REJECTED | Negative zero |
+| T9d | `Decimal("1.5000")` → `"1.5"` | Trailing zero stripped |
+| T9e | `TemperatureDifference(5, "delta_degC")` → `{"value":"5","unit":"K"}` | SI unit |
+| T9f | `TemperatureDifference(5, "K")` and `TemperatureDifference(5, "delta_degC")` → same digest | Unit equivalence |
+| T9g | SolverParams omitted → same defaults as explicit `SolverParamsSpec()` | Default projection |
+| T10–T12 | Envelope type enforcement | Cross-field |
 | T13 | Envelope `result_hash` mismatch → rejected | Cross-field |
-| T14–T14e | Rating envelope warning/blocker/failure/provenance mismatch; sizing warning/blocker reconstruction, failure authority, provenance parity | All cross-field |
-| T14f | Sizing envelope warning mismatch from bundle → rejected | Warning parity |
-| T14g | Sizing envelope blocker mismatch from bundle → rejected | Blocker parity |
-| T14h | Sizing envelope failure mismatch from bundle → rejected | Failure parity |
-| T14i | Sizing envelope bundle digest mismatch → rejected | Digest parity |
-| T15–T18 | Idempotency: same-key replay, collision, cross-operation isolation, concurrent single execution | Various outcomes |
-| T18b | RUNNING same-key caller behavior (existing record returned) | Wait/replay |
-| T18c | Stale claim takeover succeeds | New owner_token |
-| T18d | Old owner completion after takeover → rejected (CAS version mismatch) | CAS enforcement |
-| T18e | CAS version mismatch on `start()` or `complete()` → rejected | CAS enforcement |
-| T19–T22 | BLOCKED→200, 404, 500 structured error, 501 no adapter | Status code contract |
-| T23–T24 | Artifact bundle replay verification + digest cross-check | Verifier replay |
-| T24b | Bundle missing `SizingRequest` → rejected | Required field enforcement |
-| T25 | `PresentReportArtifact` RFC 6901 pointer resolution | Source document + pointer |
-| T26–T27 | PRESENT missing pointer → rejected; NOT_IMPLEMENTED with source → rejected | Invariant |
-| T28–T30 | Duplicate section, missing mandatory section, wrong order → rejected | Section contract |
-| T30b | Invalid section/status combination → rejected | Section/status matrix |
-| T30c | `artifact_id` not in `ReportArtifactId` enum → rejected | Typed enforcement |
-| T31–T34 | Tampered `report_content_hash`, source envelope digest, bundle digest, template hash → rejected | Fail-closed |
-| T34b | `report_instance_identity.report_content_hash != report_content_hash` → rejected | Cross-binding |
-| T35–T37 | Blocker top-banner, print-header DOM, screen-view disclaimer | HTML structure |
-| T38–T39 | HTML escaping, no path/traceback/token leakage | Security |
+| T14 | Rating envelope cross-field mismatch → rejected | Cross-field |
+| T14b–T14e | Sizing warning/blocker/failure/provenance parity | Cross-field |
+| T14f | Sizing envelope warning mismatch → rejected | Warning parity |
+| T14g | Sizing envelope blocker mismatch → rejected | Blocker parity |
+| T14h | Rating bundle digest mismatch → rejected | Bundle parity |
+| T14i | Rating bundle result mismatch → rejected | Bundle parity |
+| T15–T18 | Idempotency: replay, collision, isolation, concurrency | Various |
+| T18b–T18e | RUNNING replay, stale takeover, CAS rejection | CAS |
+| T19–T22 | BLOCKED→200, 404, 500, 501 | Status code |
+| T23–T24 | Artifact bundle replay + digest cross-check | Verifier |
+| T24b | Bundle missing SizingRequest → rejected | Required field |
+| T25 | PresentReportArtifact pointer resolution | RFC 6901 + discriminator |
+| T26–T27 | PRESENT missing pointer → reject; non-PRESENT with source → reject | Invariant |
+| T28–T30 | Section uniqueness, mandatory, order → reject | Section contract |
+| T30b | Section/status matrix violations (see §10.5) | 12 cases |
+| T30c | `artifact_id` not in `ReportArtifactId` → reject | Typed enforcement |
+| T31–T34 | Tampered hashes → reject | Fail-closed |
+| T34b | `report_instance_identity.report_content_hash` cross-binding → reject | Cross-binding |
+| T35–T37 | Blocker top-banner, print DOM, screen disclaimer | HTML structure |
+| T38–T39 | HTML escaping, no path/traceback/token leak | Security |
 | T40–T41 | NOT_IMPLEMENTED / OUT_OF_SCOPE display | String search |
-| T42 | User-facing labels no "selected"/"recommended"; provenance may preserve | Section-specific |
-| T43 | Same canonical request → byte-identical HTML | `bytes` comparison |
-| T44 | Same stored run → identical report | Determinism |
-| T45 | `DoublePipeService.size()` monkeypatched to raise → TASK-010 path succeeds | Trap proof |
+| T42 | User labels: no "selected"/"recommended"; provenance appendix may preserve | Section-specific |
+| T43 | Byte-identical HTML | `bytes` comparison |
+| T44 | Same run → identical report | Determinism |
+| T45 | `DoublePipeService.size()` monkeypatched → TASK-010 path succeeds | Trap proof |
 | T46–T47 | Python 3.11/3.12 full suite | Exit 0 |
-| T48–T52 | DTO → DesignCase / DoublePipeGeometry / SolverParams / SizingRequest / SizingRequestIdentity exact projection | Field parity |
-| T53 | RunRepository: save envelope + artifact bundle → generate report | Full replay |
-| T54 | All upstream hash pins complete and correctly typed (40-hex SHA-1, 64-hex SHA-256) | Static audit |
+| T48–T52 | DTO → domain model exact projection | Field parity |
+| T53 | RunRepository complete → report generation | Full replay |
+| T54 | All upstream hash pins complete and correctly typed | Static audit |
+| T55 | Catalog reference not found → `422` | Resolution failure |
+| T56 | Catalog reference hash mismatch → `422` | Content hash failure |
+| T57 | `SolverParamsSpec()` default values match production `SolverParams` defaults | Default alignment |
+| T58 | `complete()` rejects rating envelope with sizing bundle | Type mismatch |
+| T59 | `complete()` rejects sizing envelope with rating bundle | Type mismatch |
 
 ---
 
