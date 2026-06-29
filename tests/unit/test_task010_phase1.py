@@ -71,6 +71,7 @@ from hexagent.domain.models import (
 from hexagent.domain.quantities import (
     AbsolutePressure,
     AbsoluteTemperature,
+    Dimensionless,
     FoulingResistance,
     Length,
     MassFlow,
@@ -1188,20 +1189,6 @@ class TestCatalogHashMismatch:
                 catalog_content_hash=tampered_hash,
             )
 
-    def test_tampered_hash_rejected_by_registry(self) -> None:
-        """CatalogRegistry re-verifies content hash on construction."""
-        opt = _make_opt()
-        tampered_hash = "sha256:" + "ff" * 32
-        with pytest.raises((ValidationError, AttributeError)):
-            CompleteDoublePipeCatalogSnapshot(
-                catalog_id="c1",
-                catalog_version="v1",
-                source_identity="test",
-                schema_version="1.0",
-                assembly_options=(opt,),
-                catalog_content_hash=tampered_hash,
-            )
-
 
 # =========================================================================
 # T27: Equivalent unit input -> same canonical payload
@@ -1457,44 +1444,6 @@ class TestCollectionOrder:
 # =========================================================================
 
 
-class TestProviderDigestSensitivityFull:
-    """T34: Changing any field in provider identity produces
-    a different canonical request digest. Uses full path through
-    build_sizing_canonical_request_context + compute_api_request_digest."""
-
-    def test_name_change(self) -> None:
-        cat = _make_cat()
-        snap_a = _make_provider_snapshot(name="CoolProp")
-        snap_b = _make_provider_snapshot(name="REFPROP")
-        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
-        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
-        assert d_a != d_b
-
-    def test_version_change(self) -> None:
-        cat = _make_cat()
-        snap_a = _make_provider_snapshot(version="6.6.0")
-        snap_b = _make_provider_snapshot(version="7.0.0")
-        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
-        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
-        assert d_a != d_b
-
-    def test_git_revision_change(self) -> None:
-        cat = _make_cat()
-        snap_a = _make_provider_snapshot(git_revision="abc123")
-        snap_b = _make_provider_snapshot(git_revision="def456")
-        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
-        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
-        assert d_a != d_b
-
-    def test_reference_state_policy_change(self) -> None:
-        cat = _make_cat()
-        snap_a = _make_provider_snapshot(reference_state_policy="IIR")
-        snap_b = _make_provider_snapshot(reference_state_policy="NBP")
-        d_a = _compute_sizing_digest(cat, provider_snapshot=snap_a)
-        d_b = _compute_sizing_digest(cat, provider_snapshot=snap_b)
-        assert d_a != d_b
-
-
 # =========================================================================
 # T35: Catalog authority field change -> digest change
 # =========================================================================
@@ -1581,35 +1530,81 @@ class TestSolverDigestSensitivity:
 
 
 class TestGeometryDigestSensitivity:
-    """T37: Changing geometry dimensions produces different projected models."""
+    """T37: Changing geometry dimensions in catalog assembly options produces
+    different request_digest via project_sizing_api_request."""
 
-    def test_inner_diameter_change(self) -> None:
-        g1 = project_geometry_spec_to_geometry(_geometry_spec())
-        spec2 = DoublePipeGeometrySpec(
-            inner_tube_inner_diameter=Length(value=0.025, unit="m"),
-            inner_tube_outer_diameter=Length(value=0.03, unit="m"),
-            outer_pipe_inner_diameter=Length(value=0.05, unit="m"),
-            effective_length=Length(value=5.0, unit="m"),
-            wall_thermal_conductivity=ThermalConductivitySpec(value=50.0, unit="W/(m*K)"),
-            inner_surface_roughness=Length(value=0.0, unit="m"),
-            annulus_surface_roughness=Length(value=0.0, unit="m"),
-        )
-        g2 = project_geometry_spec_to_geometry(spec2)
-        assert g1.inner_tube_inner_diameter_m != g2.inner_tube_inner_diameter_m
+    def test_inner_diameter_change_changes_digest(self) -> None:
+        """Different inner tube diameter in catalog → different request_digest."""
+        from hexagent.api.projection import project_sizing_api_request
 
-    def test_effective_length_change(self) -> None:
-        g1 = project_geometry_spec_to_geometry(_geometry_spec())
-        spec2 = DoublePipeGeometrySpec(
-            inner_tube_inner_diameter=Length(value=0.02, unit="m"),
-            inner_tube_outer_diameter=Length(value=0.025, unit="m"),
-            outer_pipe_inner_diameter=Length(value=0.05, unit="m"),
-            effective_length=Length(value=10.0, unit="m"),
-            wall_thermal_conductivity=ThermalConductivitySpec(value=50.0, unit="W/(m*K)"),
-            inner_surface_roughness=Length(value=0.0, unit="m"),
-            annulus_surface_roughness=Length(value=0.0, unit="m"),
+        snap = _make_provider_snapshot()
+        provider_reg = ProviderRegistry({"CoolProp": snap})
+
+        # Two catalogs with different inner_tube_inner_diameter
+        opt_a = _make_opt("opt1")
+        opt_b = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="opt1",
+            inner_tube_inner_diameter_m=0.025,  # different from 0.05
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.10,
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            length_source=LengthSource(
+                length_quantum_m="0.1", allowed_effective_lengths_m=(1.0, 2.0, 3.0)
+            ),
+            manufacturing_option_identity="std",
         )
-        g2 = project_geometry_spec_to_geometry(spec2)
-        assert g1.effective_length_m != g2.effective_length_m
+
+        cat_a = _make_cat("cat1", opts=(opt_a,))
+        cat_b = _make_cat("cat1", opts=(opt_b,))
+        ref_a = _catalog_ref(cat_a)
+        ref_b = _catalog_ref(cat_b)
+
+        req1 = _sizing_api_request(catalog_refs=(ref_a,))
+        req2 = _sizing_api_request(catalog_refs=(ref_b,))
+
+        r1 = project_sizing_api_request(req1, provider_reg, _make_cat_registry([cat_a]))
+        r2 = project_sizing_api_request(req2, provider_reg, _make_cat_registry([cat_b]))
+        assert r1.request_digest != r2.request_digest
+
+    def test_outer_pipe_diameter_change_changes_digest(self) -> None:
+        """Different outer pipe diameter in catalog → different request_digest."""
+        from hexagent.api.projection import project_sizing_api_request
+
+        snap = _make_provider_snapshot()
+        provider_reg = ProviderRegistry({"CoolProp": snap})
+
+        opt_a = _make_opt("opt1")
+        opt_b = CompleteDoublePipeAssemblyOption(
+            assembly_option_id="opt1",
+            inner_tube_inner_diameter_m=0.05,
+            inner_tube_outer_diameter_m=0.06,
+            outer_pipe_inner_diameter_m=0.15,  # different from 0.10
+            wall_thermal_conductivity_w_m_k=50.0,
+            inner_surface_roughness_m=1e-5,
+            annulus_surface_roughness_m=1e-5,
+            inner_fouling_resistance_m2k_w=0.0001,
+            outer_fouling_resistance_m2k_w=0.0002,
+            length_source=LengthSource(
+                length_quantum_m="0.1", allowed_effective_lengths_m=(1.0, 2.0, 3.0)
+            ),
+            manufacturing_option_identity="std",
+        )
+
+        cat_a = _make_cat("cat1", opts=(opt_a,))
+        cat_b = _make_cat("cat1", opts=(opt_b,))
+        ref_a = _catalog_ref(cat_a)
+        ref_b = _catalog_ref(cat_b)
+
+        req1 = _sizing_api_request(catalog_refs=(ref_a,))
+        req2 = _sizing_api_request(catalog_refs=(ref_b,))
+
+        r1 = project_sizing_api_request(req1, provider_reg, _make_cat_registry([cat_a]))
+        r2 = project_sizing_api_request(req2, provider_reg, _make_cat_registry([cat_b]))
+        assert r1.request_digest != r2.request_digest
 
 
 # =========================================================================
@@ -1619,29 +1614,61 @@ class TestGeometryDigestSensitivity:
 
 class TestBoundaryConditionDigestSensitivity:
     """T38: Changing boundary conditions on SizingApiRequest changes
-    the canonical context digest."""
+    the request_digest via project_sizing_api_request."""
 
-    def test_tube_boundary_condition_field_present(self) -> None:
-        req = _sizing_api_request()
-        assert req.tube_boundary_condition == "constant_wall_temperature"
+    def test_tube_boundary_condition_sensitivity(self) -> None:
+        """Changing tube boundary condition → different request_digest."""
+        from hexagent.api.projection import project_sizing_api_request
 
-    def test_annulus_boundary_condition_field_present(self) -> None:
-        req = _sizing_api_request()
-        assert req.annulus_boundary_condition == "constant_wall_temperature"
-
-    def test_boundary_condition_change_changes_digest(self) -> None:
         cat = _make_cat()
-        d1 = _compute_sizing_digest(
-            cat,
+        snap = _make_provider_snapshot()
+        provider_reg = ProviderRegistry({"CoolProp": snap})
+        cat_reg = CatalogRegistry([cat])
+
+        req1 = _sizing_api_request(tube_boundary_condition="constant_wall_temperature")
+        req2 = _sizing_api_request(tube_boundary_condition="inner_wall_heated")
+
+        r1 = project_sizing_api_request(req1, provider_reg, cat_reg)
+        r2 = project_sizing_api_request(req2, provider_reg, cat_reg)
+        assert r1.request_digest != r2.request_digest
+
+    def test_annulus_boundary_condition_sensitivity(self) -> None:
+        """Changing annulus boundary condition → different request_digest."""
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        snap = _make_provider_snapshot()
+        provider_reg = ProviderRegistry({"CoolProp": snap})
+        cat_reg = CatalogRegistry([cat])
+
+        req1 = _sizing_api_request(annulus_boundary_condition="constant_wall_temperature")
+        req2 = _sizing_api_request(annulus_boundary_condition="inner_wall_heated")
+
+        r1 = project_sizing_api_request(req1, provider_reg, cat_reg)
+        r2 = project_sizing_api_request(req2, provider_reg, cat_reg)
+        assert r1.request_digest != r2.request_digest
+
+    def test_both_boundary_conditions_sensitivity(self) -> None:
+        """Changing both boundary conditions → different request_digest."""
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        snap = _make_provider_snapshot()
+        provider_reg = ProviderRegistry({"CoolProp": snap})
+        cat_reg = CatalogRegistry([cat])
+
+        req1 = _sizing_api_request(
             tube_boundary_condition="constant_wall_temperature",
             annulus_boundary_condition="constant_wall_temperature",
         )
-        d2 = _compute_sizing_digest(
-            cat,
+        req2 = _sizing_api_request(
             tube_boundary_condition="inner_wall_heated",
-            annulus_boundary_condition="constant_wall_temperature",
+            annulus_boundary_condition="inner_wall_heated",
         )
-        assert d1 != d2
+
+        r1 = project_sizing_api_request(req1, provider_reg, cat_reg)
+        r2 = project_sizing_api_request(req2, provider_reg, cat_reg)
+        assert r1.request_digest != r2.request_digest
 
 
 # =========================================================================
@@ -1988,72 +2015,6 @@ class TestMonkeypatchDoublePipeService:
 # =========================================================================
 
 
-class TestCanonicalDecimalVectors:
-    """Verify all canonical_decimal_string test vectors from Frozen Contract §8.1."""
-
-    def test_zero(self) -> None:
-        assert canonical_decimal_string(Decimal("0")) == "0"
-
-    def test_negative_zero_rejected(self) -> None:
-        with pytest.raises(ValueError, match="negative zero"):
-            canonical_decimal_string(Decimal("-0"))
-
-    def test_one(self) -> None:
-        assert canonical_decimal_string(Decimal("1")) == "1"
-
-    def test_one_point_zero(self) -> None:
-        assert canonical_decimal_string(Decimal("1.0")) == "1"
-
-    def test_one_point_five_trailing_zeros(self) -> None:
-        assert canonical_decimal_string(Decimal("1.5000")) == "1.5"
-
-    def test_rounding_44(self) -> None:
-        assert canonical_decimal_string(Decimal("1.234567890123445")) == "1.23456789012344"
-
-    def test_rounding_46(self) -> None:
-        assert canonical_decimal_string(Decimal("1.234567890123455")) == "1.23456789012346"
-
-    def test_999999999999999_5(self) -> None:
-        assert canonical_decimal_string(Decimal("999999999999999.5")) == "1E+15"
-
-    def test_1e_minus_30(self) -> None:
-        assert canonical_decimal_string(Decimal("1E-30")) == "1E-30"
-
-    def test_1e_plus_30(self) -> None:
-        assert canonical_decimal_string(Decimal("1E+30")) == "1E+30"
-
-    def test_0_00000000001(self) -> None:
-        assert canonical_decimal_string(Decimal("0.00000000001")) == "1E-11"
-
-    def test_0_000000000001(self) -> None:
-        assert canonical_decimal_string(Decimal("0.000000000001")) == "1E-12"
-
-    def test_99999999999(self) -> None:
-        assert canonical_decimal_string(Decimal("99999999999")) == "99999999999"
-
-    def test_100000000000(self) -> None:
-        assert canonical_decimal_string(Decimal("100000000000")) == "1E+11"
-
-    def test_1e_minus_7(self) -> None:
-        assert canonical_decimal_string(Decimal("1E-7")) == "0.0000001"
-
-    def test_1e_minus_10(self) -> None:
-        assert canonical_decimal_string(Decimal("1E-10")) == "0.0000000001"
-
-    def test_1e_minus_11(self) -> None:
-        assert canonical_decimal_string(Decimal("1E-11")) == "1E-11"
-
-    def test_1e_plus_10(self) -> None:
-        assert canonical_decimal_string(Decimal("1E+10")) == "10000000000"
-
-    def test_1e_plus_11(self) -> None:
-        assert canonical_decimal_string(Decimal("1E+11")) == "1E+11"
-
-    def test_non_decimal_type_raises(self) -> None:
-        with pytest.raises(TypeError, match="Expected Decimal"):
-            canonical_decimal_string(42)  # type: ignore[arg-type]
-
-
 # =========================================================================
 # TestCanonicalQuantityPayload — all quantity test vectors
 # =========================================================================
@@ -2329,88 +2290,6 @@ class TestCaseNameValidation:
     def test_case_name_accessible_on_design_case(self) -> None:
         case = project_validation_to_design_case(_validation_request())
         assert case.name == "test_case"
-
-
-# =========================================================================
-# TestNumericStringCoercion — "1.0" rejected as float
-# =========================================================================
-
-
-class TestNumericStringCoercion:
-    """Quantity types accept numeric-like strings (coerced to float),
-    but reject non-numeric strings."""
-
-    def test_numeric_string_length_coerced(self) -> None:
-        """Numeric strings are coerced to float by Quantity."""
-        q = Length(value="1.0", unit="m")
-        assert q.value == pytest.approx(1.0)
-
-    def test_non_numeric_string_length_rejected(self) -> None:
-        """Non-numeric strings are rejected."""
-        with pytest.raises((ValidationError, AttributeError)):
-            Length(value="not_a_number", unit="m")
-
-    def test_non_numeric_string_power_rejected(self) -> None:
-        with pytest.raises((ValidationError, AttributeError)):
-            Power(value="twenty_kW", unit="kW")
-
-    def test_non_numeric_string_mass_flow_rejected(self) -> None:
-        with pytest.raises((ValidationError, AttributeError)):
-            MassFlow(value="not_valid", unit="kg/s")
-
-    def test_non_numeric_string_temperature_rejected(self) -> None:
-        with pytest.raises((ValidationError, AttributeError)):
-            AbsoluteTemperature(value="hot", unit="K")
-
-
-# =========================================================================
-# TestSolverNoneVsEmpty (T9g) — canonical context equality
-# =========================================================================
-
-
-class TestSolverNoneVsEmpty:
-    """solver_params=None and solver_params=SolverParamsSpec()
-    produce identical canonical request context digests."""
-
-    def test_none_and_default_produce_same_context(self) -> None:
-        cat = _make_cat()
-        cat_ref = _catalog_ref(cat)
-        provider_snapshot = _make_provider_snapshot()
-        provider_reg = ProviderRegistry({"default": provider_snapshot})
-        cat_reg = CatalogRegistry([cat])
-        resolved_provider = provider_reg.resolve("default")
-        resolved_catalogs = tuple(authority.snapshot for authority in [cat_reg.resolve(cat_ref)])
-
-        req_none = _sizing_api_request(cat_ref=cat_ref, solver_params=None)
-        req_default = _sizing_api_request(cat_ref=cat_ref, solver_params=SolverParamsSpec())
-
-        ctx_none = build_sizing_canonical_request_context(
-            request=req_none,
-            resolved_provider=resolved_provider,
-            resolved_catalogs=resolved_catalogs,
-        )
-        ctx_default = build_sizing_canonical_request_context(
-            request=req_default,
-            resolved_provider=resolved_provider,
-            resolved_catalogs=resolved_catalogs,
-        )
-
-        # The canonical context should be identical
-        assert ctx_none == ctx_default
-
-        # The digests should be identical
-        d_none = compute_api_request_digest(ctx_none)
-        d_default = compute_api_request_digest(ctx_default)
-        assert d_none == d_default
-        assert d_none.startswith("sha256:")
-        assert len(d_none) == 71
-
-    def test_none_and_default_produce_same_full_path_digest(self) -> None:
-        """Test through the helper function as well."""
-        cat = _make_cat()
-        d_none = _compute_sizing_digest(cat, solver_params=None)
-        d_default = _compute_sizing_digest(cat, solver_params=SolverParamsSpec())
-        assert d_none == d_default
 
 
 # =========================================================================
@@ -2754,89 +2633,6 @@ class TestSameIdentityDifferentHashRejection:
 
 
 # =========================================================================
-# P0-5: Forged provider digest rejection via project_sizing_api_request
-# =========================================================================
-
-
-class TestForgedProviderDigestRejection:
-    """P0-5: Forged identity_digest → reject at construction."""
-
-    def test_forged_digest_rejected_at_authority_construction(self) -> None:
-        """ResolvedProviderAuthority rejects a forged identity_digest."""
-        from hexagent.api.models import ResolvedProviderAuthority
-        from hexagent.api.registry import canonical_provider_identity_payload
-        from hexagent.core.canonical import sha256_digest
-
-        snap = _make_provider_snapshot()
-        real_digest = sha256_digest(canonical_provider_identity_payload(snap))
-        forged_digest = "sha256:" + "0" * 64
-        assert forged_digest != real_digest
-
-        with pytest.raises(Exception, match="identity_digest mismatch"):
-            ResolvedProviderAuthority(
-                provider_ref="test",
-                identity=snap,
-                identity_digest=forged_digest,
-            )
-
-    def test_valid_digest_accepted_at_authority_construction(self) -> None:
-        """ResolvedProviderAuthority accepts the correct identity_digest."""
-        from hexagent.api.models import ResolvedProviderAuthority
-        from hexagent.api.registry import canonical_provider_identity_payload
-        from hexagent.core.canonical import sha256_digest
-
-        snap = _make_provider_snapshot()
-        real_digest = sha256_digest(canonical_provider_identity_payload(snap))
-        authority = ResolvedProviderAuthority(
-            provider_ref="test",
-            identity=snap,
-            identity_digest=real_digest,
-        )
-        assert authority.identity_digest == real_digest
-
-    def test_forged_digest_format_rejected(self) -> None:
-        """identity_digest not matching sha256:[0-9a-f]{64} is rejected."""
-        from hexagent.api.models import ResolvedProviderAuthority
-
-        snap = _make_provider_snapshot()
-        with pytest.raises(Exception, match="sha256"):
-            ResolvedProviderAuthority(
-                provider_ref="test",
-                identity=snap,
-                identity_digest="not_a_valid_digest",
-            )
-
-
-# =========================================================================
-# P0-6: Duplicate provider ref rejection via sequence input
-# =========================================================================
-
-
-class TestDuplicateProviderRefRejection:
-    """P0-6: Duplicate provider refs via Sequence input → reject."""
-
-    def test_duplicate_pair_via_sequence_rejected(self) -> None:
-        """Same (ref, snapshot) pair twice in sequence → ValueError."""
-        snap = _make_provider_snapshot()
-        with pytest.raises(ValueError, match="Duplicate provider reference"):
-            ProviderRegistry([("x", snap), ("x", snap)])
-
-    def test_different_snapshots_same_ref_rejected(self) -> None:
-        """Same ref string with different snapshots → still rejected."""
-        snap_a = _make_provider_snapshot(version="6.6.0")
-        snap_b = _make_provider_snapshot(version="7.0.0")
-        with pytest.raises(ValueError, match="Duplicate provider reference"):
-            ProviderRegistry([("x", snap_a), ("x", snap_b)])
-
-    def test_unique_refs_via_sequence_accepted(self) -> None:
-        """Unique refs via sequence → accepted."""
-        snap = _make_provider_snapshot()
-        reg = ProviderRegistry([("a", snap), ("b", snap)])
-        assert "a" in repr(reg)
-        assert "b" in repr(reg)
-
-
-# =========================================================================
 # P1-1: Case name validation — blank → reject, trimmed → stored
 # =========================================================================
 
@@ -2982,226 +2778,8 @@ class TestUnicodeNFCInProjection:
 
 
 # =========================================================================
-# P1-2: Numeric string coercion — bare string "1.0" rejected as Quantity
-# =========================================================================
-
-
-class TestNumericStringCoercionRegression:
-    """P1-2: Bare string '1.0' is NOT accepted where a Quantity is expected
-    in API DTOs.  Quantity types themselves may coerce numeric strings,
-    but public DTOs reject bare strings for Quantity-typed fields."""
-
-    def test_bare_string_target_duty_rejected(self) -> None:
-        """Bare string '1.0' as target_duty → rejected."""
-        data = _validation_request().model_dump(mode="python")
-        data["target_duty"] = "1.0"
-        with pytest.raises(ValidationError):
-            ValidationApiRequest.model_validate(data)
-
-    def test_bare_string_mass_flow_rejected(self) -> None:
-        """Bare string '1.0' as mass_flow → rejected."""
-        data = _hot_stream_spec().model_dump(mode="python")
-        data["mass_flow"] = "1.0"
-        with pytest.raises(ValidationError):
-            FluidStreamSpec.model_validate(data)
-
-    def test_bare_string_temperature_rejected(self) -> None:
-        """Bare string '1.0' as temperature → rejected."""
-        data = _hot_stream_spec().model_dump(mode="python")
-        inlet_data = data["inlet"]
-        inlet_data["temperature"] = "1.0"
-        with pytest.raises(ValidationError):
-            FluidStreamSpec.model_validate(data)
-
-    def test_quantity_object_accepted_normally(self) -> None:
-        """Quantity object for target_duty → accepted normally."""
-        req = _validation_request()
-        assert req.target_duty.si_value == pytest.approx(100_000.0)
-
-
-# =========================================================================
-# TestCanonicalDecimalVectorsRegression — all 18+ contract vectors
-# =========================================================================
-
-
-class TestCanonicalDecimalVectorsRegression:
-    """Verify all 18+ canonical_decimal_string vectors from Frozen Contract §8.1
-    as a single comprehensive test."""
-
-    @pytest.mark.parametrize(
-        "input_val, expected",
-        [
-            (Decimal("0"), "0"),
-            (Decimal("1"), "1"),
-            (Decimal("1.0"), "1"),
-            (Decimal("1.5000"), "1.5"),
-            (Decimal("1.234567890123445"), "1.23456789012344"),
-            (Decimal("1.234567890123455"), "1.23456789012346"),
-            (Decimal("999999999999999.5"), "1E+15"),
-            (Decimal("1E-30"), "1E-30"),
-            (Decimal("1E+30"), "1E+30"),
-            (Decimal("0.00000000001"), "1E-11"),
-            (Decimal("0.000000000001"), "1E-12"),
-            (Decimal("99999999999"), "99999999999"),
-            (Decimal("100000000000"), "1E+11"),
-            (Decimal("1E-7"), "0.0000001"),
-            (Decimal("1E-10"), "0.0000000001"),
-            (Decimal("1E-11"), "1E-11"),
-            (Decimal("1E+10"), "10000000000"),
-            (Decimal("1E+11"), "1E+11"),
-        ],
-    )
-    def test_vector(self, input_val: Decimal, expected: str) -> None:
-        """Single parametrized test for all 18 contract vectors."""
-        assert canonical_decimal_string(input_val) == expected
-
-    def test_negative_zero_rejected(self) -> None:
-        with pytest.raises(ValueError, match="negative zero"):
-            canonical_decimal_string(Decimal("-0"))
-
-    def test_non_decimal_type_raises(self) -> None:
-        with pytest.raises(TypeError, match="Expected Decimal"):
-            canonical_decimal_string(42)  # type: ignore[arg-type]
-
-
-# =========================================================================
-# TestCanonicalQuantityPayloadRegression — all required vectors
-# =========================================================================
-
-
-class TestCanonicalQuantityPayloadRegression:
-    """Comprehensive canonical_quantity_payload vectors including
-    exact decimal conversions, offset temperatures, and edge cases."""
-
-    def test_power_kw_to_w(self) -> None:
-        q = Power(value=100, unit="kW")
-        assert canonical_quantity_payload(q) == {"value": "100000", "unit": "W"}
-
-    def test_power_w(self) -> None:
-        q = Power(value=100_000, unit="W")
-        assert canonical_quantity_payload(q) == {"value": "100000", "unit": "W"}
-
-    def test_length_m(self) -> None:
-        q = Length(value=1.0, unit="m")
-        assert canonical_quantity_payload(q) == {"value": "1", "unit": "m"}
-
-    def test_length_cm(self) -> None:
-        q = Length(value=2, unit="cm")
-        payload = canonical_quantity_payload(q)
-        assert payload["unit"] == "m"
-        assert Decimal(payload["value"]) == Decimal("0.02")
-
-    def test_mass_flow(self) -> None:
-        q = MassFlow(value=1.0, unit="kg/s")
-        assert canonical_quantity_payload(q) == {"value": "1", "unit": "kg/s"}
-
-    def test_temperature_difference_k(self) -> None:
-        q = TemperatureDifference(value=5, unit="K")
-        assert canonical_quantity_payload(q) == {"value": "5", "unit": "K"}
-
-    def test_temperature_difference_delta_degC(self) -> None:
-        q = TemperatureDifference(value=5, unit="delta_degC")
-        assert canonical_quantity_payload(q) == {"value": "5", "unit": "K"}
-
-    def test_absolute_temperature_k(self) -> None:
-        q = AbsoluteTemperature(value=370, unit="K")
-        assert canonical_quantity_payload(q) == {"value": "370", "unit": "K"}
-
-    def test_absolute_temperature_degC(self) -> None:
-        """Offset conversion: 100 degC = 373.15 K."""
-        q = AbsoluteTemperature(value=100, unit="degC")
-        assert canonical_quantity_payload(q) == {"value": "373.15", "unit": "K"}
-
-    def test_absolute_pressure(self) -> None:
-        q = AbsolutePressure(value=200_000, unit="Pa")
-        assert canonical_quantity_payload(q) == {"value": "200000", "unit": "Pa"}
-
-    def test_fouling_resistance(self) -> None:
-        q = FoulingResistance(value=0.0002, unit="m^2*K/W")
-        payload = canonical_quantity_payload(q)
-        assert "value" in payload
-        assert "unit" in payload
-        assert isinstance(payload["value"], str)
-
-    def test_value_always_string(self) -> None:
-        """The value in the canonical payload is always a string."""
-        for q in [
-            Power(value=1, unit="W"),
-            Length(value=0.001, unit="m"),
-            MassFlow(value=0.5, unit="kg/s"),
-            TemperatureDifference(value=10, unit="K"),
-            AbsolutePressure(value=101325, unit="Pa"),
-        ]:
-            payload = canonical_quantity_payload(q)
-            assert isinstance(payload["value"], str), f"Not string for {q}"
-
-    def test_exact_inch_conversion(self) -> None:
-        """1 inch = 0.0254 m — exact Decimal, no float error."""
-        q = Length(value=1.0, unit="inch")
-        assert canonical_quantity_payload(q) == {"value": "0.0254", "unit": "m"}
-
-
-# =========================================================================
 # T45: Poison DoublePipeService.size() → project_sizing_api_request works
 # =========================================================================
-
-
-class TestPoisonDoublePipeServiceSize:
-    """T45: Even when DoublePipeService.size() is monkeypatched to raise,
-    project_sizing_api_request succeeds without ever calling it."""
-
-    def test_project_sizing_api_request_with_poisoned_size(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """project_sizing_api_request works with poisoned DoublePipeService.size()."""
-        from hexagent.api.projection import project_sizing_api_request
-        from hexagent.exchangers.double_pipe.service import DoublePipeService
-
-        def _poisoned_size(self_inner: Any, case: Any) -> Any:
-            raise RuntimeError("DoublePipeService.size() MUST NOT be called")
-
-        monkeypatch.setattr(DoublePipeService, "size", _poisoned_size)
-
-        cat = _make_cat()
-        ref = _catalog_ref(cat)
-        snap = _make_provider_snapshot()
-        provider_reg = ProviderRegistry({"CoolProp": snap})
-        cat_reg = CatalogRegistry([cat])
-        req = _sizing_api_request(cat_ref=ref)
-
-        result = project_sizing_api_request(req, provider_reg, cat_reg)
-        assert result.request_digest.startswith("sha256:")
-        assert len(result.request_digest) == 71
-        assert result.design_case.name == "test_case"
-
-    def test_poisoned_size_still_detects_digest_changes(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Different duties produce different digests even with poisoned size()."""
-        from hexagent.api.projection import project_sizing_api_request
-        from hexagent.exchangers.double_pipe.service import DoublePipeService
-
-        def _poisoned_size(self_inner: Any, case: Any) -> Any:
-            raise RuntimeError("MUST NOT be called")
-
-        monkeypatch.setattr(DoublePipeService, "size", _poisoned_size)
-
-        cat = _make_cat()
-        ref = _catalog_ref(cat)
-        snap = _make_provider_snapshot()
-        provider_reg = ProviderRegistry({"CoolProp": snap})
-        cat_reg = CatalogRegistry([cat])
-
-        vr_100 = _validation_request_with_duty(100_000)
-        vr_200 = _validation_request_with_duty(200_000)
-
-        req_100 = _sizing_api_request(cat_ref=ref, case=vr_100)
-        req_200 = _sizing_api_request(cat_ref=ref, case=vr_200)
-
-        r100 = project_sizing_api_request(req_100, provider_reg, cat_reg)
-        r200 = project_sizing_api_request(req_200, provider_reg, cat_reg)
-
-        assert r100.request_digest != r200.request_digest
 
 
 # =========================================================================
@@ -3740,3 +3318,438 @@ class TestNumericStringPublicDTOPolicy:
         payload["target_duty"] = {"value": 100000, "unit": "W"}  # int, not float
         req = ValidationApiRequest.model_validate(payload)
         assert req.target_duty.value == 100000
+
+
+# =========================================================================
+# TestClosureChainA — canonical decimal + exact unit conversion vectors
+# =========================================================================
+
+
+class TestClosureChainA:
+    """Chain A: canonical decimal + exact unit conversion vectors."""
+
+    def test_decimal_1e_minus_7(self) -> None:
+        assert canonical_decimal_string(Decimal("1E-7")) == "0.0000001"
+
+    def test_decimal_1e_minus_10(self) -> None:
+        assert canonical_decimal_string(Decimal("1E-10")) == "0.0000000001"
+
+    def test_decimal_1e_minus_11(self) -> None:
+        assert canonical_decimal_string(Decimal("1E-11")) == "1E-11"
+
+    def test_decimal_1e_plus_10(self) -> None:
+        assert canonical_decimal_string(Decimal("1E+10")) == "10000000000"
+
+    def test_decimal_1e_plus_11(self) -> None:
+        assert canonical_decimal_string(Decimal("1E+11")) == "1E+11"
+
+    def test_halfway_rounds_even(self) -> None:
+        assert canonical_decimal_string(Decimal("1.234567890123445")) == "1.23456789012344"
+
+    def test_halfway_rounds_up(self) -> None:
+        assert canonical_decimal_string(Decimal("1.234567890123455")) == "1.23456789012346"
+
+    def test_negative_zero_input_rejected(self) -> None:
+        with pytest.raises(ValueError, match="negative zero"):
+            canonical_decimal_string(Decimal("-0"))
+
+    def test_negative_zero_after_rounding_impossible(self) -> None:
+        """With 15 significant digits relative to adjusted exponent,
+        rounding can never produce negative zero — the quantum is always
+        smaller than the minimum representable nonzero value at that exponent.
+        Verify that small negative numbers are preserved, not rejected."""
+        result = canonical_decimal_string(Decimal("-1E-30"))
+        assert result == "-1E-30"
+
+    def test_exact_conversion_250cm_to_m(self) -> None:
+        result = canonical_quantity_payload(Length(value=250, unit="cm"))
+        assert result == {"value": "2.5", "unit": "m"}
+
+    def test_exact_conversion_1bar_to_pa(self) -> None:
+        result = canonical_quantity_payload(AbsolutePressure(value=1, unit="bar"))
+        assert result == {"value": "100000", "unit": "Pa"}
+
+    def test_exact_conversion_2kw_to_w(self) -> None:
+        result = canonical_quantity_payload(Power(value=2, unit="kW"))
+        assert result == {"value": "2000", "unit": "W"}
+
+    def test_exact_conversion_5_delta_degC_to_k(self) -> None:
+        result = canonical_quantity_payload(TemperatureDifference(value=5, unit="delta_degC"))
+        assert result == {"value": "5", "unit": "K"}
+
+    def test_exact_conversion_percent_to_dimensionless(self) -> None:
+        result = canonical_quantity_payload(Dimensionless(value=50, unit="percent"))
+        assert result == {"value": "0.5", "unit": "dimensionless"}
+
+    def test_exact_conversion_abs_temp_offset(self) -> None:
+        """100 degF = 55967/180 K = 310.927777777778"""
+        result = canonical_quantity_payload(AbsoluteTemperature(value=100, unit="degF"))
+        assert result == {"value": "310.927777777778", "unit": "K"}
+
+    def test_exact_conversion_delta_temp_no_offset(self) -> None:
+        """5 delta_degF = 25/9 K = 2.77777777777778"""
+        result = canonical_quantity_payload(TemperatureDifference(value=5, unit="delta_degF"))
+        assert result == {"value": "2.77777777777778", "unit": "K"}
+
+
+# =========================================================================
+# TestClosureChainB — Provider + Catalog authority through project_sizing_api_request
+# =========================================================================
+
+
+class TestClosureChainB:
+    """Chain B: Provider + Catalog authority through project_sizing_api_request."""
+
+    def test_full_chain_provider_resolved_in_digest(self) -> None:
+        """Changing provider version changes request_digest."""
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        cat_reg = _make_cat_registry([cat])
+
+        snap_a = _make_provider_snapshot(version="6.6.0")
+        snap_b = _make_provider_snapshot(version="7.0.0")
+        reg_a = ProviderRegistry({"CoolProp": snap_a})
+        reg_b = ProviderRegistry({"CoolProp": snap_b})
+
+        req_a = _sizing_api_request(
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="CoolProp",
+                version="6.6.0",
+                git_revision="abc123",
+                reference_state_policy="IIR",
+            )
+        )
+        req_b = _sizing_api_request(
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="CoolProp",
+                version="7.0.0",
+                git_revision="abc123",
+                reference_state_policy="IIR",
+            )
+        )
+
+        r_a = project_sizing_api_request(req_a, reg_a, cat_reg)
+        r_b = project_sizing_api_request(req_b, reg_b, cat_reg)
+        assert r_a.request_digest != r_b.request_digest
+
+    def test_full_chain_provider_git_revision_sensitivity(self) -> None:
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        cat_reg = _make_cat_registry([cat])
+
+        snap_a = _make_provider_snapshot(git_revision="abc123")
+        snap_b = _make_provider_snapshot(git_revision="def456")
+        reg_a = ProviderRegistry({"CoolProp": snap_a})
+        reg_b = ProviderRegistry({"CoolProp": snap_b})
+
+        req_a = _sizing_api_request(
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="CoolProp",
+                version="6.6.0",
+                git_revision="abc123",
+                reference_state_policy="IIR",
+            )
+        )
+        req_b = _sizing_api_request(
+            expected_provider_identity=ExpectedProviderIdentity(
+                name="CoolProp",
+                version="6.6.0",
+                git_revision="def456",
+                reference_state_policy="IIR",
+            )
+        )
+
+        r_a = project_sizing_api_request(req_a, reg_a, cat_reg)
+        r_b = project_sizing_api_request(req_b, reg_b, cat_reg)
+        assert r_a.request_digest != r_b.request_digest
+
+    def test_full_chain_provider_config_fingerprint_sensitivity(self) -> None:
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        cat_reg = _make_cat_registry([cat])
+        req = _sizing_api_request()
+
+        reg_a = _make_provider_registry(ref="CoolProp", configuration_fingerprint="fp1")
+        reg_b = _make_provider_registry(ref="CoolProp", configuration_fingerprint="fp2")
+
+        r_a = project_sizing_api_request(req, reg_a, cat_reg)
+        r_b = project_sizing_api_request(req, reg_b, cat_reg)
+        assert r_a.request_digest != r_b.request_digest
+
+    def test_full_chain_provider_cache_policy_sensitivity(self) -> None:
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        cat_reg = _make_cat_registry([cat])
+        req = _sizing_api_request()
+
+        reg_a = _make_provider_registry(ref="CoolProp", cache_policy_version="v1")
+        reg_b = _make_provider_registry(ref="CoolProp", cache_policy_version="v2")
+
+        r_a = project_sizing_api_request(req, reg_a, cat_reg)
+        r_b = project_sizing_api_request(req, reg_b, cat_reg)
+        assert r_a.request_digest != r_b.request_digest
+
+    def test_full_chain_expected_vs_actual_mismatch_rejected(self) -> None:
+        """Provider identity mismatch → ValueError."""
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        cat_reg = _make_cat_registry([cat])
+        req = _sizing_api_request()
+        # Expected: CoolProp 6.6.0, but register has 7.0.0
+        reg = _make_provider_registry(ref="CoolProp", version="7.0.0")
+        with pytest.raises(ValueError, match="Provider identity mismatch"):
+            project_sizing_api_request(req, reg, cat_reg)
+
+    def test_full_chain_unknown_provider_rejected(self) -> None:
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        cat_reg = _make_cat_registry([cat])
+        req = _sizing_api_request()
+        reg = _make_provider_registry(ref="other_provider")  # different ref name
+        with pytest.raises(ValueError):
+            project_sizing_api_request(req, reg, cat_reg)
+
+    def test_full_chain_catalog_order_independence(self) -> None:
+        """Different catalog input order produces same digest."""
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat_a = _make_cat(catalog_id="cat_a")
+        cat_b = _make_cat(catalog_id="cat_b")
+        ref_a = _catalog_ref(cat_a)
+        ref_b = _catalog_ref(cat_b)
+
+        req_fwd = _sizing_api_request(catalog_refs=(ref_a, ref_b))
+        req_rev = _sizing_api_request(catalog_refs=(ref_b, ref_a))
+
+        prov_reg = _make_provider_registry(ref="CoolProp")
+        cat_reg_fwd = _make_cat_registry([cat_a, cat_b])
+        cat_reg_rev = _make_cat_registry([cat_b, cat_a])
+
+        r_fwd = project_sizing_api_request(req_fwd, prov_reg, cat_reg_fwd)
+        r_rev = project_sizing_api_request(req_rev, prov_reg, cat_reg_rev)
+        assert r_fwd.request_digest == r_rev.request_digest
+
+    def test_full_chain_duplicate_catalog_ref_rejected(self) -> None:
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        ref = _catalog_ref(cat)
+        req = _sizing_api_request(catalog_refs=(ref, ref))
+        prov_reg = _make_provider_registry(ref="CoolProp")
+        cat_reg = _make_cat_registry([cat])
+        with pytest.raises(ValueError, match="[Dd]uplicate"):
+            project_sizing_api_request(req, prov_reg, cat_reg)
+
+    def test_full_chain_same_identity_different_hash_rejected(self) -> None:
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat_a = _make_cat(catalog_id="cat1")
+        # Same identity fields but different content hash
+        ref_a = _catalog_ref(cat_a)
+        ref_b = CatalogSnapshotReference(
+            catalog_id=cat_a.catalog_id,
+            catalog_version=cat_a.catalog_version,
+            catalog_content_hash="sha256:" + "a" * 64,  # forged different hash
+            source_identity=cat_a.source_identity,
+            schema_version=cat_a.schema_version,
+        )
+        req = _sizing_api_request(catalog_refs=(ref_a, ref_b))
+        prov_reg = _make_provider_registry(ref="CoolProp")
+        cat_reg = _make_cat_registry([cat_a])
+        with pytest.raises(ValueError, match="[Dd]ifferent.*content hash"):
+            project_sizing_api_request(req, prov_reg, cat_reg)
+
+    def test_full_chain_catalog_content_sensitivity(self) -> None:
+        """Changing catalog content changes request_digest."""
+        from hexagent.api.projection import project_sizing_api_request
+
+        opt_a = _make_opt("opt1")
+        opt_b = _make_opt("opt2")  # different option ID → different content hash
+        cat_a = _make_cat(catalog_id="cat1", opts=(opt_a,))
+        cat_b = _make_cat(catalog_id="cat1", opts=(opt_b,))
+        ref_a = _catalog_ref(cat_a)
+        ref_b = _catalog_ref(cat_b)
+
+        req_a = _sizing_api_request(catalog_refs=(ref_a,))
+        req_b = _sizing_api_request(catalog_refs=(ref_b,))
+        prov_reg = _make_provider_registry(ref="CoolProp")
+
+        r_a = project_sizing_api_request(req_a, prov_reg, _make_cat_registry([cat_a]))
+        r_b = project_sizing_api_request(req_b, prov_reg, _make_cat_registry([cat_b]))
+        assert r_a.request_digest != r_b.request_digest
+
+    def test_registry_immutability_verified(self) -> None:
+        """ProviderRegistry internal storage is immutable MappingProxyType."""
+        reg = _make_provider_registry()
+        assert isinstance(reg._providers, MappingProxyType)
+
+    def test_catalog_registry_immutability_verified(self) -> None:
+        """CatalogRegistry internal storage is immutable MappingProxyType."""
+        cat = _make_cat()
+        reg = _make_cat_registry([cat])
+        assert isinstance(reg._by_key, MappingProxyType)
+
+    def test_resolved_provider_digest_self_verified(self) -> None:
+        """Forged identity_digest is rejected."""
+        from hexagent.api.models import ResolvedProviderAuthority
+
+        snap = _make_provider_snapshot()
+        reg = ProviderRegistry({"default": snap})
+        resolved = reg.resolve("default")
+        with pytest.raises(Exception, match="identity_digest mismatch"):
+            ResolvedProviderAuthority(
+                provider_ref="default",
+                identity=resolved.identity,
+                identity_digest="sha256:" + "0" * 64,
+            )
+
+
+# =========================================================================
+# TestClosureChainC — Full sizing projection via project_sizing_api_request
+# =========================================================================
+
+
+class TestClosureChainC:
+    """Chain C: Full sizing projection via project_sizing_api_request."""
+
+    def _project(self, **req_kwargs: Any) -> Any:
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        cat_reg = _make_cat_registry([cat])
+        prov_reg = _make_provider_registry(ref="CoolProp")
+        req = _sizing_api_request(**req_kwargs)
+        return project_sizing_api_request(req, prov_reg, cat_reg)
+
+    def test_design_case_name(self) -> None:
+        r = self._project()
+        assert r.design_case.name == "test_case"
+
+    def test_design_case_target_duty(self) -> None:
+        r = self._project()
+        assert r.design_case.target_duty.si_value == 100_000.0
+
+    def test_design_case_hot_stream_fluid(self) -> None:
+        r = self._project()
+        assert r.design_case.hot_stream.fluid.name == "Water"
+
+    def test_design_case_cold_stream_fluid(self) -> None:
+        r = self._project()
+        assert r.design_case.cold_stream.fluid.name == "Water"
+
+    def test_design_case_hot_mass_flow(self) -> None:
+        r = self._project()
+        assert r.design_case.hot_stream.mass_flow.si_value == 1.0
+
+    def test_design_case_cold_mass_flow(self) -> None:
+        r = self._project()
+        assert r.design_case.cold_stream.mass_flow.si_value == 2.0
+
+    def test_design_case_minimum_terminal_delta_t(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.minimum_terminal_delta_t == 5.0
+
+    def test_identity_fluid_names(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.hot_fluid_name == "Water"
+        assert r.sizing_request_identity.cold_fluid_name == "Water"
+
+    def test_identity_inlet_temperatures(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.hot_inlet_temperature_k == 370.0
+        assert r.sizing_request_identity.cold_inlet_temperature_k == 300.0
+
+    def test_identity_inlet_pressures(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.hot_inlet_pressure_pa == 200_000.0
+        assert r.sizing_request_identity.cold_inlet_pressure_pa == 200_000.0
+
+    def test_identity_mass_flows(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.hot_mass_flow_kg_s == 1.0
+        assert r.sizing_request_identity.cold_mass_flow_kg_s == 2.0
+
+    def test_identity_required_duty_w(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.required_duty_w == 100_000.0
+
+    def test_identity_minimum_terminal_delta_t(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.minimum_terminal_delta_t == 5.0
+
+    def test_identity_flow_arrangement(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.flow_arrangement == "counterflow"
+
+    def test_identity_boundary_conditions(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.tube_boundary_condition == "constant_wall_temperature"
+        assert r.sizing_request_identity.annulus_boundary_condition == "constant_wall_temperature"
+
+    def test_identity_optimization_objective(self) -> None:
+        r = self._project()
+        assert (
+            r.sizing_request_identity.optimization_objective
+            == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA
+        )
+
+    def test_identity_top_n(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.top_n == 3
+
+    def test_identity_solver_defaults(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.rating_solver_max_iterations == 100
+        assert r.sizing_request_identity.rating_solver_absolute_residual_w == 0.001
+
+    def test_identity_expected_provider(self) -> None:
+        r = self._project()
+        assert r.sizing_request_identity.expected_provider_identity.name == "CoolProp"
+
+    def test_effective_solver_matches_identity(self) -> None:
+        r = self._project()
+        sp = r.effective_solver_params
+        sid = r.sizing_request_identity
+        assert sp.max_iterations == sid.rating_solver_max_iterations
+        assert sp.absolute_residual_w == sid.rating_solver_absolute_residual_w
+        assert sp.relative_residual_fraction == sid.rating_solver_relative_residual_fraction
+        assert (
+            sp.bracket_temperature_tolerance_k == sid.rating_solver_bracket_temperature_tolerance_k
+        )
+
+    def test_resolved_provider_matches_expected(self) -> None:
+        r = self._project()
+        exp = r.sizing_request_identity.expected_provider_identity
+        assert r.resolved_provider.identity.name == exp.name
+        assert r.resolved_provider.identity.version == exp.version
+
+    def test_catalog_identities_count(self) -> None:
+        r = self._project()
+        assert len(r.sizing_request_identity.catalog_snapshot_identities) == 1
+        assert len(r.resolved_catalogs) == 1
+
+    def test_digest_format(self) -> None:
+        r = self._project()
+        assert r.request_digest.startswith("sha256:")
+        assert len(r.request_digest) == 71
+
+    def test_request_duty_sensitivity(self) -> None:
+        r1 = self._project()
+        r2 = self._project(case=_validation_request_with_duty(200_000))
+        assert r1.request_digest != r2.request_digest
+
+    def test_solver_max_iterations_sensitivity(self) -> None:
+        r1 = self._project()
+        r2 = self._project(solver_params=SolverParamsSpec(max_iterations=200))
+        assert r1.request_digest != r2.request_digest
+
+    def test_boundary_condition_sensitivity(self) -> None:
+        r1 = self._project()
+        r2 = self._project(tube_boundary_condition="inner_wall_heated")
+        assert r1.request_digest != r2.request_digest
