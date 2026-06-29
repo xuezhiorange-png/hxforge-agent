@@ -1022,6 +1022,27 @@ def geometry_identity_payload(geometry: DoublePipeGeometry) -> dict[str, object]
     }
 
 
+def canonical_geometry_identity_payload(
+    geometry: DoublePipeGeometry,
+) -> dict[str, str]:
+    """Canonical form of geometry identity for API snapshot parity.
+
+    Every float value is converted to canonical JSON string via
+    Decimal(repr(float_value)) → canonical_decimal_string() with
+    15 significant digits, ROUND_HALF_EVEN.  Same algorithm as
+    compute_api_request_digest().
+
+    Used by verify_rating_canonical_request_parity() to compare
+    canonical_request_snapshot["geometry"] against authoritative geometry.
+    NOT used for raw production identity parity (use geometry_identity_payload).
+    """
+    raw = geometry_identity_payload(geometry)
+    return {
+        key: canonical_decimal_string(Decimal(repr(typing.cast(float, value))))
+        for key, value in raw.items()
+    }
+
+
 def provider_identity_payload(
     provider: ProviderIdentitySnapshot,
 ) -> dict[str, str]:
@@ -1059,8 +1080,10 @@ def verify_rating_canonical_request_parity(
     # All comparisons use canonical payloads — never raw float vs canonical string.
     # The snapshot stores values in the same canonical form as compute_api_request_digest().
 
-    # Geometry: compare canonical payload dicts
-    expected_geometry = geometry_identity_payload(geometry)
+    # Geometry: compare canonical payload dicts (all values are canonical JSON strings)
+    # geometry_identity_payload() returns raw floats — used for production identity parity.
+    # canonical_geometry_identity_payload() returns canonical strings — used for API snapshot.
+    expected_geometry = canonical_geometry_identity_payload(geometry)
     if snapshot.get("geometry") != expected_geometry:
         raise ValueError("canonical snapshot geometry mismatch")
 
@@ -1765,6 +1788,11 @@ class ErrorDetail(StrictBaseModel):
 || T71e | Snapshot uses raw float where contract requires canonical string → rejected | Type parity |
 || T71f | Provider configuration_fingerprint tampered → rejected | Provider parity |
 || T71g | minimum_terminal_delta_t canonical value tampered → rejected | Terminal delta-T parity |
+|| T71h | Canonical snapshot geometry values are canonical strings ("0.02", "5", "16") matching production raw floats (0.02, 5.0, 16.0) via unified canonicalization → accepted | Canonical geometry parity |
+|| T71i | Canonical snapshot geometry uses raw float where contract requires canonical string → rejected | Geometry type parity |
+|| T71j | Any geometry canonical string tampered (e.g. "0.02" → "0.021") → rejected | Geometry tamper |
+|| T71k | Geometry input SI-equivalent (e.g. Length(2, "cm") vs Length(0.02, "m")) → same canonical payload → same request digest | Geometry SI equivalence |
+|| T71l | Geometry with negative zero / NaN / Inf → rejected before digest/claim | Geometry non-finite rejection |
 || T72 | Envelope `provenance_digest` differs from `result.provenance_digest` → rejected; three-way parity: envelope.provenance_digest == result.provenance_digest == envelope.provenance.compute_hash() | Provenance three-way parity |
 || T73 | Two blockers represented and order stable | Collection identity |
 || T74 | Two warnings represented and order stable | Collection identity |
