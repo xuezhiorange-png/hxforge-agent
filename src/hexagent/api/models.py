@@ -36,6 +36,35 @@ from hexagent.optimization.context import (
 )
 
 # ---------------------------------------------------------------------------
+# Numeric-string Quantity rejection helper
+# ---------------------------------------------------------------------------
+
+
+def _reject_numeric_string_quantity_values(obj: Any) -> None:
+    """Recursively reject Quantity-like payloads where 'value' is a string.
+
+    At the TASK-010 public API boundary, Quantity fields must use numeric
+    types (int/float), not string representations like "1.0" or "100".
+
+    This prevents Pydantic's implicit coercion from silently accepting
+    strings that look like numbers in Quantity value fields.
+    """
+    if isinstance(obj, dict):
+        # Check if this dict looks like a Quantity payload: has "value" and "unit" keys
+        if "value" in obj and "unit" in obj and isinstance(obj.get("value"), str):
+            raise ValueError(
+                f"Quantity value must be numeric (int/float), not string: "
+                f"value={obj['value']!r}, unit={obj.get('unit')!r}"
+            )
+        # Recurse into all dict values
+        for v in obj.values():
+            _reject_numeric_string_quantity_values(v)
+    elif isinstance(obj, (list, tuple)):
+        for item in obj:
+            _reject_numeric_string_quantity_values(item)
+
+
+# ---------------------------------------------------------------------------
 # Thermal conductivity spec (standalone — no QuantityKind for this dimension)
 # ---------------------------------------------------------------------------
 
@@ -86,6 +115,13 @@ class ValidationApiRequest(StrictBaseModel):
     design_temperature_hot: AbsoluteTemperature
     design_temperature_cold: AbsoluteTemperature
     required_area_margin_fraction: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_numeric_strings(cls, data: Any) -> Any:
+        """Reject Quantity fields with string values at the public API boundary."""
+        _reject_numeric_string_quantity_values(data)
+        return data
 
     @field_validator("case_name", mode="after")
     @classmethod
@@ -163,6 +199,13 @@ class RatingApiRequest(StrictBaseModel):
     annulus_boundary_condition: Literal["inner_wall_heated", "constant_wall_temperature"]
     solver_params: SolverParamsSpec | None = None
     provider_ref: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_numeric_strings(cls, data: Any) -> Any:
+        """Reject Quantity fields with string values at the public API boundary."""
+        _reject_numeric_string_quantity_values(data)
+        return data
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +286,13 @@ class SizingApiRequest(StrictBaseModel):
     calculation_run_id: UUID | None = None
     rating_software_version: str = "0.1.0"
     execution_context_policy_version: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_numeric_strings(cls, data: Any) -> Any:
+        """Reject Quantity fields with string values at the public API boundary."""
+        _reject_numeric_string_quantity_values(data)
+        return data
 
 
 # ---------------------------------------------------------------------------

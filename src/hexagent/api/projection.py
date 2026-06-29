@@ -239,6 +239,33 @@ def project_sizing_api_request(
     # Extract snapshots in the canonical sorted order
     resolved_catalogs = tuple(authority.snapshot for authority in resolved_catalog_authorities)
 
+    # Step 4b: Verify request refs match resolved catalogs exactly
+    ref_identities = tuple(
+        (
+            ref.catalog_id,
+            ref.catalog_version,
+            ref.catalog_content_hash,
+            ref.source_identity,
+            ref.schema_version,
+        )
+        for ref in sorted_catalog_refs
+    )
+    resolved_identities = tuple(
+        (
+            cat.catalog_id,
+            cat.catalog_version,
+            cat.catalog_content_hash,
+            cat.source_identity,
+            cat.schema_version,
+        )
+        for cat in resolved_catalogs
+    )
+    if ref_identities != resolved_identities:
+        raise ValueError(
+            f"Request catalog refs do not match resolved catalogs: "
+            f"ref identities {ref_identities} != resolved identities {resolved_identities}"
+        )
+
     # Step 5: Verify catalog content hash matches (done by CatalogRegistry.resolve)
 
     # Step 6: Build effective solver params

@@ -3435,3 +3435,308 @@ class TestCatalogRefSortKeyConsistency:
             cat.source_identity,
             cat.schema_version,
         )
+
+
+# =========================================================================
+# P0-2: Canonical builder adversarial catalog tests
+# =========================================================================
+
+
+class TestCanonicalBuilderCatalogAdversarial:
+    """P0-2: Adversarial tests for build_sizing_canonical_request_context catalog validation."""
+
+    def _make_valid_context_args(self):
+        """Return (request, resolved_provider, resolved_catalogs) for a valid sizing request."""
+        from hexagent.api.models import ResolvedProviderAuthority
+        from hexagent.api.registry import canonical_provider_identity_payload
+        from hexagent.core.canonical import sha256_digest
+
+        cat = _make_cat()
+        ref = _catalog_ref(cat)
+        snap = _make_provider_snapshot()
+
+        digest = sha256_digest(canonical_provider_identity_payload(snap))
+        provider = ResolvedProviderAuthority(
+            provider_ref="CoolProp",
+            identity=snap,
+            identity_digest=digest,
+        )
+
+        request = _sizing_api_request(cat_ref=ref)
+        resolved_catalogs = (cat,)
+        return request, provider, resolved_catalogs
+
+    def test_duplicate_five_field_ref_rejected(self) -> None:
+        """Duplicate five-field ref must be rejected by the builder."""
+        from hexagent.api.canonical_request import canonicalize_catalog_refs
+
+        cat = _make_cat()
+        ref = _catalog_ref(cat)
+        dup_refs = (ref, ref)
+
+        with pytest.raises(ValueError, match="Duplicate catalog ref"):
+            canonicalize_catalog_refs(dup_refs)
+
+    def test_same_identity_different_hash_rejected(self) -> None:
+        """Same four-field identity with different hash must be rejected."""
+        from hexagent.api.canonical_request import canonicalize_catalog_refs
+
+        cat = _make_cat()
+        ref1 = _catalog_ref(cat)
+        # Create a ref with same identity but different content hash
+        ref2 = CatalogSnapshotReference(
+            catalog_id=ref1.catalog_id,
+            catalog_version=ref1.catalog_version,
+            catalog_content_hash="sha256:" + "ff" * 32,
+            source_identity=ref1.source_identity,
+            schema_version=ref1.schema_version,
+        )
+
+        with pytest.raises(ValueError, match="different content hash"):
+            canonicalize_catalog_refs((ref1, ref2))
+
+    def test_request_two_refs_resolved_one_rejected(self) -> None:
+        """Request has 2 refs but resolved only has 1 → reject."""
+        from hexagent.api.models import ResolvedProviderAuthority
+        from hexagent.api.registry import canonical_provider_identity_payload
+        from hexagent.core.canonical import sha256_digest
+
+        cat1 = _make_cat("cat1")
+        cat2 = _make_cat("cat2")
+        ref1 = _catalog_ref(cat1)
+        ref2 = _catalog_ref(cat2)
+
+        snap = _make_provider_snapshot()
+        digest = sha256_digest(canonical_provider_identity_payload(snap))
+        provider = ResolvedProviderAuthority(
+            provider_ref="CoolProp",
+            identity=snap,
+            identity_digest=digest,
+        )
+
+        request = _sizing_api_request(cat_ref=ref1, catalog_refs=(ref1, ref2))
+        # Only resolve one catalog — the second ref won't have a resolved catalog
+        resolved_catalogs = (cat1,)  # Missing cat2
+
+        with pytest.raises(ValueError, match="do not match resolved catalogs"):
+            build_sizing_canonical_request_context(
+                request=request,
+                resolved_provider=provider,
+                resolved_catalogs=resolved_catalogs,
+            )
+
+    def test_ref_snapshot_hash_mismatch_rejected(self) -> None:
+        """Ref and snapshot content hash differ → reject."""
+        from hexagent.api.models import ResolvedProviderAuthority
+        from hexagent.api.registry import canonical_provider_identity_payload
+        from hexagent.core.canonical import sha256_digest
+
+        cat = _make_cat()
+        ref = _catalog_ref(cat)
+
+        snap = _make_provider_snapshot()
+        digest = sha256_digest(canonical_provider_identity_payload(snap))
+        provider = ResolvedProviderAuthority(
+            provider_ref="CoolProp",
+            identity=snap,
+            identity_digest=digest,
+        )
+
+        # Create a catalog with different content hash (use model_construct
+        # to bypass hash validation — this simulates a tampered snapshot)
+        tampered_cat = CompleteDoublePipeCatalogSnapshot.model_construct(
+            catalog_id=cat.catalog_id,
+            catalog_version=cat.catalog_version,
+            catalog_content_hash="sha256:" + "aa" * 32,
+            source_identity=cat.source_identity,
+            schema_version=cat.schema_version,
+            assembly_options=cat.assembly_options,
+        )
+
+        request = _sizing_api_request(cat_ref=ref)
+        resolved_catalogs = (tampered_cat,)
+
+        with pytest.raises(ValueError, match="do not match resolved catalogs"):
+            build_sizing_canonical_request_context(
+                request=request,
+                resolved_provider=provider,
+                resolved_catalogs=resolved_catalogs,
+            )
+
+    def test_input_order_different_same_authority_same_context(self) -> None:
+        """Different input order but same authority set → identical canonical context."""
+        from hexagent.api.models import ResolvedProviderAuthority
+        from hexagent.api.registry import canonical_provider_identity_payload
+        from hexagent.core.canonical import sha256_digest
+
+        cat_a = _make_cat("aaa")
+        cat_z = _make_cat("zzz")
+        ref_a = _catalog_ref(cat_a)
+        ref_z = _catalog_ref(cat_z)
+
+        snap = _make_provider_snapshot()
+        digest = sha256_digest(canonical_provider_identity_payload(snap))
+        provider = ResolvedProviderAuthority(
+            provider_ref="CoolProp",
+            identity=snap,
+            identity_digest=digest,
+        )
+
+        # Order 1: [aaa, zzz]
+        request1 = _sizing_api_request(cat_ref=ref_a, catalog_refs=(ref_a, ref_z))
+        ctx1 = build_sizing_canonical_request_context(
+            request=request1,
+            resolved_provider=provider,
+            resolved_catalogs=(cat_a, cat_z),
+        )
+
+        # Order 2: [zzz, aaa] — different input order
+        request2 = _sizing_api_request(cat_ref=ref_z, catalog_refs=(ref_z, ref_a))
+        ctx2 = build_sizing_canonical_request_context(
+            request=request2,
+            resolved_provider=provider,
+            resolved_catalogs=(cat_z, cat_a),
+        )
+
+        assert ctx1 == ctx2, "Different input order should produce identical canonical context"
+
+    def test_valid_projection_builder_works(self) -> None:
+        """Full valid projection → builder produces context."""
+        from hexagent.api.projection import project_sizing_api_request
+
+        cat = _make_cat()
+        ref = _catalog_ref(cat)
+        snap = _make_provider_snapshot()
+        provider_reg = ProviderRegistry({"CoolProp": snap})
+        cat_reg = CatalogRegistry([cat])
+        request = _sizing_api_request(cat_ref=ref)
+
+        result = project_sizing_api_request(request, provider_reg, cat_reg)
+        assert result.request_digest.startswith("sha256:")
+        assert len(result.request_digest) == 71
+        assert result.canonical_request_snapshot is not None
+
+
+# =========================================================================
+# P1: Numeric-string public DTO policy
+# =========================================================================
+
+
+class TestNumericStringPublicDTOPolicy:
+    """P1: Quantity value fields in public DTOs must reject string values."""
+
+    def _valid_raw_payload(self) -> dict:
+        """Return a minimal valid ValidationApiRequest as raw dict."""
+        return {
+            "api_schema_version": "1",
+            "case_name": "test",
+            "hot_stream": {
+                "fluid": {"backend": "CoolProp", "name": "Water", "phase_hint": "liquid"},
+                "inlet": {
+                    "type": "TP",
+                    "temperature": {"value": 370.0, "unit": "K"},
+                    "pressure": {"value": 200000.0, "unit": "Pa"},
+                },
+                "mass_flow": {"value": 1.0, "unit": "kg/s"},
+                "fouling": {
+                    "value": {"value": 0.0002, "unit": "m^2*K/W"},
+                    "source": {
+                        "source_type": "STANDARD",
+                        "reference_id": "TEMA",
+                        "edition": "10th",
+                        "table_or_clause": "Table RGP-2.4",
+                        "verification_status": "VERIFIED",
+                        "note": "Clean",
+                    },
+                },
+            },
+            "cold_stream": {
+                "fluid": {"backend": "CoolProp", "name": "Water", "phase_hint": "liquid"},
+                "inlet": {
+                    "type": "TP",
+                    "temperature": {"value": 300.0, "unit": "K"},
+                    "pressure": {"value": 200000.0, "unit": "Pa"},
+                },
+                "mass_flow": {"value": 2.0, "unit": "kg/s"},
+                "fouling": {
+                    "value": {"value": 0.0002, "unit": "m^2*K/W"},
+                    "source": {
+                        "source_type": "STANDARD",
+                        "reference_id": "TEMA",
+                        "edition": "10th",
+                        "table_or_clause": "Table RGP-2.4",
+                        "verification_status": "VERIFIED",
+                        "note": "Clean",
+                    },
+                },
+            },
+            "target_duty": {"value": 100000.0, "unit": "W"},
+            "minimum_terminal_delta_t": {"value": 5.0, "unit": "K"},
+            "design_pressure_hot": {"value": 500000.0, "unit": "Pa"},
+            "design_pressure_cold": {"value": 500000.0, "unit": "Pa"},
+            "design_temperature_hot": {"value": 400.0, "unit": "K"},
+            "design_temperature_cold": {"value": 350.0, "unit": "K"},
+            "required_area_margin_fraction": 0.1,
+        }
+
+    def test_valid_numeric_payload_accepted(self) -> None:
+        """Valid payload with numeric values passes."""
+        payload = self._valid_raw_payload()
+        req = ValidationApiRequest.model_validate(payload)
+        assert req.case_name == "test"
+
+    def test_target_duty_string_value_rejected(self) -> None:
+        """target_duty.value as string is rejected."""
+        payload = self._valid_raw_payload()
+        payload["target_duty"] = {"value": "100000", "unit": "W"}
+        with pytest.raises((ValidationError, ValueError)):
+            ValidationApiRequest.model_validate(payload)
+
+    def test_mass_flow_string_value_rejected(self) -> None:
+        """mass_flow.value as string is rejected."""
+        payload = self._valid_raw_payload()
+        payload["hot_stream"]["mass_flow"] = {"value": "1.0", "unit": "kg/s"}
+        with pytest.raises((ValidationError, ValueError)):
+            ValidationApiRequest.model_validate(payload)
+
+    def test_temperature_string_value_rejected(self) -> None:
+        """temperature.value as string is rejected."""
+        payload = self._valid_raw_payload()
+        payload["hot_stream"]["inlet"]["temperature"] = {"value": "370", "unit": "K"}
+        with pytest.raises((ValidationError, ValueError)):
+            ValidationApiRequest.model_validate(payload)
+
+    def test_pressure_string_value_rejected(self) -> None:
+        """pressure.value as string is rejected."""
+        payload = self._valid_raw_payload()
+        payload["hot_stream"]["inlet"]["pressure"] = {"value": "200000", "unit": "Pa"}
+        with pytest.raises((ValidationError, ValueError)):
+            ValidationApiRequest.model_validate(payload)
+
+    def test_delta_t_string_value_rejected(self) -> None:
+        """minimum_terminal_delta_t.value as string is rejected."""
+        payload = self._valid_raw_payload()
+        payload["minimum_terminal_delta_t"] = {"value": "5", "unit": "K"}
+        with pytest.raises((ValidationError, ValueError)):
+            ValidationApiRequest.model_validate(payload)
+
+    def test_fouling_string_value_rejected(self) -> None:
+        """fouling.value.value as string is rejected."""
+        payload = self._valid_raw_payload()
+        payload["hot_stream"]["fouling"]["value"] = {"value": "0.0002", "unit": "m^2*K/W"}
+        with pytest.raises((ValidationError, ValueError)):
+            ValidationApiRequest.model_validate(payload)
+
+    def test_normal_string_field_not_rejected(self) -> None:
+        """Normal string fields like case_name are not rejected."""
+        payload = self._valid_raw_payload()
+        payload["case_name"] = "my case"
+        req = ValidationApiRequest.model_validate(payload)
+        assert req.case_name == "my case"
+
+    def test_int_value_accepted(self) -> None:
+        """Integer value for Quantity is accepted."""
+        payload = self._valid_raw_payload()
+        payload["target_duty"] = {"value": 100000, "unit": "W"}  # int, not float
+        req = ValidationApiRequest.model_validate(payload)
+        assert req.target_duty.value == 100000
