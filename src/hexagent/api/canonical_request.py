@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import math
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import ROUND_HALF_EVEN, Decimal
+from decimal import ROUND_HALF_EVEN, Context, Decimal, localcontext
 from enum import Enum
 from fractions import Fraction
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID
 
@@ -38,6 +40,8 @@ from hexagent.optimization.models import CompleteDoublePipeCatalogSnapshot
 # ---------------------------------------------------------------------------
 # canonical_decimal_string
 # ---------------------------------------------------------------------------
+
+_CANONICAL_DECIMAL_CONTEXT = Context(prec=80, rounding=ROUND_HALF_EVEN)
 
 
 def canonical_decimal_string(value: Decimal) -> str:
@@ -86,28 +90,28 @@ def canonical_decimal_string(value: Decimal) -> str:
     if value.is_zero():
         return "0"
 
-    precision = 15
-    adjusted = value.adjusted()
-    quantum = Decimal(1).scaleb(adjusted - precision + 1)
-    rounded = value.quantize(quantum, rounding=ROUND_HALF_EVEN)
+    with localcontext(_CANONICAL_DECIMAL_CONTEXT):
+        precision = 15
+        adjusted = value.adjusted()
+        quantum = Decimal(1).scaleb(adjusted - precision + 1)
+        rounded = value.quantize(quantum, rounding=ROUND_HALF_EVEN)
 
-    if rounded.is_zero() and rounded.is_signed():
-        raise ValueError("rounding produced negative zero")
+        if rounded.is_zero() and rounded.is_signed():
+            raise ValueError("rounding produced negative zero")
 
-    rounded_adjusted = rounded.adjusted()
-    if -10 <= rounded_adjusted <= 10:
-        result = format(rounded, "f")
-        if "." in result:
-            result = result.rstrip("0").rstrip(".")
-        return result
+        rounded_adjusted = rounded.adjusted()
+        if -10 <= rounded_adjusted <= 10:
+            result = format(rounded, "f")
+            if "." in result:
+                result = result.rstrip("0").rstrip(".")
+            return result
 
-    # Scientific notation: mantissa "E" sign exponent
-    normalized = rounded.normalize()
-    mantissa_str = format(normalized, "E")
-    parts = mantissa_str.split("E")
-    mantissa = parts[0]
-    exp = int(parts[1])
-    return f"{mantissa}E{exp:+d}"
+        normalized = rounded.normalize()
+        mantissa_str = format(normalized, "E")
+        parts = mantissa_str.split("E")
+        mantissa = parts[0]
+        exp = int(parts[1])
+        return f"{mantissa}E{exp:+d}"
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +151,7 @@ _FOULING_IMPERIAL_TO_SI = Fraction(3600) * (_FT_M**2) * Fraction(5, 9) / _BTU_J
 # 1 Btu/lb = Btu_J / lb_kg  J/kg
 _BTU_LB_J_KG = _BTU_J / _LB_KG
 
-_EXACT_UNIT_CONVERSIONS: dict[QuantityKind, dict[str, ExactUnitConversion]] = {
+_RAW_EXACT_UNIT_CONVERSIONS: dict[QuantityKind, dict[str, ExactUnitConversion]] = {
     QuantityKind.MASS_FLOW: {
         "kg/s": ExactUnitConversion("kg/s", Fraction(1)),
         "kg/h": ExactUnitConversion("kg/s", Fraction(1, 3600)),
@@ -238,6 +242,17 @@ _EXACT_UNIT_CONVERSIONS: dict[QuantityKind, dict[str, ExactUnitConversion]] = {
     },
 }
 
+_EXACT_UNIT_CONVERSIONS: Mapping[
+    QuantityKind,
+    Mapping[str, ExactUnitConversion],
+] = MappingProxyType(
+    {
+        kind: MappingProxyType(dict(conversions))
+        for kind, conversions in _RAW_EXACT_UNIT_CONVERSIONS.items()
+    }
+)
+del _RAW_EXACT_UNIT_CONVERSIONS
+
 
 def verify_exact_unit_registry() -> None:
     """Verify that the exact conversion registry covers all UNIT_RULES canonical units.
@@ -295,9 +310,10 @@ def exact_decimal_conversion(
     canonical_unit = normalize_unit(kind, unit)
     spec = _EXACT_UNIT_CONVERSIONS[kind][canonical_unit]
     input_decimal = Decimal(repr(value))
-    factor = Decimal(spec.scale.numerator) / Decimal(spec.scale.denominator)
-    offset = Decimal(spec.offset.numerator) / Decimal(spec.offset.denominator)
-    si_value = input_decimal * factor + offset
+    with localcontext(_CANONICAL_DECIMAL_CONTEXT):
+        factor = Decimal(spec.scale.numerator) / Decimal(spec.scale.denominator)
+        offset = Decimal(spec.offset.numerator) / Decimal(spec.offset.denominator)
+        si_value = input_decimal * factor + offset
     return si_value, spec.si_unit
 
 

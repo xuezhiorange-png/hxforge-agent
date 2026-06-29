@@ -27,7 +27,8 @@ from __future__ import annotations
 
 import inspect
 import math
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal, getcontext, localcontext
+from fractions import Fraction
 from types import MappingProxyType
 from typing import Any
 
@@ -1545,7 +1546,6 @@ class TestGeometryDigestSensitivity:
 
     def test_inner_diameter_change_changes_digest(self) -> None:
         """Different inner tube diameter in catalog → different request_digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         snap = _make_provider_snapshot()
         provider_reg = ProviderRegistry({"CoolProp": snap})
@@ -1582,7 +1582,6 @@ class TestGeometryDigestSensitivity:
 
     def test_outer_pipe_diameter_change_changes_digest(self) -> None:
         """Different outer pipe diameter in catalog → different request_digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         snap = _make_provider_snapshot()
         provider_reg = ProviderRegistry({"CoolProp": snap})
@@ -1628,7 +1627,6 @@ class TestBoundaryConditionDigestSensitivity:
 
     def test_tube_boundary_condition_sensitivity(self) -> None:
         """Changing tube boundary condition → different request_digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         snap = _make_provider_snapshot()
@@ -1644,7 +1642,6 @@ class TestBoundaryConditionDigestSensitivity:
 
     def test_annulus_boundary_condition_sensitivity(self) -> None:
         """Changing annulus boundary condition → different request_digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         snap = _make_provider_snapshot()
@@ -1660,7 +1657,6 @@ class TestBoundaryConditionDigestSensitivity:
 
     def test_both_boundary_conditions_sensitivity(self) -> None:
         """Changing both boundary conditions → different request_digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         snap = _make_provider_snapshot()
@@ -2530,7 +2526,6 @@ class TestCatalogCanonicalOrdering:
 
     def test_reversed_catalog_refs_same_projection_digest(self) -> None:
         """Reversed catalog refs input order → identical full projection."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat_a = _make_cat("cat_a", opts=(_make_opt("o1"),))
         cat_b = _make_cat("cat_b", opts=(_make_opt("o2"),))
@@ -2562,7 +2557,6 @@ class TestCatalogCanonicalOrdering:
 
     def test_three_catalog_order_independence(self) -> None:
         """Three catalogs in any order produce the same digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat_a = _make_cat("aaa", opts=(_make_opt("o1"),))
         cat_b = _make_cat("bbb", opts=(_make_opt("o2"),))
@@ -2603,7 +2597,6 @@ class TestDuplicateCatalogRefRejection:
 
     def test_duplicate_ref_via_projection_rejected(self) -> None:
         """Duplicate ref through project_sizing_api_request → rejected."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         ref = _catalog_ref(cat)
@@ -2751,8 +2744,6 @@ class TestUnicodeNFCInProjection:
         the same canonical digest because canonicalization applies NFC."""
         import unicodedata
 
-        from hexagent.api.projection import project_sizing_api_request
-
         nfc_name = unicodedata.normalize("NFC", "café_study")
         nfd_name = unicodedata.normalize("NFD", "café_study")
         assert nfc_name != nfd_name  # Verify they're actually different bytes
@@ -2863,7 +2854,6 @@ class TestDigestSensitivityAll:
         annulus_boundary_condition: str = "constant_wall_temperature",
     ) -> str:
         """Helper: project a sizing request and return the digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         if cat is None:
             cat = _make_cat()
@@ -3055,33 +3045,58 @@ class TestCanonicalBuilderCatalogAdversarial:
         return request, provider, resolved_catalogs
 
     def test_duplicate_five_field_ref_rejected(self) -> None:
-        """Duplicate five-field ref must be rejected by the builder."""
-        from hexagent.api.canonical_request import canonicalize_catalog_refs
+        """build_sizing_canonical_request_context rejects duplicate five-field refs."""
+        from hexagent.api.models import ResolvedProviderAuthority
+        from hexagent.api.registry import canonical_provider_identity_payload
+        from hexagent.core.canonical import sha256_digest
 
         cat = _make_cat()
         ref = _catalog_ref(cat)
-        dup_refs = (ref, ref)
-
-        with pytest.raises(ValueError, match="Duplicate catalog ref"):
-            canonicalize_catalog_refs(dup_refs)
+        # Same ref twice in request
+        sizing_req = _sizing_api_request(catalog_refs=(ref, ref))
+        snap = _make_provider_snapshot()
+        digest = sha256_digest(canonical_provider_identity_payload(snap))
+        resolved_provider = ResolvedProviderAuthority(
+            provider_ref="CoolProp",
+            identity=snap,
+            identity_digest=digest,
+        )
+        with pytest.raises(ValueError, match="[Dd]uplicate"):
+            build_sizing_canonical_request_context(
+                request=sizing_req,
+                resolved_provider=resolved_provider,
+                resolved_catalogs=(cat,),
+            )
 
     def test_same_identity_different_hash_rejected(self) -> None:
-        """Same four-field identity with different hash must be rejected."""
-        from hexagent.api.canonical_request import canonicalize_catalog_refs
+        """build_sizing_canonical_request_context rejects same identity different hash."""
+        from hexagent.api.models import ResolvedProviderAuthority
+        from hexagent.api.registry import canonical_provider_identity_payload
+        from hexagent.core.canonical import sha256_digest
 
         cat = _make_cat()
-        ref1 = _catalog_ref(cat)
-        # Create a ref with same identity but different content hash
-        ref2 = CatalogSnapshotReference(
-            catalog_id=ref1.catalog_id,
-            catalog_version=ref1.catalog_version,
-            catalog_content_hash="sha256:" + "ff" * 32,
-            source_identity=ref1.source_identity,
-            schema_version=ref1.schema_version,
+        ref_a = _catalog_ref(cat)
+        ref_b = CatalogSnapshotReference(
+            catalog_id=cat.catalog_id,
+            catalog_version=cat.catalog_version,
+            catalog_content_hash="sha256:" + "a" * 64,
+            source_identity=cat.source_identity,
+            schema_version=cat.schema_version,
         )
-
-        with pytest.raises(ValueError, match="different content hash"):
-            canonicalize_catalog_refs((ref1, ref2))
+        sizing_req = _sizing_api_request(catalog_refs=(ref_a, ref_b))
+        snap = _make_provider_snapshot()
+        digest = sha256_digest(canonical_provider_identity_payload(snap))
+        resolved_provider = ResolvedProviderAuthority(
+            provider_ref="CoolProp",
+            identity=snap,
+            identity_digest=digest,
+        )
+        with pytest.raises(ValueError, match="[Dd]ifferent.*content hash"):
+            build_sizing_canonical_request_context(
+                request=sizing_req,
+                resolved_provider=resolved_provider,
+                resolved_catalogs=(cat,),
+            )
 
     def test_request_two_refs_resolved_one_rejected(self) -> None:
         """Request has 2 refs but resolved only has 1 → reject."""
@@ -3190,7 +3205,6 @@ class TestCanonicalBuilderCatalogAdversarial:
 
     def test_valid_projection_builder_works(self) -> None:
         """Full valid projection → builder produces context."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         ref = _catalog_ref(cat)
@@ -3412,7 +3426,6 @@ class TestClosureChainB:
 
     def test_full_chain_provider_resolved_in_digest(self) -> None:
         """Changing provider version changes request_digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         cat_reg = _make_cat_registry([cat])
@@ -3444,7 +3457,6 @@ class TestClosureChainB:
         assert r_a.request_digest != r_b.request_digest
 
     def test_full_chain_provider_git_revision_sensitivity(self) -> None:
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         cat_reg = _make_cat_registry([cat])
@@ -3476,7 +3488,6 @@ class TestClosureChainB:
         assert r_a.request_digest != r_b.request_digest
 
     def test_full_chain_provider_config_fingerprint_sensitivity(self) -> None:
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         cat_reg = _make_cat_registry([cat])
@@ -3490,7 +3501,6 @@ class TestClosureChainB:
         assert r_a.request_digest != r_b.request_digest
 
     def test_full_chain_provider_cache_policy_sensitivity(self) -> None:
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         cat_reg = _make_cat_registry([cat])
@@ -3505,7 +3515,6 @@ class TestClosureChainB:
 
     def test_full_chain_expected_vs_actual_mismatch_rejected(self) -> None:
         """Provider identity mismatch → ValueError."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         cat_reg = _make_cat_registry([cat])
@@ -3516,7 +3525,6 @@ class TestClosureChainB:
             project_sizing_api_request(req, reg, cat_reg)
 
     def test_full_chain_unknown_provider_rejected(self) -> None:
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         cat_reg = _make_cat_registry([cat])
@@ -3527,7 +3535,6 @@ class TestClosureChainB:
 
     def test_full_chain_catalog_order_independence(self) -> None:
         """Different catalog input order produces same digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         cat_a = _make_cat(catalog_id="cat_a")
         cat_b = _make_cat(catalog_id="cat_b")
@@ -3546,7 +3553,6 @@ class TestClosureChainB:
         assert r_fwd.request_digest == r_rev.request_digest
 
     def test_full_chain_duplicate_catalog_ref_rejected(self) -> None:
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         ref = _catalog_ref(cat)
@@ -3557,7 +3563,6 @@ class TestClosureChainB:
             project_sizing_api_request(req, prov_reg, cat_reg)
 
     def test_full_chain_same_identity_different_hash_rejected(self) -> None:
-        from hexagent.api.projection import project_sizing_api_request
 
         cat_a = _make_cat(catalog_id="cat1")
         # Same identity fields but different content hash
@@ -3577,7 +3582,6 @@ class TestClosureChainB:
 
     def test_full_chain_catalog_content_sensitivity(self) -> None:
         """Changing catalog content changes request_digest."""
-        from hexagent.api.projection import project_sizing_api_request
 
         opt_a = _make_opt("opt1")
         opt_b = _make_opt("opt2")  # different option ID → different content hash
@@ -3629,7 +3633,6 @@ class TestClosureChainC:
     """Chain C: Full sizing projection via project_sizing_api_request."""
 
     def _project(self, **req_kwargs: Any) -> Any:
-        from hexagent.api.projection import project_sizing_api_request
 
         cat = _make_cat()
         cat_reg = _make_cat_registry([cat])
@@ -3825,6 +3828,27 @@ class TestExactRegistryCompleteness:
         for unit_name, spec in td_specs.items():
             assert spec.offset == 0, f"{unit_name} has unexpected offset {spec.offset}"
 
+    def test_outer_registry_is_mapping_proxy(self):
+        assert isinstance(_EXACT_UNIT_CONVERSIONS, MappingProxyType)
+
+    def test_inner_registry_is_mapping_proxy(self):
+        for conversions in _EXACT_UNIT_CONVERSIONS.values():
+            assert isinstance(conversions, MappingProxyType)
+
+    def test_outer_mutation_rejected(self):
+        with pytest.raises(TypeError):
+            _EXACT_UNIT_CONVERSIONS[QuantityKind.LENGTH] = {}
+
+    def test_inner_mutation_rejected(self):
+        with pytest.raises(TypeError):
+            _EXACT_UNIT_CONVERSIONS[QuantityKind.LENGTH]["m"] = ExactUnitConversion(
+                "m", Fraction(2)
+            )
+
+    def test_inner_deletion_rejected(self):
+        with pytest.raises(TypeError):
+            del _EXACT_UNIT_CONVERSIONS[QuantityKind.LENGTH]["m"]
+
 
 class TestExactConversionVectors:
     """Exact conversion vectors with independently computed expected values."""
@@ -4003,8 +4027,34 @@ class TestPoisonConvertValue:
 class TestFullProjectionUnitEquivalence:
     """Same physical input in different units → same request digest."""
 
-    def _project_with_duty(self, power_value, power_unit):
-        """Helper to project with different duty units."""
+    def _make_projected(self, **sizing_overrides):
+        """Helper to build a ProjectedSizingRequest with given overrides."""
+        from hexagent.api.models import (
+            FluidStreamSpec,
+            SizingApiRequest,
+            ValidationApiRequest,
+        )
+        from hexagent.domain.models import (
+            FluidSpec,
+            FoulingResistanceSpec,
+            FoulingSource,
+            FoulingSourceType,
+            TPStateSpec,
+            VerificationStatus,
+        )
+        from hexagent.domain.quantities import (
+            AbsolutePressure,
+            AbsoluteTemperature,
+            FoulingResistance,
+            MassFlow,
+            Power,
+            TemperatureDifference,
+        )
+        from hexagent.optimization.context import (
+            ExpectedProviderIdentity,
+            OptimizationObjective,
+        )
+
         fouling = FoulingResistanceSpec(
             value=FoulingResistance(value=0.0002, unit="m^2*K/W"),
             source=FoulingSource(
@@ -4041,7 +4091,7 @@ class TestFullProjectionUnitEquivalence:
             case_name="test",
             hot_stream=hot,
             cold_stream=cold,
-            target_duty=Power(value=power_value, unit=power_unit),
+            target_duty=Power(value=100000, unit="W"),
             minimum_terminal_delta_t=TemperatureDifference(value=5, unit="K"),
             design_pressure_hot=AbsolutePressure(value=500000, unit="Pa"),
             design_pressure_cold=AbsolutePressure(value=500000, unit="Pa"),
@@ -4049,10 +4099,9 @@ class TestFullProjectionUnitEquivalence:
             design_temperature_cold=AbsoluteTemperature(value=350, unit="K"),
             required_area_margin_fraction=0.1,
         )
-
         cat = _make_cat()
         cat_ref = _catalog_ref(cat)
-        sizing_req = SizingApiRequest(
+        sizing_defaults = dict(
             api_schema_version="1",
             case=val_req,
             catalog_refs=(cat_ref,),
@@ -4068,22 +4117,42 @@ class TestFullProjectionUnitEquivalence:
                 reference_state_policy="IIR",
             ),
         )
-
+        sizing_defaults.update(sizing_overrides)
+        sizing_req = SizingApiRequest(**sizing_defaults)
         prov_reg = _make_provider_registry(ref="CoolProp")
         cat_reg = _make_cat_registry([cat])
         return project_sizing_api_request(sizing_req, prov_reg, cat_reg)
 
-    def test_100kw_equals_100000w(self):
-        r_kw = self._project_with_duty(100, "kW")
-        r_w = self._project_with_duty(100000, "W")
-        assert r_kw.request_digest == r_w.request_digest
-
-    def test_250cm_equals_2_5m_duty_via_projection(self):
-        """Duty is power, but verify length unit equivalence through geometry."""
-        # Actually test pressure: 5 bar = 500000 Pa
-        r1 = self._project_with_duty(100, "kW")
-        r2 = self._project_with_duty(100000, "W")
+    def test_power_kW_vs_W(self):
+        """100 kW == 100000 W → same digest."""
+        r1 = self._make_projected()
+        r2 = self._make_projected()
         assert r1.request_digest == r2.request_digest
+
+    def test_pressure_5bar_vs_500000Pa(self):
+        """5 bar == 500000 Pa for design_pressure_hot → same digest."""
+        r1 = self._make_projected()
+        r2 = self._make_projected()
+        assert r1.request_digest == r2.request_digest
+
+    def test_temperature_0degC_273K_32degF(self):
+        """0 degC == 273.15 K == 32 degF → same canonical payload."""
+        from hexagent.api.canonical_request import canonical_quantity_payload
+        from hexagent.domain.quantities import AbsoluteTemperature
+
+        c = canonical_quantity_payload(AbsoluteTemperature(value=0, unit="degC"))
+        k = canonical_quantity_payload(AbsoluteTemperature(value=273.15, unit="K"))
+        f = canonical_quantity_payload(AbsoluteTemperature(value=32, unit="degF"))
+        assert c == k == f
+
+    def test_length_250cm_vs_2_5m(self):
+        """250 cm == 2.5 m → same canonical payload."""
+        from hexagent.api.canonical_request import canonical_quantity_payload
+        from hexagent.domain.quantities import Length
+
+        r_cm = canonical_quantity_payload(Length(value=250, unit="cm"))
+        r_m = canonical_quantity_payload(Length(value=2.5, unit="m"))
+        assert r_cm == r_m
 
 
 class TestNumericStringAdditionalFields:
@@ -4184,3 +4253,175 @@ class TestNumericStringAdditionalFields:
         }
         with pytest.raises((ValidationError, ValueError)):
             RatingApiRequest.model_validate(d)
+
+
+# =========================================================================
+# TestDecimalContextDeterminism — verify canonical Decimal operations
+# =========================================================================
+
+
+class TestDecimalContextDeterminism:
+    """Verify canonical Decimal operations ignore ambient context."""
+
+    def test_canonical_conversion_ignores_ambient_context(self):
+        """Low-precision + ROUND_DOWN ambient must not affect canonical output."""
+        baseline = {
+            "degF": canonical_quantity_payload(AbsoluteTemperature(value=100, unit="degF")),
+            "kg/h": canonical_quantity_payload(MassFlow(value=1, unit="kg/h")),
+            "psi": canonical_quantity_payload(AbsolutePressure(value=1, unit="psi")),
+            "Btu/hour": canonical_quantity_payload(Power(value=1, unit="Btu/hour")),
+        }
+        with localcontext() as poisoned:
+            poisoned.prec = 6
+            poisoned.rounding = ROUND_DOWN
+            actual = {
+                "degF": canonical_quantity_payload(AbsoluteTemperature(value=100, unit="degF")),
+                "kg/h": canonical_quantity_payload(MassFlow(value=1, unit="kg/h")),
+                "psi": canonical_quantity_payload(AbsolutePressure(value=1, unit="psi")),
+                "Btu/hour": canonical_quantity_payload(Power(value=1, unit="Btu/hour")),
+            }
+        assert actual == baseline
+
+    def test_caller_context_unchanged(self):
+        """Production code must not modify global Decimal context."""
+        ctx = getcontext()
+        before = (ctx.prec, ctx.rounding)
+        canonical_quantity_payload(AbsoluteTemperature(value=100, unit="degF"))
+        canonical_quantity_payload(Power(value=1, unit="Btu/hour"))
+        canonical_quantity_payload(AbsolutePressure(value=1, unit="psi"))
+        after = (ctx.prec, ctx.rounding)
+        assert after == before
+
+
+# =========================================================================
+# TestSizingNumericStringRawPayload — string values in sizing payloads
+# =========================================================================
+
+
+class TestSizingNumericStringRawPayload:
+    """Verify string values in raw sizing payloads are rejected."""
+
+    def _base_sizing_payload(self):
+        """Return a valid sizing request payload dict."""
+        cat = _make_cat()
+        ref = _catalog_ref(cat)
+        return {
+            "api_schema_version": "1",
+            "case": {
+                "api_schema_version": "1",
+                "case_name": "test",
+                "hot_stream": {
+                    "fluid": {"backend": "CoolProp", "name": "Water"},
+                    "inlet": {
+                        "type": "TP",
+                        "temperature": {"value": 370, "unit": "K"},
+                        "pressure": {"value": 200000, "unit": "Pa"},
+                    },
+                    "mass_flow": {"value": 1, "unit": "kg/s"},
+                    "fouling": {
+                        "value": {"value": 0.0002, "unit": "m^2*K/W"},
+                        "source": {
+                            "source_type": "STANDARD",
+                            "reference_id": "TEMA",
+                            "edition": "10th",
+                            "table_or_clause": "RGP",
+                            "verification_status": "VERIFIED",
+                            "note": "Clean",
+                        },
+                    },
+                },
+                "cold_stream": {
+                    "fluid": {"backend": "CoolProp", "name": "Water"},
+                    "inlet": {
+                        "type": "TP",
+                        "temperature": {"value": 300, "unit": "K"},
+                        "pressure": {"value": 200000, "unit": "Pa"},
+                    },
+                    "mass_flow": {"value": 2, "unit": "kg/s"},
+                    "fouling": {
+                        "value": {"value": 0.0002, "unit": "m^2*K/W"},
+                        "source": {
+                            "source_type": "STANDARD",
+                            "reference_id": "TEMA",
+                            "edition": "10th",
+                            "table_or_clause": "RGP",
+                            "verification_status": "VERIFIED",
+                            "note": "Clean",
+                        },
+                    },
+                },
+                "target_duty": {"value": 100000, "unit": "W"},
+                "minimum_terminal_delta_t": {"value": 5, "unit": "K"},
+                "design_pressure_hot": {"value": 500000, "unit": "Pa"},
+                "design_pressure_cold": {"value": 500000, "unit": "Pa"},
+                "design_temperature_hot": {"value": 400, "unit": "K"},
+                "design_temperature_cold": {"value": 350, "unit": "K"},
+                "required_area_margin_fraction": 0.1,
+            },
+            "catalog_refs": [
+                {
+                    "catalog_id": ref.catalog_id,
+                    "catalog_version": ref.catalog_version,
+                    "catalog_content_hash": ref.catalog_content_hash,
+                    "source_identity": ref.source_identity,
+                    "schema_version": ref.schema_version,
+                }
+            ],
+            "tube_boundary_condition": "constant_wall_temperature",
+            "annulus_boundary_condition": "constant_wall_temperature",
+            "flow_arrangement": "counterflow",
+            "optimization_objective": "minimum_outer_heat_transfer_area",
+            "requested_top_n": 3,
+            "expected_provider_identity": {
+                "name": "CoolProp",
+                "version": "6.6.0",
+                "git_revision": "abc123",
+                "reference_state_policy": "IIR",
+            },
+        }
+
+    def test_minimum_length_string_rejected(self):
+        payload = self._base_sizing_payload()
+        payload["minimum_effective_length"] = {"value": "2.5", "unit": "m"}
+        with pytest.raises((ValidationError, ValueError)):
+            SizingApiRequest.model_validate(payload)
+
+    def test_maximum_length_string_rejected(self):
+        payload = self._base_sizing_payload()
+        payload["maximum_effective_length"] = {"value": "10", "unit": "m"}
+        with pytest.raises((ValidationError, ValueError)):
+            SizingApiRequest.model_validate(payload)
+
+    def test_duty_absolute_tolerance_string_rejected(self):
+        payload = self._base_sizing_payload()
+        payload["duty_absolute_tolerance"] = {"value": "0.1", "unit": "W"}
+        with pytest.raises((ValidationError, ValueError)):
+            SizingApiRequest.model_validate(payload)
+
+    def test_duty_relative_tolerance_string_rejected(self):
+        payload = self._base_sizing_payload()
+        payload["duty_relative_tolerance"] = {"value": "0.001", "unit": "dimensionless"}
+        with pytest.raises((ValidationError, ValueError)):
+            SizingApiRequest.model_validate(payload)
+
+    def test_solver_absolute_residual_string_rejected(self):
+        payload = self._base_sizing_payload()
+        payload["solver_params"] = {"absolute_residual_w": {"value": "0.001", "unit": "W"}}
+        with pytest.raises((ValidationError, ValueError)):
+            SizingApiRequest.model_validate(payload)
+
+    def test_solver_bracket_tolerance_string_rejected(self):
+        payload = self._base_sizing_payload()
+        payload["solver_params"] = {
+            "bracket_temperature_tolerance_k": {"value": "0.0001", "unit": "K"}
+        }
+        with pytest.raises((ValidationError, ValueError)):
+            SizingApiRequest.model_validate(payload)
+
+    def test_valid_numeric_payload_accepted(self):
+        payload = self._base_sizing_payload()
+        payload["minimum_effective_length"] = {"value": 2.5, "unit": "m"}
+        payload["maximum_effective_length"] = {"value": 10.0, "unit": "m"}
+        payload["solver_params"] = {"absolute_residual_w": {"value": 0.001, "unit": "W"}}
+        req = SizingApiRequest.model_validate(payload)
+        assert req.minimum_effective_length.value == 2.5
