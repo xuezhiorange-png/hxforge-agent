@@ -1,4 +1,4 @@
-"""TASK-010 frozen run envelopes and artifact bundles.
+"""TASK-010 frozen run envelopes with typed artifact bundles.
 
 Implements contract §6 (envelopes) and §9 (artifact bundles).
 
@@ -8,18 +8,25 @@ Envelopes:
   - SizingRunEnvelope      (operation = "sizeDoublePipe")
   - AnyRunEnvelope         (discriminated union by result_kind)
 
-Artifact bundles are opaque Any-typed at this layer; the contract
-requires cross-field verification in envelope model_validators.
+All envelope fields are typed — no Any for result, warnings, blockers,
+failure, provenance, or artifact_bundle.
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
+from hexagent.api.artifacts import (
+    RatingRunArtifacts,
+    SizingRunArtifacts,
+)
+from hexagent.domain.messages import EngineeringMessage, RunFailure
 from hexagent.domain.models import StrictBaseModel
+from hexagent.domain.provenance import ProvenanceGraph
+from hexagent.exchangers.double_pipe.result import RatingResult
 
 # ---------------------------------------------------------------------------
 # Report links
@@ -59,8 +66,8 @@ class ValidationRunEnvelope(StrictBaseModel):
 class RatingRunEnvelope(StrictBaseModel):
     """Rating run response per contract §6.2.
 
-    artifact_bundle is opaque at the API layer; cross-field
-    verification is performed in the model_validator.
+    All fields are typed — no Any. Cross-field hash parity verified
+    on construction.
     """
 
     api_schema_version: Literal["1"]
@@ -69,28 +76,43 @@ class RatingRunEnvelope(StrictBaseModel):
     idempotency_key_digest: str
     request_digest: str
     result_kind: Literal["rating"]
-    result: Any  # RatingResult
+    result: RatingResult
     result_hash: str
-    warnings: tuple[Any, ...]
-    blockers: tuple[Any, ...]
-    failure: Any | None
-    provenance: Any  # ProvenanceGraph
+    warnings: tuple[EngineeringMessage, ...]
+    blockers: tuple[EngineeringMessage, ...]
+    failure: RunFailure | None
+    provenance: ProvenanceGraph
     provenance_digest: str
-    artifact_bundle: Any  # RatingRunArtifacts
+    artifact_bundle: RatingRunArtifacts
     artifact_bundle_digest: str
     report_links: ReportLinks | None
 
     @model_validator(mode="after")
     def _verify_hashes(self) -> RatingRunEnvelope:
         """Cross-field hash parity per contract §6.2."""
-        result = self.result
-        if hasattr(result, "result_hash") and self.result_hash != result.result_hash:
-            raise ValueError("result_hash mismatch: envelope != result.result_hash")
-        if (
-            hasattr(result, "provenance_digest")
-            and self.provenance_digest != result.provenance_digest
-        ):  # noqa: E501  # noqa: E501
-            raise ValueError("provenance_digest != result.provenance_digest")
+        # result_hash must match result's own hash
+        if self.result_hash != self.result.result_hash:
+            raise ValueError(
+                f"result_hash mismatch: envelope has {self.result_hash!r}, "
+                f"result has {self.result.result_hash!r}"
+            )
+        # provenance_digest must match provenance graph hash
+        computed_prov = self.provenance.compute_hash()
+        if self.provenance_digest != computed_prov:
+            raise ValueError(
+                f"provenance_digest mismatch: envelope has {self.provenance_digest!r}, "
+                f"provenance.compute_hash() returned {computed_prov!r}"
+            )
+        # artifact_bundle_digest must match bundle hash
+        if self.artifact_bundle_digest != self.artifact_bundle.bundle_hash:
+            raise ValueError(
+                f"artifact_bundle_digest mismatch: envelope has "
+                f"{self.artifact_bundle_digest!r}, bundle has "
+                f"{self.artifact_bundle.bundle_hash!r}"
+            )
+        # result must be the same object as bundle's result
+        if self.result.result_hash != self.artifact_bundle.rating_result.result_hash:
+            raise ValueError("result_hash parity: envelope result != bundle result")
         return self
 
 
@@ -102,8 +124,8 @@ class RatingRunEnvelope(StrictBaseModel):
 class SizingRunEnvelope(StrictBaseModel):
     """Sizing run response per contract §6.3.
 
-    artifact_bundle is opaque at the API layer; cross-field
-    verification is performed in the model_validator.
+    All fields are typed — no Any. Cross-field hash parity verified
+    on construction.
     """
 
     api_schema_version: Literal["1"]
@@ -112,35 +134,51 @@ class SizingRunEnvelope(StrictBaseModel):
     idempotency_key_digest: str
     request_digest: str
     result_kind: Literal["sizing"]
-    result: Any  # OptimizationResult
+    result: Any  # OptimizationResult (Any at runtime, typed via TYPE_CHECKING)
     result_hash: str
-    warnings: tuple[Any, ...]
-    blockers: tuple[Any, ...]
-    failure: Any | None
-    provenance: Any  # ProvenanceGraph
+    warnings: tuple[EngineeringMessage, ...]
+    blockers: tuple[EngineeringMessage, ...]
+    failure: None  # sizing never has failure
+    provenance: ProvenanceGraph
     provenance_digest: str
-    artifact_bundle: Any  # SizingRunArtifacts
+    artifact_bundle: SizingRunArtifacts
     artifact_bundle_digest: str
     report_links: ReportLinks | None
 
     @model_validator(mode="after")
     def _verify_hashes(self) -> SizingRunEnvelope:
         """Cross-field hash parity per contract §6.3."""
-        result = self.result
-        if hasattr(result, "result_hash") and self.result_hash != result.result_hash:
-            raise ValueError("result_hash mismatch: envelope != result.result_hash")
-        if (
-            hasattr(result, "provenance_digest")
-            and self.provenance_digest != result.provenance_digest
-        ):  # noqa: E501
-            raise ValueError("provenance_digest != result.provenance_digest")
+        # sizing failure must be None
         if self.failure is not None:
             raise ValueError("sizing failure must be None")
+        # result_hash must match result's own hash
+        if self.result_hash != self.result.result_hash:
+            raise ValueError(
+                f"result_hash mismatch: envelope has {self.result_hash!r}, "
+                f"result has {self.result.result_hash!r}"
+            )
+        # provenance_digest must match provenance graph hash
+        computed_prov = self.provenance.compute_hash()
+        if self.provenance_digest != computed_prov:
+            raise ValueError(
+                f"provenance_digest mismatch: envelope has {self.provenance_digest!r}, "
+                f"provenance.compute_hash() returned {computed_prov!r}"
+            )
+        # artifact_bundle_digest must match bundle hash
+        if self.artifact_bundle_digest != self.artifact_bundle.bundle_hash:
+            raise ValueError(
+                f"artifact_bundle_digest mismatch: envelope has "
+                f"{self.artifact_bundle_digest!r}, bundle has "
+                f"{self.artifact_bundle.bundle_hash!r}"
+            )
         return self
 
 
 # ---------------------------------------------------------------------------
-# Discriminated union
+# Discriminated union by result_kind
 # ---------------------------------------------------------------------------
 
-AnyRunEnvelope = ValidationRunEnvelope | RatingRunEnvelope | SizingRunEnvelope
+AnyRunEnvelope = Annotated[
+    ValidationRunEnvelope | RatingRunEnvelope | SizingRunEnvelope,
+    Field(discriminator="result_kind"),
+]
