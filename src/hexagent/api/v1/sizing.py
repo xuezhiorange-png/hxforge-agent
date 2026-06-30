@@ -9,13 +9,13 @@ Idempotency required.
 from __future__ import annotations
 
 import hashlib
-import json
+from dataclasses import dataclass
 from typing import Any
-from uuid import UUID
 
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
+from hexagent.api.artifacts import SizingRunArtifacts, compute_bundle_hash
 from hexagent.api.canonical_request import (
     compute_idempotency_namespace_digest,
 )
@@ -27,8 +27,25 @@ from hexagent.api.repository import (
     IdempotencyConflictError,
     RunRepository,
 )
+from hexagent.domain.messages import EngineeringMessage
+from hexagent.domain.provenance import ProvenanceGraph
 
 router = APIRouter(prefix="/v1/double-pipe", tags=["sizing"])
+
+
+@dataclass(frozen=True, slots=True)
+class SizingExecutionResult:
+    """Result of the sizing optimization pipeline.
+
+    Bundles the ``OptimizationResult`` (which carries its own
+    ``result_hash``), the provenance graph, and any warnings or
+    blockers produced during optimization.
+    """
+
+    optimization_result: Any  # OptimizationResult — has .result_hash
+    provenance: ProvenanceGraph
+    warnings: tuple[EngineeringMessage, ...]
+    blockers: tuple[EngineeringMessage, ...]
 
 
 def _validate_idempotency_key(key: str) -> str:
@@ -160,70 +177,145 @@ async def size_double_pipe(
 
     # NEW_CLAIM or STALE_TAKEOVER → execute
     owner_token = record.owner_token
-    version = record.record_version
 
-    try:  # noqa: SIM105
-        repo.start(owner_token=owner_token, expected_version=version)
-        version += 1
-    except Exception:  # noqa: BLE001
+    # 9. Start run — use RETURNED record's version (never manual increment)
+    try:
+        record = repo.start(
+            owner_token=owner_token,
+            expected_version=record.record_version,
+        )
+    except Exception as exc:
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message="Failed to start run",
+            error_message=f"Failed to start run: {exc}",
             operation="sizeDoublePipe",
         )
 
-    # 9. Execute sizing optimization
-    try:  # noqa: SIM105
-        optimization_result = _execute_sizing(
+    # 10. Execute sizing optimization
+    try:
+        exec_result = _execute_sizing(
             service_result=service_result,
             sizing_service=sizing_service,
         )
+    except NotImplementedError as exc:
+        repo.fail(
+            owner_token=owner_token,
+            expected_version=record.record_version,
+            failure=str(exc),
+        )
+        return _error_response(
+            status_code=501,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message=str(exc),
+            operation="sizeDoublePipe",
+            request_digest=request_digest,
+        )
     except Exception as exc:
         repo.fail(
             owner_token=owner_token,
-            expected_version=version,
+            expected_version=record.record_version,
             failure=str(exc),
         )
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message="Sizing execution failed",
+            error_message=f"Sizing execution failed: {exc}",
             operation="sizeDoublePipe",
+            request_digest=request_digest,
         )
 
-    # 10. Build envelope
-    try:  # noqa: SIM105
-        envelope = _build_sizing_envelope(
+    # 11. Build artifact bundle with real hashes
+    try:
+        bundle_dict = {
+            "canonical_request_snapshot": service_result.canonical_request_snapshot,
+            "sizing_request": service_result.sizing_request,
+            "sizing_request_identity": service_result.sizing_request_identity,
+            "resolved_provider": service_result.resolved_provider,
+            "resolved_catalogs": service_result.resolved_catalogs,
+            "optimization_result": exec_result.optimization_result,
+            "result_hash": exec_result.optimization_result.result_hash,
+            "provenance_graph": exec_result.provenance,
+            "provenance_digest": exec_result.provenance.compute_hash(),
+        }
+        bundle_hash = compute_bundle_hash(bundle_dict)
+
+        bundle = SizingRunArtifacts(
+            canonical_request_snapshot=service_result.canonical_request_snapshot,
+            sizing_request=service_result.sizing_request,
+            sizing_request_identity=service_result.sizing_request_identity,
+            resolved_provider=service_result.resolved_provider,
+            resolved_catalogs=service_result.resolved_catalogs,
+            optimization_result=exec_result.optimization_result,
+            result_hash=exec_result.optimization_result.result_hash,
+            provenance_graph=exec_result.provenance,
+            provenance_digest=exec_result.provenance.compute_hash(),
+            bundle_hash=bundle_hash,
+        )
+    except Exception as exc:
+        repo.fail(
+            owner_token=owner_token,
+            expected_version=record.record_version,
+            failure=str(exc),
+        )
+        return _error_response(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message=f"Artifact bundle construction failed: {exc}",
+            operation="sizeDoublePipe",
+            request_digest=request_digest,
+        )
+
+    # 12. Build envelope with typed fields and real hashes
+    try:
+        envelope = SizingRunEnvelope(
+            api_schema_version="1",
+            operation="sizeDoublePipe",
             run_id=record.run_id,
             idempotency_key_digest=key_digest,
             request_digest=request_digest,
-            optimization_result=optimization_result,
-            provenance=service_result.provenance,
+            result_kind="sizing",
+            result=exec_result.optimization_result,
+            result_hash=exec_result.optimization_result.result_hash,
+            warnings=exec_result.warnings,
+            blockers=exec_result.blockers,
+            failure=None,
+            provenance=exec_result.provenance,
+            provenance_digest=exec_result.provenance.compute_hash(),
+            artifact_bundle=bundle,
+            artifact_bundle_digest=bundle_hash,
+            report_links=ReportLinks(html=f"/v1/runs/{record.run_id}/report.html"),
         )
     except Exception as exc:
         repo.fail(
             owner_token=owner_token,
-            expected_version=version,
+            expected_version=record.record_version,
             failure=str(exc),
         )
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message="Envelope construction failed",
+            error_message=f"Envelope construction failed: {exc}",
             operation="sizeDoublePipe",
+            request_digest=request_digest,
         )
 
-    # 11. Repository complete
-    try:  # noqa: SIM105
-        repo.complete(
+    # 13. Repository complete — structured 500 on failure (never silent pass)
+    try:
+        record = repo.complete(
             owner_token=owner_token,
-            expected_version=version,
+            expected_version=record.record_version,
             envelope=envelope,
-            artifact_bundle=None,  # Phase 2: simplified
+            artifact_bundle=bundle,
         )
-    except Exception:  # noqa: BLE001
-        pass  # envelope already built
+    except Exception as exc:
+        return _error_response(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message=f"Repository completion failed: {exc}",
+            operation="sizeDoublePipe",
+            request_digest=request_digest,
+        )
 
     return JSONResponse(
         status_code=200,
@@ -235,58 +327,25 @@ def _execute_sizing(
     *,
     service_result: Any,
     sizing_service: Any,
-) -> Any:
+) -> SizingExecutionResult:
     """Execute sizing via the optimization pipeline.
 
-    This delegates to the existing optimization pipeline APIs.
-    Phase 2 simplified: returns a stub OptimizationResult.
-    Full pipeline implementation requires TASK-009 integration.
+    Delegates to ``sizing_service.run_optimization(service_result)``
+    when the optimization pipeline (TASK-009 Phase 3) is wired.
+
+    Raises
+    ------
+    NotImplementedError
+        If the optimization pipeline is not yet available.
+    Exception
+        If the optimization pipeline fails for any other reason.
     """
-    # Phase 2: use sizing service to run the full optimization pipeline
-    # The service_result contains all projected artifacts needed
+    if not hasattr(sizing_service, "run_optimization"):
+        raise NotImplementedError(
+            "Sizing optimization pipeline (TASK-009 Phase 3) is not yet wired. "
+            "SizingService.run_optimization() does not exist."
+        )
     return sizing_service.run_optimization(service_result)
-
-
-def _build_sizing_envelope(
-    *,
-    run_id: UUID,
-    idempotency_key_digest: str,
-    request_digest: str,
-    optimization_result: Any,
-    provenance: Any,
-) -> SizingRunEnvelope:
-    """Build SizingRunEnvelope from optimization result."""
-    from hexagent.core.canonical import sha256_digest
-
-    result_hash = sha256_digest(
-        json.dumps(
-            optimization_result.model_dump()
-            if hasattr(optimization_result, "model_dump")
-            else str(optimization_result),
-            sort_keys=True,
-            default=str,
-        ).encode()
-    )
-    provenance_digest = provenance.compute_hash()
-
-    return SizingRunEnvelope(
-        api_schema_version="1",
-        operation="sizeDoublePipe",
-        run_id=run_id,
-        idempotency_key_digest=idempotency_key_digest,
-        request_digest=request_digest,
-        result_kind="sizing",
-        result=optimization_result,
-        result_hash=result_hash,
-        warnings=(),
-        blockers=(),
-        failure=None,
-        provenance=provenance,
-        provenance_digest=provenance_digest,
-        artifact_bundle=None,
-        artifact_bundle_digest="",
-        report_links=ReportLinks(html=f"/v1/runs/{run_id}/report.html"),
-    )
 
 
 def _error_response(

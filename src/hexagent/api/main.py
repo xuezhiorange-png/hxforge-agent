@@ -11,51 +11,53 @@ Frozen API surface (6 operations):
   GET  /v1/runs/{run_id}/report.pdf  → getRunReportPdf
 
 No mutable module globals. All dependencies injected via create_app().
-Legacy starter routes REMOVED.
+No MagicMock usage — tests construct their own ApplicationDependencies.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from hexagent.api.application import RatingApplicationService, SizingService
 from hexagent.api.errors import ApiError, ApiErrorCode, ErrorDetail
+from hexagent.api.registry import CatalogRegistry, ProviderRegistry
 from hexagent.api.repository import (
     CASCasError,
     IdempotencyConflictError,
     RepositoryStateError,
+    RunRepository,
 )
 from hexagent.api.v1 import rating, runs, sizing, validation
 
+# ---------------------------------------------------------------------------
+# Typed dependency container
+# ---------------------------------------------------------------------------
 
-class DependencyContainer:
-    """Immutable container for application dependencies."""
 
-    __slots__ = (
-        "provider_registry",
-        "catalog_registry",
-        "run_repository",
-        "sizing_service",
-        "rating_service",
-    )
+@dataclass(frozen=True, slots=True)
+class ApplicationDependencies:
+    """Immutable container for all application dependencies.
 
-    def __init__(
-        self,
-        *,
-        provider_registry: Any,
-        catalog_registry: Any,
-        run_repository: Any,
-        sizing_service: Any,
-        rating_service: Any,
-    ) -> None:
-        self.provider_registry = provider_registry
-        self.catalog_registry = catalog_registry
-        self.run_repository = run_repository
-        self.sizing_service = sizing_service
-        self.rating_service = rating_service
+    Constructed once at startup (or in test fixtures) and stored on
+    ``app.state.deps``.  All route handlers access dependencies through
+    this container.
+    """
+
+    provider_registry: ProviderRegistry
+    catalog_registry: CatalogRegistry
+    run_repository: RunRepository
+    rating_service: RatingApplicationService
+    sizing_service: SizingService
+
+
+# ---------------------------------------------------------------------------
+# Error response helper
+# ---------------------------------------------------------------------------
 
 
 def _make_error_response(
@@ -82,27 +84,18 @@ def _make_error_response(
     )
 
 
-def create_app(
-    *,
-    provider_registry: Any,
-    catalog_registry: Any,
-    run_repository: Any,
-    sizing_service: Any,
-    rating_service: Any,
-) -> FastAPI:
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+
+def create_app(dependencies: ApplicationDependencies) -> FastAPI:
     """Application factory per contract P0-5.
 
-    All dependencies MUST be provided at construction time.
-    Missing dependencies → fail at construction, not at request time.
+    All dependencies MUST be provided at construction time via an
+    ``ApplicationDependencies`` instance.  Missing dependencies → fail
+    at construction, not at request time.
     """
-    container = DependencyContainer(
-        provider_registry=provider_registry,
-        catalog_registry=catalog_registry,
-        run_repository=run_repository,
-        sizing_service=sizing_service,
-        rating_service=rating_service,
-    )
-
     app = FastAPI(
         title="Heat Exchanger Design Agent",
         version="1.0.0",
@@ -110,9 +103,11 @@ def create_app(
     )
 
     # Store immutable container on app.state
-    app.state.deps = container
+    app.state.deps = dependencies
 
-    # Register exception handlers BEFORE including routers
+    # -----------------------------------------------------------------------
+    # Exception handlers (registered BEFORE routers)
+    # -----------------------------------------------------------------------
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error_handler(
@@ -176,13 +171,20 @@ def create_app(
             error_message="An internal error occurred",
         )
 
-    # Include routers (frozen operation set)
+    # -----------------------------------------------------------------------
+    # Router registration (frozen operation set)
+    # -----------------------------------------------------------------------
     app.include_router(validation.router)
     app.include_router(rating.router)
     app.include_router(sizing.router)
     app.include_router(runs.router)
 
     return app
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 def _safe_preview(value: Any) -> str | None:
@@ -193,18 +195,3 @@ def _safe_preview(value: Any) -> str | None:
     if len(s) > 200:
         return s[:200]
     return s
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatible module-level app for legacy integration tests.
-# This will be removed once integration tests are updated to use create_app().
-# ---------------------------------------------------------------------------
-from unittest.mock import MagicMock as _MagicMock  # noqa: E402
-
-app = create_app(
-    provider_registry=_MagicMock(),
-    catalog_registry=_MagicMock(),
-    run_repository=_MagicMock(),
-    sizing_service=_MagicMock(),
-    rating_service=_MagicMock(),
-)

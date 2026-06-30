@@ -14,14 +14,56 @@ from uuid import UUID
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from hexagent.api.envelopes import AnyRunEnvelope
 from hexagent.api.errors import ApiError, ApiErrorCode
 
 router = APIRouter(prefix="/v1/runs", tags=["runs"])
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_error_response(
+    *,
+    status_code: int,
+    error_code: str,
+    error_message: str,
+    operation: str | None = None,
+) -> JSONResponse:
+    api_error = ApiError(
+        api_schema_version="1",
+        operation=operation,
+        status_code=status_code,
+        error_code=error_code,
+        error_message=error_message,
+        request_digest=None,
+        details=(),
+    )
+    return JSONResponse(
+        status_code=status_code,
+        content=api_error.model_dump(mode="json"),
+    )
+
+
+def _not_found(run_id: UUID) -> JSONResponse:
+    return _make_error_response(
+        status_code=404,
+        error_code=ApiErrorCode.RUN_NOT_FOUND,
+        error_message=f"Run {run_id} not found",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+
 @router.get(
     "/{run_id}",
     operation_id="getRun",
+    response_model=AnyRunEnvelope,
     responses={
         200: {"description": "Run envelope"},
         404: {"model": ApiError},
@@ -66,17 +108,27 @@ async def get_run_report_html(request: Request, run_id: UUID) -> Any:
     if record.operation == "validateCase":
         return _not_found(run_id)
 
-    # Phase 2: return placeholder HTML
-    # Full report rendering requires Phase 3 report builder
-    html = (
-        f"<html><head><title>Run {run_id}</title></head>"
-        f"<body><h1>Run Report</h1>"
-        f"<p>Run ID: {run_id}</p>"
-        f"<p>Operation: {record.operation}</p>"
-        f"<p>State: {record.state}</p>"
-        f"</body></html>"
-    )
-    return HTMLResponse(content=html, status_code=200)
+    # Attempt to render a real report via hexagent.reporting.
+    # If the module is not yet implemented, return a structured 500.
+    try:
+        from hexagent.reporting import build_report_html  # noqa: F811
+
+        html = build_report_html(record)
+        return HTMLResponse(content=html, status_code=200)
+    except ImportError:
+        return _make_error_response(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message="Report rendering is not available",
+            operation=record.operation,
+        )
+    except Exception:
+        return _make_error_response(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message="Report rendering failed",
+            operation=record.operation,
+        )
 
 
 @router.get(
@@ -93,30 +145,9 @@ async def get_run_report_pdf(request: Request, run_id: UUID) -> Any:
 
     No PDF adapter configured → 501 pdf_not_available.
     """
-    return JSONResponse(
+    return _make_error_response(
         status_code=501,
-        content={
-            "api_schema_version": "1",
-            "operation": "getRunReportPdf",
-            "status_code": 501,
-            "error_code": ApiErrorCode.PDF_NOT_AVAILABLE,
-            "error_message": "PDF rendering is not available",
-            "request_digest": None,
-            "details": [],
-        },
-    )
-
-
-def _not_found(run_id: UUID) -> JSONResponse:
-    return JSONResponse(
-        status_code=404,
-        content={
-            "api_schema_version": "1",
-            "operation": None,
-            "status_code": 404,
-            "error_code": ApiErrorCode.RUN_NOT_FOUND,
-            "error_message": f"Run {run_id} not found",
-            "request_digest": None,
-            "details": [],
-        },
+        error_code=ApiErrorCode.PDF_NOT_AVAILABLE,
+        error_message="PDF rendering is not available",
+        operation="getRunReportPdf",
     )
