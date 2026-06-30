@@ -22,6 +22,8 @@ from pydantic import Field, model_validator
 from hexagent.api.artifacts import (
     RatingRunArtifacts,
     SizingRunArtifacts,
+    compute_rating_artifact_bundle_digest,
+    verify_rating_artifact_bundle,
 )
 from hexagent.domain.messages import EngineeringMessage, RunFailure
 from hexagent.domain.models import StrictBaseModel
@@ -89,30 +91,50 @@ class RatingRunEnvelope(StrictBaseModel):
 
     @model_validator(mode="after")
     def _verify_hashes(self) -> RatingRunEnvelope:
-        """Cross-field hash parity per contract §6.2."""
-        # result_hash must match result's own hash
+        """Complete cross-field hash parity per contract §6.2 (P0-4)."""
+        # result_hash parity
         if self.result_hash != self.result.result_hash:
-            raise ValueError(
-                f"result_hash mismatch: envelope has {self.result_hash!r}, "
-                f"result has {self.result.result_hash!r}"
-            )
-        # provenance_digest must match provenance graph hash
-        computed_prov = self.provenance.compute_hash()
-        if self.provenance_digest != computed_prov:
-            raise ValueError(
-                f"provenance_digest mismatch: envelope has {self.provenance_digest!r}, "
-                f"provenance.compute_hash() returned {computed_prov!r}"
-            )
-        # artifact_bundle_digest must match bundle hash
-        if self.artifact_bundle_digest != self.artifact_bundle.bundle_hash:
-            raise ValueError(
-                f"artifact_bundle_digest mismatch: envelope has "
-                f"{self.artifact_bundle_digest!r}, bundle has "
-                f"{self.artifact_bundle.bundle_hash!r}"
-            )
-        # result must be the same object as bundle's result
-        if self.result.result_hash != self.artifact_bundle.rating_result.result_hash:
-            raise ValueError("result_hash parity: envelope result != bundle result")
+            raise ValueError("result_hash mismatch")
+
+        # warnings parity
+        if self.warnings != self.result.warnings:
+            raise ValueError("warnings mismatch")
+
+        # blockers parity
+        if self.blockers != self.result.blockers:
+            raise ValueError("blockers mismatch")
+
+        # failure parity
+        if self.failure != self.result.failure:
+            raise ValueError("failure mismatch")
+
+        # provenance object parity
+        if self.provenance != self.result.provenance_graph:
+            raise ValueError("provenance mismatch")
+
+        # provenance digest parity
+        # The result's provenance_digest is computed by the kernel using
+        # _provenance_graph_digest() which excludes result_hash from metadata.
+        # The envelope's provenance_digest should match the result's value.
+        if self.provenance_digest != self.result.provenance_digest:
+            raise ValueError("provenance_digest != result.provenance_digest")
+
+        # bundle parity
+        verify_rating_artifact_bundle(self.artifact_bundle)
+        if self.artifact_bundle.result != self.result:
+            raise ValueError("bundle result mismatch")
+        if self.artifact_bundle.request_identity != self.result.request_identity:
+            raise ValueError("bundle request_identity mismatch")
+        if self.artifact_bundle.provider_identity != self.result.provider_identity:
+            raise ValueError("bundle provider_identity mismatch")
+        if self.artifact_bundle.provenance_graph != self.result.provenance_graph:
+            raise ValueError("bundle provenance_graph mismatch")
+
+        # bundle digest parity
+        expected_digest = compute_rating_artifact_bundle_digest(self.artifact_bundle)
+        if self.artifact_bundle_digest != expected_digest:
+            raise ValueError("artifact_bundle_digest mismatch")
+
         return self
 
 

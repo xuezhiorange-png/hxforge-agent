@@ -23,7 +23,11 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from hexagent.api.application import RatingApplicationService, SizingService
+from hexagent.api.application import (
+    RatingApplicationService,
+    SizingApplicationService,
+    SizingService,
+)
 from hexagent.api.errors import ApiError, ApiErrorCode, ErrorDetail
 from hexagent.api.registry import CatalogRegistry, ProviderRegistry
 from hexagent.api.repository import (
@@ -53,6 +57,7 @@ class ApplicationDependencies:
     run_repository: RunRepository
     rating_service: RatingApplicationService
     sizing_service: SizingService
+    sizing_application_service: SizingApplicationService | None = None
 
 
 # ---------------------------------------------------------------------------

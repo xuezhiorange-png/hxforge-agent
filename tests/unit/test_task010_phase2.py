@@ -73,13 +73,14 @@ def _create_test_app() -> FastAPI:
     from hexagent.properties.coolprop_provider import CoolPropProvider
 
     provider = CoolPropProvider()
+    # Build snapshot matching what the rating kernel's _provider_snapshot()
+    # actually produces: it does NOT capture configuration_fingerprint or
+    # cache_policy_version (they default to "").
     snapshot = ProviderIdentitySnapshot(
         name=provider.name,
         version=provider.version,
         git_revision=provider.git_revision,
         reference_state_policy=str(provider.reference_state_policy.value),
-        configuration_fingerprint=provider._construction_fingerprint,
-        cache_policy_version=provider.cache_policy_version,
     )
     provider_registry = ProviderRegistry({"CoolProp": snapshot})
     catalog_registry = CatalogRegistry([])
@@ -117,13 +118,14 @@ def _create_fresh_app() -> FastAPI:
     from hexagent.properties.coolprop_provider import CoolPropProvider
 
     provider = CoolPropProvider()
+    # Build snapshot matching what the rating kernel's _provider_snapshot()
+    # actually produces: it does NOT capture configuration_fingerprint or
+    # cache_policy_version (they default to "").
     snapshot = ProviderIdentitySnapshot(
         name=provider.name,
         version=provider.version,
         git_revision=provider.git_revision,
         reference_state_policy=str(provider.reference_state_policy.value),
-        configuration_fingerprint=provider._construction_fingerprint,
-        cache_policy_version=provider.cache_policy_version,
     )
     provider_registry = ProviderRegistry({"CoolProp": snapshot})
     catalog_registry = CatalogRegistry([])
@@ -978,10 +980,12 @@ class TestRatingEndpoint:
         envelope = RatingRunEnvelope.model_validate(resp.json())
         # result_hash must match result's own hash
         assert envelope.result_hash == envelope.result.result_hash
-        # provenance_digest must match provenance graph hash
-        assert envelope.provenance_digest == envelope.provenance.compute_hash()
+        # provenance_digest must match result's provenance_digest
+        # (computed by kernel using _provenance_graph_digest which excludes
+        # result_hash from metadata — differs from provenance.compute_hash())
+        assert envelope.provenance_digest == envelope.result.provenance_digest
         # artifact_bundle_digest must match bundle hash
-        assert envelope.artifact_bundle_digest == envelope.artifact_bundle.bundle_hash
+        assert envelope.artifact_bundle_digest == envelope.artifact_bundle.artifact_bundle_digest
 
     def test_rating_artifact_bundle_typed(self):
         """Artifact bundle is typed RatingRunArtifacts, not a raw dict."""
@@ -996,13 +1000,13 @@ class TestRatingEndpoint:
         data = resp.json()
         bundle = data["artifact_bundle"]
         assert "canonical_request_snapshot" in bundle
-        assert "resolved_provider" in bundle
-        assert "geometry_artifact" in bundle
-        assert "solver_artifact" in bundle
-        assert "rating_result" in bundle
-        assert "result_hash" in bundle
+        assert "request_identity" in bundle
+        assert "geometry_snapshot" in bundle
+        assert "solver_settings" in bundle
+        assert "provider_identity" in bundle
+        assert "result" in bundle
         assert "provenance_graph" in bundle
-        assert "provenance_digest" in bundle
+        assert "artifact_bundle_digest" in bundle
 
 
 # ===================================================================

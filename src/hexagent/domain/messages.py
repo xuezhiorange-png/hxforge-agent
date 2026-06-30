@@ -68,6 +68,7 @@ class ErrorCode(StrEnum):
     HASH_MISMATCH = "hash_mismatch"
     INVALID_STATE_TRANSITION = "invalid_state_transition"
     TASK008_ADAPTER = "task008_adapter"
+    TASK010_ROUTE = "task010_route"
     BLOCKER = "blocker"
 
     # Correlation-specific error codes

@@ -4,17 +4,22 @@ Contract: POST /v1/double-pipe/rating → operation_id=rateDoublePipe
 Request: RatingApiRequest
 Response: RatingRunEnvelope
 Idempotency required.
+
+P0-1: prepare() runs BEFORE idempotency claim; execute() runs AFTER.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 from typing import Any
 
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
-from hexagent.api.artifacts import RatingRunArtifacts, compute_bundle_hash
+from hexagent.api.artifacts import (
+    RatingRunArtifacts,
+)
 from hexagent.api.canonical_request import compute_idempotency_namespace_digest
 from hexagent.api.envelopes import RatingRunEnvelope, ReportLinks
 from hexagent.api.errors import ApiError, ApiErrorCode
@@ -24,6 +29,8 @@ from hexagent.api.repository import (
     IdempotencyConflictError,
     RunRepository,
 )
+from hexagent.core.canonical import sha256_digest
+from hexagent.domain.messages import ErrorCode, RunFailure
 
 router = APIRouter(prefix="/v1/double-pipe", tags=["rating"])
 
@@ -42,6 +49,53 @@ def _validate_idempotency_key(key: str) -> str:
     return key
 
 
+def _dump_to_python(obj: Any) -> Any:
+    """Serialize a domain object to its Python dict form for hashing."""
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump(mode="python")
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return dataclasses.asdict(obj)
+    return obj
+
+
+def _compute_bundle_digest_from_fields(
+    *,
+    canonical_request_snapshot: dict[str, object],
+    request_identity: Any,
+    geometry_snapshot: Any,
+    solver_settings: Any,
+    provider_identity: Any,
+    result: Any,
+    provenance_graph: Any,
+) -> str:
+    """Compute the bundle digest from raw field values without constructing RatingRunArtifacts.
+
+    Uses the same serialization as RatingRunArtifacts.model_dump() to
+    ensure the digest matches what the verifier computes.
+    """
+
+    # Use model_dump for Pydantic models, asdict for dataclasses
+    def _dump(obj: Any) -> Any:
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump(mode="python")
+        import dataclasses
+
+        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+            return dataclasses.asdict(obj)
+        return obj
+
+    payload = {
+        "canonical_request_snapshot": canonical_request_snapshot,
+        "request_identity": _dump(request_identity),
+        "geometry_snapshot": _dump(geometry_snapshot),
+        "solver_settings": _dump(solver_settings),
+        "provider_identity": _dump(provider_identity),
+        "result": _dump(result),
+        "provenance_graph": _dump(provenance_graph),
+    }
+    return sha256_digest(payload)
+
+
 @router.post(
     "/rating",
     operation_id="rateDoublePipe",
@@ -57,34 +111,41 @@ async def rate_double_pipe(
     body: RatingApiRequest,
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
 ) -> Any:
-    """Execute a rating request with idempotency protection."""
+    """Execute a rating request with idempotency protection.
+
+    P0-1 flow:
+    1. prepare() — NO kernel, builds PreparedRatingRun
+    2. Compute idempotency namespace
+    3. claim()
+    4. Handle replay/in-progress outcomes
+    5. execute() — kernel ONLY for NEW_CLAIM / STALE_TAKEOVER
+    """
     deps = request.app.state.deps
     repo: RunRepository = deps.run_repository
 
     # 1. Validate Idempotency-Key
     try:  # noqa: SIM105
         idempotency_key = _validate_idempotency_key(idempotency_key)
-    except ValueError as exc:
+    except ValueError:
         return _error_response(
             status_code=422,
             error_code=ApiErrorCode.VALIDATION_FAILED,
-            error_message=str(exc),
+            error_message="Invalid idempotency key",
             operation="rateDoublePipe",
         )
 
-    # 2. Execute rating via application service (resolves provider,
-    #    builds canonical context, executes rating kernel)
+    # 2. Prepare — NO kernel execution (P0-1)
     try:
-        service_result = deps.rating_service.rate(body)
-    except ValueError as exc:
+        prepared = deps.rating_service.prepare(body)
+    except ValueError:
         return _error_response(
             status_code=422,
             error_code=ApiErrorCode.VALIDATION_FAILED,
-            error_message=str(exc),
+            error_message="Validation failed",
             operation="rateDoublePipe",
         )
 
-    request_digest = service_result.request_digest
+    request_digest = prepared.request_digest
 
     # 3. Compute idempotency namespace
     key_digest = hashlib.sha256(idempotency_key.encode("ascii")).hexdigest()
@@ -101,11 +162,11 @@ async def rate_double_pipe(
             request_digest=request_digest,
             operation="rateDoublePipe",
         )
-    except IdempotencyConflictError as exc:
+    except IdempotencyConflictError:
         return _error_response(
             status_code=409,
             error_code=ApiErrorCode.IDEMPOTENCY_CONFLICT,
-            error_message=str(exc),
+            error_message="Idempotency conflict",
             operation="rateDoublePipe",
             request_digest=request_digest,
         )
@@ -113,12 +174,15 @@ async def rate_double_pipe(
     record = claim.record
 
     # 5. Handle claim outcomes
+
+    # COMPLETE_REPLAY → return stored envelope (200)
     if claim.outcome == ClaimOutcome.COMPLETE_REPLAY:
         return JSONResponse(
             status_code=200,
             content=record.envelope.model_dump(mode="json") if record.envelope else {},
         )
 
+    # IN_PROGRESS → return 409
     if claim.outcome == ClaimOutcome.IN_PROGRESS:
         return _error_response(
             status_code=409,
@@ -128,6 +192,7 @@ async def rate_double_pipe(
             request_digest=request_digest,
         )
 
+    # STALE_REJECTED → return 409
     if claim.outcome == ClaimOutcome.STALE_REJECTED:
         return _error_response(
             status_code=409,
@@ -137,10 +202,24 @@ async def rate_double_pipe(
             request_digest=request_digest,
         )
 
+    # FAILED_REPLAY → return stored failure (NOT 200)
     if claim.outcome == ClaimOutcome.FAILED_REPLAY:
-        return JSONResponse(
-            status_code=200,
-            content=record.envelope.model_dump(mode="json") if record.envelope else {},
+        # Return the stored failure — NOT 200
+        if record.failure is not None and hasattr(record.failure, "status_code"):
+            return _error_response(
+                status_code=record.failure.status_code,
+                error_code=record.failure.error_code,
+                error_message=record.failure.error_message,
+                operation="rateDoublePipe",
+                request_digest=request_digest,
+            )
+        # Fallback: return 500 with stable message
+        return _error_response(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message="Previous execution failed",
+            operation="rateDoublePipe",
+            request_digest=request_digest,
         )
 
     # NEW_CLAIM or STALE_TAKEOVER → execute
@@ -157,36 +236,57 @@ async def rate_double_pipe(
             operation="rateDoublePipe",
         )
 
-    # 7. Build artifact bundle
+    # 7. Execute rating kernel (P0-1: only runs for NEW_CLAIM / STALE_TAKEOVER)
     try:
-        bundle_dict = {
-            "canonical_request_snapshot": service_result.canonical_request_snapshot,
-            "resolved_provider": service_result.resolved_provider.model_dump(mode="json"),
-            "geometry_artifact": service_result.geometry_artifact,
-            "solver_artifact": service_result.solver_artifact,
-            "rating_result": service_result.result.model_dump(mode="python"),
-            "result_hash": service_result.result.result_hash,
-            "provenance_graph": service_result.provenance.model_dump(mode="python"),
-            "provenance_digest": service_result.provenance.compute_hash(),
-        }
-        bundle_hash = compute_bundle_hash(bundle_dict)
-
-        bundle = RatingRunArtifacts(
-            canonical_request_snapshot=service_result.canonical_request_snapshot,
-            resolved_provider=service_result.resolved_provider,
-            geometry_artifact=service_result.geometry_artifact,
-            solver_artifact=service_result.solver_artifact,
-            rating_result=service_result.result,
-            result_hash=service_result.result.result_hash,
-            provenance_graph=service_result.provenance,
-            provenance_digest=service_result.provenance.compute_hash(),
-            bundle_hash=bundle_hash,
-        )
-    except Exception as exc:
+        service_result = deps.rating_service.execute(prepared)
+    except Exception:
         repo.fail(
             owner_token=owner_token,
             expected_version=record.record_version,
-            failure=str(exc),
+            failure=RunFailure(
+                code=ErrorCode.TASK010_ROUTE,
+                message="Rating execution failed",
+            ),
+        )
+        return _error_response(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message="Rating execution failed",
+            operation="rateDoublePipe",
+            request_digest=request_digest,
+        )
+
+    # 8. Build artifact bundle using prepared fields + result (P0-3)
+    try:
+        # Compute digest from raw fields (avoids chicken-and-egg with model_validator)
+        bundle_digest = _compute_bundle_digest_from_fields(
+            canonical_request_snapshot=prepared.canonical_request_snapshot,
+            request_identity=service_result.result.request_identity,
+            geometry_snapshot=prepared.geometry,
+            solver_settings=prepared.solver_settings,
+            provider_identity=prepared.resolved_provider.identity,
+            result=service_result.result,
+            provenance_graph=service_result.provenance,
+        )
+
+        bundle = RatingRunArtifacts(
+            canonical_request_snapshot=prepared.canonical_request_snapshot,
+            request_identity=service_result.result.request_identity,
+            geometry_snapshot=prepared.geometry,
+            solver_settings=prepared.solver_settings,
+            provider_identity=prepared.resolved_provider.identity,
+            result=service_result.result,
+            provenance_graph=service_result.provenance,
+            artifact_bundle_digest=bundle_digest,
+        )
+    except Exception:
+        repo.fail(
+            owner_token=owner_token,
+            expected_version=record.record_version,
+            failure=RunFailure(
+                code=ErrorCode.TASK010_ROUTE,
+                message="Artifact bundle construction failed",
+            ),
         )
         return _error_response(
             status_code=500,
@@ -195,7 +295,7 @@ async def rate_double_pipe(
             operation="rateDoublePipe",
         )
 
-    # 8. Build envelope with typed fields
+    # 9. Build envelope with typed fields (P0-4)
     try:
         envelope = RatingRunEnvelope(
             api_schema_version="1",
@@ -210,16 +310,19 @@ async def rate_double_pipe(
             blockers=service_result.result.blockers,
             failure=service_result.result.failure,
             provenance=service_result.provenance,
-            provenance_digest=service_result.provenance.compute_hash(),
+            provenance_digest=service_result.result.provenance_digest,
             artifact_bundle=bundle,
-            artifact_bundle_digest=bundle_hash,
+            artifact_bundle_digest=bundle_digest,
             report_links=ReportLinks(html=f"/v1/runs/{record.run_id}/report.html"),
         )
-    except Exception as exc:
+    except Exception:
         repo.fail(
             owner_token=owner_token,
             expected_version=record.record_version,
-            failure=str(exc),
+            failure=RunFailure(
+                code=ErrorCode.TASK010_ROUTE,
+                message="Envelope construction failed",
+            ),
         )
         return _error_response(
             status_code=500,
@@ -228,7 +331,7 @@ async def rate_double_pipe(
             operation="rateDoublePipe",
         )
 
-    # 9. Complete repository — use RETURNED record, structured error on failure
+    # 10. Complete repository — use RETURNED record, structured error on failure
     try:
         record = repo.complete(
             owner_token=owner_token,
@@ -236,11 +339,11 @@ async def rate_double_pipe(
             envelope=envelope,
             artifact_bundle=bundle,
         )
-    except Exception as exc:
+    except Exception:
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message=f"Repository completion failed: {exc}",
+            error_message="Repository completion failed",
             operation="rateDoublePipe",
             request_digest=request_digest,
         )

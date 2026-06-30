@@ -4,17 +4,21 @@ Contract: POST /v1/double-pipe/sizing → operation_id=sizeDoublePipe
 Request: SizingApiRequest
 Response: SizingRunEnvelope
 Idempotency required.
+
+P0-1: prepare() runs BEFORE idempotency claim; execute() runs AFTER.
 """
 
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
+from hexagent.api.application import (
+    SizingApplicationService,
+)
 from hexagent.api.artifacts import SizingRunArtifacts, compute_bundle_hash
 from hexagent.api.canonical_request import (
     compute_idempotency_namespace_digest,
@@ -27,25 +31,9 @@ from hexagent.api.repository import (
     IdempotencyConflictError,
     RunRepository,
 )
-from hexagent.domain.messages import EngineeringMessage
-from hexagent.domain.provenance import ProvenanceGraph
+from hexagent.domain.messages import ErrorCode, RunFailure
 
 router = APIRouter(prefix="/v1/double-pipe", tags=["sizing"])
-
-
-@dataclass(frozen=True, slots=True)
-class SizingExecutionResult:
-    """Result of the sizing optimization pipeline.
-
-    Bundles the ``OptimizationResult`` (which carries its own
-    ``result_hash``), the provenance graph, and any warnings or
-    blockers produced during optimization.
-    """
-
-    optimization_result: Any  # OptimizationResult — has .result_hash
-    provenance: ProvenanceGraph
-    warnings: tuple[EngineeringMessage, ...]
-    blockers: tuple[EngineeringMessage, ...]
 
 
 def _validate_idempotency_key(key: str) -> str:
@@ -80,42 +68,40 @@ async def size_double_pipe(
 
     Execution chain per contract §4.3:
     1. Validate public DTO
-    2. Resolve provider authority
-    3. Resolve and verify catalog snapshots
-    4. Build canonical request context
-    5. Compute request_digest
+    2-5. prepare() → projection (provider, catalogs, identity, digest)
     6. Claim idempotency namespace
-    7. Execute sizing via SizingService
+    7. execute() → full optimization pipeline
     8. Build SizingRunEnvelope
     9. Repository complete
     """
     deps = request.app.state.deps
     repo: RunRepository = deps.run_repository
-    sizing_service = deps.sizing_service
+    sizing_app: SizingApplicationService = deps.sizing_application_service
 
     # 1. Validate Idempotency-Key
     try:  # noqa: SIM105
         idempotency_key = _validate_idempotency_key(idempotency_key)
-    except ValueError as exc:
+    except ValueError:
         return _error_response(
             status_code=422,
             error_code=ApiErrorCode.VALIDATION_FAILED,
-            error_message=str(exc),
+            error_message="Invalid idempotency key",
             operation="sizeDoublePipe",
         )
 
-    # 2-5. Full projection via sizing service (includes provider/catalog
+    # 2-5. Full projection via prepare (includes provider/catalog
     # resolution, canonical context, request_digest)
     try:  # noqa: SIM105
-        service_result = sizing_service.process(body)
-    except ValueError as exc:
+        prepared = sizing_app.prepare(body)
+    except ValueError:
         return _error_response(
             status_code=422,
             error_code=ApiErrorCode.VALIDATION_FAILED,
-            error_message=str(exc),
+            error_message="Validation failed",
             operation="sizeDoublePipe",
         )
 
+    service_result = prepared.service_result
     request_digest = service_result.request_digest
 
     # 6. Compute idempotency namespace
@@ -133,11 +119,11 @@ async def size_double_pipe(
             request_digest=request_digest,
             operation="sizeDoublePipe",
         )
-    except IdempotencyConflictError as exc:
+    except IdempotencyConflictError:
         return _error_response(
             status_code=409,
             error_code=ApiErrorCode.IDEMPOTENCY_CONFLICT,
-            error_message=str(exc),
+            error_message="Idempotency conflict",
             operation="sizeDoublePipe",
             request_digest=request_digest,
         )
@@ -170,9 +156,22 @@ async def size_double_pipe(
         )
 
     if claim.outcome == ClaimOutcome.FAILED_REPLAY:
-        return JSONResponse(
-            status_code=200,
-            content=record.envelope.model_dump(mode="json") if record.envelope else {},
+        # Return the stored failure — NOT 200
+        if record.failure is not None and hasattr(record.failure, "status_code"):
+            return _error_response(
+                status_code=record.failure.status_code,
+                error_code=record.failure.error_code,
+                error_message=record.failure.error_message,
+                operation="sizeDoublePipe",
+                request_digest=request_digest,
+            )
+        # Fallback: return 500 with stable message
+        return _error_response(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message="Previous execution failed",
+            operation="sizeDoublePipe",
+            request_digest=request_digest,
         )
 
     # NEW_CLAIM or STALE_TAKEOVER → execute
@@ -184,43 +183,30 @@ async def size_double_pipe(
             owner_token=owner_token,
             expected_version=record.record_version,
         )
-    except Exception as exc:
+    except Exception:
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message=f"Failed to start run: {exc}",
+            error_message="Failed to start run",
             operation="sizeDoublePipe",
         )
 
     # 10. Execute sizing optimization
     try:
-        exec_result = _execute_sizing(
-            service_result=service_result,
-            sizing_service=sizing_service,
-        )
-    except NotImplementedError as exc:
+        exec_result = sizing_app.execute(prepared)
+    except Exception:
         repo.fail(
             owner_token=owner_token,
             expected_version=record.record_version,
-            failure=str(exc),
-        )
-        return _error_response(
-            status_code=501,
-            error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message=str(exc),
-            operation="sizeDoublePipe",
-            request_digest=request_digest,
-        )
-    except Exception as exc:
-        repo.fail(
-            owner_token=owner_token,
-            expected_version=record.record_version,
-            failure=str(exc),
+            failure=RunFailure(
+                code=ErrorCode.TASK010_ROUTE,
+                message="Sizing execution failed",
+            ),
         )
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message=f"Sizing execution failed: {exc}",
+            error_message="Sizing execution failed",
             operation="sizeDoublePipe",
             request_digest=request_digest,
         )
@@ -252,16 +238,19 @@ async def size_double_pipe(
             provenance_digest=exec_result.provenance.compute_hash(),
             bundle_hash=bundle_hash,
         )
-    except Exception as exc:
+    except Exception:
         repo.fail(
             owner_token=owner_token,
             expected_version=record.record_version,
-            failure=str(exc),
+            failure=RunFailure(
+                code=ErrorCode.TASK010_ROUTE,
+                message="Artifact bundle construction failed",
+            ),
         )
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message=f"Artifact bundle construction failed: {exc}",
+            error_message="Artifact bundle construction failed",
             operation="sizeDoublePipe",
             request_digest=request_digest,
         )
@@ -286,16 +275,19 @@ async def size_double_pipe(
             artifact_bundle_digest=bundle_hash,
             report_links=ReportLinks(html=f"/v1/runs/{record.run_id}/report.html"),
         )
-    except Exception as exc:
+    except Exception:
         repo.fail(
             owner_token=owner_token,
             expected_version=record.record_version,
-            failure=str(exc),
+            failure=RunFailure(
+                code=ErrorCode.TASK010_ROUTE,
+                message="Envelope construction failed",
+            ),
         )
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message=f"Envelope construction failed: {exc}",
+            error_message="Envelope construction failed",
             operation="sizeDoublePipe",
             request_digest=request_digest,
         )
@@ -308,11 +300,11 @@ async def size_double_pipe(
             envelope=envelope,
             artifact_bundle=bundle,
         )
-    except Exception as exc:
+    except Exception:
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message=f"Repository completion failed: {exc}",
+            error_message="Repository completion failed",
             operation="sizeDoublePipe",
             request_digest=request_digest,
         )
@@ -321,31 +313,6 @@ async def size_double_pipe(
         status_code=200,
         content=envelope.model_dump(mode="json"),
     )
-
-
-def _execute_sizing(
-    *,
-    service_result: Any,
-    sizing_service: Any,
-) -> SizingExecutionResult:
-    """Execute sizing via the optimization pipeline.
-
-    Delegates to ``sizing_service.run_optimization(service_result)``
-    when the optimization pipeline (TASK-009 Phase 3) is wired.
-
-    Raises
-    ------
-    NotImplementedError
-        If the optimization pipeline is not yet available.
-    Exception
-        If the optimization pipeline fails for any other reason.
-    """
-    if not hasattr(sizing_service, "run_optimization"):
-        raise NotImplementedError(
-            "Sizing optimization pipeline (TASK-009 Phase 3) is not yet wired. "
-            "SizingService.run_optimization() does not exist."
-        )
-    return sizing_service.run_optimization(service_result)  # type: ignore[no-any-return]
 
 
 def _error_response(

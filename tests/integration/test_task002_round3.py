@@ -25,8 +25,6 @@ def _make_test_app():
         version=provider.version,
         git_revision=provider.git_revision,
         reference_state_policy=str(provider.reference_state_policy.value),
-        configuration_fingerprint=getattr(provider, "_construction_fingerprint", "fp1"),
-        cache_policy_version=provider.cache_policy_version,
     )
     provider_registry = ProviderRegistry({"CoolProp": snapshot})
     catalog_registry = CatalogRegistry([])

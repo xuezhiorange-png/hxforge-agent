@@ -430,12 +430,44 @@ class InMemoryRunRepository:
             record = self._find_by_owner(owner_token, expected_version)
             if record.state != RunState.RUNNING:
                 raise RepositoryStateError(f"complete() requires RUNNING state, got {record.state}")
-            # Verify request_digest parity when envelope carries one
-            if envelope is not None and hasattr(envelope, "request_digest"):  # noqa: SIM102
-                if envelope.request_digest != record.request_digest:
-                    raise IdempotencyConflictError(
-                        "envelope.request_digest does not match record.request_digest"
-                    )
+
+            # Operation parity
+            if hasattr(envelope, "operation") and envelope.operation != record.operation:
+                raise RepositoryStateError("envelope.operation != record.operation")
+
+            # Request digest parity
+            if (
+                hasattr(envelope, "request_digest")
+                and envelope.request_digest != record.request_digest
+            ):  # noqa: E501
+                raise IdempotencyConflictError("envelope.request_digest mismatch")
+
+            # Bundle type check
+            if record.operation == "rateDoublePipe":
+                from hexagent.api.artifacts import RatingRunArtifacts
+
+                if artifact_bundle is not None and not isinstance(
+                    artifact_bundle, RatingRunArtifacts
+                ):  # noqa: E501
+                    raise RepositoryStateError("rateDoublePipe requires RatingRunArtifacts")
+            elif record.operation == "sizeDoublePipe":
+                from hexagent.api.artifacts import SizingRunArtifacts
+
+                if artifact_bundle is not None and not isinstance(
+                    artifact_bundle, SizingRunArtifacts
+                ):  # noqa: E501
+                    raise RepositoryStateError("sizeDoublePipe requires SizingRunArtifacts")
+
+            # Bundle identity (value equality, not reference)
+            if (
+                hasattr(envelope, "artifact_bundle")
+                and envelope.artifact_bundle is not None
+                and artifact_bundle is not None
+                and envelope.artifact_bundle != artifact_bundle
+            ):
+                raise RepositoryStateError("envelope.artifact_bundle != artifact_bundle")
+
+            # Store and transition
             now = self._now()
             new_record = self._replace_record(
                 record,
