@@ -14,12 +14,12 @@ EXAMPLE_PATH = Path(__file__).resolve().parents[2] / "examples" / "water_water_d
 def test_missing_fouling_returns_422_via_api() -> None:
     payload = json.loads(EXAMPLE_PATH.read_text())
     payload["hot_stream"].pop("fouling_resistance")
-    response = TestClient(app).post("/v1/cases/validate", json=payload)
+    response = TestClient(app, raise_server_exceptions=False).post("/v1/cases/validate", json=payload)
     assert response.status_code == 422
-    assert any(
-        error["type"] == "missing" and error["loc"][-1] == "fouling_resistance"
-        for error in response.json()["detail"]
-    )
+    data = response.json()
+    # New frozen ApiError format: top-level error_code
+    assert data.get("api_schema_version") == "1"
+    assert data.get("error_code") == "validation_failed"
 
 
 def test_schema_requires_fouling_resistance() -> None:

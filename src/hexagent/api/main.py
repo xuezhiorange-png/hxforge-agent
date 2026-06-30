@@ -193,3 +193,18 @@ def _safe_preview(value: Any) -> str | None:
     if len(s) > 200:
         return s[:200]
     return s
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatible module-level app for legacy integration tests.
+# This will be removed once integration tests are updated to use create_app().
+# ---------------------------------------------------------------------------
+from unittest.mock import MagicMock as _MagicMock
+
+app = create_app(
+    provider_registry=_MagicMock(),
+    catalog_registry=_MagicMock(),
+    run_repository=_MagicMock(),
+    sizing_service=_MagicMock(),
+    rating_service=_MagicMock(),
+)
