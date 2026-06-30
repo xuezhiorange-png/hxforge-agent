@@ -425,7 +425,7 @@ class SizingApplicationService:
             check_cap,
             compute_raw_combination_count,
         )
-        from hexagent.optimization.phase3_builder import (
+        from hexagent.optimization.phase3_builder import (  # type: ignore[attr-defined]
             Phase3CandidateClassificationInput,
             build_optimization_result,
             build_ranked_candidate_record,
@@ -439,7 +439,7 @@ class SizingApplicationService:
             build_phase3_message_descriptor_binding,
             build_phase3_run_failure_descriptor_binding,
         )
-        from hexagent.optimization.phase3_evaluation import (
+        from hexagent.optimization.phase3_evaluation import (  # type: ignore[attr-defined]
             Phase3PreparationStatus,
             build_phase3_candidate_preparation_result,
             build_phase3_source_record_binding,
@@ -553,6 +553,7 @@ class SizingApplicationService:
                 warn_binds: list[Any] = []
                 for w_msg in evidence.warnings:
                     cd = _build_message_descriptor(w_msg)
+                    assert cd.message_payload_digest is not None
                     md = Phase3MessageDescriptor(
                         owner_sort_key=cd.owner_sort_key,
                         original_code=cd.original_code,
@@ -565,6 +566,7 @@ class SizingApplicationService:
                 block_binds: list[Any] = []
                 for b_msg in evidence.blockers:
                     cd = _build_message_descriptor(b_msg)
+                    assert cd.message_payload_digest is not None
                     md = Phase3MessageDescriptor(
                         owner_sort_key=cd.owner_sort_key,
                         original_code=cd.original_code,
