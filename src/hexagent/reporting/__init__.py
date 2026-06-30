@@ -25,10 +25,10 @@ import json
 import re
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import ConfigDict, Discriminator, Tag, model_validator
+from pydantic import ConfigDict, Discriminator, model_validator
 
 from hexagent.core.canonical import sha256_digest
 from hexagent.domain.models import StrictBaseModel
@@ -57,28 +57,31 @@ _SENSITIVE_PATTERNS = re.compile(
 # =========================================================================
 
 
+class ReportSourceDocument(StrEnum):
+    """Source documents that report artifacts can originate from."""
+
+    RUN_ENVELOPE = "run_envelope"
+    ARTIFACT_BUNDLE = "artifact_bundle"
+    CANONICAL_REQUEST = "canonical_request"
+
+
 class ReportArtifactKind(StrEnum):
     """Kinds of report artifacts."""
 
-    CANONICAL_REQUEST_SNAPSHOT = "canonical_request_snapshot"
-    REQUEST_IDENTITY = "request_identity"
-    PROVIDER_IDENTITY = "provider_identity"
-    GEOMETRY_SNAPSHOT = "geometry_snapshot"
-    SOLVER_SETTINGS = "solver_settings"
-    DOMAIN_RESULT = "domain_result"
-    RESULT_HASH = "result_hash"
-    PROVENANCE_GRAPH = "provenance_graph"
-    PROVENANCE_DIGEST = "provenance_digest"
-    BUNDLE_DIGEST = "bundle_digest"
+    PRESENT = "present"
+    NOT_AVAILABLE = "not_available"
+    NOT_IMPLEMENTED = "not_implemented"
+    OUT_OF_SCOPE = "out_of_scope"
 
 
 class ReportSectionStatus(StrEnum):
-    """Section presence status."""
+    """Section completion status."""
 
-    PRESENT = "present"
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    EMPTY = "empty"
+    BLOCKED = "blocked"
     NOT_APPLICABLE = "not_applicable"
-    NOT_IMPLEMENTED = "not_implemented"
-    OUT_OF_SCOPE = "out_of_scope"
 
 
 class ReportSectionId(StrEnum):
@@ -100,18 +103,44 @@ class ReportSectionId(StrEnum):
 
 
 class ReportArtifactId(StrEnum):
-    """Artifact identifiers — one per ReportArtifactKind."""
+    """Artifact identifiers — one per logical data point in the report."""
 
-    CANONICAL_REQUEST_SNAPSHOT = "canonical_request_snapshot"
-    REQUEST_IDENTITY = "request_identity"
-    PROVIDER_IDENTITY = "provider_identity"
-    GEOMETRY_SNAPSHOT = "geometry_snapshot"
-    SOLVER_SETTINGS = "solver_settings"
-    DOMAIN_RESULT = "domain_result"
-    RESULT_HASH = "result_hash"
+    STATUS = "status"
+    TERMINATION_STATUS = "termination_status"
+    RUN_ID = "run_id"
+    API_VERSION = "api_version"
+    OPERATION = "operation"
+    REQUEST_DIGEST = "request_digest"
+    CASE_NAME = "case_name"
+    HOT_FLUID = "hot_fluid"
+    COLD_FLUID = "cold_fluid"
+    HOT_INLET_T = "hot_inlet_t"
+    COLD_INLET_T = "cold_inlet_t"
+    MASS_FLOWS = "mass_flows"
+    DESIGN_PRESSURES = "design_pressures"
+    DESIGN_TEMPERATURES = "design_temperatures"
+    GEOMETRY_SPEC = "geometry_spec"
+    HEAT_DUTY = "heat_duty"
+    ENERGY_RESIDUAL = "energy_residual"
+    TUBE_HTC = "tube_htc"
+    ANNULUS_HTC = "annulus_htc"
+    OVERALL_U = "overall_u"
+    EFFECTIVENESS = "effectiveness"
+    SIZING_RANK = "sizing_rank"
+    OPTIMIZATION_OBJECTIVE = "optimization_objective"
+    WARNING_MESSAGES = "warning_messages"
+    BLOCKER_MESSAGES = "blocker_messages"
+    TOP_RANKED_CANDIDATES = "top_ranked_candidates"
+    FAILURE_REASON = "failure_reason"
     PROVENANCE_GRAPH = "provenance_graph"
-    PROVENANCE_DIGEST = "provenance_digest"
-    BUNDLE_DIGEST = "bundle_digest"
+    RESULT_HASH = "result_hash"
+    BUNDLE_HASH = "bundle_hash"
+    PRESSURE_DROP = "pressure_drop"
+    VELOCITY = "velocity"
+    MATERIALS = "materials"
+    COST = "cost"
+    MECHANICAL = "mechanical"
+    PROCUREMENT = "procurement"
 
 
 # ---------------------------------------------------------------------------
@@ -124,11 +153,19 @@ class PresentReportArtifact(StrictBaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    kind: Literal[ReportArtifactKind.PRESENT]
     artifact_id: ReportArtifactId
-    kind: ReportArtifactKind
-    section: ReportSectionId
+    source_document: ReportSourceDocument
+    source_document_digest: str
+    source_json_pointer: str
+    authority_digest: str
     canonical_raw_value: str
-    source_pointer: str  # RFC 6901 JSON Pointer
+    source_unit: str | None = None
+    display_unit: str | None = None
+    formatter_id: str = ""
+    formatter_version: str = ""
+    rounding_mode: str = ""
+    formatted_display_value: str = ""
 
 
 class UnavailableReportArtifact(StrictBaseModel):
@@ -136,10 +173,12 @@ class UnavailableReportArtifact(StrictBaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    kind: Literal[ReportArtifactKind.NOT_AVAILABLE]
     artifact_id: ReportArtifactId
-    kind: ReportArtifactKind
-    section: ReportSectionId
-    reason: str = "unavailable"
+    source_document: ReportSourceDocument
+    source_document_digest: str = ""
+    source_json_pointer: str = ""
+    authority_digest: str = ""
 
 
 class NotImplementedReportArtifact(StrictBaseModel):
@@ -147,10 +186,12 @@ class NotImplementedReportArtifact(StrictBaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    kind: Literal[ReportArtifactKind.NOT_IMPLEMENTED]
     artifact_id: ReportArtifactId
-    kind: ReportArtifactKind
-    section: ReportSectionId
-    reason: str = "not_implemented"
+    source_document: ReportSourceDocument
+    source_document_digest: str = ""
+    source_json_pointer: str = ""
+    authority_digest: str = ""
 
 
 class OutOfScopeReportArtifact(StrictBaseModel):
@@ -158,48 +199,26 @@ class OutOfScopeReportArtifact(StrictBaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    kind: Literal[ReportArtifactKind.OUT_OF_SCOPE]
     artifact_id: ReportArtifactId
-    kind: ReportArtifactKind
-    section: ReportSectionId
-    reason: str = "out_of_scope"
+    source_document: ReportSourceDocument
+    source_document_digest: str = ""
+    source_json_pointer: str = ""
+    authority_digest: str = ""
 
 
 # ---------------------------------------------------------------------------
 # Discriminated union for ReportArtifact (B1)
 # ---------------------------------------------------------------------------
-# All four variants share `kind: ReportArtifactKind`, so kind alone cannot
-# discriminate.  We use a callable discriminator that inspects structural
-# differences: PresentReportArtifact has `source_pointer` + `canonical_raw_value`
-# while the other three are distinguished by their `reason` default.
-
-
-def _artifact_discriminator(v: Any) -> str:
-    """Callable discriminator for ReportArtifact union."""
-    if isinstance(v, dict):
-        if "source_pointer" in v and "canonical_raw_value" in v:
-            return "present"
-        reason = v.get("reason", "")
-        if reason == "unavailable":
-            return "unavailable"
-        if reason == "not_implemented":
-            return "not_implemented"
-        return "out_of_scope"
-    # Model instances
-    if isinstance(v, PresentReportArtifact):
-        return "present"
-    if isinstance(v, UnavailableReportArtifact):
-        return "unavailable"
-    if isinstance(v, NotImplementedReportArtifact):
-        return "not_implemented"
-    return "out_of_scope"
-
+# Each variant has a `kind` field with a distinct Literal StrEnum value,
+# so Pydantic v2 Discriminator("kind") resolves unambiguously.
 
 ReportArtifact = Annotated[
-    Annotated[PresentReportArtifact, Tag("present")]
-    | Annotated[UnavailableReportArtifact, Tag("unavailable")]
-    | Annotated[NotImplementedReportArtifact, Tag("not_implemented")]
-    | Annotated[OutOfScopeReportArtifact, Tag("out_of_scope")],
-    Discriminator(_artifact_discriminator),
+    PresentReportArtifact
+    | UnavailableReportArtifact
+    | NotImplementedReportArtifact
+    | OutOfScopeReportArtifact,
+    Discriminator("kind"),
 ]
 
 
@@ -258,84 +277,216 @@ _SECTION_TITLES: dict[ReportSectionId, str] = {
 
 
 # =========================================================================
-# B4 — Mandatory Artifacts
+# B4 — Mandatory Artifacts (exactly 5)
 # =========================================================================
 
 MANDATORY_ARTIFACT_IDS: frozenset[ReportArtifactId] = frozenset(
     {
-        ReportArtifactId.CANONICAL_REQUEST_SNAPSHOT,
-        ReportArtifactId.REQUEST_IDENTITY,
-        ReportArtifactId.PROVIDER_IDENTITY,
-        ReportArtifactId.GEOMETRY_SNAPSHOT,
-        ReportArtifactId.SOLVER_SETTINGS,
-        ReportArtifactId.DOMAIN_RESULT,
+        ReportArtifactId.STATUS,
+        ReportArtifactId.RUN_ID,
+        ReportArtifactId.REQUEST_DIGEST,
         ReportArtifactId.RESULT_HASH,
-        ReportArtifactId.PROVENANCE_GRAPH,
-        ReportArtifactId.PROVENANCE_DIGEST,
-        ReportArtifactId.BUNDLE_DIGEST,
+        ReportArtifactId.BUNDLE_HASH,
     }
 )
 
 MANDATORY_ARTIFACT_OWNERS: dict[ReportArtifactId, ReportSectionId] = {
-    ReportArtifactId.CANONICAL_REQUEST_SNAPSHOT: ReportSectionId.INPUT_SUMMARY,
-    ReportArtifactId.REQUEST_IDENTITY: ReportSectionId.RUN_IDENTITY,
-    ReportArtifactId.PROVIDER_IDENTITY: ReportSectionId.RUN_IDENTITY,
-    ReportArtifactId.GEOMETRY_SNAPSHOT: ReportSectionId.GEOMETRY,
-    ReportArtifactId.SOLVER_SETTINGS: ReportSectionId.INPUT_SUMMARY,
-    ReportArtifactId.DOMAIN_RESULT: ReportSectionId.THERMAL_PERFORMANCE,
+    ReportArtifactId.STATUS: ReportSectionId.STATUS_BANNER,
+    ReportArtifactId.RUN_ID: ReportSectionId.RUN_IDENTITY,
+    ReportArtifactId.REQUEST_DIGEST: ReportSectionId.RUN_IDENTITY,
     ReportArtifactId.RESULT_HASH: ReportSectionId.INTEGRITY,
-    ReportArtifactId.PROVENANCE_GRAPH: ReportSectionId.PROVENANCE,
-    ReportArtifactId.PROVENANCE_DIGEST: ReportSectionId.PROVENANCE,
-    ReportArtifactId.BUNDLE_DIGEST: ReportSectionId.INTEGRITY,
+    ReportArtifactId.BUNDLE_HASH: ReportSectionId.INTEGRITY,
 }
 
-# Mapping from artifact kind → (owner section, candidate pointer paths in envelope dict)
-_ARTIFACT_POINTER_MAP: dict[ReportArtifactKind, tuple[ReportSectionId, tuple[str, ...]]] = {
-    ReportArtifactKind.CANONICAL_REQUEST_SNAPSHOT: (
+
+# ---------------------------------------------------------------------------
+# Artifact → section + pointer mapping
+# ---------------------------------------------------------------------------
+
+# Mapping: artifact_id → (owner section, source_document, pointer candidates)
+_ARTIFACT_MAP: dict[
+    ReportArtifactId,
+    tuple[ReportSectionId, ReportSourceDocument, tuple[str, ...]],
+] = {
+    ReportArtifactId.STATUS: (
+        ReportSectionId.STATUS_BANNER,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/status", "/result/result_status"),
+    ),
+    ReportArtifactId.TERMINATION_STATUS: (
+        ReportSectionId.STATUS_BANNER,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/termination_status",),
+    ),
+    ReportArtifactId.RUN_ID: (
+        ReportSectionId.RUN_IDENTITY,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/run_id",),
+    ),
+    ReportArtifactId.API_VERSION: (
+        ReportSectionId.RUN_IDENTITY,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/api_schema_version",),
+    ),
+    ReportArtifactId.OPERATION: (
+        ReportSectionId.RUN_IDENTITY,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/operation",),
+    ),
+    ReportArtifactId.REQUEST_DIGEST: (
+        ReportSectionId.RUN_IDENTITY,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/request_digest",),
+    ),
+    ReportArtifactId.CASE_NAME: (
         ReportSectionId.INPUT_SUMMARY,
-        ("/artifact_bundle/canonical_request_snapshot",),
+        ReportSourceDocument.CANONICAL_REQUEST,
+        ("/artifact_bundle/canonical_request_snapshot/case_name",),
     ),
-    ReportArtifactKind.REQUEST_IDENTITY: (
-        ReportSectionId.RUN_IDENTITY,
-        (
-            "/artifact_bundle/request_identity",
-            "/artifact_bundle/sizing_request_identity",
-        ),
+    ReportArtifactId.HOT_FLUID: (
+        ReportSectionId.INPUT_SUMMARY,
+        ReportSourceDocument.CANONICAL_REQUEST,
+        ("/artifact_bundle/canonical_request_snapshot/hot_stream/fluid/name",),
     ),
-    ReportArtifactKind.PROVIDER_IDENTITY: (
-        ReportSectionId.RUN_IDENTITY,
-        (
-            "/artifact_bundle/provider_identity",
-            "/artifact_bundle/resolved_provider",
-        ),
+    ReportArtifactId.COLD_FLUID: (
+        ReportSectionId.INPUT_SUMMARY,
+        ReportSourceDocument.CANONICAL_REQUEST,
+        ("/artifact_bundle/canonical_request_snapshot/cold_stream/fluid/name",),
     ),
-    ReportArtifactKind.GEOMETRY_SNAPSHOT: (
+    ReportArtifactId.HOT_INLET_T: (
+        ReportSectionId.INPUT_SUMMARY,
+        ReportSourceDocument.CANONICAL_REQUEST,
+        ("/artifact_bundle/canonical_request_snapshot/hot_stream/inlet/temperature/value",),
+    ),
+    ReportArtifactId.COLD_INLET_T: (
+        ReportSectionId.INPUT_SUMMARY,
+        ReportSourceDocument.CANONICAL_REQUEST,
+        ("/artifact_bundle/canonical_request_snapshot/cold_stream/inlet/temperature/value",),
+    ),
+    ReportArtifactId.MASS_FLOWS: (
+        ReportSectionId.INPUT_SUMMARY,
+        ReportSourceDocument.CANONICAL_REQUEST,
+        ("/artifact_bundle/canonical_request_snapshot/hot_stream/mass_flow/value",),
+    ),
+    ReportArtifactId.DESIGN_PRESSURES: (
+        ReportSectionId.INPUT_SUMMARY,
+        ReportSourceDocument.CANONICAL_REQUEST,
+        ("/artifact_bundle/canonical_request_snapshot/design_pressure_hot/value",),
+    ),
+    ReportArtifactId.DESIGN_TEMPERATURES: (
+        ReportSectionId.INPUT_SUMMARY,
+        ReportSourceDocument.CANONICAL_REQUEST,
+        ("/artifact_bundle/canonical_request_snapshot/design_temperature_hot/value",),
+    ),
+    ReportArtifactId.GEOMETRY_SPEC: (
         ReportSectionId.GEOMETRY,
+        ReportSourceDocument.ARTIFACT_BUNDLE,
         ("/artifact_bundle/geometry_snapshot",),
     ),
-    ReportArtifactKind.SOLVER_SETTINGS: (
-        ReportSectionId.INPUT_SUMMARY,
-        ("/artifact_bundle/solver_settings",),
+    ReportArtifactId.HEAT_DUTY: (
+        ReportSectionId.HEAT_BALANCE,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/heat_duty_w",),
     ),
-    ReportArtifactKind.DOMAIN_RESULT: (
+    ReportArtifactId.ENERGY_RESIDUAL: (
+        ReportSectionId.HEAT_BALANCE,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/energy_residual_w",),
+    ),
+    ReportArtifactId.TUBE_HTC: (
         ReportSectionId.THERMAL_PERFORMANCE,
-        ("/artifact_bundle/result", "/artifact_bundle/optimization_result"),
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/U_inner_basis",),
     ),
-    ReportArtifactKind.RESULT_HASH: (
+    ReportArtifactId.ANNULUS_HTC: (
+        ReportSectionId.THERMAL_PERFORMANCE,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/U_outer_basis",),
+    ),
+    ReportArtifactId.OVERALL_U: (
+        ReportSectionId.THERMAL_PERFORMANCE,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/U_inner_basis", "/result/U_outer_basis"),
+    ),
+    ReportArtifactId.EFFECTIVENESS: (
+        ReportSectionId.THERMAL_PERFORMANCE,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/effectiveness",),
+    ),
+    ReportArtifactId.PRESSURE_DROP: (
+        ReportSectionId.THERMAL_PERFORMANCE,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/pressure_drop_tube_pa", "/result/pressure_drop_annulus_pa"),
+    ),
+    ReportArtifactId.VELOCITY: (
+        ReportSectionId.THERMAL_PERFORMANCE,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/velocity_tube_m_s", "/result/velocity_annulus_m_s"),
+    ),
+    ReportArtifactId.MATERIALS: (
+        ReportSectionId.GEOMETRY,
+        ReportSourceDocument.ARTIFACT_BUNDLE,
+        ("/artifact_bundle/geometry_snapshot/wall_thermal_conductivity",),
+    ),
+    ReportArtifactId.SIZING_RANK: (
+        ReportSectionId.SIZING_RANKING,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/termination_status",),
+    ),
+    ReportArtifactId.OPTIMIZATION_OBJECTIVE: (
+        ReportSectionId.SIZING_RANKING,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/optimization_objective",),
+    ),
+    ReportArtifactId.COST: (
+        ReportSectionId.SIZING_RANKING,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/cost",),
+    ),
+    ReportArtifactId.MECHANICAL: (
+        ReportSectionId.SIZING_RANKING,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/mechanical",),
+    ),
+    ReportArtifactId.PROCUREMENT: (
+        ReportSectionId.SIZING_RANKING,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/procurement",),
+    ),
+    ReportArtifactId.WARNING_MESSAGES: (
+        ReportSectionId.WARNINGS,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/warnings",),
+    ),
+    ReportArtifactId.BLOCKER_MESSAGES: (
+        ReportSectionId.BLOCKERS,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/blockers",),
+    ),
+    ReportArtifactId.TOP_RANKED_CANDIDATES: (
+        ReportSectionId.TOP_RANKED_CANDIDATES,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/result/ordered_top_n_record_digests",),
+    ),
+    ReportArtifactId.FAILURE_REASON: (
+        ReportSectionId.FAILURE_DETAILS,
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/failure/message", "/failure/code"),
+    ),
+    ReportArtifactId.PROVENANCE_GRAPH: (
+        ReportSectionId.PROVENANCE,
+        ReportSourceDocument.ARTIFACT_BUNDLE,
+        ("/provenance", "/artifact_bundle/provenance_graph"),
+    ),
+    ReportArtifactId.RESULT_HASH: (
         ReportSectionId.INTEGRITY,
+        ReportSourceDocument.RUN_ENVELOPE,
         ("/result_hash",),
     ),
-    ReportArtifactKind.PROVENANCE_GRAPH: (
-        ReportSectionId.PROVENANCE,
-        ("/artifact_bundle/provenance_graph", "/provenance"),
-    ),
-    ReportArtifactKind.PROVENANCE_DIGEST: (
-        ReportSectionId.PROVENANCE,
-        ("/provenance_digest",),
-    ),
-    ReportArtifactKind.BUNDLE_DIGEST: (
+    ReportArtifactId.BUNDLE_HASH: (
         ReportSectionId.INTEGRITY,
-        ("/artifact_bundle_digest", "/artifact_bundle/bundle_hash"),
+        ReportSourceDocument.RUN_ENVELOPE,
+        ("/artifact_bundle_digest",),
     ),
 }
 
@@ -357,28 +508,29 @@ def validate_rfc6901_pointer(pointer: str) -> tuple[str | int, ...]:
     if not pointer.startswith("/"):
         raise ValueError(f"JSON Pointer must start with '/': {pointer!r}")
 
-    # Reject trailing bare tilde
-    if pointer.endswith("~"):
-        raise ValueError(f"JSON Pointer has trailing '~': {pointer!r}")
-
-    parts: list[str | int] = []
-    for segment in pointer[1:].split("/"):
-        # Validate escape sequences: only ~0 and ~1 are legal
+    parts = pointer.split("/")[1:]
+    result: list[str | int] = []
+    for part in parts:
+        # Check for trailing ~
+        if part.endswith("~"):
+            raise ValueError(f"Trailing ~ in pointer: {pointer!r}")
+        # Validate escape sequences BEFORE unescaping: only ~0 and ~1 are legal
         i = 0
-        while i < len(segment):
-            if segment[i] == "~":
-                if i + 1 >= len(segment):
-                    raise ValueError(f"Trailing '~' in segment: {segment!r}")
-                next_char = segment[i + 1]
-                if next_char not in ("0", "1"):
-                    raise ValueError(f"Illegal escape '~{next_char}' in pointer: {pointer!r}")
+        while i < len(part):
+            if part[i] == "~":
+                if i + 1 >= len(part) or part[i + 1] not in ("0", "1"):
+                    raise ValueError(f"Illegal escape sequence in pointer: {pointer!r}")
                 i += 2
             else:
                 i += 1
-        # Unescape
-        unescaped = segment.replace("~0", "~").replace("~1", "/")
-        parts.append(unescaped)
-    return tuple(parts)
+        # Unescape ~1 -> / and ~0 -> ~
+        unescaped = part.replace("~1", "/").replace("~0", "~")
+        # Try to parse as int for array indices
+        try:
+            result.append(int(unescaped))
+        except ValueError:
+            result.append(unescaped)
+    return tuple(result)
 
 
 def resolve_source_pointer(obj: Any, pointer: str) -> Any:
@@ -388,27 +540,15 @@ def resolve_source_pointer(obj: Any, pointer: str) -> Any:
     Raises ``ValueError`` if the path does not exist.
     """
     parts = validate_rfc6901_pointer(pointer)
-    current = obj
+    current: Any = obj
     for part in parts:
         if isinstance(current, dict):
-            if not isinstance(part, str):
-                raise ValueError(f"Expected string key for dict, got {type(part).__name__}")
-            if part not in current:
-                raise ValueError(f"Key {part!r} not found in dict")
             current = current[part]
         elif isinstance(current, (list, tuple)):
-            if isinstance(part, str):
-                try:
-                    idx = int(part)
-                except ValueError:
-                    raise ValueError(f"Invalid array index {part!r} for list/tuple") from None
-            else:
-                idx = part
-            if idx < 0 or idx >= len(current):
-                raise ValueError(f"Array index {idx} out of range [0, {len(current)})")
+            idx = part if isinstance(part, int) else int(part)
             current = current[idx]
         else:
-            raise ValueError(f"Cannot traverse into {type(current).__name__} with key {part!r}")
+            raise ValueError(f"Cannot resolve {part!r} in {type(current)}")
     return current
 
 
@@ -429,8 +569,8 @@ class ReportInstanceIdentity:
 
 def compute_report_content_hash(sections: tuple[ReportSection, ...]) -> str:
     """Compute deterministic content hash over section data."""
-    section_data = tuple((s.section_id.value, s.title, s.content, s.status.value) for s in sections)
-    return sha256_digest(section_data)
+    payload = tuple((s.section_id.value, s.status.value, s.content) for s in sections)
+    return sha256_digest(payload)
 
 
 def compute_report_instance_hash(identity: ReportInstanceIdentity) -> str:
@@ -465,10 +605,9 @@ class ReportModel(StrictBaseModel):
 
     run_id: UUID
     operation: str
-    report_schema_version: str = "1.0"
     sections: tuple[ReportSection, ...]
     content_hash: str
-    instance_hash: str
+    section_order: tuple[ReportSectionId, ...]
 
     @model_validator(mode="after")
     def _validate_sections(self) -> ReportModel:
@@ -478,13 +617,7 @@ class ReportModel(StrictBaseModel):
         expected = REPORT_SECTION_ORDER
         actual = tuple(s.section_id for s in self.sections)
         if actual != expected:
-            raise ValueError(
-                f"Section order mismatch: expected {[e.value for e in expected]}, "
-                f"got {[a.value for a in actual]}"
-            )
-        # No duplicates
-        if len(set(actual)) != len(actual):
-            raise ValueError("Duplicate section IDs")
+            raise ValueError("Section order mismatch")
         return self
 
 
@@ -492,118 +625,142 @@ class ReportModel(StrictBaseModel):
 # B3 — Section/Status Matrix Verification
 # =========================================================================
 
-# Rating matrices keyed by result.status
+# Rating matrices keyed by source_state
 _RATING_MATRIX: dict[str, dict[ReportSectionId, ReportSectionStatus]] = {
-    "succeeded": {
-        ReportSectionId.STATUS_BANNER: ReportSectionStatus.PRESENT,
-        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.PRESENT,
-        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.PRESENT,
-        ReportSectionId.GEOMETRY: ReportSectionStatus.PRESENT,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.SIZING_RANKING: ReportSectionStatus.OUT_OF_SCOPE,
-        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.OUT_OF_SCOPE,
-        ReportSectionId.WARNINGS: ReportSectionStatus.PRESENT,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.PRESENT,
+    "rating_succeeded": {
+        ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
+        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.SIZING_RANKING: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.WARNINGS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.PROVENANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.INTEGRITY: ReportSectionStatus.PRESENT,
+        ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
-    "blocked": {
-        ReportSectionId.STATUS_BANNER: ReportSectionStatus.PRESENT,
-        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.PRESENT,
-        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.PRESENT,
-        ReportSectionId.GEOMETRY: ReportSectionStatus.PRESENT,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.SIZING_RANKING: ReportSectionStatus.OUT_OF_SCOPE,
-        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.OUT_OF_SCOPE,
-        ReportSectionId.WARNINGS: ReportSectionStatus.PRESENT,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.PRESENT,
+    "rating_blocked": {
+        ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
+        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.SIZING_RANKING: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.WARNINGS: ReportSectionStatus.BLOCKED,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.BLOCKED,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.PROVENANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.INTEGRITY: ReportSectionStatus.PRESENT,
+        ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
-    "failed": {
-        ReportSectionId.STATUS_BANNER: ReportSectionStatus.PRESENT,
-        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.PRESENT,
-        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.PRESENT,
-        ReportSectionId.GEOMETRY: ReportSectionStatus.PRESENT,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.SIZING_RANKING: ReportSectionStatus.OUT_OF_SCOPE,
-        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.OUT_OF_SCOPE,
-        ReportSectionId.WARNINGS: ReportSectionStatus.PRESENT,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.PRESENT,
-        ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.PRESENT,
-        ReportSectionId.PROVENANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.INTEGRITY: ReportSectionStatus.PRESENT,
+    "rating_failed": {
+        ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
+        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.SIZING_RANKING: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.WARNINGS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
 }
 
-# Sizing matrices keyed by termination_status
+# Sizing matrices keyed by source_state
 _SIZING_MATRIX: dict[str, dict[ReportSectionId, ReportSectionStatus]] = {
-    "complete": {
-        ReportSectionId.STATUS_BANNER: ReportSectionStatus.PRESENT,
-        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.PRESENT,
-        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.PRESENT,
-        ReportSectionId.GEOMETRY: ReportSectionStatus.PRESENT,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.SIZING_RANKING: ReportSectionStatus.PRESENT,
-        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.PRESENT,
-        ReportSectionId.WARNINGS: ReportSectionStatus.PRESENT,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.PRESENT,
+    "sizing_complete": {
+        ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
+        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.SIZING_RANKING: ReportSectionStatus.COMPLETE,
+        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.COMPLETE,
+        ReportSectionId.WARNINGS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.PROVENANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.INTEGRITY: ReportSectionStatus.PRESENT,
+        ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
-    "partial": {
-        ReportSectionId.STATUS_BANNER: ReportSectionStatus.PRESENT,
-        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.PRESENT,
-        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.PRESENT,
-        ReportSectionId.GEOMETRY: ReportSectionStatus.PRESENT,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.SIZING_RANKING: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.WARNINGS: ReportSectionStatus.PRESENT,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.PRESENT,
+    "sizing_partial": {
+        ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
+        ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.SIZING_RANKING: ReportSectionStatus.PARTIAL,
+        ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.PARTIAL,
+        ReportSectionId.WARNINGS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.PROVENANCE: ReportSectionStatus.PRESENT,
-        ReportSectionId.INTEGRITY: ReportSectionStatus.PRESENT,
+        ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
 }
+
+# Sections where COMPLETE or EMPTY are both acceptable in rating_succeeded
+_FLEXIBLE_SECTIONS: frozenset[ReportSectionId] = frozenset(
+    {
+        ReportSectionId.WARNINGS,
+        ReportSectionId.BLOCKERS,
+    }
+)
+
+
+def _get_expected_matrix(
+    source_state: str,
+) -> dict[ReportSectionId, ReportSectionStatus]:
+    """Return expected section→status mapping for the given source state."""
+    combined = {**_RATING_MATRIX, **_SIZING_MATRIX}
+    matrix = combined.get(source_state)
+    if matrix is None:
+        raise ValueError(f"Unknown source state: {source_state!r}")
+    return matrix
 
 
 def verify_report_section_status_matrix(
     model: ReportModel,
     operation: str,
-    termination_status: str,
+    source_state: str,
 ) -> None:
     """Verify each section's status matches the expected matrix.
 
+    For ``rating_succeeded``, warnings and blockers sections accept
+    either COMPLETE or EMPTY (depending on whether data exists).
+
     Raises :class:`ValueError` on any mismatch.
     """
-    if operation == "rateDoublePipe":
-        matrix = _RATING_MATRIX.get(termination_status)
-        if matrix is None:
-            raise ValueError(f"Unknown rating termination status: {termination_status!r}")
-    elif operation == "sizeDoublePipe":
-        matrix = _SIZING_MATRIX.get(termination_status)
-        if matrix is None:
-            raise ValueError(f"Unknown sizing termination status: {termination_status!r}")
-    else:
-        raise ValueError(f"Unsupported operation for status matrix: {operation!r}")
-
+    expected = _get_expected_matrix(source_state)
     for section in model.sections:
-        expected = matrix.get(section.section_id)
-        if expected is None:
-            raise ValueError(f"Section {section.section_id.value} not in status matrix")
-        if section.status != expected:
+        if section.section_id not in expected:
+            raise ValueError(f"Unexpected section {section.section_id.value}")
+        exp = expected[section.section_id]
+        actual = section.status
+        # Flexible: warnings and blockers can be COMPLETE or EMPTY in
+        # rating_succeeded mode (depends on whether data exists)
+        if source_state == "rating_succeeded" and section.section_id in _FLEXIBLE_SECTIONS:
+            if actual not in (
+                ReportSectionStatus.COMPLETE,
+                ReportSectionStatus.EMPTY,
+            ):
+                raise ValueError(
+                    f"Section {section.section_id.value}: "
+                    f"expected COMPLETE or EMPTY, got {actual.value}"
+                )
+        elif actual != exp:
             raise ValueError(
                 f"Section {section.section_id.value}: "
-                f"expected status {expected.value}, got {section.status.value}"
+                f"expected status {exp.value}, got {actual.value}"
             )
 
 
@@ -612,43 +769,47 @@ def verify_report_section_status_matrix(
 # =========================================================================
 
 
-def _get_result_status(envelope: Any) -> str:
-    """Extract the result status string from an envelope."""
-    result = envelope.result
-    if hasattr(result, "status"):
-        return str(result.status)
-    if hasattr(result, "termination_status"):
-        return str(result.termination_status)
-    return "unknown"
-
-
-def _get_termination_status(envelope: Any) -> str:
-    """Extract the termination status for matrix verification."""
-    if envelope.operation == "rateDoublePipe":
-        return str(envelope.result.status)
-    if envelope.operation == "sizeDoublePipe":
-        return str(envelope.result.termination_status)
-    raise ValueError(f"Unsupported operation: {envelope.operation}")
+def _determine_source_state(envelope: Any) -> str:
+    """Determine the source_state string from an envelope."""
+    operation = envelope.operation
+    if operation == "rateDoublePipe":
+        failure = getattr(envelope, "failure", None)
+        if failure is not None:
+            return "rating_failed"
+        blockers = getattr(envelope, "blockers", ())
+        if blockers:
+            return "rating_blocked"
+        return "rating_succeeded"
+    if operation == "sizeDoublePipe":
+        result = envelope.result
+        ts = str(getattr(result, "termination_status", "unknown"))
+        if ts in ("complete", "COMPLETE"):
+            return "sizing_complete"
+        if ts in ("partial", "PARTIAL"):
+            return "sizing_partial"
+        raise ValueError(f"Unknown sizing termination status: {ts!r}")
+    raise ValueError(f"Unsupported operation for status matrix: {operation!r}")
 
 
 def _build_section_statuses(
     envelope: Any,
 ) -> dict[ReportSectionId, ReportSectionStatus]:
     """Build the expected section status map from the envelope."""
-    operation = envelope.operation
-    if operation == "rateDoublePipe":
-        status = str(envelope.result.status)
-        matrix = _RATING_MATRIX.get(status)
-        if matrix is None:
-            raise ValueError(f"Unknown rating status: {status!r}")
-        return dict(matrix)
-    if operation == "sizeDoublePipe":
-        status = str(envelope.result.termination_status)
-        matrix = _SIZING_MATRIX.get(status)
-        if matrix is None:
-            raise ValueError(f"Unknown sizing termination: {status!r}")
-        return dict(matrix)
-    raise ValueError(f"Unsupported operation: {operation!r}")
+    source_state = _determine_source_state(envelope)
+    matrix = _get_expected_matrix(source_state)
+
+    # For rating_succeeded, override warnings/blockers based on actual data
+    if source_state == "rating_succeeded":
+        warnings = getattr(envelope, "warnings", ())
+        blockers = getattr(envelope, "blockers", ())
+        matrix = dict(matrix)
+        matrix[ReportSectionId.WARNINGS] = (
+            ReportSectionStatus.COMPLETE if warnings else ReportSectionStatus.EMPTY
+        )
+        matrix[ReportSectionId.BLOCKERS] = (
+            ReportSectionStatus.COMPLETE if blockers else ReportSectionStatus.EMPTY
+        )
+    return matrix
 
 
 def _section_content(
@@ -659,33 +820,35 @@ def _section_content(
     """Build text content for a report section."""
     title = _SECTION_TITLES[section_id]
 
-    if status == ReportSectionStatus.OUT_OF_SCOPE:
-        return f"{title} is out of scope for this operation."
     if status == ReportSectionStatus.NOT_APPLICABLE:
         return f"{title} is not applicable."
-    if status == ReportSectionStatus.NOT_IMPLEMENTED:
-        return f"{title} is not yet implemented."
+    if status == ReportSectionStatus.BLOCKED:
+        return f"{title} is blocked."
+    if status == ReportSectionStatus.EMPTY:
+        return f"No {title.lower()} recorded."
 
-    # PRESENT — build actual content from envelope
+    # COMPLETE or PARTIAL — build actual content from envelope
     result = envelope.result
     lines: list[str] = []
 
     if section_id == ReportSectionId.STATUS_BANNER:
         lines.append(f"Operation: {envelope.operation}")
-        lines.append(f"Result Kind: {envelope.result_kind}")
-        lines.append(f"Status: {_get_result_status(envelope)}")
+        result_kind = getattr(envelope, "result_kind", "unknown")
+        lines.append(f"Result Kind: {result_kind}")
+        if hasattr(result, "status"):
+            lines.append(f"Status: {result.status}")
+        elif hasattr(result, "termination_status"):
+            lines.append(f"Termination Status: {result.termination_status}")
 
     elif section_id == ReportSectionId.RUN_IDENTITY:
         lines.append(f"Run ID: {envelope.run_id}")
         lines.append(f"Operation: {envelope.operation}")
         lines.append(f"Request Digest: {envelope.request_digest}")
-        if hasattr(envelope, "idempotency_key_digest"):
-            lines.append(f"Idempotency Key Digest: {envelope.idempotency_key_digest}")
 
     elif section_id == ReportSectionId.INPUT_SUMMARY:
-        snapshot = getattr(envelope, "artifact_bundle", None)
-        if snapshot is not None and hasattr(snapshot, "canonical_request_snapshot"):
-            snap = snapshot.canonical_request_snapshot
+        bundle = getattr(envelope, "artifact_bundle", None)
+        if bundle is not None and hasattr(bundle, "canonical_request_snapshot"):
+            snap = bundle.canonical_request_snapshot
             if isinstance(snap, dict):
                 for k, v in sorted(snap.items()):
                     lines.append(f"  {k}: {v}")
@@ -790,100 +953,23 @@ def _section_content(
         if provenance is not None:
             nodes = getattr(provenance, "nodes", ())
             edges = getattr(provenance, "edges", ())
-            lines.append(f"Provenance Digest: {envelope.provenance_digest}")
+            prov_digest = getattr(envelope, "provenance_digest", "N/A")
+            lines.append(f"Provenance Digest: {prov_digest}")
             lines.append(f"Nodes: {len(nodes)}")
             lines.append(f"Edges: {len(edges)}")
         else:
-            lines.append(f"Provenance Digest: {envelope.provenance_digest}")
+            prov_digest = getattr(envelope, "provenance_digest", "N/A")
+            lines.append(f"Provenance Digest: {prov_digest}")
 
     elif section_id == ReportSectionId.INTEGRITY:
-        lines.append(f"Result Hash: {envelope.result_hash}")
-        lines.append(f"Provenance Digest: {envelope.provenance_digest}")
-        lines.append(f"Bundle Digest: {envelope.artifact_bundle_digest}")
+        result_hash = getattr(envelope, "result_hash", "N/A")
+        prov_digest = getattr(envelope, "provenance_digest", "N/A")
+        bundle_digest = getattr(envelope, "artifact_bundle_digest", "N/A")
+        lines.append(f"Result Hash: {result_hash}")
+        lines.append(f"Provenance Digest: {prov_digest}")
+        lines.append(f"Bundle Digest: {bundle_digest}")
 
     return "\n".join(lines)
-
-
-def _build_artifacts_for_section(
-    section_id: ReportSectionId,
-    envelope_dict: dict[str, Any],
-    section_statuses: dict[ReportSectionId, ReportSectionStatus],
-) -> list[ReportArtifact]:
-    """Build artifact list for a given section."""
-    artifacts: list[ReportArtifact] = []
-    section_status = section_statuses[section_id]
-
-    for kind, (owner_section, pointer_candidates) in _ARTIFACT_POINTER_MAP.items():
-        if owner_section != section_id:
-            continue
-
-        artifact_id = ReportArtifactId(kind.value)
-
-        if section_status in (
-            ReportSectionStatus.OUT_OF_SCOPE,
-            ReportSectionStatus.NOT_APPLICABLE,
-            ReportSectionStatus.NOT_IMPLEMENTED,
-        ):
-            # Section is not present — artifact inherits the status
-            if section_status == ReportSectionStatus.OUT_OF_SCOPE:
-                artifacts.append(
-                    OutOfScopeReportArtifact(
-                        artifact_id=artifact_id,
-                        kind=kind,
-                        section=section_id,
-                        reason="out_of_scope",
-                    )
-                )
-            elif section_status == ReportSectionStatus.NOT_APPLICABLE:
-                artifacts.append(
-                    UnavailableReportArtifact(
-                        artifact_id=artifact_id,
-                        kind=kind,
-                        section=section_id,
-                        reason="unavailable",
-                    )
-                )
-            else:
-                artifacts.append(
-                    NotImplementedReportArtifact(
-                        artifact_id=artifact_id,
-                        kind=kind,
-                        section=section_id,
-                        reason="not_implemented",
-                    )
-                )
-        else:
-            # Section is PRESENT — try to resolve the pointer
-            resolved = False
-            for pointer in pointer_candidates:
-                try:
-                    value = resolve_source_pointer(envelope_dict, pointer)
-                    canonical_raw = _canonical_raw(value)
-                    artifacts.append(
-                        PresentReportArtifact(
-                            artifact_id=artifact_id,
-                            kind=kind,
-                            section=section_id,
-                            canonical_raw_value=canonical_raw,
-                            source_pointer=pointer,
-                        )
-                    )
-                    resolved = True
-                    break
-                except (ValueError, KeyError, IndexError):
-                    continue
-            if not resolved:
-                # Could not resolve — mark unavailable
-                artifacts.append(
-                    UnavailableReportArtifact(
-                        artifact_id=artifact_id,
-                        kind=kind,
-                        section=section_id,
-                        reason="pointer_unresolvable",
-                    )
-                )
-
-    return artifacts
 
 
 def _canonical_raw(value: Any) -> str:
@@ -896,6 +982,65 @@ def _canonical_raw(value: Any) -> str:
         return "null"
     # Complex types → canonical JSON
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _build_artifacts_for_section(
+    section_id: ReportSectionId,
+    envelope_dict: dict[str, Any],
+    section_statuses: dict[ReportSectionId, ReportSectionStatus],
+) -> list[ReportArtifact]:
+    """Build artifact list for a given section."""
+    artifacts: list[ReportArtifact] = []
+    section_status = section_statuses[section_id]
+
+    for artifact_id, (owner_section, source_doc, pointer_candidates) in _ARTIFACT_MAP.items():
+        if owner_section != section_id:
+            continue
+
+        if section_status in (
+            ReportSectionStatus.NOT_APPLICABLE,
+            ReportSectionStatus.BLOCKED,
+        ):
+            artifacts.append(
+                UnavailableReportArtifact(
+                    kind=ReportArtifactKind.NOT_AVAILABLE,
+                    artifact_id=artifact_id,
+                    source_document=source_doc,
+                )
+            )
+            continue
+
+        # Section is COMPLETE, PARTIAL, or EMPTY — try to resolve the pointer
+        resolved = False
+        for pointer in pointer_candidates:
+            try:
+                value = resolve_source_pointer(envelope_dict, pointer)
+                canonical_raw = _canonical_raw(value)
+                artifacts.append(
+                    PresentReportArtifact(
+                        kind=ReportArtifactKind.PRESENT,
+                        artifact_id=artifact_id,
+                        source_document=source_doc,
+                        source_document_digest="",
+                        source_json_pointer=pointer,
+                        authority_digest="",
+                        canonical_raw_value=canonical_raw,
+                    )
+                )
+                resolved = True
+                break
+            except (ValueError, KeyError, IndexError):
+                continue
+        if not resolved:
+            artifacts.append(
+                UnavailableReportArtifact(
+                    kind=ReportArtifactKind.NOT_AVAILABLE,
+                    artifact_id=artifact_id,
+                    source_document=source_doc,
+                )
+            )
+
+    return artifacts
 
 
 def _build_sections_from_envelope(
@@ -964,9 +1109,9 @@ def _verify_source_pointers(model: ReportModel, envelope_dict: dict[str, Any]) -
         for artifact in section.artifacts:
             if isinstance(artifact, PresentReportArtifact):
                 # Validate pointer format
-                validate_rfc6901_pointer(artifact.source_pointer)
+                validate_rfc6901_pointer(artifact.source_json_pointer)
                 # Resolve and verify
-                resolved = resolve_source_pointer(envelope_dict, artifact.source_pointer)
+                resolved = resolve_source_pointer(envelope_dict, artifact.source_json_pointer)
                 expected_raw = _canonical_raw(resolved)
                 if artifact.canonical_raw_value != expected_raw:
                     raise ValueError(
@@ -990,11 +1135,11 @@ def build_report_html(record: Any) -> bytes:
     2. Verify domain result
     3. Verify provenance
     4. Verify artifact bundle
-    5. Verify run envelope
-    6. Verify section/status matrix
-    7. Verify mandatory artifacts
-    8. Resolve source pointers
-    9. Verify canonical raw values
+    5. Verify run envelope (cross-field parity)
+    6. Build 13 sections from envelope
+    7. Build artifacts for each section
+    8. Verify status matrix
+    9. Verify mandatory artifacts
     10. Verify report hashes
     11. Render HTML
 
@@ -1021,8 +1166,10 @@ def build_report_html(record: Any) -> bytes:
     if not hasattr(envelope, "provenance"):
         raise ValueError("Envelope has no provenance")
     # Cross-check: provenance_digest must match result's provenance_digest
-    prov_match = hasattr(envelope.result, "provenance_digest")
-    if prov_match and envelope.provenance_digest != envelope.result.provenance_digest:
+    if (
+        hasattr(envelope.result, "provenance_digest")
+        and envelope.provenance_digest != envelope.result.provenance_digest
+    ):
         raise ValueError("provenance_digest mismatch between envelope and result")
 
     # 4. Verify artifact bundle (check bundle parity)
@@ -1040,52 +1187,46 @@ def build_report_html(record: Any) -> bytes:
     if has_rd and envelope.request_digest != record.request_digest:
         raise ValueError("Envelope request_digest != record request_digest")
 
-    # Build sections
+    # 6 & 7. Build sections and artifacts from envelope
     sections = _build_sections_from_envelope(envelope)
 
     # Compute content hash
     content_hash = compute_report_content_hash(sections)
 
-    # Compute instance hash
+    # Build model (triggers B2 section validation)
+    model = ReportModel(
+        run_id=envelope.run_id,
+        operation=operation,
+        sections=sections,
+        content_hash=content_hash,
+        section_order=REPORT_SECTION_ORDER,
+    )
+
+    # 8. Verify section/status matrix
+    source_state = _determine_source_state(envelope)
+    verify_report_section_status_matrix(model, operation, source_state)
+
+    # 9. Verify mandatory artifacts (exactly 5 present, correct owners)
+    _verify_mandatory_artifacts(model)
+
+    # 10. Verify source pointers and canonical raw values
+    envelope_dict = envelope.model_dump(mode="json")
+    _verify_source_pointers(model, envelope_dict)
+
+    # 11. Verify report hashes
+    recomputed_content = compute_report_content_hash(model.sections)
+    if recomputed_content != content_hash:
+        raise ValueError("Content hash recomputation mismatch")
+
     instance_identity = ReportInstanceIdentity(
         report_content_hash=content_hash,
         report_schema_version="1.0",
         run_id=envelope.run_id,
         operation=operation,
     )
-    instance_hash = compute_report_instance_hash(instance_identity)
+    compute_report_instance_hash(instance_identity)
 
-    # Build model (triggers B2 section validation)
-    model = ReportModel(
-        run_id=envelope.run_id,
-        operation=operation,
-        report_schema_version="1.0",
-        sections=sections,
-        content_hash=content_hash,
-        instance_hash=instance_hash,
-    )
-
-    # 6. Verify section/status matrix
-    termination_status = _get_termination_status(envelope)
-    verify_report_section_status_matrix(model, operation, termination_status)
-
-    # 7. Verify mandatory artifacts
-    _verify_mandatory_artifacts(model)
-
-    # 8 & 9. Resolve source pointers and verify canonical raw values
-    envelope_dict = envelope.model_dump(mode="json")
-    _verify_source_pointers(model, envelope_dict)
-
-    # 10. Verify report hashes
-    # Content hash is computed fresh above — verify it matches
-    recomputed_content = compute_report_content_hash(model.sections)
-    if recomputed_content != content_hash:
-        raise ValueError("Content hash recomputation mismatch")
-    recomputed_instance = compute_report_instance_hash(instance_identity)
-    if recomputed_instance != instance_hash:
-        raise ValueError("Instance hash recomputation mismatch")
-
-    # 11. Render HTML
+    # 12. Render HTML
     return render_report_html(model)
 
 
@@ -1165,11 +1306,6 @@ def render_report_html(model: ReportModel) -> bytes:
         f"<p><strong>Content Hash:</strong> "
         f'<span class="hash">{_escape(model.content_hash)}</span></p>'
     )
-    parts.append(
-        f"<p><strong>Instance Hash:</strong> "
-        f'<span class="hash">{_escape(model.instance_hash)}</span></p>'
-    )
-    parts.append(f"<p><strong>Schema Version:</strong> {_escape(model.report_schema_version)}</p>")
 
     # Sections (order is deterministic because the tuple is frozen)
     for section in model.sections:
@@ -1186,15 +1322,15 @@ def render_report_html(model: ReportModel) -> bytes:
                 art_id = _escape(art.artifact_id.value)
                 art_kind = _escape(art.kind.value)
                 if isinstance(art, PresentReportArtifact):
-                    pointer = _escape(art.source_pointer)
+                    pointer = _escape(art.source_json_pointer)
                     raw_preview = _escape(art.canonical_raw_value[:200])
                     parts.append(
                         f"<li><strong>{art_id}</strong> ({art_kind}): "
-                        f"<code>{pointer}</code> = <code>{raw_preview}</code></li>"
+                        f"<code>{pointer}</code> = "
+                        f"<code>{raw_preview}</code></li>"
                     )
                 else:
-                    reason = _escape(getattr(art, "reason", "unknown"))
-                    parts.append(f"<li><strong>{art_id}</strong> ({art_kind}): [{reason}]</li>")
+                    parts.append(f"<li><strong>{art_id}</strong> ({art_kind}): [{art_kind}]</li>")
             parts.append("</ul></details>")
         parts.append("</div>")
 
@@ -1221,6 +1357,7 @@ __all__ = [
     "ReportSection",
     "ReportSectionId",
     "ReportSectionStatus",
+    "ReportSourceDocument",
     "UnavailableReportArtifact",
     "build_report_html",
     "compute_report_content_hash",
