@@ -492,13 +492,14 @@ class TestA6T45:
     """
 
     def test_t45_real_http_200(self):
-        """monkeypatch DoublePipeService.size to poison, POST sizing, assert 200.
+        """T45: DoublePipeService.size() never called, sizing returns HTTP 200.
 
         The sizing endpoint uses SizingApplicationService (not
         DoublePipeService.size).  We patch size() with a poison function
-        and verify it is never invoked.  If the sizing endpoint succeeds,
-        we also verify the 200 status.
+        and verify it is never invoked AND the endpoint returns 200.
         """
+        from hexagent.api.envelopes import SizingRunEnvelope
+        from hexagent.api.repository import RunState
         from hexagent.exchangers.double_pipe.service import DoublePipeService
 
         app = _create_sizing_app()
@@ -511,12 +512,24 @@ class TestA6T45:
 
         sizing_payload = _make_real_sizing_request(app)
         with patch.object(DoublePipeService, "size", poison):
-            client.post(
+            resp = client.post(
                 "/v1/double-pipe/sizing",
                 json=sizing_payload,
                 headers={"Idempotency-Key": "test-t45-real-200"},
             )
-        # T45 invariant: DoublePipeService.size() is NEVER called
+
+        # T45: HTTP 200
+        assert resp.status_code == 200
+        # T45: typed envelope parse
+        envelope = SizingRunEnvelope.model_validate(resp.json())
+        # T45: bundle verifier (auto-verified on construction)
+        assert envelope.artifact_bundle is not None
+        # T45: repository state
+        repo = app.state.deps.run_repository
+        record = repo.get_by_run_id(envelope.run_id)
+        assert record is not None
+        assert record.state == RunState.COMPLETE
+        # T45: poison count
         assert poison_called["count"] == 0
 
 

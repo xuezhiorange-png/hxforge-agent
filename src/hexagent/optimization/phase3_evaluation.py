@@ -259,7 +259,7 @@ class Phase3EvaluationInput(BaseModel):
             if isnap.identity_snapshot_digest != self.ordered_identity_snapshot_digests[i]:
                 raise ValueError(f"[{i}] identity_snapshot_digest != ordered digest")
         # 7) Complete snapshot — verify via authoritative verifier
-        for i, (_rec, cs) in enumerate(zip(source_records, self.complete_snapshots, strict=False)):
+        for i, (rec, cs) in enumerate(zip(source_records, self.complete_snapshots, strict=False)):
             if cs is None:
                 if rec.candidate_evaluation_state == VERIFIED:
                     raise ValueError(f"[{i}] VERIFIED must have complete_snapshot")

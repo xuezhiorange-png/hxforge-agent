@@ -222,7 +222,8 @@ async def size_double_pipe(
 
     # 11. Build typed artifact bundle (A1)
     try:
-        bundle = SizingRunArtifacts(
+        # First pass: model_construct bypasses validators to compute digest
+        _bundle_fields = dict(
             canonical_request_snapshot=service_result.canonical_request_snapshot,
             sizing_request=service_result.sizing_request,
             evaluation_input=exec_result.evaluation_input,
@@ -232,23 +233,13 @@ async def size_double_pipe(
             top_n_records=exec_result.top_n_records,
             optimization_result=exec_result.optimization_result,
             provenance_graph=exec_result.provenance,
-            # C2: single provenance digest authority from OptimizationResult
-            artifact_bundle_digest="",  # placeholder — computed below
+            artifact_bundle_digest="",
         )
-        # Compute bundle digest from actual content
-        bundle_digest = compute_sizing_artifact_bundle_digest(bundle)
-        # Reconstruct with correct digest
+        _draft = SizingRunArtifacts.model_construct(**_bundle_fields)
+        bundle_digest = compute_sizing_artifact_bundle_digest(_draft)
+
         bundle = SizingRunArtifacts(
-            canonical_request_snapshot=service_result.canonical_request_snapshot,
-            sizing_request=service_result.sizing_request,
-            evaluation_input=exec_result.evaluation_input,
-            phase3_authoritative_artifacts=exec_result.phase3_authoritative_artifacts,
-            dispositions=exec_result.dispositions,
-            ranked_records=exec_result.ranked_records,
-            top_n_records=exec_result.top_n_records,
-            optimization_result=exec_result.optimization_result,
-            provenance_graph=exec_result.provenance,
-            artifact_bundle_digest=bundle_digest,
+            **{**_bundle_fields, "artifact_bundle_digest": bundle_digest},
         )
     except Exception:
         _store_failure(
