@@ -30,8 +30,20 @@ except ImportError:  # pragma: no cover
             return self.value  # type: ignore[no-any-return]
 
 
-from typing import Any, Protocol  # noqa: E402
+from collections.abc import Callable  # noqa: E402
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias  # noqa: E402
 from uuid import UUID  # noqa: E402
+
+if TYPE_CHECKING:
+    from hexagent.api.artifacts import RatingRunArtifacts, SizingRunArtifacts  # noqa: F401
+    from hexagent.api.envelopes import (  # noqa: F401
+        RatingRunEnvelope,
+        SizingRunEnvelope,
+        ValidationRunEnvelope,
+    )
+
+_RunEnvelope: TypeAlias = "ValidationRunEnvelope | RatingRunEnvelope | SizingRunEnvelope"
+_ArtifactBundle: TypeAlias = "RatingRunArtifacts | SizingRunArtifacts"
 
 # ---------------------------------------------------------------------------
 # Frozen failure payload (C5) — stores exact HTTP failure for replay
@@ -127,9 +139,9 @@ class RunRecord:
     started_at: datetime | None = None
     completed_at: datetime | None = None
     failed_at: datetime | None = None
-    envelope: Any | None = None
-    artifact_bundle: Any | None = None
-    failure: Any | None = None
+    envelope: _RunEnvelope | None = None
+    artifact_bundle: _ArtifactBundle | None = None
+    failure: FrozenFailurePayload | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -181,8 +193,8 @@ class RunRepository(Protocol):
         *,
         owner_token: UUID,
         expected_version: int,
-        envelope: Any,
-        artifact_bundle: Any,
+        envelope: _RunEnvelope,
+        artifact_bundle: _ArtifactBundle,
     ) -> RunRecord: ...
 
     def fail(
@@ -190,7 +202,7 @@ class RunRepository(Protocol):
         *,
         owner_token: UUID,
         expected_version: int,
-        failure: Any,
+        failure: FrozenFailurePayload,
     ) -> RunRecord: ...
 
     def get_by_run_id(self, run_id: UUID) -> RunRecord | None: ...
@@ -218,7 +230,7 @@ class InMemoryRunRepository:
     The old record object is never modified.
     """
 
-    def __init__(self, *, clock: Any | None = None) -> None:
+    def __init__(self, *, clock: Callable[[], datetime] | None = None) -> None:
         self._lock = threading.Lock()
         self._records: dict[UUID, RunRecord] = {}
         self._by_namespace: dict[str, UUID] = {}
@@ -228,7 +240,7 @@ class InMemoryRunRepository:
 
     def _now(self) -> datetime:
         if self._clock is not None:
-            return self._clock()  # type: ignore[no-any-return]
+            return self._clock()
         return _now_utc()
 
     def _is_stale(self, record: RunRecord) -> bool:
@@ -443,8 +455,8 @@ class InMemoryRunRepository:
         *,
         owner_token: UUID,
         expected_version: int,
-        envelope: Any,
-        artifact_bundle: Any,
+        envelope: _RunEnvelope,
+        artifact_bundle: _ArtifactBundle,
     ) -> RunRecord:
         with self._lock:
             record = self._find_by_owner(owner_token, expected_version)
@@ -503,7 +515,7 @@ class InMemoryRunRepository:
         *,
         owner_token: UUID,
         expected_version: int,
-        failure: Any,
+        failure: FrozenFailurePayload,
     ) -> RunRecord:
         with self._lock:
             record = self._find_by_owner(owner_token, expected_version)

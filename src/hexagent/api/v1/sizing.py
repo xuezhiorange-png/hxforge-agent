@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
@@ -37,6 +38,7 @@ from hexagent.api.repository import (
     ClaimOutcome,
     FrozenFailurePayload,
     IdempotencyConflictError,
+    RunRecord,
     RunRepository,
 )
 
@@ -235,11 +237,11 @@ async def size_double_pipe(
             provenance_graph=exec_result.provenance,
             artifact_bundle_digest="",
         )
-        _draft = SizingRunArtifacts.model_construct(**_bundle_fields)
+        _draft = SizingRunArtifacts.model_construct(**_bundle_fields)  # type: ignore[arg-type]
         bundle_digest = compute_sizing_artifact_bundle_digest(_draft)
 
         bundle = SizingRunArtifacts(
-            **{**_bundle_fields, "artifact_bundle_digest": bundle_digest},
+            **{**_bundle_fields, "artifact_bundle_digest": bundle_digest},  # type: ignore[arg-type]
         )
     except Exception:
         _store_failure(
@@ -326,8 +328,8 @@ async def size_double_pipe(
 
 def _store_failure(
     repo: RunRepository,
-    owner_token: Any,
-    record: Any,
+    owner_token: UUID,
+    record: RunRecord,
     *,
     status_code: int,
     error_code: str,

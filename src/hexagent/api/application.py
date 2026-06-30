@@ -11,7 +11,7 @@ SizingService — re-exported from sizing_service.py (Phase 1 projection).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from hexagent.api.canonical_request import (
     build_rating_canonical_request_context,
@@ -20,6 +20,7 @@ from hexagent.api.canonical_request import (
 from hexagent.api.models import (
     RatingApiRequest,
     ResolvedProviderAuthority,
+    SizingApiRequest,
     SolverParamsSpec,
 )
 from hexagent.api.projection import (
@@ -42,6 +43,15 @@ from hexagent.exchangers.double_pipe.service import DoublePipeRatingService
 from hexagent.exchangers.double_pipe.solver import SolverParams
 from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 from hexagent.properties.base import FluidIdentifier, PropertyProvider
+
+if TYPE_CHECKING:
+    from hexagent.optimization.phase3_builder import OptimizationResult, RankedCandidateRecord
+    from hexagent.optimization.phase3_core import Phase3RunFailureDescriptorBinding
+    from hexagent.optimization.phase3_evaluation import (
+        CandidateDispositionRecord,
+        Phase3EvaluationInput,
+    )
+    from hexagent.optimization.phase3_verifier import Phase3AuthoritativeArtifacts
 
 # ---------------------------------------------------------------------------
 # RatingServiceResult
@@ -357,16 +367,16 @@ class SizingExecutionResult:
     ``SizingRunArtifacts``.
     """
 
-    optimization_result: Any  # OptimizationResult — resolved at runtime
+    optimization_result: OptimizationResult
     provenance: ProvenanceGraph
     warnings: tuple[EngineeringMessage, ...]
     blockers: tuple[EngineeringMessage, ...]
     # A1: Phase 3 artifacts for typed SizingRunArtifacts
-    evaluation_input: Any  # Phase3EvaluationInput
-    phase3_authoritative_artifacts: Any  # Phase3AuthoritativeArtifacts
-    dispositions: tuple[Any, ...]  # tuple[CandidateDispositionRecord, ...]
-    ranked_records: tuple[Any, ...]  # tuple[RankedCandidateRecord, ...]
-    top_n_records: tuple[Any, ...]  # tuple[RankedCandidateRecord, ...]
+    evaluation_input: Phase3EvaluationInput
+    phase3_authoritative_artifacts: Phase3AuthoritativeArtifacts
+    dispositions: tuple[CandidateDispositionRecord, ...]
+    ranked_records: tuple[RankedCandidateRecord, ...]
+    top_n_records: tuple[RankedCandidateRecord, ...]
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +414,7 @@ class SizingApplicationService:
             catalog_registry=catalog_registry,
         )
 
-    def prepare(self, request: Any) -> PreparedSizingRun:
+    def prepare(self, request: SizingApiRequest) -> PreparedSizingRun:
         """Prepare a sizing run WITHOUT executing the optimization kernel.
 
         Steps:
@@ -601,7 +611,7 @@ class SizingApplicationService:
                 blocker_binding_tuples.append(tuple(block_binds))
 
                 # Build evidence failure binding if evidence has failure
-                efb: Any = None
+                efb: Phase3RunFailureDescriptorBinding | None = None
                 if evidence.failure is not None:
                     fail_desc = _build_run_failure_descriptor(evidence.failure)
                     if fail_desc.canonicalization_error is None:
