@@ -73,14 +73,16 @@ def _create_test_app() -> FastAPI:
     from hexagent.properties.coolprop_provider import CoolPropProvider
 
     provider = CoolPropProvider()
-    # Build snapshot matching what the rating kernel's _provider_snapshot()
-    # actually produces: it does NOT capture configuration_fingerprint or
-    # cache_policy_version (they default to "").
+    # C1: Build snapshot with ALL 6 identity fields matching the kernel's
+    # _provider_snapshot() output (now captures configuration_fingerprint
+    # and cache_policy_version).
     snapshot = ProviderIdentitySnapshot(
         name=provider.name,
         version=provider.version,
         git_revision=provider.git_revision,
         reference_state_policy=str(provider.reference_state_policy.value),
+        configuration_fingerprint=getattr(provider, "_construction_fingerprint", ""),
+        cache_policy_version=getattr(provider, "cache_policy_version", ""),
     )
     provider_registry = ProviderRegistry({"CoolProp": snapshot})
     catalog_registry = CatalogRegistry([])
@@ -118,14 +120,16 @@ def _create_fresh_app() -> FastAPI:
     from hexagent.properties.coolprop_provider import CoolPropProvider
 
     provider = CoolPropProvider()
-    # Build snapshot matching what the rating kernel's _provider_snapshot()
-    # actually produces: it does NOT capture configuration_fingerprint or
-    # cache_policy_version (they default to "").
+    # C1: Build snapshot with ALL 6 identity fields matching the kernel's
+    # _provider_snapshot() output (now captures configuration_fingerprint
+    # and cache_policy_version).
     snapshot = ProviderIdentitySnapshot(
         name=provider.name,
         version=provider.version,
         git_revision=provider.git_revision,
         reference_state_policy=str(provider.reference_state_policy.value),
+        configuration_fingerprint=getattr(provider, "_construction_fingerprint", ""),
+        cache_policy_version=getattr(provider, "cache_policy_version", ""),
     )
     provider_registry = ProviderRegistry({"CoolProp": snapshot})
     catalog_registry = CatalogRegistry([])
