@@ -26,5 +26,10 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy
-      - run: pytest -x --timeout=180 --ignore=tests/unit/test_double_pipe_correction_r10.py
+      - name: Run TASK-010 tests
+        run: |
+          pytest -x --timeout=120 \
+            tests/unit/test_task010_final.py \
+            tests/unit/test_task010_phase1.py \
+            tests/unit/test_task010_phase2.py
       - run: pip-audit
