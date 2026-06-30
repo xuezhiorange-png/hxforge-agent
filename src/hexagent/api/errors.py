@@ -15,8 +15,19 @@ from pydantic import field_validator
 
 from hexagent.domain.models import StrictBaseModel
 
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
 
-class ApiErrorCode(str):  # noqa: SLOT000 — StrEnum alternative for 3.10 compat
+    class StrEnum(str, Enum):  # type: ignore[no-redef]  # noqa: UP042
+        """Backport of StrEnum for Python < 3.11."""
+
+        def __str__(self) -> str:
+            return self.value
+
+
+class ApiErrorCode(StrEnum):
     """Frozen error codes per contract §17."""
 
     VALIDATION_FAILED = "validation_failed"
@@ -24,15 +35,6 @@ class ApiErrorCode(str):  # noqa: SLOT000 — StrEnum alternative for 3.10 compa
     RUN_NOT_FOUND = "run_not_found"
     PDF_NOT_AVAILABLE = "pdf_not_available"
     INTERNAL_ERROR = "internal_error"
-
-    # Allow comparison as string
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, str):
-            return str(self) == other
-        return super().__eq__(other)
-
-    def __hash__(self) -> int:
-        return hash(str(self))
 
 
 # Canonical set of valid error codes for assertion
@@ -63,6 +65,16 @@ class ErrorDetail(StrictBaseModel):
         if value is not None and len(value) > 200:
             return value[:200]
         return value
+
+
+def _error_path_sort_key(
+    path: tuple[str | int, ...],
+) -> tuple[tuple[int, str], ...]:
+    """Normalize mixed str/int path elements for deterministic sorting.
+
+    Strings sort before ints (0 < 1), both compared as str within their group.
+    """
+    return tuple((0, str(part)) if isinstance(part, str) else (1, str(part)) for part in path)
 
 
 class ApiError(StrictBaseModel):
@@ -96,5 +108,8 @@ class ApiError(StrictBaseModel):
     @field_validator("details")
     @classmethod
     def sort_details(cls, value: tuple[ErrorDetail, ...]) -> tuple[ErrorDetail, ...]:
-        """Deterministic ordering by (path, code)."""
-        return tuple(sorted(value, key=lambda d: (d.path, d.code)))
+        """Deterministic ordering by (path, code).
+
+        Uses _error_path_sort_key to handle mixed str/int path elements.
+        """
+        return tuple(sorted(value, key=lambda d: (_error_path_sort_key(d.path), d.code)))

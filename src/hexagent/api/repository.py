@@ -1,10 +1,11 @@
 """TASK-010 in-memory RunRepository with CAS state machine.
 
 Implements contract §7.4:
-- RunState enum: CLAIMED, RUNNING, COMPLETE, FAILED, STALE
-- RunRecord frozen dataclass
-- ClaimOutcome / ClaimResult
-- CAS on all mutating operations (owner_token + expected_version)
+- RunState StrEnum: CLAIMED, RUNNING, COMPLETE, FAILED, STALE
+- RunRecord frozen dataclass (frozen=True, slots=True, truly immutable)
+- ClaimOutcome StrEnum / ClaimResult
+- CAS on all mutating operations (owner_token + expected_version + lease)
+- All mutating methods return NEW frozen records (never mutate in place)
 - Lease management with STALE detection
 - Thread-safe via threading.Lock
 """
@@ -13,17 +14,31 @@ from __future__ import annotations
 
 import threading
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
-from uuid import UUID
+
+UTC = UTC
+try:
+    from enum import StrEnum  # Python 3.11+
+except ImportError:  # pragma: no cover
+    from enum import Enum
+
+    class StrEnum(str, Enum):  # type: ignore[no-redef]  # noqa: UP042  # Python 3.10 shim
+        """Minimal StrEnum backport for Python 3.10."""
+
+        def __str__(self) -> str:
+            return self.value
+
+
+from typing import Any, Protocol  # noqa: E402
+from uuid import UUID  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Frozen state enum
 # ---------------------------------------------------------------------------
 
 
-class RunState:
+class RunState(StrEnum):
     """Run lifecycle states per contract §7.4."""
 
     CLAIMED = "claimed"
@@ -32,34 +47,21 @@ class RunState:
     FAILED = "failed"
     STALE = "stale"
 
-    _VALID: frozenset[str] = frozenset(
-        {
-            CLAIMED,
-            RUNNING,
-            COMPLETE,
-            FAILED,
-            STALE,
-        }
-    )
 
-    # Allowed transitions: (from_state, to_state) → True
-    _TRANSITIONS: frozenset[tuple[str, str]] = frozenset(
-        {
-            (CLAIMED, RUNNING),
-            (CLAIMED, FAILED),
-            (RUNNING, COMPLETE),
-            (RUNNING, FAILED),
-            # STALE transitions handled via takeover
-        }
-    )
+# Allowed transitions: (from_state, to_state) → True
+_VALID_TRANSITIONS: frozenset[tuple[str, str]] = frozenset(
+    {
+        (RunState.CLAIMED, RunState.RUNNING),
+        (RunState.CLAIMED, RunState.FAILED),
+        (RunState.RUNNING, RunState.COMPLETE),
+        (RunState.RUNNING, RunState.FAILED),
+        # STALE transitions handled via takeover
+    }
+)
 
-    @classmethod
-    def is_valid(cls, state: str) -> bool:
-        return state in cls._VALID
 
-    @classmethod
-    def check_transition(cls, from_state: str, to_state: str) -> bool:
-        return (from_state, to_state) in cls._TRANSITIONS
+def _check_transition(from_state: RunState, to_state: RunState) -> bool:
+    return (from_state, to_state) in _VALID_TRANSITIONS
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +69,7 @@ class RunState:
 # ---------------------------------------------------------------------------
 
 
-class ClaimOutcome:
+class ClaimOutcome(StrEnum):
     """Outcomes of a claim() call per contract §7.4."""
 
     NEW_CLAIM = "new_claim"
@@ -78,38 +80,49 @@ class ClaimOutcome:
     STALE_TAKEOVER = "stale_takeover"
 
 
-@dataclass(frozen=True)
-class ClaimResult:
-    """Result of a claim() call."""
-
-    outcome: str  # ClaimOutcome value
-    record: RunRecord
-
-
 # ---------------------------------------------------------------------------
-# RunRecord
+# RunRecord — truly immutable via frozen=True, slots=True
 # ---------------------------------------------------------------------------
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class RunRecord:
-    """Immutable run record (mutated only via CAS-protected repository methods)."""
+    """Immutable run record.
+
+    All mutating operations in the repository create a NEW RunRecord via
+    dataclasses.replace() with an incremented record_version.  The frozen
+    + slots combination prevents any attribute reassignment.
+    """
 
     run_id: UUID
     namespace_digest: str
     request_digest: str
     operation: str
-    state: str  # RunState value
+    state: RunState
     owner_token: UUID
     record_version: int
     claimed_at: datetime
     lease_expires_at: datetime
+    heartbeat_at: datetime | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     failed_at: datetime | None = None
     envelope: Any | None = None
     artifact_bundle: Any | None = None
     failure: Any | None = None
+
+
+# ---------------------------------------------------------------------------
+# Claim result (forward-ref-safe because RunRecord is now defined)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimResult:
+    """Result of a claim() call."""
+
+    outcome: ClaimOutcome
+    record: RunRecord
 
 
 # ---------------------------------------------------------------------------
@@ -178,13 +191,20 @@ def _now_utc() -> datetime:
 
 
 class InMemoryRunRepository:
-    """Thread-safe in-memory run repository with CAS semantics."""
+    """Thread-safe in-memory run repository with CAS semantics.
+
+    Every mutating operation creates a NEW frozen RunRecord with
+    record_version += 1 and atomically replaces the stored record.
+    The old record object is never modified.
+    """
 
     def __init__(self, *, clock: Any | None = None) -> None:
         self._lock = threading.Lock()
         self._records: dict[UUID, RunRecord] = {}
         self._by_namespace: dict[str, UUID] = {}
         self._clock = clock  # injectable for testing
+
+    # -- helpers -----------------------------------------------------------
 
     def _now(self) -> datetime:
         if self._clock is not None:
@@ -196,6 +216,37 @@ class InMemoryRunRepository:
             record.state in (RunState.CLAIMED, RunState.RUNNING)
             and self._now() > record.lease_expires_at
         )
+
+    def _find_by_owner(self, owner_token: UUID, expected_version: int) -> RunRecord:
+        """CAS lookup — find record by owner_token and version.
+
+        Also validates that the lease has not expired; an expired lease is
+        treated as a CAS failure because the record is effectively STALE.
+        """
+        for record in self._records.values():
+            if record.owner_token == owner_token:
+                # Lease check — expired lease means CAS failure
+                if self._now() > record.lease_expires_at:
+                    raise CASCasError(f"lease expired for owner_token {owner_token}")
+                if record.record_version != expected_version:
+                    raise CASCasError(
+                        f"version mismatch: expected {expected_version}, "
+                        f"got {record.record_version}"
+                    )
+                return record
+        raise CASCasError(f"owner_token {owner_token} not found")
+
+    def _replace_record(self, old: RunRecord, **overrides: Any) -> RunRecord:
+        """Create a new frozen record with record_version + 1."""
+        new_record = replace(
+            old,
+            record_version=old.record_version + 1,
+            **overrides,
+        )
+        self._records[new_record.run_id] = new_record
+        return new_record
+
+    # -- claim -------------------------------------------------------------
 
     def claim(
         self,
@@ -257,8 +308,11 @@ class InMemoryRunRepository:
                     record=record,
                 )
 
-            # --- STALE_TAKEOVER: atomic CAS takeover ---
-            return self._stale_takeover(record=record, request_digest=request_digest)
+            # --- STALE_TAKEOVER: verify request_digest parity first ---
+            return self._stale_takeover(
+                record=record,
+                request_digest=request_digest,
+            )
 
     def _new_claim(
         self,
@@ -289,24 +343,41 @@ class InMemoryRunRepository:
         record: RunRecord,
         request_digest: str,
     ) -> ClaimResult:
+        """Take over a stale run.
+
+        If the request_digest differs from the existing record, this is an
+        idempotency conflict — not a takeover.  A takeover is only allowed
+        when the request_digest matches (same logical request retried).
+        """
+        if record.request_digest != request_digest:
+            raise IdempotencyConflictError(
+                f"namespace {record.namespace_digest[:16]}… is STALE "
+                f"but request_digest differs — idempotency conflict"
+            )
+
         now = self._now()
         new_token = uuid.uuid4()
 
-        record.owner_token = new_token
-        record.record_version += 1
-        record.request_digest = request_digest
-        record.claimed_at = now
-        record.lease_expires_at = now + LEASE_DURATION
-        record.state = RunState.CLAIMED
-        record.started_at = None
-        record.completed_at = None
-        record.failed_at = None
-        record.envelope = None
-        record.artifact_bundle = None
-        record.failure = None
+        # Create a NEW frozen record — never mutate the old one
+        new_record = self._replace_record(
+            record,
+            owner_token=new_token,
+            request_digest=request_digest,
+            claimed_at=now,
+            lease_expires_at=now + LEASE_DURATION,
+            state=RunState.CLAIMED,
+            heartbeat_at=None,
+            started_at=None,
+            completed_at=None,
+            failed_at=None,
+            envelope=None,
+            artifact_bundle=None,
+            failure=None,
+        )
 
-        # Old token is immediately invalid — CAS will reject it
-        return ClaimResult(outcome=ClaimOutcome.STALE_TAKEOVER, record=record)
+        return ClaimResult(outcome=ClaimOutcome.STALE_TAKEOVER, record=new_record)
+
+    # -- mutating operations (all return NEW frozen records) ---------------
 
     def start(
         self,
@@ -318,10 +389,14 @@ class InMemoryRunRepository:
             record = self._find_by_owner(owner_token, expected_version)
             if record.state != RunState.CLAIMED:
                 raise RepositoryStateError(f"start() requires CLAIMED state, got {record.state}")
-            record.state = RunState.RUNNING
-            record.started_at = self._now()
-            record.lease_expires_at = self._now() + LEASE_DURATION
-            return record
+            now = self._now()
+            new_record = self._replace_record(
+                record,
+                state=RunState.RUNNING,
+                started_at=now,
+                lease_expires_at=now + LEASE_DURATION,
+            )
+            return new_record
 
     def heartbeat(
         self,
@@ -335,8 +410,13 @@ class InMemoryRunRepository:
                 raise RepositoryStateError(
                     f"heartbeat() requires CLAIMED/RUNNING, got {record.state}"
                 )
-            record.lease_expires_at = self._now() + LEASE_DURATION
-            return record
+            now = self._now()
+            new_record = self._replace_record(
+                record,
+                heartbeat_at=now,
+                lease_expires_at=now + LEASE_DURATION,
+            )
+            return new_record
 
     def complete(
         self,
@@ -350,11 +430,21 @@ class InMemoryRunRepository:
             record = self._find_by_owner(owner_token, expected_version)
             if record.state != RunState.RUNNING:
                 raise RepositoryStateError(f"complete() requires RUNNING state, got {record.state}")
-            record.state = RunState.COMPLETE
-            record.completed_at = self._now()
-            record.envelope = envelope
-            record.artifact_bundle = artifact_bundle
-            return record
+            # Verify request_digest parity when envelope carries one
+            if envelope is not None and hasattr(envelope, "request_digest"):  # noqa: SIM102
+                if envelope.request_digest != record.request_digest:
+                    raise IdempotencyConflictError(
+                        "envelope.request_digest does not match record.request_digest"
+                    )
+            now = self._now()
+            new_record = self._replace_record(
+                record,
+                state=RunState.COMPLETE,
+                completed_at=now,
+                envelope=envelope,
+                artifact_bundle=artifact_bundle,
+            )
+            return new_record
 
     def fail(
         self,
@@ -367,33 +457,28 @@ class InMemoryRunRepository:
             record = self._find_by_owner(owner_token, expected_version)
             if record.state not in (RunState.CLAIMED, RunState.RUNNING):
                 raise RepositoryStateError(f"fail() requires CLAIMED/RUNNING, got {record.state}")
-            record.state = RunState.FAILED
-            record.failed_at = self._now()
-            record.failure = failure
-            return record
+            now = self._now()
+            new_record = self._replace_record(
+                record,
+                state=RunState.FAILED,
+                failed_at=now,
+                failure=failure,
+            )
+            return new_record
+
+    # -- getters (frozen dataclass is safe to return directly) -------------
 
     def get_by_run_id(self, run_id: UUID) -> RunRecord | None:
         with self._lock:
-            return self._records.get(run_id)
+            record = self._records.get(run_id)
+            return record  # frozen dataclass — safe to expose
 
     def get_by_namespace(self, namespace_digest: str) -> RunRecord | None:
         with self._lock:
             run_id = self._by_namespace.get(namespace_digest)
             if run_id is None:
                 return None
-            return self._records.get(run_id)
-
-    def _find_by_owner(self, owner_token: UUID, expected_version: int) -> RunRecord:
-        """CAS lookup — find record by owner_token and version."""
-        for record in self._records.values():
-            if record.owner_token == owner_token:
-                if record.record_version != expected_version:
-                    raise CASCasError(
-                        f"version mismatch: expected {expected_version}, "
-                        f"got {record.record_version}"
-                    )
-                return record
-        raise CASCasError(f"owner_token {owner_token} not found")
+            return self._records.get(run_id)  # frozen dataclass — safe
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +491,7 @@ class RepositoryError(Exception):
 
 
 class CASCasError(RepositoryError):
-    """CAS failure: owner_token not found or version mismatch."""
+    """CAS failure: owner_token not found, version mismatch, or expired lease."""
 
 
 class RepositoryStateError(RepositoryError):
