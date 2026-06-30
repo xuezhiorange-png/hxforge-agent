@@ -25,13 +25,16 @@ import json
 import re
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import ConfigDict, Discriminator, model_validator
 
 from hexagent.core.canonical import sha256_digest
 from hexagent.domain.models import StrictBaseModel
+
+if TYPE_CHECKING:
+    from hexagent.api.repository import RunRecord
 
 # ---------------------------------------------------------------------------
 # Risk banners displayed on every report page
@@ -1021,9 +1024,9 @@ def _build_artifacts_for_section(
                         kind=ReportArtifactKind.PRESENT,
                         artifact_id=artifact_id,
                         source_document=source_doc,
-                        source_document_digest="",
+                        source_document_digest=sha256_digest(envelope_dict),
                         source_json_pointer=pointer,
-                        authority_digest="",
+                        authority_digest=sha256_digest(value),
                         canonical_raw_value=canonical_raw,
                     )
                 )
@@ -1127,7 +1130,7 @@ def _verify_source_pointers(model: ReportModel, envelope_dict: dict[str, Any]) -
 # =========================================================================
 
 
-def build_report_html(record: Any) -> bytes:
+def build_report_html(record: RunRecord) -> bytes:
     """Build an HTML report from a repository :class:`RunRecord`.
 
     Executes the full verification chain (B7):
@@ -1152,13 +1155,11 @@ def build_report_html(record: Any) -> bytes:
     envelope = record.envelope
     operation = record.operation
 
-    # 2. Verify domain result (check envelope fields exist)
-    if not hasattr(envelope, "result") or envelope.result is None:
+    # 2. Verify domain result (envelope always has these fields per frozen contract)
+    if envelope.result is None:
         raise ValueError("Envelope has no result")
-    if not hasattr(envelope, "result_hash"):
+    if envelope.result_hash is None:
         raise ValueError("Envelope has no result_hash")
-    if not hasattr(envelope, "result_kind"):
-        raise ValueError("Envelope has no result_kind")
 
     # 3. Verify provenance (check provenance_digest matches)
     if not hasattr(envelope, "provenance_digest"):

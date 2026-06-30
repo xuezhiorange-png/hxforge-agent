@@ -19,6 +19,7 @@ from hexagent.api.envelopes import ValidationRunEnvelope
 from hexagent.api.errors import ApiError, ApiErrorCode, ErrorDetail
 from hexagent.api.models import ValidationApiRequest
 from hexagent.api.projection import project_validation_to_design_case
+from hexagent.core.canonical import sha256_digest
 
 router = APIRouter(prefix="/v1/cases", tags=["validation"])
 
@@ -45,15 +46,7 @@ async def validate_case(request: Request, body: ValidationApiRequest) -> Any:
     except Exception:
         raise
 
-    import hashlib
-    import json
-
-    receipt_hash = (
-        "sha256:"
-        + hashlib.sha256(
-            json.dumps(snapshot, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest()
-    )
+    receipt_hash = sha256_digest(snapshot)
 
     return ValidationRunEnvelope(
         api_schema_version="1",
