@@ -3,11 +3,14 @@
 Provides frozen Pydantic models that bind together all inputs, outputs,
 provenance, and integrity hashes for a completed run.  Construction
 auto-verifies all hash parities via ``model_validator(mode="after")``.
+
+A1: All fields are runtime-typed — no Any in public models.
+A4: Sizing artifact bundle verifier with full parity checks.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from pydantic import ConfigDict, model_validator
 
@@ -23,7 +26,16 @@ from hexagent.exchangers.double_pipe.result import (
 from hexagent.exchangers.double_pipe.solver import SolverParams
 
 if TYPE_CHECKING:
-    pass
+    from hexagent.optimization.models import SizingRequest
+    from hexagent.optimization.phase3_builder import (
+        OptimizationResult,
+        RankedCandidateRecord,
+    )
+    from hexagent.optimization.phase3_evaluation import (
+        CandidateDispositionRecord,
+        Phase3EvaluationInput,
+    )
+    from hexagent.optimization.phase3_verifier import Phase3AuthoritativeArtifacts
 
 
 # ---------------------------------------------------------------------------
@@ -36,7 +48,6 @@ def compute_rating_artifact_bundle_digest(bundle: RatingRunArtifacts) -> str:
     payload = bundle.model_dump(mode="python")
     # Remove the digest field from the payload
     payload.pop("artifact_bundle_digest", None)
-    # Also remove the result's result_hash and provenance_digest to avoid recursion
     return sha256_digest(payload)
 
 
@@ -63,15 +74,6 @@ def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
     # 7. provenance object parity
     if bundle.result.provenance_graph != bundle.provenance_graph:
         raise ValueError("result provenance_graph mismatch")
-
-    # 8. provenance digest parity
-    # The result's provenance_digest is computed by _provenance_graph_digest()
-    # which excludes result_hash from metadata to avoid circular dependency.
-    # ProvenanceGraph.compute_hash() includes all metadata, so they differ.
-    # We verify that the result's provenance_digest matches the graph's
-    # compute_hash() only if the result sets provenance_digest from compute_hash().
-    # Since the kernel uses _provenance_graph_digest(), we skip this check
-    # and instead verify the provenance_graph object parity (already done above).
 
 
 # ---------------------------------------------------------------------------
@@ -102,105 +104,168 @@ class RatingRunArtifacts(StrictBaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Legacy bundle hash helper (kept for sizing route compatibility)
+# Sizing bundle hash helper
 # ---------------------------------------------------------------------------
 
 
-def compute_bundle_hash(artifacts_dict: dict[str, Any]) -> str:
-    """Compute deterministic bundle hash excluding the ``bundle_hash`` field.
+def compute_sizing_artifact_bundle_digest(
+    bundle: SizingRunArtifacts,
+) -> str:
+    """Compute deterministic bundle digest excluding the digest field itself.
 
-    Parameters
-    ----------
-    artifacts_dict:
-        A dict of all bundle fields (typically from ``model_dump()``).
-
-    Returns
-    -------
-    str
-        A ``sha256:`` prefixed hex digest of the canonical JSON
-        representation of all fields except ``bundle_hash``.
+    Serializes all fields except ``artifact_bundle_digest`` to a canonical
+    Python representation and computes sha256.
     """
-    filtered = {k: v for k, v in artifacts_dict.items() if k != "bundle_hash"}
-    return sha256_digest(filtered)
+    payload = bundle.model_dump(mode="python")
+    payload.pop("artifact_bundle_digest", None)
+    return sha256_digest(payload)
 
 
 # ---------------------------------------------------------------------------
-# Sizing bundle (kept for backward compatibility — will be rewritten P0-9/P0-10)
+# Sizing bundle verifier (A4)
+# ---------------------------------------------------------------------------
+
+
+def verify_sizing_artifact_bundle(artifacts: SizingRunArtifacts) -> None:
+    """Verify all parities in a sizing artifact bundle (A4).
+
+    Checks:
+    1. artifact_bundle_digest recompute
+    2. provenance_digest == optimization_result.provenance_digest
+    3. Top-N is prefix of ranked records
+    4. disposition count == optimization_result.total_candidate_count
+    5. ranked count == optimization_result.feasible_candidate_count
+    """
+    # 1. Bundle digest recompute
+    expected_digest = compute_sizing_artifact_bundle_digest(artifacts)
+    if artifacts.artifact_bundle_digest != expected_digest:
+        raise ValueError(
+            f"artifact_bundle_digest mismatch: bundle has "
+            f"{artifacts.artifact_bundle_digest!r}, recomputed {expected_digest!r}"
+        )
+
+    opt = artifacts.optimization_result
+
+    # 2. provenance_digest parity (C2: single provenance digest authority)
+    computed_prov = artifacts.provenance_graph.compute_hash()
+    if opt.provenance_digest != computed_prov:
+        raise ValueError(
+            f"provenance_digest mismatch: result has {opt.provenance_digest!r}, "
+            f"provenance_graph.compute_hash() returned {computed_prov!r}"
+        )
+
+    # 3. Top-N is prefix of ranked records
+    if artifacts.top_n_records != artifacts.ranked_records[: len(artifacts.top_n_records)]:
+        raise ValueError("top_n_records is not a prefix of ranked_records")
+
+    # 4. Disposition count matches total
+    if len(artifacts.dispositions) != opt.total_candidate_count:
+        raise ValueError(
+            f"dispositions count {len(artifacts.dispositions)} != "
+            f"total_candidate_count {opt.total_candidate_count}"
+        )
+
+    # 5. Ranked count matches feasible
+    if len(artifacts.ranked_records) != opt.feasible_candidate_count:
+        raise ValueError(
+            f"ranked_records count {len(artifacts.ranked_records)} != "
+            f"feasible_candidate_count {opt.feasible_candidate_count}"
+        )
+
+    # 6. Top-N count matches min(requested, feasible)
+    expected_top_n = min(opt.requested_top_n, opt.feasible_candidate_count)
+    if len(artifacts.top_n_records) != expected_top_n:
+        raise ValueError(
+            f"top_n_records count {len(artifacts.top_n_records)} != expected {expected_top_n}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Sizing bundle (A1 — fully typed, no Any at runtime after model_rebuild)
 # ---------------------------------------------------------------------------
 
 
 class SizingRunArtifacts(StrictBaseModel):
-    """Typed artifact bundle for sizing runs.
+    """Typed artifact bundle for sizing runs (A1).
 
-    Binds together the canonical request snapshot, sizing request and
-    identity, resolved provider and catalogs, the optimization result,
-    and the full provenance graph.  All integrity hashes are verified on
-    construction.
+    All fields use forward references resolved at import time via
+    model_rebuild.  ``from __future__ import annotations`` turns all
+    annotations into strings so Python never tries to resolve them
+    eagerly; Pydantic resolves them when the model is first used.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
+    )
 
-    canonical_request_snapshot: dict[str, Any]
-    sizing_request: Any  # SizingRequest
-    sizing_request_identity: Any  # SizingRequestIdentity
-    resolved_provider: Any  # ResolvedProviderAuthority
-    resolved_catalogs: tuple[Any, ...]  # tuple[CompleteDoublePipeCatalogSnapshot, ...]
-    optimization_result: Any  # OptimizationResult
-    result_hash: str
+    canonical_request_snapshot: dict[str, object]
+    sizing_request: SizingRequest
+    evaluation_input: Phase3EvaluationInput
+    phase3_authoritative_artifacts: Phase3AuthoritativeArtifacts
+    dispositions: tuple[CandidateDispositionRecord, ...]
+    ranked_records: tuple[RankedCandidateRecord, ...]
+    top_n_records: tuple[RankedCandidateRecord, ...]
+    optimization_result: OptimizationResult
     provenance_graph: ProvenanceGraph
-    provenance_digest: str
-    bundle_hash: str
+    artifact_bundle_digest: str
 
     # -- auto-verify on construction ----------------------------------------
 
     @model_validator(mode="after")
-    def _verify_hashes(self) -> SizingRunArtifacts:
-        verify_sizing_bundle(self)
+    def _verify_bundle(self) -> SizingRunArtifacts:
+        verify_sizing_artifact_bundle(self)
         return self
 
 
 # ---------------------------------------------------------------------------
-# Verification functions
+# Rebuild models to resolve forward references at runtime
 # ---------------------------------------------------------------------------
 
 
-def verify_sizing_bundle(artifacts: SizingRunArtifacts) -> None:
-    """Verify all hash parities in a sizing bundle.
-
-    Raises
-    ------
-    ValueError
-        If any hash does not match its expected value.
-    """
-    # 1. result_hash parity
-    if artifacts.result_hash != artifacts.optimization_result.result_hash:
-        raise ValueError(
-            f"result_hash mismatch: bundle has {artifacts.result_hash!r}, "
-            f"optimization_result has {artifacts.optimization_result.result_hash!r}"
+def _rebuild_sizing_models() -> None:
+    """Resolve forward references in SizingRunArtifacts."""
+    try:
+        from hexagent.optimization.models import SizingRequest as _SR
+        from hexagent.optimization.phase3_builder import (
+            OptimizationResult as _OR,
+        )
+        from hexagent.optimization.phase3_builder import (
+            RankedCandidateRecord as _RCR,
+        )
+        from hexagent.optimization.phase3_evaluation import (
+            CandidateDispositionRecord as _CDR,
+        )
+        from hexagent.optimization.phase3_evaluation import (
+            Phase3EvaluationInput as _PEI,
+        )
+        from hexagent.optimization.phase3_verifier import (
+            Phase3AuthoritativeArtifacts as _PAA,
         )
 
-    # 2. provenance_digest parity
-    computed_prov = artifacts.provenance_graph.compute_hash()
-    if artifacts.provenance_digest != computed_prov:
-        raise ValueError(
-            f"provenance_digest mismatch: bundle has {artifacts.provenance_digest!r}, "
-            f"provenance_graph.compute_hash() returned {computed_prov!r}"
+        SizingRunArtifacts.model_rebuild(
+            _types_namespace={
+                "SizingRequest": _SR,
+                "Phase3EvaluationInput": _PEI,
+                "Phase3AuthoritativeArtifacts": _PAA,
+                "CandidateDispositionRecord": _CDR,
+                "RankedCandidateRecord": _RCR,
+                "OptimizationResult": _OR,
+            },
         )
+    except ImportError:
+        pass  # optimization module not available during minimal imports
 
-    # 3. bundle_hash parity
-    computed_bundle = compute_bundle_hash(artifacts.model_dump())
-    if artifacts.bundle_hash != computed_bundle:
-        raise ValueError(
-            f"bundle_hash mismatch: bundle has {artifacts.bundle_hash!r}, "
-            f"recomputed {computed_bundle!r}"
-        )
+
+_rebuild_sizing_models()
 
 
 __all__ = [
     "RatingRunArtifacts",
     "SizingRunArtifacts",
-    "compute_bundle_hash",
     "compute_rating_artifact_bundle_digest",
+    "compute_sizing_artifact_bundle_digest",
     "verify_rating_artifact_bundle",
-    "verify_sizing_bundle",
+    "verify_sizing_artifact_bundle",
 ]

@@ -809,19 +809,28 @@ def _make_blocker(
 
 
 def _provider_snapshot(provider: PropertyProvider | None) -> ProviderIdentitySnapshot:
-    """Build a ProviderIdentitySnapshot from the provider."""
+    """Build a ProviderIdentitySnapshot from the provider.
+
+    Captures all 6 identity fields per contract C1:
+    name, version, git_revision, reference_state_policy,
+    configuration_fingerprint, cache_policy_version.
+    """
     if provider is None:
         return ProviderIdentitySnapshot(
             name="",
             version="",
             git_revision="",
             reference_state_policy="",
+            configuration_fingerprint="",
+            cache_policy_version="",
         )
     return ProviderIdentitySnapshot(
         name=provider.name,
         version=provider.version,
         git_revision=getattr(provider, "git_revision", ""),
         reference_state_policy=provider.reference_state_policy.value,
+        configuration_fingerprint=getattr(provider, "_construction_fingerprint", ""),
+        cache_policy_version=getattr(provider, "cache_policy_version", ""),
     )
 
 

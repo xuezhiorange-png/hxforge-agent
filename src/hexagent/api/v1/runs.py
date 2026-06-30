@@ -109,17 +109,25 @@ async def get_run_report_html(request: Request, run_id: UUID) -> Any:
         return _not_found(run_id)
 
     # Attempt to render a real report via hexagent.reporting.
-    # If the module is not yet implemented, return a structured 500.
+    # The build_report_html function executes the full verification chain
+    # (B7) and raises ValueError on any verification failure.
     try:
         from hexagent.reporting import build_report_html  # noqa: F811
 
-        html = build_report_html(record)
-        return HTMLResponse(content=html, status_code=200)
+        html_bytes = build_report_html(record)
+        return HTMLResponse(content=html_bytes, status_code=200)
     except ImportError:
         return _make_error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
             error_message="Report rendering is not available",
+            operation=record.operation,
+        )
+    except ValueError as exc:
+        return _make_error_response(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message=f"Report verification failed: {exc}",
             operation=record.operation,
         )
     except Exception:

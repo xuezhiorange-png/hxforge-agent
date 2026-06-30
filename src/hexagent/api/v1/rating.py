@@ -26,11 +26,11 @@ from hexagent.api.errors import ApiError, ApiErrorCode
 from hexagent.api.models import RatingApiRequest
 from hexagent.api.repository import (
     ClaimOutcome,
+    FrozenFailurePayload,
     IdempotencyConflictError,
     RunRepository,
 )
 from hexagent.core.canonical import sha256_digest
-from hexagent.domain.messages import ErrorCode, RunFailure
 
 router = APIRouter(prefix="/v1/double-pipe", tags=["rating"])
 
@@ -204,14 +204,14 @@ async def rate_double_pipe(
 
     # FAILED_REPLAY → return stored failure (NOT 200)
     if claim.outcome == ClaimOutcome.FAILED_REPLAY:
-        # Return the stored failure — NOT 200
-        if record.failure is not None and hasattr(record.failure, "status_code"):
+        # C5: Return the exact stored failure — NOT 200
+        if record.failure is not None and isinstance(record.failure, FrozenFailurePayload):
             return _error_response(
                 status_code=record.failure.status_code,
                 error_code=record.failure.error_code,
                 error_message=record.failure.error_message,
-                operation="rateDoublePipe",
-                request_digest=request_digest,
+                operation=record.failure.operation,
+                request_digest=record.failure.request_digest,
             )
         # Fallback: return 500 with stable message
         return _error_response(
@@ -240,13 +240,17 @@ async def rate_double_pipe(
     try:
         service_result = deps.rating_service.execute(prepared)
     except Exception:
+        _failure = FrozenFailurePayload(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message="Rating execution failed",
+            request_digest=request_digest,
+            operation="rateDoublePipe",
+        )
         repo.fail(
             owner_token=owner_token,
             expected_version=record.record_version,
-            failure=RunFailure(
-                code=ErrorCode.TASK010_ROUTE,
-                message="Rating execution failed",
-            ),
+            failure=_failure,
         )
         return _error_response(
             status_code=500,
@@ -280,13 +284,17 @@ async def rate_double_pipe(
             artifact_bundle_digest=bundle_digest,
         )
     except Exception:
+        _failure = FrozenFailurePayload(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message="Artifact bundle construction failed",
+            request_digest=request_digest,
+            operation="rateDoublePipe",
+        )
         repo.fail(
             owner_token=owner_token,
             expected_version=record.record_version,
-            failure=RunFailure(
-                code=ErrorCode.TASK010_ROUTE,
-                message="Artifact bundle construction failed",
-            ),
+            failure=_failure,
         )
         return _error_response(
             status_code=500,
@@ -316,13 +324,17 @@ async def rate_double_pipe(
             report_links=ReportLinks(html=f"/v1/runs/{record.run_id}/report.html"),
         )
     except Exception:
+        _failure = FrozenFailurePayload(
+            status_code=500,
+            error_code=ApiErrorCode.INTERNAL_ERROR,
+            error_message="Envelope construction failed",
+            request_digest=request_digest,
+            operation="rateDoublePipe",
+        )
         repo.fail(
             owner_token=owner_token,
             expected_version=record.record_version,
-            failure=RunFailure(
-                code=ErrorCode.TASK010_ROUTE,
-                message="Envelope construction failed",
-            ),
+            failure=_failure,
         )
         return _error_response(
             status_code=500,

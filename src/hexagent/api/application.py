@@ -108,12 +108,12 @@ def _verify_provider_identity_match(
 ) -> None:
     """Verify PropertyProvider identity matches resolved authority.
 
-    Checks core identity fields: name, version, git_revision,
-    reference_state_policy.
+    Checks ALL 6 identity fields per contract C1:
+    name, version, git_revision, reference_state_policy,
+    configuration_fingerprint, cache_policy_version.
 
-    Note: configuration_fingerprint and cache_policy_version are NOT
-    captured by the rating kernel's _provider_snapshot(), so they are
-    excluded from this comparison.
+    A mismatch in any field means the resolved provider authority does
+    not match the actual execution provider — pre-claim failure.
     """
     if authority.identity.name != provider.name:
         raise ValueError(
@@ -138,6 +138,22 @@ def _verify_provider_identity_match(
             f"{authority.identity.reference_state_policy!r}, actual provider has "
             f"{actual_policy!r}"
         )
+    # C1: configuration_fingerprint
+    actual_fp = getattr(provider, "_construction_fingerprint", "")
+    if authority.identity.configuration_fingerprint != actual_fp:
+        raise ValueError(
+            f"Provider configuration_fingerprint mismatch: registry has "
+            f"{authority.identity.configuration_fingerprint!r}, actual provider has "
+            f"{actual_fp!r}"
+        )
+    # C1: cache_policy_version
+    actual_cpv = getattr(provider, "cache_policy_version", "")
+    if authority.identity.cache_policy_version != actual_cpv:
+        raise ValueError(
+            f"Provider cache_policy_version mismatch: registry has "
+            f"{authority.identity.cache_policy_version!r}, actual provider has "
+            f"{actual_cpv!r}"
+        )
 
 
 def _verify_result_provenance(
@@ -146,23 +162,21 @@ def _verify_result_provenance(
 ) -> None:
     """Verify result provider_identity matches prepared provider authority.
 
-    Checks core identity fields. The configuration_fingerprint field is
-    excluded from comparison because the rating kernel's _provider_snapshot()
-    uses getattr(prov, 'configuration_fingerprint', '') which may differ
-    from the CoolPropProvider's _construction_fingerprint attribute.
+    Checks ALL 6 identity fields per contract C1:
+    name, version, git_revision, reference_state_policy,
+    configuration_fingerprint, cache_policy_version.
     """
     expected = prepared.resolved_provider.identity
     actual = result.provider_identity
-    # Core fields that the kernel captures correctly
-    # Note: configuration_fingerprint and cache_policy_version are NOT set
-    # by the rating kernel's _provider_snapshot() — they default to "".
-    core_fields = (
+    all_fields = (
         "name",
         "version",
         "git_revision",
         "reference_state_policy",
+        "configuration_fingerprint",
+        "cache_policy_version",
     )
-    for field_name in core_fields:
+    for field_name in all_fields:
         expected_val = getattr(expected, field_name)
         actual_val = getattr(actual, field_name)
         if expected_val != actual_val:
@@ -336,17 +350,23 @@ class PreparedSizingRun:
 
 @dataclass(frozen=True, slots=True)
 class SizingExecutionResult:
-    """Result of the sizing optimization pipeline.
+    """Result of the sizing optimization pipeline (A1).
 
-    Bundles the ``OptimizationResult`` (which carries its own
-    ``result_hash``), the provenance graph, and any warnings or
-    blockers produced during optimization.
+    Bundles the ``OptimizationResult``, provenance graph, warnings,
+    blockers, and all Phase 3 artifacts needed to construct typed
+    ``SizingRunArtifacts``.
     """
 
-    optimization_result: Any  # OptimizationResult — has .result_hash
+    optimization_result: Any  # OptimizationResult — resolved at runtime
     provenance: ProvenanceGraph
     warnings: tuple[EngineeringMessage, ...]
     blockers: tuple[EngineeringMessage, ...]
+    # A1: Phase 3 artifacts for typed SizingRunArtifacts
+    evaluation_input: Any  # Phase3EvaluationInput
+    phase3_authoritative_artifacts: Any  # Phase3AuthoritativeArtifacts
+    dispositions: tuple[Any, ...]  # tuple[CandidateDispositionRecord, ...]
+    ranked_records: tuple[Any, ...]  # tuple[RankedCandidateRecord, ...]
+    top_n_records: tuple[Any, ...]  # tuple[RankedCandidateRecord, ...]
 
 
 # ---------------------------------------------------------------------------
@@ -864,11 +884,61 @@ class SizingApplicationService:
             phase3_failure_bindings=tuple(phase3_failure_bindings),
         )
 
+        # A2: Authoritative verification after build_optimization_result
+        from hexagent.optimization.phase3_verifier import (
+            Phase3AuthoritativeArtifacts as _PAA,
+        )
+        from hexagent.optimization.phase3_verifier import (
+            verify_phase3_result_semantics_or_raise,
+        )
+
+        phase3_artifacts = _PAA(
+            sizing_request=sizing_request,
+            phase2_source_record_descriptors=tuple(descriptors),
+            source_bindings=tuple(source_bindings),
+            classification_inputs=tuple(classification_inputs),
+            preparation_results=tuple(preparation_results),
+            warning_descriptor_tuples=tuple(warning_descriptor_tuples),
+            blocker_descriptor_tuples=tuple(blocker_descriptor_tuples),
+            warning_binding_tuples=tuple(warning_binding_tuples),
+            blocker_binding_tuples=tuple(blocker_binding_tuples),
+            evidence_failure_bindings=tuple(evidence_failure_bindings),
+            source_failure_bindings=tuple(source_failure_bindings),
+            phase3_failure_bindings=tuple(phase3_failure_bindings),
+        )
+
+        verify_phase3_result_semantics_or_raise(
+            result=opt_result,
+            graph=provenance,
+            evaluation_input=eval_input,
+            artifacts=phase3_artifacts,
+            dispositions=tuple(dispositions),
+            ranked_records=tuple(ranked_records),
+        )
+
+        # A3: Collect real warnings/blockers from evaluation records
+        all_warnings: list[EngineeringMessage] = []
+        all_blockers: list[EngineeringMessage] = []
+        for rec in eval_records:
+            if rec.candidate_evaluation_state == CandidateEvaluationState.VERIFIED:
+                evidence = rec.verified_rating_evidence
+                if evidence is not None:
+                    all_warnings.extend(evidence.warnings)
+                    all_blockers.extend(evidence.blockers)
+
+        # Compute top_n from ranked records
+        top_n = min(opt_result.requested_top_n, opt_result.feasible_candidate_count)
+
         return SizingExecutionResult(
             optimization_result=opt_result,
             provenance=provenance,
-            warnings=(),
-            blockers=(),
+            warnings=tuple(all_warnings),
+            blockers=tuple(all_blockers),
+            evaluation_input=eval_input,
+            phase3_authoritative_artifacts=phase3_artifacts,
+            dispositions=tuple(dispositions),
+            ranked_records=tuple(ranked_records),
+            top_n_records=tuple(ranked_records[:top_n]),
         )
 
 

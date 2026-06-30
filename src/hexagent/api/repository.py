@@ -34,6 +34,26 @@ from typing import Any, Protocol  # noqa: E402
 from uuid import UUID  # noqa: E402
 
 # ---------------------------------------------------------------------------
+# Frozen failure payload (C5) — stores exact HTTP failure for replay
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class FrozenFailurePayload:
+    """Immutable snapshot of a failed run's HTTP response.
+
+    Stored on RunRecord.failure so FAILED_REPLAY can return the exact
+    same status code and error body without re-executing.
+    """
+
+    status_code: int
+    error_code: str
+    error_message: str
+    request_digest: str | None
+    operation: str
+
+
+# ---------------------------------------------------------------------------
 # Frozen state enum
 # ---------------------------------------------------------------------------
 

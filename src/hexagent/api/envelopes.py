@@ -14,21 +14,26 @@ failure, provenance, or artifact_bundle.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from hexagent.api.artifacts import (
     RatingRunArtifacts,
     SizingRunArtifacts,
     compute_rating_artifact_bundle_digest,
+    compute_sizing_artifact_bundle_digest,
     verify_rating_artifact_bundle,
 )
 from hexagent.domain.messages import EngineeringMessage, RunFailure
 from hexagent.domain.models import StrictBaseModel
 from hexagent.domain.provenance import ProvenanceGraph
 from hexagent.exchangers.double_pipe.result import RatingResult
+
+if TYPE_CHECKING:
+    from hexagent.optimization.phase3_builder import OptimizationResult
+
 
 # ---------------------------------------------------------------------------
 # Report links
@@ -49,6 +54,8 @@ class ReportLinks(StrictBaseModel):
 
 class ValidationRunEnvelope(StrictBaseModel):
     """Validation run response per contract §6.1."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     api_schema_version: Literal["1"]
     operation: Literal["validateCase"]
@@ -71,6 +78,8 @@ class RatingRunEnvelope(StrictBaseModel):
     All fields are typed — no Any. Cross-field hash parity verified
     on construction.
     """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     api_schema_version: Literal["1"]
     operation: Literal["rateDoublePipe"]
@@ -112,10 +121,7 @@ class RatingRunEnvelope(StrictBaseModel):
         if self.provenance != self.result.provenance_graph:
             raise ValueError("provenance mismatch")
 
-        # provenance digest parity
-        # The result's provenance_digest is computed by the kernel using
-        # _provenance_graph_digest() which excludes result_hash from metadata.
-        # The envelope's provenance_digest should match the result's value.
+        # provenance digest parity (C2: single authority)
         if self.provenance_digest != self.result.provenance_digest:
             raise ValueError("provenance_digest != result.provenance_digest")
 
@@ -139,7 +145,7 @@ class RatingRunEnvelope(StrictBaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Sizing envelope
+# Sizing envelope (A1 — typed result, A5 — full verifier)
 # ---------------------------------------------------------------------------
 
 
@@ -150,13 +156,19 @@ class SizingRunEnvelope(StrictBaseModel):
     on construction.
     """
 
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
+    )
+
     api_schema_version: Literal["1"]
     operation: Literal["sizeDoublePipe"]
     run_id: UUID
     idempotency_key_digest: str
     request_digest: str
     result_kind: Literal["sizing"]
-    result: Any  # OptimizationResult (Any at runtime, typed via TYPE_CHECKING)
+    result: OptimizationResult  # A1: typed, not Any
     result_hash: str
     warnings: tuple[EngineeringMessage, ...]
     blockers: tuple[EngineeringMessage, ...]
@@ -169,31 +181,65 @@ class SizingRunEnvelope(StrictBaseModel):
 
     @model_validator(mode="after")
     def _verify_hashes(self) -> SizingRunEnvelope:
-        """Cross-field hash parity per contract §6.3."""
+        """Cross-field hash parity per contract §6.3 (A5)."""
         # sizing failure must be None
         if self.failure is not None:
             raise ValueError("sizing failure must be None")
-        # result_hash must match result's own hash
+
+        # result_hash == result.result_hash
         if self.result_hash != self.result.result_hash:
             raise ValueError(
                 f"result_hash mismatch: envelope has {self.result_hash!r}, "
                 f"result has {self.result.result_hash!r}"
             )
-        # provenance_digest must match provenance graph hash
-        computed_prov = self.provenance.compute_hash()
-        if self.provenance_digest != computed_prov:
-            raise ValueError(
-                f"provenance_digest mismatch: envelope has {self.provenance_digest!r}, "
-                f"provenance.compute_hash() returned {computed_prov!r}"
-            )
-        # artifact_bundle_digest must match bundle hash
-        if self.artifact_bundle_digest != self.artifact_bundle.bundle_hash:
+
+        # artifact_bundle.optimization_result == result (A5)
+        if (
+            self.artifact_bundle.optimization_result is not self.result
+            and self.artifact_bundle.optimization_result != self.result
+        ):
+            raise ValueError("bundle optimization_result != envelope result")
+
+        # artifact_bundle_digest recomputation (A5)
+        expected_digest = compute_sizing_artifact_bundle_digest(self.artifact_bundle)
+        if self.artifact_bundle_digest != expected_digest:
             raise ValueError(
                 f"artifact_bundle_digest mismatch: envelope has "
-                f"{self.artifact_bundle_digest!r}, bundle has "
-                f"{self.artifact_bundle.bundle_hash!r}"
+                f"{self.artifact_bundle_digest!r}, recomputed {expected_digest!r}"
             )
+
+        # provenance object parity (A5)
+        if self.provenance != self.artifact_bundle.provenance_graph:
+            raise ValueError("provenance object mismatch")
+
+        # provenance digest parity (C2: single authority)
+        if self.provenance_digest != self.result.provenance_digest:
+            raise ValueError(
+                f"provenance_digest mismatch: envelope has {self.provenance_digest!r}, "
+                f"result has {self.result.provenance_digest!r}"
+            )
+
         return self
+
+
+# ---------------------------------------------------------------------------
+# Rebuild SizingRunEnvelope to resolve OptimizationResult forward ref
+# ---------------------------------------------------------------------------
+
+
+def _rebuild_sizing_envelope() -> None:
+    """Resolve OptimizationResult forward reference."""
+    try:
+        from hexagent.optimization.phase3_builder import OptimizationResult as _OR
+
+        SizingRunEnvelope.model_rebuild(
+            _types_namespace={"OptimizationResult": _OR},
+        )
+    except ImportError:
+        pass
+
+
+_rebuild_sizing_envelope()
 
 
 # ---------------------------------------------------------------------------
