@@ -14,7 +14,9 @@ EXAMPLE_PATH = Path(__file__).resolve().parents[2] / "examples" / "water_water_d
 def test_missing_fouling_returns_422_via_api() -> None:
     payload = json.loads(EXAMPLE_PATH.read_text())
     payload["hot_stream"].pop("fouling_resistance")
-    response = TestClient(app, raise_server_exceptions=False).post("/v1/cases/validate", json=payload)
+    response = TestClient(app, raise_server_exceptions=False).post(
+        "/v1/cases/validate", json=payload
+    )
     assert response.status_code == 422
     data = response.json()
     # New frozen ApiError format: top-level error_code

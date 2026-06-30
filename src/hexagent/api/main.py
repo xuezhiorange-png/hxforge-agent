@@ -199,7 +199,7 @@ def _safe_preview(value: Any) -> str | None:
 # Backward-compatible module-level app for legacy integration tests.
 # This will be removed once integration tests are updated to use create_app().
 # ---------------------------------------------------------------------------
-from unittest.mock import MagicMock as _MagicMock
+from unittest.mock import MagicMock as _MagicMock  # noqa: E402
 
 app = create_app(
     provider_registry=_MagicMock(),
