@@ -5,10 +5,51 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from hexagent.api.main import app
 from hexagent.domain.models import StreamSpec
 
 EXAMPLE_PATH = Path(__file__).resolve().parents[2] / "examples" / "water_water_double_pipe.json"
+
+
+def _make_test_app():
+    """Create a test app with real CoolProp provider."""
+    from hexagent.api.application import RatingApplicationService, SizingService
+    from hexagent.api.main import ApplicationDependencies, create_app
+    from hexagent.api.registry import CatalogRegistry, ProviderRegistry
+    from hexagent.api.repository import InMemoryRunRepository
+    from hexagent.core.heat_balance import ProviderIdentitySnapshot
+    from hexagent.properties.coolprop_provider import CoolPropProvider
+
+    provider = CoolPropProvider()
+    snapshot = ProviderIdentitySnapshot(
+        name=provider.name,
+        version=provider.version,
+        git_revision=provider.git_revision,
+        reference_state_policy=str(provider.reference_state_policy.value),
+        configuration_fingerprint=getattr(provider, "_construction_fingerprint", "fp1"),
+        cache_policy_version=provider.cache_policy_version,
+    )
+    provider_registry = ProviderRegistry({"CoolProp": snapshot})
+    catalog_registry = CatalogRegistry([])
+    repo = InMemoryRunRepository()
+    rating_service = RatingApplicationService(
+        provider_registry=provider_registry,
+        property_provider=provider,
+    )
+    sizing_service = SizingService(
+        provider_registry=provider_registry,
+        catalog_registry=catalog_registry,
+    )
+    deps = ApplicationDependencies(
+        provider_registry=provider_registry,
+        catalog_registry=catalog_registry,
+        run_repository=repo,
+        rating_service=rating_service,
+        sizing_service=sizing_service,
+    )
+    return create_app(deps)
+
+
+app = _make_test_app()
 
 
 def test_missing_fouling_returns_422_via_api() -> None:
