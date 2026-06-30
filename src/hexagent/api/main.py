@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from hexagent.api.v1.sizing import router as sizing_router
 from hexagent.domain.models import CalculationResult, DesignCase
 from hexagent.exchangers.double_pipe.service import DoublePipeService
 
@@ -10,6 +11,8 @@ app = FastAPI(
     version="0.1.0",
     description="Starter API. Preliminary calculations only.",
 )
+
+app.include_router(sizing_router)
 
 
 @app.get("/health")
