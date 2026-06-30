@@ -798,6 +798,29 @@ def build_sizing_canonical_request_context(
     return result
 
 
+def compute_idempotency_namespace_digest(
+    *,
+    api_schema_version: str,
+    operation_id: str,
+    idempotency_key_digest: str,
+) -> str:
+    """Compute deterministic idempotency namespace digest.
+
+    Namespace = sha256(canonical({api_schema_version, operation_id, key_digest}))
+    Per contract §7.3.
+    """
+    import hashlib
+    import json
+
+    payload = {
+        "api_schema_version": api_schema_version,
+        "operation_id": operation_id,
+        "idempotency_key_digest": idempotency_key_digest,
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 __all__ = [
     "build_rating_canonical_request_context",
     "build_sizing_canonical_request_context",
@@ -805,4 +828,5 @@ __all__ = [
     "canonical_quantity_payload",
     "canonicalize_api_payload",
     "compute_api_request_digest",
+    "compute_idempotency_namespace_digest",
 ]

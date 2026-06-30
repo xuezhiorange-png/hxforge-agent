@@ -1,8 +1,8 @@
-"""TASK-010 sizing endpoint.
+"""TASK-010 rating endpoint.
 
-Contract: POST /v1/double-pipe/sizing → operation_id=sizeDoublePipe
-Request: SizingApiRequest
-Response: SizingRunEnvelope
+Contract: POST /v1/double-pipe/rating → operation_id=rateDoublePipe
+Request: RatingApiRequest
+Response: RatingRunEnvelope
 Idempotency required.
 """
 
@@ -17,18 +17,19 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 
 from hexagent.api.canonical_request import (
+    build_rating_canonical_request_context,
     compute_idempotency_namespace_digest,
 )
-from hexagent.api.envelopes import ReportLinks, SizingRunEnvelope
+from hexagent.api.envelopes import RatingRunEnvelope, ReportLinks
 from hexagent.api.errors import ApiError, ApiErrorCode
-from hexagent.api.models import SizingApiRequest
+from hexagent.api.models import RatingApiRequest
 from hexagent.api.repository import (
     ClaimOutcome,
     IdempotencyConflictError,
     RunRepository,
 )
 
-router = APIRouter(prefix="/v1/double-pipe", tags=["sizing"])
+router = APIRouter(prefix="/v1/double-pipe", tags=["rating"])
 
 
 def _validate_idempotency_key(key: str) -> str:
@@ -38,6 +39,7 @@ def _validate_idempotency_key(key: str) -> str:
         raise ValueError("Idempotency-Key must not be empty")
     if len(key) > 128:
         raise ValueError("Idempotency-Key must be ≤ 128 characters")
+    # Check printable ASCII
     for ch in key:
         if ord(ch) < 0x20 or ord(ch) > 0x7E:
             raise ValueError("Idempotency-Key must contain only printable ASCII")
@@ -45,36 +47,24 @@ def _validate_idempotency_key(key: str) -> str:
 
 
 @router.post(
-    "/sizing",
-    operation_id="sizeDoublePipe",
-    response_model=SizingRunEnvelope,
+    "/rating",
+    operation_id="rateDoublePipe",
+    response_model=RatingRunEnvelope,
     responses={
         422: {"model": ApiError},
         409: {"model": ApiError},
         500: {"model": ApiError},
     },
 )
-async def size_double_pipe(
+async def rate_double_pipe(
     request: Request,
-    body: SizingApiRequest,
+    body: RatingApiRequest,
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
 ) -> Any:
-    """Execute a sizing request with idempotency protection.
-
-    Execution chain per contract §4.3:
-    1. Validate public DTO
-    2. Resolve provider authority
-    3. Resolve and verify catalog snapshots
-    4. Build canonical request context
-    5. Compute request_digest
-    6. Claim idempotency namespace
-    7. Execute sizing via SizingService
-    8. Build SizingRunEnvelope
-    9. Repository complete
-    """
+    """Execute a rating request with idempotency protection."""
     deps = request.app.state.deps
     repo: RunRepository = deps.run_repository
-    sizing_service = deps.sizing_service
+    rating_service = deps.rating_service
 
     # 1. Validate Idempotency-Key
     try:  # noqa: SIM105
@@ -84,50 +74,63 @@ async def size_double_pipe(
             status_code=422,
             error_code=ApiErrorCode.VALIDATION_FAILED,
             error_message=str(exc),
-            operation="sizeDoublePipe",
+            operation="rateDoublePipe",
         )
 
-    # 2-5. Full projection via sizing service (includes provider/catalog
-    # resolution, canonical context, request_digest)
+    # 2. Resolve provider (before claim)
     try:  # noqa: SIM105
-        service_result = sizing_service.process(body)
+        provider_authority = deps.provider_registry.resolve(body.provider_ref)
     except ValueError as exc:
         return _error_response(
             status_code=422,
             error_code=ApiErrorCode.VALIDATION_FAILED,
-            error_message=str(exc),
-            operation="sizeDoublePipe",
+            error_message=f"Provider resolution failed: {exc}",
+            operation="rateDoublePipe",
         )
 
-    request_digest = service_result.request_digest
+    # 3. Build canonical request context
+    try:  # noqa: SIM105
+        context = build_rating_canonical_request_context(
+            request=body,
+            resolved_provider=provider_authority,
+        )
+        request_digest = context["request_digest"]
+        context["canonical_request_snapshot"]
+    except Exception as exc:
+        return _error_response(
+            status_code=422,
+            error_code=ApiErrorCode.VALIDATION_FAILED,
+            error_message=f"Canonical request failed: {exc}",
+            operation="rateDoublePipe",
+        )
 
-    # 6. Compute idempotency namespace
+    # 4. Compute idempotency namespace
     key_digest = hashlib.sha256(idempotency_key.encode("ascii")).hexdigest()
     namespace_digest = compute_idempotency_namespace_digest(
         api_schema_version="1",
-        operation_id="sizeDoublePipe",
+        operation_id="rateDoublePipe",
         idempotency_key_digest=key_digest,
     )
 
-    # 7. Claim idempotency namespace
+    # 5. Claim idempotency namespace
     try:  # noqa: SIM105
         claim = repo.claim(
             namespace_digest=namespace_digest,
             request_digest=request_digest,
-            operation="sizeDoublePipe",
+            operation="rateDoublePipe",
         )
     except IdempotencyConflictError as exc:
         return _error_response(
             status_code=409,
             error_code=ApiErrorCode.IDEMPOTENCY_CONFLICT,
             error_message=str(exc),
-            operation="sizeDoublePipe",
+            operation="rateDoublePipe",
             request_digest=request_digest,
         )
 
     record = claim.record
 
-    # 8. Handle claim outcomes
+    # 6. Handle claim outcomes
     if claim.outcome == ClaimOutcome.COMPLETE_REPLAY:
         return JSONResponse(
             status_code=200,
@@ -138,8 +141,8 @@ async def size_double_pipe(
         return _error_response(
             status_code=409,
             error_code=ApiErrorCode.IDEMPOTENCY_CONFLICT,
-            error_message="Sizing is already in progress",
-            operation="sizeDoublePipe",
+            error_message="Rating is already in progress",
+            operation="rateDoublePipe",
             request_digest=request_digest,
         )
 
@@ -147,8 +150,8 @@ async def size_double_pipe(
         return _error_response(
             status_code=409,
             error_code=ApiErrorCode.IDEMPOTENCY_CONFLICT,
-            error_message="Previous run is stale",
-            operation="sizeDoublePipe",
+            error_message="Previous run is stale; retry with takeover=True",
+            operation="rateDoublePipe",
             request_digest=request_digest,
         )
 
@@ -165,20 +168,17 @@ async def size_double_pipe(
     try:  # noqa: SIM105
         repo.start(owner_token=owner_token, expected_version=version)
         version += 1
-    except Exception:  # noqa: BLE001
+    except Exception:
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
             error_message="Failed to start run",
-            operation="sizeDoublePipe",
+            operation="rateDoublePipe",
         )
 
-    # 9. Execute sizing optimization
+    # 7. Execute rating
     try:  # noqa: SIM105
-        optimization_result = _execute_sizing(
-            service_result=service_result,
-            sizing_service=sizing_service,
-        )
+        rating_result = rating_service.rate(body)
     except Exception as exc:
         repo.fail(
             owner_token=owner_token,
@@ -188,18 +188,18 @@ async def size_double_pipe(
         return _error_response(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
-            error_message="Sizing execution failed",
-            operation="sizeDoublePipe",
+            error_message="Rating execution failed",
+            operation="rateDoublePipe",
         )
 
-    # 10. Build envelope
+    # 8. Build envelope (simplified — production builds full artifacts)
     try:  # noqa: SIM105
-        envelope = _build_sizing_envelope(
+        envelope = _build_rating_envelope(
             run_id=record.run_id,
             idempotency_key_digest=key_digest,
             request_digest=request_digest,
-            optimization_result=optimization_result,
-            provenance=service_result.provenance,
+            result=rating_result,
+            provenance=rating_result.provenance,
         )
     except Exception as exc:
         repo.fail(
@@ -211,10 +211,10 @@ async def size_double_pipe(
             status_code=500,
             error_code=ApiErrorCode.INTERNAL_ERROR,
             error_message="Envelope construction failed",
-            operation="sizeDoublePipe",
+            operation="rateDoublePipe",
         )
 
-    # 11. Repository complete
+    # 9. Complete repository
     try:  # noqa: SIM105
         repo.complete(
             owner_token=owner_token,
@@ -223,7 +223,7 @@ async def size_double_pipe(
             artifact_bundle=None,  # Phase 2: simplified
         )
     except Exception:  # noqa: BLE001
-        pass  # envelope already built
+        pass  # envelope already built; response will be sent
 
     return JSONResponse(
         status_code=200,
@@ -231,52 +231,34 @@ async def size_double_pipe(
     )
 
 
-def _execute_sizing(
-    *,
-    service_result: Any,
-    sizing_service: Any,
-) -> Any:
-    """Execute sizing via the optimization pipeline.
-
-    This delegates to the existing optimization pipeline APIs.
-    Phase 2 simplified: returns a stub OptimizationResult.
-    Full pipeline implementation requires TASK-009 integration.
-    """
-    # Phase 2: use sizing service to run the full optimization pipeline
-    # The service_result contains all projected artifacts needed
-    return sizing_service.run_optimization(service_result)
-
-
-def _build_sizing_envelope(
+def _build_rating_envelope(
     *,
     run_id: UUID,
     idempotency_key_digest: str,
     request_digest: str,
-    optimization_result: Any,
+    result: Any,
     provenance: Any,
-) -> SizingRunEnvelope:
-    """Build SizingRunEnvelope from optimization result."""
+) -> RatingRunEnvelope:
+    """Build a RatingRunEnvelope from rating result."""
     from hexagent.core.canonical import sha256_digest
 
     result_hash = sha256_digest(
         json.dumps(
-            optimization_result.model_dump()
-            if hasattr(optimization_result, "model_dump")
-            else str(optimization_result),
+            result.model_dump() if hasattr(result, "model_dump") else str(result),
             sort_keys=True,
             default=str,
         ).encode()
     )
     provenance_digest = provenance.compute_hash()
 
-    return SizingRunEnvelope(
+    return RatingRunEnvelope(
         api_schema_version="1",
-        operation="sizeDoublePipe",
+        operation="rateDoublePipe",
         run_id=run_id,
         idempotency_key_digest=idempotency_key_digest,
         request_digest=request_digest,
-        result_kind="sizing",
-        result=optimization_result,
+        result_kind="rating",
+        result=result,
         result_hash=result_hash,
         warnings=(),
         blockers=(),

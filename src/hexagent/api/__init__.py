@@ -1,4 +1,4 @@
-"""Public API surface for hexagent."""
+"""TASK-010 API surface — public DTOs and envelope types."""
 
 from hexagent.api.models import (
     CatalogSnapshotReference,
