@@ -51,6 +51,61 @@ from hexagent.api.repository import (
 )
 
 # ===================================================================
+# Helper: minimal typed objects for repository unit tests
+# ===================================================================
+
+
+def _make_rating_envelope_and_bundle(
+    *,
+    request_digest: str = "req1",
+    run_id=None,
+):
+    """Build minimal RatingRunEnvelope + RatingRunArtifacts for repo tests.
+
+    Uses model_construct() to bypass validators — tests CAS semantics,
+    not data integrity.
+    """
+    from uuid import uuid4
+
+    from hexagent.api.artifacts import RatingRunArtifacts
+    from hexagent.api.envelopes import RatingRunEnvelope
+
+    _id = run_id or uuid4()
+    result_stub = object()  # shared identity for parity check
+
+    bundle = RatingRunArtifacts.model_construct(
+        canonical_request_snapshot={},
+        request_identity=None,
+        geometry_snapshot=None,
+        solver_settings=None,
+        provider_identity=None,
+        result=result_stub,
+        provenance_graph=None,
+        artifact_bundle_digest="sha256:test",
+    )
+
+    envelope = RatingRunEnvelope.model_construct(
+        api_schema_version="1",
+        operation="rateDoublePipe",
+        run_id=_id,
+        idempotency_key_digest="kid",
+        request_digest=request_digest,
+        result_kind="rating",
+        result=result_stub,
+        result_hash="sha256:hash",
+        warnings=(),
+        blockers=(),
+        failure=None,
+        provenance=None,
+        provenance_digest="sha256:prov",
+        artifact_bundle=bundle,
+        artifact_bundle_digest="sha256:test",
+        report_links=None,
+    )
+    return envelope, bundle
+
+
+# ===================================================================
 # Module-level cached test app (CoolProp init takes ~1s)
 # ===================================================================
 
@@ -528,7 +583,7 @@ class TestRunRepository:
         result = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         assert result.outcome == ClaimOutcome.NEW_CLAIM
         assert result.record.state == RunState.CLAIMED
@@ -538,22 +593,26 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         rec = repo.start(
             owner_token=claim.record.owner_token,
             expected_version=claim.record.record_version,
         )
+        envelope, bundle = _make_rating_envelope_and_bundle(
+            request_digest="req1",
+            run_id=rec.run_id,
+        )
         repo.complete(
             owner_token=claim.record.owner_token,
             expected_version=rec.record_version,
-            envelope={"result_kind": "sizing", "request_digest": "req1"},
-            artifact_bundle={"test": True},
+            envelope=envelope,
+            artifact_bundle=bundle,
         )
         result = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         assert result.outcome == ClaimOutcome.COMPLETE_REPLAY
 
@@ -562,23 +621,27 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         rec = repo.start(
             owner_token=claim.record.owner_token,
             expected_version=claim.record.record_version,
         )
+        envelope, bundle = _make_rating_envelope_and_bundle(
+            request_digest="req1",
+            run_id=rec.run_id,
+        )
         repo.complete(
             owner_token=claim.record.owner_token,
             expected_version=rec.record_version,
-            envelope={"result_kind": "sizing", "request_digest": "req1"},
-            artifact_bundle={"test": True},
+            envelope=envelope,
+            artifact_bundle=bundle,
         )
         with pytest.raises(IdempotencyConflictError):
             repo.claim(
                 namespace_digest="ns1",
                 request_digest="req2",
-                operation="sizing",
+                operation="rateDoublePipe",
             )
 
     def test_in_progress(self):
@@ -586,12 +649,12 @@ class TestRunRepository:
         repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         result = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         assert result.outcome == ClaimOutcome.IN_PROGRESS
 
@@ -602,13 +665,13 @@ class TestRunRepository:
         repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         clock_time = datetime(2025, 1, 2, tzinfo=UTC)
         result = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
             takeover=False,
         )
         assert result.outcome == ClaimOutcome.STALE_REJECTED
@@ -620,7 +683,7 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         old_token = claim.record.owner_token
         old_version = claim.record.record_version
@@ -628,7 +691,7 @@ class TestRunRepository:
         result = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
             takeover=True,
         )
         assert result.outcome == ClaimOutcome.STALE_TAKEOVER
@@ -642,7 +705,7 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         old_token = claim.record.owner_token
         old_version = claim.record.record_version
@@ -650,7 +713,7 @@ class TestRunRepository:
         repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
             takeover=True,
         )
         with pytest.raises(CASCasError):
@@ -661,7 +724,7 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         with pytest.raises(CASCasError):
             repo.start(
@@ -679,7 +742,7 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         rec = repo.start(
             owner_token=claim.record.owner_token,
@@ -696,14 +759,14 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         with pytest.raises(RepositoryStateError):
             repo.complete(
                 owner_token=claim.record.owner_token,
                 expected_version=claim.record.record_version,
-                envelope={"result_kind": "sizing"},
-                artifact_bundle={"test": True},
+                envelope=None,
+                artifact_bundle=None,
             )
 
     def test_failed_replay(self):
@@ -711,7 +774,7 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         rec = repo.start(
             owner_token=claim.record.owner_token,
@@ -725,7 +788,7 @@ class TestRunRepository:
         result = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         assert result.outcome == ClaimOutcome.FAILED_REPLAY
 
@@ -734,7 +797,7 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         rec = repo.start(
             owner_token=claim.record.owner_token,
@@ -749,7 +812,7 @@ class TestRunRepository:
             repo.claim(
                 namespace_digest="ns1",
                 request_digest="req2",
-                operation="sizing",
+                operation="rateDoublePipe",
             )
 
     def test_get_by_run_id(self):
@@ -757,7 +820,7 @@ class TestRunRepository:
         claim = repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         found = repo.get_by_run_id(claim.record.run_id)
         assert found is not None
@@ -768,7 +831,7 @@ class TestRunRepository:
         repo.claim(
             namespace_digest="ns1",
             request_digest="req1",
-            operation="sizing",
+            operation="rateDoublePipe",
         )
         found = repo.get_by_namespace("ns1")
         assert found is not None
@@ -791,7 +854,7 @@ class TestRunRepository:
                     repo.claim(
                         namespace_digest=f"{ns}-{i}",
                         request_digest=f"req-{i}",
-                        operation="sizing",
+                        operation="rateDoublePipe",
                     )
             except Exception as e:
                 errors.append(e)
