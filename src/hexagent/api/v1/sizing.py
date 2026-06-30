@@ -345,7 +345,7 @@ def _execute_sizing(
             "Sizing optimization pipeline (TASK-009 Phase 3) is not yet wired. "
             "SizingService.run_optimization() does not exist."
         )
-    return sizing_service.run_optimization(service_result)
+    return sizing_service.run_optimization(service_result)  # type: ignore[no-any-return]
 
 
 def _error_response(

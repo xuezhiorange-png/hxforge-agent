@@ -24,7 +24,7 @@ except ImportError:
         """Backport of StrEnum for Python < 3.11."""
 
         def __str__(self) -> str:
-            return self.value
+            return self.value  # type: ignore[no-any-return]
 
 
 class ApiErrorCode(StrEnum):
