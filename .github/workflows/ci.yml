@@ -26,5 +26,5 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy
-      - run: pytest --cov=hexagent --cov-report=term-missing -x
+      - run: pytest --cov=hexagent --cov-report=term-missing -x --timeout=180
       - run: pip-audit
