@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+import sys
+
+# Python 3.11 + pydantic v2: assertion introspection can hit default
+# recursion limit when repr-ing deeply nested models.
+if sys.getrecursionlimit() < 3000:
+    sys.setrecursionlimit(3000)
+
 from datetime import UTC, datetime
 from uuid import UUID
 
