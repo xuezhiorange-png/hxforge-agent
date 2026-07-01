@@ -1,6 +1,6 @@
 name: nightly
 
-on:
+"on":
   schedule:
     # Every day at 03:00 UTC
     - cron: "0 3 * * *"
@@ -37,10 +37,10 @@ jobs:
         run: uv sync --locked --extra dev
       - name: Verify no lock drift
         run: git diff --exit-code -- uv.lock pyproject.toml
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run mypy
-      - run: uv run pip-audit
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked mypy
+      - run: uv run --locked pip-audit
 
   shard-py3.11:
     runs-on: ubuntu-latest
