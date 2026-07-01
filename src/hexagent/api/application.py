@@ -11,7 +11,6 @@ SizingService — re-exported from sizing_service.py (Phase 1 projection).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from hexagent.api.canonical_request import (
@@ -443,7 +442,6 @@ class SizingApplicationService:
         """
         from hexagent.optimization.adapter import evaluate_all_candidates
         from hexagent.optimization.context import (
-            OptimizationObjective,
             create_passed_sizing_gate,
         )
         from hexagent.optimization.evaluation import (
@@ -460,7 +458,6 @@ class SizingApplicationService:
             FEASIBLE,
             Phase3CandidateClassificationInput,
             build_optimization_result,
-            build_ranked_candidate_record,
             classify_candidate,
             map_non_verified,
         )
@@ -842,38 +839,17 @@ class SizingApplicationService:
 
         # 7. Rank feasible candidates
         feasible_dispositions = [d for d in dispositions if d.disposition is FEASIBLE]
+        from hexagent.optimization.phase3_builder import (
+            rank_feasible_candidate_dispositions,
+        )
+
         obj = sizing_request_identity.optimization_objective
-        if obj == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
-            primary_field = "area_outer_m2"
-            secondary_field = "effective_length_m_canonical"
-        else:
-            primary_field = "effective_length_m_canonical"
-            secondary_field = "area_outer_m2"
-
-        def _rank_sort_key(d: CandidateDispositionRecord) -> tuple[Decimal, Decimal, str]:
-            return (
-                Decimal(d.primary_engineering_value or "0"),
-                Decimal(d.secondary_engineering_value or "0"),
-                d.source_qualified_candidate_id,
-            )
-
-        sorted_feasible = sorted(feasible_dispositions, key=_rank_sort_key)
-        ranked_records = []
-        for rank, disp in enumerate(sorted_feasible, 1):
-            rr = build_ranked_candidate_record(
-                rank=rank,
-                source_qualified_candidate_id=disp.source_qualified_candidate_id,
+        ranked_records = list(
+            rank_feasible_candidate_dispositions(
+                dispositions=tuple(feasible_dispositions),
                 optimization_objective=obj,
-                primary_objective_value=disp.primary_engineering_value or "",
-                primary_objective_field=primary_field,
-                secondary_tie_break_value=disp.secondary_engineering_value or "",
-                secondary_tie_break_field=secondary_field,
-                candidate_evaluation_identity_digest=disp.candidate_evaluation_identity_digest
-                or "",
-                verified_rating_evidence_digest=disp.verified_rating_evidence_digest or "",
-                feasibility_digest=disp.feasibility_digest,
             )
-            ranked_records.append(rr)
+        )
 
         # 8. Build OptimizationResult
         from hexagent.optimization.phase3_evaluation import Phase3EvaluationInput

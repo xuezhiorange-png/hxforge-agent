@@ -1763,6 +1763,68 @@ def build_ranked_candidate_record(
     )
 
 
+# ── Authoritative ranking function ────────────────────────────────────────
+
+
+def rank_feasible_candidate_dispositions(
+    *,
+    dispositions: tuple[CandidateDispositionRecord, ...],
+    optimization_objective: OptimizationObjective,
+) -> tuple[RankedCandidateRecord, ...]:
+    """Rank FEASIBLE dispositions according to the optimization objective.
+
+    Returns an empty tuple when no FEASIBLE dispositions are present.
+
+    Raises ValueError if a FEASIBLE disposition is missing its primary or
+    secondary engineering values (they must be non-None and non-empty).
+    """
+    feasible = [d for d in dispositions if d.disposition is FEASIBLE]
+    if not feasible:
+        return ()
+
+    if optimization_objective == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
+        primary_field = "area_outer_m2"
+        secondary_field = "effective_length_m_canonical"
+    else:
+        primary_field = "effective_length_m_canonical"
+        secondary_field = "area_outer_m2"
+
+    def _sort_key(d: CandidateDispositionRecord) -> tuple[Decimal, Decimal, str]:
+        if not d.primary_engineering_value:
+            raise ValueError(
+                f"FEASIBLE disposition {d.source_qualified_candidate_id} "
+                f"has empty primary_engineering_value — cannot rank"
+            )
+        if not d.secondary_engineering_value:
+            raise ValueError(
+                f"FEASIBLE disposition {d.source_qualified_candidate_id} "
+                f"has empty secondary_engineering_value — cannot rank"
+            )
+        return (
+            Decimal(d.primary_engineering_value),
+            Decimal(d.secondary_engineering_value),
+            d.source_qualified_candidate_id,
+        )
+
+    sorted_feasible = sorted(feasible, key=_sort_key)
+    ranked_records = []
+    for rank, disp in enumerate(sorted_feasible, 1):
+        rr = build_ranked_candidate_record(
+            rank=rank,
+            source_qualified_candidate_id=disp.source_qualified_candidate_id,
+            optimization_objective=optimization_objective,
+            primary_objective_value=disp.primary_engineering_value or "",
+            primary_objective_field=primary_field,
+            secondary_tie_break_value=disp.secondary_engineering_value or "",
+            secondary_tie_break_field=secondary_field,
+            candidate_evaluation_identity_digest=disp.candidate_evaluation_identity_digest or "",
+            verified_rating_evidence_digest=disp.verified_rating_evidence_digest or "",
+            feasibility_digest=disp.feasibility_digest,
+        )
+        ranked_records.append(rr)
+    return tuple(ranked_records)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Section 19 — OptimizationResult (P0-10)
 # ═══════════════════════════════════════════════════════════════════════════
