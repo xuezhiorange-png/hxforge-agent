@@ -11,6 +11,7 @@ SizingService — re-exported from sizing_service.py (Phase 1 projection).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from hexagent.api.canonical_request import (
@@ -456,10 +457,12 @@ class SizingApplicationService:
             compute_raw_combination_count,
         )
         from hexagent.optimization.phase3_builder import (  # type: ignore[attr-defined]
+            FEASIBLE,
             Phase3CandidateClassificationInput,
             build_optimization_result,
             build_ranked_candidate_record,
             classify_candidate,
+            map_non_verified,
         )
         from hexagent.optimization.phase3_core import (
             Phase3MessageDescriptor,
@@ -771,6 +774,18 @@ class SizingApplicationService:
                     sfb = None
                 source_failure_bindings.append(sfb)
 
+                # Generate disposition for RUNTIME_FAILED
+                disp = map_non_verified(
+                    rec,
+                    source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
+                    source_record_descriptor_digest=None,
+                    source_failure_binding=sfb,
+                    warning_descriptors=(),
+                    blocker_descriptors=(),
+                    evidence_failure_binding=None,
+                )
+                dispositions.append(disp)
+
             elif rec.candidate_evaluation_state == CandidateEvaluationState.INTEGRITY_INVALID:
                 # INTEGRITY_INVALID: only identity_snapshot
                 complete_snapshots.append(None)
@@ -785,6 +800,18 @@ class SizingApplicationService:
                 evidence_failure_bindings.append(None)
                 source_failure_bindings.append(None)
                 phase3_failure_bindings.append(None)
+
+                # Generate disposition for INTEGRITY_INVALID
+                disp = map_non_verified(
+                    rec,
+                    source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
+                    source_record_descriptor_digest=None,
+                    source_failure_binding=None,
+                    warning_descriptors=(),
+                    blocker_descriptors=(),
+                    evidence_failure_binding=None,
+                )
+                dispositions.append(disp)
 
             else:
                 # UNEVALUATED: only identity_snapshot
@@ -801,38 +828,52 @@ class SizingApplicationService:
                 source_failure_bindings.append(None)
                 phase3_failure_bindings.append(None)
 
-        # 7. Rank feasible candidates
-        from hexagent.optimization.phase3_builder import FEASIBLE
-
-        ranked_records = []
-        rank = 1
-        for disp in dispositions:
-            if disp.disposition is FEASIBLE:
-                # Determine primary/secondary based on optimization objective
-                obj = sizing_request_identity.optimization_objective
-                if obj == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
-                    primary_field = "area_outer_m2"
-                    secondary_field = "effective_length_m_canonical"
-                else:
-                    primary_field = "effective_length_m_canonical"
-                    secondary_field = "area_outer_m2"
-
-                rr = build_ranked_candidate_record(
-                    rank=rank,
-                    source_qualified_candidate_id=disp.source_qualified_candidate_id,
-                    optimization_objective=obj,
-                    primary_objective_value=disp.primary_engineering_value or "",
-                    primary_objective_field=primary_field,
-                    secondary_tie_break_value=disp.secondary_engineering_value or "",
-                    secondary_tie_break_field=secondary_field,
-                    candidate_evaluation_identity_digest=(
-                        disp.candidate_evaluation_identity_digest or ""
-                    ),
-                    verified_rating_evidence_digest=(disp.verified_rating_evidence_digest or ""),
-                    feasibility_digest=disp.feasibility_digest,
+                # Generate disposition for UNEVALUATED
+                disp = map_non_verified(
+                    rec,
+                    source_identity_record_descriptor_digest=isnap.identity_snapshot_digest,
+                    source_record_descriptor_digest=None,
+                    source_failure_binding=None,
+                    warning_descriptors=(),
+                    blocker_descriptors=(),
+                    evidence_failure_binding=None,
                 )
-                ranked_records.append(rr)
-                rank += 1
+                dispositions.append(disp)
+
+        # 7. Rank feasible candidates
+        feasible_dispositions = [d for d in dispositions if d.disposition is FEASIBLE]
+        obj = sizing_request_identity.optimization_objective
+        if obj == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
+            primary_field = "area_outer_m2"
+            secondary_field = "effective_length_m_canonical"
+        else:
+            primary_field = "effective_length_m_canonical"
+            secondary_field = "area_outer_m2"
+
+        def _rank_sort_key(d: CandidateDispositionRecord) -> tuple[Decimal, Decimal, str]:
+            return (
+                Decimal(d.primary_engineering_value or "0"),
+                Decimal(d.secondary_engineering_value or "0"),
+                d.source_qualified_candidate_id,
+            )
+
+        sorted_feasible = sorted(feasible_dispositions, key=_rank_sort_key)
+        ranked_records = []
+        for rank, disp in enumerate(sorted_feasible, 1):
+            rr = build_ranked_candidate_record(
+                rank=rank,
+                source_qualified_candidate_id=disp.source_qualified_candidate_id,
+                optimization_objective=obj,
+                primary_objective_value=disp.primary_engineering_value or "",
+                primary_objective_field=primary_field,
+                secondary_tie_break_value=disp.secondary_engineering_value or "",
+                secondary_tie_break_field=secondary_field,
+                candidate_evaluation_identity_digest=disp.candidate_evaluation_identity_digest
+                or "",
+                verified_rating_evidence_digest=disp.verified_rating_evidence_digest or "",
+                feasibility_digest=disp.feasibility_digest,
+            )
+            ranked_records.append(rr)
 
         # 8. Build OptimizationResult
         from hexagent.optimization.phase3_evaluation import Phase3EvaluationInput

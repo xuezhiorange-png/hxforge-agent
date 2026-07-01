@@ -13,6 +13,7 @@ from hexagent.optimization import phase3_builder as phase3_builder
 from hexagent.optimization import phase3_core as phase3_core
 from hexagent.optimization import phase3_evaluation as phase3_evaluation
 from hexagent.optimization import phase3_verifier as phase3_verifier
+from hexagent.optimization.phase3_builder import map_non_verified as map_non_verified
 
 __all__ = [
     "adapter",
@@ -22,6 +23,7 @@ __all__ = [
     "evaluation",
     "identities",
     "length",
+    "map_non_verified",
     "materialization",
     "models",
     "phase3_core",

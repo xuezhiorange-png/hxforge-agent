@@ -946,6 +946,29 @@ def _map_non_verified(
     raise ValueError(f"unexpected state: {rec.candidate_evaluation_state}")
 
 
+def map_non_verified(
+    rec: CandidateEvaluationRecord,
+    *,
+    source_identity_record_descriptor_digest: str,
+    source_record_descriptor_digest: str | None,
+    source_failure_binding: Phase3RunFailureDescriptorBinding | None,
+    warning_descriptors: tuple[Phase3MessageDescriptor, ...],
+    blocker_descriptors: tuple[Phase3MessageDescriptor, ...],
+    evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
+) -> CandidateDispositionRecord:
+    """Public wrapper for _map_non_verified — generates a disposition for
+    any non-VERIFIED CandidateEvaluationState."""
+    return _map_non_verified(
+        rec,
+        source_identity_record_descriptor_digest=source_identity_record_descriptor_digest,
+        source_record_descriptor_digest=source_record_descriptor_digest,
+        source_failure_binding=source_failure_binding,
+        warning_descriptors=warning_descriptors,
+        blocker_descriptors=blocker_descriptors,
+        evidence_failure_binding=evidence_failure_binding,
+    )
+
+
 # === 16.2 _build_provider_mismatch ===
 
 
