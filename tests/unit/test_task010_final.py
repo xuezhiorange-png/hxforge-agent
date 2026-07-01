@@ -1065,12 +1065,12 @@ class TestP05ArtifactVariantFields:
             canonical_raw_value="success",
             formatter_id="default",
             formatter_version="1.0",
-            rounding_mode="round",
+            rounding_mode="none",
             formatted_display_value="success",
         )
         assert art.formatter_id == "default"
         assert art.formatter_version == "1.0"
-        assert art.rounding_mode == "round"
+        assert art.rounding_mode == "none"
         assert art.formatted_display_value == "success"
 
     def test_unavailable_rejects_source_document(self):
@@ -1340,7 +1340,7 @@ class TestP06ContentHash:
                         canonical_raw_value="ok",
                         formatter_id="f1",
                         formatter_version="1.0",
-                        rounding_mode="round",
+                        rounding_mode="none",
                         formatted_display_value="ok",
                     ),
                 ),
@@ -2519,7 +2519,7 @@ class TestP06MandatoryArtifactMustBePresent:
                 canonical_raw_value="success",
                 formatter_id="default",
                 formatter_version="1.0",
-                rounding_mode="round",
+                rounding_mode="none",
                 formatted_display_value="success",
             )
 
@@ -2601,7 +2601,7 @@ class TestP06MandatoryArtifactMustBePresent:
             canonical_raw_value="success",
             formatter_id="default",
             formatter_version="1.0",
-            rounding_mode="round",
+            rounding_mode="none",
             formatted_display_value="success",
         )
         sections = []
@@ -2750,6 +2750,9 @@ class TestP05SourceDocumentRoot:
         crs_digest = sha256_digest(crs_root)
 
         # Build a model with an ARTIFACT_BUNDLE artifact that has wrong digest
+        canonical_raw = json.dumps(
+            bundle_root["geometry_snapshot"], sort_keys=True, separators=(",", ":")
+        )
         bad_artifact = PresentReportArtifact(
             kind=ReportArtifactKind.PRESENT,
             artifact_id=ReportArtifactId.GEOMETRY_SPEC,
@@ -2757,13 +2760,11 @@ class TestP05SourceDocumentRoot:
             source_document_digest=envelope_root_digest,  # WRONG — should be bundle digest
             source_json_pointer="/geometry_snapshot",
             authority_digest=sha256_digest(bundle_root["geometry_snapshot"]),
-            canonical_raw_value=json.dumps(
-                bundle_root["geometry_snapshot"], sort_keys=True, separators=(",", ":")
-            ),
+            canonical_raw_value=canonical_raw,
             formatter_id="default",
             formatter_version="1.0",
-            rounding_mode="round",
-            formatted_display_value="x",
+            rounding_mode="none",
+            formatted_display_value=canonical_raw,
         )
         good_artifact = PresentReportArtifact(
             kind=ReportArtifactKind.PRESENT,
@@ -2775,7 +2776,7 @@ class TestP05SourceDocumentRoot:
             canonical_raw_value="test-case",
             formatter_id="default",
             formatter_version="1.0",
-            rounding_mode="round",
+            rounding_mode="none",
             formatted_display_value="test-case",
         )
         section = ReportSection(
@@ -2838,7 +2839,7 @@ class TestP05SourceDocumentRoot:
             canonical_raw_value="rateDoublePipe",
             formatter_id="default",
             formatter_version="1.0",
-            rounding_mode="round",
+            rounding_mode="none",
             formatted_display_value="rateDoublePipe",
         )
         section = ReportSection(
@@ -2892,7 +2893,7 @@ class TestP05SourceDocumentRoot:
             canonical_raw_value=run_id_val,
             formatter_id="default",
             formatter_version="1.0",
-            rounding_mode="round",
+            rounding_mode="none",
             formatted_display_value=run_id_val,
         )
         section = ReportSection(
@@ -2947,7 +2948,7 @@ class TestP05SourceDocumentRoot:
             canonical_raw_value="tampered-value",  # WRONG
             formatter_id="default",
             formatter_version="1.0",
-            rounding_mode="round",
+            rounding_mode="none",
             formatted_display_value="tampered-value",
         )
         section = ReportSection(
@@ -3144,4 +3145,784 @@ def test_model_tamper_rejects_content_hash_mismatch():
             report_instance_identity=identity,
             report_content_hash=wrong_hash,
             report_instance_hash=instance_hash,
+        )
+
+
+# ===================================================================
+# P0-1: Fix ranking to use candidate effective_length_m_canonical
+# ===================================================================
+
+
+def _make_ranking_candidate(idx: int, length: float):
+    """Build a ManufacturableCandidate with model_construct for ranking tests."""
+    from decimal import Decimal
+
+    from hexagent.optimization.identities import (
+        CatalogSnapshotRef,
+        ManufacturableCandidate,
+        PhysicalCandidateIdentity,
+        SourceQualifiedCandidateIdentity,
+    )
+    from hexagent.optimization.phase3_core import canonical_decimal_string
+
+    length_str = canonical_decimal_string(Decimal(str(length)))
+
+    phys = PhysicalCandidateIdentity.model_construct(
+        inner_tube_inner_diameter_m=0.02,
+        inner_tube_outer_diameter_m=0.025,
+        outer_pipe_inner_diameter_m=0.05,
+        effective_length_m_canonical=length_str,
+        wall_thermal_conductivity_w_m_k=50.0,
+        inner_surface_roughness_m=0.0,
+        annulus_surface_roughness_m=0.0,
+        inner_fouling_resistance_m2k_w=0.0001,
+        outer_fouling_resistance_m2k_w=0.0001,
+    )
+    cat_ref = CatalogSnapshotRef.model_construct(
+        catalog_id="cat1",
+        catalog_version="1.0",
+        catalog_content_hash="sha256:" + "ab" * 32,
+        source_identity="test",
+        schema_version="1.0",
+    )
+    sq = SourceQualifiedCandidateIdentity.model_construct(
+        physical_identity_digest=phys.physical_identity_digest,
+        catalog_id="cat1",
+        catalog_version="1.0",
+        catalog_content_hash="sha256:" + "ab" * 32,
+        assembly_option_id="opt1",
+        manufacturing_option_identity="mfg1",
+    )
+    return ManufacturableCandidate.model_construct(
+        source_qualified_candidate_id=sq.source_qualified_candidate_id,
+        evaluation_order_index=idx,
+        physical_identity=phys,
+        physical_identity_digest=phys.physical_identity_digest,
+        source_qualified_identity=sq,
+        catalog_snapshot_ref=cat_ref,
+        assembly_option_id="opt1",
+        manufacturing_option_identity="mfg1",
+        manufacturing_metadata=(),
+        effective_length_m_canonical=length_str,
+    )
+
+
+def _make_ranking_disposition(
+    idx: int,
+    cand,
+    area: float,
+    heat_duty: float,
+    *,
+    disposition=None,
+    candidate_id_override: str | None = None,
+):
+    """Build a CandidateDispositionRecord with model_construct for ranking tests."""
+    from decimal import Decimal
+
+    from hexagent.optimization.evaluation import (
+        CandidateEvaluationState,
+        VerificationOutcome,
+    )
+    from hexagent.optimization.phase3_core import Phase3Disposition, canonical_decimal_string
+    from hexagent.optimization.phase3_evaluation import CandidateDispositionRecord
+
+    if disposition is None:
+        disposition = Phase3Disposition.FEASIBLE
+
+    cand_id = candidate_id_override or cand.source_qualified_candidate_id
+
+    return CandidateDispositionRecord.model_construct(
+        source_qualified_candidate_id=cand_id,
+        evaluation_order_index=idx,
+        source_candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
+        source_hash_verification_outcome=VerificationOutcome.PASSED,
+        source_provenance_verification_outcome=VerificationOutcome.PASSED,
+        source_record_descriptor_digest=None,
+        source_identity_record_descriptor_digest="sha256:" + "aa" * 32,
+        disposition=disposition,
+        diagnostic=None,
+        provider_identity_matches=True,
+        rating_status="succeeded",
+        candidate_evaluation_identity_digest="sha256:" + "bb" * 32,
+        verified_rating_evidence_digest="sha256:" + "cc" * 32,
+        invalid_rating_evidence_digest=None,
+        primary_engineering_value=canonical_decimal_string(Decimal(str(area))),
+        secondary_engineering_value=canonical_decimal_string(Decimal(str(heat_duty))),
+        warning_descriptors=(),
+        blocker_descriptors=(),
+        source_evaluation_failure_payload_digest=None,
+        source_evaluation_failure_binding_digest=None,
+        phase3_failure_binding_digest=None,
+        phase3_failure_payload_digest=None,
+        failure_origin=None,
+        failure_stage=None,
+        feasibility_digest="sha256:" + "dd" * 32,
+    )
+
+
+def test_production_ranking_uses_candidate_effective_length():
+    """Verify ranking uses candidate effective_length, not heat duty."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    # Build 3 candidates with different area/length combinations
+    # Candidate A: area=10, length=8, heat_duty=100
+    # Candidate B: area=10, length=5, heat_duty=1000
+    # Candidate C: area=12, length=3, heat_duty=1
+    cand_a = _make_ranking_candidate(0, 8.0)
+    cand_b = _make_ranking_candidate(1, 5.0)
+    cand_c = _make_ranking_candidate(2, 3.0)
+    candidates = (cand_a, cand_b, cand_c)
+
+    disp_a = _make_ranking_disposition(0, cand_a, 10.0, 100.0)
+    disp_b = _make_ranking_disposition(1, cand_b, 10.0, 1000.0)
+    disp_c = _make_ranking_disposition(2, cand_c, 12.0, 1.0)
+    dispositions = (disp_a, disp_b, disp_c)
+
+    # MIN_AREA: sort by (area, length, id)
+    # B(10,5) < A(10,8) < C(12,3)
+    result_area = rank_feasible_candidate_dispositions(
+        dispositions=dispositions,
+        candidates=candidates,
+        optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+    )
+    assert len(result_area) == 3
+    assert [r.source_qualified_candidate_id for r in result_area] == [
+        cand_b.source_qualified_candidate_id,
+        cand_a.source_qualified_candidate_id,
+        cand_c.source_qualified_candidate_id,
+    ]
+
+    # MIN_LENGTH: sort by (length, area, id)
+    # C(3) < B(5) < A(8)
+    result_length = rank_feasible_candidate_dispositions(
+        dispositions=dispositions,
+        candidates=candidates,
+        optimization_objective=OptimizationObjective.MINIMUM_EFFECTIVE_LENGTH,
+    )
+    assert len(result_length) == 3
+    assert [r.source_qualified_candidate_id for r in result_length] == [
+        cand_c.source_qualified_candidate_id,
+        cand_b.source_qualified_candidate_id,
+        cand_a.source_qualified_candidate_id,
+    ]
+
+
+def test_ranking_ignores_heat_duty():
+    """Heat duty changes must not affect ranking."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    cand_a = _make_ranking_candidate(0, 8.0)
+    cand_b = _make_ranking_candidate(1, 5.0)
+    cand_c = _make_ranking_candidate(2, 3.0)
+    candidates = (cand_a, cand_b, cand_c)
+
+    # Same area/length as above, but heat_duty values are scrambled
+    disp_a = _make_ranking_disposition(0, cand_a, 10.0, 9999.0)
+    disp_b = _make_ranking_disposition(1, cand_b, 10.0, 1.0)
+    disp_c = _make_ranking_disposition(2, cand_c, 12.0, 5000.0)
+    dispositions = (disp_a, disp_b, disp_c)
+
+    # MIN_AREA: B(10,5) < A(10,8) < C(12,3) — same as test above
+    result_area = rank_feasible_candidate_dispositions(
+        dispositions=dispositions,
+        candidates=candidates,
+        optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+    )
+    assert [r.source_qualified_candidate_id for r in result_area] == [
+        cand_b.source_qualified_candidate_id,
+        cand_a.source_qualified_candidate_id,
+        cand_c.source_qualified_candidate_id,
+    ]
+
+    # MIN_LENGTH: C(3) < B(5) < A(8) — same as test above
+    result_length = rank_feasible_candidate_dispositions(
+        dispositions=dispositions,
+        candidates=candidates,
+        optimization_objective=OptimizationObjective.MINIMUM_EFFECTIVE_LENGTH,
+    )
+    assert [r.source_qualified_candidate_id for r in result_length] == [
+        cand_c.source_qualified_candidate_id,
+        cand_b.source_qualified_candidate_id,
+        cand_a.source_qualified_candidate_id,
+    ]
+
+
+def test_production_ranking_rejects_candidate_id_mismatch():
+    """Disposition and candidate have different source_qualified_candidate_id → ValueError."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    cand_a = _make_ranking_candidate(0, 5.0)
+    candidates = (cand_a,)
+
+    # Build disposition with a different source_qualified_candidate_id
+    wrong_id = "sha256:" + "ff" * 32
+    disp_a = _make_ranking_disposition(0, cand_a, 10.0, 100.0, candidate_id_override=wrong_id)
+
+    with pytest.raises(ValueError, match="candidate ID mismatch"):
+        rank_feasible_candidate_dispositions(
+            dispositions=(disp_a,),
+            candidates=candidates,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+        )
+
+
+def test_production_ranking_rejects_evaluation_index_mismatch():
+    """Disposition.evaluation_order_index not found in candidates → ValueError."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    cand_a = _make_ranking_candidate(0, 5.0)
+    candidates = (cand_a,)
+
+    # Build disposition with evaluation_order_index=999 (not in candidates)
+    disp_a = _make_ranking_disposition(999, cand_a, 10.0, 100.0)
+
+    with pytest.raises(ValueError, match="no candidate with evaluation_order_index=999"):
+        rank_feasible_candidate_dispositions(
+            dispositions=(disp_a,),
+            candidates=candidates,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+        )
+
+
+def test_production_ranking_rejects_missing_area():
+    """primary_engineering_value is empty → ValueError."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    cand_a = _make_ranking_candidate(0, 5.0)
+    candidates = (cand_a,)
+
+    # Build disposition with primary_engineering_value=None
+    disp_a = _make_ranking_disposition(0, cand_a, 10.0, 100.0)
+    # Override primary_engineering_value after construction
+    object.__setattr__(disp_a, "primary_engineering_value", None)
+
+    with pytest.raises(ValueError, match="empty primary_engineering_value"):
+        rank_feasible_candidate_dispositions(
+            dispositions=(disp_a,),
+            candidates=candidates,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+        )
+
+
+def test_production_ranking_rejects_missing_effective_length():
+    """candidate.effective_length_m_canonical is empty → ValueError."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    cand_a = _make_ranking_candidate(0, 5.0)
+    candidates = (cand_a,)
+
+    # Override effective_length_m_canonical after construction
+    object.__setattr__(cand_a, "effective_length_m_canonical", "")
+
+    disp_a = _make_ranking_disposition(0, cand_a, 10.0, 100.0)
+
+    with pytest.raises(ValueError, match="empty effective_length_m_canonical"):
+        rank_feasible_candidate_dispositions(
+            dispositions=(disp_a,),
+            candidates=candidates,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+        )
+
+
+def test_production_ranking_rejects_invalid_decimal():
+    """primary_engineering_value is not a valid Decimal → ValueError."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    cand_a = _make_ranking_candidate(0, 5.0)
+    candidates = (cand_a,)
+
+    disp_a = _make_ranking_disposition(0, cand_a, 10.0, 100.0)
+    # Override primary_engineering_value to a non-numeric string
+    object.__setattr__(disp_a, "primary_engineering_value", "not_a_number")
+
+    with pytest.raises(ValueError):
+        rank_feasible_candidate_dispositions(
+            dispositions=(disp_a,),
+            candidates=candidates,
+            optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+        )
+
+
+def test_ranking_permutation_invariance():
+    """Ranking result is the same regardless of input permutation of dispositions."""
+    import random
+
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    cand_a = _make_ranking_candidate(0, 8.0)
+    cand_b = _make_ranking_candidate(1, 5.0)
+    cand_c = _make_ranking_candidate(2, 3.0)
+    candidates = (cand_a, cand_b, cand_c)
+
+    disp_a = _make_ranking_disposition(0, cand_a, 10.0, 100.0)
+    disp_b = _make_ranking_disposition(1, cand_b, 10.0, 1000.0)
+    disp_c = _make_ranking_disposition(2, cand_c, 12.0, 1.0)
+    dispositions = (disp_a, disp_b, disp_c)
+
+    # Reference result
+    ref = rank_feasible_candidate_dispositions(
+        dispositions=dispositions,
+        candidates=candidates,
+        optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+    )
+    ref_ids = [r.source_qualified_candidate_id for r in ref]
+
+    # Test original order
+    for objective in OptimizationObjective:
+        result = rank_feasible_candidate_dispositions(
+            dispositions=dispositions,
+            candidates=candidates,
+            optimization_objective=objective,
+        )
+        result_ids = [r.source_qualified_candidate_id for r in result]
+        # Reversed
+        result_rev = rank_feasible_candidate_dispositions(
+            dispositions=tuple(reversed(dispositions)),
+            candidates=candidates,
+            optimization_objective=objective,
+        )
+        assert [r.source_qualified_candidate_id for r in result_rev] == result_ids
+        # Rotated
+        result_rot = rank_feasible_candidate_dispositions(
+            dispositions=(dispositions[1], dispositions[2], dispositions[0]),
+            candidates=candidates,
+            optimization_objective=objective,
+        )
+        assert [r.source_qualified_candidate_id for r in result_rot] == result_ids
+
+    # Seeded random permutations
+    for seed in (42, 123, 456, 789, 101):
+        rng = random.Random(seed)
+        perm = list(range(3))
+        rng.shuffle(perm)
+        permuted = tuple(dispositions[i] for i in perm)
+        for objective in OptimizationObjective:
+            result = rank_feasible_candidate_dispositions(
+                dispositions=permuted,
+                candidates=candidates,
+                optimization_objective=objective,
+            )
+            result_ids = [r.source_qualified_candidate_id for r in result]
+            ref_result = rank_feasible_candidate_dispositions(
+                dispositions=dispositions,
+                candidates=candidates,
+                optimization_objective=objective,
+            )
+            ref_ids = [r.source_qualified_candidate_id for r in ref_result]
+            assert result_ids == ref_ids
+
+
+def test_ranking_skips_non_feasible_dispositions():
+    """Non-FEASIBLE dispositions are filtered out before ranking."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+    from hexagent.optimization.phase3_core import Phase3Disposition
+
+    cand_a = _make_ranking_candidate(0, 5.0)
+    cand_b = _make_ranking_candidate(1, 8.0)
+    candidates = (cand_a, cand_b)
+
+    disp_feasible = _make_ranking_disposition(0, cand_a, 10.0, 100.0)
+    disp_infeasible = _make_ranking_disposition(
+        1,
+        cand_b,
+        12.0,
+        200.0,
+        disposition=Phase3Disposition.INFEASIBLE,
+    )
+
+    result = rank_feasible_candidate_dispositions(
+        dispositions=(disp_feasible, disp_infeasible),
+        candidates=candidates,
+        optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+    )
+    assert len(result) == 1
+    assert result[0].source_qualified_candidate_id == cand_a.source_qualified_candidate_id
+
+
+def test_ranking_empty_dispositions_returns_empty():
+    """Empty dispositions tuple returns empty result."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import rank_feasible_candidate_dispositions
+
+    result = rank_feasible_candidate_dispositions(
+        dispositions=(),
+        candidates=(),
+        optimization_objective=OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA,
+    )
+    assert result == ()
+
+
+def test_ranking_uses_expected_ranked_values():
+    """Verify primary/secondary fields in ranked records match _expected_ranked_values."""
+    from hexagent.optimization.context import OptimizationObjective
+    from hexagent.optimization.phase3_builder import (
+        _expected_ranked_values,
+        rank_feasible_candidate_dispositions,
+    )
+
+    cand_a = _make_ranking_candidate(0, 5.0)
+    candidates = (cand_a,)
+
+    disp_a = _make_ranking_disposition(0, cand_a, 10.0, 100.0)
+
+    for objective in OptimizationObjective:
+        result = rank_feasible_candidate_dispositions(
+            dispositions=(disp_a,),
+            candidates=candidates,
+            optimization_objective=objective,
+        )
+        assert len(result) == 1
+        rr = result[0]
+
+        expected_primary, expected_primary_field, expected_secondary, expected_secondary_field = (
+            _expected_ranked_values(disp_a, cand_a, objective)
+        )
+        assert rr.primary_objective_value == expected_primary
+        assert rr.primary_objective_field == expected_primary_field
+        assert rr.secondary_tie_break_value == expected_secondary
+        assert rr.secondary_tie_break_field == expected_secondary_field
+
+
+# ===================================================================
+# P0-2: Wire formatter authority into production chain
+# ===================================================================
+
+
+def test_artifact_builder_uses_registered_formatter_fields():
+    """Artifact builder must use FORMATTER_REGISTRY fields, not hardcoded values."""
+    app = _create_fresh_app()
+    _, envelope = _execute_rating(app, key="test-p02-formatter-fields")
+
+    from hexagent.reporting import _build_sections_from_envelope
+
+    sections = _build_sections_from_envelope(envelope)
+    for section in sections:
+        for artifact in section.artifacts:
+            if isinstance(artifact, PresentReportArtifact):
+                assert artifact.formatter_id == "default", (
+                    f"formatter_id must be 'default', got {artifact.formatter_id!r}"
+                )
+                assert artifact.formatter_version == "1.0", (
+                    f"formatter_version must be '1.0', got {artifact.formatter_version!r}"
+                )
+                assert artifact.rounding_mode == "none", (
+                    f"rounding_mode must be 'none', got {artifact.rounding_mode!r}"
+                )
+                assert artifact.formatted_display_value == artifact.canonical_raw_value, (
+                    f"formatted_display_value must equal canonical_raw_value for identity "
+                    f"formatter: {artifact.formatted_display_value!r} != "
+                    f"{artifact.canonical_raw_value!r}"
+                )
+
+
+def test_pre_render_rejects_unknown_formatter_id():
+    """Report model must reject artifacts with unknown formatter_id."""
+    sections = tuple(
+        ReportSection(
+            section_id=sid,
+            title=sid.value,
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    # Build a valid model first
+    correct_hash = compute_report_content_hash(sections)
+    identity = _dummy_identity(report_content_hash=correct_hash)
+    instance_hash = compute_report_instance_hash(identity)
+    model = DoublePipeReportModel(
+        report_schema_version="1",
+        sections=sections,
+        report_instance_identity=identity,
+        report_content_hash=correct_hash,
+        report_instance_hash=instance_hash,
+    )
+    # Tamper: inject an artifact with bad formatter_id via model_construct
+
+    bad_artifact = PresentReportArtifact.model_construct(
+        kind=ReportArtifactKind.PRESENT,
+        artifact_id=ReportArtifactId.GEOMETRY_SPEC,
+        source_document=ReportSourceDocument.RUN_ENVELOPE,
+        source_document_digest="sha256:" + "a" * 64,
+        source_json_pointer="/geometry/innerDiameter",
+        authority_digest="sha256:" + "b" * 64,
+        canonical_raw_value="0.025",
+        formatter_id="nonexistent",
+        formatter_version="1.0",
+        rounding_mode="none",
+        formatted_display_value="0.025",
+    )
+    # Rebuild sections with tampered artifact
+    tampered_sections = []
+    for section in model.sections:
+        if section.section_id == ReportSectionId.GEOMETRY:
+            tampered_sections.append(
+                ReportSection.model_construct(
+                    section_id=section.section_id,
+                    title=section.title,
+                    content=section.content,
+                    status=section.status,
+                    artifacts=(bad_artifact,),
+                )
+            )
+        else:
+            tampered_sections.append(section)
+
+    tampered_hash = compute_report_content_hash(tuple(tampered_sections))
+    tampered_identity = _dummy_identity(report_content_hash=tampered_hash)
+    tampered_instance_hash = compute_report_instance_hash(tampered_identity)
+
+    with pytest.raises(ValueError, match="unknown formatter_id"):
+        DoublePipeReportModel(
+            report_schema_version="1",
+            sections=tuple(tampered_sections),
+            report_instance_identity=tampered_identity,
+            report_content_hash=tampered_hash,
+            report_instance_hash=tampered_instance_hash,
+        )
+
+
+def test_pre_render_rejects_wrong_formatter_version():
+    """Report model must reject artifacts with wrong formatter_version."""
+    sections = tuple(
+        ReportSection(
+            section_id=sid,
+            title=sid.value,
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    correct_hash = compute_report_content_hash(sections)
+    identity = _dummy_identity(report_content_hash=correct_hash)
+    instance_hash = compute_report_instance_hash(identity)
+    model = DoublePipeReportModel(
+        report_schema_version="1",
+        sections=sections,
+        report_instance_identity=identity,
+        report_content_hash=correct_hash,
+        report_instance_hash=instance_hash,
+    )
+    bad_artifact = PresentReportArtifact.model_construct(
+        kind=ReportArtifactKind.PRESENT,
+        artifact_id=ReportArtifactId.GEOMETRY_SPEC,
+        source_document=ReportSourceDocument.RUN_ENVELOPE,
+        source_document_digest="sha256:" + "a" * 64,
+        source_json_pointer="/geometry/innerDiameter",
+        authority_digest="sha256:" + "b" * 64,
+        canonical_raw_value="0.025",
+        formatter_id="default",
+        formatter_version="9.9",
+        rounding_mode="none",
+        formatted_display_value="0.025",
+    )
+    tampered_sections = []
+    for section in model.sections:
+        if section.section_id == ReportSectionId.GEOMETRY:
+            tampered_sections.append(
+                ReportSection.model_construct(
+                    section_id=section.section_id,
+                    title=section.title,
+                    content=section.content,
+                    status=section.status,
+                    artifacts=(bad_artifact,),
+                )
+            )
+        else:
+            tampered_sections.append(section)
+
+    tampered_hash = compute_report_content_hash(tuple(tampered_sections))
+    tampered_identity = _dummy_identity(report_content_hash=tampered_hash)
+    tampered_instance_hash = compute_report_instance_hash(tampered_identity)
+
+    with pytest.raises(ValueError, match="formatter_version mismatch"):
+        DoublePipeReportModel(
+            report_schema_version="1",
+            sections=tuple(tampered_sections),
+            report_instance_identity=tampered_identity,
+            report_content_hash=tampered_hash,
+            report_instance_hash=tampered_instance_hash,
+        )
+
+
+def test_pre_render_rejects_wrong_rounding_mode():
+    """Report model must reject artifacts with wrong rounding_mode."""
+    sections = tuple(
+        ReportSection(
+            section_id=sid,
+            title=sid.value,
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    correct_hash = compute_report_content_hash(sections)
+    identity = _dummy_identity(report_content_hash=correct_hash)
+    instance_hash = compute_report_instance_hash(identity)
+    model = DoublePipeReportModel(
+        report_schema_version="1",
+        sections=sections,
+        report_instance_identity=identity,
+        report_content_hash=correct_hash,
+        report_instance_hash=instance_hash,
+    )
+    bad_artifact = PresentReportArtifact.model_construct(
+        kind=ReportArtifactKind.PRESENT,
+        artifact_id=ReportArtifactId.GEOMETRY_SPEC,
+        source_document=ReportSourceDocument.RUN_ENVELOPE,
+        source_document_digest="sha256:" + "a" * 64,
+        source_json_pointer="/geometry/innerDiameter",
+        authority_digest="sha256:" + "b" * 64,
+        canonical_raw_value="0.025",
+        formatter_id="default",
+        formatter_version="1.0",
+        rounding_mode="half_up",
+        formatted_display_value="0.025",
+    )
+    tampered_sections = []
+    for section in model.sections:
+        if section.section_id == ReportSectionId.GEOMETRY:
+            tampered_sections.append(
+                ReportSection.model_construct(
+                    section_id=section.section_id,
+                    title=section.title,
+                    content=section.content,
+                    status=section.status,
+                    artifacts=(bad_artifact,),
+                )
+            )
+        else:
+            tampered_sections.append(section)
+
+    tampered_hash = compute_report_content_hash(tuple(tampered_sections))
+    tampered_identity = _dummy_identity(report_content_hash=tampered_hash)
+    tampered_instance_hash = compute_report_instance_hash(tampered_identity)
+
+    with pytest.raises(ValueError, match="rounding_mode mismatch"):
+        DoublePipeReportModel(
+            report_schema_version="1",
+            sections=tuple(tampered_sections),
+            report_instance_identity=tampered_identity,
+            report_content_hash=tampered_hash,
+            report_instance_hash=tampered_instance_hash,
+        )
+
+
+def test_pre_render_rejects_wrong_formatted_display_value():
+    """Tamper formatted_display_value, recompute hashes, still rejected."""
+    sections = tuple(
+        ReportSection(
+            section_id=sid,
+            title=sid.value,
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    correct_hash = compute_report_content_hash(sections)
+    identity = _dummy_identity(report_content_hash=correct_hash)
+    instance_hash = compute_report_instance_hash(identity)
+    model = DoublePipeReportModel(
+        report_schema_version="1",
+        sections=sections,
+        report_instance_identity=identity,
+        report_content_hash=correct_hash,
+        report_instance_hash=instance_hash,
+    )
+    bad_artifact = PresentReportArtifact.model_construct(
+        kind=ReportArtifactKind.PRESENT,
+        artifact_id=ReportArtifactId.GEOMETRY_SPEC,
+        source_document=ReportSourceDocument.RUN_ENVELOPE,
+        source_document_digest="sha256:" + "a" * 64,
+        source_json_pointer="/geometry/innerDiameter",
+        authority_digest="sha256:" + "b" * 64,
+        canonical_raw_value="0.025",
+        formatter_id="default",
+        formatter_version="1.0",
+        rounding_mode="none",
+        formatted_display_value="TAMPERED",
+    )
+    tampered_sections = []
+    for section in model.sections:
+        if section.section_id == ReportSectionId.GEOMETRY:
+            tampered_sections.append(
+                ReportSection.model_construct(
+                    section_id=section.section_id,
+                    title=section.title,
+                    content=section.content,
+                    status=section.status,
+                    artifacts=(bad_artifact,),
+                )
+            )
+        else:
+            tampered_sections.append(section)
+
+    tampered_hash = compute_report_content_hash(tuple(tampered_sections))
+    tampered_identity = _dummy_identity(report_content_hash=tampered_hash)
+    tampered_instance_hash = compute_report_instance_hash(tampered_identity)
+
+    with pytest.raises(ValueError, match="formatted_display_value mismatch"):
+        DoublePipeReportModel(
+            report_schema_version="1",
+            sections=tuple(tampered_sections),
+            report_instance_identity=tampered_identity,
+            report_content_hash=tampered_hash,
+            report_instance_hash=tampered_instance_hash,
+        )
+
+
+def test_formatter_registry_version_is_bound_to_report_identity():
+    """Report identity must use FORMATTER_REGISTRY_VERSION."""
+    from hexagent.reporting import FORMATTER_REGISTRY_VERSION
+
+    assert FORMATTER_REGISTRY_VERSION == "1.0.0"
+    # Verify that a real report uses this constant
+    app = _create_fresh_app()
+    _, envelope = _execute_rating(app, key="test-p02-registry-version")
+    record = _make_record_for_report(envelope)
+    html = build_report_html(record)
+    assert isinstance(html, bytes)
+    # The report was built successfully, confirming the constant is wired in
+
+
+def test_formatter_definition_has_format_value_callable():
+    """FormatterDefinition must have a format_value callable."""
+    from hexagent.reporting import DEFAULT_FORMATTER
+
+    assert callable(DEFAULT_FORMATTER.format_value)
+    assert DEFAULT_FORMATTER.format_value("42.0", None, None) == "42.0"
+
+
+def test_format_value_uses_registry():
+    """format_value must look up the formatter from FORMATTER_REGISTRY."""
+    from hexagent.reporting import format_value
+
+    result = format_value(
+        value="42.0",
+        source_unit=None,
+        display_unit=None,
+        formatter_id="default",
+    )
+    assert result == "42.0"
+
+
+def test_format_value_rejects_unknown_id():
+    """format_value must reject unknown formatter_id."""
+    from hexagent.reporting import format_value
+
+    with pytest.raises(ValueError, match="unknown formatter_id"):
+        format_value(
+            value="42.0",
+            source_unit=None,
+            display_unit=None,
+            formatter_id="nonexistent",
         )

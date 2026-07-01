@@ -455,7 +455,6 @@ class SizingApplicationService:
             compute_raw_combination_count,
         )
         from hexagent.optimization.phase3_builder import (  # type: ignore[attr-defined]
-            FEASIBLE,
             Phase3CandidateClassificationInput,
             build_optimization_result,
             classify_candidate,
@@ -838,7 +837,6 @@ class SizingApplicationService:
                 dispositions.append(disp)
 
         # 7. Rank feasible candidates
-        feasible_dispositions = [d for d in dispositions if d.disposition is FEASIBLE]
         from hexagent.optimization.phase3_builder import (
             rank_feasible_candidate_dispositions,
         )
@@ -846,7 +844,8 @@ class SizingApplicationService:
         obj = sizing_request_identity.optimization_objective
         ranked_records = list(
             rank_feasible_candidate_dispositions(
-                dispositions=tuple(feasible_dispositions),
+                dispositions=tuple(dispositions),
+                candidates=candidates_tuple,
                 optimization_objective=obj,
             )
         )

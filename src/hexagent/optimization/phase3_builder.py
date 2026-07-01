@@ -1769,18 +1769,26 @@ def build_ranked_candidate_record(
 def rank_feasible_candidate_dispositions(
     *,
     dispositions: tuple[CandidateDispositionRecord, ...],
+    candidates: tuple[ManufacturableCandidate, ...],
     optimization_objective: OptimizationObjective,
 ) -> tuple[RankedCandidateRecord, ...]:
     """Rank FEASIBLE dispositions according to the optimization objective.
 
     Returns an empty tuple when no FEASIBLE dispositions are present.
 
-    Raises ValueError if a FEASIBLE disposition is missing its primary or
-    secondary engineering values (they must be non-None and non-empty).
+    Raises ValueError if:
+    - A FEASIBLE disposition is missing its primary_engineering_value
+    - No candidate matches the disposition's evaluation_order_index
+    - The candidate's source_qualified_candidate_id mismatches the disposition
+    - The candidate's effective_length_m_canonical is missing
     """
     feasible = [d for d in dispositions if d.disposition is FEASIBLE]
     if not feasible:
         return ()
+
+    cand_by_index: dict[int, ManufacturableCandidate] = {
+        c.evaluation_order_index: c for c in candidates
+    }
 
     if optimization_objective == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
         primary_field = "area_outer_m2"
@@ -1789,37 +1797,66 @@ def rank_feasible_candidate_dispositions(
         primary_field = "effective_length_m_canonical"
         secondary_field = "area_outer_m2"
 
-    def _sort_key(d: CandidateDispositionRecord) -> tuple[Decimal, Decimal, str]:
-        if not d.primary_engineering_value:
+    # Bind each feasible disposition to its candidate and validate
+    paired: list[tuple[CandidateDispositionRecord, ManufacturableCandidate]] = []
+    for d in feasible:
+        cand = cand_by_index.get(d.evaluation_order_index)
+        if cand is None:
+            raise ValueError(f"no candidate with evaluation_order_index={d.evaluation_order_index}")
+        if cand.source_qualified_candidate_id != d.source_qualified_candidate_id:
+            raise ValueError(
+                f"candidate ID mismatch: "
+                f"evaluation_order_index={d.evaluation_order_index} "
+                f"has id={cand.source_qualified_candidate_id!r} "
+                f"but disposition has {d.source_qualified_candidate_id!r}"
+            )
+        area = d.primary_engineering_value
+        length = cand.effective_length_m_canonical
+        if not area:
             raise ValueError(
                 f"FEASIBLE disposition {d.source_qualified_candidate_id} "
-                f"has empty primary_engineering_value — cannot rank"
+                f"has empty primary_engineering_value"
             )
-        if not d.secondary_engineering_value:
+        if not length:
             raise ValueError(
-                f"FEASIBLE disposition {d.source_qualified_candidate_id} "
-                f"has empty secondary_engineering_value — cannot rank"
+                f"candidate {d.source_qualified_candidate_id} "
+                f"has empty effective_length_m_canonical"
             )
-        return (
-            Decimal(d.primary_engineering_value),
-            Decimal(d.secondary_engineering_value),
-            d.source_qualified_candidate_id,
-        )
+        paired.append((d, cand))
 
-    sorted_feasible = sorted(feasible, key=_sort_key)
+    def _sort_key(
+        pair: tuple[CandidateDispositionRecord, ManufacturableCandidate],
+    ) -> tuple[Decimal, Decimal, str]:
+        d, cand = pair
+        try:
+            area = Decimal(d.primary_engineering_value)
+            length = Decimal(cand.effective_length_m_canonical)
+        except Exception as exc:
+            raise ValueError(f"invalid Decimal in ranking values: {exc}") from exc
+        if optimization_objective == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
+            return (area, length, d.source_qualified_candidate_id)
+        return (length, area, d.source_qualified_candidate_id)
+
+    sorted_pairs = sorted(paired, key=_sort_key)
     ranked_records = []
-    for rank, disp in enumerate(sorted_feasible, 1):
+    for rank, (d, cand) in enumerate(sorted_pairs, 1):
+        (
+            primary_val,
+            primary_field,
+            secondary_val,
+            secondary_field,
+        ) = _expected_ranked_values(d, cand, optimization_objective)
         rr = build_ranked_candidate_record(
             rank=rank,
-            source_qualified_candidate_id=disp.source_qualified_candidate_id,
+            source_qualified_candidate_id=d.source_qualified_candidate_id,
             optimization_objective=optimization_objective,
-            primary_objective_value=disp.primary_engineering_value or "",
+            primary_objective_value=primary_val,
             primary_objective_field=primary_field,
-            secondary_tie_break_value=disp.secondary_engineering_value or "",
+            secondary_tie_break_value=secondary_val,
             secondary_tie_break_field=secondary_field,
-            candidate_evaluation_identity_digest=disp.candidate_evaluation_identity_digest or "",
-            verified_rating_evidence_digest=disp.verified_rating_evidence_digest or "",
-            feasibility_digest=disp.feasibility_digest,
+            candidate_evaluation_identity_digest=d.candidate_evaluation_identity_digest or "",
+            verified_rating_evidence_digest=d.verified_rating_evidence_digest or "",
+            feasibility_digest=d.feasibility_digest,
         )
         ranked_records.append(rr)
     return tuple(ranked_records)
