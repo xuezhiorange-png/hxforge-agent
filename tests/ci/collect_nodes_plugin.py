@@ -109,9 +109,7 @@ def _parse_positive_int_environment(name: str) -> int:
 
 def _sha256_file(path: Path) -> str:
     if not path.is_file():
-        raise pytest.UsageError(
-            f"required fingerprint input is missing: {path.as_posix()}"
-        )
+        raise pytest.UsageError(f"required fingerprint input is missing: {path.as_posix()}")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     return f"sha256:{digest}"
 
@@ -147,17 +145,13 @@ def _behavior_fingerprint(config: pytest.Config) -> str:
     }
     if not locale:
         raise pytest.UsageError("TASK-015A requires LC_ALL or LANG")
-    canonical = json.dumps(
-        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    )
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _python_file_patterns(config: pytest.Config) -> tuple[str, ...]:
     patterns = config.getini("python_files")
-    if not isinstance(patterns, list) or not all(
-        isinstance(item, str) for item in patterns
-    ):
+    if not isinstance(patterns, list) or not all(isinstance(item, str) for item in patterns):
         raise pytest.UsageError("pytest python_files must be a list of strings")
     return tuple(patterns)
 
@@ -168,8 +162,7 @@ def _discover_test_files(root: Path, patterns: tuple[str, ...]) -> list[str]:
     files = {
         _normalize_path(path)
         for path in root.rglob("*.py")
-        if path.is_file()
-        and any(fnmatch.fnmatch(path.name, pattern) for pattern in patterns)
+        if path.is_file() and any(fnmatch.fnmatch(path.name, pattern) for pattern in patterns)
     }
     return sorted(files)
 
@@ -180,9 +173,7 @@ def _validate_collection_targets(
     args = [_normalize_path(arg) for arg in config.args]
     if scope == "global":
         if shard is not None:
-            raise pytest.UsageError(
-                "global collection requires --hx-shard to be absent"
-            )
+            raise pytest.UsageError("global collection requires --hx-shard to be absent")
         if args != ["tests"]:
             raise pytest.UsageError(
                 "global collection must target exactly tests/ and no explicit subset; "
@@ -195,9 +186,7 @@ def _validate_collection_targets(
     if not args:
         raise pytest.UsageError("shard collection requires explicit test files")
     if "tests" in args:
-        raise pytest.UsageError(
-            "shard collection must not target the whole tests/ directory"
-        )
+        raise pytest.UsageError("shard collection must not target the whole tests/ directory")
 
     explicit_files: list[str] = []
     for raw, normalized in zip(config.args, args, strict=True):
@@ -233,9 +222,7 @@ def _load_zero_node_metadata(config: pytest.Config) -> dict[str, ZeroNodeMetadat
     metadata: dict[str, ZeroNodeMetadata] = {}
     for raw_file, raw_record in raw.items():
         if not isinstance(raw_file, str) or not isinstance(raw_record, dict):
-            raise pytest.UsageError(
-                "zero-node metadata entries must map file strings to objects"
-            )
+            raise pytest.UsageError("zero-node metadata entries must map file strings to objects")
         expected_keys = {"zero_node_reason", "reason_authority", "evidence"}
         if set(raw_record) != expected_keys:
             raise pytest.UsageError(
@@ -245,9 +232,7 @@ def _load_zero_node_metadata(config: pytest.Config) -> dict[str, ZeroNodeMetadat
         authority = raw_record["reason_authority"]
         evidence = raw_record["evidence"]
         if reason not in _ALLOWED_ZERO_NODE_REASONS:
-            raise pytest.UsageError(
-                f"unknown zero-node reason for {raw_file!r}: {reason!r}"
-            )
+            raise pytest.UsageError(f"unknown zero-node reason for {raw_file!r}: {reason!r}")
         if not isinstance(authority, str) or not authority.strip():
             raise pytest.UsageError(f"zero-node authority is required for {raw_file!r}")
         if not isinstance(evidence, str) or not evidence.strip():
@@ -276,8 +261,7 @@ def _build_file_records(
     unknown_files = sorted(set(counts) - set(target_files))
     if unknown_files:
         raise pytest.UsageError(
-            "collected node IDs reference files outside the declared target set: "
-            f"{unknown_files!r}"
+            f"collected node IDs reference files outside the declared target set: {unknown_files!r}"
         )
 
     unused_metadata = sorted(set(zero_metadata) - set(target_files))
@@ -308,8 +292,7 @@ def _build_file_records(
 
         if metadata is None:
             raise pytest.UsageError(
-                "zero-node file requires approved metadata with a frozen reason code: "
-                f"{file_path}"
+                f"zero-node file requires approved metadata with a frozen reason code: {file_path}"
             )
         records.append(
             {
@@ -341,19 +324,13 @@ def pytest_collection_finish(session: pytest.Session) -> None:
 
     scope = cast(CollectionScope, scope_value)
     raw_shard = config.getoption("--hx-shard")
-    shard = (
-        raw_shard.strip() if isinstance(raw_shard, str) and raw_shard.strip() else None
-    )
+    shard = raw_shard.strip() if isinstance(raw_shard, str) and raw_shard.strip() else None
     target_files = _validate_collection_targets(config, scope, shard)
 
     node_ids = sorted(item.nodeid.replace("\\", "/") for item in session.items)
-    duplicates = sorted(
-        node_id for node_id, count in Counter(node_ids).items() if count > 1
-    )
+    duplicates = sorted(node_id for node_id, count in Counter(node_ids).items() if count > 1)
     if duplicates:
-        raise pytest.UsageError(
-            f"duplicate collected node IDs are prohibited: {duplicates!r}"
-        )
+        raise pytest.UsageError(f"duplicate collected node IDs are prohibited: {duplicates!r}")
 
     zero_metadata = _load_zero_node_metadata(config)
     file_records = _build_file_records(target_files, node_ids, zero_metadata)
@@ -361,9 +338,7 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     track = _required_environment("HX_TRACK")
     if track not in _ALLOWED_TRACKS:
         raise pytest.UsageError(f"invalid HX_TRACK: {track!r}")
-    commit_sha = os.environ.get(
-        "HX_COMMIT_SHA", os.environ.get("GITHUB_SHA", "")
-    ).strip()
+    commit_sha = os.environ.get("HX_COMMIT_SHA", os.environ.get("GITHUB_SHA", "")).strip()
     if not commit_sha:
         raise pytest.UsageError("TASK-015A requires HX_COMMIT_SHA or GITHUB_SHA")
 
