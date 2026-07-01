@@ -72,7 +72,13 @@ from hexagent.exchangers.double_pipe.thermal import (
     lmtd_counterflow,
     lmtd_parallel,
 )
-from hexagent.properties.base import FluidIdentifier, FluidState, PhaseRegion, PropertyProvider
+from hexagent.properties.base import (
+    FluidIdentifier,
+    FluidState,
+    PhaseRegion,
+    PropertyProvider,
+    ReferenceStatePolicy,
+)
 from hexagent.properties.errors import PropertyServiceError
 
 # ---------------------------------------------------------------------------
@@ -808,20 +814,47 @@ def _make_blocker(
     )
 
 
+def _optional_string_attribute(source: object, attribute_name: str) -> str:
+    """Extract a string attribute, returning '' for non-string or missing values.
+
+    Safe for MagicMock / dynamic proxy objects whose ``__getattr__``
+    returns a new mock instead of the requested default.
+    """
+    value = getattr(source, attribute_name, "")
+    return value if isinstance(value, str) else ""
+
+
 def _provider_snapshot(provider: PropertyProvider | None) -> ProviderIdentitySnapshot:
-    """Build a ProviderIdentitySnapshot from the provider."""
+    """Build a ProviderIdentitySnapshot from the provider.
+
+    Captures all 6 identity fields per contract C1:
+    name, version, git_revision, reference_state_policy,
+    configuration_fingerprint, cache_policy_version.
+    """
     if provider is None:
         return ProviderIdentitySnapshot(
             name="",
             version="",
             git_revision="",
             reference_state_policy="",
+            configuration_fingerprint="",
+            cache_policy_version="",
         )
+    reference_policy = provider.reference_state_policy
     return ProviderIdentitySnapshot(
-        name=provider.name,
-        version=provider.version,
-        git_revision=getattr(provider, "git_revision", ""),
-        reference_state_policy=provider.reference_state_policy.value,
+        name=_optional_string_attribute(provider, "name"),
+        version=_optional_string_attribute(provider, "version"),
+        git_revision=_optional_string_attribute(provider, "git_revision"),
+        reference_state_policy=(
+            reference_policy.value
+            if isinstance(reference_policy, ReferenceStatePolicy)
+            else (reference_policy if isinstance(reference_policy, str) else "")
+        ),
+        configuration_fingerprint=(
+            _optional_string_attribute(provider, "configuration_fingerprint")
+            or _optional_string_attribute(provider, "_construction_fingerprint")
+        ),
+        cache_policy_version=_optional_string_attribute(provider, "cache_policy_version"),
     )
 
 

@@ -946,6 +946,29 @@ def _map_non_verified(
     raise ValueError(f"unexpected state: {rec.candidate_evaluation_state}")
 
 
+def map_non_verified(
+    rec: CandidateEvaluationRecord,
+    *,
+    source_identity_record_descriptor_digest: str,
+    source_record_descriptor_digest: str | None,
+    source_failure_binding: Phase3RunFailureDescriptorBinding | None,
+    warning_descriptors: tuple[Phase3MessageDescriptor, ...],
+    blocker_descriptors: tuple[Phase3MessageDescriptor, ...],
+    evidence_failure_binding: Phase3RunFailureDescriptorBinding | None,
+) -> CandidateDispositionRecord:
+    """Public wrapper for _map_non_verified — generates a disposition for
+    any non-VERIFIED CandidateEvaluationState."""
+    return _map_non_verified(
+        rec,
+        source_identity_record_descriptor_digest=source_identity_record_descriptor_digest,
+        source_record_descriptor_digest=source_record_descriptor_digest,
+        source_failure_binding=source_failure_binding,
+        warning_descriptors=warning_descriptors,
+        blocker_descriptors=blocker_descriptors,
+        evidence_failure_binding=evidence_failure_binding,
+    )
+
+
 # === 16.2 _build_provider_mismatch ===
 
 
@@ -1738,6 +1761,113 @@ def build_ranked_candidate_record(
         feasibility_digest=feasibility_digest,
         ranked_record_digest=rrd,
     )
+
+
+# ── Authoritative ranking function ────────────────────────────────────────
+
+
+def rank_feasible_candidate_dispositions(
+    *,
+    dispositions: tuple[CandidateDispositionRecord, ...],
+    candidates: tuple[ManufacturableCandidate, ...],
+    optimization_objective: OptimizationObjective,
+) -> tuple[RankedCandidateRecord, ...]:
+    """Rank FEASIBLE dispositions according to the optimization objective.
+
+    Returns an empty tuple when no FEASIBLE dispositions are present.
+
+    Raises ValueError if:
+    - A FEASIBLE disposition is missing its primary_engineering_value
+    - No candidate matches the disposition's evaluation_order_index
+    - The candidate's source_qualified_candidate_id mismatches the disposition
+    - The candidate's effective_length_m_canonical is missing
+    """
+    feasible = [d for d in dispositions if d.disposition is FEASIBLE]
+    if not feasible:
+        return ()
+
+    cand_by_index: dict[int, ManufacturableCandidate] = {
+        c.evaluation_order_index: c for c in candidates
+    }
+
+    if optimization_objective == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
+        primary_field = "area_outer_m2"
+        secondary_field = "effective_length_m_canonical"
+    else:
+        primary_field = "effective_length_m_canonical"
+        secondary_field = "area_outer_m2"
+
+    # Bind each feasible disposition to its candidate and validate.
+    # Store the narrowed (non-None) area and length strings so the sort
+    # closure never re-reads Optional model fields.
+    _RankPair = tuple[
+        CandidateDispositionRecord,
+        ManufacturableCandidate,
+        str,
+        str,
+    ]
+    paired: list[_RankPair] = []
+    for d in feasible:
+        cand = cand_by_index.get(d.evaluation_order_index)
+        if cand is None:
+            raise ValueError(f"no candidate with evaluation_order_index={d.evaluation_order_index}")
+        if cand.source_qualified_candidate_id != d.source_qualified_candidate_id:
+            raise ValueError(
+                f"candidate ID mismatch: "
+                f"evaluation_order_index={d.evaluation_order_index} "
+                f"has id={cand.source_qualified_candidate_id!r} "
+                f"but disposition has {d.source_qualified_candidate_id!r}"
+            )
+        area_raw = d.primary_engineering_value
+        length_raw = cand.effective_length_m_canonical
+        if not area_raw:
+            raise ValueError(
+                f"FEASIBLE disposition {d.source_qualified_candidate_id} "
+                f"has empty primary_engineering_value"
+            )
+        if not length_raw:
+            raise ValueError(
+                f"candidate {d.source_qualified_candidate_id} "
+                f"has empty effective_length_m_canonical"
+            )
+        paired.append((d, cand, area_raw, length_raw))
+
+    def _sort_key(
+        pair: _RankPair,
+    ) -> tuple[Decimal, Decimal, str]:
+        _d, _cand, area_raw, length_raw = pair
+        try:
+            area = Decimal(area_raw)
+            length = Decimal(length_raw)
+        except Exception as exc:
+            raise ValueError(f"invalid Decimal in ranking values: {exc}") from exc
+        if optimization_objective == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
+            return (area, length, _d.source_qualified_candidate_id)
+        return (length, area, _d.source_qualified_candidate_id)
+
+    sorted_pairs = sorted(paired, key=_sort_key)
+    ranked_records = []
+    for rank, (d, cand, _area_raw, _length_raw) in enumerate(sorted_pairs, 1):
+        (
+            primary_val,
+            primary_field,
+            secondary_val,
+            secondary_field,
+        ) = _expected_ranked_values(d, cand, optimization_objective)
+        rr = build_ranked_candidate_record(
+            rank=rank,
+            source_qualified_candidate_id=d.source_qualified_candidate_id,
+            optimization_objective=optimization_objective,
+            primary_objective_value=primary_val,
+            primary_objective_field=primary_field,
+            secondary_tie_break_value=secondary_val,
+            secondary_tie_break_field=secondary_field,
+            candidate_evaluation_identity_digest=d.candidate_evaluation_identity_digest or "",
+            verified_rating_evidence_digest=d.verified_rating_evidence_digest or "",
+            feasibility_digest=d.feasibility_digest,
+        )
+        ranked_records.append(rr)
+    return tuple(ranked_records)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
