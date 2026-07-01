@@ -18,7 +18,7 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: test "$(uv --version)" = "uv 0.11.25"
+        run: uv --version | grep -q "^uv 0.11.25"
       - name: Check lock freshness
         run: uv lock --check
       - name: Install from lock
@@ -37,6 +37,9 @@ jobs:
       shard-count: ${{ steps.parse.outputs.shard-count }}
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
       - name: Parse manifest to JSON matrix
         id: parse
         run: |

@@ -30,7 +30,7 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: test "$(uv --version)" = "uv 0.11.25"
+        run: uv --version | grep -q "^uv 0.11.25"
       - name: Check lock freshness
         run: uv lock --check
       - name: Install from lock
@@ -52,7 +52,7 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: test "$(uv --version)" = "uv 0.11.25"
+        run: uv --version | grep -q "^uv 0.11.25"
       - name: Install from lock
         run: uv sync --locked --extra dev
       - name: Run all tests (py3.11)
@@ -105,7 +105,7 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: test "$(uv --version)" = "uv 0.11.25"
+        run: uv --version | grep -q "^uv 0.11.25"
       - name: Install from lock
         run: uv sync --locked --extra dev
       - name: Run all tests (py3.12)
@@ -158,7 +158,7 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: test "$(uv --version)" = "uv 0.11.25"
+        run: uv --version | grep -q "^uv 0.11.25"
       - name: Install from lock
         run: uv sync --locked --extra dev
       - name: Run golden regression tests
