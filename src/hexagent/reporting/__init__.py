@@ -23,6 +23,7 @@ from __future__ import annotations
 import html as _html
 import json
 import re
+from dataclasses import dataclass as _dc
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 from uuid import UUID
@@ -200,6 +201,60 @@ class OutOfScopeReportArtifact(StrictBaseModel):
     kind: Literal[ReportArtifactKind.OUT_OF_SCOPE]
     artifact_id: ReportArtifactId
     capability: str
+
+
+# ---------------------------------------------------------------------------
+# Formatter authority (B9)
+# ---------------------------------------------------------------------------
+
+
+@_dc(frozen=True)
+class FormatterDefinition:
+    """Immutable formatter specification."""
+
+    formatter_id: str
+    formatter_version: str
+    rounding_mode: str  # e.g. "half_up", "none"
+
+
+DEFAULT_FORMATTER = FormatterDefinition(
+    formatter_id="default",
+    formatter_version="1.0",
+    rounding_mode="none",
+)
+
+# Formatter registry — all known formatters
+FORMATTER_REGISTRY: dict[str, FormatterDefinition] = {
+    DEFAULT_FORMATTER.formatter_id: DEFAULT_FORMATTER,
+}
+
+
+def validate_formatter_fields(
+    *,
+    formatter_id: str,
+    formatter_version: str,
+    rounding_mode: str,
+) -> None:
+    """Verify that the given formatter fields match a registered formatter."""
+    fmt = FORMATTER_REGISTRY.get(formatter_id)
+    if fmt is None:
+        raise ValueError(f"unknown formatter_id: {formatter_id!r}")
+    if fmt.formatter_version != formatter_version:
+        raise ValueError(
+            f"formatter_version mismatch: {formatter_version!r} != {fmt.formatter_version!r}"
+        )
+    if fmt.rounding_mode != rounding_mode:
+        raise ValueError(f"rounding_mode mismatch: {rounding_mode!r} != {fmt.rounding_mode!r}")
+
+
+def format_value(
+    value: str,
+    source_unit: str | None,
+    display_unit: str | None,
+    formatter_id: str = "default",
+) -> str:
+    """Format a canonical raw value for display.  Deterministic."""
+    return value  # identity formatter — no transformation
 
 
 # ---------------------------------------------------------------------------
@@ -596,12 +651,12 @@ REPORT_TEMPLATE_DEFINITION: str = (
     '<meta charset="utf-8">'
     "<title>Run Report {run_id}</title>"
     "<style>"
-    "body{font-family:monospace;margin:2em}"
-    ".banner{background:#c00;color:#fff;padding:0.5em;margin:0.5em 0;font-weight:bold}"
-    ".section{border:1px solid #ccc;padding:1em;margin:1em 0}"
-    ".section-header{font-weight:bold;margin-bottom:0.5em}"
-    ".status{font-style:italic;color:#555}"
-    ".hash{font-family:monospace;font-size:0.9em;word-break:break-all}"
+    "body{{font-family:monospace;margin:2em}}"
+    ".banner{{background:#c00;color:#fff;padding:0.5em;margin:0.5em 0;font-weight:bold}}"
+    ".section{{border:1px solid #ccc;padding:1em;margin:1em 0}}"
+    ".section-header{{font-weight:bold;margin-bottom:0.5em}}"
+    ".status{{font-style:italic;color:#555}}"
+    ".hash{{font-family:monospace;font-size:0.9em;word-break:break-all}}"
     "</style>"
     "</head>\n<body>"
     "{risk_banners}"
@@ -671,6 +726,8 @@ def compute_report_content_hash(sections: tuple[ReportSection, ...]) -> str:
         payload_sections.append(
             {
                 "section_id": s.section_id.value,
+                "title": s.title,
+                "content": s.content,
                 "status": s.status.value,
                 "artifacts": artifact_list,
             }
@@ -1449,68 +1506,53 @@ def render_report_html(model: ReportModel | DoublePipeReportModel) -> bytes:
     - No token / env-var leaking
     - PRELIMINARY / NOT FOR PROCUREMENT / NOT FOR CONSTRUCTION banners
     """
-    parts: list[str] = []
-    parts.append('<!DOCTYPE html>\n<html lang="en">\n<head>')
-    parts.append('<meta charset="utf-8">')
-    parts.append(f"<title>Run Report {_escape(str(model.report_instance_identity.run_id))}</title>")
-    parts.append(
-        "<style>"
-        "body{font-family:monospace;margin:2em}"
-        ".banner{background:#c00;color:#fff;padding:0.5em;margin:0.5em 0;font-weight:bold}"
-        ".section{border:1px solid #ccc;padding:1em;margin:1em 0}"
-        ".section-header{font-weight:bold;margin-bottom:0.5em}"
-        ".status{font-style:italic;color:#555}"
-        ".hash{font-family:monospace;font-size:0.9em;word-break:break-all}"
-        "</style>"
-    )
-    parts.append("</head>\n<body>")
-
-    # Risk banners — must appear on every page
-    for banner in _RISK_BANNERS:
-        parts.append(f'<div class="banner">{_escape(banner)}</div>')
-
-    # Header
-    parts.append("<h1>Run Report</h1>")
-    run_id_str = _escape(str(model.report_instance_identity.run_id))
-    parts.append(f"<p><strong>Run ID:</strong> {run_id_str}</p>")
-    parts.append(
-        f"<p><strong>Content Hash:</strong> "
-        f'<span class="hash">{_escape(model.report_content_hash)}</span></p>'
-    )
-    parts.append(
-        f"<p><strong>Instance Hash:</strong> "
-        f'<span class="hash">{_escape(model.report_instance_hash)}</span></p>'
+    # Build risk banners
+    risk_banners_html = "\n".join(
+        f'<div class="banner">{_escape(banner)}</div>' for banner in _RISK_BANNERS
     )
 
-    # Sections (order is deterministic because the tuple is frozen)
+    # Build sections HTML
+    sections_parts: list[str] = []
     for section in model.sections:
-        parts.append('<div class="section">')
-        parts.append(f'<div class="section-header">{_escape(section.title)}</div>')
-        parts.append(f'<p class="status">Status: {_escape(section.status.value)}</p>')
-        # Render content with line breaks preserved
+        sections_parts.append('<div class="section">')
+        sections_parts.append(f'<div class="section-header">{_escape(section.title)}</div>')
+        sections_parts.append(f'<p class="status">Status: {_escape(section.status.value)}</p>')
         for line in section.content.split("\n"):
-            parts.append(f"<p>{_escape(line)}</p>")
-        # Render artifacts
+            sections_parts.append(f"<p>{_escape(line)}</p>")
         if section.artifacts:
-            parts.append("<details><summary>Artifacts</summary><ul>")
+            sections_parts.append("<details><summary>Artifacts</summary><ul>")
             for art in section.artifacts:
                 art_id = _escape(art.artifact_id.value)
                 art_kind = _escape(art.kind.value)
                 if isinstance(art, PresentReportArtifact):
                     pointer = _escape(art.source_json_pointer)
                     raw_preview = _escape(art.canonical_raw_value[:200])
-                    parts.append(
+                    sections_parts.append(
                         f"<li><strong>{art_id}</strong> ({art_kind}): "
                         f"<code>{pointer}</code> = "
                         f"<code>{raw_preview}</code></li>"
                     )
                 else:
-                    parts.append(f"<li><strong>{art_id}</strong> ({art_kind}): [{art_kind}]</li>")
-            parts.append("</ul></details>")
-        parts.append("</div>")
+                    sections_parts.append(
+                        f"<li><strong>{art_id}</strong> ({art_kind}): [{art_kind}]</li>"
+                    )
+            sections_parts.append("</ul></details>")
+        sections_parts.append("</div>")
+    sections_html = "\n".join(sections_parts)
 
-    parts.append("</body>\n</html>")
-    return "\n".join(parts).encode("utf-8")
+    run_id_str = _escape(str(model.report_instance_identity.run_id))
+    content_hash_str = _escape(model.report_content_hash)
+    instance_hash_str = _escape(model.report_instance_hash)
+
+    # Use the canonical template definition
+    html = REPORT_TEMPLATE_DEFINITION.format(
+        risk_banners=risk_banners_html,
+        run_id=run_id_str,
+        content_hash=content_hash_str,
+        instance_hash=instance_hash_str,
+        sections=sections_html,
+    )
+    return html.encode("utf-8")
 
 
 # =========================================================================
@@ -1520,6 +1562,8 @@ def render_report_html(model: ReportModel | DoublePipeReportModel) -> bytes:
 __all__ = [
     "MANDATORY_ARTIFACT_IDS",
     "MANDATORY_ARTIFACT_OWNERS",
+    "DEFAULT_FORMATTER",
+    "FORMATTER_REGISTRY",
     "NotImplementedReportArtifact",
     "OutOfScopeReportArtifact",
     "PresentReportArtifact",
@@ -1541,9 +1585,12 @@ __all__ = [
     "compute_report_content_hash",
     "compute_report_instance_hash",
     "derive_source_state",
+    "format_value",
     "render_report_html",
     "resolve_source_pointer",
     "select_report_source_document",
+    "validate_formatter_fields",
+    "FormatterDefinition",
     "validate_rfc6901_pointer",
     "verify_report_section_status_matrix",
 ]

@@ -2980,3 +2980,168 @@ class TestP05SourceDocumentRoot:
         )
         with pytest.raises(ValueError, match="canonical_raw_value mismatch"):
             _verify_source_pointers(model, fake)
+
+
+# ===================================================================
+# Gate 3: Report content/template/formatter authority tests
+# ===================================================================
+
+
+def test_content_hash_includes_title():
+    """Content hash changes when a section's title changes."""
+    sections_a = tuple(
+        ReportSection(
+            section_id=sid,
+            title="Title A",
+            content="some content",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    sections_b = tuple(
+        ReportSection(
+            section_id=sid,
+            title="Title B",
+            content="some content",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    hash_a = compute_report_content_hash(sections_a)
+    hash_b = compute_report_content_hash(sections_b)
+    assert hash_a != hash_b, "content hash must change when title changes"
+
+
+def test_content_hash_includes_content():
+    """Content hash changes when a section's content changes."""
+    sections_a = tuple(
+        ReportSection(
+            section_id=sid,
+            title="same title",
+            content="content A",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    sections_b = tuple(
+        ReportSection(
+            section_id=sid,
+            title="same title",
+            content="content B",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    hash_a = compute_report_content_hash(sections_a)
+    hash_b = compute_report_content_hash(sections_b)
+    assert hash_a != hash_b, "content hash must change when content changes"
+
+
+def test_template_hash_matches_renderer():
+    """REPORT_TEMPLATE_DEFINITION_HASH must equal sha256_digest(REPORT_TEMPLATE_DEFINITION)."""
+    expected = sha256_digest(REPORT_TEMPLATE_DEFINITION)
+    assert expected == REPORT_TEMPLATE_DEFINITION_HASH, (
+        f"template hash mismatch: {REPORT_TEMPLATE_DEFINITION_HASH!r} != {expected!r}"
+    )
+
+
+def test_formatter_registry_rejects_unknown_id():
+    """validate_formatter_fields raises ValueError for unknown formatter_id."""
+    from hexagent.reporting import validate_formatter_fields
+
+    with pytest.raises(ValueError, match="unknown formatter_id"):
+        validate_formatter_fields(
+            formatter_id="nonexistent",
+            formatter_version="1.0",
+            rounding_mode="none",
+        )
+
+
+def test_formatter_registry_rejects_wrong_version():
+    """validate_formatter_fields raises ValueError for wrong formatter_version."""
+    from hexagent.reporting import validate_formatter_fields
+
+    with pytest.raises(ValueError, match="formatter_version mismatch"):
+        validate_formatter_fields(
+            formatter_id="default",
+            formatter_version="2.0",
+            rounding_mode="none",
+        )
+
+
+def test_formatter_registry_rejects_wrong_rounding():
+    """validate_formatter_fields raises ValueError for wrong rounding_mode."""
+    from hexagent.reporting import validate_formatter_fields
+
+    with pytest.raises(ValueError, match="rounding_mode mismatch"):
+        validate_formatter_fields(
+            formatter_id="default",
+            formatter_version="1.0",
+            rounding_mode="half_up",
+        )
+
+
+def test_formatter_registry_rejects_wrong_formatted_value():
+    """format_value with unknown formatter_id should still work (identity formatter)."""
+    from hexagent.reporting import format_value
+
+    result = format_value(
+        value="42.0",
+        source_unit=None,
+        display_unit=None,
+        formatter_id="default",
+    )
+    assert result == "42.0", "identity formatter must return value unchanged"
+
+
+def test_external_identity_envelope_digest():
+    """source_run_envelope_digest in identity can be set and matches actual digest."""
+    from hexagent.core.canonical import sha256_digest
+
+    fake_env = {"run_id": "test-123", "data": 42}
+    actual_digest = sha256_digest(fake_env)
+    identity = _dummy_identity(source_run_envelope_digest=actual_digest)
+    assert identity.source_run_envelope_digest == actual_digest
+
+
+def test_external_identity_bundle_digest():
+    """source_artifact_bundle_digest in identity can be set and matches actual digest."""
+    from hexagent.core.canonical import sha256_digest
+
+    fake_bundle = {"artifacts": ["a", "b"]}
+    actual_digest = sha256_digest(fake_bundle)
+    identity = _dummy_identity(source_artifact_bundle_digest=actual_digest)
+    assert identity.source_artifact_bundle_digest == actual_digest
+
+
+def test_external_identity_template_hash():
+    """template_definition_hash in identity must match REPORT_TEMPLATE_DEFINITION_HASH."""
+    identity = _dummy_identity(template_definition_hash=REPORT_TEMPLATE_DEFINITION_HASH)
+    assert identity.template_definition_hash == REPORT_TEMPLATE_DEFINITION_HASH
+
+
+def test_model_tamper_rejects_content_hash_mismatch():
+    """Model construction fails if report_content_hash doesn't match computed hash."""
+    sections = tuple(
+        ReportSection(
+            section_id=sid,
+            title=sid.value,
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+        )
+        for sid in REPORT_SECTION_ORDER
+    )
+    correct_hash = compute_report_content_hash(sections)
+    identity = _dummy_identity(report_content_hash=correct_hash)
+    instance_hash = compute_report_instance_hash(identity)
+
+    # Try to construct with a WRONG content hash
+    wrong_hash = "sha256:" + "b" * 64
+    with pytest.raises(ValueError):
+        DoublePipeReportModel(
+            report_schema_version="1",
+            sections=sections,
+            report_instance_identity=identity,
+            report_content_hash=wrong_hash,
+            report_instance_hash=instance_hash,
+        )
