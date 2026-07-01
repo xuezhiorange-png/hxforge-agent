@@ -23,7 +23,9 @@ from __future__ import annotations
 import html as _html
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass as _dc
+from dataclasses import field as _field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 from uuid import UUID
@@ -208,6 +210,15 @@ class OutOfScopeReportArtifact(StrictBaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _identity_formatter(
+    value: str,
+    source_unit: str | None,
+    display_unit: str | None,
+) -> str:
+    """Identity formatter — returns value unchanged."""
+    return value
+
+
 @_dc(frozen=True)
 class FormatterDefinition:
     """Immutable formatter specification."""
@@ -215,18 +226,22 @@ class FormatterDefinition:
     formatter_id: str
     formatter_version: str
     rounding_mode: str  # e.g. "half_up", "none"
+    format_value: Callable[[str, str | None, str | None], str] = _field(compare=False, repr=False)
 
 
 DEFAULT_FORMATTER = FormatterDefinition(
     formatter_id="default",
     formatter_version="1.0",
     rounding_mode="none",
+    format_value=_identity_formatter,
 )
 
 # Formatter registry — all known formatters
 FORMATTER_REGISTRY: dict[str, FormatterDefinition] = {
     DEFAULT_FORMATTER.formatter_id: DEFAULT_FORMATTER,
 }
+
+FORMATTER_REGISTRY_VERSION = "1.0.0"
 
 
 def validate_formatter_fields(
@@ -248,13 +263,17 @@ def validate_formatter_fields(
 
 
 def format_value(
+    *,
     value: str,
     source_unit: str | None,
     display_unit: str | None,
     formatter_id: str = "default",
 ) -> str:
     """Format a canonical raw value for display.  Deterministic."""
-    return value  # identity formatter — no transformation
+    fmt = FORMATTER_REGISTRY.get(formatter_id)
+    if fmt is None:
+        raise ValueError(f"unknown formatter_id: {formatter_id!r}")
+    return fmt.format_value(value, source_unit, display_unit)
 
 
 # ---------------------------------------------------------------------------
@@ -801,6 +820,28 @@ class DoublePipeReportModel(StrictBaseModel):
                 "report_instance_hash does not match "
                 "sha256_digest(report_instance_identity.model_dump())"
             )
+        # P0-2: Verify formatter fields for all present artifacts
+        for section in self.sections:
+            for artifact in section.artifacts:
+                if isinstance(artifact, PresentReportArtifact):
+                    validate_formatter_fields(
+                        formatter_id=artifact.formatter_id,
+                        formatter_version=artifact.formatter_version,
+                        rounding_mode=artifact.rounding_mode,
+                    )
+                    expected_display = format_value(
+                        value=artifact.canonical_raw_value,
+                        source_unit=artifact.source_unit,
+                        display_unit=artifact.display_unit,
+                        formatter_id=artifact.formatter_id,
+                    )
+                    if artifact.formatted_display_value != expected_display:
+                        raise ValueError(
+                            f"formatted_display_value mismatch for "
+                            f"{artifact.artifact_id.value}: "
+                            f"{artifact.formatted_display_value!r} != "
+                            f"{expected_display!r}"
+                        )
         return self
 
 
@@ -1188,6 +1229,13 @@ def _build_artifacts_for_section(
                 value = resolve_source_pointer(root_document, pointer)
                 canonical_raw = _canonical_raw(value)
                 authority_digest = sha256_digest(value)
+                fmt = FORMATTER_REGISTRY["default"]
+                formatted = format_value(
+                    value=canonical_raw,
+                    source_unit=None,
+                    display_unit=None,
+                    formatter_id=fmt.formatter_id,
+                )
                 artifacts.append(
                     PresentReportArtifact(
                         kind=ReportArtifactKind.PRESENT,
@@ -1197,10 +1245,10 @@ def _build_artifacts_for_section(
                         source_json_pointer=pointer,
                         authority_digest=authority_digest,
                         canonical_raw_value=canonical_raw,
-                        formatter_id="default",
-                        formatter_version="1.0",
-                        rounding_mode="round",
-                        formatted_display_value=canonical_raw,
+                        formatter_id=fmt.formatter_id,
+                        formatter_version=fmt.formatter_version,
+                        rounding_mode=fmt.rounding_mode,
+                        formatted_display_value=formatted,
                     )
                 )
                 resolved = True
@@ -1331,6 +1379,25 @@ def _verify_source_pointers(
                         f"Expected {expected_auth_digest!r}, "
                         f"got {artifact.authority_digest!r}"
                     )
+                # P0-2: Verify formatter fields match registry
+                validate_formatter_fields(
+                    formatter_id=artifact.formatter_id,
+                    formatter_version=artifact.formatter_version,
+                    rounding_mode=artifact.rounding_mode,
+                )
+                expected_display = format_value(
+                    value=artifact.canonical_raw_value,
+                    source_unit=artifact.source_unit,
+                    display_unit=artifact.display_unit,
+                    formatter_id=artifact.formatter_id,
+                )
+                if artifact.formatted_display_value != expected_display:
+                    raise ValueError(
+                        f"Artifact {artifact.artifact_id.value!r}: "
+                        f"formatted_display_value mismatch. "
+                        f"Expected {expected_display!r}, "
+                        f"got {artifact.formatted_display_value!r}"
+                    )
 
 
 # =========================================================================
@@ -1420,7 +1487,7 @@ def build_report_html(record: RunRecord) -> bytes:
         template_id="double_pipe_v1",
         template_version="1.0.0",
         template_definition_hash=REPORT_TEMPLATE_DEFINITION_HASH,
-        formatter_registry_version="1.0.0",
+        formatter_registry_version=FORMATTER_REGISTRY_VERSION,
     )
 
     # Instance hash = sha256_digest(report_instance_identity)
