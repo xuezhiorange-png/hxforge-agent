@@ -14,204 +14,321 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install uv
-        run: pipx install uv==0.11.25
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
       - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
+        run: test "$(uv --version)" = "uv 0.11.25"
       - name: Check lock freshness
         run: uv lock --check
       - name: Install from lock
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --all-extras
       - name: Verify no lock drift
         run: git diff --exit-code -- uv.lock pyproject.toml
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run mypy
-      - run: uv run pip-audit
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked mypy src/hexagent tests/support/property_provider_doubles.py tests/support/test_property_provider_doubles.py
+      - run: uv run --locked pip-audit
 
-  shard-ci:
+  parse-manifest:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.parse.outputs.matrix }}
+      shard-count: ${{ steps.parse.outputs.shard-count }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse manifest to JSON matrix
+        id: parse
+        run: |
+          uv run --locked python -m tests.ci.verify_manifest \
+            --manifest ci-shard-manifest.yml \
+            --test-root tests \
+          | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          if data['status'] != 'pass':
+              print(f'Manifest verification failed: {data.get(\"error\", \"unknown\")}', file=sys.stderr)
+              sys.exit(1)
+          matrix = data['matrix']
+          print(f'matrix={json.dumps(matrix)}')
+          print(f'shard-count={len(matrix[\"include\"])}')
+          " >> "$GITHUB_OUTPUT"
+
+  verify-manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Verify manifest D == M
+        run: |
+          uv run --locked python -m tests.ci.verify_manifest \
+            --manifest ci-shard-manifest.yml \
+            --test-root tests
+
+  shard:
+    needs: [parse-manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.parse-manifest.outputs.matrix) }}
+    env:
+      PYTHONHASHSEED: "0"
+      TZ: "UTC"
+      LC_ALL: "C.UTF-8"
+    steps:
+      - name: Determine track and commit SHA
+        id: track
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "track=main" >> "$GITHUB_OUTPUT"
+            echo "commit-sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "track=pr-head" >> "$GITHUB_OUTPUT"
+            echo "commit-sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.track.outputs.commit-sha }}
+      - name: Assert checkout SHA
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ steps.track.outputs.commit-sha }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Run shard
+        run: |
+          uv run --locked pytest --timeout=${{ matrix.timeout }} -q \
+            -p tests.ci.collect_nodes_plugin \
+            --hx-collection-scope shard \
+            --hx-shard "${{ matrix.name }}" \
+            --hx-node-output "node-inventory.json" \
+            --junitxml="junit.xml" \
+            --tb=short \
+            ${{ matrix.files }}
+      - name: Prepare artifacts
+        if: always()
+        run: |
+          python3 -c "
+          import json, os
+          meta = {
+              'track': '${{ steps.track.outputs.track }}',
+              'commit_sha': '${{ steps.track.outputs.commit-sha }}',
+              'run_id': '${{ github.run_id }}',
+              'run_attempt': int('${{ github.run_attempt }}'),
+              'python_version': '${{ matrix.python }}',
+              'shard': '${{ matrix.name }}',
+              'artifact_kind': 'metadata',
+          }
+          with open('artifact-metadata.json', 'w') as f:
+              json.dump(meta, f, indent=2, sort_keys=True)
+          "
+      - name: Upload shard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.track.outputs.track }}-${{ matrix.name }}-py${{ matrix.python }}-attempt${{ github.run_attempt }}
+          path: |
+            node-inventory.json
+            junit.xml
+            coverage.xml
+            .coverage
+            artifact-metadata.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  shard-merge-ref:
+    if: github.event_name == 'pull_request'
+    needs: [parse-manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.parse-manifest.outputs.matrix) }}
+    env:
+      PYTHONHASHSEED: "0"
+      TZ: "UTC"
+      LC_ALL: "C.UTF-8"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+      - name: Record merge-ref SHA
+        run: |
+          MERGE_SHA="$(git rev-parse HEAD)"
+          echo "Merge-ref SHA: $MERGE_SHA"
+          echo "Expected: base=${{ github.event.pull_request.base.sha }} head=${{ github.event.pull_request.head.sha }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Run shard
+        run: |
+          uv run --locked pytest --timeout=${{ matrix.timeout }} -q \
+            -p tests.ci.collect_nodes_plugin \
+            --hx-collection-scope shard \
+            --hx-shard "${{ matrix.name }}" \
+            --hx-node-output "node-inventory.json" \
+            --junitxml="junit.xml" \
+            --tb=short \
+            ${{ matrix.files }}
+      - name: Prepare artifacts
+        if: always()
+        run: |
+          python3 -c "
+          import json
+          meta = {
+              'track': 'merge-ref',
+              'commit_sha': '${{ github.event.pull_request.head.sha }}',
+              'run_id': '${{ github.run_id }}',
+              'run_attempt': int('${{ github.run_attempt }}'),
+              'python_version': '${{ matrix.python }}',
+              'shard': '${{ matrix.name }}',
+              'artifact_kind': 'metadata',
+          }
+          with open('artifact-metadata.json', 'w') as f:
+              json.dump(meta, f, indent=2, sort_keys=True)
+          "
+      - name: Upload shard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-ref-${{ matrix.name }}-py${{ matrix.python }}-attempt${{ github.run_attempt }}
+          path: |
+            node-inventory.json
+            junit.xml
+            coverage.xml
+            .coverage
+            artifact-metadata.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  aggregate:
+    needs: [shard, lint, verify-manifest]
+    if: always() && needs.shard.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - name: Install uv
-        run: pipx install uv==0.11.25
-      - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
-      - name: Install from lock
-        run: uv sync --locked --extra dev
-      - name: Run shard tests
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Download all shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: false
+      - name: Validate artifact identity and completeness
         run: |
-          uv run pytest --timeout=120 -q \
-            tests/ci/test_node_inventory.py \
-            tests/ci/test_shard_manifest.py \
-            tests/support/test_property_provider_doubles.py
+          uv run --locked python3 -c "
+          import json, os, sys
+          from pathlib import Path
 
-  shard-pure-unit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - name: Install uv
-        run: pipx install uv==0.11.25
-      - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
-      - name: Install from lock
-        run: uv sync --locked --extra dev
-      - name: Run shard tests
-        run: |
-          uv run pytest --timeout=120 -q \
-            tests/unit/test_calculation_runs.py \
-            tests/unit/test_canonical_serialization.py \
-            tests/unit/test_correlation_applicability.py \
-            tests/unit/test_correlation_models.py \
-            tests/unit/test_correlation_registry.py \
-            tests/unit/test_correlation_usage.py \
-            tests/unit/test_design_case_revisions.py \
-            tests/unit/test_double_pipe_geometry.py \
-            tests/unit/test_double_pipe_solver.py \
-            tests/unit/test_double_pipe_thermal.py \
-            tests/unit/test_provenance_graph.py \
-            tests/unit/test_task009_catalog_hash.py \
-            tests/unit/test_task009_phase1.py \
-            tests/unit/test_task009_phase2_contract.py \
-            tests/unit/test_task009_phase3.py \
-            tests/unit/test_thermal.py \
-            tests/unit/test_tube_annulus_correlations.py
+          track = 'main' if '${{ github.event_name }}' == 'push' else 'pr-head'
+          commit_sha = '${{ github.sha }}' if '${{ github.event_name }}' == 'push' else '${{ github.event.pull_request.head.sha }}'
+          run_id = '${{ github.run_id }}'
+          run_attempt = int('${{ github.run_attempt }}')
 
-  shard-coolprop-unit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - name: Install uv
-        run: pipx install uv==0.11.25
-      - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
-      - name: Install from lock
-        run: uv sync --locked --extra dev
-      - name: Run shard tests
-        run: |
-          uv run pytest --timeout=120 -q \
-            tests/unit/test_double_pipe_correction_r5.py \
-            tests/unit/test_double_pipe_correction_r6.py \
-            tests/unit/test_double_pipe_correction_r8.py \
-            tests/unit/test_double_pipe_correction_r10.py \
-            tests/unit/test_double_pipe_correction_r12.py \
-            tests/unit/test_double_pipe_correction_r13.py \
-            tests/unit/test_double_pipe_rating_kernel.py \
-            tests/unit/test_engineering_messages.py \
-            tests/unit/test_heat_balance.py \
-            tests/unit/test_properties.py \
-            tests/unit/test_provider_snapshot.py \
-            tests/unit/test_review02.py \
-            tests/unit/test_review03.py \
-            tests/unit/test_review_items.py \
-            tests/unit/test_task010_final.py \
-            tests/unit/test_task010_phase1.py \
-            tests/unit/test_task010_phase2.py \
-            tests/unit/test_units.py
+          # Load manifest to get expected shards
+          import yaml
+          with open('ci-shard-manifest.yml') as f:
+              manifest = yaml.safe_load(f)
 
-  shard-provider-unit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - name: Install uv
-        run: pipx install uv==0.11.25
-      - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
-      - name: Install from lock
-        run: uv sync --locked --extra dev
-      - name: Run shard tests
-        run: |
-          uv run pytest --timeout=120 -q \
-            tests/unit/test_task009_phase2_adapter.py \
-            tests/unit/test_task009_phase2_canonicalization.py
+          expected = set()
+          for shard in manifest['shards']:
+              if track not in ('main', 'pr-head'):
+                  continue
+              for py in shard['python']:
+                  expected.add((track, shard['name'], py, run_id, run_attempt, commit_sha))
 
-  shard-golden:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - name: Install uv
-        run: pipx install uv==0.11.25
-      - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
-      - name: Install from lock
-        run: uv sync --locked --extra dev
-      - name: Run shard tests
-        run: |
-          uv run pytest --timeout=300 -q \
-            tests/golden/double_pipe_rating/test_golden_double_pipe.py \
-            tests/golden/double_pipe_rating/test_independent_references.py \
-            tests/golden/heat_balance/test_golden.py
+          # Scan downloaded artifacts
+          found = set()
+          artifact_dir = Path('artifacts')
+          for artifact_path in artifact_dir.rglob('artifact-metadata.json'):
+              meta = json.loads(artifact_path.read_text())
+              key = (meta['track'], meta['shard'], meta['python_version'],
+                     str(meta['run_id']), int(meta['run_attempt']), meta['commit_sha'])
+              if key in found:
+                  print(f'DUPLICATE artifact identity: {key}', file=sys.stderr)
+                  sys.exit(1)
+              found.add(key)
 
-  shard-integration:
+          missing = expected - found
+          extra = found - expected
+          if missing:
+              print(f'MISSING producer artifacts: {sorted(missing)}', file=sys.stderr)
+              sys.exit(1)
+          if extra:
+              print(f'UNEXPECTED extra artifacts: {sorted(extra)}', file=sys.stderr)
+              sys.exit(1)
+
+          print(f'Artifact identity gate PASS: {len(found)} producers validated')
+          print(f'  track={track}')
+          print(f'  commit_sha={commit_sha}')
+          print(f'  run_id={run_id}')
+          print(f'  run_attempt={run_attempt}')
+          "
+
+  merge-ref-aggregate:
+    if: github.event_name == 'pull_request' && needs.shard-merge-ref.result == 'success'
+    needs: [shard-merge-ref, lint, verify-manifest]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - name: Install uv
-        run: pipx install uv==0.11.25
-      - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
-      - name: Install from lock
-        run: uv sync --locked --extra dev
-      - name: Run shard tests
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Download merge-ref shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: false
+          pattern: merge-ref-*
+      - name: Validate merge-ref artifact identity
         run: |
-          uv run pytest --timeout=120 -q \
-            tests/integration/test_api.py \
-            tests/integration/test_correlation_registry_workflow.py \
-            tests/integration/test_double_pipe_rating.py \
-            tests/integration/test_heat_balance_property_provider.py \
-            tests/integration/test_revision_run_workflow.py \
-            tests/integration/test_task002_round3.py
+          uv run --locked python3 -c "
+          import json, os, sys
+          from pathlib import Path
+
+          commit_sha = '${{ github.event.pull_request.head.sha }}'
+          run_id = '${{ github.run_id }}'
+          run_attempt = int('${{ github.run_attempt }}')
+
+          import yaml
+          with open('ci-shard-manifest.yml') as f:
+              manifest = yaml.safe_load(f)
+
+          expected = set()
+          for shard in manifest['shards']:
+              for py in shard['python']:
+                  expected.add(('merge-ref', shard['name'], py, run_id, run_attempt, commit_sha))
+
+          found = set()
+          artifact_dir = Path('artifacts')
+          for artifact_path in artifact_dir.rglob('artifact-metadata.json'):
+              meta = json.loads(artifact_path.read_text())
+              key = (meta['track'], meta['shard'], meta['python_version'],
+                     str(meta['run_id']), int(meta['run_attempt']), meta['commit_sha'])
+              found.add(key)
+
+          missing = expected - found
+          if missing:
+              print(f'MISSING merge-ref producer artifacts: {sorted(missing)}', file=sys.stderr)
+              sys.exit(1)
+
+          print(f'Merge-ref artifact identity gate PASS: {len(found)} producers validated')
+          "

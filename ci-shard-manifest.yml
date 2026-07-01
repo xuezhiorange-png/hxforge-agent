@@ -4,10 +4,12 @@ shards:
     job: test-ci
     python: ["3.11", "3.12"]
     files:
+      - tests/ci/test_collect_acceptance.py
       - tests/ci/test_node_inventory.py
       - tests/ci/test_shard_manifest.py
+      - tests/support/test_mypy_doubles.py
       - tests/support/test_property_provider_doubles.py
-    timeout: 120
+    timeout: 180
 
   - name: pure-unit
     job: test-pure-unit
