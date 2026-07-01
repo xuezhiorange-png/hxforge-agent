@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
@@ -64,8 +65,21 @@ jobs:
           pytest -x --timeout=120 \
             --ignore=tests/unit/test_double_pipe_correction_r10.py \
             --ignore=tests/unit/test_double_pipe_correction_r12.py \
-            --ignore=tests/unit/test_units.py \
             -q
+
+  units:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - name: Run unit conversion tests
+        run: pytest --timeout=120 tests/unit/test_units.py -q
 
   correction-r10:
     runs-on: ubuntu-latest
