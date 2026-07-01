@@ -12,7 +12,7 @@
 
 ## 1. Objective
 
-Establish a deterministic, reproducible, and maintainable test environment for HXForge that eliminates hidden test files, provides explicit per-shard file manifests verified at pytest node-ID level, replaces ad-hoc `--ignore` with structured test partitioning, introduces typed provider test doubles conforming to the real `PropertyProvider` protocol, separates CoolProp-dependent tests from pure unit tests, adds mandatory CI telemetry (JUnit, durations, coverage, resource), and defines clear authority for PR-head, merge-ref, and main-push CI tracks — all executed exclusively through the `uv`-managed locked project environment.
+Establish a deterministic, reproducible, and maintainable test environment for HXForge that eliminates hidden test files, provides explicit per-shard file manifests verified at pytest node-ID level per Python version, replaces ad-hoc `--ignore` with structured test partitioning, introduces typed provider test doubles conforming to the real `PropertyProvider` protocol, separates CoolProp-dependent tests from pure unit tests, adds mandatory CI telemetry with rerun-safe artifact identity, and defines clear authority for PR-head, merge-ref, and main-push CI tracks — all executed exclusively through the `uv`-managed locked project environment.
 
 ## 2. Scope
 
@@ -20,16 +20,17 @@ Establish a deterministic, reproducible, and maintainable test environment for H
 2. Frozen `uv` installation authority (`astral-sh/setup-uv` with pinned commit SHA)
 3. Locked environment execution authority (`uv run --locked` for all commands)
 4. Pytest marker taxonomy
-5. Test shard manifest specification with node-ID completeness proof
+5. Test shard manifest specification with per-Python-version node-ID completeness proof
 6. Typed `PropertyProvider` test doubles (real protocol)
 7. CoolProp test isolation
-8. Mandatory test coverage with cross-job aggregation
-9. JUnit, durations, coverage, resource telemetry
+8. Mandatory test coverage with event-local aggregation
+9. JUnit, durations, coverage, resource telemetry with run_attempt-safe identity
 10. PR-head, merge-ref, main-push tri-track CI authority
 11. Nightly full regression
 12. Golden and benchmark test separation
-13. Workflow/job naming stability
-14. Rollout, migration, and rollback strategy
+13. Structured pytest collection plugin
+14. Workflow/job naming stability
+15. Rollout, migration, and rollback strategy
 
 ## 3. Non-goals
 
@@ -75,16 +76,17 @@ Python matrix: 3.11, 3.12
 
 ### 4.4 Baseline inventory generation algorithm
 
-To be executed and recorded before shard cutover:
+To be executed per Python version before shard cutover:
 
 ```bash
-set -o pipefail
-uv run --locked pytest --collect-only -q > collection.stdout.txt 2> collection.stderr.txt
-# Parse node IDs from stdout (exclude summary, warnings, empty lines)
-# Sort and deduplicate
+# Per-version global collection via structured plugin
+uv run --locked pytest --collect-only \
+  -p tests.ci.collect_nodes_plugin \
+  --hx-node-output global-nodes.py311.json \
+  tests/
 ```
 
-Artifact format: one text file per shard containing sorted pytest node IDs, plus stdout, stderr, and collection metadata JSON.
+Artifact format: structured JSON per version per shard (see Section 18).
 
 ## 5. uv Installation Authority
 
@@ -145,7 +147,6 @@ Failure conditions (all must fail CI):
 Every executable used by TASK-015A CI must resolve from the `uv`-managed locked project environment via `uv run --locked`.
 
 ```bash
-# Environment verification
 uv run --locked python -c "import sys; print(sys.executable)"
 uv run --locked pytest --version
 uv run --locked coverage --version
@@ -169,8 +170,6 @@ uv run --locked coverage report
 ```
 
 ### 6.3 Prohibited forms
-
-The following are NOT allowed unless the design explicitly selects an alternative unique form and unifies ALL commands to that form:
 
 - `uv run pytest` (without `--locked`)
 - bare `pytest` (system PATH)
@@ -270,9 +269,11 @@ Reject: duplicate shard/job names, duplicate files, empty shards, non-existent p
 
 ### 9.4 File-level completeness
 
+File ownership is determined globally by the manifest, independent of Python version:
+
 ```python
 def verify_file_completeness(manifest: dict, test_root: str) -> None:
-    """Verify D == M bidirectionally."""
+    """Verify D == M bidirectionally (global, version-independent)."""
     D = set(discover_all_test_files(test_root))
     M = set()
     for shard in manifest["shards"]:
@@ -283,58 +284,103 @@ def verify_file_completeness(manifest: dict, test_root: str) -> None:
     extra = M - D
     assert not missing, f"Missing from manifest: {missing}"
     assert not extra, f"Stale manifest paths: {extra}"
-    assert M, "No files in manifest"
     for shard in manifest["shards"]:
         assert shard["files"], f"Empty shard: {shard['name']}"
 ```
 
-### 9.5 pytest node-ID completeness
+### 9.5 Per-Python-version node-ID completeness
+
+Node collection completeness is verified separately for each supported Python version:
 
 ```python
-def verify_node_completeness(manifest: dict, test_root: str) -> None:
-    """Verify union(S_i) == G and S_i intersect S_j == empty."""
-    G = set(collect_node_ids(test_root))
-    S = {}
-    for shard in manifest["shards"]:
-        cmd = build_pytest_command(shard)
-        S[shard["name"]] = set(collect_node_ids(cmd))
-    union = set()
-    for nodes in S.values():
-        union |= nodes
-    missing = G - union
-    extra = union - G
-    assert not missing, f"Missing node IDs: {missing}"
-    assert not extra, f"Extra node IDs: {extra}"
-    names = list(S.keys())
-    for i in range(len(names)):
-        for j in range(i + 1, len(names)):
-            overlap = S[names[i]] & S[names[j]]
-            assert not overlap, f"Overlap between {names[i]} and {names[j]}: {overlap}"
+from typing import Literal
+
+PythonVersion = Literal["3.11", "3.12"]
+ShardName = str
+NodeId = str
+
+def verify_per_version_node_completeness(
+    manifest: dict,
+    G_v: dict[PythonVersion, set[NodeId]],
+    S_v_i: dict[tuple[PythonVersion, ShardName], set[NodeId]],
+) -> None:
+    """For each Python version, prove union equality and pairwise disjointness."""
+    for version in ("3.11", "3.12"):
+        applicable_shards = [
+            shard for shard in manifest["shards"]
+            if version in shard["python"]
+        ]
+        omitted_shards = [
+            shard for shard in manifest["shards"]
+            if version not in shard["python"]
+        ]
+
+        shard_union = set()
+        for shard in applicable_shards:
+            shard_union |= S_v_i[(version, shard["name"])]
+
+        missing = G_v[version] - shard_union
+        extra = shard_union - G_v[version]
+
+        assert not missing, (
+            f"Python {version}: missing node IDs: {missing}"
+            f"\n  applicable shards: {[s['name'] for s in applicable_shards]}"
+            f"\n  omitted shards: {[s['name'] for s in omitted_shards]}"
+        )
+        assert not extra, (
+            f"Python {version}: extra node IDs: {extra}"
+        )
+
+        # Pairwise disjointness
+        for i, shard_a in enumerate(applicable_shards):
+            for shard_b in applicable_shards[i+1:]:
+                overlap = (
+                    S_v_i[(version, shard_a["name"])]
+                    & S_v_i[(version, shard_b["name"])]
+                )
+                assert not overlap, (
+                    f"Python {version}: overlap between "
+                    f"{shard_a['name']} and {shard_b['name']}: {overlap}"
+                )
 ```
 
-### 9.6 Node-ID parser requirements
+### 9.6 Version-conditioned node behavior
 
-- Only accept lines matching pytest node-ID syntax
-- Exclude summary, warning, empty lines, collected-count lines
-- UTF-8 encoding, normalize path separators, sort and deduplicate
-- Discover duplicate raw node IDs → FAIL
-- Global and shard collection must use identical: locked environment, Python version, pytest version, plugins, pyproject.toml, working directory, environment variables
+If a file is in the manifest but produces zero nodes under a specific Python version:
+- This is a **legal version condition** (e.g., `skipIf(sys.version_info < (3, 12))`)
+- The file is still part of the shard's file ownership
+- Zero nodes from that file under that version is valid
+- Must be documented in collection metadata JSON
+- NOT treated as collection error unless pytest itself fails
 
-### 9.7 Collection failure semantics
+If a file produces nodes under one version but not another:
+- Record in collection metadata: `{"file": "...", "python_version": "3.11", "node_count": 0, "reason": "skip_marker"}`
+- Do not fail the completeness check for that version's shard
+
+### 9.7 Node-ID parser requirements
+
+Uses the structured pytest collection plugin (see Section 18), NOT stdout parsing.
+
+### 9.8 Collection failure semantics
 
 - `pytest --collect-only` exit code != 0 → FAIL
 - Import errors → FAIL, plugin errors → FAIL
 - `collection.stderr.txt` always preserved and uploaded
 - Warnings during collection: recorded but do not fail
+- Schema validation failure → FAIL
+- `node_count` mismatch → FAIL
+- Duplicate node ID → FAIL
+- Wrong Python version in output → FAIL
+- Wrong commit SHA → FAIL
 
-### 9.8 Marker authority
+### 9.9 Marker authority
 
 - Manifest owns file ownership; markers own semantics only
 - Markers do NOT change shard node ownership
 
 ## 10. "--ignore" Elimination
 
-Replace `--ignore` with explicit file lists. Verify no test file lost (file-level + node-ID completeness). Completeness check job validates atomically.
+Replace `--ignore` with explicit file lists. Verify no test file lost (file-level + node-ID completeness per version). Completeness check job validates atomically.
 
 ## 11. CoolProp Test Isolation
 
@@ -371,22 +417,18 @@ class PropertyProvider(Protocol):
 
 ```python
 def canonical_fluid_identity(fluid: FluidIdentifier | str) -> str:
-    """Return the canonical cache identity for a fluid.
-
-    Uses FluidIdentifier.cache_identity which delegates to coolprop_fluid,
-    producing strings like "HEOS::Water" or "HEOS::Ethanol[0.5]&Water[0.5]".
-    """
+    """Return the canonical cache identity for a fluid."""
     return FluidIdentifier.from_value(fluid).cache_identity
 ```
 
-Ensures: same fluid + same backend → same key; same name + different backend → different key; same mixture + different composition → different key; same mixture + different component order → same key; string `"Water"` and `FluidIdentifier("Water")` → same key.
-
 ### 12.4 Query key types
+
+All keys created via `from_request()` factory. Direct construction with hand-built identity strings prohibited.
 
 ```python
 @dataclass(frozen=True)
 class TPQueryKey:
-    fluid_identity: str   # from canonical_fluid_identity()
+    fluid_identity: str
     temperature_k: float
     pressure_pa: float
     @classmethod
@@ -416,19 +458,22 @@ class SatTQueryKey:
     def from_request(cls, fluid, temperature_k) -> SatTQueryKey: ...
 ```
 
-All keys created via `from_request()` factory. Direct construction with hand-built identity strings prohibited.
-
 ### 12.5 StubPropertyProvider
 
-Returns fixed typed results. Configuration: `tp_results: dict[TPQueryKey, FluidState]`, `ph_results: dict[PHQueryKey, FluidState]`, `sat_p_results: dict[SatPQueryKey, SaturationState]`, `sat_t_results: dict[SatTQueryKey, SaturationState]`, identity fields. Unconfigured input → deterministic error. `cache_info()` → fixed zeros. `clear_cache()` → no-op.
+Returns fixed typed results. Unconfigured input → deterministic error. `cache_info()` → fixed zeros. `clear_cache()` → no-op.
 
 ### 12.6 ReplayPropertyProvider
 
-Replays ordered sequences. Configuration: per-query-type `deque` of typed results. Sequence exhausted → error. Supports `assert_fully_consumed()`. Call log as immutable tuple. **Cache semantics (frozen):** `cache_info()` → fixed zeros; `clear_cache()` → no-op (does NOT clear queues, reset positions, refill sequences, clear call log, or reset call index). Optional `reset_replay()` for test-only explicit reset.
+Replays ordered sequences. Sequence exhausted → error. Supports `assert_fully_consumed()`. Call log as immutable tuple.
+
+**Cache semantics (frozen):**
+- `cache_info()` → `PropertyCacheInfo(hits=0, misses=0, size=0, max_size=0)`
+- `clear_cache()` → no-op; does NOT clear queues, reset positions, refill sequences, clear call log, or reset call index
+- Optional `reset_replay()` → test-only, explicitly called; resets queues and call log
 
 ### 12.7 SelectiveFailurePropertyProvider
 
-Wraps real `PropertyProvider`. Failure map: `dict[tuple[PropertyQueryType, int], Callable[[], Exception]]`. Call index starts at 1. Failure triggered BEFORE delegation. All four query types supported. `cache_info()`/`clear_cache()` delegate to inner. Identity from inner.
+Wraps real `PropertyProvider`. Failure map: `dict[tuple[PropertyQueryType, int], Callable[[], Exception]]`. Call index starts at 1. Failure BEFORE delegation. All four query types supported. `cache_info()`/`clear_cache()` delegate to inner. Identity from inner.
 
 ### 12.8 CountingPropertyProvider
 
@@ -477,43 +522,85 @@ Runner-side cancellation recorded, not auto-retried. No automatic test retry (de
 
 ## 16. Globally Unique Artifact Identity
 
-### 16.1 Naming
+### 16.1 Naming convention
 
-GitHub artifact: `<track>-<shard>-py<version>-<artifact-kind>`
-Internal file: `<artifact-kind>.<track>.<shard>.py<version>.<ext>`
+GitHub artifact name: `<track>-<shard>-py<version>-attempt<run_attempt>-<artifact-kind>`
 
-### 16.2 Tracks
+Internal file name: `<artifact-kind>.<track>.<shard>.py<version>.attempt<run_attempt>.<ext>`
+
+### 16.2 Run attempt authority
+
+- `run_id`: `github.run_id`
+- `run_attempt`: `github.run_attempt`
+
+### 16.3 Track values
 
 `pr-head`, `merge-ref`, `main`, `nightly` (exactly these four)
 
-### 16.3 Kinds
+### 16.4 Artifact kind values
 
 | Kind | GitHub name suffix | Internal file |
 |---|---|---|
-| JUnit | `-junit` | `junit.<track>.<shard>.py<ver>.xml` |
-| pytest output | `-pytest-output` | `pytest-output.<track>.<shard>.py<ver>.txt` |
-| coverage data | `-coverage-data` | `coverage.<track>.<shard>.py<ver>.xml` |
-| coverage raw | `-coverage-raw` | `.coverage.<track>.<shard>.py<ver>` |
-| resource | `-resource` | `resource.<track>.<shard>.py<ver>.json` |
-| node inventory | `-node-inventory` | `nodes.<track>.<shard>.py<ver>.txt` |
-| collection stderr | `-collection-stderr` | `collection-stderr.<track>.<shard>.py<ver>.txt` |
+| JUnit | `-junit` | `junit.<track>.<shard>.py<ver>.attempt<N>.xml` |
+| pytest output | `-pytest-output` | `pytest-output.<track>.<shard>.py<ver>.attempt<N>.txt` |
+| coverage data | `-coverage-data` | `coverage.<track>.<shard>.py<ver>.attempt<N>.xml` |
+| coverage raw | `-coverage-raw` | `.coverage.<track>.<shard>.py<ver>.attempt<N>` |
+| resource | `-resource` | `resource.<track>.<shard>.py<ver>.attempt<N>.json` |
+| node inventory | `-node-inventory` | `nodes.<track>.<shard>.py<ver>.attempt<N>.json` |
+| collection stderr | `-collection-stderr` | `collection-stderr.<track>.<shard>.py<ver>.attempt<N>.txt` |
 
-### 16.4 Character rules
+### 16.5 Character rules
 
 Lowercase ASCII, hyphen or dot separators, no spaces/slash/dynamic labels. Globally unique within workflow run.
+
+### 16.6 Examples
+
+```
+pr-head-api-reporting-py311-attempt1-junit
+pr-head-api-reporting-py311-attempt1-coverage-raw
+pr-head-api-reporting-py311-attempt2-coverage-raw
+merge-ref-units-py312-attempt2-resource
+main-repository-core-py312-attempt1-junit
+nightly-benchmark-py312-attempt1-resource
+```
+
+### 16.7 Rerun safety
+
+- `actions/upload-artifact` overwrite mode is NOT the authority
+- Artifacts are append-only per run attempt, distinguished by `run_attempt`
+- Aggregate jobs MUST only consume artifacts matching current `github.run_attempt`
+- Must reject: old attempt artifacts mixed with current, duplicate raw coverage for same identity, missing current attempt artifact, metadata `run_attempt` mismatch, different commit SHA for same identity
+
+### 16.8 Artifact metadata
+
+Each uploaded artifact includes metadata:
+
+```json
+{
+  "run_id": "github.run_id",
+  "run_attempt": "github.run_attempt",
+  "track": "pr-head",
+  "shard": "api-reporting",
+  "python_version": "3.11",
+  "commit_sha": "string",
+  "artifact_kind": "coverage-raw"
+}
+```
+
+Must not rely solely on filename — must validate metadata.
 
 ## 17. Telemetry Contracts
 
 ### 17.1 JUnit
 
 ```bash
-uv run --locked pytest --junitxml=junit.${TRACK}.${SHARD}.py${PYVER}.xml --timeout=<timeout> <args>
+uv run --locked pytest --junitxml=junit.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}.xml --timeout=<timeout> <args>
 ```
 
 ### 17.2 Durations
 
 ```bash
-uv run --locked pytest --durations=20 --timeout=<timeout> <args> 2>&1 | tee pytest-output.${TRACK}.${SHARD}.py${PYVER}.txt
+uv run --locked pytest --durations=20 --timeout=<timeout> <args> 2>&1 | tee pytest-output.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}.txt
 ```
 
 ### 17.3 Coverage (mandatory)
@@ -521,16 +608,67 @@ uv run --locked pytest --durations=20 --timeout=<timeout> <args> 2>&1 | tee pyte
 Every required test shard must emit raw coverage data and per-shard coverage XML.
 
 ```bash
-export COVERAGE_FILE=".coverage.${TRACK}.${SHARD}.py${PYVER}"
-uv run --locked pytest --cov=hexagent --cov-branch --cov-report=xml:coverage.${TRACK}.${SHARD}.py${PYVER}.xml --timeout=<timeout> <files>
+export COVERAGE_FILE=".coverage.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+uv run --locked pytest --cov=hexagent --cov-branch \
+  --cov-report=xml:coverage.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}.xml \
+  --timeout=<timeout> <files>
 test -s "$COVERAGE_FILE"
 ```
 
 No minimum percentage threshold. Branch coverage enabled. Subprocess coverage out of scope.
 
-### 17.4 Cross-job coverage aggregation
+### 17.4 Event-local coverage aggregation
 
-Dedicated `coverage-aggregate` job depends on all test jobs. Downloads `*-coverage-raw` artifacts, validates count/uniqueness/completeness, rejects zero-byte/unknown/duplicate files, runs `uv run --locked coverage combine`, generates `combined-coverage.xml`, uploads. Failure: missing file → FAIL, duplicate → FAIL, combine fails → FAIL, aggregate not executed → overall FAIL.
+Coverage aggregation is per-workflow-event, NOT across event types.
+
+#### 17.4.1 Pull request workflow run
+
+Two separate aggregate jobs:
+
+```yaml
+coverage-aggregate-pr-head:
+  needs: [<all pr-head test jobs>]
+  # Consumes only: track=pr-head, current run_attempt
+  # Output: combined-coverage.pr-head.py-all.attempt<N>.xml
+
+coverage-aggregate-merge-ref:
+  needs: [<all merge-ref test jobs>]
+  # Consumes only: track=merge-ref, current run_attempt
+  # Output: combined-coverage.merge-ref.py-all.attempt<N>.xml
+```
+
+PR-head and merge-ref raw coverage MUST NOT be combined into a single correctness report (different commit SHA authority). An optional comparison report may be generated but must not be coverage combine input.
+
+#### 17.4.2 Main push workflow run
+
+```yaml
+coverage-aggregate-main:
+  needs: [<all main test jobs>]
+  # Consumes only: track=main, current push SHA, current run_attempt
+  # Output: combined-coverage.main.attempt<N>.xml
+```
+
+#### 17.4.3 Nightly workflow run
+
+```yaml
+coverage-aggregate-nightly:
+  needs: [<all nightly test jobs>]
+  # Consumes only: track=nightly, current checkout SHA, current run_attempt
+  # Output: combined-coverage.nightly.attempt<N>.xml
+```
+
+#### 17.4.4 Aggregate completeness
+
+Each aggregate job builds expected manifest from event matrix:
+- expected track
+- expected shard
+- expected Python version
+- expected run attempt
+- expected commit SHA
+
+Then proves: `downloaded identities == expected identities`
+
+Failure conditions: missing identity → FAIL, extra identity → FAIL, duplicate identity → FAIL, wrong track → FAIL, wrong attempt → FAIL, wrong SHA → FAIL, zero-byte data → FAIL, `coverage combine` failure → FAIL, combined XML missing → FAIL, aggregate job not executed → overall CI FAIL.
 
 ### 17.5 Resource telemetry schema
 
@@ -568,43 +706,170 @@ Dedicated `coverage-aggregate` job depends on all test jobs. Downloads `*-covera
 
 Unobtainable values: `null` (never `0`). Availability flags consistent with null. All durations finite non-negative. `commit_sha` equals track asserted SHA. `schema_version` fixed. `extra=forbid`.
 
-## 18. Golden and Benchmark Separation
+## 18. Structured Pytest Collection Plugin
 
-- **golden**: Correctness regression, PR-blocking. `@pytest.mark.golden`.
-- **benchmark**: Performance measurement, nightly/non-blocking. `@pytest.mark.benchmark`.
-- Mutually exclusive on single test.
-- `@pytest.mark.benchmark` does NOT imply `@pytest.mark.golden`.
-- `@pytest.mark.golden` does NOT imply `@pytest.mark.coolprop`.
-- Golden/benchmark not mixed with correctness shards.
-- Golden result updates require explicit PR approval.
+### 18.1 Implementation location
 
-## 19. Workflow/Job Naming Stability
+Frozen: `tests/ci/collect_nodes_plugin.py`
+
+### 18.2 Pytest hook authority
+
+```python
+def pytest_collection_finish(session):
+    """Emit structured JSON node inventory after collection."""
+    nodes = sorted(item.nodeid for item in session.items)
+    # Validate: no duplicates, UTF-8, slash-normalized
+    output = {
+        "schema_version": "1",
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
+        "pytest_version": pytest.__version__,
+        "commit_sha": os.environ.get("COMMIT_SHA", ""),
+        "track": os.environ.get("CI_TRACK", ""),
+        "shard": os.environ.get("CI_SHARD", ""),
+        "run_id": os.environ.get("GITHUB_RUN_ID", ""),
+        "run_attempt": int(os.environ.get("GITHUB_RUN_ATTEMPT", "1")),
+        "node_count": len(nodes),
+        "node_ids": nodes,
+    }
+    # Write to --hx-node-output path
+```
+
+### 18.3 Node inventory schema
+
+```json
+{
+  "schema_version": "1",
+  "python_version": "3.11",
+  "pytest_version": "9.1.1",
+  "commit_sha": "string",
+  "track": "pr-head",
+  "shard": "api-reporting",
+  "run_id": "string",
+  "run_attempt": 1,
+  "node_count": 2,
+  "node_ids": [
+    "tests/unit/test_example.py::test_a",
+    "tests/unit/test_example.py::test_b[param value]"
+  ]
+}
+```
+
+### 18.4 Node ID rules
+
+- UTF-8 strings
+- Exact `pytest item.nodeid` values
+- Slash normalized to `/`
+- Sorted lexicographically
+- Duplicates prohibited
+- No trimming inside parameter values
+- No modification of `::` or `[]`
+- Supports: parameterized IDs, spaces in parameters, Unicode parameters, nested classes, multiple `::` components, bracket content, platform-specific path separators
+
+### 18.5 Collection command
+
+```bash
+uv run --locked pytest --collect-only \
+  -p tests.ci.collect_nodes_plugin \
+  --hx-node-output nodes.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}.json \
+  <args>
+```
+
+Global collection:
+
+```bash
+uv run --locked pytest --collect-only \
+  -p tests.ci.collect_nodes_plugin \
+  --hx-node-output global-nodes.py${PYVER}.attempt${ATTEMPT}.json \
+  tests/
+```
+
+### 18.6 Failure semantics
+
+- pytest collection exit != 0 → FAIL
+- Plugin import error → FAIL
+- Schema validation failure → FAIL
+- Duplicate node ID → FAIL
+- `node_count` mismatch → FAIL
+- Missing output JSON → FAIL
+- Wrong Python version → FAIL
+- Wrong commit SHA → FAIL
+- Wrong track/shard/attempt → FAIL
+- `collection.stderr.txt` preserved as independent artifact
+- stdout preserved for diagnostics, but NOT node authority
+
+### 18.7 Acceptance fixtures
+
+At minimum:
+- Simple function node
+- Class method node
+- Parameterized node with spaces
+- Parameterized node with Unicode
+- Parameterized node with brackets
+- Node with multiple `::` components
+- Windows-style input path normalization
+- Duplicate node rejection
+- Empty collection handling
+- Collection import failure
+- Plugin failure
+- Schema mismatch
+
+### 18.8 Global and shard collection consistency
+
+Global and shard collection MUST use the same plugin, same schema, same locked environment, same Python version, same pytest version, same `pyproject.toml`, same working directory, same environment variables.
+
+## 19. Golden and Benchmark Separation
+
+### 19.1 Definitions
+
+- **golden**: Correctness authority — deterministic regression against approved baseline. PR-blocking.
+- **benchmark**: Performance observation authority — timing/throughput/memory. Not correctness authority. Nightly/non-blocking.
+
+### 19.2 Rules
+
+- Golden tests run in dedicated golden correctness shards
+- Golden shards do not contain: non-golden correctness nodes, benchmark nodes
+- Benchmark shards do not contain: golden nodes, PR-blocking correctness nodes
+- `golden` and `benchmark` are mutually exclusive on a single test
+- `@pytest.mark.benchmark` does NOT imply `@pytest.mark.golden`
+- `@pytest.mark.golden` does NOT imply `@pytest.mark.coolprop`
+- Golden result updates require explicit PR approval
+
+### 19.3 Acceptance gates
+
+- Every golden node belongs to exactly one dedicated golden shard
+- No non-golden correctness node belongs to a golden shard
+- Every benchmark node belongs to exactly one nightly benchmark shard
+- No benchmark node belongs to a PR-blocking shard
+- No node carries both `golden` and `benchmark` markers
+
+## 20. Workflow/Job Naming Stability
 
 Job names stable, unique within run, match manifest `job` field. Renaming requires manifest update.
 
-## 20. Shard I/O/Failure Semantics
+## 21. Shard Input/Output/Failure Semantics
 
 **Input:** Git checkout, Python version, `uv sync --locked --all-extras`.
-**Output:** JUnit, durations, coverage raw + XML (mandatory), resource telemetry, node inventory.
+**Output:** JUnit, durations, coverage raw + XML (mandatory), resource telemetry, node inventory JSON.
 **Failure:** Any test failure fails shard. Shards independent. All required shards must pass.
 
-## 21. Rollout Order
+## 22. Rollout Order
 
 | Phase | Action | Gate |
 |---|---|---|
 | 1 | Freeze uv authority + `uv.lock` + freshness gate + `uv run --locked` for all | `uv lock --check`; `git diff --exit-code`; all commands `uv run --locked` |
 | 2 | Add marker registration only | `uv run --locked pytest --markers` |
 | 3 | Add manifest schema, parser, file+node-ID verifiers (shadow mode) | Verifier runs, no routing |
-| 4 | Generate baseline topology inventory | Documented node union and overlaps |
-| 5 | Add typed `PropertyProvider` doubles, migrate tests | mypy protocol proof; no routing change |
-| 6 | Introduce explicit shards, remove `--ignore` atomically | Completeness verifier required in same PR |
-| 7 | Add PR-head and merge-ref tracks | SHA assertions pass |
-| 8 | Add JUnit, durations, coverage, telemetry + `coverage-aggregate` | Artifacts uploaded; aggregate passes |
-| 9 | Add nightly workflow | Manual trigger test passes |
+| 4 | Implement `tests/ci/collect_nodes_plugin.py` | Plugin produces valid schema JSON |
+| 5 | Generate baseline topology inventory per Python version | Per-version node union and overlaps documented |
+| 6 | Add typed `PropertyProvider` doubles, migrate tests | mypy protocol proof; no routing change |
+| 7 | Introduce explicit shards, remove `--ignore` atomically | Completeness verifier + plugin required in same PR |
+| 8 | Add PR-head and merge-ref tracks | SHA assertions pass |
+| 9 | Add JUnit, durations, coverage, telemetry + event-local `coverage-aggregate` | Artifacts uploaded; aggregates pass |
+| 10 | Add nightly workflow | Manual trigger test passes |
 
-Rollback: each phase revertible via `git revert`. Typed doubles rollback restores last approved implementation (bare MagicMock NOT a recommended long-term state).
+Rollback: each phase revertible via `git revert`. Bare MagicMock NOT a recommended long-term rollback state.
 
-## 22. Implementation Acceptance Tests
+## 23. Implementation Acceptance Tests
 
 1. `uv sync --locked --all-extras` succeeds on fresh clone
 2. `uv lock --check` passes
@@ -616,32 +881,41 @@ Rollback: each phase revertible via `git revert`. Typed doubles rollback restore
 8. `uv run --locked coverage --version` succeeds
 9. All CI jobs pass with `uv run --locked`
 10. File-level completeness: `D == M`
-11. Node-ID completeness: `union(S_i) == G`
-12. Node-ID pairwise disjointness
-13. No `--ignore` in any CI job
-14. All test doubles implement `PropertyProvider` (mypy)
-15. No bare MagicMock provider success path
-16. CoolProp tests isolated in dedicated shard
-17. JUnit XML uploaded per shard
-18. Coverage raw + XML uploaded per shard (mandatory)
-19. Combined coverage by `coverage-aggregate`
-20. Resource telemetry JSON per shard
-21. PR-head SHA assertion passes
-22. Merge-ref SHA assertion passes
-23. Main-push SHA assertion passes
-24. Nightly workflow runs
-25. Golden node IDs only in golden shards; no non-golden node in golden shard
-26. Benchmark node IDs only in nightly benchmark shards; no benchmark in PR-blocking shards
+11. Python 3.11 file completeness: PASS
+12. Python 3.11 node union equality: PASS
+13. Python 3.11 node pairwise disjointness: PASS
+14. Python 3.12 file completeness: PASS
+15. Python 3.12 node union equality: PASS
+16. Python 3.12 node pairwise disjointness: PASS
+17. No `--ignore` in any CI job
+18. All test doubles implement `PropertyProvider` (mypy)
+19. No bare MagicMock provider success path
+20. CoolProp tests isolated in dedicated shard
+21. JUnit XML uploaded per shard with attempt-safe name
+22. Coverage raw + XML uploaded per shard (mandatory) with attempt-safe name
+23. Event-local combined coverage by `coverage-aggregate` jobs
+24. Resource telemetry JSON per shard with attempt-safe name
+25. PR-head SHA assertion passes
+26. Merge-ref SHA assertion passes
+27. Main-push SHA assertion passes
+28. Nightly workflow runs
+29. Every golden node in exactly one dedicated golden shard
+30. No non-golden correctness node in golden shard
+31. Every benchmark node in exactly one nightly benchmark shard
+32. No benchmark node in PR-blocking shard
+33. No node carries both `golden` and `benchmark`
+34. Structured collection plugin produces valid JSON for every shard
+35. Collection stderr preserved for every shard
 
-## 23. TASK-010 Frozen Contract Preservation
+## 24. TASK-010 Frozen Contract Preservation
 
 Must not alter TASK-010 frozen contract SHA `9a1faeb92f4015a62f9d9add0739f3853a876415` or any TASK-010 behavior.
 
-## 24. TASK-011 Dependency
+## 25. TASK-011 Dependency
 
 TASK-011 must not start until TASK-015A implementation complete and CI stable.
 
-## 25. Design Freeze Process
+## 26. Design Freeze Process
 
 - **TASK-015A Design Frozen Contract SHA** = exact reviewed Head commit SHA
 - Additional hashes for traceability: Reviewed Head Commit SHA, Design Document Git Blob SHA-1, Design Document Content SHA-256
@@ -661,8 +935,12 @@ TASK-011 must not start until TASK-015A implementation complete and CI stable.
 | Python 3.12 locked sync | YES |
 | Manifest schema validation | YES |
 | File set equality (D == M) | YES |
-| Node-ID union equality | YES |
-| Node-ID pairwise disjointness | YES |
+| Python 3.11 global node inventory | YES |
+| Python 3.11 shard node union equality | YES |
+| Python 3.11 shard pairwise disjointness | YES |
+| Python 3.12 global node inventory | YES |
+| Python 3.12 shard node union equality | YES |
+| Python 3.12 shard pairwise disjointness | YES |
 | No stale manifest paths | YES |
 | No empty shards | YES |
 | PR-head exact SHA assertion | YES |
@@ -673,10 +951,17 @@ TASK-011 must not start until TASK-015A implementation complete and CI stable.
 | JUnit artifact per shard | YES |
 | Coverage raw data per shard (mandatory) | YES |
 | Coverage XML per shard (mandatory) | YES |
-| Combined coverage artifact | YES |
+| Event-local combined coverage | YES |
+| Artifact identity includes run_attempt | YES |
+| Aggregate consumes current attempt only | YES |
+| Old/new attempt mixing rejected | YES |
 | Durations/log artifact per shard | YES |
 | Resource telemetry artifact per shard | YES |
-| Golden/benchmark separation | YES |
+| Golden dedicated correctness shards | YES |
+| Benchmark nightly-only shards | YES |
+| Structured pytest collection plugin | YES |
+| Node inventory schema validation | YES |
+| Collection stderr preserved | YES |
 | TASK-010 frozen behavior unchanged | YES |
 | TASK-011 not started | YES |
 
