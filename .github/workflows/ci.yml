@@ -117,6 +117,11 @@ jobs:
             --junitxml="junit.xml" \
             --tb=short \
             ${{ matrix.files }}
+        env:
+          HX_TRACK: ${{ steps.track.outputs.track || 'merge-ref' }}
+          HX_COMMIT_SHA: ${{ steps.track.outputs.commit-sha || github.event.pull_request.head.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
       - name: Prepare artifacts
         if: always()
         run: |
@@ -186,6 +191,11 @@ jobs:
             --junitxml="junit.xml" \
             --tb=short \
             ${{ matrix.files }}
+        env:
+          HX_TRACK: ${{ steps.track.outputs.track || 'merge-ref' }}
+          HX_COMMIT_SHA: ${{ steps.track.outputs.commit-sha || github.event.pull_request.head.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
       - name: Prepare artifacts
         if: always()
         run: |
