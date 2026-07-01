@@ -61,7 +61,8 @@ def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
     Checks (in order):
     1. result.verify_hash() — verify the result's own hash
     2. result.verify_provenance() — verify provenance chain
-    3. geometry_snapshot is non-None and fields match request_identity geometry
+    2b. result.validate_integrity() — Pydantic structural validation
+    3. geometry_snapshot is non-None and ALL 9 fields match request_identity geometry
     4. solver_settings fields match execution authority (tolerance, max_iterations)
     5. provider_identity 6-field binding matches result.provider_identity
     6. canonical_request_snapshot is non-None and digest is valid
@@ -79,6 +80,11 @@ def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
     if not bundle.result.verify_provenance():
         raise ValueError("result provenance verification failed")
 
+    # -- 2b. validate_integrity — Pydantic structural validation ---------------
+    valid, issues = bundle.result.validate_integrity()
+    if not valid:
+        raise ValueError(f"RatingResult.validate_integrity() failed: {'; '.join(issues)}")
+
     # -- 3. geometry_snapshot non-None and fields match request_identity ------
     if bundle.geometry_snapshot is None:
         raise ValueError("geometry_snapshot must not be None")
@@ -90,6 +96,10 @@ def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
         "outer_pipe_inner_diameter_m",
         "effective_length_m",
         "wall_thermal_conductivity_w_m_k",
+        "inner_surface_roughness_m",
+        "annulus_surface_roughness_m",
+        "inner_fouling_resistance_m2k_w",
+        "outer_fouling_resistance_m2k_w",
     )
     for _gf in _GEOM_FIELDS:
         _geom_val = getattr(geom, _gf, None)
@@ -221,10 +231,10 @@ def verify_sizing_artifact_bundle(artifacts: SizingRunArtifacts) -> None:
     Full verification chain:
     1. artifact_bundle_digest recompute
     2. provenance_digest == provenance_graph.compute_hash()
-    3. sizing_request is non-None and has expected structure
-    4. evaluation_input is non-None
-    5. evaluation_input.materialization_result is non-None
-    6. phase3_authoritative_artifacts is non-None
+    3. SizingRequest structural validation via model_validate
+    4. Evaluation input authority validation (digest recomputation)
+    5. MaterializationResult authority validation (verify_or_raise)
+    6. Phase3AuthoritativeArtifacts non-None (full verification in step 12)
     7. Ranking: ranked_records are sorted by rank
     8. Ranked count matches feasible_candidate_count
     9. Top-N: top_n_records is exact prefix
@@ -250,25 +260,46 @@ def verify_sizing_artifact_bundle(artifacts: SizingRunArtifacts) -> None:
             f"provenance_graph.compute_hash() returned {computed_prov!r}"
         )
 
-    # 3. sizing_request is non-None and has expected structure
+    # 3. SizingRequest structural validation
     if artifacts.sizing_request is None:
         raise ValueError("sizing_request must not be None")
-    if not hasattr(artifacts.sizing_request, "catalogs"):
-        raise ValueError("sizing_request missing required 'catalogs' field")
+    # Validate via the frozen Pydantic model
+    from hexagent.optimization.models import SizingRequest as _SR
+
+    try:
+        _SR.model_validate(artifacts.sizing_request.model_dump(mode="python"))
+    except Exception as exc:
+        raise ValueError(f"SizingRequest.model_validate() failed: {exc}") from exc
     if not artifacts.sizing_request.catalogs:
         raise ValueError("sizing_request.catalogs must be non-empty")
 
-    # 4. evaluation_input is non-None
+    # 4. Evaluation input authority validation
     if artifacts.evaluation_input is None:
         raise ValueError("evaluation_input must not be None")
+    # Verify evaluation_input_digest by recomputing the canonical payload hash
+    from hexagent.optimization.phase3_evaluation import _evaluation_input_payload
 
-    # 5. evaluation_input.materialization_result is non-None
+    ei_expected_digest = sha256_digest(_evaluation_input_payload(artifacts.evaluation_input))
+    if artifacts.evaluation_input.evaluation_input_digest != ei_expected_digest:
+        raise ValueError(
+            f"evaluation_input.evaluation_input_digest mismatch: "
+            f"stored {artifacts.evaluation_input.evaluation_input_digest!r} "
+            f"!= recomputed {ei_expected_digest!r}"
+        )
+
+    # 5. Materialization result authority validation
     if artifacts.evaluation_input.materialization_result is None:
         raise ValueError("evaluation_input.materialization_result must not be None")
+    try:
+        artifacts.evaluation_input.materialization_result.verify_or_raise()
+    except Exception as exc:
+        raise ValueError(f"materialization_result.verify_or_raise() failed: {exc}") from exc
 
-    # 6. phase3_authoritative_artifacts is non-None
+    # 6. Phase3 authoritative artifacts — verify via the frozen authority verifier
     if artifacts.phase3_authoritative_artifacts is None:
         raise ValueError("phase3_authoritative_artifacts must not be None")
+    # Note: Phase3AuthoritativeArtifacts does not have verify_or_raise;
+    # full verification is done by verify_phase3_result_semantics_or_raise in step 12.
 
     # 7. Ranking: ranked_records are sorted by rank
     for i in range(len(artifacts.ranked_records)):

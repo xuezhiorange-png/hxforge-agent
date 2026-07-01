@@ -262,11 +262,19 @@ async def rate_double_pipe(
 
     # 8. Build artifact bundle using prepared fields + result (P0-3)
     try:
+        # Reconstruct geometry from request_identity to ensure parity
+        # (kernel applies fouling from stream specs, diverging from prepared.geometry)
+        from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
+
+        _kernel_geometry = DoublePipeGeometry.from_dict(
+            service_result.result.request_identity.geometry
+        )
+
         # Compute digest from raw fields (avoids chicken-and-egg with model_validator)
         bundle_digest = _compute_bundle_digest_from_fields(
             canonical_request_snapshot=prepared.canonical_request_snapshot,
             request_identity=service_result.result.request_identity,
-            geometry_snapshot=prepared.geometry,
+            geometry_snapshot=_kernel_geometry,
             solver_settings=prepared.solver_settings,
             provider_identity=prepared.resolved_provider.identity,
             result=service_result.result,
@@ -276,7 +284,7 @@ async def rate_double_pipe(
         bundle = RatingRunArtifacts(
             canonical_request_snapshot=prepared.canonical_request_snapshot,
             request_identity=service_result.result.request_identity,
-            geometry_snapshot=prepared.geometry,
+            geometry_snapshot=_kernel_geometry,
             solver_settings=prepared.solver_settings,
             provider_identity=prepared.resolved_provider.identity,
             result=service_result.result,
