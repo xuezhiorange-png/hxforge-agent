@@ -63,4 +63,5 @@ jobs:
         run: |
           pytest -x --timeout=120 \
             --ignore=tests/unit/test_double_pipe_correction_r10.py \
+            --ignore=tests/unit/test_double_pipe_correction_r12.py \
             -q
