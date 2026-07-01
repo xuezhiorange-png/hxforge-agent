@@ -66,7 +66,7 @@ _PROV_SAT = PropertyProvenance(
     fluid_identifier="Water",
     validation_level=FluidValidationLevel.UNVALIDATED,
     query_type=PropertyQueryType.SATURATION_P,
-    inputs=(("pressure_pa", 101325.0)),
+    inputs=(("pressure_pa", 101325.0),),
     cache_policy_version="v1",
 )
 
