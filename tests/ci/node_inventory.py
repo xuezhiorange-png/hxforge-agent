@@ -146,9 +146,7 @@ def _parse_file_record(raw: Any, index: int) -> FileRecord:
 
     if node_count > 0:
         if reason is not None or authority is not None or evidence is not None:
-            raise InventoryError(
-                f"{context} non-zero record must have null zero-node metadata"
-            )
+            raise InventoryError(f"{context} non-zero record must have null zero-node metadata")
         return FileRecord(file_path, node_count, None, None, None)
 
     if reason not in _ALLOWED_ZERO_NODE_REASONS:
@@ -198,18 +196,14 @@ def load_inventory(path: Path) -> NodeInventory:
     pytest_version = _non_empty_string(typed_raw["pytest_version"], "pytest_version")
     commit_sha = _non_empty_string(typed_raw["commit_sha"], "commit_sha")
     if _HEX_40.fullmatch(commit_sha) is None:
-        raise InventoryError(
-            "commit_sha must be a lowercase 40-character hexadecimal SHA"
-        )
+        raise InventoryError("commit_sha must be a lowercase 40-character hexadecimal SHA")
     run_id = _non_empty_string(typed_raw["run_id"], "run_id")
     run_attempt = _positive_int(typed_raw["run_attempt"], "run_attempt")
     fingerprint = _non_empty_string(
         typed_raw["behavior_fingerprint_sha256"], "behavior_fingerprint_sha256"
     )
     if _HEX_64.fullmatch(fingerprint) is None:
-        raise InventoryError(
-            "behavior_fingerprint_sha256 must be 64 lowercase hex characters"
-        )
+        raise InventoryError("behavior_fingerprint_sha256 must be 64 lowercase hex characters")
 
     raw_node_ids = typed_raw["node_ids"]
     if not isinstance(raw_node_ids, list) or not all(
@@ -231,8 +225,7 @@ def load_inventory(path: Path) -> NodeInventory:
     if not isinstance(raw_records, list):
         raise InventoryError("file_records must be a list")
     file_records = tuple(
-        _parse_file_record(raw_record, index)
-        for index, raw_record in enumerate(raw_records)
+        _parse_file_record(raw_record, index) for index, raw_record in enumerate(raw_records)
     )
     record_files = tuple(record.file for record in file_records)
     if record_files != tuple(sorted(record_files)):
@@ -272,10 +265,7 @@ def verify_per_version(
 ) -> None:
     """Prove per-version union equality and pairwise disjointness."""
 
-    if (
-        global_inventory.collection_scope != "global"
-        or global_inventory.shard is not None
-    ):
+    if global_inventory.collection_scope != "global" or global_inventory.shard is not None:
         raise InventoryError("global_inventory must have global scope and shard=null")
     if global_inventory.python_version != version:
         raise InventoryError("global inventory Python version mismatch")
@@ -289,26 +279,18 @@ def verify_per_version(
             f"unexpected={sorted(actual_names - expected_names)!r}"
         )
 
-    expected_global_files = frozenset(
-        file for shard in applicable for file in shard.files
-    )
+    expected_global_files = frozenset(file for shard in applicable for file in shard.files)
     if global_inventory.file_set != expected_global_files:
-        raise InventoryError(
-            "global inventory file set does not match applicable manifest files"
-        )
+        raise InventoryError("global inventory file set does not match applicable manifest files")
 
     union: set[str] = set()
     owner_by_node: dict[str, str] = {}
     for shard_spec in applicable:
         inventory = shard_inventories[shard_spec.name]
         if inventory.collection_scope != "shard" or inventory.shard != shard_spec.name:
-            raise InventoryError(
-                f"inventory scope/name mismatch for shard {shard_spec.name!r}"
-            )
+            raise InventoryError(f"inventory scope/name mismatch for shard {shard_spec.name!r}")
         if inventory.python_version != version:
-            raise InventoryError(
-                f"Python version mismatch for shard {shard_spec.name!r}"
-            )
+            raise InventoryError(f"Python version mismatch for shard {shard_spec.name!r}")
         if inventory.file_set != frozenset(shard_spec.files):
             raise InventoryError(f"file set mismatch for shard {shard_spec.name!r}")
 
@@ -330,8 +312,7 @@ def verify_per_version(
             previous_owner = owner_by_node.get(node_id)
             if previous_owner is not None:
                 raise InventoryError(
-                    f"node {node_id!r} appears in both {previous_owner!r} and "
-                    f"{shard_spec.name!r}"
+                    f"node {node_id!r} appears in both {previous_owner!r} and {shard_spec.name!r}"
                 )
             owner_by_node[node_id] = shard_spec.name
         union.update(inventory.node_ids)
