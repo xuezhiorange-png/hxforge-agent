@@ -1,0 +1,194 @@
+name: nightly
+
+on:
+  schedule:
+    # Every day at 03:00 UTC
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  HX_TRACK: nightly
+  HX_COMMIT_SHA: ${{ github.sha }}
+  GITHUB_RUN_ID: ${{ github.run_id }}
+  GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+  PYTHONHASHSEED: "0"
+  TZ: UTC
+  LC_ALL: C.UTF-8
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - name: Verify uv version
+        run: test "$(uv --version)" = "uv 0.11.25"
+      - name: Check lock freshness
+        run: uv lock --check
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Verify no lock drift
+        run: git diff --exit-code -- uv.lock pyproject.toml
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pip-audit
+
+  shard-py3.11:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - name: Verify uv version
+        run: test "$(uv --version)" = "uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run all tests (py3.11)
+        run: >
+          uv run --locked --python 3.11 pytest
+          --timeout=300 -q
+          --junitxml=nightly-py3.11-junit.xml
+          --cov=src --cov-report=xml:nightly-py3.11-coverage.xml
+          tests/
+      - name: Generate node inventory
+        if: always()
+        run: uv run --locked --python 3.11 pytest --collect-only -q tests/ | tee nightly-py3.11-nodes.txt
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-py3.11-results
+          retention-days: 30
+          path: |
+            nightly-py3.11-junit.xml
+            nightly-py3.11-coverage.xml
+            nightly-py3.11-nodes.txt
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HX_COMMIT_SHA: ${{ github.sha }}
+          HX_RUN_ID: ${{ github.run_id }}
+          HX_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Nightly CI failure – shard-py3.11 ($HX_COMMIT_SHA)" \
+            --body "Nightly run failed for Python 3.11 shard.
+
+          - **Run:** $HX_RUN_URL
+          - **Commit:** $HX_COMMIT_SHA
+          - **Track:** nightly
+
+          @${{ github.actor }} please investigate." \
+            --label "nightly-failure,ci"
+
+  shard-py3.12:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - name: Verify uv version
+        run: test "$(uv --version)" = "uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run all tests (py3.12)
+        run: >
+          uv run --locked --python 3.12 pytest
+          --timeout=300 -q
+          --junitxml=nightly-py3.12-junit.xml
+          --cov=src --cov-report=xml:nightly-py3.12-coverage.xml
+          tests/
+      - name: Generate node inventory
+        if: always()
+        run: uv run --locked --python 3.12 pytest --collect-only -q tests/ | tee nightly-py3.12-nodes.txt
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-py3.12-results
+          retention-days: 30
+          path: |
+            nightly-py3.12-junit.xml
+            nightly-py3.12-coverage.xml
+            nightly-py3.12-nodes.txt
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HX_COMMIT_SHA: ${{ github.sha }}
+          HX_RUN_ID: ${{ github.run_id }}
+          HX_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Nightly CI failure – shard-py3.12 ($HX_COMMIT_SHA)" \
+            --body "Nightly run failed for Python 3.12 shard.
+
+          - **Run:** $HX_RUN_URL
+          - **Commit:** $HX_COMMIT_SHA
+          - **Track:** nightly
+
+          @${{ github.actor }} please investigate." \
+            --label "nightly-failure,ci"
+
+  golden-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - name: Verify uv version
+        run: test "$(uv --version)" = "uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run golden regression tests
+        run: >
+          uv run --locked pytest -m golden
+          --timeout=300 -q
+          --junitxml=nightly-golden-junit.xml
+          tests/
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-golden-results
+          retention-days: 30
+          path: nightly-golden-junit.xml
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HX_COMMIT_SHA: ${{ github.sha }}
+          HX_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Nightly golden regression failure ($HX_COMMIT_SHA)" \
+            --body "Golden correctness regression tests failed.
+
+          - **Run:** $HX_RUN_URL
+          - **Commit:** $HX_COMMIT_SHA
+          - **Track:** nightly
+
+          @${{ github.actor }} please investigate.  Golden regressions are correctness authority failures." \
+            --label "nightly-failure,golden-regression,ci"
