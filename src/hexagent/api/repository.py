@@ -582,9 +582,7 @@ class InMemoryRunRepository:
         from hexagent.api.canonical_request import compute_api_request_digest
 
         if artifact_bundle.canonical_request_snapshot is not None:
-            recomputed_req = compute_api_request_digest(
-                artifact_bundle.canonical_request_snapshot
-            )
+            recomputed_req = compute_api_request_digest(artifact_bundle.canonical_request_snapshot)
             if recomputed_req != record.request_digest:
                 raise ValueError(
                     f"canonical request digest mismatch: "
@@ -669,9 +667,7 @@ class InMemoryRunRepository:
         from hexagent.api.canonical_request import compute_api_request_digest
 
         if artifact_bundle.canonical_request_snapshot is not None:
-            recomputed_req = compute_api_request_digest(
-                artifact_bundle.canonical_request_snapshot
-            )
+            recomputed_req = compute_api_request_digest(artifact_bundle.canonical_request_snapshot)
             if recomputed_req != record.request_digest:
                 raise ValueError(
                     f"canonical request digest mismatch: "
