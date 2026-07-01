@@ -238,11 +238,12 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
-      - name: Download all shard artifacts
+      - name: Download shard artifacts for this track
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
           merge-multiple: false
+          pattern: ${{ github.event_name == 'push' && 'main-*' || 'pr-head-*' }}
       - name: Validate artifact identity and completeness
         run: |
           uv run --locked python3 -c "
