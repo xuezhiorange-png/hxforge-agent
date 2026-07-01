@@ -23,7 +23,6 @@ from __future__ import annotations
 import html as _html
 import json
 import re
-from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 from uuid import UUID
@@ -34,6 +33,7 @@ from hexagent.core.canonical import sha256_digest
 from hexagent.domain.models import StrictBaseModel
 
 if TYPE_CHECKING:
+    from hexagent.api.envelopes import RatingRunEnvelope, SizingRunEnvelope
     from hexagent.api.repository import RunRecord
 
 # ---------------------------------------------------------------------------
@@ -336,47 +336,47 @@ _ARTIFACT_MAP: dict[
     ReportArtifactId.CASE_NAME: (
         ReportSectionId.INPUT_SUMMARY,
         ReportSourceDocument.CANONICAL_REQUEST,
-        ("/artifact_bundle/canonical_request_snapshot/case_name",),
+        ("/case_name",),
     ),
     ReportArtifactId.HOT_FLUID: (
         ReportSectionId.INPUT_SUMMARY,
         ReportSourceDocument.CANONICAL_REQUEST,
-        ("/artifact_bundle/canonical_request_snapshot/hot_stream/fluid/name",),
+        ("/hot_stream/fluid/name",),
     ),
     ReportArtifactId.COLD_FLUID: (
         ReportSectionId.INPUT_SUMMARY,
         ReportSourceDocument.CANONICAL_REQUEST,
-        ("/artifact_bundle/canonical_request_snapshot/cold_stream/fluid/name",),
+        ("/cold_stream/fluid/name",),
     ),
     ReportArtifactId.HOT_INLET_T: (
         ReportSectionId.INPUT_SUMMARY,
         ReportSourceDocument.CANONICAL_REQUEST,
-        ("/artifact_bundle/canonical_request_snapshot/hot_stream/inlet/temperature/value",),
+        ("/hot_stream/inlet/temperature/value",),
     ),
     ReportArtifactId.COLD_INLET_T: (
         ReportSectionId.INPUT_SUMMARY,
         ReportSourceDocument.CANONICAL_REQUEST,
-        ("/artifact_bundle/canonical_request_snapshot/cold_stream/inlet/temperature/value",),
+        ("/cold_stream/inlet/temperature/value",),
     ),
     ReportArtifactId.MASS_FLOWS: (
         ReportSectionId.INPUT_SUMMARY,
         ReportSourceDocument.CANONICAL_REQUEST,
-        ("/artifact_bundle/canonical_request_snapshot/hot_stream/mass_flow/value",),
+        ("/hot_stream/mass_flow/value",),
     ),
     ReportArtifactId.DESIGN_PRESSURES: (
         ReportSectionId.INPUT_SUMMARY,
         ReportSourceDocument.CANONICAL_REQUEST,
-        ("/artifact_bundle/canonical_request_snapshot/design_pressure_hot/value",),
+        ("/design_pressure_hot/value",),
     ),
     ReportArtifactId.DESIGN_TEMPERATURES: (
         ReportSectionId.INPUT_SUMMARY,
         ReportSourceDocument.CANONICAL_REQUEST,
-        ("/artifact_bundle/canonical_request_snapshot/design_temperature_hot/value",),
+        ("/design_temperature_hot/value",),
     ),
     ReportArtifactId.GEOMETRY_SPEC: (
         ReportSectionId.GEOMETRY,
         ReportSourceDocument.ARTIFACT_BUNDLE,
-        ("/artifact_bundle/geometry_snapshot",),
+        ("/geometry_snapshot",),
     ),
     ReportArtifactId.HEAT_DUTY: (
         ReportSectionId.HEAT_BALANCE,
@@ -421,7 +421,7 @@ _ARTIFACT_MAP: dict[
     ReportArtifactId.MATERIALS: (
         ReportSectionId.GEOMETRY,
         ReportSourceDocument.ARTIFACT_BUNDLE,
-        ("/artifact_bundle/geometry_snapshot/wall_thermal_conductivity",),
+        ("/geometry_snapshot/wall_thermal_conductivity",),
     ),
     ReportArtifactId.SIZING_RANK: (
         ReportSectionId.SIZING_RANKING,
@@ -471,7 +471,7 @@ _ARTIFACT_MAP: dict[
     ReportArtifactId.PROVENANCE_GRAPH: (
         ReportSectionId.PROVENANCE,
         ReportSourceDocument.ARTIFACT_BUNDLE,
-        ("/provenance", "/artifact_bundle/provenance_graph"),
+        ("/provenance_graph",),
     ),
     ReportArtifactId.RESULT_HASH: (
         ReportSectionId.INTEGRITY,
@@ -547,16 +547,81 @@ def resolve_source_pointer(obj: Any, pointer: str) -> Any:
     return current
 
 
+def select_report_source_document(
+    *,
+    envelope: RatingRunEnvelope | SizingRunEnvelope,
+    source_document: ReportSourceDocument,
+) -> dict[str, object]:
+    """Select the root document dict for a given source_document enum.
+
+    Accepts a typed envelope (RatingRunEnvelope | SizingRunEnvelope) and
+    extracts the appropriate sub-document based on *source_document*.
+
+    RUN_ENVELOPE  → the full envelope dict
+    ARTIFACT_BUNDLE → envelope.artifact_bundle dict
+    CANONICAL_REQUEST → envelope.artifact_bundle.canonical_request_snapshot dict
+
+    Raises ``ValueError`` if the requested sub-document is missing.
+    """
+    envelope_dict: dict[str, object] = envelope.model_dump(mode="json")
+    if source_document is ReportSourceDocument.RUN_ENVELOPE:
+        return envelope_dict
+    if source_document is ReportSourceDocument.ARTIFACT_BUNDLE:
+        bundle = envelope_dict.get("artifact_bundle")
+        if bundle is None:
+            raise ValueError("No artifact_bundle in envelope")
+        return dict(bundle) if isinstance(bundle, dict) else {}
+    if source_document is ReportSourceDocument.CANONICAL_REQUEST:
+        bundle = envelope_dict.get("artifact_bundle")
+        if bundle is None:
+            raise ValueError("No artifact_bundle in envelope")
+        crs = bundle.get("canonical_request_snapshot") if isinstance(bundle, dict) else None
+        if crs is None:
+            raise ValueError("No canonical_request_snapshot")
+        return dict(crs) if isinstance(crs, dict) else {}
+    raise ValueError(f"Unknown source_document: {source_document}")
+
+
 # =========================================================================
 # B6 — Report Hashes (P0-6: frozen ReportInstanceIdentity + DoublePipeReportModel)
 # =========================================================================
 
 
-@dataclass(frozen=True, slots=True)
-class ReportInstanceIdentity:
-    """Identity model for a report instance — 11-field frozen contract."""
+# ---------------------------------------------------------------------------
+# Template authority — the actual render string and its hash
+# ---------------------------------------------------------------------------
 
-    report_schema_version: str  # Literal['1']
+REPORT_TEMPLATE_DEFINITION: str = (
+    '<!DOCTYPE html>\n<html lang="en">\n<head>'
+    '<meta charset="utf-8">'
+    "<title>Run Report {run_id}</title>"
+    "<style>"
+    "body{font-family:monospace;margin:2em}"
+    ".banner{background:#c00;color:#fff;padding:0.5em;margin:0.5em 0;font-weight:bold}"
+    ".section{border:1px solid #ccc;padding:1em;margin:1em 0}"
+    ".section-header{font-weight:bold;margin-bottom:0.5em}"
+    ".status{font-style:italic;color:#555}"
+    ".hash{font-family:monospace;font-size:0.9em;word-break:break-all}"
+    "</style>"
+    "</head>\n<body>"
+    "{risk_banners}"
+    "<h1>Run Report</h1>"
+    "<p><strong>Run ID:</strong> {run_id}</p>"
+    '<p><strong>Content Hash:</strong> <span class="hash">{content_hash}</span></p>'
+    '<p><strong>Instance Hash:</strong> <span class="hash">{instance_hash}</span></p>'
+    "{sections}"
+    "</body>\n</html>"
+)
+
+REPORT_TEMPLATE_DEFINITION_HASH: str = sha256_digest(REPORT_TEMPLATE_DEFINITION)
+
+
+class ReportInstanceIdentity(StrictBaseModel):
+    """Identity model for a report instance — 11-field frozen Pydantic contract."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    report_schema_version: Literal["1"]
     report_content_hash: str
     run_id: UUID
     request_digest: str
@@ -616,22 +681,9 @@ def compute_report_content_hash(sections: tuple[ReportSection, ...]) -> str:
 def compute_report_instance_hash(identity: ReportInstanceIdentity) -> str:
     """SHA256 of the ReportInstanceIdentity.
 
-    instance hash = sha256_digest(report_instance_identity).
+    instance hash = sha256_digest(report_instance_identity.model_dump()).
     """
-    identity_dict: dict[str, Any] = {
-        "report_schema_version": identity.report_schema_version,
-        "report_content_hash": identity.report_content_hash,
-        "run_id": str(identity.run_id),
-        "request_digest": identity.request_digest,
-        "source_run_envelope_digest": identity.source_run_envelope_digest,
-        "source_domain_result_hash": identity.source_domain_result_hash,
-        "source_artifact_bundle_digest": identity.source_artifact_bundle_digest,
-        "template_id": identity.template_id,
-        "template_version": identity.template_version,
-        "template_definition_hash": identity.template_definition_hash,
-        "formatter_registry_version": identity.formatter_registry_version,
-    }
-    return sha256_digest(identity_dict)
+    return sha256_digest(identity.model_dump(mode="json"))
 
 
 # =========================================================================
@@ -659,14 +711,39 @@ class DoublePipeReportModel(StrictBaseModel):
     report_instance_hash: str
 
     @model_validator(mode="after")
-    def _validate_sections(self) -> DoublePipeReportModel:
-        """B2: Validate exactly 13 sections in correct order."""
+    def _validate_sections(self) -> DoublePipeReportModel:  # noqa: N805
+        """B2: Validate exactly 13 sections in correct order + P0-7 identity consistency."""
         if len(self.sections) != 13:
             raise ValueError(f"Expected 13 sections, got {len(self.sections)}")
         expected = REPORT_SECTION_ORDER
         actual = tuple(s.section_id for s in self.sections)
         if actual != expected:
             raise ValueError("Section order mismatch")
+        # P0-7: Recompute content hash from sections and verify match
+        recomputed_content_hash = compute_report_content_hash(self.sections)
+        if recomputed_content_hash != self.report_content_hash:
+            raise ValueError(
+                "report_content_hash does not match "
+                "sha256_digest(sections) — content hash recomputation mismatch"
+            )
+        # P0-7: Identity content hash must match
+        if self.report_instance_identity.report_content_hash != self.report_content_hash:
+            raise ValueError(
+                "report_instance_identity.report_content_hash does not match report_content_hash"
+            )
+        # P0-7: Identity schema version must match
+        if self.report_instance_identity.report_schema_version != self.report_schema_version:
+            raise ValueError(
+                "report_instance_identity.report_schema_version "
+                "does not match report_schema_version"
+            )
+        # P0-7: Instance hash must match recomputed value
+        expected_instance_hash = compute_report_instance_hash(self.report_instance_identity)
+        if self.report_instance_hash != expected_instance_hash:
+            raise ValueError(
+                "report_instance_hash does not match "
+                "sha256_digest(report_instance_identity.model_dump())"
+            )
         return self
 
 
@@ -1013,7 +1090,7 @@ def _build_section_statuses(
 
 def _build_artifacts_for_section(
     section_id: ReportSectionId,
-    envelope_dict: dict[str, Any],
+    envelope: RatingRunEnvelope | SizingRunEnvelope,
     section_statuses: dict[ReportSectionId, ReportSectionStatus],
 ) -> list[ReportArtifact]:
     """Build artifact list for a given section."""
@@ -1024,9 +1101,13 @@ def _build_artifacts_for_section(
         if owner_section != section_id:
             continue
 
-        if section_status in (
-            ReportSectionStatus.NOT_APPLICABLE,
-            ReportSectionStatus.BLOCKED,
+        if (
+            section_status
+            in (
+                ReportSectionStatus.NOT_APPLICABLE,
+                ReportSectionStatus.BLOCKED,
+            )
+            and artifact_id not in MANDATORY_ARTIFACT_IDS
         ):
             artifacts.append(
                 UnavailableReportArtifact(
@@ -1040,18 +1121,24 @@ def _build_artifacts_for_section(
 
         # Section is COMPLETE, PARTIAL, or EMPTY — try to resolve the pointer
         resolved = False
+        root_document = select_report_source_document(
+            envelope=envelope,
+            source_document=source_doc,
+        )
+        source_document_digest = sha256_digest(root_document)
         for pointer in pointer_candidates:
             try:
-                value = resolve_source_pointer(envelope_dict, pointer)
+                value = resolve_source_pointer(root_document, pointer)
                 canonical_raw = _canonical_raw(value)
+                authority_digest = sha256_digest(value)
                 artifacts.append(
                     PresentReportArtifact(
                         kind=ReportArtifactKind.PRESENT,
                         artifact_id=artifact_id,
                         source_document=source_doc,
-                        source_document_digest=sha256_digest(envelope_dict),
+                        source_document_digest=source_document_digest,
                         source_json_pointer=pointer,
-                        authority_digest=sha256_digest(value),
+                        authority_digest=authority_digest,
                         canonical_raw_value=canonical_raw,
                         formatter_id="default",
                         formatter_version="1.0",
@@ -1077,18 +1164,17 @@ def _build_artifacts_for_section(
 
 
 def _build_sections_from_envelope(
-    envelope: Any,
+    envelope: RatingRunEnvelope | SizingRunEnvelope,
 ) -> tuple[ReportSection, ...]:
     """Build exactly 13 report sections from a run envelope."""
     section_statuses = _build_section_statuses(envelope)
-    envelope_dict = envelope.model_dump(mode="json")
 
     sections: list[ReportSection] = []
     for section_id in REPORT_SECTION_ORDER:
         status = section_statuses[section_id]
         title = _SECTION_TITLES[section_id]
         content = _section_content(section_id, envelope, status)
-        artifacts = _build_artifacts_for_section(section_id, envelope_dict, section_statuses)
+        artifacts = _build_artifacts_for_section(section_id, envelope, section_statuses)
         sections.append(
             ReportSection(
                 section_id=section_id,
@@ -1108,12 +1194,17 @@ def _build_sections_from_envelope(
 
 
 def _verify_mandatory_artifacts(model: ReportModel | DoublePipeReportModel) -> None:
-    """B4: Verify mandatory artifacts are present and correctly placed."""
+    """B4: Verify mandatory artifacts are present, correctly placed, and PresentReportArtifact."""
     seen: dict[ReportArtifactId, ReportSectionId] = {}
 
     for section in model.sections:
         for artifact in section.artifacts:
             aid = artifact.artifact_id
+            if aid in MANDATORY_ARTIFACT_IDS and not isinstance(artifact, PresentReportArtifact):
+                raise ValueError(
+                    f"Mandatory artifact {aid.value!r} must be PresentReportArtifact, "
+                    f"got {type(artifact).__name__}"
+                )
             if aid in seen:
                 raise ValueError(
                     f"Duplicate artifact ID {aid.value!r}: "
@@ -1138,16 +1229,34 @@ def _verify_mandatory_artifacts(model: ReportModel | DoublePipeReportModel) -> N
 
 def _verify_source_pointers(
     model: ReportModel | DoublePipeReportModel,
-    envelope_dict: dict[str, Any],
+    envelope: RatingRunEnvelope | SizingRunEnvelope,
 ) -> None:
-    """B5: Resolve source pointers and verify canonical raw values."""
+    """B5: Resolve source pointers against per-document roots and verify.
+
+    Verifies: source_document_digest, source_json_pointer resolution,
+    canonical_raw_value, authority_digest.
+    """
     for section in model.sections:
         for artifact in section.artifacts:
             if isinstance(artifact, PresentReportArtifact):
                 # Validate pointer format
                 validate_rfc6901_pointer(artifact.source_json_pointer)
-                # Resolve and verify
-                resolved = resolve_source_pointer(envelope_dict, artifact.source_json_pointer)
+                # Get root document for this artifact's source_document
+                root_document = select_report_source_document(
+                    envelope=envelope,
+                    source_document=artifact.source_document,
+                )
+                # Verify source_document_digest matches
+                expected_doc_digest = sha256_digest(root_document)
+                if artifact.source_document_digest != expected_doc_digest:
+                    raise ValueError(
+                        f"Artifact {artifact.artifact_id.value!r}: "
+                        f"source_document_digest mismatch. "
+                        f"Expected {expected_doc_digest!r}, "
+                        f"got {artifact.source_document_digest!r}"
+                    )
+                # Resolve against root document and verify
+                resolved = resolve_source_pointer(root_document, artifact.source_json_pointer)
                 expected_raw = _canonical_raw(resolved)
                 if artifact.canonical_raw_value != expected_raw:
                     raise ValueError(
@@ -1155,6 +1264,15 @@ def _verify_source_pointers(
                         f"canonical_raw_value mismatch. "
                         f"Expected {expected_raw!r}, "
                         f"got {artifact.canonical_raw_value!r}"
+                    )
+                # Verify authority_digest matches
+                expected_auth_digest = sha256_digest(resolved)
+                if artifact.authority_digest != expected_auth_digest:
+                    raise ValueError(
+                        f"Artifact {artifact.artifact_id.value!r}: "
+                        f"authority_digest mismatch. "
+                        f"Expected {expected_auth_digest!r}, "
+                        f"got {artifact.authority_digest!r}"
                     )
 
 
@@ -1244,7 +1362,7 @@ def build_report_html(record: RunRecord) -> bytes:
         source_artifact_bundle_digest=source_artifact_bundle_digest,
         template_id="double_pipe_v1",
         template_version="1.0.0",
-        template_definition_hash=sha256_digest("double_pipe_template"),
+        template_definition_hash=REPORT_TEMPLATE_DEFINITION_HASH,
         formatter_registry_version="1.0.0",
     )
 
@@ -1267,8 +1385,7 @@ def build_report_html(record: RunRecord) -> bytes:
     _verify_mandatory_artifacts(model)
 
     # 10. Verify source pointers and canonical raw values
-    envelope_dict = envelope.model_dump(mode="json")
-    _verify_source_pointers(model, envelope_dict)
+    _verify_source_pointers(model, envelope)
 
     # 11. Verify report hashes
     recomputed_content = compute_report_content_hash(model.sections)
@@ -1407,6 +1524,8 @@ __all__ = [
     "OutOfScopeReportArtifact",
     "PresentReportArtifact",
     "REPORT_SECTION_ORDER",
+    "REPORT_TEMPLATE_DEFINITION",
+    "REPORT_TEMPLATE_DEFINITION_HASH",
     "ReportArtifact",
     "ReportArtifactId",
     "ReportArtifactKind",
@@ -1424,6 +1543,7 @@ __all__ = [
     "derive_source_state",
     "render_report_html",
     "resolve_source_pointer",
+    "select_report_source_document",
     "validate_rfc6901_pointer",
     "verify_report_section_status_matrix",
 ]
