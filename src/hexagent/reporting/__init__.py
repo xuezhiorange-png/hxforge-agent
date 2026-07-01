@@ -147,7 +147,7 @@ class ReportArtifactId(StrEnum):
 
 
 # ---------------------------------------------------------------------------
-# Artifact variant models (B1)
+# Artifact variant models (B1, P0-5)
 # ---------------------------------------------------------------------------
 
 
@@ -165,10 +165,10 @@ class PresentReportArtifact(StrictBaseModel):
     canonical_raw_value: str
     source_unit: str | None = None
     display_unit: str | None = None
-    formatter_id: str = ""
-    formatter_version: str = ""
-    rounding_mode: str = ""
-    formatted_display_value: str = ""
+    formatter_id: str
+    formatter_version: str
+    rounding_mode: str
+    formatted_display_value: str
 
 
 class UnavailableReportArtifact(StrictBaseModel):
@@ -178,10 +178,8 @@ class UnavailableReportArtifact(StrictBaseModel):
 
     kind: Literal[ReportArtifactKind.NOT_AVAILABLE]
     artifact_id: ReportArtifactId
-    source_document: ReportSourceDocument
-    source_document_digest: str = ""
-    source_json_pointer: str = ""
-    authority_digest: str = ""
+    reason_code: str
+    capability: str
 
 
 class NotImplementedReportArtifact(StrictBaseModel):
@@ -191,10 +189,7 @@ class NotImplementedReportArtifact(StrictBaseModel):
 
     kind: Literal[ReportArtifactKind.NOT_IMPLEMENTED]
     artifact_id: ReportArtifactId
-    source_document: ReportSourceDocument
-    source_document_digest: str = ""
-    source_json_pointer: str = ""
-    authority_digest: str = ""
+    capability: str
 
 
 class OutOfScopeReportArtifact(StrictBaseModel):
@@ -204,10 +199,7 @@ class OutOfScopeReportArtifact(StrictBaseModel):
 
     kind: Literal[ReportArtifactKind.OUT_OF_SCOPE]
     artifact_id: ReportArtifactId
-    source_document: ReportSourceDocument
-    source_document_digest: str = ""
-    source_json_pointer: str = ""
-    authority_digest: str = ""
+    capability: str
 
 
 # ---------------------------------------------------------------------------
@@ -556,44 +548,98 @@ def resolve_source_pointer(obj: Any, pointer: str) -> Any:
 
 
 # =========================================================================
-# B6 — Report Hashes
+# B6 — Report Hashes (P0-6: frozen ReportInstanceIdentity + DoublePipeReportModel)
 # =========================================================================
 
 
 @dataclass(frozen=True, slots=True)
 class ReportInstanceIdentity:
-    """Identity model for a report instance."""
+    """Identity model for a report instance — 11-field frozen contract."""
 
+    report_schema_version: str  # Literal['1']
     report_content_hash: str
-    report_schema_version: str
     run_id: UUID
-    operation: str
+    request_digest: str
+    source_run_envelope_digest: str
+    source_domain_result_hash: str
+    source_artifact_bundle_digest: str
+    template_id: str
+    template_version: str
+    template_definition_hash: str
+    formatter_registry_version: str
 
 
 def compute_report_content_hash(sections: tuple[ReportSection, ...]) -> str:
-    """Compute deterministic content hash over section data."""
-    payload = tuple((s.section_id.value, s.status.value, s.content) for s in sections)
-    return sha256_digest(payload)
+    """Compute deterministic content hash over section data.
+
+    Includes all artifact fields: section_id, status, ordered artifacts,
+    and every variant field.
+    """
+    payload_sections: list[dict[str, Any]] = []
+    for s in sections:
+        artifact_list: list[dict[str, Any]] = []
+        for a in s.artifacts:
+            artifact_dict: dict[str, Any] = {
+                "kind": a.kind.value,
+                "artifact_id": a.artifact_id.value,
+            }
+            if isinstance(a, PresentReportArtifact):
+                artifact_dict["source_document"] = a.source_document.value
+                artifact_dict["source_document_digest"] = a.source_document_digest
+                artifact_dict["source_json_pointer"] = a.source_json_pointer
+                artifact_dict["authority_digest"] = a.authority_digest
+                artifact_dict["canonical_raw_value"] = a.canonical_raw_value
+                artifact_dict["formatter_id"] = a.formatter_id
+                artifact_dict["formatter_version"] = a.formatter_version
+                artifact_dict["rounding_mode"] = a.rounding_mode
+                artifact_dict["formatted_display_value"] = a.formatted_display_value
+                if a.source_unit is not None:
+                    artifact_dict["source_unit"] = a.source_unit
+                if a.display_unit is not None:
+                    artifact_dict["display_unit"] = a.display_unit
+            elif isinstance(a, UnavailableReportArtifact):
+                artifact_dict["reason_code"] = a.reason_code
+                artifact_dict["capability"] = a.capability
+            elif isinstance(a, (NotImplementedReportArtifact, OutOfScopeReportArtifact)):
+                artifact_dict["capability"] = a.capability
+            artifact_list.append(artifact_dict)
+        payload_sections.append(
+            {
+                "section_id": s.section_id.value,
+                "status": s.status.value,
+                "artifacts": artifact_list,
+            }
+        )
+    return sha256_digest({"sections": payload_sections})
 
 
 def compute_report_instance_hash(identity: ReportInstanceIdentity) -> str:
-    """SHA256 of the identity model."""
-    return sha256_digest(
-        {
-            "report_content_hash": identity.report_content_hash,
-            "report_schema_version": identity.report_schema_version,
-            "run_id": str(identity.run_id),
-            "operation": identity.operation,
-        }
-    )
+    """SHA256 of the ReportInstanceIdentity.
+
+    instance hash = sha256_digest(report_instance_identity).
+    """
+    identity_dict: dict[str, Any] = {
+        "report_schema_version": identity.report_schema_version,
+        "report_content_hash": identity.report_content_hash,
+        "run_id": str(identity.run_id),
+        "request_digest": identity.request_digest,
+        "source_run_envelope_digest": identity.source_run_envelope_digest,
+        "source_domain_result_hash": identity.source_domain_result_hash,
+        "source_artifact_bundle_digest": identity.source_artifact_bundle_digest,
+        "template_id": identity.template_id,
+        "template_version": identity.template_version,
+        "template_definition_hash": identity.template_definition_hash,
+        "formatter_registry_version": identity.formatter_registry_version,
+    }
+    return sha256_digest(identity_dict)
 
 
 # =========================================================================
-# ReportModel (B1 + B2 validation)
+# ReportModel — DoublePipeReportModel (P0-6)
 # =========================================================================
 
 
-class ReportModel(StrictBaseModel):
+class DoublePipeReportModel(StrictBaseModel):
     """Deterministic report model built from a verified envelope.
 
     Frozen: once constructed the model cannot be mutated, which
@@ -606,14 +652,14 @@ class ReportModel(StrictBaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    run_id: UUID
-    operation: str
+    report_schema_version: Literal["1"]
     sections: tuple[ReportSection, ...]
-    content_hash: str
-    section_order: tuple[ReportSectionId, ...]
+    report_instance_identity: ReportInstanceIdentity
+    report_content_hash: str
+    report_instance_hash: str
 
     @model_validator(mode="after")
-    def _validate_sections(self) -> ReportModel:
+    def _validate_sections(self) -> DoublePipeReportModel:
         """B2: Validate exactly 13 sections in correct order."""
         if len(self.sections) != 13:
             raise ValueError(f"Expected 13 sections, got {len(self.sections)}")
@@ -624,11 +670,15 @@ class ReportModel(StrictBaseModel):
         return self
 
 
+# Backward-compatible alias
+ReportModel = DoublePipeReportModel
+
+
 # =========================================================================
-# B3 — Section/Status Matrix Verification
+# B3 — Section/Status Matrix Verification (P0-4: exact frozen contract)
 # =========================================================================
 
-# Rating matrices keyed by source_state
+# Rating matrices keyed by source_state — EXACT values from frozen contract
 _RATING_MATRIX: dict[str, dict[ReportSectionId, ReportSectionStatus]] = {
     "rating_succeeded": {
         ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
@@ -640,84 +690,76 @@ _RATING_MATRIX: dict[str, dict[ReportSectionId, ReportSectionStatus]] = {
         ReportSectionId.SIZING_RANKING: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.WARNINGS: ReportSectionStatus.COMPLETE,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.EMPTY,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
         ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
     "rating_blocked": {
-        ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
+        ReportSectionId.STATUS_BANNER: ReportSectionStatus.BLOCKED,
         ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
         ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
-        ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.GEOMETRY: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.SIZING_RANKING: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.WARNINGS: ReportSectionStatus.BLOCKED,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.BLOCKED,
+        ReportSectionId.WARNINGS: ReportSectionStatus.PARTIAL,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
         ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
     "rating_failed": {
-        ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
+        ReportSectionId.STATUS_BANNER: ReportSectionStatus.BLOCKED,
         ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
         ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
-        ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.GEOMETRY: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.PARTIAL,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.PARTIAL,
         ReportSectionId.SIZING_RANKING: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.NOT_APPLICABLE,
-        ReportSectionId.WARNINGS: ReportSectionStatus.COMPLETE,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.WARNINGS: ReportSectionStatus.PARTIAL,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.PARTIAL,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.COMPLETE,
         ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
         ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
 }
 
-# Sizing matrices keyed by source_state
+# Sizing matrices keyed by source_state — EXACT values from frozen contract
 _SIZING_MATRIX: dict[str, dict[ReportSectionId, ReportSectionStatus]] = {
     "sizing_complete": {
         ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
         ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
         ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
         ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.SIZING_RANKING: ReportSectionStatus.COMPLETE,
         ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.COMPLETE,
         ReportSectionId.WARNINGS: ReportSectionStatus.COMPLETE,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.EMPTY,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
         ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
     "sizing_partial": {
-        ReportSectionId.STATUS_BANNER: ReportSectionStatus.COMPLETE,
+        ReportSectionId.STATUS_BANNER: ReportSectionStatus.PARTIAL,
         ReportSectionId.RUN_IDENTITY: ReportSectionStatus.COMPLETE,
         ReportSectionId.INPUT_SUMMARY: ReportSectionStatus.COMPLETE,
-        ReportSectionId.GEOMETRY: ReportSectionStatus.COMPLETE,
-        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.COMPLETE,
-        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.COMPLETE,
+        ReportSectionId.GEOMETRY: ReportSectionStatus.PARTIAL,
+        ReportSectionId.HEAT_BALANCE: ReportSectionStatus.NOT_APPLICABLE,
+        ReportSectionId.THERMAL_PERFORMANCE: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.SIZING_RANKING: ReportSectionStatus.PARTIAL,
         ReportSectionId.TOP_RANKED_CANDIDATES: ReportSectionStatus.PARTIAL,
         ReportSectionId.WARNINGS: ReportSectionStatus.COMPLETE,
-        ReportSectionId.BLOCKERS: ReportSectionStatus.COMPLETE,
+        ReportSectionId.BLOCKERS: ReportSectionStatus.PARTIAL,
         ReportSectionId.FAILURE_DETAILS: ReportSectionStatus.NOT_APPLICABLE,
         ReportSectionId.PROVENANCE: ReportSectionStatus.COMPLETE,
         ReportSectionId.INTEGRITY: ReportSectionStatus.COMPLETE,
     },
 }
-
-# Sections where COMPLETE or EMPTY are both acceptable in rating_succeeded
-_FLEXIBLE_SECTIONS: frozenset[ReportSectionId] = frozenset(
-    {
-        ReportSectionId.WARNINGS,
-        ReportSectionId.BLOCKERS,
-    }
-)
 
 
 def _get_expected_matrix(
@@ -731,49 +773,11 @@ def _get_expected_matrix(
     return matrix
 
 
-def verify_report_section_status_matrix(
-    model: ReportModel,
-    operation: str,
-    source_state: str,
-) -> None:
-    """Verify each section's status matches the expected matrix.
+def derive_source_state(envelope: Any) -> str:
+    """Determine the source_state string from an envelope.
 
-    For ``rating_succeeded``, warnings and blockers sections accept
-    either COMPLETE or EMPTY (depending on whether data exists).
-
-    Raises :class:`ValueError` on any mismatch.
+    This implements the envelope-derived source_state derivation (P0-6).
     """
-    expected = _get_expected_matrix(source_state)
-    for section in model.sections:
-        if section.section_id not in expected:
-            raise ValueError(f"Unexpected section {section.section_id.value}")
-        exp = expected[section.section_id]
-        actual = section.status
-        # Flexible: warnings and blockers can be COMPLETE or EMPTY in
-        # rating_succeeded mode (depends on whether data exists)
-        if source_state == "rating_succeeded" and section.section_id in _FLEXIBLE_SECTIONS:
-            if actual not in (
-                ReportSectionStatus.COMPLETE,
-                ReportSectionStatus.EMPTY,
-            ):
-                raise ValueError(
-                    f"Section {section.section_id.value}: "
-                    f"expected COMPLETE or EMPTY, got {actual.value}"
-                )
-        elif actual != exp:
-            raise ValueError(
-                f"Section {section.section_id.value}: "
-                f"expected status {exp.value}, got {actual.value}"
-            )
-
-
-# =========================================================================
-# Section/Artifact Building Helpers
-# =========================================================================
-
-
-def _determine_source_state(envelope: Any) -> str:
-    """Determine the source_state string from an envelope."""
     operation = envelope.operation
     if operation == "rateDoublePipe":
         failure = getattr(envelope, "failure", None)
@@ -794,25 +798,36 @@ def _determine_source_state(envelope: Any) -> str:
     raise ValueError(f"Unsupported operation for status matrix: {operation!r}")
 
 
-def _build_section_statuses(
-    envelope: Any,
-) -> dict[ReportSectionId, ReportSectionStatus]:
-    """Build the expected section status map from the envelope."""
-    source_state = _determine_source_state(envelope)
-    matrix = _get_expected_matrix(source_state)
+def verify_report_section_status_matrix(
+    model: ReportModel | DoublePipeReportModel,
+    operation: str,
+    source_envelope: Any,
+) -> None:
+    """Verify each section's status matches the exact frozen contract matrix.
 
-    # For rating_succeeded, override warnings/blockers based on actual data
-    if source_state == "rating_succeeded":
-        warnings = getattr(envelope, "warnings", ())
-        blockers = getattr(envelope, "blockers", ())
-        matrix = dict(matrix)
-        matrix[ReportSectionId.WARNINGS] = (
-            ReportSectionStatus.COMPLETE if warnings else ReportSectionStatus.EMPTY
-        )
-        matrix[ReportSectionId.BLOCKERS] = (
-            ReportSectionStatus.COMPLETE if blockers else ReportSectionStatus.EMPTY
-        )
-    return matrix
+    Accepts a source_envelope and derives source_state internally via
+    :func:`derive_source_state`.  No flexible matching — every cell
+    must match exactly.
+
+    Raises :class:`ValueError` on any mismatch.
+    """
+    source_state = derive_source_state(source_envelope)
+    expected = _get_expected_matrix(source_state)
+    for section in model.sections:
+        if section.section_id not in expected:
+            raise ValueError(f"Unexpected section {section.section_id.value}")
+        exp = expected[section.section_id]
+        actual = section.status
+        if actual != exp:
+            raise ValueError(
+                f"Section {section.section_id.value}: "
+                f"expected status {exp.value}, got {actual.value}"
+            )
+
+
+# =========================================================================
+# Section/Artifact Building Helpers
+# =========================================================================
 
 
 def _section_content(
@@ -987,6 +1002,15 @@ def _canonical_raw(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
+def _build_section_statuses(
+    envelope: Any,
+) -> dict[ReportSectionId, ReportSectionStatus]:
+    """Build the expected section status map from the envelope."""
+    source_state = derive_source_state(envelope)
+    matrix = _get_expected_matrix(source_state)
+    return matrix
+
+
 def _build_artifacts_for_section(
     section_id: ReportSectionId,
     envelope_dict: dict[str, Any],
@@ -1008,7 +1032,8 @@ def _build_artifacts_for_section(
                 UnavailableReportArtifact(
                     kind=ReportArtifactKind.NOT_AVAILABLE,
                     artifact_id=artifact_id,
-                    source_document=source_doc,
+                    reason_code="section_not_available",
+                    capability=section_status.value,
                 )
             )
             continue
@@ -1028,6 +1053,10 @@ def _build_artifacts_for_section(
                         source_json_pointer=pointer,
                         authority_digest=sha256_digest(value),
                         canonical_raw_value=canonical_raw,
+                        formatter_id="default",
+                        formatter_version="1.0",
+                        rounding_mode="round",
+                        formatted_display_value=canonical_raw,
                     )
                 )
                 resolved = True
@@ -1039,7 +1068,8 @@ def _build_artifacts_for_section(
                 UnavailableReportArtifact(
                     kind=ReportArtifactKind.NOT_AVAILABLE,
                     artifact_id=artifact_id,
-                    source_document=source_doc,
+                    reason_code="pointer_not_resolved",
+                    capability=section_status.value,
                 )
             )
 
@@ -1077,7 +1107,7 @@ def _build_sections_from_envelope(
 # =========================================================================
 
 
-def _verify_mandatory_artifacts(model: ReportModel) -> None:
+def _verify_mandatory_artifacts(model: ReportModel | DoublePipeReportModel) -> None:
     """B4: Verify mandatory artifacts are present and correctly placed."""
     seen: dict[ReportArtifactId, ReportSectionId] = {}
 
@@ -1106,7 +1136,10 @@ def _verify_mandatory_artifacts(model: ReportModel) -> None:
             )
 
 
-def _verify_source_pointers(model: ReportModel, envelope_dict: dict[str, Any]) -> None:
+def _verify_source_pointers(
+    model: ReportModel | DoublePipeReportModel,
+    envelope_dict: dict[str, Any],
+) -> None:
     """B5: Resolve source pointers and verify canonical raw values."""
     for section in model.sections:
         for artifact in section.artifacts:
@@ -1194,18 +1227,41 @@ def build_report_html(record: RunRecord) -> bytes:
     # Compute content hash
     content_hash = compute_report_content_hash(sections)
 
-    # Build model (triggers B2 section validation)
-    model = ReportModel(
+    # Build identity (P0-6: 11-field version)
+    source_run_envelope_digest = sha256_digest(envelope.model_dump(mode="json"))
+    source_domain_result_hash = (
+        envelope.result.result_hash if hasattr(envelope.result, "result_hash") else ""
+    )
+    source_artifact_bundle_digest = envelope.artifact_bundle_digest
+
+    instance_identity = ReportInstanceIdentity(
+        report_schema_version="1",
+        report_content_hash=content_hash,
         run_id=envelope.run_id,
-        operation=operation,
-        sections=sections,
-        content_hash=content_hash,
-        section_order=REPORT_SECTION_ORDER,
+        request_digest=envelope.request_digest,
+        source_run_envelope_digest=source_run_envelope_digest,
+        source_domain_result_hash=source_domain_result_hash,
+        source_artifact_bundle_digest=source_artifact_bundle_digest,
+        template_id="double_pipe_v1",
+        template_version="1.0.0",
+        template_definition_hash=sha256_digest("double_pipe_template"),
+        formatter_registry_version="1.0.0",
     )
 
-    # 8. Verify section/status matrix
-    source_state = _determine_source_state(envelope)
-    verify_report_section_status_matrix(model, operation, source_state)
+    # Instance hash = sha256_digest(report_instance_identity)
+    report_instance_hash = compute_report_instance_hash(instance_identity)
+
+    # Build DoublePipeReportModel (P0-6)
+    model = DoublePipeReportModel(
+        report_schema_version="1",
+        sections=sections,
+        report_instance_identity=instance_identity,
+        report_content_hash=content_hash,
+        report_instance_hash=report_instance_hash,
+    )
+
+    # 8. Verify section/status matrix (P0-6: accepts source_envelope)
+    verify_report_section_status_matrix(model, operation, envelope)
 
     # 9. Verify mandatory artifacts (exactly 5 present, correct owners)
     _verify_mandatory_artifacts(model)
@@ -1219,13 +1275,10 @@ def build_report_html(record: RunRecord) -> bytes:
     if recomputed_content != content_hash:
         raise ValueError("Content hash recomputation mismatch")
 
-    instance_identity = ReportInstanceIdentity(
-        report_content_hash=content_hash,
-        report_schema_version="1.0",
-        run_id=envelope.run_id,
-        operation=operation,
-    )
-    compute_report_instance_hash(instance_identity)
+    # Verify instance hash
+    recomputed_instance_hash = compute_report_instance_hash(instance_identity)
+    if recomputed_instance_hash != report_instance_hash:
+        raise ValueError("Instance hash recomputation mismatch")
 
     # 12. Render HTML
     return render_report_html(model)
@@ -1266,7 +1319,7 @@ def _escape(text: str) -> str:
     return _html.escape(text, quote=True)
 
 
-def render_report_html(model: ReportModel) -> bytes:
+def render_report_html(model: ReportModel | DoublePipeReportModel) -> bytes:
     """Render a :class:`ReportModel` to deterministic HTML bytes.
 
     Contract guarantees (B8):
@@ -1282,7 +1335,7 @@ def render_report_html(model: ReportModel) -> bytes:
     parts: list[str] = []
     parts.append('<!DOCTYPE html>\n<html lang="en">\n<head>')
     parts.append('<meta charset="utf-8">')
-    parts.append(f"<title>Run Report {_escape(str(model.run_id))}</title>")
+    parts.append(f"<title>Run Report {_escape(str(model.report_instance_identity.run_id))}</title>")
     parts.append(
         "<style>"
         "body{font-family:monospace;margin:2em}"
@@ -1301,11 +1354,15 @@ def render_report_html(model: ReportModel) -> bytes:
 
     # Header
     parts.append("<h1>Run Report</h1>")
-    parts.append(f"<p><strong>Run ID:</strong> {_escape(str(model.run_id))}</p>")
-    parts.append(f"<p><strong>Operation:</strong> {_escape(model.operation)}</p>")
+    run_id_str = _escape(str(model.report_instance_identity.run_id))
+    parts.append(f"<p><strong>Run ID:</strong> {run_id_str}</p>")
     parts.append(
         f"<p><strong>Content Hash:</strong> "
-        f'<span class="hash">{_escape(model.content_hash)}</span></p>'
+        f'<span class="hash">{_escape(model.report_content_hash)}</span></p>'
+    )
+    parts.append(
+        f"<p><strong>Instance Hash:</strong> "
+        f'<span class="hash">{_escape(model.report_instance_hash)}</span></p>'
     )
 
     # Sections (order is deterministic because the tuple is frozen)
@@ -1360,9 +1417,11 @@ __all__ = [
     "ReportSectionStatus",
     "ReportSourceDocument",
     "UnavailableReportArtifact",
+    "DoublePipeReportModel",
     "build_report_html",
     "compute_report_content_hash",
     "compute_report_instance_hash",
+    "derive_source_state",
     "render_report_html",
     "resolve_source_pointer",
     "validate_rfc6901_pointer",

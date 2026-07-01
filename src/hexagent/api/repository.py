@@ -45,6 +45,26 @@ if TYPE_CHECKING:
 _RunEnvelope: TypeAlias = "ValidationRunEnvelope | RatingRunEnvelope | SizingRunEnvelope"
 _ArtifactBundle: TypeAlias = "RatingRunArtifacts | SizingRunArtifacts"
 
+
+# ---------------------------------------------------------------------------
+# Recomputed bundle digest helpers (P0-3 trust boundary)
+# ---------------------------------------------------------------------------
+
+
+def _recompute_rating_bundle_digest(artifact_bundle: RatingRunArtifacts) -> str:
+    """Recompute the rating artifact bundle digest for parity verification."""
+    from hexagent.api.artifacts import compute_rating_artifact_bundle_digest
+
+    return compute_rating_artifact_bundle_digest(artifact_bundle)
+
+
+def _recompute_sizing_bundle_digest(artifact_bundle: SizingRunArtifacts) -> str:
+    """Recompute the sizing artifact bundle digest for parity verification."""
+    from hexagent.api.artifacts import compute_sizing_artifact_bundle_digest
+
+    return compute_sizing_artifact_bundle_digest(artifact_bundle)
+
+
 # ---------------------------------------------------------------------------
 # Frozen failure payload (C5) — stores exact HTTP failure for replay
 # ---------------------------------------------------------------------------
@@ -463,41 +483,21 @@ class InMemoryRunRepository:
             if record.state != RunState.RUNNING:
                 raise RepositoryStateError(f"complete() requires RUNNING state, got {record.state}")
 
-            # Operation parity
-            if hasattr(envelope, "operation") and envelope.operation != record.operation:
-                raise RepositoryStateError("envelope.operation != record.operation")
-
-            # Request digest parity
-            if (
-                hasattr(envelope, "request_digest")
-                and envelope.request_digest != record.request_digest
-            ):  # noqa: E501
-                raise IdempotencyConflictError("envelope.request_digest mismatch")
-
-            # Bundle type check
+            # ---- Typed operation dispatch (P0-3) ----
             if record.operation == "rateDoublePipe":
-                from hexagent.api.artifacts import RatingRunArtifacts
-
-                if artifact_bundle is not None and not isinstance(
-                    artifact_bundle, RatingRunArtifacts
-                ):  # noqa: E501
-                    raise RepositoryStateError("rateDoublePipe requires RatingRunArtifacts")
+                self._complete_rating(
+                    record=record,
+                    envelope=envelope,
+                    artifact_bundle=artifact_bundle,
+                )
             elif record.operation == "sizeDoublePipe":
-                from hexagent.api.artifacts import SizingRunArtifacts
-
-                if artifact_bundle is not None and not isinstance(
-                    artifact_bundle, SizingRunArtifacts
-                ):  # noqa: E501
-                    raise RepositoryStateError("sizeDoublePipe requires SizingRunArtifacts")
-
-            # Bundle identity (value equality, not reference)
-            if (
-                hasattr(envelope, "artifact_bundle")
-                and envelope.artifact_bundle is not None
-                and artifact_bundle is not None
-                and envelope.artifact_bundle != artifact_bundle
-            ):
-                raise RepositoryStateError("envelope.artifact_bundle != artifact_bundle")
+                self._complete_sizing(
+                    record=record,
+                    envelope=envelope,
+                    artifact_bundle=artifact_bundle,
+                )
+            else:
+                raise RepositoryStateError(f"complete() unsupported operation: {record.operation}")
 
             # Store and transition
             now = self._now()
@@ -509,6 +509,146 @@ class InMemoryRunRepository:
                 artifact_bundle=artifact_bundle,
             )
             return new_record
+
+    # -- typed complete sub-dispatchers (P0-3) --------------------------------
+
+    def _complete_rating(
+        self,
+        *,
+        record: RunRecord,
+        envelope: _RunEnvelope,
+        artifact_bundle: _ArtifactBundle,
+    ) -> None:
+        """RATING-specific complete: typed dispatch + full parity (P0-3)."""
+        from hexagent.api.artifacts import RatingRunArtifacts, verify_rating_artifact_bundle
+        from hexagent.api.envelopes import RatingRunEnvelope
+
+        # 1. Typed isinstance checks
+        if not isinstance(envelope, RatingRunEnvelope):
+            raise RepositoryStateError(
+                f"rateDoublePipe requires RatingRunEnvelope, got {type(envelope).__name__}"  # noqa: E501
+            )
+        if not isinstance(artifact_bundle, RatingRunArtifacts):
+            raise RepositoryStateError(
+                f"rateDoublePipe requires RatingRunArtifacts, got {type(artifact_bundle).__name__}"  # noqa: E501
+            )
+
+        # 2. Operation parity
+        if envelope.operation != record.operation:
+            raise ValueError(
+                f"envelope.operation {envelope.operation!r} != record.operation {record.operation!r}"  # noqa: E501
+            )
+
+        # 3. Request digest parity
+        if envelope.request_digest != record.request_digest:
+            raise ValueError(
+                f"envelope.request_digest {envelope.request_digest!r} != record.request_digest {record.request_digest!r}"  # noqa: E501
+            )
+
+        # 4. Bundle identity (value equality)
+        if envelope.artifact_bundle != artifact_bundle:
+            raise ValueError("envelope.artifact_bundle != artifact_bundle")
+
+        # 5. Result parity
+        if artifact_bundle.result != envelope.result:
+            raise ValueError("artifact_bundle.result != envelope.result")
+
+        # 6. artifact_bundle_digest parity
+        if artifact_bundle.artifact_bundle_digest != envelope.artifact_bundle_digest:
+            raise ValueError(
+                "artifact_bundle.artifact_bundle_digest != envelope.artifact_bundle_digest"  # noqa: E501
+            )
+
+        # 7. Recomputed bundle digest parity
+        recomputed = _recompute_rating_bundle_digest(artifact_bundle)
+        if recomputed != envelope.artifact_bundle_digest:
+            raise ValueError(
+                f"recomputed bundle digest {recomputed!r} != envelope.artifact_bundle_digest {envelope.artifact_bundle_digest!r}"  # noqa: E501
+            )
+
+        # 8. Provenance parity
+        if artifact_bundle.provenance_graph != envelope.provenance:
+            raise ValueError("artifact_bundle.provenance_graph != envelope.provenance")
+
+        # 9. result_hash parity
+        if envelope.result.result_hash != envelope.result_hash:
+            raise ValueError("result.result_hash != envelope.result_hash")
+
+        # 10. provenance_digest parity
+        if envelope.result.provenance_digest != envelope.provenance_digest:
+            raise ValueError("result.provenance_digest != envelope.provenance_digest")
+
+        # 11. Full bundle verification
+        verify_rating_artifact_bundle(artifact_bundle)
+
+    def _complete_sizing(
+        self,
+        *,
+        record: RunRecord,
+        envelope: _RunEnvelope,
+        artifact_bundle: _ArtifactBundle,
+    ) -> None:
+        """SIZING-specific complete: typed dispatch + full parity (P0-3)."""
+        from hexagent.api.artifacts import SizingRunArtifacts, verify_sizing_artifact_bundle
+        from hexagent.api.envelopes import SizingRunEnvelope
+
+        # 1. Typed isinstance checks
+        if not isinstance(envelope, SizingRunEnvelope):
+            raise RepositoryStateError(
+                f"sizeDoublePipe requires SizingRunEnvelope, got {type(envelope).__name__}"  # noqa: E501
+            )
+        if not isinstance(artifact_bundle, SizingRunArtifacts):
+            raise RepositoryStateError(
+                f"sizeDoublePipe requires SizingRunArtifacts, got {type(artifact_bundle).__name__}"  # noqa: E501
+            )
+
+        # 2. Operation parity
+        if envelope.operation != record.operation:
+            raise ValueError(
+                f"envelope.operation {envelope.operation!r} != record.operation {record.operation!r}"  # noqa: E501
+            )
+
+        # 3. Request digest parity
+        if envelope.request_digest != record.request_digest:
+            raise ValueError(
+                f"envelope.request_digest {envelope.request_digest!r} != record.request_digest {record.request_digest!r}"  # noqa: E501
+            )
+
+        # 4. Bundle identity (value equality)
+        if envelope.artifact_bundle != artifact_bundle:
+            raise ValueError("envelope.artifact_bundle != artifact_bundle")
+
+        # 5. optimization_result parity (sizing uses optimization_result)
+        if artifact_bundle.optimization_result != envelope.result:
+            raise ValueError("artifact_bundle.optimization_result != envelope.result")
+
+        # 6. artifact_bundle_digest parity
+        if artifact_bundle.artifact_bundle_digest != envelope.artifact_bundle_digest:
+            raise ValueError(
+                "artifact_bundle.artifact_bundle_digest != envelope.artifact_bundle_digest"  # noqa: E501
+            )
+
+        # 7. Recomputed bundle digest parity
+        recomputed = _recompute_sizing_bundle_digest(artifact_bundle)
+        if recomputed != envelope.artifact_bundle_digest:
+            raise ValueError(
+                f"recomputed bundle digest {recomputed!r} != envelope.artifact_bundle_digest {envelope.artifact_bundle_digest!r}"  # noqa: E501
+            )
+
+        # 8. Provenance parity
+        if artifact_bundle.provenance_graph != envelope.provenance:
+            raise ValueError("artifact_bundle.provenance_graph != envelope.provenance")
+
+        # 9. result_hash parity
+        if envelope.result.result_hash != envelope.result_hash:
+            raise ValueError("result.result_hash != envelope.result_hash")
+
+        # 10. provenance_digest parity
+        if envelope.result.provenance_digest != envelope.provenance_digest:
+            raise ValueError("result.provenance_digest != envelope.provenance_digest")
+
+        # 11. Full bundle verification
+        verify_sizing_artifact_bundle(artifact_bundle)
 
     def fail(
         self,

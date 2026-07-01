@@ -28,7 +28,7 @@ jobs:
       - run: mypy
       - name: Run TASK-010 tests
         run: |
-          pytest -x --timeout=120 \
+          pytest -x --timeout=120 -n auto \
             tests/unit/test_task010_final.py \
             tests/unit/test_task010_phase1.py \
             tests/unit/test_task010_phase2.py

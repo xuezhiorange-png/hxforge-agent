@@ -60,28 +60,132 @@ def _make_rating_envelope_and_bundle(
     request_digest: str = "req1",
     run_id=None,
 ):
-    """Build minimal RatingRunEnvelope + RatingRunArtifacts for repo tests.
+    """Build RatingRunEnvelope + RatingRunArtifacts for repo tests.
 
-    Uses model_construct() to bypass validators — tests CAS semantics,
-    not data integrity.
+    Uses model_construct() to bypass validators but builds serializable
+    objects so that full parity checks (P0-3) pass, including digest
+    recomputation and verify_rating_artifact_bundle.
     """
-    from uuid import uuid4
-
-    from hexagent.api.artifacts import RatingRunArtifacts
+    from hexagent.api.artifacts import RatingRunArtifacts, compute_rating_artifact_bundle_digest
     from hexagent.api.envelopes import RatingRunEnvelope
+    from hexagent.core.heat_balance import ProviderIdentitySnapshot
+    from hexagent.domain.provenance import ProvenanceGraph
+    from hexagent.exchangers.double_pipe.result import (
+        RatingRequestIdentity,
+        RatingResult,
+        RatingStatus,
+        SolverDetailsModel,
+    )
+    from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 
     _id = run_id or uuid4()
-    result_stub = object()  # shared identity for parity check
+
+    result = RatingResult.model_construct(
+        status=RatingStatus.SUCCEEDED,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=1000.0,
+        hot_outlet_temperature_k=350.0,
+        cold_outlet_temperature_k=310.0,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.1,
+        area_outer_m2=0.15,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        Q_hot_w=None,
+        Q_cold_w=None,
+        relative_energy_residual=None,
+        energy_tolerance_w=None,
+        relative_ua_lmtd_residual=None,
+        ua_lmtd_tolerance_w=None,
+        iterations=1,
+        converged=True,
+        solver_termination_reason="converged",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=1,
+            residual_w=0.0,
+            function_evaluations=1,
+            termination_reason="converged",
+        ),
+        warnings=(),
+        blockers=(),
+        failure=None,
+        property_calls=(),
+        provider_identity=ProviderIdentitySnapshot(
+            name="test",
+            version="1.0",
+            git_revision="abc",
+            reference_state_policy="IAPWS-IF97",
+        ),
+        request_identity=RatingRequestIdentity(
+            hot_fluid_name="Water",
+            hot_fluid_backend="iapws-if97",
+            hot_fluid_components=(),
+            cold_fluid_name="Water",
+            cold_fluid_backend="iapws-if97",
+            cold_fluid_components=(),
+            hot_mass_flow_kg_s=1.0,
+            cold_mass_flow_kg_s=1.0,
+            hot_inlet_pressure_pa=101325.0,
+            cold_inlet_pressure_pa=101325.0,
+            hot_inlet_temperature_k=350.0,
+            cold_inlet_temperature_k=300.0,
+            flow_arrangement="counterflow",
+            geometry={},
+            solver_absolute_residual_w=1e-6,
+            solver_relative_residual_fraction=1e-6,
+            solver_bracket_temperature_tolerance_k=0.01,
+            solver_max_iterations=100,
+        ),
+        result_hash="sha256:hash",
+        provenance_graph=ProvenanceGraph(),
+        provenance_digest="sha256:prov",
+    )
 
     bundle = RatingRunArtifacts.model_construct(
         canonical_request_snapshot={},
-        request_identity=None,
+        request_identity=result.request_identity,
         geometry_snapshot=None,
         solver_settings=None,
-        provider_identity=None,
-        result=result_stub,
-        provenance_graph=None,
-        artifact_bundle_digest="sha256:test",
+        provider_identity=result.provider_identity,
+        result=result,
+        provenance_graph=ProvenanceGraph(),
+        artifact_bundle_digest="",
+    )
+    digest = compute_rating_artifact_bundle_digest(bundle)
+    bundle = RatingRunArtifacts.model_construct(
+        canonical_request_snapshot={},
+        request_identity=result.request_identity,
+        geometry_snapshot=None,
+        solver_settings=None,
+        provider_identity=result.provider_identity,
+        result=result,
+        provenance_graph=ProvenanceGraph(),
+        artifact_bundle_digest=digest,
     )
 
     envelope = RatingRunEnvelope.model_construct(
@@ -91,15 +195,15 @@ def _make_rating_envelope_and_bundle(
         idempotency_key_digest="kid",
         request_digest=request_digest,
         result_kind="rating",
-        result=result_stub,
-        result_hash="sha256:hash",
+        result=result,
+        result_hash=result.result_hash,
         warnings=(),
         blockers=(),
         failure=None,
-        provenance=None,
-        provenance_digest="sha256:prov",
+        provenance=ProvenanceGraph(),
+        provenance_digest=result.provenance_digest,
         artifact_bundle=bundle,
-        artifact_bundle_digest="sha256:test",
+        artifact_bundle_digest=digest,
         report_links=None,
     )
     return envelope, bundle
@@ -1241,3 +1345,515 @@ class TestOpenAPIContract:
                 assert method in paths[path], f"Missing {method} {path}"
         # No extra paths beyond the frozen set
         assert set(paths.keys()) == set(frozen_paths.keys())
+
+
+# ===================================================================
+# P0-3: Repository.complete() trust boundary tamper tests
+# ===================================================================
+
+
+class TestCompleteTrustBoundary:
+    """Tamper tests for the enhanced complete() trust boundary (P0-3).
+
+    Each test creates a RUNNING record, then attempts complete() with
+    a specific tamper.  On ANY failure the record must stay RUNNING,
+    no state transition occurs, and no envelope is stored.
+    """
+
+    def _running_record(self, operation: str = "rateDoublePipe"):
+        """Helper: create a RUNNING record ready for complete()."""
+        repo = InMemoryRunRepository()
+        claim = repo.claim(
+            namespace_digest=f"ns-{operation}",
+            request_digest="req1",
+            operation=operation,
+        )
+        rec = repo.start(
+            owner_token=claim.record.owner_token,
+            expected_version=claim.record.record_version,
+        )
+        return repo, claim.record.owner_token, rec
+
+    def _valid_rating_pair(self, *, request_digest: str = "req1"):
+        """Helper: return a valid (envelope, bundle) for rating."""
+        return _make_rating_envelope_and_bundle(request_digest=request_digest)
+
+    # -- type rejection tests -----------------------------------------------
+
+    def test_complete_rejects_wrong_envelope_type(self):
+        """SizingRunEnvelope for rateDoublePipe → RepositoryStateError."""
+        from hexagent.api.envelopes import ValidationRunEnvelope
+
+        repo, token, rec = self._running_record("rateDoublePipe")
+        wrong_env = ValidationRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="validateCase",
+            run_id=rec.run_id,
+            request_digest="req1",
+            result_kind="validation",
+            result=None,
+            validation_receipt_hash="sha256:x",
+            report_links=None,
+        )
+        env, bundle = self._valid_rating_pair()
+        with pytest.raises(RepositoryStateError, match="RatingRunEnvelope"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=wrong_env,
+                artifact_bundle=bundle,
+            )
+        # Record stays RUNNING
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+        assert stored.completed_at is None
+        assert stored.envelope is None
+        assert stored.artifact_bundle is None
+
+    def test_complete_rejects_wrong_bundle_type(self):
+        """SizingRunArtifacts for rateDoublePipe → RepositoryStateError."""
+        from hexagent.api.artifacts import SizingRunArtifacts
+
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, _bundle = self._valid_rating_pair()
+        wrong_bundle = SizingRunArtifacts.model_construct(
+            canonical_request_snapshot={},
+            sizing_request=None,
+            evaluation_input=None,
+            phase3_authoritative_artifacts=None,
+            dispositions=(),
+            ranked_records=(),
+            top_n_records=(),
+            optimization_result=None,
+            provenance_graph=None,
+            artifact_bundle_digest="sha256:x",
+        )
+        with pytest.raises(RepositoryStateError, match="RatingRunArtifacts"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env,
+                artifact_bundle=wrong_bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_rejects_null_bundle(self):
+        """None artifact_bundle for rateDoublePipe → RepositoryStateError."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, _bundle = self._valid_rating_pair()
+        with pytest.raises(RepositoryStateError, match="RatingRunArtifacts"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env,
+                artifact_bundle=None,  # type: ignore[arg-type]
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    # -- parity rejection tests ---------------------------------------------
+
+    def test_complete_rejects_operation_mismatch(self):
+        """envelope.operation != record.operation → ValueError."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair()
+        # Tamper: use a bundle whose envelope has wrong operation
+        # We construct a new envelope with operation="validateCase"
+        from hexagent.api.envelopes import RatingRunEnvelope
+
+        RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="rateDoublePipe",  # must match for isinstance check
+            run_id=rec.run_id,
+            idempotency_key_digest="kid",
+            request_digest="req1",
+            result_kind="rating",
+            result=env.result,
+            result_hash=env.result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=env.provenance,
+            provenance_digest=env.result.provenance_digest,
+            artifact_bundle=bundle,
+            artifact_bundle_digest=bundle.artifact_bundle_digest,
+            report_links=None,
+        )
+        # The record.operation is "rateDoublePipe" but we'll use a
+        # record with a different operation to test the mismatch
+        repo2, token2, rec2 = self._running_record("rateDoublePipe")
+        # Manually tamper the record's operation by creating a new claim
+        # with a different operation but same namespace
+        # Actually, we can't easily change record.operation after creation.
+        # Instead, test the mismatch by constructing an envelope with
+        # a different operation string in the model_construct
+        # The key check is: envelope.operation != record.operation
+        # Since both are "rateDoublePipe", we need a different approach.
+        # Let's create a record with one operation and try to complete
+        # with an envelope of a different operation.
+        # We can't easily do this without the record having a different
+        # operation. Let's just verify the check exists by testing
+        # request_digest mismatch instead, which is easier to trigger.
+        # Actually, we CAN test this: use model_construct to set
+        # operation to something that won't match
+        env_bad_op = RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="sizeDoublePipe",  # tampered!
+            run_id=rec.run_id,
+            idempotency_key_digest="kid",
+            request_digest="req1",
+            result_kind="rating",
+            result=env.result,
+            result_hash=env.result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=env.provenance,
+            provenance_digest=env.result.provenance_digest,
+            artifact_bundle=bundle,
+            artifact_bundle_digest=bundle.artifact_bundle_digest,
+            report_links=None,
+        )
+        with pytest.raises(ValueError, match="operation"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env_bad_op,
+                artifact_bundle=bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_rejects_request_digest_mismatch(self):
+        """envelope.request_digest != record.request_digest → ValueError."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair(request_digest="DIFFERENT_DIGEST")
+        with pytest.raises(ValueError, match="request_digest"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env,
+                artifact_bundle=bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_rejects_bundle_identity_mismatch(self):
+        """envelope.artifact_bundle != artifact_bundle arg → ValueError."""
+        from hexagent.api.artifacts import RatingRunArtifacts
+
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair()
+        # Construct a second bundle with different canonical_request_snapshot
+        tampered_bundle = RatingRunArtifacts.model_construct(
+            canonical_request_snapshot={"tampered": True},  # different!
+            request_identity=bundle.request_identity,
+            geometry_snapshot=bundle.geometry_snapshot,
+            solver_settings=bundle.solver_settings,
+            provider_identity=bundle.provider_identity,
+            result=bundle.result,
+            provenance_graph=bundle.provenance_graph,
+            artifact_bundle_digest=bundle.artifact_bundle_digest,
+        )
+        # Use envelope from pair1 but artifact_bundle from pair2
+        with pytest.raises(ValueError, match="artifact_bundle"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env,
+                artifact_bundle=tampered_bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_rejects_result_mismatch(self):
+        """artifact_bundle.result != envelope.result → ValueError."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair()
+        # Create a different result object
+        from hexagent.exchangers.double_pipe.result import (
+            RatingResult,
+            RatingStatus,
+            SolverDetailsModel,
+        )
+        from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+        other_result = RatingResult.model_construct(
+            status=RatingStatus.SUCCEEDED,
+            flow_arrangement=FlowArrangement.COUNTERFLOW,
+            heat_duty_w=9999.0,  # different!
+            hot_outlet_temperature_k=350.0,
+            cold_outlet_temperature_k=310.0,
+            tube_reynolds=None,
+            tube_prandtl=None,
+            tube_nusselt=None,
+            tube_h=None,
+            tube_selected_correlation_id=None,
+            tube_selected_correlation_version=None,
+            tube_applicability_status=None,
+            annulus_reynolds=None,
+            annulus_prandtl=None,
+            annulus_nusselt=None,
+            annulus_h=None,
+            annulus_selected_correlation_id=None,
+            annulus_selected_correlation_version=None,
+            annulus_applicability_status=None,
+            area_inner_m2=0.1,
+            area_outer_m2=0.15,
+            resistance_breakdown=None,
+            U_inner_basis=None,
+            U_outer_basis=None,
+            UA_w_k=None,
+            C_hot_w_k=None,
+            C_cold_w_k=None,
+            C_min_w_k=None,
+            C_max_w_k=None,
+            capacity_ratio=None,
+            NTU=None,
+            effectiveness=None,
+            LMTD_k=None,
+            energy_residual_w=None,
+            ua_lmtd_residual_w=None,
+            Q_hot_w=None,
+            Q_cold_w=None,
+            relative_energy_residual=None,
+            energy_tolerance_w=None,
+            relative_ua_lmtd_residual=None,
+            ua_lmtd_tolerance_w=None,
+            iterations=1,
+            converged=True,
+            solver_termination_reason="converged",
+            solver_details=SolverDetailsModel.model_construct(
+                iterations=1,
+                residual_w=0.0,
+                function_evaluations=1,
+                termination_reason="converged",
+            ),
+            warnings=(),
+            blockers=(),
+            failure=None,
+            property_calls=(),
+            provider_identity=env.result.provider_identity,
+            request_identity=env.result.request_identity,
+            result_hash="sha256:tampered_hash",
+            provenance_graph=env.result.provenance_graph,
+            provenance_digest="sha256:tampered_prov",
+        )
+        # Construct envelope where artifact_bundle has the original result
+        # but envelope.result is the tampered result
+        from hexagent.api.envelopes import RatingRunEnvelope
+
+        env_mismatched = RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="rateDoublePipe",
+            run_id=rec.run_id,
+            idempotency_key_digest="kid",
+            request_digest="req1",
+            result_kind="rating",
+            result=other_result,  # tampered!
+            result_hash=other_result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=env.provenance,
+            provenance_digest=env.result.provenance_digest,
+            artifact_bundle=bundle,  # bundle still has original result
+            artifact_bundle_digest=bundle.artifact_bundle_digest,
+            report_links=None,
+        )
+        with pytest.raises(ValueError, match="result"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env_mismatched,
+                artifact_bundle=bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_rejects_result_hash_mismatch(self):
+        """result.result_hash != envelope.result_hash → ValueError."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair()
+        # Tamper envelope's result_hash to not match result.result_hash
+        from hexagent.api.envelopes import RatingRunEnvelope
+
+        env_tampered = RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="rateDoublePipe",
+            run_id=rec.run_id,
+            idempotency_key_digest="kid",
+            request_digest="req1",
+            result_kind="rating",
+            result=env.result,
+            result_hash="sha256:TAMPERED_HASH",  # tampered!
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=env.provenance,
+            provenance_digest=env.result.provenance_digest,
+            artifact_bundle=bundle,
+            artifact_bundle_digest=bundle.artifact_bundle_digest,
+            report_links=None,
+        )
+        with pytest.raises(ValueError, match="result_hash"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env_tampered,
+                artifact_bundle=bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_rejects_provenance_mismatch(self):
+        """artifact_bundle.provenance_graph != envelope.provenance → ValueError."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair()
+        from hexagent.api.envelopes import RatingRunEnvelope
+        from hexagent.domain.provenance import ProvenanceGraph, ProvenanceNode, ProvenanceNodeType
+
+        tampered_prov = ProvenanceGraph.model_construct(
+            schema_version="1.0",
+            nodes=(
+                ProvenanceNode.model_construct(
+                    node_id=uuid4(),
+                    node_type=ProvenanceNodeType.CASE_REVISION,
+                    label="tampered",
+                    metadata=(),
+                    payload_hash="sha256:" + "00" * 32,
+                ),
+            ),
+            edges=(),
+        )
+        env_tampered = RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="rateDoublePipe",
+            run_id=rec.run_id,
+            idempotency_key_digest="kid",
+            request_digest="req1",
+            result_kind="rating",
+            result=env.result,
+            result_hash=env.result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=tampered_prov,  # tampered!
+            provenance_digest=env.result.provenance_digest,
+            artifact_bundle=bundle,
+            artifact_bundle_digest=bundle.artifact_bundle_digest,
+            report_links=None,
+        )
+        with pytest.raises(ValueError, match="provenance"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env_tampered,
+                artifact_bundle=bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_rejects_bundle_digest_mismatch(self):
+        """Recomputed digest != envelope.artifact_bundle_digest → ValueError."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair()
+        from hexagent.api.envelopes import RatingRunEnvelope
+
+        env_tampered = RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="rateDoublePipe",
+            run_id=rec.run_id,
+            idempotency_key_digest="kid",
+            request_digest="req1",
+            result_kind="rating",
+            result=env.result,
+            result_hash=env.result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=env.provenance,
+            provenance_digest=env.result.provenance_digest,
+            artifact_bundle=bundle,
+            artifact_bundle_digest="sha256:TAMPERED_DIGEST",  # tampered!
+            report_links=None,
+        )
+        with pytest.raises(ValueError, match="artifact_bundle_digest"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env_tampered,
+                artifact_bundle=bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_rejects_canonical_request_tamper(self):
+        """Tampered canonical_request_snapshot → digest mismatch → ValueError."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair()
+        from hexagent.api.artifacts import RatingRunArtifacts
+        from hexagent.api.envelopes import RatingRunEnvelope
+
+        # Tamper the canonical_request_snapshot in the bundle
+        tampered_bundle = RatingRunArtifacts.model_construct(
+            canonical_request_snapshot={"tampered": True},  # tampered!
+            request_identity=bundle.request_identity,
+            geometry_snapshot=bundle.geometry_snapshot,
+            solver_settings=bundle.solver_settings,
+            provider_identity=bundle.provider_identity,
+            result=bundle.result,
+            provenance_graph=bundle.provenance_graph,
+            artifact_bundle_digest=bundle.artifact_bundle_digest,
+        )
+        env_tampered = RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="rateDoublePipe",
+            run_id=rec.run_id,
+            idempotency_key_digest="kid",
+            request_digest="req1",
+            result_kind="rating",
+            result=env.result,
+            result_hash=env.result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=env.provenance,
+            provenance_digest=env.result.provenance_digest,
+            artifact_bundle=tampered_bundle,
+            artifact_bundle_digest=tampered_bundle.artifact_bundle_digest,  # old digest!
+            report_links=None,
+        )
+        with pytest.raises(ValueError, match="artifact_bundle_digest"):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env_tampered,
+                artifact_bundle=tampered_bundle,
+            )
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+
+    def test_complete_failure_does_not_transition_state(self):
+        """After ANY parity failure, record stays RUNNING, no envelope stored."""
+        repo, token, rec = self._running_record("rateDoublePipe")
+        env, bundle = self._valid_rating_pair(request_digest="WRONG_DIGEST")
+        original_version = rec.record_version
+        original_started_at = rec.started_at
+
+        with pytest.raises(ValueError):
+            repo.complete(
+                owner_token=token,
+                expected_version=rec.record_version,
+                envelope=env,
+                artifact_bundle=bundle,
+            )
+
+        stored = repo.get_by_run_id(rec.run_id)
+        assert stored.state == RunState.RUNNING
+        assert stored.completed_at is None
+        assert stored.envelope is None
+        assert stored.artifact_bundle is None
+        assert stored.record_version == original_version
+        assert stored.started_at == original_started_at
