@@ -11,17 +11,17 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| TASK-000 | Repository, CI and engineering scaffold | IN_PROGRESS | — |
-| TASK-001 | Freeze v0.1 scope, terminology and engineering assumptions | READY | TASK-000 |
+| TASK-000 | Repository, CI and engineering scaffold | DONE | — |
+| TASK-001 | Freeze v0.1 scope, terminology and engineering assumptions | DONE | TASK-000 |
 
 ## M1 — Deterministic calculation foundation
 
 | ID | Task | Status | Depends on |
 |---|---|---|---|
-| TASK-002 | Implement unit-safe quantity model and SI semantics | READY | TASK-001 |
-| TASK-003 | Implement fluid-property contract and CoolProp provider | READY | TASK-001, TASK-002 |
-| TASK-004 | Implement correlation registry and applicability engine | READY | TASK-001 |
-| TASK-005 | Implement calculation provenance and structured errors | READY | TASK-001 |
+| TASK-002 | Implement unit-safe quantity model and SI semantics | DONE | TASK-001 |
+| TASK-003 | Implement fluid-property contract and CoolProp provider | DONE | TASK-001, TASK-002 |
+| TASK-004 | Implement immutable design-case revisions, calculation provenance and structured errors | DONE | TASK-001 |
+| TASK-005 | Implement correlation registry and applicability engine | DONE | TASK-001 |
 | TASK-006 | Implement heat-balance and specification closure | DONE | TASK-002, TASK-003, TASK-005 |
 | TASK-011 | Collect and approve the first 20 benchmark cases | PLANNED | TASK-001 |
 | TASK-012 | Define standards rule-pack and license boundary | PLANNED | TASK-001 |
@@ -40,7 +40,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-009 (Phase 3 impl) | Deterministic feasibility, ranking and Top-N implementation | DONE | TASK-009 Phase 3 design |
 | TASK-009 (Issue #26) | Fix inherited heat-balance golden and rating test failures | DONE | TASK-009 Phase 3 |
 | TASK-010 (design) | Freeze versioned API and traceable report contract | DONE | TASK-009 |
-| TASK-010 (impl) | Implement versioned API and traceable report | IN_PROGRESS | TASK-010 design |
+| TASK-010 (impl) | Implement versioned API and traceable report | DONE | TASK-010 design |
+| TASK-015A | Deterministic test environment and CI sharding | PLANNED | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 | Add materials, mass and preliminary mechanical checks | PLANNED | TASK-012, TASK-013, TASK-016 |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
@@ -76,7 +77,39 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 
 ## Next execution sequence
 
-1. Finish TASK-000 and merge the bootstrap PR.
-2. Execute TASK-001 through TASK-006 in order.
-3. Execute TASK-007 through TASK-010 to deliver the first complete exchanger workflow.
-4. Complete TASK-011 through TASK-019 before starting shell-and-tube development.
+1. Complete project-governance closeout for TASK-000 through TASK-010.
+2. Design and approve TASK-015A deterministic test environment and CI sharding.
+3. Implement TASK-015A without changing frozen TASK-010 behavior.
+4. Design and implement TASK-011 benchmark cases.
+5. Complete TASK-012 through TASK-019 before starting shell-and-tube development.
+
+## Merge evidence
+
+| Task | PR |
+|---|---|
+| TASK-000 | #1 |
+| TASK-001 | #2 |
+| TASK-002 | #5 |
+| TASK-003 | #7 |
+| TASK-004 | #9 |
+| TASK-005 | #11 |
+| TASK-006 | #14 |
+| TASK-007 | #18 |
+| TASK-008 | #21 |
+| TASK-009 | #24 |
+| TASK-010 design | #29 |
+| TASK-010 impl | #31 |
+
+| Item | Value |
+|---|---|
+| TASK-010 Design PR | #29 |
+| TASK-010 Design reviewed Head | `252b9499c681ac98722ff173b854ea023b5ec03a` |
+| TASK-010 Design merge SHA | `210bdf4069cfd5e1282e4c9b5cc7da02bb7c5170` |
+| TASK-010 Implementation PR | #31 |
+| Reviewed Head | `7c6b62931f5c9d12a0259ffd938ba80f757e65e1` |
+| Merge SHA | `971df0007aa4b7b979598ba5568f702ab76af56f` |
+| Final Review | `4609799752` |
+| Final PR CI | `28522537592` |
+| Main Post-Merge CI | `28523901677` |
+| Frozen Contract SHA | `9a1faeb92f4015a62f9d9add0739f3853a876415` |
+| Contract Closure | APPROVED |
