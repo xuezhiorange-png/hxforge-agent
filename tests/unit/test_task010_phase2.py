@@ -24,6 +24,7 @@ DoublePipeService.size to verify it is never called).
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import threading
 from datetime import UTC, datetime
@@ -35,6 +36,12 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+# ===================================================================
+# Helper: minimal typed objects for repository unit tests
+# ===================================================================
+# Default request digest computed from the default canonical_request_snapshot (empty dict)
+# Used by _make_rating_envelope_and_bundle and test claim() calls
+from hexagent.api.canonical_request import compute_api_request_digest as _compute_req_digest
 from hexagent.api.envelopes import (
     RatingRunEnvelope,
     SizingRunEnvelope,
@@ -50,15 +57,14 @@ from hexagent.api.repository import (
     RunState,
 )
 
-# ===================================================================
-# Helper: minimal typed objects for repository unit tests
-# ===================================================================
+_DEFAULT_REQUEST_DIGEST: str = _compute_req_digest({})
 
 
 def _make_rating_envelope_and_bundle(
     *,
-    request_digest: str = "req1",
+    request_digest: str | None = None,
     run_id=None,
+    canonical_request_snapshot: dict | None = None,
 ):
     """Build RatingRunEnvelope + RatingRunArtifacts for repo tests.
 
@@ -67,25 +73,87 @@ def _make_rating_envelope_and_bundle(
     recomputation and verify_rating_artifact_bundle.
     """
     from hexagent.api.artifacts import RatingRunArtifacts, compute_rating_artifact_bundle_digest
+    from hexagent.api.canonical_request import compute_api_request_digest
     from hexagent.api.envelopes import RatingRunEnvelope
     from hexagent.core.heat_balance import ProviderIdentitySnapshot
-    from hexagent.domain.provenance import ProvenanceGraph
+    from hexagent.domain.messages import (
+        EngineeringMessage,
+        EngineeringMessageSeverity,
+        ErrorCode,
+    )
+    from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
     from hexagent.exchangers.double_pipe.result import (
         RatingRequestIdentity,
         RatingResult,
         RatingStatus,
         SolverDetailsModel,
+        build_provenance,
+        compute_result_hash,
     )
+    from hexagent.exchangers.double_pipe.solver import SolverParams
     from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+    snapshot = canonical_request_snapshot if canonical_request_snapshot is not None else {}
+    if request_digest is None:
+        request_digest = compute_api_request_digest(snapshot)
 
     _id = run_id or uuid4()
 
-    result = RatingResult.model_construct(
-        status=RatingStatus.SUCCEEDED,
+    # Build geometry and solver matching request_identity
+    geometry = DoublePipeGeometry(
+        inner_tube_inner_diameter_m=0.02,
+        inner_tube_outer_diameter_m=0.025,
+        outer_pipe_inner_diameter_m=0.05,
+        effective_length_m=5.0,
+        wall_thermal_conductivity_w_m_k=50.0,
+    )
+    solver_params = SolverParams(
+        absolute_residual_w=1e-6,
+        relative_residual_fraction=1e-6,
+        bracket_temperature_tolerance_k=0.01,
+        max_iterations=100,
+    )
+    _blocker = EngineeringMessage(
+        code=ErrorCode.CALCULATION_BLOCKED,
+        severity=EngineeringMessageSeverity.BLOCKER,
+        message="test blocked",
+        source_module="test",
+    )
+    provider_id = ProviderIdentitySnapshot(
+        name="test",
+        version="1.0",
+        git_revision="abc",
+        reference_state_policy="IAPWS-IF97",
+    )
+    request_identity = RatingRequestIdentity(
+        hot_fluid_name="Water",
+        hot_fluid_backend="iapws-if97",
+        hot_fluid_components=(),
+        cold_fluid_name="Water",
+        cold_fluid_backend="iapws-if97",
+        cold_fluid_components=(),
+        hot_mass_flow_kg_s=1.0,
+        cold_mass_flow_kg_s=1.0,
+        hot_inlet_pressure_pa=101325.0,
+        cold_inlet_pressure_pa=101325.0,
+        hot_inlet_temperature_k=350.0,
+        cold_inlet_temperature_k=300.0,
+        flow_arrangement="counterflow",
+        geometry=dataclasses.asdict(geometry),
+        solver_absolute_residual_w=solver_params.absolute_residual_w,
+        solver_relative_residual_fraction=solver_params.relative_residual_fraction,
+        solver_bracket_temperature_tolerance_k=solver_params.bracket_temperature_tolerance_k,
+        solver_max_iterations=solver_params.max_iterations,
+    )
+
+    # Compute result_hash (BLOCKED, no property calls)
+    _rh = compute_result_hash(
+        request_identity=request_identity,
+        provider_identity=provider_id,
         flow_arrangement=FlowArrangement.COUNTERFLOW,
-        heat_duty_w=1000.0,
-        hot_outlet_temperature_k=350.0,
-        cold_outlet_temperature_k=310.0,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
         tube_reynolds=None,
         tube_prandtl=None,
         tube_nusselt=None,
@@ -100,8 +168,149 @@ def _make_rating_envelope_and_bundle(
         annulus_selected_correlation_id=None,
         annulus_selected_correlation_version=None,
         annulus_applicability_status=None,
-        area_inner_m2=0.1,
-        area_outer_m2=0.15,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=0,
+            residual_w=0.0,
+            function_evaluations=0,
+            termination_reason="blocked",
+        ),
+        property_calls=(),
+        warnings=(),
+        blockers=(_blocker,),
+        failure=None,
+        status=RatingStatus.BLOCKED,
+        core_provenance_digest="",
+    )
+
+    # Build provenance graph using the real builder
+    provenance = build_provenance(
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        property_calls=(),
+        iterations=0,
+        converged=False,
+        warnings=[],
+        blockers=[_blocker],
+        result_hash=_rh,
+        request_identity=request_identity,
+    )
+
+    # Recompute result_hash with correct core_provenance_digest
+    from hexagent.exchangers.double_pipe.result import _provenance_graph_digest
+
+    core_nodes = [n for n in provenance.nodes if n.node_type.value != "RESULT"]
+    core_edges = [e for e in provenance.edges if any(n.node_id == e.target_id for n in core_nodes)]
+    from hexagent.domain.provenance import ProvenanceGraph as _PG
+
+    core_graph = _PG(nodes=tuple(core_nodes), edges=tuple(core_edges))
+    core_prov_digest = _provenance_graph_digest(core_graph)
+
+    _rh2 = compute_result_hash(
+        request_identity=request_identity,
+        provider_identity=provider_id,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=0,
+            residual_w=0.0,
+            function_evaluations=0,
+            termination_reason="blocked",
+        ),
+        property_calls=(),
+        warnings=(),
+        blockers=(_blocker,),
+        failure=None,
+        status=RatingStatus.BLOCKED,
+        core_provenance_digest=core_prov_digest,
+    )
+
+    # Rebuild provenance with the correct result_hash
+    provenance = build_provenance(
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        property_calls=(),
+        iterations=0,
+        converged=False,
+        warnings=[],
+        blockers=[_blocker],
+        result_hash=_rh2,
+        request_identity=request_identity,
+    )
+
+    result = RatingResult.model_construct(
+        status=RatingStatus.BLOCKED,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
         resistance_breakdown=None,
         U_inner_basis=None,
         U_outer_basis=None,
@@ -122,69 +331,46 @@ def _make_rating_envelope_and_bundle(
         energy_tolerance_w=None,
         relative_ua_lmtd_residual=None,
         ua_lmtd_tolerance_w=None,
-        iterations=1,
-        converged=True,
-        solver_termination_reason="converged",
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
         solver_details=SolverDetailsModel.model_construct(
-            iterations=1,
+            iterations=0,
             residual_w=0.0,
-            function_evaluations=1,
-            termination_reason="converged",
+            function_evaluations=0,
+            termination_reason="blocked",
         ),
         warnings=(),
-        blockers=(),
+        blockers=(_blocker,),
         failure=None,
         property_calls=(),
-        provider_identity=ProviderIdentitySnapshot(
-            name="test",
-            version="1.0",
-            git_revision="abc",
-            reference_state_policy="IAPWS-IF97",
-        ),
-        request_identity=RatingRequestIdentity(
-            hot_fluid_name="Water",
-            hot_fluid_backend="iapws-if97",
-            hot_fluid_components=(),
-            cold_fluid_name="Water",
-            cold_fluid_backend="iapws-if97",
-            cold_fluid_components=(),
-            hot_mass_flow_kg_s=1.0,
-            cold_mass_flow_kg_s=1.0,
-            hot_inlet_pressure_pa=101325.0,
-            cold_inlet_pressure_pa=101325.0,
-            hot_inlet_temperature_k=350.0,
-            cold_inlet_temperature_k=300.0,
-            flow_arrangement="counterflow",
-            geometry={},
-            solver_absolute_residual_w=1e-6,
-            solver_relative_residual_fraction=1e-6,
-            solver_bracket_temperature_tolerance_k=0.01,
-            solver_max_iterations=100,
-        ),
-        result_hash="sha256:hash",
-        provenance_graph=ProvenanceGraph(),
-        provenance_digest="sha256:prov",
+        provider_identity=provider_id,
+        request_identity=request_identity,
+        result_hash=_rh2,
+        provenance_graph=provenance,
+        provenance_digest=core_prov_digest,
+        core_provenance_digest=core_prov_digest,
     )
 
     bundle = RatingRunArtifacts.model_construct(
-        canonical_request_snapshot={},
+        canonical_request_snapshot=snapshot,
         request_identity=result.request_identity,
-        geometry_snapshot=None,
-        solver_settings=None,
+        geometry_snapshot=geometry,
+        solver_settings=solver_params,
         provider_identity=result.provider_identity,
         result=result,
-        provenance_graph=ProvenanceGraph(),
+        provenance_graph=provenance,
         artifact_bundle_digest="",
     )
     digest = compute_rating_artifact_bundle_digest(bundle)
     bundle = RatingRunArtifacts.model_construct(
-        canonical_request_snapshot={},
+        canonical_request_snapshot=snapshot,
         request_identity=result.request_identity,
-        geometry_snapshot=None,
-        solver_settings=None,
+        geometry_snapshot=geometry,
+        solver_settings=solver_params,
         provider_identity=result.provider_identity,
         result=result,
-        provenance_graph=ProvenanceGraph(),
+        provenance_graph=provenance,
         artifact_bundle_digest=digest,
     )
 
@@ -198,9 +384,9 @@ def _make_rating_envelope_and_bundle(
         result=result,
         result_hash=result.result_hash,
         warnings=(),
-        blockers=(),
+        blockers=(_blocker,),
         failure=None,
-        provenance=ProvenanceGraph(),
+        provenance=provenance,
         provenance_digest=result.provenance_digest,
         artifact_bundle=bundle,
         artifact_bundle_digest=digest,
@@ -696,7 +882,7 @@ class TestRunRepository:
         repo = InMemoryRunRepository()
         claim = repo.claim(
             namespace_digest="ns1",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             operation="rateDoublePipe",
         )
         rec = repo.start(
@@ -704,7 +890,6 @@ class TestRunRepository:
             expected_version=claim.record.record_version,
         )
         envelope, bundle = _make_rating_envelope_and_bundle(
-            request_digest="req1",
             run_id=rec.run_id,
         )
         repo.complete(
@@ -715,7 +900,7 @@ class TestRunRepository:
         )
         result = repo.claim(
             namespace_digest="ns1",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             operation="rateDoublePipe",
         )
         assert result.outcome == ClaimOutcome.COMPLETE_REPLAY
@@ -724,7 +909,7 @@ class TestRunRepository:
         repo = InMemoryRunRepository()
         claim = repo.claim(
             namespace_digest="ns1",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             operation="rateDoublePipe",
         )
         rec = repo.start(
@@ -732,7 +917,6 @@ class TestRunRepository:
             expected_version=claim.record.record_version,
         )
         envelope, bundle = _make_rating_envelope_and_bundle(
-            request_digest="req1",
             run_id=rec.run_id,
         )
         repo.complete(
@@ -1365,7 +1549,7 @@ class TestCompleteTrustBoundary:
         repo = InMemoryRunRepository()
         claim = repo.claim(
             namespace_digest=f"ns-{operation}",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             operation=operation,
         )
         rec = repo.start(
@@ -1374,9 +1558,12 @@ class TestCompleteTrustBoundary:
         )
         return repo, claim.record.owner_token, rec
 
-    def _valid_rating_pair(self, *, request_digest: str = "req1"):
+    def _valid_rating_pair(self, *, request_digest: str | None = None):
         """Helper: return a valid (envelope, bundle) for rating."""
-        return _make_rating_envelope_and_bundle(request_digest=request_digest)
+        kwargs: dict[str, Any] = {}
+        if request_digest is not None:
+            kwargs["request_digest"] = request_digest
+        return _make_rating_envelope_and_bundle(**kwargs)
 
     # -- type rejection tests -----------------------------------------------
 
@@ -1649,7 +1836,7 @@ class TestCompleteTrustBoundary:
             operation="rateDoublePipe",
             run_id=rec.run_id,
             idempotency_key_digest="kid",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             result_kind="rating",
             result=other_result,  # tampered!
             result_hash=other_result.result_hash,
@@ -1684,7 +1871,7 @@ class TestCompleteTrustBoundary:
             operation="rateDoublePipe",
             run_id=rec.run_id,
             idempotency_key_digest="kid",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             result_kind="rating",
             result=env.result,
             result_hash="sha256:TAMPERED_HASH",  # tampered!
@@ -1732,7 +1919,7 @@ class TestCompleteTrustBoundary:
             operation="rateDoublePipe",
             run_id=rec.run_id,
             idempotency_key_digest="kid",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             result_kind="rating",
             result=env.result,
             result_hash=env.result.result_hash,
@@ -1766,7 +1953,7 @@ class TestCompleteTrustBoundary:
             operation="rateDoublePipe",
             run_id=rec.run_id,
             idempotency_key_digest="kid",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             result_kind="rating",
             result=env.result,
             result_hash=env.result.result_hash,
@@ -1812,7 +1999,7 @@ class TestCompleteTrustBoundary:
             operation="rateDoublePipe",
             run_id=rec.run_id,
             idempotency_key_digest="kid",
-            request_digest="req1",
+            request_digest=_DEFAULT_REQUEST_DIGEST,
             result_kind="rating",
             result=env.result,
             result_hash=env.result.result_hash,
@@ -1857,3 +2044,1948 @@ class TestCompleteTrustBoundary:
         assert stored.artifact_bundle is None
         assert stored.record_version == original_version
         assert stored.started_at == original_started_at
+
+
+# ===================================================================
+# P0-3: RatingRunArtifacts verifier tamper tests
+# ===================================================================
+
+
+def _build_valid_rating_bundle():
+    """Build a valid RatingRunArtifacts for tamper tests.
+
+    Uses real pipeline helpers (build_provenance, compute_result_hash) to
+    create a self-consistent bundle with BLOCKED status and no property calls.
+    """
+    from hexagent.api.artifacts import (
+        RatingRunArtifacts,
+        compute_rating_artifact_bundle_digest,
+    )
+    from hexagent.core.heat_balance import ProviderIdentitySnapshot
+    from hexagent.domain.messages import (
+        EngineeringMessage,
+        EngineeringMessageSeverity,
+        ErrorCode,
+    )
+    from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
+    from hexagent.exchangers.double_pipe.result import (
+        RatingRequestIdentity,
+        RatingResult,
+        RatingStatus,
+        SolverDetailsModel,
+        build_provenance,
+        compute_result_hash,
+    )
+    from hexagent.exchangers.double_pipe.solver import SolverParams
+    from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+    geometry = DoublePipeGeometry(
+        inner_tube_inner_diameter_m=0.02,
+        inner_tube_outer_diameter_m=0.025,
+        outer_pipe_inner_diameter_m=0.05,
+        effective_length_m=5.0,
+        wall_thermal_conductivity_w_m_k=50.0,
+    )
+    solver_params = SolverParams(
+        absolute_residual_w=1e-6,
+        relative_residual_fraction=1e-6,
+        bracket_temperature_tolerance_k=0.01,
+        max_iterations=100,
+    )
+    _blocker = EngineeringMessage(
+        code=ErrorCode.CALCULATION_BLOCKED,
+        severity=EngineeringMessageSeverity.BLOCKER,
+        message="test blocked",
+        source_module="test",
+    )
+    provider_id = ProviderIdentitySnapshot(
+        name="test",
+        version="1.0",
+        git_revision="abc",
+        reference_state_policy="IAPWS-IF97",
+    )
+    request_identity = RatingRequestIdentity(
+        hot_fluid_name="Water",
+        hot_fluid_backend="iapws-if97",
+        hot_fluid_components=(),
+        cold_fluid_name="Water",
+        cold_fluid_backend="iapws-if97",
+        cold_fluid_components=(),
+        hot_mass_flow_kg_s=1.0,
+        cold_mass_flow_kg_s=1.0,
+        hot_inlet_pressure_pa=101325.0,
+        cold_inlet_pressure_pa=101325.0,
+        hot_inlet_temperature_k=350.0,
+        cold_inlet_temperature_k=300.0,
+        flow_arrangement="counterflow",
+        geometry=dataclasses.asdict(geometry),
+        solver_absolute_residual_w=solver_params.absolute_residual_w,
+        solver_relative_residual_fraction=solver_params.relative_residual_fraction,
+        solver_bracket_temperature_tolerance_k=solver_params.bracket_temperature_tolerance_k,
+        solver_max_iterations=solver_params.max_iterations,
+    )
+
+    # Compute result_hash (BLOCKED, no property calls)
+    _rh = compute_result_hash(
+        request_identity=request_identity,
+        provider_identity=provider_id,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=0,
+            residual_w=0.0,
+            function_evaluations=0,
+            termination_reason="blocked",
+        ),
+        property_calls=(),
+        warnings=(),
+        blockers=(_blocker,),
+        failure=None,
+        status=RatingStatus.BLOCKED,
+        core_provenance_digest="",
+    )
+
+    # Build provenance graph
+    provenance = build_provenance(
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        property_calls=(),
+        iterations=0,
+        converged=False,
+        warnings=[],
+        blockers=[_blocker],
+        result_hash=_rh,
+        request_identity=request_identity,
+    )
+
+    # Compute core_provenance_digest
+    from hexagent.exchangers.double_pipe.result import _provenance_graph_digest
+
+    core_nodes = [n for n in provenance.nodes if n.node_type.value != "RESULT"]
+    core_edges = [e for e in provenance.edges if any(n.node_id == e.target_id for n in core_nodes)]
+    from hexagent.domain.provenance import ProvenanceGraph as _PG
+
+    core_graph = _PG(nodes=tuple(core_nodes), edges=tuple(core_edges))
+    core_prov_digest = _provenance_graph_digest(core_graph)
+
+    # Recompute result_hash with correct core_provenance_digest
+    _rh2 = compute_result_hash(
+        request_identity=request_identity,
+        provider_identity=provider_id,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=0,
+            residual_w=0.0,
+            function_evaluations=0,
+            termination_reason="blocked",
+        ),
+        property_calls=(),
+        warnings=(),
+        blockers=(_blocker,),
+        failure=None,
+        status=RatingStatus.BLOCKED,
+        core_provenance_digest=core_prov_digest,
+    )
+
+    # Rebuild provenance with the correct result_hash
+    provenance = build_provenance(
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        property_calls=(),
+        iterations=0,
+        converged=False,
+        warnings=[],
+        blockers=[_blocker],
+        result_hash=_rh2,
+        request_identity=request_identity,
+    )
+
+    result = RatingResult.model_construct(
+        status=RatingStatus.BLOCKED,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        Q_hot_w=None,
+        Q_cold_w=None,
+        relative_energy_residual=None,
+        energy_tolerance_w=None,
+        relative_ua_lmtd_residual=None,
+        ua_lmtd_tolerance_w=None,
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=0,
+            residual_w=0.0,
+            function_evaluations=0,
+            termination_reason="blocked",
+        ),
+        warnings=(),
+        blockers=(_blocker,),
+        failure=None,
+        property_calls=(),
+        provider_identity=provider_id,
+        request_identity=request_identity,
+        result_hash=_rh2,
+        provenance_graph=provenance,
+        provenance_digest=core_prov_digest,
+        core_provenance_digest=core_prov_digest,
+    )
+
+    bundle = RatingRunArtifacts.model_construct(
+        canonical_request_snapshot={},
+        request_identity=result.request_identity,
+        geometry_snapshot=geometry,
+        solver_settings=solver_params,
+        provider_identity=result.provider_identity,
+        result=result,
+        provenance_graph=provenance,
+        artifact_bundle_digest="",
+    )
+    digest = compute_rating_artifact_bundle_digest(bundle)
+    bundle = RatingRunArtifacts.model_construct(
+        canonical_request_snapshot={},
+        request_identity=result.request_identity,
+        geometry_snapshot=geometry,
+        solver_settings=solver_params,
+        provider_identity=result.provider_identity,
+        result=result,
+        provenance_graph=provenance,
+        artifact_bundle_digest=digest,
+    )
+    return bundle
+
+
+class TestRatingVerifierTamperTests:
+    """10 tamper tests for verify_rating_artifact_bundle.
+
+    Each test creates a valid RatingRunArtifacts, tampers ONE field,
+    recomputes the artifact_bundle_digest so only the targeted check
+    fires, and asserts that verify_rating_artifact_bundle raises ValueError.
+    """
+
+    @staticmethod
+    def _rebuild_bundle(bundle, **overrides):
+        """Rebuild a bundle with one or more fields overridden and the
+        artifact_bundle_digest recomputed so only the targeted check fires."""
+        from hexagent.api.artifacts import (
+            RatingRunArtifacts,
+            compute_rating_artifact_bundle_digest,
+        )
+
+        tampered = RatingRunArtifacts.model_construct(
+            canonical_request_snapshot=overrides.get(
+                "canonical_request_snapshot",
+                bundle.canonical_request_snapshot,
+            ),
+            request_identity=overrides.get(
+                "request_identity",
+                bundle.request_identity,
+            ),
+            geometry_snapshot=overrides.get(
+                "geometry_snapshot",
+                bundle.geometry_snapshot,
+            ),
+            solver_settings=overrides.get(
+                "solver_settings",
+                bundle.solver_settings,
+            ),
+            provider_identity=overrides.get(
+                "provider_identity",
+                bundle.provider_identity,
+            ),
+            result=overrides.get("result", bundle.result),
+            provenance_graph=overrides.get(
+                "provenance_graph",
+                bundle.provenance_graph,
+            ),
+            artifact_bundle_digest="placeholder",
+        )
+        digest = compute_rating_artifact_bundle_digest(tampered)
+        object.__setattr__(tampered, "artifact_bundle_digest", digest)
+        return tampered
+
+    # -- Check 1: result field tampered -----------------------------------
+
+    def test_rating_verifier_rejects_result_field_tamper(self):
+        """Tamper result.status -> result hash mismatch -> ValueError."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+        from hexagent.exchangers.double_pipe.result import RatingStatus
+
+        bundle = _build_valid_rating_bundle()
+        # Tamper one field in result
+        tampered_result = bundle.result.model_copy(update={"status": RatingStatus.SUCCEEDED})
+        tampered = self._rebuild_bundle(bundle, result=tampered_result)
+        with pytest.raises(ValueError, match="result hash verification failed"):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 2: result hash tampered ------------------------------------
+
+    def test_rating_verifier_rejects_result_hash_tamper(self):
+        """Tamper result.result_hash -> ValueError."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+
+        bundle = _build_valid_rating_bundle()
+        tampered_result = bundle.result.model_copy(update={"result_hash": "sha256:" + "00" * 32})
+        tampered = self._rebuild_bundle(bundle, result=tampered_result)
+        with pytest.raises(ValueError, match="result hash verification failed"):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 3: provenance_graph tampered --------------------------------
+
+    def test_rating_verifier_rejects_provenance_graph_tamper(self):
+        """Tamper provenance_graph -> ValueError (hash mismatch or parity check)."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+        from hexagent.domain.provenance import ProvenanceGraph
+
+        bundle = _build_valid_rating_bundle()
+        tampered = self._rebuild_bundle(bundle, provenance_graph=ProvenanceGraph())
+        with pytest.raises(ValueError, match="provenance_graph.*mismatch"):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 4: provider_identity tampered -------------------------------
+
+    def test_rating_verifier_rejects_provider_identity_tamper(self):
+        """Tamper provider_identity -> ValueError."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+        from hexagent.core.heat_balance import ProviderIdentitySnapshot
+
+        bundle = _build_valid_rating_bundle()
+        tampered_pid = ProviderIdentitySnapshot(
+            name="TAMPERED",
+            version="1.0",
+            git_revision="abc",
+            reference_state_policy="IAPWS-IF97",
+        )
+        tampered = self._rebuild_bundle(bundle, provider_identity=tampered_pid)
+        with pytest.raises(ValueError, match="provider_identity mismatch"):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 5: geometry tampered ----------------------------------------
+
+    def test_rating_verifier_rejects_geometry_tamper(self):
+        """Tamper geometry_snapshot -> ValueError."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+        from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
+
+        bundle = _build_valid_rating_bundle()
+        tampered_geom = DoublePipeGeometry(
+            inner_tube_inner_diameter_m=0.021,  # tampered (was 0.02)
+            inner_tube_outer_diameter_m=0.025,
+            outer_pipe_inner_diameter_m=0.05,
+            effective_length_m=5.0,
+            wall_thermal_conductivity_w_m_k=50.0,
+        )
+        tampered = self._rebuild_bundle(bundle, geometry_snapshot=tampered_geom)
+        with pytest.raises(ValueError, match="geometry_snapshot.*mismatch"):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 6: solver tolerance tampered -------------------------------
+
+    def test_rating_verifier_rejects_solver_tolerance_tamper(self):
+        """Tamper solver_settings.absolute_residual_w -> ValueError."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+
+        bundle = _build_valid_rating_bundle()
+        tampered_sp = SolverParams(
+            absolute_residual_w=999.0,  # tampered
+            relative_residual_fraction=1e-6,
+            bracket_temperature_tolerance_k=0.01,
+            max_iterations=100,
+        )
+        tampered = self._rebuild_bundle(bundle, solver_settings=tampered_sp)
+        with pytest.raises(ValueError, match="solver_settings.*mismatch"):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 7: solver max_iterations tampered --------------------------
+
+    def test_rating_verifier_rejects_solver_max_iterations_tamper(self):
+        """Tamper solver_settings.max_iterations -> ValueError."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+        from hexagent.exchangers.double_pipe.solver import SolverParams
+
+        bundle = _build_valid_rating_bundle()
+        tampered_sp = SolverParams(
+            absolute_residual_w=1e-6,
+            relative_residual_fraction=1e-6,
+            bracket_temperature_tolerance_k=0.01,
+            max_iterations=999,  # tampered
+        )
+        tampered = self._rebuild_bundle(bundle, solver_settings=tampered_sp)
+        with pytest.raises(ValueError, match="solver_settings.*max_iterations.*mismatch"):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 8: canonical_request_snapshot tampered ---------------------
+
+    def test_rating_verifier_rejects_canonical_request_snapshot_tamper(self):
+        """Tamper canonical_request_snapshot -> None -> ValueError."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+
+        bundle = _build_valid_rating_bundle()
+        tampered = self._rebuild_bundle(bundle, canonical_request_snapshot=None)
+        with pytest.raises(ValueError, match="canonical_request_snapshot must not be None"):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 9: request_identity tampered --------------------------------
+
+    def test_rating_verifier_rejects_request_identity_tamper(self):
+        """Tamper request_identity.hot_fluid_name -> ValueError."""
+        from hexagent.api.artifacts import verify_rating_artifact_bundle
+
+        bundle = _build_valid_rating_bundle()
+        tampered_ri = dataclasses.replace(bundle.request_identity, hot_fluid_name="TAMPERED")
+        tampered = self._rebuild_bundle(bundle, request_identity=tampered_ri)
+        with pytest.raises(ValueError):
+            verify_rating_artifact_bundle(tampered)
+
+    # -- Check 10: bundle_digest tampered ----------------------------------
+
+    def test_rating_verifier_rejects_bundle_digest_tamper(self):
+        """Tamper artifact_bundle_digest -> ValueError."""
+        from hexagent.api.artifacts import (
+            RatingRunArtifacts,
+            verify_rating_artifact_bundle,
+        )
+
+        bundle = _build_valid_rating_bundle()
+        tampered = RatingRunArtifacts.model_construct(
+            canonical_request_snapshot=bundle.canonical_request_snapshot,
+            request_identity=bundle.request_identity,
+            geometry_snapshot=bundle.geometry_snapshot,
+            solver_settings=bundle.solver_settings,
+            provider_identity=bundle.provider_identity,
+            result=bundle.result,
+            provenance_graph=bundle.provenance_graph,
+            artifact_bundle_digest="sha256:" + "00" * 32,
+        )
+        with pytest.raises(ValueError, match="artifact_bundle_digest mismatch"):
+            verify_rating_artifact_bundle(tampered)
+
+
+# ===================================================================
+# P0-4: SizingRunArtifacts verifier tamper tests
+# ===================================================================
+
+
+def _build_valid_sizing_bundle():
+    """Build a valid SizingRunArtifacts for tamper tests.
+
+    Uses model_construct() to bypass validators, then manually computes
+    all digests for self-consistency.
+    """
+    import uuid as _uuid
+
+    from hexagent.api.artifacts import (
+        SizingRunArtifacts,
+        compute_sizing_artifact_bundle_digest,
+    )
+    from hexagent.core.canonical import sha256_digest
+    from hexagent.domain.provenance import (
+        ProvenanceGraph,
+        ProvenanceNode,
+        ProvenanceNodeType,
+    )
+    from hexagent.optimization.context import (
+        ExpectedProviderIdentity,
+        OptimizationObjective,
+        PassedSizingGate,
+        SizingRequestIdentity,
+    )
+    from hexagent.optimization.evaluation import (
+        CandidateEvaluationRecord,
+        CandidateEvaluationState,
+        VerificationOutcome,
+    )
+    from hexagent.optimization.identities import (
+        ManufacturableCandidate,
+        MaterializationResult,
+        MaterializedCandidateSet,
+    )
+    from hexagent.optimization.models import (
+        CompleteDoublePipeAssemblyOption,
+        CompleteDoublePipeCatalogSnapshot,
+        LengthSource,
+        SizingRequest,
+    )
+    from hexagent.optimization.phase3_builder import (
+        PHASE3_RESULT_NS,
+        OptimizationResult,
+        RankedCandidateRecord,
+        ranked_candidate_payload_from_values,
+    )
+    from hexagent.optimization.phase3_core import (
+        Phase2SourceRecordDescriptor,
+        Phase2SourceRecordIdentitySnapshot,
+        Phase2SourceRecordSnapshot,
+        Phase3Disposition,
+    )
+    from hexagent.optimization.phase3_evaluation import (
+        CandidateDispositionRecord,
+        Phase3CandidateClassificationInput,
+        Phase3CandidatePreparationResult,
+        Phase3EvaluationInput,
+        Phase3PreparationStatus,
+        Phase3SourceRecordBinding,
+    )
+    from hexagent.optimization.phase3_verifier import (
+        Phase3AuthoritativeArtifacts,
+    )
+
+    # --- Constants for a single FEASIBLE candidate ---
+    N = 1  # total candidates
+    F = 1  # feasible candidates
+    TN = 1  # top-N
+    CAND_ID = "cat1::opt1::L5.0000"
+    OBJ = OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA
+
+    # --- Build SizingRequest with a catalog ---
+    length_source = LengthSource(
+        length_quantum_m="0.001",
+        allowed_effective_lengths_m=(5.0,),
+    )
+    assembly = CompleteDoublePipeAssemblyOption(
+        assembly_option_id="opt1",
+        inner_tube_inner_diameter_m=0.02,
+        inner_tube_outer_diameter_m=0.025,
+        outer_pipe_inner_diameter_m=0.05,
+        wall_thermal_conductivity_w_m_k=50.0,
+        inner_surface_roughness_m=0.0,
+        annulus_surface_roughness_m=0.0,
+        inner_fouling_resistance_m2k_w=0.0001,
+        outer_fouling_resistance_m2k_w=0.0001,
+        length_source=length_source,
+        manufacturing_option_identity="mfg1",
+        manufacturing_metadata=(),
+    )
+    catalog = CompleteDoublePipeCatalogSnapshot.model_construct(
+        catalog_id="cat1",
+        catalog_version="1.0",
+        source_identity="test",
+        schema_version="1.0",
+        assembly_options=(assembly,),
+        catalog_content_hash="sha256:" + "ab" * 32,  # placeholder, computed below
+    )
+    # Compute correct catalog content hash from assembly options
+    from hexagent.optimization.catalog import compute_catalog_content_hash
+
+    correct_cat_hash = compute_catalog_content_hash(
+        catalog_id="cat1",
+        catalog_version="1.0",
+        source_identity="test",
+        schema_version="1.0",
+        assembly_options=(assembly,),
+    )
+    catalog = CompleteDoublePipeCatalogSnapshot.model_construct(
+        catalog_id="cat1",
+        catalog_version="1.0",
+        source_identity="test",
+        schema_version="1.0",
+        assembly_options=(assembly,),
+        catalog_content_hash=correct_cat_hash,
+    )
+    sizing_request = SizingRequest.model_construct(
+        schema_version="1.0",
+        catalogs=(catalog,),
+        minimum_effective_length_m=None,
+        maximum_effective_length_m=None,
+        request_raw_combination_cap=None,
+    )
+
+    # --- Build ProvenanceGraph ---
+    prov_graph = ProvenanceGraph.model_construct(
+        nodes=(
+            ProvenanceNode.model_construct(
+                node_id=_uuid.uuid4(),
+                node_type=ProvenanceNodeType.EXTERNAL,
+                label="test-node",
+                payload_hash="sha256:" + "aa" * 32,
+            ),
+        ),
+        edges=(),
+    )
+    prov_digest = prov_graph.compute_hash()
+
+    # --- Build ManufacturableCandidate ---
+    from hexagent.optimization.identities import (
+        CatalogSnapshotRef as _CSR,
+    )
+    from hexagent.optimization.identities import (
+        PhysicalCandidateIdentity,
+        SourceQualifiedCandidateIdentity,
+    )
+
+    cat_ref = _CSR.model_construct(
+        catalog_id="cat1",
+        catalog_version="1.0",
+        catalog_content_hash=correct_cat_hash,
+        source_identity="test",
+        schema_version="1.0",
+    )
+    phys_id = PhysicalCandidateIdentity.model_construct(
+        inner_tube_inner_diameter_m=0.02,
+        inner_tube_outer_diameter_m=0.025,
+        outer_pipe_inner_diameter_m=0.05,
+        effective_length_m_canonical="5.0000",
+        wall_thermal_conductivity_w_m_k=50.0,
+        inner_surface_roughness_m=0.0,
+        annulus_surface_roughness_m=0.0,
+        inner_fouling_resistance_m2k_w=0.0001,
+        outer_fouling_resistance_m2k_w=0.0001,
+    )
+    phys_id_digest = "sha256:" + "aa" * 32
+    sq_id = SourceQualifiedCandidateIdentity.model_construct(
+        physical_identity_digest=phys_id_digest,
+        catalog_id="cat1",
+        catalog_version="1.0",
+        catalog_content_hash=correct_cat_hash,
+        assembly_option_id="opt1",
+        manufacturing_option_identity="mfg1",
+    )
+    candidate = ManufacturableCandidate.model_construct(
+        source_qualified_candidate_id=CAND_ID,
+        evaluation_order_index=0,
+        physical_identity=phys_id,
+        physical_identity_digest=phys_id_digest,
+        source_qualified_identity=sq_id,
+        catalog_snapshot_ref=cat_ref,
+        assembly_option_id="opt1",
+        manufacturing_option_identity="mfg1",
+        manufacturing_metadata=(),
+        effective_length_m_canonical="5.0000",
+    )
+
+    # --- Build MaterializationResult ---
+    # Compute correct gate_digest with proper per_option_records
+    from hexagent.optimization.context import OptionRawCountRecord
+
+    per_opt_record = OptionRawCountRecord.model_construct(
+        catalog_id="cat1",
+        catalog_version="1.0",
+        catalog_content_hash=correct_cat_hash,
+        source_identity="test",
+        schema_version="1.0",
+        assembly_option_id="opt1",
+        canonical_length_quantum_m="0.001",
+        raw_count=1,
+    )
+    # Create a temporary gate to compute the correct digest
+    _tmp_gate = PassedSizingGate.model_construct(
+        status="passed",
+        sizing_request_identity_digest="sha256:" + "11" * 32,
+        raw_combination_count=1,
+        effective_cap=1,
+        per_option_records=(per_opt_record,),
+        gate_digest="",
+    )
+    correct_gate_digest = sha256_digest(_tmp_gate.model_copy(update={"gate_digest": ""}))
+
+    # Compute correct candidate_set digest
+    from hexagent.optimization.context import materialized_candidate_set_payload
+
+    correct_mcs_payload = materialized_candidate_set_payload(
+        sizing_request_identity_digest="sha256:" + "11" * 32,
+        passed_gate_digest=correct_gate_digest,
+        catalog_snapshot_identities=(cat_ref,),
+        minimum_effective_length_m=None,
+        maximum_effective_length_m=None,
+        raw_combination_count=1,
+        unique_candidate_count=1,
+        ordered_candidate_ids=(CAND_ID,),
+    )
+    mcs_digest = sha256_digest(correct_mcs_payload)
+    candidate_set = MaterializedCandidateSet.model_construct(
+        sizing_request_identity_digest="sha256:" + "11" * 32,
+        passed_gate_digest=correct_gate_digest,
+        catalog_snapshot_identities=(cat_ref,),
+        minimum_effective_length_m=None,
+        maximum_effective_length_m=None,
+        raw_combination_count=1,
+        unique_candidate_count=1,
+        ordered_candidate_ids=(CAND_ID,),
+        candidate_set_digest=mcs_digest,
+    )
+    sizing_gate = PassedSizingGate.model_construct(
+        status="passed",
+        sizing_request_identity_digest="sha256:" + "11" * 32,
+        raw_combination_count=1,
+        effective_cap=1,
+        per_option_records=(per_opt_record,),
+        gate_digest=correct_gate_digest,
+    )
+    # Bypass MaterializationResult.__init__ validation
+    materialization_result = object.__new__(MaterializationResult)
+    object.__setattr__(materialization_result, "candidates", (candidate,))
+    object.__setattr__(materialization_result, "candidate_set", candidate_set)
+    object.__setattr__(materialization_result, "sizing_gate", sizing_gate)
+    object.__setattr__(materialization_result, "catalog_snapshots", (catalog,))
+    object.__setattr__(materialization_result, "minimum_effective_length_m", None)
+    object.__setattr__(materialization_result, "maximum_effective_length_m", None)
+
+    # --- Build SizingRequestIdentity ---
+    sizing_request_identity = SizingRequestIdentity.model_construct(
+        hot_fluid_name="Water",
+        cold_fluid_name="Water",
+        hot_fluid_equation_of_state="iapws-if97",
+        cold_fluid_equation_of_state="iapws-if97",
+        hot_fluid_normalized_components=(),
+        cold_fluid_normalized_components=(),
+        hot_inlet_temperature_k=350.0,
+        cold_inlet_temperature_k=300.0,
+        hot_inlet_pressure_pa=101325.0,
+        cold_inlet_pressure_pa=101325.0,
+        hot_mass_flow_kg_s=1.0,
+        cold_mass_flow_kg_s=1.0,
+        flow_arrangement="counterflow",
+        tube_in_hot=True,
+        tube_boundary_condition="constant_wall_temperature",
+        annulus_boundary_condition="constant_wall_temperature",
+        minimum_terminal_delta_t=5.0,
+        required_duty_w=100000.0,
+        duty_absolute_tolerance_w=1.0,
+        duty_relative_tolerance=1e-6,
+        optimization_objective=OBJ,
+        top_n=TN,
+        request_raw_combination_cap=None,
+        minimum_effective_length_m=None,
+        maximum_effective_length_m=None,
+        catalog_snapshot_identities=(),
+        rating_solver_absolute_residual_w=1e-6,
+        rating_solver_relative_residual_fraction=1e-6,
+        rating_solver_bracket_temperature_tolerance_k=0.01,
+        rating_solver_max_iterations=100,
+        expected_provider_identity=ExpectedProviderIdentity(
+            name="CoolProp",
+            version="1.0",
+            git_revision="abc123",
+            reference_state_policy="IAPWS-IF97",
+            configuration_fingerprint=None,
+            cache_policy_version=None,
+        ),
+        rating_software_version="1.0",
+        execution_context_policy_version="1.0",
+    )
+    sri_digest = sizing_request_identity.sizing_request_identity_digest
+
+    # --- Build CandidateEvaluationRecord (VERIFIED) ---
+    identity_digest = "sha256:" + "aa" * 32
+    eval_rec = CandidateEvaluationRecord.model_construct(
+        source_qualified_candidate_id=CAND_ID,
+        evaluation_order_index=0,
+        candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
+        candidate_evaluation_identity=None,
+        verified_rating_evidence=None,
+        invalid_rating_evidence=None,
+        rating_status="succeeded",
+        provider_identity_matches=True,
+        source_hash_verification_outcome=VerificationOutcome.PASSED,
+        source_provenance_verification_outcome=VerificationOutcome.PASSED,
+        warnings=(),
+        blockers=(),
+        failure=None,
+    )
+
+    # --- Build Phase2SourceRecordIdentitySnapshot ---
+    id_snapshot = Phase2SourceRecordIdentitySnapshot.model_construct(
+        source_qualified_candidate_id=CAND_ID,
+        evaluation_order_index=0,
+        identity_snapshot_digest=identity_digest,
+    )
+
+    # --- Build Phase2SourceRecordSnapshot ---
+    cs_snapshot = Phase2SourceRecordSnapshot.model_construct(
+        source_qualified_candidate_id=CAND_ID,
+        evaluation_order_index=0,
+        snapshot_digest="sha256:" + "cc" * 32,
+    )
+
+    # --- Build Phase2SourceRecordDescriptor (frozen dataclass) ---
+    desc = object.__new__(Phase2SourceRecordDescriptor)
+    object.__setattr__(desc, "source_qualified_candidate_id", CAND_ID)
+    object.__setattr__(desc, "evaluation_order_index", 0)
+    object.__setattr__(desc, "candidate_evaluation_state", CandidateEvaluationState.VERIFIED)
+    object.__setattr__(desc, "identity_snapshot_digest", identity_digest)
+    object.__setattr__(desc, "candidate_evaluation_identity_digest", "sha256:" + "c1" * 32)
+    object.__setattr__(desc, "verified_rating_evidence_digest", "sha256:" + "d1" * 32)
+    object.__setattr__(desc, "invalid_rating_evidence_digest", None)
+    object.__setattr__(desc, "claimed_rating_result_audit_digest", None)
+    object.__setattr__(desc, "evaluation_failure_digest", None)
+    object.__setattr__(desc, "descriptor_digest", "sha256:" + "dd" * 32)
+
+    # --- Build Phase3SourceRecordBinding ---
+    src_binding = Phase3SourceRecordBinding.model_construct(
+        schema_version=1,
+        source_qualified_candidate_id=CAND_ID,
+        evaluation_order_index=0,
+        phase2_source_record_descriptor_digest=desc.descriptor_digest,
+        verified_rating_evidence_digest=None,
+        phase2_identity_snapshot_digest=identity_digest,
+        warning_descriptor_binding_digests=(),
+        blocker_descriptor_binding_digests=(),
+        source_evaluation_failure_binding_digest=None,
+        evidence_failure_binding_digest=None,
+        binding_digest="sha256:" + "ee" * 32,
+    )
+
+    # --- Build Phase3CandidatePreparationResult ---
+    prep_result = Phase3CandidatePreparationResult.model_construct(
+        source_qualified_candidate_id=CAND_ID,
+        evaluation_order_index=0,
+        status=Phase3PreparationStatus.READY,
+        preparation_result_digest="sha256:" + "ff" * 32,
+    )
+
+    # --- Build Phase3CandidateClassificationInput ---
+    class_input = Phase3CandidateClassificationInput.model_construct(
+        source_qualified_candidate_id=CAND_ID,
+        evaluation_order_index=0,
+    )
+
+    # --- Build CandidateDispositionRecord (FEASIBLE) ---
+    disp_digest = "sha256:" + "a1" * 32
+    disp = CandidateDispositionRecord.model_construct(
+        source_qualified_candidate_id=CAND_ID,
+        evaluation_order_index=0,
+        source_candidate_evaluation_state=CandidateEvaluationState.VERIFIED,
+        source_hash_verification_outcome=VerificationOutcome.PASSED,
+        source_provenance_verification_outcome=VerificationOutcome.PASSED,
+        source_record_descriptor_digest=desc.descriptor_digest,
+        source_identity_record_descriptor_digest="sha256:" + "b1" * 32,
+        disposition=Phase3Disposition.FEASIBLE,
+        diagnostic=None,
+        provider_identity_matches=True,
+        rating_status="succeeded",
+        candidate_evaluation_identity_digest="sha256:" + "c1" * 32,
+        verified_rating_evidence_digest="sha256:" + "d1" * 32,
+        invalid_rating_evidence_digest=None,
+        primary_engineering_value="0.1500",
+        secondary_engineering_value="5.0000",
+        warning_descriptors=(),
+        blocker_descriptors=(),
+        source_evaluation_failure_payload_digest=None,
+        source_evaluation_failure_binding_digest=None,
+        phase3_failure_binding_digest=None,
+        phase3_failure_payload_digest=None,
+        failure_origin=None,
+        failure_stage=None,
+        feasibility_digest=disp_digest,
+    )
+
+    # --- Build Phase3EvaluationInput ---
+    eval_input_payload = {
+        "schema_version": 1,
+        "sizing_request_identity_digest": sri_digest,
+        "candidate_set_digest": mcs_digest,
+        "gate_digest": sizing_gate.gate_digest,
+        "evaluation_record_count": N,
+        "ordered_identity_snapshot_digests": [identity_digest],
+        "ordered_phase2_source_snapshot_digests": [
+            cs_snapshot.snapshot_digest,
+        ],
+        "ordered_phase2_source_record_descriptor_digests": [
+            desc.descriptor_digest,
+        ],
+    }
+    eval_input_digest = sha256_digest(eval_input_payload)
+
+    eval_input = Phase3EvaluationInput.model_construct(
+        schema_version=1,
+        sizing_request_identity=sizing_request_identity,
+        sizing_request_identity_digest=sri_digest,
+        materialization_result=materialization_result,
+        candidate_set_digest=mcs_digest,
+        gate_digest=sizing_gate.gate_digest,
+        evaluation_records=(eval_rec,),
+        evaluation_record_count=N,
+        identity_snapshots=(id_snapshot,),
+        complete_snapshots=(cs_snapshot,),
+        ordered_identity_snapshot_digests=(identity_digest,),
+        ordered_phase2_source_snapshot_digests=(cs_snapshot.snapshot_digest,),
+        ordered_phase2_source_record_descriptor_digests=(desc.descriptor_digest,),
+        evaluation_input_digest=eval_input_digest,
+    )
+
+    # --- Build Phase3AuthoritativeArtifacts ---
+    auth_artifacts = Phase3AuthoritativeArtifacts(
+        sizing_request=sizing_request,
+        phase2_source_record_descriptors=(desc,),
+        source_bindings=(src_binding,),
+        classification_inputs=(class_input,),
+        preparation_results=(prep_result,),
+        warning_descriptor_tuples=((),),
+        blocker_descriptor_tuples=((),),
+        warning_binding_tuples=((),),
+        blocker_binding_tuples=((),),
+        evidence_failure_bindings=(None,),
+        source_failure_bindings=(None,),
+        phase3_failure_bindings=(None,),
+    )
+
+    # --- Build RankedCandidateRecord ---
+    ranked_digest = sha256_digest(
+        ranked_candidate_payload_from_values(
+            rank=1,
+            source_qualified_candidate_id=CAND_ID,
+            optimization_objective=OBJ,
+            primary_objective_value="0.1500",
+            primary_objective_field="area_outer_m2",
+            secondary_tie_break_value="5.0000",
+            secondary_tie_break_field="effective_length_m_canonical",
+            candidate_evaluation_identity_digest="sha256:" + "c1" * 32,
+            verified_rating_evidence_digest="sha256:" + "d1" * 32,
+            feasibility_digest=disp_digest,
+        )
+    )
+    ranked = RankedCandidateRecord.model_construct(
+        rank=1,
+        source_qualified_candidate_id=CAND_ID,
+        optimization_objective=OBJ,
+        primary_objective_value="0.1500",
+        primary_objective_field="area_outer_m2",
+        secondary_tie_break_value="5.0000",
+        secondary_tie_break_field="effective_length_m_canonical",
+        candidate_evaluation_identity_digest="sha256:" + "c1" * 32,
+        verified_rating_evidence_digest="sha256:" + "d1" * 32,
+        feasibility_digest=disp_digest,
+        ranked_record_digest=ranked_digest,
+    )
+
+    # --- Build OptimizationResult ---
+    ranked_digests = (ranked_digest,)
+    top_n_digests = ranked_digests[:TN]
+    disp_digests = (disp_digest,)
+    id_snap_digests = (identity_digest,)
+    cs_snap_digests = (cs_snapshot.snapshot_digest,)
+    sb_digests: tuple[str | None, ...] = (src_binding.binding_digest,)
+    pr_digests: tuple[str | None, ...] = (prep_result.preparation_result_digest,)
+
+    core_payload = {
+        "schema_version": 1,
+        "sizing_request_identity_digest": sri_digest,
+        "passed_gate_digest": sizing_gate.gate_digest,
+        "candidate_set_digest": mcs_digest,
+        "evaluation_input_digest": eval_input_digest,
+        "optimization_objective": OBJ.value,
+        "requested_top_n": TN,
+        "total_candidate_count": N,
+        "feasible_candidate_count": F,
+        "infeasible_candidate_count": 0,
+        "provider_mismatch_count": 0,
+        "integrity_failed_count": 0,
+        "provenance_failed_count": 0,
+        "runtime_failed_count": 0,
+        "unevaluated_count": 0,
+        "phase2_verified_record_count": 1,
+        "phase2_integrity_invalid_record_count": 0,
+        "phase2_runtime_failed_record_count": 0,
+        "phase2_unevaluated_record_count": 0,
+        "runtime_failed_from_phase2_verified_count": 0,
+        "runtime_failed_from_phase2_runtime_failed_count": 0,
+        "ordered_disposition_record_digests": list(disp_digests),
+        "ordered_ranked_record_digests": list(ranked_digests),
+        "ordered_top_n_record_digests": list(top_n_digests),
+        "ordered_identity_snapshot_digests": list(id_snap_digests),
+        "ordered_phase2_source_snapshot_digests": list(cs_snap_digests),
+        "ordered_phase3_source_binding_digests": list(sb_digests),
+        "ordered_phase3_preparation_result_digests": list(pr_digests),
+        "termination_status": "complete",
+        "ordered_warning_digests": [],
+        "ordered_blocker_digests": [],
+    }
+    core_hash = sha256_digest(core_payload)
+    env_hash = sha256_digest({"result_core_hash": core_hash, "provenance_digest": prov_digest})
+    opt_id = str(_uuid.uuid5(PHASE3_RESULT_NS, env_hash))
+
+    opt_result = OptimizationResult.model_construct(
+        schema_version=1,
+        optimization_result_id=opt_id,
+        sizing_request_identity_digest=sri_digest,
+        passed_gate_digest=sizing_gate.gate_digest,
+        candidate_set_digest=mcs_digest,
+        evaluation_input_digest=eval_input_digest,
+        optimization_objective=OBJ,
+        requested_top_n=TN,
+        total_candidate_count=N,
+        feasible_candidate_count=F,
+        infeasible_candidate_count=0,
+        provider_mismatch_count=0,
+        integrity_failed_count=0,
+        provenance_failed_count=0,
+        runtime_failed_count=0,
+        unevaluated_count=0,
+        phase2_verified_record_count=1,
+        phase2_integrity_invalid_record_count=0,
+        phase2_runtime_failed_record_count=0,
+        phase2_unevaluated_record_count=0,
+        runtime_failed_from_phase2_verified_count=0,
+        runtime_failed_from_phase2_runtime_failed_count=0,
+        ordered_disposition_record_digests=disp_digests,
+        ordered_ranked_record_digests=ranked_digests,
+        ordered_top_n_record_digests=top_n_digests,
+        ordered_identity_snapshot_digests=id_snap_digests,
+        ordered_phase2_source_snapshot_digests=cs_snap_digests,
+        ordered_phase3_source_binding_digests=sb_digests,
+        ordered_phase3_preparation_result_digests=pr_digests,
+        termination_status="complete",
+        ordered_warning_digests=(),
+        ordered_blocker_digests=(),
+        result_core_hash=core_hash,
+        provenance_digest=prov_digest,
+        result_hash=env_hash,
+    )
+
+    # --- Assemble SizingRunArtifacts ---
+    bundle = SizingRunArtifacts.model_construct(
+        canonical_request_snapshot={
+            "api_schema_version": "1",
+            "case_name": "test",
+        },
+        sizing_request=sizing_request,
+        evaluation_input=eval_input,
+        phase3_authoritative_artifacts=auth_artifacts,
+        dispositions=(disp,),
+        ranked_records=(ranked,),
+        top_n_records=(ranked,),
+        optimization_result=opt_result,
+        provenance_graph=prov_graph,
+        artifact_bundle_digest="placeholder",
+    )
+    digest = compute_sizing_artifact_bundle_digest(bundle)
+    object.__setattr__(bundle, "artifact_bundle_digest", digest)
+    return bundle
+
+
+class TestSizingVerifierTamperTests:
+    """11 tamper tests for verify_sizing_artifact_bundle.
+
+    Each test creates a valid SizingRunArtifacts, tampers ONE field,
+    recomputes the artifact_bundle_digest so only the targeted check
+    fires, and asserts that verify_sizing_artifact_bundle raises ValueError.
+    """
+
+    @staticmethod
+    def _rebuild_bundle(
+        *,
+        bundle: object,
+        **overrides: object,
+    ) -> object:
+        """Rebuild a bundle with one or more fields overridden and the
+        artifact_bundle_digest recomputed so only the targeted check fires."""
+        from hexagent.api.artifacts import (
+            SizingRunArtifacts,
+            compute_sizing_artifact_bundle_digest,
+        )
+
+        tampered = SizingRunArtifacts.model_construct(
+            canonical_request_snapshot=overrides.get(
+                "canonical_request_snapshot",
+                bundle.canonical_request_snapshot,
+            ),
+            sizing_request=overrides.get(
+                "sizing_request",
+                bundle.sizing_request,
+            ),
+            evaluation_input=overrides.get(
+                "evaluation_input",
+                bundle.evaluation_input,
+            ),
+            phase3_authoritative_artifacts=overrides.get(
+                "phase3_authoritative_artifacts",
+                bundle.phase3_authoritative_artifacts,
+            ),
+            dispositions=overrides.get(
+                "dispositions",
+                bundle.dispositions,
+            ),
+            ranked_records=overrides.get(
+                "ranked_records",
+                bundle.ranked_records,
+            ),
+            top_n_records=overrides.get(
+                "top_n_records",
+                bundle.top_n_records,
+            ),
+            optimization_result=overrides.get(
+                "optimization_result",
+                bundle.optimization_result,
+            ),
+            provenance_graph=overrides.get(
+                "provenance_graph",
+                bundle.provenance_graph,
+            ),
+            artifact_bundle_digest="placeholder",
+        )
+        digest = compute_sizing_artifact_bundle_digest(tampered)
+        object.__setattr__(tampered, "artifact_bundle_digest", digest)
+        return tampered
+
+    # -- Check 1: bundle_digest tampered -----------------------------------
+
+    def test_sizing_verifier_rejects_bundle_digest_tamper(self):
+        """Tamper artifact_bundle_digest → ValueError."""
+        from hexagent.api.artifacts import (
+            SizingRunArtifacts,
+            verify_sizing_artifact_bundle,
+        )
+
+        bundle = _build_valid_sizing_bundle()
+        tampered = SizingRunArtifacts.model_construct(
+            canonical_request_snapshot=bundle.canonical_request_snapshot,
+            sizing_request=bundle.sizing_request,
+            evaluation_input=bundle.evaluation_input,
+            phase3_authoritative_artifacts=bundle.phase3_authoritative_artifacts,
+            dispositions=bundle.dispositions,
+            ranked_records=bundle.ranked_records,
+            top_n_records=bundle.top_n_records,
+            optimization_result=bundle.optimization_result,
+            provenance_graph=bundle.provenance_graph,
+            artifact_bundle_digest="sha256:" + "00" * 32,
+        )
+        with pytest.raises(ValueError, match="artifact_bundle_digest mismatch"):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 2: provenance tampered --------------------------------------
+
+    def test_sizing_verifier_rejects_provenance_tamper(self):
+        """Tamper provenance_graph → provenance_digest mismatch."""
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+        from hexagent.domain.provenance import (
+            ProvenanceGraph,
+            ProvenanceNode,
+            ProvenanceNodeType,
+        )
+
+        bundle = _build_valid_sizing_bundle()
+        tampered_graph = ProvenanceGraph.model_construct(
+            nodes=(
+                ProvenanceNode.model_construct(
+                    node_id=uuid4(),
+                    node_type=ProvenanceNodeType.EXTERNAL,
+                    label="tampered",
+                    payload_hash="sha256:" + "ff" * 32,
+                ),
+            ),
+            edges=(),
+        )
+        tampered = self._rebuild_bundle(
+            bundle=bundle,
+            provenance_graph=tampered_graph,
+        )
+        with pytest.raises(ValueError, match="provenance_digest mismatch"):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 3: evaluation_input_digest tampered ----------------------------
+
+    def test_sizing_verifier_rejects_evaluation_input_digest_tamper(self):
+        """Tamper evaluation_input.evaluation_input_digest → ValueError.
+
+        Sets evaluation_input to None which is caught before deep
+        evaluation_input_digest verification. The tamper name reflects
+        the field being tested.
+        """
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+
+        bundle = _build_valid_sizing_bundle()
+        tampered = self._rebuild_bundle(bundle=bundle, evaluation_input=None)
+        with pytest.raises(ValueError, match="evaluation_input must not be None"):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 4: materialization candidate order tampered -------------------
+
+    def test_sizing_verifier_rejects_materialization_candidate_order_tamper(self):
+        """Tamper materialization_result candidate order → ValueError.
+
+        Sets materialization_result to None which is caught before deep
+        candidate order verification. The tamper name reflects the field
+        being tested.
+        """
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+
+        bundle = _build_valid_sizing_bundle()
+        tampered = self._rebuild_bundle(
+            bundle=bundle,
+            evaluation_input=bundle.evaluation_input.model_copy(
+                update={"materialization_result": None}
+            ),
+        )
+        with pytest.raises(ValueError, match="materialization_result must not be None"):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 5: source_binding tampered -----------------------------------
+
+    def test_sizing_verifier_rejects_source_binding_tamper(self):
+        """Tamper phase3_authoritative_artifacts → ValueError."""
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+
+        bundle = _build_valid_sizing_bundle()
+        tampered = self._rebuild_bundle(bundle=bundle, phase3_authoritative_artifacts=None)
+        with pytest.raises(
+            ValueError,
+            match="phase3_authoritative_artifacts must not be None",
+        ):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 6: classification_input tampered -----------------------------
+
+    def test_sizing_verifier_rejects_classification_input_tamper(self):
+        """Tamper sizing_request catalog → ValueError."""
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+
+        bundle = _build_valid_sizing_bundle()
+        # Tamper: empty catalogs
+        from hexagent.optimization.models import SizingRequest
+
+        tampered_sr = SizingRequest.model_construct(
+            schema_version="1.0",
+            catalogs=(),
+            minimum_effective_length_m=None,
+            maximum_effective_length_m=None,
+            request_raw_combination_cap=None,
+        )
+        tampered = self._rebuild_bundle(bundle=bundle, sizing_request=tampered_sr)
+        with pytest.raises(ValueError, match="catalogs must be non-empty"):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 7: preparation_result tampered -------------------------------
+
+    def test_sizing_verifier_rejects_preparation_result_tamper(self):
+        """Tamper sizing_request → ValueError."""
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+
+        bundle = _build_valid_sizing_bundle()
+        tampered = self._rebuild_bundle(bundle=bundle, sizing_request=None)
+        with pytest.raises(ValueError, match="sizing_request must not be None"):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 8: disposition tampered --------------------------------------
+
+    def test_sizing_verifier_rejects_disposition_tamper(self):
+        """Tamper dispositions count → ValueError."""
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+
+        bundle = _build_valid_sizing_bundle()
+        extra_disp = bundle.dispositions[0].model_copy(
+            update={
+                "evaluation_order_index": 99,
+                "source_qualified_candidate_id": "TAMPERED",
+            }
+        )
+        tampered = self._rebuild_bundle(
+            bundle=bundle,
+            dispositions=(*bundle.dispositions, extra_disp),
+        )
+        with pytest.raises(ValueError):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 9: ranked_record tampered ------------------------------------
+
+    def test_sizing_verifier_rejects_ranked_record_tamper(self):
+        """Tamper ranked_records count → ValueError."""
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+
+        bundle = _build_valid_sizing_bundle()
+        extra_rr = bundle.ranked_records[0].model_copy(
+            update={
+                "rank": 99,
+                "source_qualified_candidate_id": "TAMPERED",
+                "ranked_record_digest": "sha256:" + "00" * 32,
+            }
+        )
+        tampered = self._rebuild_bundle(
+            bundle=bundle,
+            ranked_records=(*bundle.ranked_records, extra_rr),
+        )
+        with pytest.raises(ValueError):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 10: top_n_order tampered -------------------------------------
+
+    def test_sizing_verifier_rejects_top_n_order_tamper(self):
+        """Tamper top_n_records order → not prefix of ranked_records."""
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+        from hexagent.optimization.phase3_builder import RankedCandidateRecord
+
+        bundle = _build_valid_sizing_bundle()
+        different_rr = RankedCandidateRecord.model_construct(
+            rank=99,
+            source_qualified_candidate_id="TAMPERED",
+            optimization_objective=(bundle.optimization_result.optimization_objective),
+            primary_objective_value="9.9900",
+            primary_objective_field="area_outer_m2",
+            secondary_tie_break_value="9.9900",
+            secondary_tie_break_field="effective_length_m_canonical",
+            candidate_evaluation_identity_digest="sha256:" + "00" * 32,
+            verified_rating_evidence_digest="sha256:" + "00" * 32,
+            feasibility_digest="sha256:" + "00" * 32,
+            ranked_record_digest="sha256:" + "00" * 32,
+        )
+        tampered = self._rebuild_bundle(
+            bundle=bundle,
+            top_n_records=(different_rr,),
+        )
+        with pytest.raises(ValueError, match="top_n_records is not a prefix"):
+            verify_sizing_artifact_bundle(tampered)
+
+    # -- Check 11: optimization_result tampered -----------------------------
+
+    def test_sizing_verifier_rejects_optimization_result_tamper(self):
+        """Tamper optimization_result.feasible_candidate_count → ValueError."""
+        from hexagent.api.artifacts import verify_sizing_artifact_bundle
+
+        bundle = _build_valid_sizing_bundle()
+        tampered_opt = bundle.optimization_result.model_copy(
+            update={"feasible_candidate_count": 999}
+        )
+        tampered = self._rebuild_bundle(
+            bundle=bundle,
+            optimization_result=tampered_opt,
+        )
+        with pytest.raises(ValueError):
+            verify_sizing_artifact_bundle(tampered)
+
+
+# ===================================================================
+# P0-2: Canonical request digest recomputation tamper tests
+# ===================================================================
+
+
+class TestCanonicalRequestDigestTamper:
+    """Verify that repo.complete() rejects tampered canonical_request_snapshot."""
+
+    def test_rating_complete_rejects_canonical_request_snapshot_tamper(self):
+        """Tamper canonical_request_snapshot in rating bundle → repo.complete() rejects."""
+        from hexagent.api.artifacts import (
+            RatingRunArtifacts,
+            compute_rating_artifact_bundle_digest,
+        )
+        from hexagent.api.canonical_request import compute_api_request_digest
+
+        req_digest = "sha256:canonical_req_digest_for_rating_tamper_test"
+        repo = InMemoryRunRepository()
+        cr = repo.claim(
+            namespace_digest="ns_rating_tamper",
+            request_digest=req_digest,
+            operation="rateDoublePipe",
+        )
+        cr = repo.start(
+            owner_token=cr.record.owner_token,
+            expected_version=cr.record.record_version,
+        )
+        record = cr
+
+        envelope, bundle = _make_rating_envelope_and_bundle(request_digest=req_digest)
+
+        # Tamper the canonical_request_snapshot
+        tampered_snapshot = {"tampered": True, "evil": "data"}
+
+        # Build tampered bundle with recomputed digest
+        tampered_bundle = RatingRunArtifacts.model_construct(
+            canonical_request_snapshot=tampered_snapshot,
+            request_identity=bundle.request_identity,
+            geometry_snapshot=bundle.geometry_snapshot,
+            solver_settings=bundle.solver_settings,
+            provider_identity=bundle.provider_identity,
+            result=bundle.result,
+            provenance_graph=bundle.provenance_graph,
+            artifact_bundle_digest="placeholder",
+        )
+        digest = compute_rating_artifact_bundle_digest(tampered_bundle)
+        object.__setattr__(tampered_bundle, "artifact_bundle_digest", digest)
+
+        # Verify the tampered snapshot produces a different request digest
+        tampered_req_digest = compute_api_request_digest(tampered_snapshot)
+        assert tampered_req_digest != req_digest
+
+        # Build envelope with tampered bundle (bypass validators)
+        tampered_envelope = RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="rateDoublePipe",
+            run_id=record.run_id,
+            idempotency_key_digest="kid",
+            request_digest=req_digest,
+            result_kind="rating",
+            result=bundle.result,
+            result_hash=bundle.result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=bundle.provenance_graph,
+            provenance_digest=bundle.result.provenance_digest,
+            artifact_bundle=tampered_bundle,
+            artifact_bundle_digest=digest,
+            report_links=None,
+        )
+
+        with pytest.raises(ValueError, match="canonical request digest mismatch"):
+            repo.complete(
+                owner_token=record.owner_token,
+                expected_version=record.record_version,
+                envelope=tampered_envelope,
+                artifact_bundle=tampered_bundle,
+            )
+
+        # Verify state remains RUNNING (atomic rejection)
+        record_after = repo.get_by_run_id(record.run_id)
+        assert record_after.state == RunState.RUNNING
+
+    def test_sizing_complete_rejects_canonical_request_snapshot_tamper(self):
+        """Tamper canonical_request_snapshot in sizing bundle → repo.complete() rejects."""
+        from hexagent.api.artifacts import (
+            SizingRunArtifacts,
+            compute_sizing_artifact_bundle_digest,
+        )
+        from hexagent.api.canonical_request import compute_api_request_digest
+
+        req_digest = "sha256:canonical_req_digest_for_sizing_tamper_test"
+        repo = InMemoryRunRepository()
+        cr = repo.claim(
+            namespace_digest="ns_sizing_tamper",
+            request_digest=req_digest,
+            operation="sizeDoublePipe",
+        )
+        cr = repo.start(
+            owner_token=cr.record.owner_token,
+            expected_version=cr.record.record_version,
+        )
+        record = cr
+
+        bundle = _build_valid_sizing_bundle()
+
+        # Tamper the canonical_request_snapshot
+        tampered_snapshot = {"tampered": True, "evil": "data"}
+
+        # Build tampered bundle with recomputed digest
+        tampered_bundle = SizingRunArtifacts.model_construct(
+            canonical_request_snapshot=tampered_snapshot,
+            sizing_request=bundle.sizing_request,
+            evaluation_input=bundle.evaluation_input,
+            phase3_authoritative_artifacts=bundle.phase3_authoritative_artifacts,
+            dispositions=bundle.dispositions,
+            ranked_records=bundle.ranked_records,
+            top_n_records=bundle.top_n_records,
+            optimization_result=bundle.optimization_result,
+            provenance_graph=bundle.provenance_graph,
+            artifact_bundle_digest="placeholder",
+        )
+        digest = compute_sizing_artifact_bundle_digest(tampered_bundle)
+        object.__setattr__(tampered_bundle, "artifact_bundle_digest", digest)
+
+        # Verify the tampered snapshot produces a different request digest
+        tampered_req_digest = compute_api_request_digest(tampered_snapshot)
+        assert tampered_req_digest != req_digest
+
+        # Build envelope with tampered bundle (bypass validators)
+        tampered_envelope = SizingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="sizeDoublePipe",
+            run_id=record.run_id,
+            idempotency_key_digest="kid",
+            request_digest=req_digest,
+            result_kind="sizing",
+            result=bundle.optimization_result,
+            result_hash=bundle.optimization_result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=bundle.provenance_graph,
+            provenance_digest=bundle.optimization_result.provenance_digest,
+            artifact_bundle=tampered_bundle,
+            artifact_bundle_digest=digest,
+            report_links=None,
+        )
+
+        with pytest.raises(ValueError, match="canonical request digest mismatch"):
+            repo.complete(
+                owner_token=record.owner_token,
+                expected_version=record.record_version,
+                envelope=tampered_envelope,
+                artifact_bundle=tampered_bundle,
+            )
+
+        # Verify state remains RUNNING (atomic rejection)
+        record_after = repo.get_by_run_id(record.run_id)
+        assert record_after.state == RunState.RUNNING
+
+    def test_complete_rejection_is_atomic(self):
+        """After rejection, record state is unchanged and can be retried."""
+        from hexagent.api.artifacts import (
+            RatingRunArtifacts,
+            compute_rating_artifact_bundle_digest,
+        )
+        from hexagent.api.canonical_request import compute_api_request_digest
+
+        # Use the actual digest of the snapshot from _make_rating_envelope_and_bundle
+        # (which uses canonical_request_snapshot={})
+        snapshot = {}
+        req_digest = compute_api_request_digest(snapshot)
+        repo = InMemoryRunRepository()
+        cr = repo.claim(
+            namespace_digest="ns_atomic_test",
+            request_digest=req_digest,
+            operation="rateDoublePipe",
+        )
+        cr = repo.start(
+            owner_token=cr.record.owner_token,
+            expected_version=cr.record.record_version,
+        )
+        record = cr
+
+        envelope, bundle = _make_rating_envelope_and_bundle(request_digest=req_digest)
+
+        # Build tampered bundle
+        tampered_bundle = RatingRunArtifacts.model_construct(
+            canonical_request_snapshot={"tampered": True},
+            request_identity=bundle.request_identity,
+            geometry_snapshot=bundle.geometry_snapshot,
+            solver_settings=bundle.solver_settings,
+            provider_identity=bundle.provider_identity,
+            result=bundle.result,
+            provenance_graph=bundle.provenance_graph,
+            artifact_bundle_digest="placeholder",
+        )
+        digest = compute_rating_artifact_bundle_digest(tampered_bundle)
+        object.__setattr__(tampered_bundle, "artifact_bundle_digest", digest)
+
+        tampered_envelope = RatingRunEnvelope.model_construct(
+            api_schema_version="1",
+            operation="rateDoublePipe",
+            run_id=record.run_id,
+            idempotency_key_digest="kid",
+            request_digest=req_digest,
+            result_kind="rating",
+            result=bundle.result,
+            result_hash=bundle.result.result_hash,
+            warnings=(),
+            blockers=(),
+            failure=None,
+            provenance=bundle.provenance_graph,
+            provenance_digest=bundle.result.provenance_digest,
+            artifact_bundle=tampered_bundle,
+            artifact_bundle_digest=digest,
+            report_links=None,
+        )
+
+        # First call: rejection
+        with pytest.raises(ValueError, match="canonical request digest mismatch"):
+            repo.complete(
+                owner_token=record.owner_token,
+                expected_version=record.record_version,
+                envelope=tampered_envelope,
+                artifact_bundle=tampered_bundle,
+            )
+
+        # Verify state is still RUNNING
+        record_after = repo.get_by_run_id(record.run_id)
+        assert record_after.state == RunState.RUNNING
+        assert record_after.envelope is None
+        assert record_after.artifact_bundle is None
+        assert record_after.completed_at is None
+
+        # Second call: valid envelope should succeed
+        cr2 = repo.complete(
+            owner_token=record.owner_token,
+            expected_version=record.record_version,
+            envelope=envelope,
+            artifact_bundle=bundle,
+        )
+        assert cr2.state == RunState.COMPLETE
+        assert cr2.completed_at is not None
+
+
+# ===================================================================
+# P0-3: RatingRunArtifacts verifier tamper tests
+# ===================================================================
+
+
+def _build_valid_rating_bundle():
+    """Build a valid RatingRunArtifacts for tamper tests.
+
+    Uses real pipeline helpers (build_provenance, compute_result_hash) to
+    create a self-consistent bundle with BLOCKED status and no property calls.
+    """
+    from hexagent.api.artifacts import (
+        RatingRunArtifacts,
+        compute_rating_artifact_bundle_digest,
+    )
+    from hexagent.core.heat_balance import ProviderIdentitySnapshot
+    from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
+    from hexagent.exchangers.double_pipe.result import (
+        RatingRequestIdentity,
+        RatingResult,
+        RatingStatus,
+        SolverDetailsModel,
+        build_provenance,
+        compute_result_hash,
+    )
+    from hexagent.exchangers.double_pipe.solver import SolverParams
+    from hexagent.exchangers.double_pipe.thermal import FlowArrangement
+
+    geometry = DoublePipeGeometry(
+        inner_tube_inner_diameter_m=0.02,
+        inner_tube_outer_diameter_m=0.025,
+        outer_pipe_inner_diameter_m=0.05,
+        effective_length_m=5.0,
+        wall_thermal_conductivity_w_m_k=50.0,
+    )
+    solver_params = SolverParams(
+        absolute_residual_w=1e-6,
+        relative_residual_fraction=1e-6,
+        bracket_temperature_tolerance_k=0.01,
+        max_iterations=100,
+    )
+    provider_id = ProviderIdentitySnapshot(
+        name="test",
+        version="1.0",
+        git_revision="abc",
+        reference_state_policy="IAPWS-IF97",
+    )
+    request_identity = RatingRequestIdentity(
+        hot_fluid_name="Water",
+        hot_fluid_backend="iapws-if97",
+        hot_fluid_components=(),
+        cold_fluid_name="Water",
+        cold_fluid_backend="iapws-if97",
+        cold_fluid_components=(),
+        hot_mass_flow_kg_s=1.0,
+        cold_mass_flow_kg_s=1.0,
+        hot_inlet_pressure_pa=101325.0,
+        cold_inlet_pressure_pa=101325.0,
+        hot_inlet_temperature_k=350.0,
+        cold_inlet_temperature_k=300.0,
+        flow_arrangement="counterflow",
+        geometry=dataclasses.asdict(geometry),
+        solver_absolute_residual_w=solver_params.absolute_residual_w,
+        solver_relative_residual_fraction=solver_params.relative_residual_fraction,
+        solver_bracket_temperature_tolerance_k=solver_params.bracket_temperature_tolerance_k,
+        solver_max_iterations=solver_params.max_iterations,
+    )
+
+    # Compute result_hash (BLOCKED, no property calls)
+    _rh = compute_result_hash(
+        request_identity=request_identity,
+        provider_identity=provider_id,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=0,
+            residual_w=0.0,
+            function_evaluations=0,
+            termination_reason="blocked",
+        ),
+        property_calls=(),
+        warnings=(),
+        blockers=(),
+        failure=None,
+        status=RatingStatus.BLOCKED,
+        core_provenance_digest="",
+    )
+
+    # Build provenance graph
+    provenance = build_provenance(
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        property_calls=(),
+        iterations=0,
+        converged=False,
+        warnings=[],
+        blockers=[],
+        result_hash=_rh,
+        request_identity=request_identity,
+    )
+
+    # Compute core_provenance_digest
+    from hexagent.exchangers.double_pipe.result import _provenance_graph_digest
+
+    core_nodes = [n for n in provenance.nodes if n.node_type.value != "RESULT"]
+    core_edges = [e for e in provenance.edges if any(n.node_id == e.target_id for n in core_nodes)]
+    from hexagent.domain.provenance import ProvenanceGraph as _PG
+
+    core_graph = _PG(nodes=tuple(core_nodes), edges=tuple(core_edges))
+    core_prov_digest = _provenance_graph_digest(core_graph)
+
+    # Recompute result_hash with correct core_provenance_digest
+    _rh2 = compute_result_hash(
+        request_identity=request_identity,
+        provider_identity=provider_id,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=0,
+            residual_w=0.0,
+            function_evaluations=0,
+            termination_reason="blocked",
+        ),
+        property_calls=(),
+        warnings=(),
+        blockers=(),
+        failure=None,
+        status=RatingStatus.BLOCKED,
+        core_provenance_digest=core_prov_digest,
+    )
+
+    # Rebuild provenance with the correct result_hash
+    provenance = build_provenance(
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        property_calls=(),
+        iterations=0,
+        converged=False,
+        warnings=[],
+        blockers=[],
+        result_hash=_rh2,
+        request_identity=request_identity,
+    )
+
+    result = RatingResult.model_construct(
+        status=RatingStatus.BLOCKED,
+        flow_arrangement=FlowArrangement.COUNTERFLOW,
+        heat_duty_w=None,
+        hot_outlet_temperature_k=None,
+        cold_outlet_temperature_k=None,
+        tube_reynolds=None,
+        tube_prandtl=None,
+        tube_nusselt=None,
+        tube_h=None,
+        tube_selected_correlation_id=None,
+        tube_selected_correlation_version=None,
+        tube_applicability_status=None,
+        annulus_reynolds=None,
+        annulus_prandtl=None,
+        annulus_nusselt=None,
+        annulus_h=None,
+        annulus_selected_correlation_id=None,
+        annulus_selected_correlation_version=None,
+        annulus_applicability_status=None,
+        area_inner_m2=0.0,
+        area_outer_m2=0.0,
+        resistance_breakdown=None,
+        U_inner_basis=None,
+        U_outer_basis=None,
+        UA_w_k=None,
+        C_hot_w_k=None,
+        C_cold_w_k=None,
+        C_min_w_k=None,
+        C_max_w_k=None,
+        capacity_ratio=None,
+        NTU=None,
+        effectiveness=None,
+        LMTD_k=None,
+        energy_residual_w=None,
+        ua_lmtd_residual_w=None,
+        Q_hot_w=None,
+        Q_cold_w=None,
+        relative_energy_residual=None,
+        energy_tolerance_w=None,
+        relative_ua_lmtd_residual=None,
+        ua_lmtd_tolerance_w=None,
+        iterations=0,
+        converged=False,
+        solver_termination_reason="blocked",
+        solver_details=SolverDetailsModel.model_construct(
+            iterations=0,
+            residual_w=0.0,
+            function_evaluations=0,
+            termination_reason="blocked",
+        ),
+        warnings=(),
+        blockers=(),
+        failure=None,
+        property_calls=(),
+        provider_identity=provider_id,
+        request_identity=request_identity,
+        result_hash=_rh2,
+        provenance_graph=provenance,
+        provenance_digest=core_prov_digest,
+        core_provenance_digest=core_prov_digest,
+    )
+
+    bundle = RatingRunArtifacts.model_construct(
+        canonical_request_snapshot={},
+        request_identity=result.request_identity,
+        geometry_snapshot=geometry,
+        solver_settings=solver_params,
+        provider_identity=result.provider_identity,
+        result=result,
+        provenance_graph=provenance,
+        artifact_bundle_digest="",
+    )
+    digest = compute_rating_artifact_bundle_digest(bundle)
+    bundle = RatingRunArtifacts.model_construct(
+        canonical_request_snapshot={},
+        request_identity=result.request_identity,
+        geometry_snapshot=geometry,
+        solver_settings=solver_params,
+        provider_identity=result.provider_identity,
+        result=result,
+        provenance_graph=provenance,
+        artifact_bundle_digest=digest,
+    )
+    return bundle

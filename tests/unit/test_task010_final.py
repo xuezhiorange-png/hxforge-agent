@@ -51,6 +51,8 @@ from hexagent.reporting import (
     MANDATORY_ARTIFACT_IDS,
     MANDATORY_ARTIFACT_OWNERS,
     REPORT_SECTION_ORDER,
+    REPORT_TEMPLATE_DEFINITION,
+    REPORT_TEMPLATE_DEFINITION_HASH,
     DoublePipeReportModel,
     NotImplementedReportArtifact,
     OutOfScopeReportArtifact,
@@ -70,6 +72,7 @@ from hexagent.reporting import (
     compute_report_instance_hash,
     derive_source_state,
     resolve_source_pointer,
+    select_report_source_document,
     validate_rfc6901_pointer,
     verify_report_section_status_matrix,
 )
@@ -403,13 +406,14 @@ def _dummy_model(
             )
             for sid in REPORT_SECTION_ORDER
         )
+    content_hash = compute_report_content_hash(sections)
     if identity is None:
-        identity = _dummy_identity()
+        identity = _dummy_identity(report_content_hash=content_hash)
     return DoublePipeReportModel(
         report_schema_version="1",
         sections=sections,
         report_instance_identity=identity,
-        report_content_hash=compute_report_content_hash(sections),
+        report_content_hash=content_hash,
         report_instance_hash=compute_report_instance_hash(identity),
     )
 
@@ -1488,6 +1492,9 @@ class TestP06InstanceHash:
         for field in base:
             modified = dict(base)
             val = modified[field]
+            # report_schema_version is Literal["1"] - skip since can't be mutated
+            if field == "report_schema_version":
+                continue
             if isinstance(val, UUID):
                 modified[field] = uuid4()
             else:
@@ -2230,3 +2237,746 @@ class TestOpenAPIFinal:
                 if isinstance(method_data, dict) and "operationId" in method_data:
                     ids.append(method_data["operationId"])
         assert len(ids) == len(set(ids))
+
+
+# ===================================================================
+# P0-6 + P0-7: Model boundary tests (mandatory PRESENT enforcement,
+# strict identity, template hash authority)
+# ===================================================================
+
+
+class TestP07IdentityStrictPydantic:
+    """P0-7: ReportInstanceIdentity is a strict Pydantic model."""
+
+    def test_report_identity_rejects_wrong_schema_version(self):
+        """ReportInstanceIdentity rejects schema_version != '1'."""
+        from pydantic import ValidationError
+
+        with pytest.raises((ValidationError, TypeError)):
+            ReportInstanceIdentity(
+                report_schema_version="2",  # type: ignore[arg-type]
+                report_content_hash="sha256:a",
+                run_id=uuid4(),
+                request_digest="sha256:rd",
+                source_run_envelope_digest="sha256:env",
+                source_domain_result_hash="sha256:drh",
+                source_artifact_bundle_digest="sha256:abd",
+                template_id="t",
+                template_version="v",
+                template_definition_hash="sha256:tdh",
+                formatter_registry_version="frv",
+            )
+
+    def test_report_identity_rejects_extra_fields(self):
+        """ReportInstanceIdentity with extra='forbid' rejects unknown fields."""
+        from pydantic import ValidationError
+
+        with pytest.raises((ValidationError, TypeError)):
+            ReportInstanceIdentity(
+                report_schema_version="1",
+                report_content_hash="sha256:a",
+                run_id=uuid4(),
+                request_digest="sha256:rd",
+                source_run_envelope_digest="sha256:env",
+                source_domain_result_hash="sha256:drh",
+                source_artifact_bundle_digest="sha256:abd",
+                template_id="t",
+                template_version="v",
+                template_definition_hash="sha256:tdh",
+                formatter_registry_version="frv",
+                extra_field="nope",  # type: ignore[call-arg]
+            )
+
+    def test_report_identity_is_frozen(self):
+        """ReportInstanceIdentity is immutable."""
+        from pydantic import ValidationError
+
+        identity = _dummy_identity()
+        with pytest.raises(ValidationError):
+            identity.report_schema_version = "2"  # type: ignore[misc]
+
+
+class TestP07ModelBoundary:
+    """P0-7: DoublePipeReportModel validates identity consistency."""
+
+    def _make_13_sections(self) -> tuple[ReportSection, ...]:
+        return tuple(
+            ReportSection(
+                section_id=sid,
+                title=sid.value,
+                content="test",
+                status=ReportSectionStatus.COMPLETE,
+            )
+            for sid in REPORT_SECTION_ORDER
+        )
+
+    def test_report_model_rejects_content_hash_mismatch(self):
+        """Model rejects when report_content_hash != identity.report_content_hash."""
+        sections = self._make_13_sections()
+        correct_ch = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=correct_ch)
+        wrong_ch = "sha256:" + "b" * 64
+        with pytest.raises(ValueError, match="report_content_hash"):
+            DoublePipeReportModel(
+                report_schema_version="1",
+                sections=sections,
+                report_instance_identity=identity,
+                report_content_hash=wrong_ch,
+                report_instance_hash=compute_report_instance_hash(identity),
+            )
+
+    def test_report_model_rejects_identity_content_hash_mismatch(self):
+        """Model rejects when identity.report_content_hash != report_content_hash."""
+        sections = self._make_13_sections()
+        correct_ch = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash="sha256:" + "c" * 64)
+        with pytest.raises(ValueError, match="report_content_hash"):
+            DoublePipeReportModel(
+                report_schema_version="1",
+                sections=sections,
+                report_instance_identity=identity,
+                report_content_hash=correct_ch,
+                report_instance_hash=compute_report_instance_hash(identity),
+            )
+
+    def test_report_model_rejects_instance_hash_mismatch(self):
+        """Model rejects when report_instance_hash != sha256_digest(identity)."""
+        sections = self._make_13_sections()
+        correct_ch = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=correct_ch)
+        with pytest.raises(ValueError, match="report_instance_hash"):
+            DoublePipeReportModel(
+                report_schema_version="1",
+                sections=sections,
+                report_instance_identity=identity,
+                report_content_hash=correct_ch,
+                report_instance_hash="sha256:wrong",
+            )
+
+    def test_report_model_rejects_template_hash_tamper(self):
+        """Model rejects when instance hash doesn't match (template hash tamper)."""
+        sections = self._make_13_sections()
+        correct_ch = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=correct_ch)
+        tampered_id = _dummy_identity(
+            report_content_hash=correct_ch,
+            template_definition_hash="sha256:TAMPERED",
+        )
+        with pytest.raises(ValueError, match="report_instance_hash"):
+            DoublePipeReportModel(
+                report_schema_version="1",
+                sections=sections,
+                report_instance_identity=tampered_id,
+                report_content_hash=correct_ch,
+                report_instance_hash=compute_report_instance_hash(identity),
+            )
+
+    def test_report_model_rejects_source_envelope_digest_tamper(self):
+        """Model rejects when source_run_envelope_digest tamper changes instance hash."""
+        sections = self._make_13_sections()
+        correct_ch = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=correct_ch)
+        tampered_id = _dummy_identity(
+            report_content_hash=correct_ch,
+            source_run_envelope_digest="sha256:TAMPERED",
+        )
+        with pytest.raises(ValueError, match="report_instance_hash"):
+            DoublePipeReportModel(
+                report_schema_version="1",
+                sections=sections,
+                report_instance_identity=tampered_id,
+                report_content_hash=correct_ch,
+                report_instance_hash=compute_report_instance_hash(identity),
+            )
+
+    def test_report_model_rejects_bundle_digest_tamper(self):
+        """Model rejects when source_artifact_bundle_digest tamper changes instance hash."""
+        sections = self._make_13_sections()
+        correct_ch = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=correct_ch)
+        tampered_id = _dummy_identity(
+            report_content_hash=correct_ch,
+            source_artifact_bundle_digest="sha256:TAMPERED",
+        )
+        with pytest.raises(ValueError, match="report_instance_hash"):
+            DoublePipeReportModel(
+                report_schema_version="1",
+                sections=sections,
+                report_instance_identity=tampered_id,
+                report_content_hash=correct_ch,
+                report_instance_hash=compute_report_instance_hash(identity),
+            )
+
+    def test_report_model_accepts_consistent_identity(self):
+        """Model succeeds when all identity fields are consistent."""
+        sections = self._make_13_sections()
+        correct_ch = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=correct_ch)
+        model = DoublePipeReportModel(
+            report_schema_version="1",
+            sections=sections,
+            report_instance_identity=identity,
+            report_content_hash=correct_ch,
+            report_instance_hash=compute_report_instance_hash(identity),
+        )
+        assert model.report_schema_version == "1"
+        assert model.report_content_hash == correct_ch
+
+
+class TestP06MandatoryArtifactMustBePresent:
+    """P0-6: Each of the 5 mandatory artifacts must be PresentReportArtifact."""
+
+    def _make_sections_with_artifact(
+        self,
+        artifact_id: ReportArtifactId,
+        owner_section: ReportSectionId,
+        artifact: ReportArtifact,
+    ) -> tuple[ReportSection, ...]:
+        """Build 13 sections, placing the given artifact in the owner section."""
+        sections: list[ReportSection] = []
+        for sid in REPORT_SECTION_ORDER:
+            if sid == owner_section:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="test",
+                        status=ReportSectionStatus.COMPLETE,
+                        artifacts=(artifact,),
+                    )
+                )
+            else:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="",
+                        status=ReportSectionStatus.NOT_APPLICABLE,
+                    )
+                )
+        return tuple(sections)
+
+    def _build_model(self, sections: tuple[ReportSection, ...]) -> DoublePipeReportModel:
+        """Build a DoublePipeReportModel from sections."""
+        ch = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=ch)
+        return DoublePipeReportModel(
+            report_schema_version="1",
+            sections=sections,
+            report_instance_identity=identity,
+            report_content_hash=ch,
+            report_instance_hash=compute_report_instance_hash(identity),
+        )
+
+    def _non_present_variants(self, aid: ReportArtifactId) -> list[ReportArtifact]:
+        """Return 3 non-PRESENT artifact variants for the given artifact_id."""
+        return [
+            UnavailableReportArtifact(
+                kind=ReportArtifactKind.NOT_AVAILABLE,
+                artifact_id=aid,
+                reason_code="not_available",
+                capability="n/a",
+            ),
+            NotImplementedReportArtifact(
+                kind=ReportArtifactKind.NOT_IMPLEMENTED,
+                artifact_id=aid,
+                capability="not_implemented",
+            ),
+            OutOfScopeReportArtifact(
+                kind=ReportArtifactKind.OUT_OF_SCOPE,
+                artifact_id=aid,
+                capability="out_of_scope",
+            ),
+        ]
+
+    def test_each_mandatory_artifact_must_be_present(self):
+        """5 mandatory IDs x 3 non-PRESENT variants = 15 rejection cases."""
+        from hexagent.reporting import _verify_mandatory_artifacts
+
+        for aid in MANDATORY_ARTIFACT_IDS:
+            owner = MANDATORY_ARTIFACT_OWNERS[aid]
+            for variant in self._non_present_variants(aid):
+                sections = self._make_sections_with_artifact(aid, owner, variant)
+                model = self._build_model(sections)
+                with pytest.raises(
+                    ValueError,
+                    match=f"Mandatory artifact {aid.value!r} must be PresentReportArtifact",
+                ):
+                    _verify_mandatory_artifacts(model)
+
+    def test_mandatory_artifact_wrong_owner_rejected(self):
+        """Mandatory artifact in wrong section is rejected."""
+        from hexagent.reporting import _verify_mandatory_artifacts
+
+        def _make_present(aid: ReportArtifactId) -> PresentReportArtifact:
+            return PresentReportArtifact(
+                kind=ReportArtifactKind.PRESENT,
+                artifact_id=aid,
+                source_document=ReportSourceDocument.RUN_ENVELOPE,
+                source_document_digest="sha256:abc",
+                source_json_pointer="/result/status",
+                authority_digest="sha256:def",
+                canonical_raw_value="success",
+                formatter_id="default",
+                formatter_version="1.0",
+                rounding_mode="round",
+                formatted_display_value="success",
+            )
+
+        # STATUS belongs in STATUS_BANNER, put it in PROVENANCE instead
+        bad_artifact = _make_present(ReportArtifactId.STATUS)
+        sections = []
+        for sid in REPORT_SECTION_ORDER:
+            if sid == ReportSectionId.PROVENANCE:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="test",
+                        status=ReportSectionStatus.COMPLETE,
+                        artifacts=(bad_artifact,),
+                    )
+                )
+            elif sid == ReportSectionId.STATUS_BANNER:
+                # Empty section (STATUS is misplaced to PROVENANCE)
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="test",
+                        status=ReportSectionStatus.COMPLETE,
+                        artifacts=(),
+                    )
+                )
+            elif sid == ReportSectionId.RUN_IDENTITY:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="test",
+                        status=ReportSectionStatus.COMPLETE,
+                        artifacts=(
+                            _make_present(ReportArtifactId.RUN_ID),
+                            _make_present(ReportArtifactId.REQUEST_DIGEST),
+                        ),
+                    )
+                )
+            elif sid == ReportSectionId.INTEGRITY:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="test",
+                        status=ReportSectionStatus.COMPLETE,
+                        artifacts=(
+                            _make_present(ReportArtifactId.RESULT_HASH),
+                            _make_present(ReportArtifactId.BUNDLE_HASH),
+                        ),
+                    )
+                )
+            else:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="",
+                        status=ReportSectionStatus.NOT_APPLICABLE,
+                    )
+                )
+        model = self._build_model(tuple(sections))
+        with pytest.raises(ValueError, match="wrong section"):
+            _verify_mandatory_artifacts(model)
+
+    def test_duplicate_mandatory_artifact_rejected(self):
+        """Duplicate mandatory artifact ID is rejected."""
+        from hexagent.reporting import _verify_mandatory_artifacts
+
+        art = PresentReportArtifact(
+            kind=ReportArtifactKind.PRESENT,
+            artifact_id=ReportArtifactId.STATUS,
+            source_document=ReportSourceDocument.RUN_ENVELOPE,
+            source_document_digest="sha256:abc",
+            source_json_pointer="/result/status",
+            authority_digest="sha256:def",
+            canonical_raw_value="success",
+            formatter_id="default",
+            formatter_version="1.0",
+            rounding_mode="round",
+            formatted_display_value="success",
+        )
+        sections = []
+        placed = False
+        for sid in REPORT_SECTION_ORDER:
+            if sid == ReportSectionId.STATUS_BANNER:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="test",
+                        status=ReportSectionStatus.COMPLETE,
+                        artifacts=(art,),
+                    )
+                )
+            elif sid == ReportSectionId.RUN_IDENTITY and not placed:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="test",
+                        status=ReportSectionStatus.COMPLETE,
+                        artifacts=(art,),
+                    )
+                )
+                placed = True
+            else:
+                sections.append(
+                    ReportSection(
+                        section_id=sid,
+                        title=sid.value,
+                        content="",
+                        status=ReportSectionStatus.NOT_APPLICABLE,
+                    )
+                )
+        model = self._build_model(tuple(sections))
+        with pytest.raises(ValueError, match="Duplicate artifact ID"):
+            _verify_mandatory_artifacts(model)
+
+
+class TestP07TemplateAuthority:
+    """P0-7: Template definition hash is authoritative."""
+
+    def test_template_hash_is_sha256_of_definition(self):
+        """REPORT_TEMPLATE_DEFINITION_HASH == sha256_digest(REPORT_TEMPLATE_DEFINITION)."""
+        assert sha256_digest(REPORT_TEMPLATE_DEFINITION) == REPORT_TEMPLATE_DEFINITION_HASH
+
+    def test_template_definition_is_nonempty_string(self):
+        """REPORT_TEMPLATE_DEFINITION is a non-empty string."""
+        assert isinstance(REPORT_TEMPLATE_DEFINITION, str)
+        assert len(REPORT_TEMPLATE_DEFINITION) > 0
+
+    def test_template_hash_is_used_in_build_report_html(self):
+        """build_report_html uses REPORT_TEMPLATE_DEFINITION_HASH in the identity."""
+        app = _create_fresh_app()
+        _, envelope = _execute_rating(app, key="test-p07-template-hash")
+        record = _make_record_for_report(envelope)
+        html = build_report_html(record)
+        assert isinstance(html, bytes)
+        assert REPORT_TEMPLATE_DEFINITION_HASH.startswith("sha256:")
+
+
+# ===================================================================
+# P0-5: Source document root selector with real digests
+# ===================================================================
+
+
+class _FakeEnvelope:
+    """Minimal typed envelope wrapper for P0-5 unit tests.
+
+    Wraps a plain dict so that ``model_dump(mode="json")`` returns it,
+    allowing ``select_report_source_document`` to accept a typed object
+    rather than a raw dict.
+    """
+
+    def __init__(self, data: dict[str, Any]) -> None:
+        self._data = data
+
+    def model_dump(self, *, mode: str | None = None) -> dict[str, Any]:
+        return self._data
+
+
+class TestP05SourceDocumentRoot:
+    """P0-5: select_report_source_document resolves correct root per source_document."""
+
+    def _make_envelope_dict(self) -> dict[str, Any]:
+        """Build a minimal envelope dict for unit tests."""
+        return {
+            "operation": "rateDoublePipe",
+            "run_id": "test-run-id",
+            "request_digest": "sha256:rd",
+            "result": {"status": "success"},
+            "artifact_bundle": {
+                "canonical_request_snapshot": {
+                    "case_name": "test-case",
+                    "hot_stream": {"fluid": {"name": "water"}},
+                },
+                "geometry_snapshot": {"wall_thermal_conductivity": 50.0},
+                "provenance_graph": {"nodes": [], "edges": []},
+            },
+        }
+
+    def test_run_envelope_artifact_uses_envelope_root(self):
+        """RUN_ENVELOPE artifact source_document_digest is sha256(envelope_dict)."""
+        env_dict = self._make_envelope_dict()
+        fake = _FakeEnvelope(env_dict)
+        root = select_report_source_document(
+            envelope=fake,
+            source_document=ReportSourceDocument.RUN_ENVELOPE,
+        )
+        assert root == env_dict
+        assert sha256_digest(root) == sha256_digest(env_dict)
+
+    def test_bundle_artifact_uses_bundle_root(self):
+        """ARTIFACT_BUNDLE artifact source_document_digest is sha256(bundle)."""
+        env_dict = self._make_envelope_dict()
+        fake = _FakeEnvelope(env_dict)
+        root = select_report_source_document(
+            envelope=fake,
+            source_document=ReportSourceDocument.ARTIFACT_BUNDLE,
+        )
+        assert root == env_dict["artifact_bundle"]
+        assert sha256_digest(root) == sha256_digest(env_dict["artifact_bundle"])
+
+    def test_canonical_request_artifact_uses_request_root(self):
+        """CANONICAL_REQUEST artifact source_document_digest is sha256(crs)."""
+        env_dict = self._make_envelope_dict()
+        fake = _FakeEnvelope(env_dict)
+        root = select_report_source_document(
+            envelope=fake,
+            source_document=ReportSourceDocument.CANONICAL_REQUEST,
+        )
+        expected = env_dict["artifact_bundle"]["canonical_request_snapshot"]
+        assert root == expected
+        assert sha256_digest(root) == sha256_digest(expected)
+
+    def test_rejects_wrong_source_document_digest(self):
+        """_verify_source_pointers rejects artifact with wrong source_document_digest."""
+        from hexagent.reporting import _verify_source_pointers
+
+        env_dict = self._make_envelope_dict()
+        fake = _FakeEnvelope(env_dict)
+        envelope_root_digest = sha256_digest(env_dict)
+        bundle_root = env_dict["artifact_bundle"]
+        crs_root = bundle_root["canonical_request_snapshot"]
+        crs_digest = sha256_digest(crs_root)
+
+        # Build a model with an ARTIFACT_BUNDLE artifact that has wrong digest
+        bad_artifact = PresentReportArtifact(
+            kind=ReportArtifactKind.PRESENT,
+            artifact_id=ReportArtifactId.GEOMETRY_SPEC,
+            source_document=ReportSourceDocument.ARTIFACT_BUNDLE,
+            source_document_digest=envelope_root_digest,  # WRONG — should be bundle digest
+            source_json_pointer="/geometry_snapshot",
+            authority_digest=sha256_digest(bundle_root["geometry_snapshot"]),
+            canonical_raw_value=json.dumps(
+                bundle_root["geometry_snapshot"], sort_keys=True, separators=(",", ":")
+            ),
+            formatter_id="default",
+            formatter_version="1.0",
+            rounding_mode="round",
+            formatted_display_value="x",
+        )
+        good_artifact = PresentReportArtifact(
+            kind=ReportArtifactKind.PRESENT,
+            artifact_id=ReportArtifactId.CASE_NAME,
+            source_document=ReportSourceDocument.CANONICAL_REQUEST,
+            source_document_digest=crs_digest,
+            source_json_pointer="/case_name",
+            authority_digest=sha256_digest("test-case"),
+            canonical_raw_value="test-case",
+            formatter_id="default",
+            formatter_version="1.0",
+            rounding_mode="round",
+            formatted_display_value="test-case",
+        )
+        section = ReportSection(
+            section_id=ReportSectionId.GEOMETRY,
+            title="Geometry",
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+            artifacts=(bad_artifact,),
+        )
+        section2 = ReportSection(
+            section_id=ReportSectionId.INPUT_SUMMARY,
+            title="Input Summary",
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+            artifacts=(good_artifact,),
+        )
+        sections = tuple(
+            section
+            if sid == ReportSectionId.GEOMETRY
+            else section2
+            if sid == ReportSectionId.INPUT_SUMMARY
+            else ReportSection(
+                section_id=sid,
+                title=sid.value,
+                content="",
+                status=ReportSectionStatus.NOT_APPLICABLE,
+            )
+            for sid in REPORT_SECTION_ORDER
+        )
+        content_hash = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=content_hash)
+        instance_hash = compute_report_instance_hash(identity)
+        model = DoublePipeReportModel(
+            report_schema_version="1",
+            sections=sections,
+            report_instance_identity=identity,
+            report_content_hash=content_hash,
+            report_instance_hash=instance_hash,
+        )
+        with pytest.raises(ValueError, match="source_document_digest mismatch"):
+            _verify_source_pointers(model, fake)
+
+    def test_rejects_pointer_resolved_against_wrong_root(self):
+        """_verify_source_pointers rejects artifact whose pointer doesn't resolve against root."""
+        from hexagent.reporting import _verify_source_pointers
+
+        env_dict = self._make_envelope_dict()
+        fake = _FakeEnvelope(env_dict)
+        crs_root = env_dict["artifact_bundle"]["canonical_request_snapshot"]
+        crs_digest = sha256_digest(crs_root)
+
+        # Point to an envelope-level key that doesn't exist in canonical_request_snapshot
+        bad_artifact = PresentReportArtifact(
+            kind=ReportArtifactKind.PRESENT,
+            artifact_id=ReportArtifactId.CASE_NAME,
+            source_document=ReportSourceDocument.CANONICAL_REQUEST,
+            source_document_digest=crs_digest,
+            source_json_pointer="/operation",  # exists in envelope, not in CRS
+            authority_digest="sha256:fake",
+            canonical_raw_value="rateDoublePipe",
+            formatter_id="default",
+            formatter_version="1.0",
+            rounding_mode="round",
+            formatted_display_value="rateDoublePipe",
+        )
+        section = ReportSection(
+            section_id=ReportSectionId.INPUT_SUMMARY,
+            title="Input Summary",
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+            artifacts=(bad_artifact,),
+        )
+        sections = tuple(
+            section
+            if sid == ReportSectionId.INPUT_SUMMARY
+            else ReportSection(
+                section_id=sid,
+                title=sid.value,
+                content="",
+                status=ReportSectionStatus.NOT_APPLICABLE,
+            )
+            for sid in REPORT_SECTION_ORDER
+        )
+        content_hash = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=content_hash)
+        instance_hash = compute_report_instance_hash(identity)
+        model = DoublePipeReportModel(
+            report_schema_version="1",
+            sections=sections,
+            report_instance_identity=identity,
+            report_content_hash=content_hash,
+            report_instance_hash=instance_hash,
+        )
+        with pytest.raises((KeyError, ValueError)):
+            _verify_source_pointers(model, fake)
+
+    def test_rejects_authority_digest_tamper(self):
+        """_verify_source_pointers rejects artifact with tampered authority_digest."""
+        from hexagent.reporting import _verify_source_pointers
+
+        env_dict = self._make_envelope_dict()
+        fake = _FakeEnvelope(env_dict)
+        envelope_root_digest = sha256_digest(env_dict)
+        run_id_val = env_dict["run_id"]
+
+        # Correct pointer, wrong authority_digest
+        bad_artifact = PresentReportArtifact(
+            kind=ReportArtifactKind.PRESENT,
+            artifact_id=ReportArtifactId.RUN_ID,
+            source_document=ReportSourceDocument.RUN_ENVELOPE,
+            source_document_digest=envelope_root_digest,
+            source_json_pointer="/run_id",
+            authority_digest="sha256:tampered",  # WRONG
+            canonical_raw_value=run_id_val,
+            formatter_id="default",
+            formatter_version="1.0",
+            rounding_mode="round",
+            formatted_display_value=run_id_val,
+        )
+        section = ReportSection(
+            section_id=ReportSectionId.RUN_IDENTITY,
+            title="Run Identity",
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+            artifacts=(bad_artifact,),
+        )
+        sections = tuple(
+            section
+            if sid == ReportSectionId.RUN_IDENTITY
+            else ReportSection(
+                section_id=sid,
+                title=sid.value,
+                content="",
+                status=ReportSectionStatus.NOT_APPLICABLE,
+            )
+            for sid in REPORT_SECTION_ORDER
+        )
+        content_hash = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=content_hash)
+        instance_hash = compute_report_instance_hash(identity)
+        model = DoublePipeReportModel(
+            report_schema_version="1",
+            sections=sections,
+            report_instance_identity=identity,
+            report_content_hash=content_hash,
+            report_instance_hash=instance_hash,
+        )
+        with pytest.raises(ValueError, match="authority_digest mismatch"):
+            _verify_source_pointers(model, fake)
+
+    def test_rejects_canonical_raw_value_tamper(self):
+        """_verify_source_pointers rejects artifact with tampered canonical_raw_value."""
+        from hexagent.reporting import _verify_source_pointers
+
+        env_dict = self._make_envelope_dict()
+        fake = _FakeEnvelope(env_dict)
+        envelope_root_digest = sha256_digest(env_dict)
+        run_id_val = env_dict["run_id"]
+        run_id_digest = sha256_digest(run_id_val)
+
+        # Correct pointer, correct authority_digest, wrong canonical_raw_value
+        bad_artifact = PresentReportArtifact(
+            kind=ReportArtifactKind.PRESENT,
+            artifact_id=ReportArtifactId.RUN_ID,
+            source_document=ReportSourceDocument.RUN_ENVELOPE,
+            source_document_digest=envelope_root_digest,
+            source_json_pointer="/run_id",
+            authority_digest=run_id_digest,
+            canonical_raw_value="tampered-value",  # WRONG
+            formatter_id="default",
+            formatter_version="1.0",
+            rounding_mode="round",
+            formatted_display_value="tampered-value",
+        )
+        section = ReportSection(
+            section_id=ReportSectionId.RUN_IDENTITY,
+            title="Run Identity",
+            content="test",
+            status=ReportSectionStatus.COMPLETE,
+            artifacts=(bad_artifact,),
+        )
+        sections = tuple(
+            section
+            if sid == ReportSectionId.RUN_IDENTITY
+            else ReportSection(
+                section_id=sid,
+                title=sid.value,
+                content="",
+                status=ReportSectionStatus.NOT_APPLICABLE,
+            )
+            for sid in REPORT_SECTION_ORDER
+        )
+        content_hash = compute_report_content_hash(sections)
+        identity = _dummy_identity(report_content_hash=content_hash)
+        instance_hash = compute_report_instance_hash(identity)
+        model = DoublePipeReportModel(
+            report_schema_version="1",
+            sections=sections,
+            report_instance_identity=identity,
+            report_content_hash=content_hash,
+            report_instance_hash=instance_hash,
+        )
+        with pytest.raises(ValueError, match="canonical_raw_value mismatch"):
+            _verify_source_pointers(model, fake)
