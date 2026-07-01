@@ -9,7 +9,53 @@ permissions:
   contents: read
 
 jobs:
-  task010-focused:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: pipx install uv==0.11.25
+      - name: Verify uv version
+        run: uv --version | grep -q "^uv 0.11.25"
+      - name: Check lock freshness
+        run: uv lock --check
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Verify no lock drift
+        run: git diff --exit-code -- uv.lock pyproject.toml
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pip-audit
+
+  shard-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install uv
+        run: pipx install uv==0.11.25
+      - name: Verify uv version
+        run: uv --version | grep -q "^uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run shard tests
+        run: |
+          uv run pytest --timeout=120 -q \
+            tests/ci/test_node_inventory.py \
+            tests/ci/test_shard_manifest.py \
+            tests/support/test_property_provider_doubles.py
+
+  shard-pure-unit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -22,89 +68,150 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[dev]"
-      - run: ruff check .
-      - run: ruff format --check .
-      - run: mypy
-      - name: Run TASK-010 tests
+      - name: Install uv
+        run: pipx install uv==0.11.25
+      - name: Verify uv version
+        run: uv --version | grep -q "^uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run shard tests
         run: |
-          pytest -x --timeout=120 \
+          uv run pytest --timeout=120 -q \
+            tests/unit/test_calculation_runs.py \
+            tests/unit/test_canonical_serialization.py \
+            tests/unit/test_correlation_applicability.py \
+            tests/unit/test_correlation_models.py \
+            tests/unit/test_correlation_registry.py \
+            tests/unit/test_correlation_usage.py \
+            tests/unit/test_design_case_revisions.py \
+            tests/unit/test_double_pipe_geometry.py \
+            tests/unit/test_double_pipe_solver.py \
+            tests/unit/test_double_pipe_thermal.py \
+            tests/unit/test_provenance_graph.py \
+            tests/unit/test_task009_catalog_hash.py \
+            tests/unit/test_task009_phase1.py \
+            tests/unit/test_task009_phase2_contract.py \
+            tests/unit/test_task009_phase3.py \
+            tests/unit/test_thermal.py \
+            tests/unit/test_tube_annulus_correlations.py
+
+  shard-coolprop-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install uv
+        run: pipx install uv==0.11.25
+      - name: Verify uv version
+        run: uv --version | grep -q "^uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run shard tests
+        run: |
+          uv run pytest --timeout=120 -q \
+            tests/unit/test_double_pipe_correction_r5.py \
+            tests/unit/test_double_pipe_correction_r6.py \
+            tests/unit/test_double_pipe_correction_r8.py \
+            tests/unit/test_double_pipe_correction_r10.py \
+            tests/unit/test_double_pipe_correction_r12.py \
+            tests/unit/test_double_pipe_correction_r13.py \
+            tests/unit/test_double_pipe_rating_kernel.py \
+            tests/unit/test_engineering_messages.py \
+            tests/unit/test_heat_balance.py \
+            tests/unit/test_properties.py \
+            tests/unit/test_provider_snapshot.py \
+            tests/unit/test_review02.py \
+            tests/unit/test_review03.py \
+            tests/unit/test_review_items.py \
             tests/unit/test_task010_final.py \
             tests/unit/test_task010_phase1.py \
-            tests/unit/test_task010_phase2.py
-      - run: pip-audit
+            tests/unit/test_task010_phase2.py \
+            tests/unit/test_units.py
 
-  integration:
+  shard-provider-unit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[dev]"
-      - name: Run integration tests
-        run: pytest -x --timeout=120 tests/integration/
-
-  repository-core:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[dev]"
-      - name: Run repository unit tests (excluding r10/r12)
+      - name: Install uv
+        run: pipx install uv==0.11.25
+      - name: Verify uv version
+        run: uv --version | grep -q "^uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run shard tests
         run: |
-          pytest -x --timeout=120 \
-            --ignore=tests/unit/test_double_pipe_correction_r10.py \
-            --ignore=tests/unit/test_double_pipe_correction_r12.py \
-            -q
+          uv run pytest --timeout=120 -q \
+            tests/unit/test_task009_phase2_adapter.py \
+            tests/unit/test_task009_phase2_canonicalization.py
 
-  units:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[dev]"
-      - name: Run unit conversion tests
-        run: pytest --timeout=120 tests/unit/test_units.py -q
-
-  correction-r10:
+  shard-golden:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[dev]"
-      - name: Run correction r10 tests
-        run: pytest --timeout=120 tests/unit/test_double_pipe_correction_r10.py -q
+      - name: Install uv
+        run: pipx install uv==0.11.25
+      - name: Verify uv version
+        run: uv --version | grep -q "^uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run shard tests
+        run: |
+          uv run pytest --timeout=300 -q \
+            tests/golden/double_pipe_rating/test_golden_double_pipe.py \
+            tests/golden/double_pipe_rating/test_independent_references.py \
+            tests/golden/heat_balance/test_golden.py
 
-  correction-r12:
+  shard-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[dev]"
-      - name: Run correction r12 tests
-        run: pytest --timeout=120 tests/unit/test_double_pipe_correction_r12.py -q
+      - name: Install uv
+        run: pipx install uv==0.11.25
+      - name: Verify uv version
+        run: uv --version | grep -q "^uv 0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --extra dev
+      - name: Run shard tests
+        run: |
+          uv run pytest --timeout=120 -q \
+            tests/integration/test_api.py \
+            tests/integration/test_correlation_registry_workflow.py \
+            tests/integration/test_double_pipe_rating.py \
+            tests/integration/test_heat_balance_property_provider.py \
+            tests/integration/test_revision_run_workflow.py \
+            tests/integration/test_task002_round3.py
