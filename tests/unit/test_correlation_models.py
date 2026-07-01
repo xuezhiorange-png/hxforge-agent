@@ -35,6 +35,8 @@ from hexagent.correlations.models import (
 )
 from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity, ErrorCode
 
+pytestmark = pytest.mark.pure
+
 # Valid sha256 hash for direct model construction (no factory)
 _HASH_DEF = "sha256:" + "a" * 64
 _HASH_ASSESS = "sha256:" + "b" * 64

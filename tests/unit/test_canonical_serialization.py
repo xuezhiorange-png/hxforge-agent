@@ -14,6 +14,8 @@ import pytest
 from hexagent.core.canonical import canonical_json, canonicalize_design_case, sha256_digest
 from hexagent.domain.messages import EngineeringMessage, EngineeringMessageSeverity
 
+pytestmark = pytest.mark.pure
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -40,6 +40,8 @@ from hexagent.domain.thermal_service import run_heat_balance
 from hexagent.properties import CoolPropProvider
 from hexagent.properties.base import FluidIdentifier
 
+pytestmark = pytest.mark.integration
+
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------

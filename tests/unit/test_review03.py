@@ -63,6 +63,8 @@ from hexagent.repositories.memory import (
     OrphanProvenanceNodeError,
 )
 
+pytestmark = pytest.mark.coolprop
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------

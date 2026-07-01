@@ -27,6 +27,8 @@ from hexagent.exchangers.double_pipe.thermal import FlowArrangement
 from hexagent.properties.base import FluidIdentifier
 from hexagent.properties.coolprop_provider import CoolPropProvider
 
+pytestmark = pytest.mark.golden
+
 _GOLDEN_DIR = Path(__file__).parent
 
 

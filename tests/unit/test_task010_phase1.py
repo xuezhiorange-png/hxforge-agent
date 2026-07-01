@@ -103,6 +103,8 @@ from hexagent.optimization.models import (
     SizingRequest,
 )
 
+pytestmark = pytest.mark.coolprop
+
 # =========================================================================
 # Helpers
 # =========================================================================

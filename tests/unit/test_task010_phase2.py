@@ -57,6 +57,8 @@ from hexagent.api.repository import (
     RunState,
 )
 
+pytestmark = pytest.mark.coolprop
+
 _DEFAULT_REQUEST_DIGEST: str = _compute_req_digest({})
 
 

@@ -4,6 +4,8 @@ import pytest
 
 from hexagent.correlations.thermal import counterflow_lmtd
 
+pytestmark = pytest.mark.pure
+
 
 def test_counterflow_lmtd() -> None:
     result = counterflow_lmtd(373.15, 333.15, 293.15, 313.15)

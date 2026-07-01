@@ -12,6 +12,8 @@ import pytest
 
 from hexagent.exchangers.double_pipe.geometry import DoublePipeGeometry
 
+pytestmark = pytest.mark.pure
+
 # ---------------------------------------------------------------------------
 # Canonical example geometry
 # ---------------------------------------------------------------------------

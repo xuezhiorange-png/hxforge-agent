@@ -16,6 +16,8 @@ from hexagent.domain.messages import (
     RunFailure,
 )
 
+pytestmark = pytest.mark.coolprop
+
 # ---------------------------------------------------------------------------
 # Tests: EngineeringMessageSeverity
 # ---------------------------------------------------------------------------

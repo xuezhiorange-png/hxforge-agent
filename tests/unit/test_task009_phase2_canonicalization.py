@@ -49,6 +49,8 @@ from hexagent.optimization.evaluation import (
     verified_rating_evidence_payload,
 )
 
+pytestmark = pytest.mark.provider
+
 # ============================================================================
 # Helper functions (MUST be defined before test classes)
 # ============================================================================

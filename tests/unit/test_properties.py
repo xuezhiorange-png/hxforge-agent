@@ -31,6 +31,8 @@ from hexagent.properties import (
 )
 from hexagent.properties.base import FluidState, PropertyProvenance, SaturationState
 
+pytestmark = pytest.mark.coolprop
+
 
 def _assert_single_phase_state(state: object) -> None:
     assert isinstance(state, FluidState)

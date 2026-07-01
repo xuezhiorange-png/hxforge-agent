@@ -20,6 +20,8 @@ from hexagent.correlations.models import (
 from hexagent.correlations.usage import CorrelationUsageRecord
 from hexagent.domain.provenance import ProvenanceNode, ProvenanceNodeType
 
+pytestmark = pytest.mark.pure
+
 _HASH_A = "sha256:" + "a" * 64
 _HASH_B = "sha256:" + "b" * 64
 _HASH_C = "sha256:" + "c" * 64

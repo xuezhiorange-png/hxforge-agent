@@ -20,6 +20,8 @@ from hexagent.domain.provenance import (
     ProvenanceNodeType,
 )
 
+pytestmark = pytest.mark.pure
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
