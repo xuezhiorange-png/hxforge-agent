@@ -78,34 +78,26 @@ class ShardManifest:
         raise ManifestError(f"unknown shard: {name!r}")
 
 
-def _require_exact_keys(
-    value: dict[Any, Any], expected: set[str], context: str
-) -> None:
+def _require_exact_keys(value: dict[Any, Any], expected: set[str], context: str) -> None:
     keys = set(value)
     if keys != expected:
         missing = sorted(expected - keys)
         unknown = sorted(str(key) for key in keys - expected)
-        raise ManifestError(
-            f"{context} keys mismatch; missing={missing!r}, unknown={unknown!r}"
-        )
+        raise ManifestError(f"{context} keys mismatch; missing={missing!r}, unknown={unknown!r}")
 
 
 def _require_string(value: Any, context: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ManifestError(f"{context} must be a non-empty string")
     if value != value.strip():
-        raise ManifestError(
-            f"{context} must not contain leading or trailing whitespace"
-        )
+        raise ManifestError(f"{context} must not contain leading or trailing whitespace")
     return value
 
 
 def _require_canonical_name(value: Any, context: str) -> str:
     name = _require_string(value, context)
     if _CANONICAL_NAME.fullmatch(name) is None:
-        raise ManifestError(
-            f"{context} must match {_CANONICAL_NAME.pattern!r}, got {name!r}"
-        )
+        raise ManifestError(f"{context} must match {_CANONICAL_NAME.pattern!r}, got {name!r}")
     return name
 
 
@@ -139,15 +131,11 @@ def _canonical_test_path(raw: Any, repo_root: Path, test_root: Path) -> str:
     try:
         resolved.relative_to(test_root.resolve())
     except ValueError as exc:
-        raise ManifestError(
-            f"shard file resolves outside the test root: {path_string!r}"
-        ) from exc
+        raise ManifestError(f"shard file resolves outside the test root: {path_string!r}") from exc
 
     canonical = candidate.relative_to(repo_root).as_posix()
     if canonical != path_string:
-        raise ManifestError(
-            f"shard file path is not canonical: {path_string!r} != {canonical!r}"
-        )
+        raise ManifestError(f"shard file path is not canonical: {path_string!r} != {canonical!r}")
     return path_string
 
 
@@ -182,9 +170,7 @@ def load_manifest(path: Path, *, repo_root: Path | None = None) -> ShardManifest
         raise ManifestError(f"test root does not exist: {test_root}")
 
     try:
-        raw = yaml.load(
-            manifest_path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader
-        )
+        raw = yaml.load(manifest_path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)
     except (OSError, yaml.YAMLError) as exc:
         raise ManifestError(f"unable to parse manifest: {manifest_path}") from exc
     if not isinstance(raw, dict):
@@ -245,9 +231,7 @@ def load_manifest(path: Path, *, repo_root: Path | None = None) -> ShardManifest
     return ShardManifest(version=version, shards=tuple(shards))
 
 
-def discover_test_files(
-    test_root: Path, *, repo_root: Path | None = None
-) -> frozenset[str]:
+def discover_test_files(test_root: Path, *, repo_root: Path | None = None) -> frozenset[str]:
     """Discover every canonical pytest file under the test root."""
 
     root = (repo_root or test_root.parent).resolve()
@@ -280,6 +264,4 @@ def verify_file_completeness(
     missing = sorted(discovered - owned)
     stale = sorted(owned - discovered)
     if missing or stale:
-        raise ManifestError(
-            f"test file ownership mismatch; missing={missing!r}, stale={stale!r}"
-        )
+        raise ManifestError(f"test file ownership mismatch; missing={missing!r}, stale={stale!r}")
