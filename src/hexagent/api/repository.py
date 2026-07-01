@@ -578,7 +578,25 @@ class InMemoryRunRepository:
         if envelope.result.provenance_digest != envelope.provenance_digest:
             raise ValueError("result.provenance_digest != envelope.provenance_digest")
 
-        # 11. Full bundle verification
+        # 11. Canonical request digest recomputation (P0-2)
+        from hexagent.api.canonical_request import compute_api_request_digest
+
+        if artifact_bundle.canonical_request_snapshot is not None:
+            recomputed_req = compute_api_request_digest(
+                artifact_bundle.canonical_request_snapshot
+            )
+            if recomputed_req != record.request_digest:
+                raise ValueError(
+                    f"canonical request digest mismatch: "
+                    f"recomputed={recomputed_req!r} != record={record.request_digest!r}"
+                )
+            if recomputed_req != envelope.request_digest:
+                raise ValueError(
+                    f"canonical request digest mismatch with envelope: "
+                    f"recomputed={recomputed_req!r} != envelope={envelope.request_digest!r}"
+                )
+
+        # 12. Full bundle verification
         verify_rating_artifact_bundle(artifact_bundle)
 
     def _complete_sizing(
@@ -647,7 +665,25 @@ class InMemoryRunRepository:
         if envelope.result.provenance_digest != envelope.provenance_digest:
             raise ValueError("result.provenance_digest != envelope.provenance_digest")
 
-        # 11. Full bundle verification
+        # 11. Canonical request digest recomputation (P0-2)
+        from hexagent.api.canonical_request import compute_api_request_digest
+
+        if artifact_bundle.canonical_request_snapshot is not None:
+            recomputed_req = compute_api_request_digest(
+                artifact_bundle.canonical_request_snapshot
+            )
+            if recomputed_req != record.request_digest:
+                raise ValueError(
+                    f"canonical request digest mismatch: "
+                    f"recomputed={recomputed_req!r} != record={record.request_digest!r}"
+                )
+            if recomputed_req != envelope.request_digest:
+                raise ValueError(
+                    f"canonical request digest mismatch with envelope: "
+                    f"recomputed={recomputed_req!r} != envelope={envelope.request_digest!r}"
+                )
+
+        # 12. Full bundle verification
         verify_sizing_artifact_bundle(artifact_bundle)
 
     def fail(
