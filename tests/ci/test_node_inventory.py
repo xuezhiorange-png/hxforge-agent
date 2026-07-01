@@ -105,9 +105,7 @@ def test_load_inventory_accepts_exact_schema_and_unicode_node_ids(
             "node_count does not equal",
         ),
         (
-            lambda value: (
-                value.update(node_ids=list(reversed(value["node_ids"]))) or value
-            ),
+            lambda value: value.update(node_ids=list(reversed(value["node_ids"]))) or value,
             "sorted lexicographically",
         ),
         (
