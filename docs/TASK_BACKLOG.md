@@ -20,8 +20,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 |---|---|---|---|
 | TASK-002 | Implement unit-safe quantity model and SI semantics | DONE | TASK-001 |
 | TASK-003 | Implement fluid-property contract and CoolProp provider | DONE | TASK-001, TASK-002 |
-| TASK-004 | Implement correlation registry and applicability engine | DONE | TASK-001 |
-| TASK-005 | Implement calculation provenance and structured errors | DONE | TASK-001 |
+| TASK-004 | Implement immutable design-case revisions, calculation provenance and structured errors | DONE | TASK-001 |
+| TASK-005 | Implement correlation registry and applicability engine | DONE | TASK-001 |
 | TASK-006 | Implement heat-balance and specification closure | DONE | TASK-002, TASK-003, TASK-005 |
 | TASK-011 | Collect and approve the first 20 benchmark cases | PLANNED | TASK-001 |
 | TASK-012 | Define standards rule-pack and license boundary | PLANNED | TASK-001 |
@@ -85,9 +85,26 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 
 ## Merge evidence
 
+| Task | PR |
+|---|---|
+| TASK-000 | #1 |
+| TASK-001 | #2 |
+| TASK-002 | #5 |
+| TASK-003 | #7 |
+| TASK-004 | #9 |
+| TASK-005 | #11 |
+| TASK-006 | #14 |
+| TASK-007 | #18 |
+| TASK-008 | #21 |
+| TASK-009 | #24 |
+| TASK-010 design | #29 |
+| TASK-010 impl | #31 |
+
 | Item | Value |
 |---|---|
 | TASK-010 Design PR | #29 |
+| TASK-010 Design reviewed Head | `252b9499c681ac98722ff173b854ea023b5ec03a` |
+| TASK-010 Design merge SHA | `210bdf4069cfd5e1282e4c9b5cc7da02bb7c5170` |
 | TASK-010 Implementation PR | #31 |
 | Reviewed Head | `7c6b62931f5c9d12a0259ffd938ba80f757e65e1` |
 | Merge SHA | `971df0007aa4b7b979598ba5568f702ab76af56f` |

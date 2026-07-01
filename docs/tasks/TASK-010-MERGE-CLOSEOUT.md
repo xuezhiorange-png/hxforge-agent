@@ -3,7 +3,9 @@
 ## Authority
 
 - Frozen Contract SHA: `9a1faeb92f4015a62f9d9add0739f3853a876415`
-- Design PR: #29 (merged `13b03c3`)
+- Design PR: #29
+- Design reviewed Head: `252b9499c681ac98722ff173b854ea023b5ec03a`
+- Design merge SHA: `210bdf4069cfd5e1282e4c9b5cc7da02bb7c5170`
 - Design branch: `docs/task-010-api-report-contract`
 - Implementation PR: #31
 - Implementation branch: `feat/task-010-api-report`
@@ -60,6 +62,7 @@
 
 ## Follow-up
 
-1. TASK-015A: Deterministic test environment and CI sharding (design required before implementation)
-2. TASK-011: Benchmark cases (design and implementation after TASK-015A stabilization)
-3. Governance closeout: sync TASK-000 through TASK-010 real states into backlog
+1. Merge this docs-only governance closeout after independent review.
+2. Design and approve TASK-015A before implementation.
+3. Stabilize the deterministic test environment.
+4. Start TASK-011 design only after TASK-015A completion.
