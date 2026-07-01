@@ -38,6 +38,15 @@ packages = ["src/hexagent"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q --strict-markers"
+markers = [
+  "pure: pure unit tests with no CoolProp or property provider",
+  "provider: PropertyProvider contract and test-double tests",
+  "coolprop: tests requiring the CoolProp backend",
+  "integration: multi-component integration tests",
+  "golden: deterministic correctness regression against an approved baseline",
+  "benchmark: performance observation tests that are not correctness authority",
+  "slow: tests expected to run longer than 30 seconds",
+]
 
 [tool.ruff]
 line-length = 100
