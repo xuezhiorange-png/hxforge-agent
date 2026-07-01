@@ -3,28 +3,33 @@
 **Issue:** #33
 **Status:** DESIGN READY_FOR_REVIEW
 **Implementation Authorization:** NOT GRANTED
-**Frozen Contract SHA:** Pending (to be established after design review — = exact reviewed Head commit SHA)
+**TASK-015A Design Frozen Contract SHA:** Pending — to be set to the exact independently approved reviewed Head commit SHA
+
+> Note: TASK-010 has its own frozen contract SHA: `9a1faeb92f4015a62f9d9add0739f3853a876415`.
+> TASK-015A design contract SHA is distinct and pending independent approval.
 
 ---
 
 ## 1. Objective
 
-Establish a deterministic, reproducible, and maintainable test environment for HXForge that eliminates hidden test files, provides explicit per-shard file manifests verified at pytest node-ID level, replaces ad-hoc `--ignore` with structured test partitioning, introduces typed provider test doubles conforming to the real `PropertyProvider` protocol, separates CoolProp-dependent tests from pure unit tests, adds CI telemetry (JUnit, durations, coverage), and defines clear authority for PR-head, merge-ref, and main-push CI tracks.
+Establish a deterministic, reproducible, and maintainable test environment for HXForge that eliminates hidden test files, provides explicit per-shard file manifests verified at pytest node-ID level, replaces ad-hoc `--ignore` with structured test partitioning, introduces typed provider test doubles conforming to the real `PropertyProvider` protocol, separates CoolProp-dependent tests from pure unit tests, adds mandatory CI telemetry (JUnit, durations, coverage, resource), and defines clear authority for PR-head, merge-ref, and main-push CI tracks — all executed exclusively through the `uv`-managed locked project environment.
 
 ## 2. Scope
 
 1. Dependency lock via `uv.lock` with freshness gate
-2. Pytest marker taxonomy
-3. Test shard manifest specification with node-ID completeness proof
-4. Typed `PropertyProvider` test doubles (real protocol)
-5. CoolProp test isolation
-6. Test coverage completeness verification
-7. JUnit, durations, coverage, resource telemetry
-8. PR-head, merge-ref, main-push tri-track CI authority
-9. Nightly full regression
-10. Golden and benchmark test separation
-11. Workflow/job naming stability
-12. Rollout, migration, and rollback strategy
+2. Frozen `uv` installation authority (`astral-sh/setup-uv` with pinned commit SHA)
+3. Locked environment execution authority (`uv run --locked` for all commands)
+4. Pytest marker taxonomy
+5. Test shard manifest specification with node-ID completeness proof
+6. Typed `PropertyProvider` test doubles (real protocol)
+7. CoolProp test isolation
+8. Mandatory test coverage with cross-job aggregation
+9. JUnit, durations, coverage, resource telemetry
+10. PR-head, merge-ref, main-push tri-track CI authority
+11. Nightly full regression
+12. Golden and benchmark test separation
+13. Workflow/job naming stability
+14. Rollout, migration, and rollback strategy
 
 ## 3. Non-goals
 
@@ -35,6 +40,7 @@ Establish a deterministic, reproducible, and maintainable test environment for H
 - No database, ORM, object storage, authentication, or authorization
 - No frontend changes
 - No PDF engine introduction
+- No minimum coverage percentage threshold in TASK-015A
 
 ## 4. Current CI and Test Topology Inventory
 
@@ -65,40 +71,48 @@ Python matrix: 3.11, 3.12
 - No pytest marker taxonomy
 - `MagicMock` used as provider in multiple test files without typed protocol conformance
 - No PR-head vs merge-ref distinction (default `pull_request` checkout is merge ref)
+- All commands run from system Python, not from a locked `uv`-managed environment
 
 ### 4.4 Baseline inventory generation algorithm
 
 To be executed and recorded before shard cutover:
 
 ```bash
-# Global collection
-pytest --collect-only -q 2>/dev/null | sort > /tmp/global-nodes.txt
-
-# Per-job collection (replicate exact CI arguments)
-pytest --collect-only -q --ignore=... -q 2>/dev/null | sort > /tmp/shard-repository-core.txt
-pytest --collect-only -q tests/unit/test_units.py -q 2>/dev/null | sort > /tmp/shard-units.txt
-# ... etc for each shard
+set -o pipefail
+uv run --locked pytest --collect-only -q > collection.stdout.txt 2> collection.stderr.txt
+# Parse node IDs from stdout (exclude summary, warnings, empty lines)
+# Sort and deduplicate
 ```
 
-Artifact format: one text file per shard containing sorted pytest node IDs.
+Artifact format: one text file per shard containing sorted pytest node IDs, plus stdout, stderr, and collection metadata JSON.
 
-## 5. Dependency Lock
+## 5. uv Installation Authority
 
-### 5.1 uv authority
+### 5.1 Frozen installation
 
-- Tool: `uv`
-- Exact version: `0.11.25` (as of design date; version changes require explicit governance approval)
-- Installation source: system package manager or official installer
-- Version verification: `uv --version` must be printed in CI before any uv command
+```yaml
+- name: Install uv
+  uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+  with:
+    version: "0.11.25"
+
+- name: Verify uv version
+  run: test "$(uv --version)" = "uv 0.11.25"
+```
+
+- **Action repository:** `astral-sh/setup-uv`
+- **Full action commit SHA:** `fac544c07dec837d0ccb6301d7b5580bf5edae39` (v8.2.0)
+- **uv version:** `0.11.25`
+- **Version assertion:** `test "$(uv --version)" = "uv 0.11.25"`
+- **Cache policy:** action-managed cache (default)
+- **Auto-update:** NOT allowed — action SHA is pinned
+- **Version upgrade process:** requires explicit governance approval, new commit SHA, new review
+
+If `setup-uv` cannot provide the specified version, CI must FAIL. No fallback to system `uv`.
 
 ### 5.2 Lock freshness gate
 
-CI must enforce:
-
 ```yaml
-- name: Verify uv version
-  run: uv --version
-
 - name: Check lock freshness
   run: uv lock --check
 
@@ -122,16 +136,62 @@ Failure conditions (all must fail CI):
 - All CI jobs must install from the lock file via `uv sync --locked --all-extras`
 - Lock file updates require explicit PR review
 - Lock file must be regenerated with `uv lock` and committed as a separate change
-- Exact `uv` version变更需要显式治理审批
+- Exact `uv` version changes require explicit governance approval
 
-## 6. Python Version Support
+## 6. Locked Environment Execution Authority
+
+### 6.1 Unique execution rule
+
+Every executable used by TASK-015A CI must resolve from the `uv`-managed locked project environment via `uv run --locked`.
+
+```bash
+# Environment verification
+uv run --locked python -c "import sys; print(sys.executable)"
+uv run --locked pytest --version
+uv run --locked coverage --version
+uv run --locked mypy --version
+uv run --locked ruff --version
+```
+
+### 6.2 Mandatory command form
+
+All CI commands MUST use `uv run --locked`:
+
+```
+uv run --locked pytest ...
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked mypy
+uv run --locked pip-audit
+uv run --locked coverage combine
+uv run --locked coverage xml
+uv run --locked coverage report
+```
+
+### 6.3 Prohibited forms
+
+The following are NOT allowed unless the design explicitly selects an alternative unique form and unifies ALL commands to that form:
+
+- `uv run pytest` (without `--locked`)
+- bare `pytest` (system PATH)
+- `python -m pytest`
+- `.venv/bin/pytest`
+- Any command not routed through `uv run --locked`
+
+### 6.4 Acceptance gate
+
+**Every executable used by TASK-015A CI must resolve from the uv-managed locked project environment.**
+
+CI must not depend on runner pre-installed tool versions.
+
+## 7. Python Version Support
 
 - Supported: 3.11, 3.12
 - CI matrix must test both versions
 - No code may use features exclusive to 3.13+ without explicit approval
 - Minimum version pin in `pyproject.toml` must match CI matrix
 
-## 7. Pytest Marker Taxonomy
+## 8. Pytest Marker Taxonomy
 
 | Marker | Description | CoolProp required | Provider required |
 |---|---|---|---|
@@ -143,7 +203,7 @@ Failure conditions (all must fail CI):
 | `benchmark` | Performance measurement; timing/throughput/memory observations; not correctness authority | Varies | Varies |
 | `slow` | Long-running tests (>30s expected) | Varies | Varies |
 
-### 7.1 Registration
+### 8.1 Registration
 
 ```toml
 [tool.pytest.ini_options]
@@ -158,7 +218,7 @@ markers = [
 ]
 ```
 
-### 7.2 Marker combination legitimacy
+### 8.2 Marker combination legitimacy
 
 | Combination | Allowed | Notes |
 |---|---|---|
@@ -174,7 +234,7 @@ markers = [
 | `golden` + `benchmark` | No | Mutually exclusive: correctness vs performance |
 | `slow` + `pure` | Yes | Long pure tests |
 
-### 7.3 Application rules
+### 8.3 Application rules
 
 - Every test file must be tagged with at least one marker
 - Markers classify semantics, not shard ownership
@@ -183,11 +243,9 @@ markers = [
 - `@pytest.mark.slow` is represented only by `@pytest.mark.slow`
 - Marker filter must not cause test nodes to silently disappear from shards
 
-## 8. Test Shard Manifest
+## 9. Test Shard Manifest
 
-### 8.1 Format
-
-Shards are defined in `ci-shard-manifest.yml`:
+### 9.1 Format
 
 ```yaml
 version: "1"
@@ -197,48 +255,32 @@ shards:
     python: ["3.11", "3.12"]    # subset of [3.11, 3.12]
     files:                        # explicit relative paths, no globs
       - tests/unit/test_file_a.py
-      - tests/unit/test_file_b.py
     timeout: 120                 # seconds per test node
 ```
 
-### 8.2 Sorting rules
+### 9.2 Sorting rules
 
 - Shard names: alphabetical
 - Files within shard: alphabetical
 - Python versions: ascending
 
-### 8.3 Schema validation
+### 9.3 Schema validation
 
-Reject:
-- Duplicate shard names
-- Duplicate job names
-- Duplicate files across shards
-- Empty shards
-- Non-existent paths
-- Directories instead of files
-- Glob patterns
-- `..` path traversal
-- Paths outside repository root
-- Symlinks pointing outside test root
-- Non-canonical paths (e.g., `./tests/` vs `tests/`)
-- Non-test files (files not matching `test_*.py`)
-- Python version values outside frozen set `{3.11, 3.12}`
-- Non-positive integer timeout
-- Unknown schema fields
+Reject: duplicate shard/job names, duplicate files, empty shards, non-existent paths, directories, globs, `..` traversal, paths outside repo root, symlinks outside test root, non-canonical paths, non-test files, Python versions outside `{3.11, 3.12}`, non-positive timeout, unknown fields.
 
-### 8.4 File-level completeness
+### 9.4 File-level completeness
 
 ```python
 def verify_file_completeness(manifest: dict, test_root: str) -> None:
     """Verify D == M bidirectionally."""
-    D = set(discover_all_test_files(test_root))  # all test_*.py in tests/
+    D = set(discover_all_test_files(test_root))
     M = set()
     for shard in manifest["shards"]:
         for f in shard["files"]:
             assert f not in M, f"Duplicate file: {f}"
             M.add(f)
-    missing = D - M  # files in repo but not in manifest
-    extra = M - D    # files in manifest but not in repo
+    missing = D - M
+    extra = M - D
     assert not missing, f"Missing from manifest: {missing}"
     assert not extra, f"Stale manifest paths: {extra}"
     assert M, "No files in manifest"
@@ -246,76 +288,67 @@ def verify_file_completeness(manifest: dict, test_root: str) -> None:
         assert shard["files"], f"Empty shard: {shard['name']}"
 ```
 
-### 8.5 pytest node-ID completeness
+### 9.5 pytest node-ID completeness
 
 ```python
 def verify_node_completeness(manifest: dict, test_root: str) -> None:
-    """Verify union(S_i) == G and S_i ∩ S_j == ∅."""
-    # Global collection
-    G = set(collect_node_ids(test_root))  # pytest --collect-only -q
-
-    # Per-shard collection
+    """Verify union(S_i) == G and S_i intersect S_j == empty."""
+    G = set(collect_node_ids(test_root))
     S = {}
     for shard in manifest["shards"]:
-        cmd = build_pytest_command(shard)  # replicate exact CI args
+        cmd = build_pytest_command(shard)
         S[shard["name"]] = set(collect_node_ids(cmd))
-
-    # Union check
     union = set()
-    for name, nodes in S.items():
+    for nodes in S.values():
         union |= nodes
     missing = G - union
     extra = union - G
     assert not missing, f"Missing node IDs: {missing}"
     assert not extra, f"Extra node IDs: {extra}"
-
-    # Pairwise disjointness
-    for i, (name_i, nodes_i) in enumerate(S.items()):
-        for name_j, nodes_j in list(S.items())[i+1:]:
-            overlap = nodes_i & nodes_j
-            assert not overlap, f"Overlap between {name_i} and {name_j}: {overlap}"
+    names = list(S.keys())
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            overlap = S[names[i]] & S[names[j]]
+            assert not overlap, f"Overlap between {names[i]} and {names[j]}: {overlap}"
 ```
 
-### 8.6 Marker authority
+### 9.6 Node-ID parser requirements
 
-- Manifest is responsible for file ownership (which files belong to which shard)
-- Markers are responsible for semantic classification (what kind of test)
+- Only accept lines matching pytest node-ID syntax
+- Exclude summary, warning, empty lines, collected-count lines
+- UTF-8 encoding, normalize path separators, sort and deduplicate
+- Discover duplicate raw node IDs → FAIL
+- Global and shard collection must use identical: locked environment, Python version, pytest version, plugins, pyproject.toml, working directory, environment variables
+
+### 9.7 Collection failure semantics
+
+- `pytest --collect-only` exit code != 0 → FAIL
+- Import errors → FAIL, plugin errors → FAIL
+- `collection.stderr.txt` always preserved and uploaded
+- Warnings during collection: recorded but do not fail
+
+### 9.8 Marker authority
+
+- Manifest owns file ownership; markers own semantics only
 - Markers do NOT change shard node ownership
-- A test file in shard A stays in shard A regardless of its markers
 
-## 9. "--ignore" Elimination
+## 10. "--ignore" Elimination
 
-### 9.1 Current state
+Replace `--ignore` with explicit file lists. Verify no test file lost (file-level + node-ID completeness). Completeness check job validates atomically.
 
-`repository-core` uses `--ignore` to exclude correction-r10 and correction-r12 files. This creates an implicit "remainder" shard that also executes `test_units.py` and TASK-010 focused tests (duplicating other shards).
-
-### 9.2 Target state
-
-All shards use explicit file lists. `--ignore` is not used in any CI job.
-
-### 9.3 Migration
-
-- Replace `--ignore` patterns with explicit file lists in shard manifest
-- Verify no test file is lost during migration (file-level + node-ID completeness)
-- Verify all intentional prior duplicate execution is removed or explicitly justified
-- Completeness check job validates the transition atomically
-
-## 10. CoolProp Test Isolation
-
-### 10.1 Rules
+## 11. CoolProp Test Isolation
 
 - CoolProp-dependent tests carry `@pytest.mark.coolprop`
-- CoolProp tests run in dedicated shards with explicit timeout (180s)
-- CoolProp tests do not share shard with pure unit tests
-- CoolProp C extension resource contention is mitigated by isolation
+- Dedicated shards with timeout 180s
+- Do not share shard with pure unit tests
 
-## 11. Typed PropertyProvider Test Doubles
+## 12. Typed PropertyProvider Test Doubles
 
-### 11.1 Context
+### 12.1 Context
 
 TASK-010 exposed unsafe dynamic `MagicMock` attributes at the provider-identity boundary. Production extraction was hardened, while strict typed provider test doubles remain a follow-up improvement.
 
-### 11.2 Real PropertyProvider protocol
+### 12.2 Real PropertyProvider protocol
 
 Source: `src/hexagent/properties/base.py`
 
@@ -326,47 +359,38 @@ class PropertyProvider(Protocol):
     git_revision: str
     reference_state_policy: ReferenceStatePolicy
 
-    def state_tp(
-        self,
-        fluid: FluidIdentifier | str,
-        temperature_k: float,
-        pressure_pa: float,
-    ) -> FluidState: ...
-
-    def state_ph(
-        self,
-        fluid: FluidIdentifier | str,
-        pressure_pa: float,
-        enthalpy_j_kg: float,
-        *,
-        reference_state: ReferenceStatePolicy,
-    ) -> FluidState: ...
-
-    def saturation_at_pressure(
-        self,
-        fluid: FluidIdentifier | str,
-        pressure_pa: float,
-    ) -> SaturationState: ...
-
-    def saturation_at_temperature(
-        self,
-        fluid: FluidIdentifier | str,
-        temperature_k: float,
-    ) -> SaturationState: ...
-
+    def state_tp(self, fluid: FluidIdentifier | str, temperature_k: float, pressure_pa: float) -> FluidState: ...
+    def state_ph(self, fluid: FluidIdentifier | str, pressure_pa: float, enthalpy_j_kg: float, *, reference_state: ReferenceStatePolicy) -> FluidState: ...
+    def saturation_at_pressure(self, fluid: FluidIdentifier | str, pressure_pa: float) -> SaturationState: ...
+    def saturation_at_temperature(self, fluid: FluidIdentifier | str, temperature_k: float) -> SaturationState: ...
     def cache_info(self) -> PropertyCacheInfo: ...
-
     def clear_cache(self) -> None: ...
 ```
 
-### 11.3 Query key types
+### 12.3 Canonical fluid identity
+
+```python
+def canonical_fluid_identity(fluid: FluidIdentifier | str) -> str:
+    """Return the canonical cache identity for a fluid.
+
+    Uses FluidIdentifier.cache_identity which delegates to coolprop_fluid,
+    producing strings like "HEOS::Water" or "HEOS::Ethanol[0.5]&Water[0.5]".
+    """
+    return FluidIdentifier.from_value(fluid).cache_identity
+```
+
+Ensures: same fluid + same backend → same key; same name + different backend → different key; same mixture + different composition → different key; same mixture + different component order → same key; string `"Water"` and `FluidIdentifier("Water")` → same key.
+
+### 12.4 Query key types
 
 ```python
 @dataclass(frozen=True)
 class TPQueryKey:
-    fluid_identity: str          # FluidIdentifier.name or str
+    fluid_identity: str   # from canonical_fluid_identity()
     temperature_k: float
     pressure_pa: float
+    @classmethod
+    def from_request(cls, fluid, temperature_k, pressure_pa) -> TPQueryKey: ...
 
 @dataclass(frozen=True)
 class PHQueryKey:
@@ -374,470 +398,255 @@ class PHQueryKey:
     pressure_pa: float
     enthalpy_j_kg: float
     reference_state: ReferenceStatePolicy
+    @classmethod
+    def from_request(cls, fluid, pressure_pa, enthalpy_j_kg, reference_state) -> PHQueryKey: ...
 
 @dataclass(frozen=True)
 class SatPQueryKey:
     fluid_identity: str
     pressure_pa: float
+    @classmethod
+    def from_request(cls, fluid, pressure_pa) -> SatPQueryKey: ...
 
 @dataclass(frozen=True)
 class SatTQueryKey:
     fluid_identity: str
     temperature_k: float
+    @classmethod
+    def from_request(cls, fluid, temperature_k) -> SatTQueryKey: ...
 ```
 
-### 11.4 StubPropertyProvider
+All keys created via `from_request()` factory. Direct construction with hand-built identity strings prohibited.
 
-Returns fixed typed results for all four query types.
+### 12.5 StubPropertyProvider
 
-```python
-@dataclass(frozen=True)
-class StubPropertyProvider:
-    """Fixed-value provider implementing PropertyProvider protocol.
+Returns fixed typed results. Configuration: `tp_results: dict[TPQueryKey, FluidState]`, `ph_results: dict[PHQueryKey, FluidState]`, `sat_p_results: dict[SatPQueryKey, SaturationState]`, `sat_t_results: dict[SatTQueryKey, SaturationState]`, identity fields. Unconfigured input → deterministic error. `cache_info()` → fixed zeros. `clear_cache()` → no-op.
 
-    Configuration:
-    - tp_results: dict[TPQueryKey, FluidState]
-    - ph_results: dict[PHQueryKey, FluidState]
-    - sat_p_results: dict[SatPQueryKey, SaturationState]
-    - sat_t_results: dict[SatTQueryKey, SaturationState]
-    - name/version/git_revision/reference_state_policy: identity fields
+### 12.6 ReplayPropertyProvider
 
-    Behavior:
-    - Configured input → return fixed typed FluidState or SaturationState
-    - Unconfigured input → raise PropertyServiceError with deterministic message
-    - cache_info() → return PropertyCacheInfo(hits=0, misses=0, size=0, max_size=0)
-    - clear_cache() → no-op (no internal cache)
-    """
-    name: str
-    version: str
-    git_revision: str
-    reference_state_policy: ReferenceStatePolicy
-    tp_results: dict[TPQueryKey, FluidState]
-    ph_results: dict[PHQueryKey, FluidState]
-    sat_p_results: dict[SatPQueryKey, SaturationState]
-    sat_t_results: dict[SatTQueryKey, SaturationState]
+Replays ordered sequences. Configuration: per-query-type `deque` of typed results. Sequence exhausted → error. Supports `assert_fully_consumed()`. Call log as immutable tuple. **Cache semantics (frozen):** `cache_info()` → fixed zeros; `clear_cache()` → no-op (does NOT clear queues, reset positions, refill sequences, clear call log, or reset call index). Optional `reset_replay()` for test-only explicit reset.
 
-    def state_tp(self, fluid, temperature_k, pressure_pa) -> FluidState: ...
-    def state_ph(self, fluid, pressure_pa, enthalpy_j_kg, *, reference_state) -> FluidState: ...
-    def saturation_at_pressure(self, fluid, pressure_pa) -> SaturationState: ...
-    def saturation_at_temperature(self, fluid, temperature_k) -> SaturationState: ...
-    def cache_info(self) -> PropertyCacheInfo: ...
-    def clear_cache(self) -> None: ...
-```
+### 12.7 SelectiveFailurePropertyProvider
 
-### 11.5 ReplayPropertyProvider
+Wraps real `PropertyProvider`. Failure map: `dict[tuple[PropertyQueryType, int], Callable[[], Exception]]`. Call index starts at 1. Failure triggered BEFORE delegation. All four query types supported. `cache_info()`/`clear_cache()` delegate to inner. Identity from inner.
 
-Replays recorded sequences of typed results for deterministic testing.
+### 12.8 CountingPropertyProvider
 
-```python
-@dataclass
-class ReplayPropertyProvider:
-    """Replay provider implementing PropertyProvider protocol.
+Wraps real or typed provider. Per-query-type counters. Records normalized request tuples. Failed calls counted. `reset_counts()` available. `cache_info()`/`clear_cache()` delegate. Identity from inner.
 
-    Configuration:
-    - tp_sequence: dict[TPQueryKey, deque[FluidState]]
-    - ph_sequence: dict[PHQueryKey, deque[FluidState]]
-    - sat_p_sequence: dict[SatPQueryKey, deque[SaturationState]]
-    - sat_t_sequence: dict[SatTQueryKey, deque[SaturationState]]
-
-    Behavior:
-    - Each call pops the next value from the corresponding deque
-    - Sequence exhausted → raise PropertyServiceError
-    - Request type mismatch → raise PropertyServiceError immediately
-    - Supports final assertion: all deques must be empty after test
-    - Call log: immutable tuple of (query_type, key, call_index)
-    - Identity fields: concrete strings/enums from configuration
-    """
-    # ... (fields as described)
-
-    def state_tp(self, fluid, temperature_k, pressure_pa) -> FluidState: ...
-    def state_ph(self, fluid, pressure_pa, enthalpy_j_kg, *, reference_state) -> FluidState: ...
-    def saturation_at_pressure(self, fluid, pressure_pa) -> SaturationState: ...
-    def saturation_at_temperature(self, fluid, temperature_k) -> SaturationState: ...
-    def cache_info(self) -> PropertyCacheInfo: ...
-    def clear_cache(self) -> None: ...
-    def assert_fully_consumed(self) -> None: ...
-    @property
-    def call_log(self) -> tuple[tuple[str, object, int], ...]: ...
-```
-
-### 11.6 SelectiveFailurePropertyProvider
-
-Wraps a real `PropertyProvider` and injects failures at configurable call indices.
-
-```python
-@dataclass
-class SelectiveFailurePropertyProvider:
-    """Failure injection provider implementing PropertyProvider protocol.
-
-    Configuration:
-    - inner: PropertyProvider (real or typed)
-    - failure_map: dict[tuple[PropertyQueryType, int], Callable[[], Exception]]
-      Call index starts at 1 (first call = index 1).
-
-    Behavior:
-    - On each call, increment per-query-type counter
-    - If (query_type, counter) ∈ failure_map → raise failure BEFORE delegating to inner
-    - Otherwise → delegate to inner provider
-    - Identity attributes: delegate to inner provider
-    - cache_info(): delegate to inner
-    - clear_cache(): delegate to inner
-    """
-    inner: PropertyProvider
-    failure_map: dict[tuple[PropertyQueryType, int], Callable[[], Exception]]
-    # ... (counters as internal mutable state)
-
-    def state_tp(self, fluid, temperature_k, pressure_pa) -> FluidState: ...
-    def state_ph(self, fluid, pressure_pa, enthalpy_j_kg, *, reference_state) -> FluidState: ...
-    def saturation_at_pressure(self, fluid, pressure_pa) -> SaturationState: ...
-    def saturation_at_temperature(self, fluid, temperature_k) -> SaturationState: ...
-    def cache_info(self) -> PropertyCacheInfo: ...
-    def clear_cache(self) -> None: ...
-    @property
-    def name(self) -> str: ...
-    @property
-    def version(self) -> str: ...
-    @property
-    def git_revision(self) -> str: ...
-    @property
-    def reference_state_policy(self) -> ReferenceStatePolicy: ...
-```
-
-### 11.7 CountingPropertyProvider
-
-Wraps a real or typed provider and counts calls per query type.
-
-```python
-@dataclass
-class CountingPropertyProvider:
-    """Counting wrapper implementing PropertyProvider protocol.
-
-    Configuration:
-    - inner: PropertyProvider
-
-    Behavior:
-    - Per-query-type call counter (TP, PH, SATURATION_P, SATURATION_T)
-    - Records normalized request records: tuple of (query_type, key, call_index)
-    - Failed calls ARE recorded (counted before delegation, failure does not prevent recording)
-    - reset_counts(): resets all counters and call log
-    - cache_info(): delegate to inner
-    - clear_cache(): delegate to inner
-    - Identity attributes: delegate to inner (safe, stable)
-    """
-    inner: PropertyProvider
-
-    def state_tp(self, fluid, temperature_k, pressure_pa) -> FluidState: ...
-    def state_ph(self, fluid, pressure_pa, enthalpy_j_kg, *, reference_state) -> FluidState: ...
-    def saturation_at_pressure(self, fluid, pressure_pa) -> SaturationState: ...
-    def saturation_at_temperature(self, fluid, temperature_k) -> SaturationState: ...
-    def cache_info(self) -> PropertyCacheInfo: ...
-    def clear_cache(self) -> None: ...
-    def reset_counts(self) -> None: ...
-    @property
-    def tp_call_count(self) -> int: ...
-    @property
-    def ph_call_count(self) -> int: ...
-    @property
-    def sat_p_call_count(self) -> int: ...
-    @property
-    def sat_t_call_count(self) -> int: ...
-    @property
-    def call_records(self) -> tuple[tuple[str, object, int], ...]: ...
-    @property
-    def name(self) -> str: ...
-    @property
-    def version(self) -> str: ...
-    @property
-    def git_revision(self) -> str: ...
-    @property
-    def reference_state_policy(self) -> ReferenceStatePolicy: ...
-```
-
-### 11.8 Design-level acceptance checks
+### 12.9 Acceptance checks
 
 - mypy proves each double satisfies `PropertyProvider`
-- All methods return typed domain artifacts (`FluidState` or `SaturationState`)
-- PH calls preserve explicit `reference_state` parameter
-- Saturation calls are independently configurable
-- Identity fields are concrete strings/enums, never dynamic `MagicMock` values
-- No bare `MagicMock` is accepted as a successful provider path
+- All methods return `FluidState` or `SaturationState`
+- PH calls preserve explicit `reference_state`
+- Identity fields concrete, never dynamic MagicMock values
+- No bare MagicMock as provider success path
+- `canonical_fluid_identity()` consistency tests pass
 
-## 12. CI Tri-Track Authority
+## 13. CI Tri-Track Authority
 
-### 12.1 Track A — PR Head
+### 13.1 Track A — PR Head
 
-```yaml
-- uses: actions/checkout@v4
-  with:
-    ref: ${{ github.event.pull_request.head.sha }}
-- name: Assert PR head SHA
-  run: |
-    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
-```
+Checkout `ref: ${{ github.event.pull_request.head.sha }}`. Assert: `test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"`. Job naming: `pr-head / <shard-name>`.
 
-Job naming: `pr-head / <shard-name>` (e.g., `pr-head / task010-focused (3.11)`)
+### 13.2 Track B — PR Merge Ref
 
-### 12.2 Track B — PR Merge Ref
+Checkout `refs/pull/${{ github.event.pull_request.number }}/merge`. Assert SHA matches `merge_commit_sha`. Job naming: `merge-ref / <shard-name>`.
 
-```yaml
-- uses: actions/checkout@v4
-  with:
-    ref: refs/pull/${{ github.event.pull_request.number }}/merge
-- name: Assert merge-ref SHA
-  run: |
-    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.merge_commit_sha }}"
-```
+### 13.3 Track C — Main Push
 
-Job naming: `merge-ref / <shard-name>`
+Checkout `ref: ${{ github.sha }}`. Assert SHA matches. Job naming: `main / <shard-name>`.
 
-### 12.3 Track C — Main Push
+### 13.4 Rules
 
-```yaml
-- uses: actions/checkout@v4
-  with:
-    ref: ${{ github.sha }}
-- name: Assert main-push SHA
-  run: |
-    test "$(git rev-parse HEAD)" = "${{ github.sha }}"
-```
+PR-head and merge-ref both required for merge. Head success + merge-ref failure → block. Test-node inventory must match. Fork PRs must not use secrets. `pull_request_target` prohibited. Merge-ref NOT optional.
 
-Job naming: `main / <shard-name>`
+## 14. Nightly Full Regression
 
-### 12.4 Authority rules
+Runs full suite including golden, benchmark, slow. Separate from PR-blocking. Failures create issues. Schedule: daily. Artifacts retained 30 days.
 
-| Rule | Enforced |
-|---|---|
-| PR-head success required for merge | YES |
-| Merge-ref success required for merge | YES |
-| Head success but merge-ref failure → block merge | YES |
-| Head and merge-ref test-node inventory must match | YES |
-| Fork PR must not use repository secrets | YES |
-| `pull_request_target` must NOT be used | YES |
-| Merge-ref is NOT optional | YES |
+## 15. Timeout, Cancellation, and Retry
 
-### 12.5 Required checks
-
-Required status checks on PR:
-- All `pr-head / *` jobs: SUCCESS
-- All `merge-ref / *` jobs: SUCCESS
-
-Required status checks on main:
-- All `main / *` jobs: SUCCESS
-
-## 13. Nightly Full Regression
-
-### 13.1 Boundary
-
-- Nightly runs the full test suite including `golden`, `benchmark`, and `slow` markers
-- Nightly is separate from PR-blocking CI
-- Nightly failures do not block PR merges
-- Nightly failures create issues for investigation
-
-### 13.2 Schedule
-
-Daily at fixed time (e.g., 03:00 UTC), triggered by `schedule` event.
-
-### 13.3 Telemetry
-
-Upload JUnit XML, durations, and coverage report as artifacts. Retain for 30 days.
-
-## 14. Timeout, Cancellation, and Retry Rules
-
-### 14.1 Timeout
-
-| Shard type | Per-node timeout |
+| Type | Timeout |
 |---|---|
 | Default | 120s |
 | CoolProp | 180s |
 | Golden | 300s |
 
-### 14.2 Cancellation
+Runner-side cancellation recorded, not auto-retried. No automatic test retry (determinism). Infrastructure retry acceptable.
 
-GitHub Actions runner-side cancellation is recorded but not retried automatically. The exact termination cause is investigated before re-run.
+## 16. Globally Unique Artifact Identity
 
-### 14.3 Retry
+### 16.1 Naming
 
-No automatic retry for test failures (determinism requirement). CI-level retry for infrastructure failures (runner unavailable) is acceptable.
+GitHub artifact: `<track>-<shard>-py<version>-<artifact-kind>`
+Internal file: `<artifact-kind>.<track>.<shard>.py<version>.<ext>`
 
-## 15. Telemetry Contracts
+### 16.2 Tracks
 
-### 15.1 JUnit artifact
+`pr-head`, `merge-ref`, `main`, `nightly` (exactly these four)
+
+### 16.3 Kinds
+
+| Kind | GitHub name suffix | Internal file |
+|---|---|---|
+| JUnit | `-junit` | `junit.<track>.<shard>.py<ver>.xml` |
+| pytest output | `-pytest-output` | `pytest-output.<track>.<shard>.py<ver>.txt` |
+| coverage data | `-coverage-data` | `coverage.<track>.<shard>.py<ver>.xml` |
+| coverage raw | `-coverage-raw` | `.coverage.<track>.<shard>.py<ver>` |
+| resource | `-resource` | `resource.<track>.<shard>.py<ver>.json` |
+| node inventory | `-node-inventory` | `nodes.<track>.<shard>.py<ver>.txt` |
+| collection stderr | `-collection-stderr` | `collection-stderr.<track>.<shard>.py<ver>.txt` |
+
+### 16.4 Character rules
+
+Lowercase ASCII, hyphen or dot separators, no spaces/slash/dynamic labels. Globally unique within workflow run.
+
+## 17. Telemetry Contracts
+
+### 17.1 JUnit
 
 ```bash
-pytest --junitxml=test-results.xml --timeout=<timeout> <args>
+uv run --locked pytest --junitxml=junit.${TRACK}.${SHARD}.py${PYVER}.xml --timeout=<timeout> <args>
 ```
 
-Artifact name: `<shard-name>-junit.xml`
-
-### 15.2 Durations artifact
-
-`pytest --durations=20` prints slow-test summary to stdout/stderr. To capture:
+### 17.2 Durations
 
 ```bash
-pytest --durations=20 --timeout=<timeout> <args> 2>&1 | tee pytest-output.txt
+uv run --locked pytest --durations=20 --timeout=<timeout> <args> 2>&1 | tee pytest-output.${TRACK}.${SHARD}.py${PYVER}.txt
 ```
 
-Artifact name: `<shard-name>-output.txt` (contains durations section in stdout)
+### 17.3 Coverage (mandatory)
 
-### 15.3 Coverage artifact
+Every required test shard must emit raw coverage data and per-shard coverage XML.
 
 ```bash
-pytest --cov=hexagent \
-       --cov-report=xml:<shard-name>-coverage.xml \
-       --cov-append \
-       --timeout=<timeout> \
-       <args>
+export COVERAGE_FILE=".coverage.${TRACK}.${SHARD}.py${PYVER}"
+uv run --locked pytest --cov=hexagent --cov-branch --cov-report=xml:coverage.${TRACK}.${SHARD}.py${PYVER}.xml --timeout=<timeout> <files>
+test -s "$COVERAGE_FILE"
 ```
 
-Per-shard coverage data file: `.coverage.<shard-name>` (via `COVERAGE_FILE` env var)
-Combined report: `coverage combine` then `coverage xml` then `coverage report`
-Artifact names: `<shard-name>-coverage.xml`, `combined-coverage.xml`
+No minimum percentage threshold. Branch coverage enabled. Subprocess coverage out of scope.
 
-No minimum percentage gate in TASK-015A. Branch coverage: enabled. Subprocess coverage: not in scope.
+### 17.4 Cross-job coverage aggregation
 
-### 15.4 Resource telemetry schema
+Dedicated `coverage-aggregate` job depends on all test jobs. Downloads `*-coverage-raw` artifacts, validates count/uniqueness/completeness, rejects zero-byte/unknown/duplicate files, runs `uv run --locked coverage combine`, generates `combined-coverage.xml`, uploads. Failure: missing file → FAIL, duplicate → FAIL, combine fails → FAIL, aggregate not executed → overall FAIL.
+
+### 17.5 Resource telemetry schema
 
 ```json
 {
+  "schema_version": "1",
   "job_name": "string",
   "shard_name": "string",
-  "track": "pr-head | merge-ref | main",
+  "track": "pr-head | merge-ref | main | nightly",
   "python_version": "3.11 | 3.12",
-  "uv_version": "string",
-  "commit_sha": "string",
+  "uv_version": "0.11.25",
+  "commit_sha": "string (must equal asserted SHA)",
   "runner_os": "string",
+  "run_id": "string",
+  "run_attempt": "number",
   "job_start": "ISO-8601",
   "job_end": "ISO-8601",
-  "wall_clock_seconds": "number",
-  "install_duration_seconds": "number",
-  "test_duration_seconds": "number",
-  "exit_status": "number"
+  "wall_clock_seconds": "number (finite, non-negative)",
+  "install_duration_seconds": "number (finite, non-negative)",
+  "collection_duration_seconds": "number (finite, non-negative)",
+  "test_duration_seconds": "number (finite, non-negative)",
+  "peak_rss_bytes": "number | null",
+  "cpu_user_seconds": "number | null",
+  "cpu_system_seconds": "number | null",
+  "disk_bytes_before": "number | null",
+  "disk_bytes_after": "number | null",
+  "exit_status": "number",
+  "telemetry_availability": {
+    "peak_rss": "boolean",
+    "cpu": "boolean",
+    "disk": "boolean"
+  }
 }
 ```
 
-Artifact name: `<shard-name>-resource.json`
+Unobtainable values: `null` (never `0`). Availability flags consistent with null. All durations finite non-negative. `commit_sha` equals track asserted SHA. `schema_version` fixed. `extra=forbid`.
 
-## 16. Golden and Benchmark Separation
+## 18. Golden and Benchmark Separation
 
-### 16.1 Definitions
+- **golden**: Correctness regression, PR-blocking. `@pytest.mark.golden`.
+- **benchmark**: Performance measurement, nightly/non-blocking. `@pytest.mark.benchmark`.
+- Mutually exclusive on single test.
+- `@pytest.mark.benchmark` does NOT imply `@pytest.mark.golden`.
+- `@pytest.mark.golden` does NOT imply `@pytest.mark.coolprop`.
+- Golden/benchmark not mixed with correctness shards.
+- Golden result updates require explicit PR approval.
 
-- **golden**: Deterministic correctness regression against approved committed baseline. PR-blocking.
-- **benchmark**: Performance measurement (timing/throughput/memory). Not correctness authority. Nightly/non-blocking unless separately approved.
+## 19. Workflow/Job Naming Stability
 
-### 16.2 Rules
+Job names stable, unique within run, match manifest `job` field. Renaming requires manifest update.
 
-- Golden tests carry `@pytest.mark.golden`
-- Benchmark tests carry `@pytest.mark.benchmark`
-- `golden` and `benchmark` are mutually exclusive on a single test
-- Golden may be PR-blocking
-- Benchmark is nightly/non-blocking unless separately approved
-- `@pytest.mark.benchmark` must not automatically imply `@pytest.mark.golden`
-- `@pytest.mark.golden` must not automatically imply `@pytest.mark.coolprop`
-- Benchmark must not be mixed with correctness shards
-- Golden result updates require explicit PR approval
+## 20. Shard I/O/Failure Semantics
 
-## 17. Workflow/Job Naming Stability
+**Input:** Git checkout, Python version, `uv sync --locked --all-extras`.
+**Output:** JUnit, durations, coverage raw + XML (mandatory), resource telemetry, node inventory.
+**Failure:** Any test failure fails shard. Shards independent. All required shards must pass.
 
-- Job names must be stable across PRs (no dynamic names)
-- Job names must be unique within a workflow run
-- Job names must match shard manifest `job` field
-- Renaming a job requires updating the manifest and all references
+## 21. Rollout Order
 
-## 18. Shard Input/Output/Failure Semantics
-
-### 18.1 Input
-
-- Git checkout of the verified SHA (per track)
-- Python version from matrix
-- Dependencies installed from `uv.lock` via `uv sync --locked --all-extras`
-
-### 18.2 Output
-
-- JUnit XML artifact
-- Durations/log artifact
-- Coverage artifact (if coverage enabled)
-- Exit code 0 (success) or non-zero (failure)
-
-### 18.3 Failure semantics
-
-- Any test failure in a shard fails the shard job
-- Shard failures are independent (no cross-shard dependencies)
-- All required shards must pass for overall CI success
-
-## 19. Rollout Order
-
-Each phase is independently revertible with explicit acceptance gates.
-
-| Phase | Action | Acceptance gate |
+| Phase | Action | Gate |
 |---|---|---|
-| 1 | Freeze uv version authority + add `uv.lock` + freshness gate | `uv lock --check` passes; `git diff --exit-code -- uv.lock pyproject.toml` after install |
-| 2 | Add marker registration to `pyproject.toml` only | `pytest --markers` shows all registered markers |
-| 3 | Add manifest schema, parser, file-level verifier, node-ID verifier | Verifier runs in shadow mode (report only, no routing) |
-| 4 | Generate and review current topology inventory | Baseline node union and overlaps documented |
-| 5 | Add typed `PropertyProvider` doubles and migrate tests | mypy proves protocol satisfaction; no CI routing change |
-| 6 | Introduce explicit shards and remove `--ignore` atomically | Completeness verifier required in same PR; `new_union == current_global` |
-| 7 | Add independent PR-head and merge-ref tracks | SHA assertions pass on test PR |
-| 8 | Add JUnit, durations, coverage, resource telemetry | Artifacts uploaded for every shard |
-| 9 | Add nightly benchmark/full regression workflow | Nightly runs successfully (manual trigger test) |
+| 1 | Freeze uv authority + `uv.lock` + freshness gate + `uv run --locked` for all | `uv lock --check`; `git diff --exit-code`; all commands `uv run --locked` |
+| 2 | Add marker registration only | `uv run --locked pytest --markers` |
+| 3 | Add manifest schema, parser, file+node-ID verifiers (shadow mode) | Verifier runs, no routing |
+| 4 | Generate baseline topology inventory | Documented node union and overlaps |
+| 5 | Add typed `PropertyProvider` doubles, migrate tests | mypy protocol proof; no routing change |
+| 6 | Introduce explicit shards, remove `--ignore` atomically | Completeness verifier required in same PR |
+| 7 | Add PR-head and merge-ref tracks | SHA assertions pass |
+| 8 | Add JUnit, durations, coverage, telemetry + `coverage-aggregate` | Artifacts uploaded; aggregate passes |
+| 9 | Add nightly workflow | Manual trigger test passes |
 
-### 19.1 Rollback
+Rollback: each phase revertible via `git revert`. Typed doubles rollback restores last approved implementation (bare MagicMock NOT a recommended long-term state).
 
-- Each phase is revertible via `git revert`
-- `uv.lock` removal: revert commit, restore `pip install` in CI
-- Shard manifest rollback: restore previous `--ignore` commands
-- Typed doubles rollback: restore previous test implementations (bare `MagicMock` is NOT a recommended long-term state; rollback restores last approved implementation, maintaining provider boundary safety)
-- Nightly workflow rollback: disable or delete workflow file
-
-## 20. Implementation Acceptance Tests
-
-Before TASK-015A implementation is considered complete:
+## 22. Implementation Acceptance Tests
 
 1. `uv sync --locked --all-extras` succeeds on fresh clone
 2. `uv lock --check` passes
-3. `git diff --exit-code -- uv.lock pyproject.toml` passes after install
-4. All CI jobs pass with `uv sync --locked` installation
-5. File-level completeness: `D == M`
-6. Node-ID completeness: `union(S_i) == G`
-7. Node-ID pairwise disjointness: `S_i ∩ S_j == ∅`
-8. No `--ignore` used in any CI job
-9. All test doubles implement `PropertyProvider` protocol (mypy)
-10. No bare `MagicMock()` as provider success path in production tests
-11. CoolProp tests isolated in dedicated shard
-12. JUnit XML uploaded for every shard
-13. Coverage artifact uploaded for every shard
-14. Combined coverage report generated
-15. Resource telemetry JSON uploaded for every shard
-16. PR-head SHA assertion passes
-17. Merge-ref SHA assertion passes
-18. Main-push SHA assertion passes
-19. Nightly workflow runs successfully (manual trigger)
-20. Golden tests separated from correctness tests
-21. Benchmark tests separated from correctness tests
+3. `git diff --exit-code -- uv.lock pyproject.toml` passes
+4. `uv run --locked python -c "import sys; print(sys.executable)"` prints valid path
+5. `uv run --locked pytest --version` succeeds
+6. `uv run --locked ruff --version` succeeds
+7. `uv run --locked mypy --version` succeeds
+8. `uv run --locked coverage --version` succeeds
+9. All CI jobs pass with `uv run --locked`
+10. File-level completeness: `D == M`
+11. Node-ID completeness: `union(S_i) == G`
+12. Node-ID pairwise disjointness
+13. No `--ignore` in any CI job
+14. All test doubles implement `PropertyProvider` (mypy)
+15. No bare MagicMock provider success path
+16. CoolProp tests isolated in dedicated shard
+17. JUnit XML uploaded per shard
+18. Coverage raw + XML uploaded per shard (mandatory)
+19. Combined coverage by `coverage-aggregate`
+20. Resource telemetry JSON per shard
+21. PR-head SHA assertion passes
+22. Merge-ref SHA assertion passes
+23. Main-push SHA assertion passes
+24. Nightly workflow runs
+25. Golden node IDs only in golden shards; no non-golden node in golden shard
+26. Benchmark node IDs only in nightly benchmark shards; no benchmark in PR-blocking shards
 
-## 21. TASK-010 Frozen Contract Preservation
+## 23. TASK-010 Frozen Contract Preservation
 
-This design contract must not alter:
-- TASK-010 frozen contract SHA: `9a1faeb92f4015a62f9d9add0739f3853a876415`
-- TASK-010 API behavior, DTOs, envelopes, artifact bundles, or report model
-- TASK-010 repository state machine or CAS semantics
-- TASK-010 ranking, formatter authority, or verifier logic
+Must not alter TASK-010 frozen contract SHA `9a1faeb92f4015a62f9d9add0739f3853a876415` or any TASK-010 behavior.
 
-Any change that affects TASK-010 behavior requires a separate design contract and approval.
+## 24. TASK-011 Dependency
 
-## 22. TASK-011 Dependency
+TASK-011 must not start until TASK-015A implementation complete and CI stable.
 
-TASK-011 (benchmark cases) must not be started until TASK-015A implementation is complete and CI environment is stable. This is a hard dependency.
+## 25. Design Freeze Process
 
-## 23. Design Freeze Process
-
-- **Frozen Contract SHA** = exact reviewed Head commit SHA containing the approved design contract
-- Additional recorded hashes (for traceability, not authority):
-  - `Reviewed Head Commit SHA`: the commit SHA of the reviewed HEAD
-  - `Design Document Git Blob SHA-1`: SHA-1 of the design document blob in Git
-  - `Design Document Content SHA-256`: SHA-256 of the design document content
-- Only the Reviewed Head Commit SHA serves as the frozen authority
-- Any modification to the design contract requires: new commit → new review → new frozen authority
-- In-place modification of a frozen document without updating the SHA is prohibited
+- **TASK-015A Design Frozen Contract SHA** = exact reviewed Head commit SHA
+- Additional hashes for traceability: Reviewed Head Commit SHA, Design Document Git Blob SHA-1, Design Document Content SHA-256
+- Only Reviewed Head Commit SHA is frozen authority
+- Modification requires: new commit → new review → new frozen authority
 
 ---
 
@@ -845,8 +654,9 @@ TASK-011 (benchmark cases) must not be started until TASK-015A implementation is
 
 | Gate | Required |
 |---|---|
-| Exact uv version authority | YES |
+| Exact uv version authority (pinned action SHA) | YES |
 | uv lock freshness check | YES |
+| `uv run --locked` for all executables | YES |
 | Python 3.11 locked sync | YES |
 | Python 3.12 locked sync | YES |
 | Manifest schema validation | YES |
@@ -858,10 +668,11 @@ TASK-011 (benchmark cases) must not be started until TASK-015A implementation is
 | PR-head exact SHA assertion | YES |
 | Merge-ref exact SHA assertion | YES |
 | Main-push exact SHA assertion | YES |
-| Typed PropertyProvider protocol check | YES |
+| Typed PropertyProvider protocol check (mypy) | YES |
 | No bare MagicMock provider success path | YES |
 | JUnit artifact per shard | YES |
-| Coverage artifact per shard | YES |
+| Coverage raw data per shard (mandatory) | YES |
+| Coverage XML per shard (mandatory) | YES |
 | Combined coverage artifact | YES |
 | Durations/log artifact per shard | YES |
 | Resource telemetry artifact per shard | YES |
@@ -873,4 +684,4 @@ TASK-011 (benchmark cases) must not be started until TASK-015A implementation is
 
 **Design Status:** READY_FOR_REVIEW
 **Implementation Authorization:** NOT GRANTED
-**Frozen Contract SHA:** Pending
+**TASK-015A Design Frozen Contract SHA:** Pending
