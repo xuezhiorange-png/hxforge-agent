@@ -94,9 +94,7 @@ def test_manifest_rejects_invalid_contract_values(
 def test_manifest_rejects_duplicate_yaml_key(tmp_path: Path) -> None:
     repo, manifest_path = _write_repo(tmp_path)
     manifest_path.write_text(
-        _valid_manifest().replace(
-            "    job: unit-a\n", "    job: unit-a\n    job: duplicate\n"
-        )
+        _valid_manifest().replace("    job: unit-a\n", "    job: unit-a\n    job: duplicate\n")
     )
 
     with pytest.raises(ManifestError, match="duplicate YAML mapping key"):
@@ -115,12 +113,15 @@ def test_manifest_rejects_duplicate_file_ownership(tmp_path: Path) -> None:
 
 def test_file_completeness_reports_missing_discovered_file(tmp_path: Path) -> None:
     repo, manifest_path = _write_repo(tmp_path)
-    manifest_path.write_text(
-        _valid_manifest().replace(
-            '  - name: unit-b\n    job: unit-b\n    python: ["3.12"]\n    files:\n      - tests/unit/test_b.py\n    timeout: 180\n',
-            "",
-        )
-    )
+    unit_b_block = """\
+  - name: unit-b
+    job: unit-b
+    python: ["3.12"]
+    files:
+      - tests/unit/test_b.py
+    timeout: 180
+"""
+    manifest_path.write_text(_valid_manifest().replace(unit_b_block, ""))
     manifest = load_manifest(manifest_path, repo_root=repo)
 
     with pytest.raises(ManifestError, match="missing=.*test_b.py"):
