@@ -1797,8 +1797,16 @@ def rank_feasible_candidate_dispositions(
         primary_field = "effective_length_m_canonical"
         secondary_field = "area_outer_m2"
 
-    # Bind each feasible disposition to its candidate and validate
-    paired: list[tuple[CandidateDispositionRecord, ManufacturableCandidate]] = []
+    # Bind each feasible disposition to its candidate and validate.
+    # Store the narrowed (non-None) area and length strings so the sort
+    # closure never re-reads Optional model fields.
+    _RankPair = tuple[
+        CandidateDispositionRecord,
+        ManufacturableCandidate,
+        str,
+        str,
+    ]
+    paired: list[_RankPair] = []
     for d in feasible:
         cand = cand_by_index.get(d.evaluation_order_index)
         if cand is None:
@@ -1810,36 +1818,36 @@ def rank_feasible_candidate_dispositions(
                 f"has id={cand.source_qualified_candidate_id!r} "
                 f"but disposition has {d.source_qualified_candidate_id!r}"
             )
-        area = d.primary_engineering_value
-        length = cand.effective_length_m_canonical
-        if not area:
+        area_raw = d.primary_engineering_value
+        length_raw = cand.effective_length_m_canonical
+        if not area_raw:
             raise ValueError(
                 f"FEASIBLE disposition {d.source_qualified_candidate_id} "
                 f"has empty primary_engineering_value"
             )
-        if not length:
+        if not length_raw:
             raise ValueError(
                 f"candidate {d.source_qualified_candidate_id} "
                 f"has empty effective_length_m_canonical"
             )
-        paired.append((d, cand))
+        paired.append((d, cand, area_raw, length_raw))
 
     def _sort_key(
-        pair: tuple[CandidateDispositionRecord, ManufacturableCandidate],
+        pair: _RankPair,
     ) -> tuple[Decimal, Decimal, str]:
-        d, cand = pair
+        _d, _cand, area_raw, length_raw = pair
         try:
-            area = Decimal(d.primary_engineering_value)
-            length = Decimal(cand.effective_length_m_canonical)
+            area = Decimal(area_raw)
+            length = Decimal(length_raw)
         except Exception as exc:
             raise ValueError(f"invalid Decimal in ranking values: {exc}") from exc
         if optimization_objective == OptimizationObjective.MINIMUM_OUTER_HEAT_TRANSFER_AREA:
-            return (area, length, d.source_qualified_candidate_id)
-        return (length, area, d.source_qualified_candidate_id)
+            return (area, length, _d.source_qualified_candidate_id)
+        return (length, area, _d.source_qualified_candidate_id)
 
     sorted_pairs = sorted(paired, key=_sort_key)
     ranked_records = []
-    for rank, (d, cand) in enumerate(sorted_pairs, 1):
+    for rank, (d, cand, _area_raw, _length_raw) in enumerate(sorted_pairs, 1):
         (
             primary_val,
             primary_field,
