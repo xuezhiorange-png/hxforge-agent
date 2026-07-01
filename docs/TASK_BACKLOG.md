@@ -41,7 +41,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-009 (Issue #26) | Fix inherited heat-balance golden and rating test failures | DONE | TASK-009 Phase 3 |
 | TASK-010 (design) | Freeze versioned API and traceable report contract | DONE | TASK-009 |
 | TASK-010 (impl) | Implement versioned API and traceable report | DONE | TASK-010 design |
-| TASK-015A | Deterministic test environment and CI sharding | PLANNED | TASK-010 |
+| TASK-015A | Deterministic test environment and CI sharding | READY_FOR_REVIEW | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 | Add materials, mass and preliminary mechanical checks | PLANNED | TASK-012, TASK-013, TASK-016 |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
@@ -110,6 +110,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | Merge SHA | `971df0007aa4b7b979598ba5568f702ab76af56f` |
 | Final Review | `4609799752` |
 | Final PR CI | `28522537592` |
-| Main Post-Merge CI | `28523901677` |
+| Main Post-Merge CI (PR #31) | `28523901677` |
+| Main Post-Merge CI (PR #32) | `28526790197` |
 | Frozen Contract SHA | `9a1faeb92f4015a62f9d9add0739f3853a876415` |
 | Contract Closure | APPROVED |
