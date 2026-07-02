@@ -833,11 +833,24 @@ jobs:
           "
       - name: Combine coverage
         run: |
-          mkdir -p coverage-combine
-          find artifacts/ -name 'coverage-raw.*' | while read f; do cp "$f" coverage-combine/; done
-          if [ -z "$(ls -A coverage-combine/ 2>/dev/null)" ]; then
-            echo "ERROR: No coverage files found" >&2; exit 1
-          fi
+          uv run --locked python -c "
+          import shutil, sys, os
+          from pathlib import Path
+          combine_dir = Path('coverage-combine')
+          combine_dir.mkdir(exist_ok=True)
+          found = []
+          for f in sorted(Path('artifacts').rglob('coverage-raw.*')):
+              dest = combine_dir / f.name
+              shutil.copy2(f, dest)
+              found.append(str(f))
+          if not found:
+              print('ERROR: No coverage-raw files found in artifacts/', file=sys.stderr)
+              print(f'artifacts/ contents: {list(Path(\"artifacts\").rglob(\"*\"))[:20]}', file=sys.stderr)
+              sys.exit(1)
+          print(f'Found {len(found)} coverage files')
+          for f in found:
+              print(f'  {f}')
+          "
           uv run --locked coverage combine coverage-combine/
           uv run --locked coverage xml
           uv run --locked coverage report
@@ -902,11 +915,20 @@ jobs:
           "
       - name: Combine merge-ref coverage
         run: |
-          mkdir -p coverage-combine
-          find artifacts/ -name 'coverage-raw.*' | while read f; do cp "$f" coverage-combine/; done
-          if [ -z "$(ls -A coverage-combine/ 2>/dev/null)" ]; then
-            echo "ERROR: No coverage files found" >&2; exit 1
-          fi
+          uv run --locked python -c "
+          import shutil, sys
+          from pathlib import Path
+          combine_dir = Path('coverage-combine')
+          combine_dir.mkdir(exist_ok=True)
+          found = []
+          for f in sorted(Path('artifacts').rglob('coverage-raw.*')):
+              shutil.copy2(f, combine_dir / f.name)
+              found.append(str(f))
+          if not found:
+              print('ERROR: No coverage-raw files found', file=sys.stderr)
+              sys.exit(1)
+          print(f'Found {len(found)} coverage files')
+          "
           uv run --locked coverage combine coverage-combine/
           uv run --locked coverage xml -o merge-ref-coverage.xml
           uv run --locked coverage report
