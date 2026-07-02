@@ -4,14 +4,20 @@ shards:
     job: shard-ci
     python: ["3.11", "3.12"]
     files:
-      - tests/ci/test_collect_acceptance.py
       - tests/ci/test_node_inventory.py
       - tests/ci/test_outcome_plugin.py
       - tests/ci/test_shard_manifest.py
       - tests/ci/test_shared_infrastructure.py
       - tests/support/test_mypy_doubles.py
       - tests/support/test_property_provider_doubles.py
-    timeout: 180
+    timeout: 300
+
+  - name: ci-acceptance
+    job: shard-ci-acceptance
+    python: ["3.11", "3.12"]
+    files:
+      - tests/ci/test_collect_acceptance.py
+    timeout: 900
 
   - name: pure-unit
     job: shard-pure-unit

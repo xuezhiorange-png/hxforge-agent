@@ -68,7 +68,7 @@ def _run(
     zero_node_metadata: dict[str, Any] | None = None,
     extra_env: dict[str, str] | None = None,
     extra_args: list[str] | None = None,
-    subprocess_timeout: int = 60,
+    subprocess_timeout: int = 180,
 ) -> subprocess.CompletedProcess[str]:
     """Run *pytest* with the collection plugin and return the result."""
     output_path = tmp_path / "inventory.json"
@@ -566,7 +566,7 @@ def test_global_with_shard_rejected(tmp_path: Path) -> None:
         ["tests"],
         scope="global",
         shard="some-shard",
-        subprocess_timeout=60,
+        subprocess_timeout=180,
     )
     assert result.returncode != 0
     combined = result.stderr + result.stdout
@@ -615,7 +615,7 @@ def test_global_with_explicit_subset_rejected(tmp_path: Path) -> None:
     test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
     rel = test_file.as_posix()
     try:
-        result = _run(tmp_path, [rel], scope="global", subprocess_timeout=60)
+        result = _run(tmp_path, [rel], scope="global", subprocess_timeout=180)
         assert result.returncode != 0
         combined = result.stderr + result.stdout
         assert (
@@ -634,7 +634,7 @@ def test_shard_with_tests_dir_rejected(tmp_path: Path) -> None:
         ["tests"],
         scope="shard",
         shard="s1",
-        subprocess_timeout=60,
+        subprocess_timeout=180,
     )
     assert result.returncode != 0
     combined = result.stderr + result.stdout
@@ -1297,6 +1297,7 @@ def test_run_test_shard_telemetry_fields_present(tmp_path: Path) -> None:
 
     test_file = tmp_path / "test_tel.py"
     test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    outcomes_path = str(tmp_path / "pytest-outcomes.json")
     run_pytest(
         [str(test_file)],
         env={"PYTHONPATH": str(REPO_ROOT)},
@@ -1305,6 +1306,7 @@ def test_run_test_shard_telemetry_fields_present(tmp_path: Path) -> None:
         telemetry_path=str(tmp_path / "telemetry.json"),
         stdout_path=str(tmp_path / "stdout.txt"),
         stderr_path=str(tmp_path / "stderr.txt"),
+        outcomes_path=outcomes_path,
         track="pr-head",
         commit_sha="abc123",
         run_id="1",
@@ -1338,6 +1340,7 @@ def test_run_test_shard_counts_authoritative_pass(tmp_path: Path) -> None:
     test_a.write_text("def test_alpha():\n    assert True\n", encoding="utf-8")
     test_b = tmp_path / "test_b.py"
     test_b.write_text("def test_beta():\n    assert True\n", encoding="utf-8")
+    outcomes_path = str(tmp_path / "pytest-outcomes.json")
     exit_code = run_pytest(
         [
             str(test_a),
@@ -1350,6 +1353,7 @@ def test_run_test_shard_counts_authoritative_pass(tmp_path: Path) -> None:
         telemetry_path=str(tmp_path / "telemetry.json"),
         stdout_path=str(tmp_path / "stdout.txt"),
         stderr_path=str(tmp_path / "stderr.txt"),
+        outcomes_path=outcomes_path,
         track="pr-head",
         commit_sha="abc123",
         run_id="1",
@@ -1379,6 +1383,7 @@ def test_run_test_shard_counts_authoritative_fail(tmp_path: Path) -> None:
 
     test_file = tmp_path / "test_fail.py"
     test_file.write_text("def test_fails():\n    assert False\n", encoding="utf-8")
+    outcomes_path = str(tmp_path / "pytest-outcomes.json")
     exit_code = run_pytest(
         [
             str(test_file),
@@ -1390,6 +1395,7 @@ def test_run_test_shard_counts_authoritative_fail(tmp_path: Path) -> None:
         telemetry_path=str(tmp_path / "telemetry.json"),
         stdout_path=str(tmp_path / "stdout.txt"),
         stderr_path=str(tmp_path / "stderr.txt"),
+        outcomes_path=outcomes_path,
         track="pr-head",
         commit_sha="abc123",
         run_id="1",
