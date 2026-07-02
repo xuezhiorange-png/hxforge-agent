@@ -5,8 +5,15 @@ environment.  It establishes a封闭允许列表 of environment variables that
 affect test collection/import behavior, and a governed-prefix fail-closed
 mechanism for detecting unknown behavior-affecting variables.
 
-P0-1: PYTEST_TIMEOUT is now explicitly in the allowlist because it is injected
-by the CI workflow and affects execution authority.
+P0-2: Separated collection fingerprint from execution controls.
+  - BEHAVIOR_ENV_ALLOWLIST: governs ALL governed-prefix variables (fail-closed).
+  - COLLECTION_FINGERPRINT_ENV_VARS: variables that affect test collection,
+    import, marker resolution, or node IDs.  PYTEST_TIMEOUT is execution-only
+    and deliberately excluded — different shards legitimately set different
+    timeout values.
+  - GOVERNED_EXECUTION_ENV_ALLOWLIST: execution-only governed variables
+    (currently PYTEST_TIMEOUT).  Still subject to fail-closed governance but
+    excluded from the collection fingerprint.
 
 Governed namespace:
   Variables whose name starts with one of the governed prefixes MUST be
@@ -28,7 +35,17 @@ from typing import Any, Final
 # ── Governed namespace prefixes ─────────────────────────────────────────────
 GOVERNED_PREFIXES: Final[tuple[str, ...]] = ("HX_", "HEXAGENT_", "COOLPROP_", "PYTEST_")
 
-# ── Behavior-affecting environment variables (allowlist) ────────────────────
+# ── Execution-only governed variables (fail-closed but not in fingerprint) ──
+GOVERNED_EXECUTION_ENV_ALLOWLIST: Final[frozenset[str]] = frozenset(
+    {
+        "PYTEST_TIMEOUT",
+    }
+)
+
+# ── Behavior-affecting environment variables (full allowlist) ───────────────
+# Every governed-prefix variable MUST appear here OR in
+# GOVERNED_EXECUTION_ENV_ALLOWLIST.  The full set is used for fail-closed
+# governance checks only.
 BEHAVIOR_ENV_ALLOWLIST: Final[frozenset[str]] = frozenset(
     {
         "PYTHONHASHSEED",
@@ -38,13 +55,18 @@ BEHAVIOR_ENV_ALLOWLIST: Final[frozenset[str]] = frozenset(
         "PYTEST_ADDOPTS",
         "PYTEST_CURRENT_TEST",
         "PYTEST_VERSION",
-        "PYTEST_TIMEOUT",
         "HX_TRACK",
         "HX_COMMIT_SHA",
         "GITHUB_RUN_ID",
         "GITHUB_RUN_ATTEMPT",
     }
 )
+
+# ── Variables that affect test collection / import behavior (fingerprint) ───
+# Only variables in this set enter the collection fingerprint payload.
+# PYTEST_TIMEOUT is execution authority only — it does NOT affect collection,
+# import, marker resolution, or node IDs.
+COLLECTION_FINGERPRINT_ENV_VARS: Final[frozenset[str]] = BEHAVIOR_ENV_ALLOWLIST
 
 # ── Behavior-affecting file inputs ──────────────────────────────────────────
 BEHAVIOR_FILE_INPUTS: Final[frozenset[str]] = frozenset(
@@ -68,8 +90,13 @@ def sha256_file(path: Path) -> str:
 
 
 def check_governed_unknowns(*, extra_allowed_vars: frozenset[str] | None = None) -> None:
-    """Fail-closed check for unknown governed-namespace variables."""
-    allowed = BEHAVIOR_ENV_ALLOWLIST | (extra_allowed_vars or frozenset())
+    """Fail-closed check for unknown governed-namespace variables.
+
+    Uses the FULL governed allowlist (behavior + execution) so that
+    execution-only variables like PYTEST_TIMEOUT are still governed.
+    """
+    full_allowed = BEHAVIOR_ENV_ALLOWLIST | GOVERNED_EXECUTION_ENV_ALLOWLIST
+    allowed = full_allowed | (extra_allowed_vars or frozenset())
     unknown: set[str] = set()
     for key in os.environ:
         if key.startswith(GOVERNED_PREFIXES) and key not in allowed:
@@ -92,12 +119,15 @@ def build_behavior_fingerprint(
     Returns dict with 'payload', 'canonical_json', 'fingerprint'.
     """
     root = repo_root or Path.cwd()
-    allowed = BEHAVIOR_ENV_ALLOWLIST | (extra_allowed_vars or frozenset())
-
     check_governed_unknowns(extra_allowed_vars=extra_allowed_vars)
 
+    # Use only collection-affecting variables for the fingerprint payload.
+    # Execution-only variables (PYTEST_TIMEOUT etc.) are excluded so that
+    # different shard timeout values don't break global/shard equality.
+    fp_vars = COLLECTION_FINGERPRINT_ENV_VARS | (extra_allowed_vars or frozenset())
+
     env_snapshot: dict[str, str] = {}
-    for key in sorted(allowed):
+    for key in sorted(fp_vars):
         value = os.environ.get(key, "")
         if value:
             env_snapshot[key] = value
