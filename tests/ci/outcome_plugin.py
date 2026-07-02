@@ -3,14 +3,13 @@
 Captures per-node outcomes via pytest hooks and writes a strict JSON
 file that the telemetry runner can cross-validate against JUnit.
 
-Phase-aware outcome semantics:
-- setup/call/teardown phases are tracked independently
-- Final outcome per node is the last phase result (teardown overrides)
-- report.passed + report.wasxfail → xpassed
-- report.skipped + report.wasxfail → xfailed
-- report.failed → failed (regardless of wasxfail)
-- report.skipped → skipped
-- report.passed → passed
+Phase-aware outcome semantics (priority-based, NOT last-phase-wins):
+- setup error/failure → final failed (teardown pass does NOT override)
+- setup skip/xfailed → preserved (call/teardown don't override unless fail)
+- call outcome → normal final outcome (unless teardown fails)
+- teardown pass → does NOT override any prior outcome
+- teardown fail/error → forces final failed
+- Each collected node produces exactly one final outcome.
 """
 
 from __future__ import annotations
@@ -68,7 +67,7 @@ class OutcomeCollector:
         if phase_outcome is not None:
             self._phase_outcomes[node_id][phase] = phase_outcome
 
-        # Final outcome is the last non-None phase result
+        # Final outcome via priority-based state machine
         self._update_final_outcome(node_id)
 
     def _determine_phase_outcome(
@@ -78,10 +77,10 @@ class OutcomeCollector:
         terminal_style = report.outcome
 
         if terminal_style == "skipped":
-            return "xfailed" if getattr(report, "wasxfail", False) else "skipped"
+            return "xfailed" if getattr(report, "wasxfail", None) is not None else "skipped"
 
         if terminal_style == "passed":
-            return "xpassed" if getattr(report, "wasxfail", False) else "passed"
+            return "xpassed" if getattr(report, "wasxfail", None) is not None else "passed"
 
         if terminal_style in ("failed", "error"):
             return "failed"
@@ -90,14 +89,39 @@ class OutcomeCollector:
         return _OUTCOME_MAP.get(terminal_style, "failed")
 
     def _update_final_outcome(self, node_id: str) -> None:
-        """Update the final outcome from the latest non-None phase."""
+        """Update the final outcome using priority-based semantics.
+
+        Priority rules (NOT last-phase-wins):
+        1. setup failed/error → final failed (only teardown fail can re-affirm)
+        2. setup skip/xfailed → preserved unless call/teardown fails
+        3. call outcome → normal final (passed/failed/skipped/xfailed/xpassed)
+        4. teardown pass → does NOT override anything
+        5. teardown failed/error → forces final failed
+        """
         phases = self._phase_outcomes.get(node_id, {})
-        # Walk phases in execution order; last non-None wins
+        setup = phases.get("setup")
+        call = phases.get("call")
+        teardown = phases.get("teardown")
+
         final: OutcomeType | None = None
-        for phase_key in ("setup", "call", "teardown"):
-            val = phases.get(phase_key)
-            if val is not None:
-                final = val
+
+        # Phase 1: setup outcome establishes base
+        if setup is not None:
+            final = setup
+
+        # Phase 2: call outcome overrides setup (except setup-fail is sticky)
+        if call is not None:
+            if setup == "failed":
+                # setup failed → call doesn't override, stays failed
+                pass
+            else:
+                final = call
+
+        # Phase 3: teardown fail/error forces failed; teardown pass is ignored
+        if teardown == "failed":
+            final = "failed"
+        # teardown "passed"/"skipped"/etc. → do NOT override
+
         if final is not None:
             self._outcomes[node_id] = final
 

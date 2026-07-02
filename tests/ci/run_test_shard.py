@@ -1,7 +1,8 @@
 """Shared pytest runner that captures real resource telemetry.
 
 P0-5: Telemetry fail-closed — runner exits non-zero if not authoritative.
-P1: Integrates outcome plugin for structured xfail/xpass.
+P0-2: Consumes structured pytest outcomes as counting authority.
+P0-7: Cross-validates outcomes vs JUnit vs node inventory.
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
+
+_OUTCOME_VALID_VALUES = frozenset({"passed", "failed", "skipped", "xfailed", "xpassed"})
 
 
 def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
@@ -58,14 +61,62 @@ def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
         return counts, "unavailable"
 
 
-def _read_outcomes(outcomes_path: Path) -> dict[str, Any] | None:
-    """Read structured outcome JSON if present."""
+def _read_and_validate_outcomes(outcomes_path: Path) -> dict[str, Any] | None:
+    """Read, parse, and validate structured outcome JSON.
+
+    Returns validated outcomes dict or None if invalid/missing.
+    Validation is strict — any schema violation returns None.
+    """
     if not outcomes_path.is_file():
         return None
     try:
-        return json.loads(outcomes_path.read_text(encoding="utf-8"))
+        raw = json.loads(outcomes_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
+
+    # Schema validation — fail closed
+    if not isinstance(raw, dict):
+        return None
+    if raw.get("schema_version") != "1":
+        return None
+    outcomes_map = raw.get("outcomes")
+    if not isinstance(outcomes_map, dict):
+        return None
+    if not isinstance(raw.get("total"), int):
+        return None
+    if raw["total"] != len(outcomes_map):
+        return None
+
+    # Validate every outcome value
+    for node_id, outcome_val in outcomes_map.items():
+        if not isinstance(node_id, str) or not node_id:
+            return None
+        if outcome_val not in _OUTCOME_VALID_VALUES:
+            return None
+
+    # Validate collection_complete is a list
+    cc = raw.get("collection_complete")
+    if not isinstance(cc, list):
+        return None
+
+    return raw
+
+
+def _aggregate_outcomes(outcomes_data: dict[str, Any]) -> dict[str, int]:
+    """Aggregate outcome counts from validated outcome data."""
+    outcomes_map = outcomes_data["outcomes"]
+    counts = {
+        "tests_passed": 0,
+        "tests_failed": 0,
+        "tests_skipped": 0,
+        "tests_xfailed": 0,
+        "tests_xpassed": 0,
+    }
+    for outcome_val in outcomes_map.values():
+        key = f"tests_{outcome_val}"
+        if key in counts:
+            counts[key] += 1
+    return counts
 
 
 def run_pytest(
@@ -88,6 +139,7 @@ def run_pytest(
     """Run pytest as subprocess and generate real telemetry."""
     junit = Path(junit_path)
     telemetry = Path(telemetry_path)
+    outcomes_file = Path(outcomes_path)
     stdout_file = Path(stdout_path)
     stderr_file = Path(stderr_path)
 
@@ -162,17 +214,53 @@ def run_pytest(
     # Parse JUnit
     junit_counts, junit_parse_status = _parse_junit(junit)
 
-    # Count consistency
-    expected_total = (
-        junit_counts["tests_passed"]
-        + junit_counts["tests_failed"]
-        + junit_counts["tests_skipped"]
-        + junit_counts["tests_xfailed"]
-        + junit_counts["tests_xpassed"]
-    )
-    counts_authoritative = (
-        junit_parse_status == "available" and junit_counts["tests_collected"] == expected_total
-    )
+    # Parse and validate structured outcomes (P0-2)
+    outcomes_data = _read_and_validate_outcomes(outcomes_file)
+    outcome_parse_status = "available" if outcomes_data is not None else "unavailable"
+    outcome_counts = _aggregate_outcomes(outcomes_data) if outcomes_data is not None else None
+
+    # ── Cross-validate outcomes vs JUnit (P0-7) ──────────────────────────
+    counts_authoritative = False
+    counts_mismatch_detail = ""
+
+    if outcome_parse_status == "available" and junit_parse_status == "available":
+        assert outcome_counts is not None  # for type checker
+        outcomes_total = outcomes_data["total"]  # type: ignore[union-attr]
+        junit_total = junit_counts["tests_collected"]
+        junit_sum = (
+            junit_counts["tests_passed"]
+            + junit_counts["tests_failed"]
+            + junit_counts["tests_skipped"]
+            + junit_counts["tests_xfailed"]
+            + junit_counts["tests_xpassed"]
+        )
+
+        # Check 1: outcomes total == JUnit collected
+        if outcomes_total != junit_total:
+            counts_mismatch_detail = (
+                f"outcomes_total={outcomes_total} != junit_collected={junit_total}"
+            )
+        # Check 2: JUnit sum matches collected
+        elif junit_sum != junit_total:
+            counts_mismatch_detail = f"junit_sum={junit_sum} != junit_collected={junit_total}"
+        # Check 3: outcome counts match between outcomes and JUnit
+        elif (
+            outcome_counts["tests_passed"] != junit_counts["tests_passed"]
+            or outcome_counts["tests_failed"] != junit_counts["tests_failed"]
+            or outcome_counts["tests_skipped"] != junit_counts["tests_skipped"]
+            or outcome_counts["tests_xfailed"] != junit_counts["tests_xfailed"]
+            or outcome_counts["tests_xpassed"] != junit_counts["tests_xpassed"]
+        ):
+            counts_mismatch_detail = (
+                f"outcome_counts={outcome_counts} != junit_counts="
+                f"{ {k: v for k, v in junit_counts.items() if k != 'tests_collected'} }"
+            )
+        else:
+            counts_authoritative = True
+    elif outcome_parse_status == "unavailable":
+        counts_mismatch_detail = "outcome artifact missing or invalid"
+    elif junit_parse_status == "unavailable":
+        counts_mismatch_detail = "JUnit unavailable"
 
     if (
         exit_code == 2
@@ -188,14 +276,28 @@ def run_pytest(
         authority_failures.append(f"execution_status={execution_status}")
     if junit_parse_status != "available":
         authority_failures.append("junit_parse_status=unavailable")
+    if outcome_parse_status != "available":
+        authority_failures.append("outcome_parse_status=unavailable")
     if not counts_authoritative:
-        authority_failures.append("counts_authoritative=false")
+        authority_failures.append(f"counts_authoritative=false: {counts_mismatch_detail}")
     if resource_status != "available":
         authority_failures.append("resource_measurement_status=unavailable")
     if exit_code != 0:
         authority_failures.append(f"pytest_exit_code={exit_code}")
 
     producer_authoritative = len(authority_failures) == 0
+
+    # Use outcome counts as the counting authority when available (P0-2)
+    if outcome_counts is not None:
+        final_counts = outcome_counts
+    else:
+        final_counts = {
+            "tests_passed": junit_counts["tests_passed"],
+            "tests_failed": junit_counts["tests_failed"],
+            "tests_skipped": junit_counts["tests_skipped"],
+            "tests_xfailed": junit_counts["tests_xfailed"],
+            "tests_xpassed": junit_counts["tests_xpassed"],
+        }
 
     telemetry_data: dict[str, Any] = {
         "track": track,
@@ -213,15 +315,17 @@ def run_pytest(
         "resource_measurement_error": resource_error if resource_error else None,
         "pytest_exit_code": exit_code,
         "junit_parse_status": junit_parse_status,
+        "outcome_parse_status": outcome_parse_status,
         "counts_authoritative": counts_authoritative,
+        "counts_mismatch_detail": counts_mismatch_detail if counts_mismatch_detail else None,
         "producer_authoritative": producer_authoritative,
         "producer_authority_failures": authority_failures,
         "tests_collected": junit_counts["tests_collected"],
-        "tests_passed": junit_counts["tests_passed"],
-        "tests_failed": junit_counts["tests_failed"],
-        "tests_skipped": junit_counts["tests_skipped"],
-        "tests_xfailed": junit_counts["tests_xfailed"],
-        "tests_xpassed": junit_counts["tests_xpassed"],
+        "tests_passed": final_counts["tests_passed"],
+        "tests_failed": final_counts["tests_failed"],
+        "tests_skipped": final_counts["tests_skipped"],
+        "tests_xfailed": final_counts["tests_xfailed"],
+        "tests_xpassed": final_counts["tests_xpassed"],
     }
 
     # Add behavior fingerprint if available
