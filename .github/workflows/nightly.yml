@@ -1,6 +1,6 @@
 name: nightly
 
-on:
+"on":
   schedule:
     # Every day at 03:00 UTC
     - cron: "0 3 * * *"
