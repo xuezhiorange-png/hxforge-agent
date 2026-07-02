@@ -32,7 +32,7 @@ def _run_with_outcome_plugin(
         ],
         capture_output=True,
         text=True,
-        cwd="/root/hxforge-agent",
+        cwd=str(Path(__file__).resolve().parent.parent.parent),
         env={**os.environ, "PYTHONPATH": "."},
     )
 
@@ -172,7 +172,7 @@ class TestOutcomePlugin:
             ],
             capture_output=True,
             text=True,
-            cwd="/root/hxforge-agent",
+            cwd=str(Path(__file__).resolve().parent.parent.parent),
             env={**os.environ, "PYTHONPATH": "."},
         )
         # Check a different (missing) path

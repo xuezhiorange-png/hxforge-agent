@@ -346,6 +346,24 @@ def run_pytest(
 
     # P0-5: Exit non-zero if not authoritative
     if not producer_authoritative and exit_code == 0:
+        import sys as _sys
+        print(
+            f"RUNNER: non-authoritative telemetry, returning 1. "
+            f"failures={authority_failures}",
+            file=_sys.stderr,
+        )
+        print(
+            f"RUNNER: telemetry detail: "
+            f"exit={exit_code} exec={execution_status} "
+            f"junit={junit_parse_status} outcome={outcome_parse_status} "
+            f"resource={resource_status} "
+            f"collected={junit_counts['tests_collected']} "
+            f"passed={final_counts['tests_passed']} "
+            f"failed={final_counts['tests_failed']} "
+            f"cnt_auth={counts_authoritative} "
+            f"mismatch={counts_mismatch_detail}",
+            file=_sys.stderr,
+        )
         return 1
 
     return exit_code
