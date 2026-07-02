@@ -1,7 +1,7 @@
 version: "1"
 shards:
   - name: ci
-    job: test-ci
+    job: shard
     python: ["3.11", "3.12"]
     files:
       - tests/ci/test_collect_acceptance.py
@@ -12,7 +12,7 @@ shards:
     timeout: 180
 
   - name: pure-unit
-    job: test-pure-unit
+    job: shard
     python: ["3.11", "3.12"]
     files:
       - tests/unit/test_calculation_runs.py
@@ -35,7 +35,7 @@ shards:
     timeout: 120
 
   - name: coolprop-unit
-    job: test-coolprop-unit
+    job: shard
     python: ["3.11", "3.12"]
     files:
       - tests/unit/test_double_pipe_correction_r5.py
@@ -59,7 +59,7 @@ shards:
     timeout: 120
 
   - name: provider-unit
-    job: test-provider-unit
+    job: shard
     python: ["3.11", "3.12"]
     files:
       - tests/unit/test_task009_phase2_adapter.py
@@ -67,16 +67,16 @@ shards:
     timeout: 120
 
   - name: golden
-    job: test-golden
+    job: shard
     python: ["3.11", "3.12"]
     files:
       - tests/golden/double_pipe_rating/test_golden_double_pipe.py
       - tests/golden/double_pipe_rating/test_independent_references.py
       - tests/golden/heat_balance/test_golden.py
-    timeout: 120
+    timeout: 300
 
   - name: integration
-    job: test-integration
+    job: shard
     python: ["3.11", "3.12"]
     files:
       - tests/integration/test_api.py

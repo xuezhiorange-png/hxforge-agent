@@ -1,6 +1,6 @@
 name: nightly
 
-"on":
+on:
   schedule:
     # Every day at 03:00 UTC
     - cron: "0 3 * * *"
@@ -30,11 +30,11 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
+        run: test "$(uv --version | cut -d' ' -f2)" = "0.11.25"
       - name: Check lock freshness
         run: uv lock --check
       - name: Install from lock
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --all-extras
       - name: Verify no lock drift
         run: git diff --exit-code -- uv.lock pyproject.toml
       - run: uv run --locked ruff check .
@@ -52,19 +52,23 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
+        run: test "$(uv --version | cut -d' ' -f2)" = "0.11.25"
       - name: Install from lock
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --all-extras
       - name: Run all tests (py3.11)
         run: >
-          uv run --locked --python 3.11 pytest
+          uv run --locked pytest
           --timeout=300 -q
           --junitxml=nightly-py3.11-junit.xml
           --cov=src --cov-report=xml:nightly-py3.11-coverage.xml
           tests/
       - name: Generate node inventory
         if: always()
-        run: uv run --locked --python 3.11 pytest --collect-only -q tests/ | tee nightly-py3.11-nodes.txt
+        env:
+          PYTHONPATH: "."
+          HX_TRACK: nightly
+          HX_COMMIT_SHA: ${{ github.sha }}
+        run: PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 uv run --locked pytest --collect-only -p tests.ci.collect_nodes_plugin --hx-collection-scope global --hx-node-output nightly-py3.11-nodes.json tests/
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -74,7 +78,7 @@ jobs:
           path: |
             nightly-py3.11-junit.xml
             nightly-py3.11-coverage.xml
-            nightly-py3.11-nodes.txt
+            nightly-py3.11-nodes.json
       - name: Open issue on failure
         if: failure()
         env:
@@ -105,19 +109,23 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
+        run: test "$(uv --version | cut -d' ' -f2)" = "0.11.25"
       - name: Install from lock
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --all-extras
       - name: Run all tests (py3.12)
         run: >
-          uv run --locked --python 3.12 pytest
+          uv run --locked pytest
           --timeout=300 -q
           --junitxml=nightly-py3.12-junit.xml
           --cov=src --cov-report=xml:nightly-py3.12-coverage.xml
           tests/
       - name: Generate node inventory
         if: always()
-        run: uv run --locked --python 3.12 pytest --collect-only -q tests/ | tee nightly-py3.12-nodes.txt
+        env:
+          PYTHONPATH: "."
+          HX_TRACK: nightly
+          HX_COMMIT_SHA: ${{ github.sha }}
+        run: PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 uv run --locked pytest --collect-only -p tests.ci.collect_nodes_plugin --hx-collection-scope global --hx-node-output nightly-py3.12-nodes.json tests/
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -127,7 +135,7 @@ jobs:
           path: |
             nightly-py3.12-junit.xml
             nightly-py3.12-coverage.xml
-            nightly-py3.12-nodes.txt
+            nightly-py3.12-nodes.json
       - name: Open issue on failure
         if: failure()
         env:
@@ -158,9 +166,9 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
+        run: test "$(uv --version | cut -d' ' -f2)" = "0.11.25"
       - name: Install from lock
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --all-extras
       - name: Run golden regression tests
         run: >
           uv run --locked pytest -m golden
