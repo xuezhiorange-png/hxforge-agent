@@ -117,8 +117,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
-          export COVERAGE_FILE
+          COV_RAW="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           set +e
           uv run --locked pytest --timeout=${{ matrix.timeout }} -q \
             -p tests.ci.collect_nodes_plugin \
@@ -126,17 +125,22 @@ jobs:
             --hx-shard "${SHARD}" \
             --hx-node-output "node-inventory.json" \
             --junitxml="junit.xml" \
-            --cov=src --cov-report= --cov-report=xml:coverage.xml \
+            --cov=src --cov-report=xml:coverage.xml \
             --tb=short \
             ${{ matrix.files }} \
             2>collection-stderr.txt
           PYTEST_EXIT=$?
           set -e
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
+          if [ -f ".coverage" ] && [ -s ".coverage" ]; then
+            mv ".coverage" "${COV_RAW}"
+          else
+            touch "${COV_RAW}"
+          fi
           test -s "junit.xml"
           test -s "node-inventory.json"
           test -s "coverage.xml"
-          test -s "${COVERAGE_FILE}"
+          test -s "${COV_RAW}"
           exit "${PYTEST_EXIT}"
         id: pytest
         env:
@@ -155,7 +159,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+          COV_RAW="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           uv run --locked python -c "
           import json, os, xml.etree.ElementTree as ET
           duration = int('${DURATION}')
@@ -216,7 +220,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+          COV_RAW="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           uv run --locked python -c "
           import json, os
           meta = {
@@ -233,7 +237,7 @@ jobs:
           required = [
               ('node-inventory', 'node-inventory.json'),
               ('junit', 'junit.xml'),
-              ('coverage-raw', '${COVERAGE_FILE}'),
+              ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
               ('collection-stderr', 'collection-stderr.txt'),
               ('resource-telemetry', 'resource-telemetry.json'),
@@ -302,8 +306,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
-          export COVERAGE_FILE
+          COV_RAW="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           set +e
           uv run --locked pytest --timeout=${{ matrix.timeout }} -q \
             -p tests.ci.collect_nodes_plugin \
@@ -311,17 +314,22 @@ jobs:
             --hx-shard "${SHARD}" \
             --hx-node-output "node-inventory.json" \
             --junitxml="junit.xml" \
-            --cov=src --cov-report= --cov-report=xml:coverage.xml \
+            --cov=src --cov-report=xml:coverage.xml \
             --tb=short \
             ${{ matrix.files }} \
             2>collection-stderr.txt
           PYTEST_EXIT=$?
           set -e
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
+          if [ -f ".coverage" ] && [ -s ".coverage" ]; then
+            mv ".coverage" "${COV_RAW}"
+          else
+            touch "${COV_RAW}"
+          fi
           test -s "junit.xml"
           test -s "node-inventory.json"
           test -s "coverage.xml"
-          test -s "${COVERAGE_FILE}"
+          test -s "${COV_RAW}"
           exit "${PYTEST_EXIT}"
         env:
           PYTHONPATH: "."
@@ -338,7 +346,7 @@ jobs:
           MERGE_SHA="${{ steps.merge-sha.outputs.merge-sha }}"
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
-          COVERAGE_FILE="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${{ github.run_attempt }}"
+          COV_RAW="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${{ github.run_attempt }}"
           uv run --locked python -c "
           import json, os, xml.etree.ElementTree as ET
           duration = int('${DURATION}')
@@ -399,7 +407,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+          COV_RAW="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           uv run --locked python -c "
           import json, os
           meta = {
@@ -416,7 +424,7 @@ jobs:
           required = [
               ('node-inventory', 'node-inventory.json'),
               ('junit', 'junit.xml'),
-              ('coverage-raw', '${COVERAGE_FILE}'),
+              ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
               ('collection-stderr', 'collection-stderr.txt'),
               ('resource-telemetry', 'resource-telemetry.json'),
