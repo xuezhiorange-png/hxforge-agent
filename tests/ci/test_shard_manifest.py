@@ -101,6 +101,14 @@ def test_manifest_rejects_duplicate_yaml_key(tmp_path: Path) -> None:
         load_manifest(manifest_path, repo_root=repo)
 
 
+def test_manifest_rejects_duplicate_job_name(tmp_path: Path) -> None:
+    repo, manifest_path = _write_repo(tmp_path)
+    manifest_path.write_text(_valid_manifest().replace("    job: unit-b\n", "    job: unit-a\n"))
+
+    with pytest.raises(ManifestError, match="duplicate job name"):
+        load_manifest(manifest_path, repo_root=repo)
+
+
 def test_manifest_rejects_duplicate_file_ownership(tmp_path: Path) -> None:
     repo, manifest_path = _write_repo(tmp_path)
     manifest_path.write_text(

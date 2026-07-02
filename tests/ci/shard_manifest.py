@@ -186,6 +186,7 @@ def load_manifest(path: Path, *, repo_root: Path | None = None) -> ShardManifest
         raise ManifestError("manifest shards must be a non-empty list")
 
     shard_names: set[str] = set()
+    job_names: set[str] = set()
     owned_files: set[str] = set()
     shards: list[ShardSpec] = []
     for index, raw_shard in enumerate(raw_shards):
@@ -198,7 +199,9 @@ def load_manifest(path: Path, *, repo_root: Path | None = None) -> ShardManifest
         job = _require_canonical_name(raw_shard["job"], f"{context}.job")
         if name in shard_names:
             raise ManifestError(f"duplicate shard name: {name!r}")
-        # job names may be shared (matrix strategy), so no uniqueness check
+        if job in job_names:
+            raise ManifestError(f"duplicate job name: {job!r}")
+        job_names.add(job)
         shard_names.add(name)
 
         python = _parse_python_versions(raw_shard["python"], f"{context}.python")
