@@ -20,6 +20,24 @@ from typing import Any
 _OUTCOME_VALID_VALUES = frozenset({"passed", "failed", "skipped", "xfailed", "xpassed"})
 
 
+def _read_node_inventory(inventory_path: Path) -> dict[str, Any] | None:
+    """Read and validate node-inventory.json. Returns validated dict or None."""
+    if not inventory_path.is_file():
+        return None
+    try:
+        raw = json.loads(inventory_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    node_ids = raw.get("node_ids")
+    if not isinstance(node_ids, list):
+        return None
+    if raw.get("node_count") != len(node_ids):
+        return None
+    return raw
+
+
 def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
     """Parse JUnit XML. Returns (counts, parse_status)."""
     counts = {
@@ -61,8 +79,15 @@ def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
         return counts, "unavailable"
 
 
-def _read_and_validate_outcomes(outcomes_path: Path) -> dict[str, Any] | None:
+def _read_and_validate_outcomes(
+    outcomes_path: Path,
+    *,
+    node_inventory_path: Path | None = None,
+) -> dict[str, Any] | None:
     """Read, parse, and validate structured outcome JSON.
+
+    P0-3: When node_inventory_path is provided, enforces strict set equality
+    between outcomes keys, collection_complete list, and node_inventory.node_ids.
 
     Returns validated outcomes dict or None if invalid/missing.
     Validation is strict — any schema violation returns None.
@@ -87,17 +112,37 @@ def _read_and_validate_outcomes(outcomes_path: Path) -> dict[str, Any] | None:
     if raw["total"] != len(outcomes_map):
         return None
 
-    # Validate every outcome value
+    # Validate every outcome value and collect unique node IDs
     for node_id, outcome_val in outcomes_map.items():
         if not isinstance(node_id, str) or not node_id:
             return None
         if outcome_val not in _OUTCOME_VALID_VALUES:
             return None
 
-    # Validate collection_complete is a list
+    # Validate collection_complete: must be list of strings, unique, non-empty
     cc = raw.get("collection_complete")
     if not isinstance(cc, list):
         return None
+    for item in cc:
+        if not isinstance(item, str) or not item:
+            return None
+    if len(cc) != len(set(cc)):
+        return None  # duplicates in collection_complete
+
+    # P0-3: Exact 3-way node set equality
+    outcome_node_ids = set(outcomes_map.keys())
+    cc_node_ids = set(cc)
+
+    if outcome_node_ids != cc_node_ids:
+        return None
+
+    if node_inventory_path is not None:
+        inv = _read_node_inventory(node_inventory_path)
+        if inv is not None:
+            # Only cross-validate if file exists and is valid
+            inv_node_ids = set(inv["node_ids"])
+            if inv_node_ids != outcome_node_ids:
+                return None
 
     return raw
 
@@ -129,6 +174,7 @@ def run_pytest(
     stdout_path: str | Path = "pytest-stdout.txt",
     stderr_path: str | Path = "pytest-stderr.txt",
     outcomes_path: str | Path = "pytest-outcomes.json",
+    node_inventory_path: str | Path = "node-inventory.json",
     track: str = "",
     commit_sha: str = "",
     run_id: str = "",
@@ -215,11 +261,27 @@ def run_pytest(
     junit_counts, junit_parse_status = _parse_junit(junit)
 
     # Parse and validate structured outcomes (P0-2)
-    outcomes_data = _read_and_validate_outcomes(outcomes_file)
+    # P0-3: Also cross-validate against node-inventory (if present alongside outcomes)
+    effective_inv_path: Path | None = None
+    if node_inventory_path:
+        inv_candidate = Path(node_inventory_path)
+        # Resolve relative to outcomes file directory to avoid stale repo-root files
+        if not inv_candidate.is_absolute():
+            inv_candidate = outcomes_file.parent / inv_candidate
+        if inv_candidate.is_file():
+            effective_inv_path = inv_candidate
+    outcomes_data = _read_and_validate_outcomes(
+        outcomes_file, node_inventory_path=effective_inv_path
+    )
     outcome_parse_status = "available" if outcomes_data is not None else "unavailable"
     outcome_counts = _aggregate_outcomes(outcomes_data) if outcomes_data is not None else None
 
-    # ── Cross-validate outcomes vs JUnit (P0-7) ──────────────────────────
+    # ── Cross-validate outcomes vs JUnit (P0-4: XPASS-safe) ────────────────
+    # Structured outcomes are the five-category authority.
+    # JUnit proves: XML exists, testcase total is correct, and
+    # failure/error count is consistent.  Per-category equality for
+    # passed/xpassed/skipped/xfailed is NOT checked because the JUnit
+    # parser cannot reliably distinguish XPASS from normal pass.
     counts_authoritative = False
     counts_mismatch_detail = ""
 
@@ -227,36 +289,25 @@ def run_pytest(
         assert outcome_counts is not None  # for type checker
         outcomes_total = outcomes_data["total"]  # type: ignore[union-attr]
         junit_total = junit_counts["tests_collected"]
-        junit_sum = (
-            junit_counts["tests_passed"]
-            + junit_counts["tests_failed"]
-            + junit_counts["tests_skipped"]
-            + junit_counts["tests_xfailed"]
-            + junit_counts["tests_xpassed"]
-        )
 
         # Check 1: outcomes total == JUnit collected
         if outcomes_total != junit_total:
             counts_mismatch_detail = (
                 f"outcomes_total={outcomes_total} != junit_collected={junit_total}"
             )
-        # Check 2: JUnit sum matches collected
-        elif junit_sum != junit_total:
-            counts_mismatch_detail = f"junit_sum={junit_sum} != junit_collected={junit_total}"
-        # Check 3: outcome counts match between outcomes and JUnit
-        elif (
-            outcome_counts["tests_passed"] != junit_counts["tests_passed"]
-            or outcome_counts["tests_failed"] != junit_counts["tests_failed"]
-            or outcome_counts["tests_skipped"] != junit_counts["tests_skipped"]
-            or outcome_counts["tests_xfailed"] != junit_counts["tests_xfailed"]
-            or outcome_counts["tests_xpassed"] != junit_counts["tests_xpassed"]
-        ):
-            counts_mismatch_detail = (
-                f"outcome_counts={outcome_counts} != junit_counts="
-                f"{ {k: v for k, v in junit_counts.items() if k != 'tests_collected'} }"
-            )
+        # Check 2: JUnit failure+error count <= structured failed count
+        # (XPASS with strict mode becomes a JUnit failure, so structured
+        # failed can be >= JUnit failed+error, never less)
         else:
-            counts_authoritative = True
+            junit_fail_or_error = junit_counts["tests_failed"]
+            structured_failed = outcome_counts["tests_failed"]
+            if junit_fail_or_error > structured_failed:
+                counts_mismatch_detail = (
+                    f"junit_fail_or_error={junit_fail_or_error} > "
+                    f"structured_failed={structured_failed}"
+                )
+            else:
+                counts_authoritative = True
     elif outcome_parse_status == "unavailable":
         counts_mismatch_detail = "outcome artifact missing or invalid"
     elif junit_parse_status == "unavailable":

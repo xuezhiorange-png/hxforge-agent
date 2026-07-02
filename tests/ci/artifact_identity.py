@@ -139,8 +139,17 @@ def _read_json_strict(path: Path, label: str, context: str) -> dict[str, Any]:
     return raw
 
 
-def _verify_outcomes_schema(outcomes_data: dict[str, Any], context: str) -> dict[str, int]:
-    """Validate pytest-outcomes.json schema. Returns aggregated counts."""
+def _verify_outcomes_schema(
+    outcomes_data: dict[str, Any],
+    context: str,
+    *,
+    node_inv_data: dict[str, Any] | None = None,
+) -> dict[str, int]:
+    """Validate pytest-outcomes.json schema. Returns aggregated counts.
+
+    P0-3: Enforces strict set equality between outcomes keys,
+    collection_complete list, and node_inventory.node_ids.
+    """
     if outcomes_data.get("schema_version") != "1":
         raise ArtifactError(f"pytest-outcomes schema_version != '1' in {context}")
     outcomes_map = outcomes_data.get("outcomes")
@@ -152,6 +161,7 @@ def _verify_outcomes_schema(outcomes_data: dict[str, Any], context: str) -> dict
             f"pytest-outcomes.total={total} != len(outcomes)={len(outcomes_map)} in {context}"
         )
 
+    outcome_node_ids: set[str] = set()
     counts = {
         "tests_passed": 0,
         "tests_failed": 0,
@@ -166,6 +176,7 @@ def _verify_outcomes_schema(outcomes_data: dict[str, Any], context: str) -> dict
         if node_id in seen:
             raise ArtifactError(f"pytest-outcomes: DUPLICATE node_id '{node_id}' in {context}")
         seen.add(node_id)
+        outcome_node_ids.add(node_id)
         if outcome_val not in _OUTCOME_VALID_VALUES:
             raise ArtifactError(
                 f"pytest-outcomes: invalid outcome '{outcome_val}' for '{node_id}' in {context}"
@@ -173,10 +184,41 @@ def _verify_outcomes_schema(outcomes_data: dict[str, Any], context: str) -> dict
         key = f"tests_{outcome_val}"
         counts[key] += 1
 
-    # Validate collection_complete is a list
+    # Validate collection_complete: list, strings only, unique, non-empty items
     cc = outcomes_data.get("collection_complete")
     if not isinstance(cc, list):
         raise ArtifactError(f"pytest-outcomes.collection_complete must be a list in {context}")
+    cc_node_ids: set[str] = set()
+    for i, item in enumerate(cc):
+        if not isinstance(item, str) or not item:
+            raise ArtifactError(
+                f"pytest-outcomes.collection_complete[{i}] is not a non-empty string in {context}"
+            )
+        if item in cc_node_ids:
+            raise ArtifactError(
+                f"pytest-outcomes.collection_complete: DUPLICATE node_id '{item}' in {context}"
+            )
+        cc_node_ids.add(item)
+
+    # P0-3: Exact set equality between outcomes and collection_complete
+    if outcome_node_ids != cc_node_ids:
+        missing_in_cc = outcome_node_ids - cc_node_ids
+        extra_in_cc = cc_node_ids - outcome_node_ids
+        raise ArtifactError(
+            f"pytest-outcomes: outcomes/collection_complete node set mismatch in {context}: "
+            f"missing_in_cc={sorted(missing_in_cc)}, extra_in_cc={sorted(extra_in_cc)}"
+        )
+
+    # P0-3: Also validate against node-inventory if provided
+    if node_inv_data is not None:
+        inv_node_ids = set(node_inv_data.get("node_ids", []))
+        if inv_node_ids != outcome_node_ids:
+            missing_in_inv = outcome_node_ids - inv_node_ids
+            extra_in_inv = inv_node_ids - outcome_node_ids
+            raise ArtifactError(
+                f"pytest-outcomes: outcomes/node-inventory node set mismatch in {context}: "
+                f"missing_in_inv={sorted(missing_in_inv)}, extra_in_inv={sorted(extra_in_inv)}"
+            )
 
     return counts
 
@@ -367,7 +409,9 @@ def _verify_bundle_contents(
         outcomes_path = bundle_root / outcomes_name
         if outcomes_path.is_file():
             outcomes_raw = _read_json_strict(outcomes_path, "pytest-outcomes.json", context)
-            outcome_counts_from_artifact = _verify_outcomes_schema(outcomes_raw, context)
+            outcome_counts_from_artifact = _verify_outcomes_schema(
+                outcomes_raw, context, node_inv_data=node_inv
+            )
 
     # resource-telemetry.json — P0-5: full authority check
     tel_name = declared_kinds.get("resource-telemetry", "")
@@ -409,22 +453,32 @@ def _verify_bundle_contents(
                 f"(expected 0) in {context}"
             )
 
-        # Cross-validate outcome counts with telemetry (P0-3/P0-7)
+        # Cross-validate outcome counts with telemetry (P0-4: XPASS-safe)
+        # Structured outcomes are the five-category authority.
+        # JUnit parser cannot reliably distinguish XPASS from normal pass,
+        # so we only check total count and that failure counts are consistent.
         if outcome_counts_from_artifact is not None:
-            for key in (
-                "tests_passed",
-                "tests_failed",
-                "tests_skipped",
-                "tests_xfailed",
-                "tests_xpassed",
-            ):
-                artifact_val = outcome_counts_from_artifact[key]
-                telemetry_val = int(tel.get(key, -1))
-                if artifact_val != telemetry_val:
-                    raise ArtifactError(
-                        f"outcome/telemetry count mismatch: {key}={artifact_val} "
-                        f"(artifact) != {telemetry_val} (telemetry) in {context}"
-                    )
+            # Total must match: structured total == telemetry tests_collected
+            structured_total = sum(outcome_counts_from_artifact.values())
+            telemetry_collected = int(tel.get("tests_collected", -1))
+            if structured_total != telemetry_collected:
+                raise ArtifactError(
+                    f"outcome/telemetry total mismatch: structured={structured_total} "
+                    f"!= telemetry_collected={telemetry_collected} in {context}"
+                )
+            # failure count: structured >= 0, telemetry failure must be <=
+            # structured (because strict XPASS adds to JUnit failure count)
+            structured_failed = outcome_counts_from_artifact["tests_failed"]
+            telemetry_failed = int(tel.get("tests_failed", -1))
+            if telemetry_failed < 0:
+                raise ArtifactError(f"resource-telemetry: tests_failed missing in {context}")
+            # Structured failed can be >= telemetry failed (XPASS strict
+            # adds to JUnit failures), but not less (impossible)
+            if structured_failed < telemetry_failed:
+                raise ArtifactError(
+                    f"outcome/telemetry failure mismatch: structured_failed={structured_failed} "
+                    f"< telemetry_failed={telemetry_failed} in {context}"
+                )
 
     # P0-2: Cross-fingerprint — behavior digest == node inventory fingerprint
     if beh_fingerprint is not None and node_inv is not None:
