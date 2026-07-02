@@ -22,8 +22,10 @@ def _payload(
     shard: str | None,
     files: dict[str, list[str]],
     version: str = "3.12",
+    node_markers: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     node_ids = sorted(node for nodes in files.values() for node in nodes)
+    markers = node_markers if node_markers is not None else {nid: [] for nid in node_ids}
     return {
         "schema_version": "1",
         "collection_scope": scope,
@@ -47,6 +49,7 @@ def _payload(
             }
             for file_path, nodes in sorted(files.items())
         ],
+        "node_markers": {nid: sorted(markers.get(nid, [])) for nid in node_ids},
     }
 
 
@@ -247,4 +250,165 @@ def test_verify_per_version_rejects_duplicate_node_ownership(tmp_path: Path) -> 
                 "shard-a": shard_a,
                 "shard-b": overlapping_shard_b,
             },
+        )
+
+
+# ---------------------------------------------------------------------------
+# node_markers validation tests
+# ---------------------------------------------------------------------------
+
+
+def test_load_inventory_accepts_node_markers(tmp_path: Path) -> None:
+    """Valid node_markers with sorted, unique entries are accepted."""
+    markers = {
+        "tests/unit/test_a.py::test_a": ["golden", "pure"],
+        "tests/unit/test_b.py::test_b": ["provider"],
+    }
+    payload = _payload(
+        scope="global",
+        shard=None,
+        files={
+            "tests/unit/test_a.py": ["tests/unit/test_a.py::test_a"],
+            "tests/unit/test_b.py": ["tests/unit/test_b.py::test_b"],
+        },
+        node_markers=markers,
+    )
+    inventory = load_inventory(_write_inventory(tmp_path, "ok.json", payload))
+    assert inventory.node_markers == (
+        ("tests/unit/test_a.py::test_a", ("golden", "pure")),
+        ("tests/unit/test_b.py::test_b", ("provider",)),
+    )
+
+
+def test_load_inventory_backward_compat_no_node_markers(tmp_path: Path) -> None:
+    """Inventories without node_markers field are still accepted."""
+    payload = _payload(
+        scope="global",
+        shard=None,
+        files={
+            "tests/unit/test_a.py": ["tests/unit/test_a.py::test_a"],
+        },
+    )
+    del payload["node_markers"]
+    inventory = load_inventory(_write_inventory(tmp_path, "no_markers.json", payload))
+    assert inventory.node_markers == ()
+
+
+def test_load_inventory_rejects_unsorted_node_markers(tmp_path: Path) -> None:
+    """node_markers lists that are not sorted are rejected."""
+    node_id = "tests/unit/test_a.py::test_a"
+    payload = _payload(
+        scope="global",
+        shard=None,
+        files={"tests/unit/test_a.py": [node_id]},
+    )
+    # Override node_markers with unsorted list (bypass _payload's sorting)
+    payload["node_markers"] = {node_id: ["pure", "golden"]}
+    with pytest.raises(InventoryError, match="must be sorted and deduplicated"):
+        load_inventory(_write_inventory(tmp_path, "unsorted.json", payload))
+
+
+def test_load_inventory_rejects_duplicate_node_markers(tmp_path: Path) -> None:
+    """node_markers lists with duplicates are rejected."""
+    node_id = "tests/unit/test_a.py::test_a"
+    payload = _payload(
+        scope="global",
+        shard=None,
+        files={"tests/unit/test_a.py": [node_id]},
+    )
+    # Override node_markers with duplicate entries
+    payload["node_markers"] = {node_id: ["golden", "golden"]}
+    with pytest.raises(InventoryError, match="must be sorted and deduplicated"):
+        load_inventory(_write_inventory(tmp_path, "dupes.json", payload))
+
+
+def test_load_inventory_rejects_missing_node_marker_entry(tmp_path: Path) -> None:
+    """node_markers that do not cover every node_id are rejected."""
+    node_id = "tests/unit/test_a.py::test_a"
+    payload = _payload(
+        scope="global",
+        shard=None,
+        files={"tests/unit/test_a.py": [node_id]},
+    )
+    # Override node_markers with empty dict – coverage mismatch
+    payload["node_markers"] = {}
+    with pytest.raises(InventoryError, match="coverage mismatch"):
+        load_inventory(_write_inventory(tmp_path, "missing.json", payload))
+
+
+def test_load_inventory_rejects_extra_node_marker_entry(tmp_path: Path) -> None:
+    """node_markers with entries for nonexistent nodes are rejected."""
+    node_id = "tests/unit/test_a.py::test_a"
+    payload = _payload(
+        scope="global",
+        shard=None,
+        files={"tests/unit/test_a.py": [node_id]},
+    )
+    # Override node_markers with an extra nonexistent node
+    payload["node_markers"] = {
+        node_id: [],
+        "tests/unit/test_a.py::test_extra": ["pure"],
+    }
+    with pytest.raises(InventoryError, match="coverage mismatch"):
+        load_inventory(_write_inventory(tmp_path, "extra.json", payload))
+
+
+def test_verify_per_version_rejects_marker_mismatch(tmp_path: Path) -> None:
+    """verify_per_version raises when a node has different markers in
+    global vs shard inventories."""
+    repo, manifest_path = _write_manifest(tmp_path)
+    manifest = load_manifest(manifest_path, repo_root=repo)
+    global_inventory = load_inventory(
+        _write_inventory(
+            tmp_path,
+            "global-m.json",
+            _payload(
+                scope="global",
+                shard=None,
+                files={
+                    "tests/unit/test_a.py": ["tests/unit/test_a.py::test_a"],
+                    "tests/unit/test_b.py": ["tests/unit/test_b.py::test_b"],
+                },
+                node_markers={
+                    "tests/unit/test_a.py::test_a": ["golden"],
+                    "tests/unit/test_b.py::test_b": ["pure"],
+                },
+            ),
+        )
+    )
+    # Shard a has correct marker; shard b has a *different* marker
+    shard_a = load_inventory(
+        _write_inventory(
+            tmp_path,
+            "a-m.json",
+            _payload(
+                scope="shard",
+                shard="shard-a",
+                files={"tests/unit/test_a.py": ["tests/unit/test_a.py::test_a"]},
+                node_markers={
+                    "tests/unit/test_a.py::test_a": ["golden"],
+                },
+            ),
+        )
+    )
+    shard_b_wrong = load_inventory(
+        _write_inventory(
+            tmp_path,
+            "b-m.json",
+            _payload(
+                scope="shard",
+                shard="shard-b",
+                files={"tests/unit/test_b.py": ["tests/unit/test_b.py::test_b"]},
+                node_markers={
+                    "tests/unit/test_b.py::test_b": ["benchmark"],  # mismatch
+                },
+            ),
+        )
+    )
+    with pytest.raises(InventoryError, match="marker mismatch"):
+        verify_per_version(
+            manifest=manifest,
+            version="3.12",
+            global_inventory=global_inventory,
+            shard_inventories={"shard-a": shard_a, "shard-b": shard_b_wrong},
         )

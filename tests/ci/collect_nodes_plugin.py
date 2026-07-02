@@ -332,6 +332,14 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     if duplicates:
         raise pytest.UsageError(f"duplicate collected node IDs are prohibited: {duplicates!r}")
 
+    # Collect per-node markers via item.iter_markers().
+    # Build a mapping from normalised node_id -> sorted tuple of marker names.
+    node_markers: dict[str, tuple[str, ...]] = {}
+    for item in session.items:
+        node_id = item.nodeid.replace("\\", "/")
+        marker_names = sorted({m.name for m in item.iter_markers() if m.name})
+        node_markers[node_id] = tuple(marker_names)
+
     zero_metadata = _load_zero_node_metadata(config)
     file_records = _build_file_records(target_files, node_ids, zero_metadata)
 
@@ -356,6 +364,7 @@ def pytest_collection_finish(session: pytest.Session) -> None:
         "node_count": len(node_ids),
         "node_ids": node_ids,
         "file_records": file_records,
+        "node_markers": {nid: node_markers[nid] for nid in node_ids},
     }
 
     if payload["node_count"] != len(payload["node_ids"]):

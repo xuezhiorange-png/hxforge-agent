@@ -718,3 +718,226 @@ def test_deterministic_output(tmp_path: Path) -> None:
         )
     finally:
         _cleanup(tmp_path)
+
+
+def test_node_markers_present_in_inventory(tmp_path: Path) -> None:
+    """A test file with markers produces a node_markers dict in the output."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_markers.py"
+    test_file.write_text(
+        textwrap.dedent(
+            """\
+            import pytest
+
+            @pytest.mark.pure
+            def test_alpha():
+                assert True
+
+            @pytest.mark.slow
+            def test_beta():
+                assert True
+            """
+        ),
+        encoding="utf-8",
+    )
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        inv = _read_inv(tmp_path)
+        assert "node_markers" in inv
+        assert isinstance(inv["node_markers"], dict)
+        # Every node_id should have an entry
+        for nid in inv["node_ids"]:
+            assert nid in inv["node_markers"], f"missing node_markers for {nid}"
+        # Check specific marker content
+        markers = inv["node_markers"]
+        alpha_nid = next(nid for nid in inv["node_ids"] if "test_alpha" in nid)
+        beta_nid = next(nid for nid in inv["node_ids"] if "test_beta" in nid)
+        assert markers[alpha_nid] == ["pure"]
+        assert markers[beta_nid] == ["slow"]
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_node_markers_sorted_and_deduplicated(tmp_path: Path) -> None:
+    """Markers are sorted lexicographically and deduplicated."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_marksort.py"
+    test_file.write_text(
+        textwrap.dedent(
+            """\
+            import pytest
+
+            @pytest.mark.pure
+            @pytest.mark.golden
+            @pytest.mark.pure  # intentional duplicate at decorator level
+            def test_multi():
+                assert True
+            """
+        ),
+        encoding="utf-8",
+    )
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        inv = _read_inv(tmp_path)
+        markers = inv["node_markers"]
+        nid = next(nid for nid in inv["node_ids"] if "test_multi" in nid)
+        # Must be sorted and deduplicated
+        assert markers[nid] == ["golden", "pure"]
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_node_markers_empty_when_no_decorators(tmp_path: Path) -> None:
+    """Tests with no markers get an empty list in node_markers."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_nomark.py"
+    test_file.write_text("def test_plain():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        inv = _read_inv(tmp_path)
+        markers = inv["node_markers"]
+        nid = inv["node_ids"][0]
+        assert markers[nid] == []
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_node_markers_class_level_marker(tmp_path: Path) -> None:
+    """A marker on a class propagates to all its methods."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_cls_mark.py"
+    test_file.write_text(
+        textwrap.dedent(
+            """\
+            import pytest
+
+            @pytest.mark.integration
+            class TestSuite:
+                def test_one(self):
+                    assert True
+                def test_two(self):
+                    assert True
+            """
+        ),
+        encoding="utf-8",
+    )
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        inv = _read_inv(tmp_path)
+        markers = inv["node_markers"]
+        for nid in inv["node_ids"]:
+            assert markers[nid] == ["integration"], f"node {nid} missing class-level marker"
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_node_markers_module_level_marker(tmp_path: Path) -> None:
+    """A module-level pytestmark propagates to all collected nodes."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_modmark.py"
+    test_file.write_text(
+        textwrap.dedent(
+            """\
+            import pytest
+            pytestmark = pytest.mark.benchmark
+
+            def test_bench_a():
+                assert True
+
+            def test_bench_b():
+                assert True
+            """
+        ),
+        encoding="utf-8",
+    )
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        inv = _read_inv(tmp_path)
+        markers = inv["node_markers"]
+        for nid in inv["node_ids"]:
+            assert markers[nid] == ["benchmark"], f"node {nid} missing module-level marker"
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_node_markers_parametrized_test(tmp_path: Path) -> None:
+    """Parametrized tests each get their own marker list."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_param_mark.py"
+    test_file.write_text(
+        textwrap.dedent(
+            """\
+            import pytest
+
+            @pytest.mark.pure
+            @pytest.mark.parametrize("val", [1, 2, 3])
+            def test_param(val):
+                assert val in (1, 2, 3)
+            """
+        ),
+        encoding="utf-8",
+    )
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        inv = _read_inv(tmp_path)
+        assert inv["node_count"] == 3
+        markers = inv["node_markers"]
+        for nid in inv["node_ids"]:
+            assert "pure" in markers[nid], f"node {nid} missing pure marker"
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_node_markers_mixed_markers(tmp_path: Path) -> None:
+    """Tests with different combinations of the frozen marker taxonomy."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_mixed.py"
+    test_file.write_text(
+        textwrap.dedent(
+            """\
+            import pytest
+
+            @pytest.mark.golden
+            @pytest.mark.pure
+            def test_golden_pure():
+                assert True
+
+            @pytest.mark.provider
+            @pytest.mark.coolprop
+            def test_coolprop():
+                assert True
+
+            @pytest.mark.integration
+            @pytest.mark.slow
+            def test_integ():
+                assert True
+            """
+        ),
+        encoding="utf-8",
+    )
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        inv = _read_inv(tmp_path)
+        markers = inv["node_markers"]
+        golden_nid = next(nid for nid in inv["node_ids"] if "test_golden_pure" in nid)
+        coolprop_nid = next(nid for nid in inv["node_ids"] if "test_coolprop" in nid)
+        integ_nid = next(nid for nid in inv["node_ids"] if "test_integ" in nid)
+        assert markers[golden_nid] == ["golden", "pure"]
+        assert markers[coolprop_nid] == ["coolprop", "provider"]
+        assert markers[integ_nid] == ["integration", "slow"]
+    finally:
+        _cleanup(tmp_path)
