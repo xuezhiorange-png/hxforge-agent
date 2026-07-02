@@ -5,8 +5,8 @@ environment.  It establishes a封闭允许列表 of environment variables that
 affect test collection/import behavior, and a governed-prefix fail-closed
 mechanism for detecting unknown behavior-affecting variables.
 
-Global and shard fingerprints MUST be consistent.  The canonical JSON payload
-is what gets SHA-256 hashed for the fingerprint.
+P0-1: PYTEST_TIMEOUT is now explicitly in the allowlist because it is injected
+by the CI workflow and affects execution authority.
 
 Governed namespace:
   Variables whose name starts with one of the governed prefixes MUST be
@@ -14,9 +14,6 @@ Governed namespace:
   raises BehaviorEnvironmentError — fail-closed.
 
 Non-governed variables (standard GitHub runner env vars) are not checked.
-
-The auditable payload (behavior-environment.json) must be saved as an
-artifact so that fingerprints can be verified post-hoc.
 """
 
 from __future__ import annotations
@@ -29,15 +26,9 @@ from pathlib import Path
 from typing import Any, Final
 
 # ── Governed namespace prefixes ─────────────────────────────────────────────
-# Variables whose name starts with these prefixes are under HX governance.
-# If a governed variable is present in the environment but NOT in the allowlist,
-# the fingerprint computation MUST fail closed.
 GOVERNED_PREFIXES: Final[tuple[str, ...]] = ("HX_", "HEXAGENT_", "COOLPROP_", "PYTEST_")
 
 # ── Behavior-affecting environment variables (allowlist) ────────────────────
-# Only these variables may influence collection/import behavior.
-# Governed-namespace variables not in this set cause fail-closed rejection.
-# Non-governed (standard runner) variables are silently ignored.
 BEHAVIOR_ENV_ALLOWLIST: Final[frozenset[str]] = frozenset(
     {
         "PYTHONHASHSEED",
@@ -47,6 +38,7 @@ BEHAVIOR_ENV_ALLOWLIST: Final[frozenset[str]] = frozenset(
         "PYTEST_ADDOPTS",
         "PYTEST_CURRENT_TEST",
         "PYTEST_VERSION",
+        "PYTEST_TIMEOUT",
         "HX_TRACK",
         "HX_COMMIT_SHA",
         "GITHUB_RUN_ID",
@@ -55,7 +47,6 @@ BEHAVIOR_ENV_ALLOWLIST: Final[frozenset[str]] = frozenset(
 )
 
 # ── Behavior-affecting file inputs ──────────────────────────────────────────
-# Files whose content affects collection/import behavior.
 BEHAVIOR_FILE_INPUTS: Final[frozenset[str]] = frozenset(
     {
         "uv.lock",
@@ -77,14 +68,7 @@ def sha256_file(path: Path) -> str:
 
 
 def check_governed_unknowns(*, extra_allowed_vars: frozenset[str] | None = None) -> None:
-    """Fail-closed check for unknown governed-namespace variables.
-
-    Inspects os.environ for variables starting with GOVERNED_PREFIXES.
-    Any governed variable not in BEHAVIOR_ENV_ALLOWLIST (or extra_allowed_vars)
-    triggers a BehaviorEnvironmentError.
-
-    Standard runner variables (without governed prefixes) are not checked.
-    """
+    """Fail-closed check for unknown governed-namespace variables."""
     allowed = BEHAVIOR_ENV_ALLOWLIST | (extra_allowed_vars or frozenset())
     unknown: set[str] = set()
     for key in os.environ:
@@ -105,36 +89,11 @@ def build_behavior_fingerprint(
 ) -> dict[str, Any]:
     """Build the canonical behavior environment fingerprint payload.
 
-    The payload includes all allowed env vars, file digests, Python/pytest
-    version info, and plugin versions (when config is provided).
-    The SHA-256 of the canonical JSON serialization is the fingerprint.
-
-    Parameters
-    ----------
-    repo_root : Path, optional
-        Repository root directory.  Defaults to cwd.
-    extra_allowed_vars : frozenset[str], optional
-        Additional variables to allow (e.g. for nightly-specific config).
-    config : pytest.Config, optional
-        When provided, pytest/plugin versions are included in the payload.
-        When None, those fields are omitted (for standalone use).
-
-    Returns
-    -------
-    dict with keys:
-      'payload'           – the canonical dict
-      'canonical_json'    – canonical JSON string
-      'fingerprint'       – SHA-256 hex digest
-
-    Raises
-    ------
-    BehaviorEnvironmentError
-        If required files are missing or unknown governed variables are present.
+    Returns dict with 'payload', 'canonical_json', 'fingerprint'.
     """
     root = repo_root or Path.cwd()
     allowed = BEHAVIOR_ENV_ALLOWLIST | (extra_allowed_vars or frozenset())
 
-    # Check for unknown governed variables BEFORE building payload
     check_governed_unknowns(extra_allowed_vars=extra_allowed_vars)
 
     env_snapshot: dict[str, str] = {}
@@ -143,16 +102,13 @@ def build_behavior_fingerprint(
         if value:
             env_snapshot[key] = value
 
-    # Python version info
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
 
-    # File digests
     file_digests: dict[str, str] = {}
     for filename in sorted(BEHAVIOR_FILE_INPUTS):
         filepath = root / filename
         file_digests[filename] = sha256_file(filepath)
 
-    # Working directory
     working_dir = str(Path.cwd().resolve())
 
     payload: dict[str, Any] = {
@@ -162,7 +118,6 @@ def build_behavior_fingerprint(
         "working_directory": working_dir,
     }
 
-    # Optionally include pytest/plugin versions when config is available
     if config is not None:
         import pytest as _pytest
 
@@ -197,10 +152,7 @@ def save_behavior_environment(
     extra_allowed_vars: frozenset[str] | None = None,
     config: Any = None,
 ) -> dict[str, Any]:
-    """Build and save the auditable behavior-environment.json artifact.
-
-    Returns the full artifact dict (schema_version + payload + fingerprint).
-    """
+    """Build and save the auditable behavior-environment.json artifact."""
     result = build_behavior_fingerprint(
         repo_root=repo_root,
         extra_allowed_vars=extra_allowed_vars,
@@ -223,13 +175,17 @@ def verify_fingerprint_consistency(
     fingerprints: list[str],
     context: str,
 ) -> None:
-    """Verify that all fingerprints are identical.
-
-    Raises BehaviorEnvironmentError if fingerprints differ.
-    """
+    """Verify that all fingerprints are identical."""
     unique = set(fingerprints)
     if len(unique) != 1:
         raise BehaviorEnvironmentError(
             f"behavior fingerprint inconsistency in {context}: "
             f"found {len(unique)} distinct values: {sorted(unique)}"
         )
+
+
+def canonicalize_payload(payload: dict[str, Any]) -> str:
+    """Return the canonical JSON string for a payload (no plugin info)."""
+    # Strip plugin_versions if present (standalone re-canonicalization)
+    stripped = {k: v for k, v in payload.items() if k != "plugin_versions"}
+    return json.dumps(stripped, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
