@@ -179,3 +179,225 @@ class TestOutcomePlugin:
         missing_path = tmp_path / "definitely-not-there.json"
         result = _read_and_validate_outcomes(missing_path)
         assert result is None
+
+
+# ── P0-3: Exact node equality tests ──────────────────────────────────────────
+
+
+def _make_outcomes_json(
+    tmp_path: Path,
+    outcomes: dict[str, str],
+    collection_complete: list[str] | None = None,
+) -> Path:
+    """Create a pytest-outcomes.json file."""
+    cc = collection_complete if collection_complete is not None else sorted(outcomes.keys())
+    data = {
+        "schema_version": "1",
+        "outcomes": dict(sorted(outcomes.items())),
+        "total": len(outcomes),
+        "collection_complete": sorted(cc),
+    }
+    path = tmp_path / "pytest-outcomes.json"
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def _make_node_inventory(
+    tmp_path: Path,
+    node_ids: list[str],
+) -> Path:
+    """Create a node-inventory.json file."""
+    data = {
+        "schema_version": "1",
+        "node_ids": sorted(node_ids),
+        "node_count": len(node_ids),
+    }
+    path = tmp_path / "node-inventory.json"
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def test_p03_outcomes_missing_node_rejected(tmp_path: Path) -> None:
+    """Outcomes missing one node vs collection_complete → rejected."""
+    from tests.ci.run_test_shard import _read_and_validate_outcomes
+
+    outcomes = {"a/test_one.py::test_a": "passed", "a/test_two.py::test_b": "passed"}
+    _make_outcomes_json(
+        tmp_path,
+        outcomes,
+        collection_complete=[
+            "a/test_one.py::test_a",
+            "a/test_two.py::test_b",
+            "a/test_three.py::test_c",  # extra in cc
+        ],
+    )
+    inv_path = _make_node_inventory(tmp_path, list(outcomes.keys()))
+    result = _read_and_validate_outcomes(
+        tmp_path / "pytest-outcomes.json",
+        node_inventory_path=inv_path,
+    )
+    assert result is None, "must reject: collection_complete has extra node not in outcomes"
+
+
+def test_p03_outcomes_extra_node_rejected(tmp_path: Path) -> None:
+    """Outcomes has extra node not in collection_complete → rejected."""
+    from tests.ci.run_test_shard import _read_and_validate_outcomes
+
+    outcomes = {
+        "a/test_one.py::test_a": "passed",
+        "a/test_two.py::test_b": "passed",
+        "a/test_three.py::test_c": "passed",
+    }
+    _make_outcomes_json(
+        tmp_path,
+        outcomes,
+        collection_complete=[
+            "a/test_one.py::test_a",
+            "a/test_two.py::test_b",
+            # missing test_three
+        ],
+    )
+    inv_path = _make_node_inventory(tmp_path, list(outcomes.keys()))
+    result = _read_and_validate_outcomes(
+        tmp_path / "pytest-outcomes.json",
+        node_inventory_path=inv_path,
+    )
+    assert result is None, "must reject: collection_complete missing a node from outcomes"
+
+
+def test_p03_collection_complete_has_duplicates_rejected(tmp_path: Path) -> None:
+    """collection_complete has duplicate node → rejected."""
+    from tests.ci.run_test_shard import _read_and_validate_outcomes
+
+    outcomes = {"a/test_one.py::test_a": "passed"}
+    _make_outcomes_json(
+        tmp_path,
+        outcomes,
+        collection_complete=[
+            "a/test_one.py::test_a",
+            "a/test_one.py::test_a",  # duplicate
+        ],
+    )
+    result = _read_and_validate_outcomes(tmp_path / "pytest-outcomes.json")
+    assert result is None, "must reject: duplicate in collection_complete"
+
+
+def test_p03_collection_complete_differs_from_outcomes(tmp_path: Path) -> None:
+    """collection_complete has same length but different node → rejected."""
+    from tests.ci.run_test_shard import _read_and_validate_outcomes
+
+    outcomes = {"a/test_one.py::test_a": "passed"}
+    _make_outcomes_json(
+        tmp_path,
+        outcomes,
+        collection_complete=[
+            "a/test_different.py::test_x",  # different node, same count
+        ],
+    )
+    result = _read_and_validate_outcomes(tmp_path / "pytest-outcomes.json")
+    assert result is None, "must reject: collection_complete has different node"
+
+
+def test_p03_node_inventory_differs_from_outcomes(tmp_path: Path) -> None:
+    """Node inventory has same count but different nodes → rejected."""
+    from tests.ci.run_test_shard import _read_and_validate_outcomes
+
+    outcomes = {"a/test_one.py::test_a": "passed"}
+    _make_outcomes_json(tmp_path, outcomes)
+    inv_path = _make_node_inventory(tmp_path, ["b/test_other.py::test_x"])
+    result = _read_and_validate_outcomes(
+        tmp_path / "pytest-outcomes.json",
+        node_inventory_path=inv_path,
+    )
+    assert result is None, "must reject: node inventory has different nodes"
+
+
+def test_p03_valid_three_way_equality(tmp_path: Path) -> None:
+    """Valid: outcomes, collection_complete, and node_inventory all match."""
+    from tests.ci.run_test_shard import _read_and_validate_outcomes
+
+    nodes = ["a/test_one.py::test_a", "b/test_two.py::test_b"]
+    outcomes = {n: "passed" for n in nodes}
+    _make_outcomes_json(tmp_path, outcomes)
+    inv_path = _make_node_inventory(tmp_path, nodes)
+    result = _read_and_validate_outcomes(
+        tmp_path / "pytest-outcomes.json",
+        node_inventory_path=inv_path,
+    )
+    assert result is not None, "valid three-way equality should be accepted"
+
+
+# ── P0-4: XPASS runner cross-validation tests ────────────────────────────────
+
+
+def _run_outcome_with_test(tmp_path: Path, test_content: str) -> dict:
+    """Run a test file with the outcome plugin and return parsed outcomes."""
+    test_file = tmp_path / "test_x.py"
+    test_file.write_text(test_content, encoding="utf-8")
+    outcomes_path = tmp_path / "pytest-outcomes.json"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            str(test_file),
+            "-p",
+            "tests.ci.outcome_plugin",
+            f"--hx-outcome-output={outcomes_path}",
+            "--tb=short",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parent.parent.parent),
+        env={**os.environ, "PYTHONPATH": "."},
+    )
+    if outcomes_path.exists():
+        return json.loads(outcomes_path.read_text(encoding="utf-8"))
+    return {}
+
+
+def test_p04_xpass_non_strict(tmp_path: Path) -> None:
+    """Non-strict XPASS: xfail(strict=False) + assert True → xpassed."""
+    outcomes = _run_outcome_with_test(
+        tmp_path,
+        "import pytest\n@pytest.mark.xfail(strict=False)\ndef test_xpass():\n    assert True\n",
+    )
+    assert outcomes.get("outcomes", {}).get("test_x.py::test_xpass") == "xpassed"
+    assert outcomes.get("total") == 1
+
+
+def test_p04_xfail_normal(tmp_path: Path) -> None:
+    """Normal xfail: xfail + assert False → xfailed."""
+    outcomes = _run_outcome_with_test(
+        tmp_path,
+        "import pytest\n@pytest.mark.xfail\ndef test_xfail():\n    assert False\n",
+    )
+    assert outcomes.get("outcomes", {}).get("test_x.py::test_xfail") == "xfailed"
+
+
+def test_p04_normal_pass(tmp_path: Path) -> None:
+    """Normal pass."""
+    outcomes = _run_outcome_with_test(
+        tmp_path,
+        "def test_pass():\n    assert True\n",
+    )
+    assert outcomes.get("outcomes", {}).get("test_x.py::test_pass") == "passed"
+
+
+def test_p04_normal_fail(tmp_path: Path) -> None:
+    """Normal fail."""
+    outcomes = _run_outcome_with_test(
+        tmp_path,
+        "def test_fail():\n    assert False\n",
+    )
+    assert outcomes.get("outcomes", {}).get("test_x.py::test_fail") == "failed"
+
+
+def test_p04_normal_skip(tmp_path: Path) -> None:
+    """Normal skip."""
+    outcomes = _run_outcome_with_test(
+        tmp_path,
+        "import pytest\ndef test_skip():\n    pytest.skip('intentional')\n",
+    )
+    assert outcomes.get("outcomes", {}).get("test_x.py::test_skip") == "skipped"

@@ -189,6 +189,7 @@ def _make_artifact_bundle(
                 "resource_measurement_status": "available",
                 "outcome_parse_status": "available",
                 "pytest_exit_code": 0,
+                "tests_collected": 1,
                 "tests_passed": 1,
                 "tests_failed": 0,
                 "tests_skipped": 0,
@@ -1070,7 +1071,7 @@ class TestOutcomeCrossValidation:
     """Tests for pytest-outcomes cross-validation with telemetry."""
 
     def test_reject_mismatched_outcome_count(self, tmp_path: Path) -> None:
-        """pytest-outcomes total != telemetry tests_passed → fail."""
+        """pytest-outcomes total != telemetry tests_collected → fail."""
         manifest = _make_manifest(tmp_path)
         root = tmp_path / "artifacts"
         root.mkdir()
@@ -1099,8 +1100,22 @@ class TestOutcomeCrossValidation:
         (bundle_dir / "pytest-outcomes.json").write_text(
             json.dumps(outcomes, indent=2), encoding="utf-8"
         )
-        # Telemetry still says tests_passed=1 (from original bundle creation)
-        with pytest.raises(ArtifactError, match="outcome/telemetry count mismatch"):
+        # Also update node-inventory to match outcomes (P0-3: node equality)
+        node_inv_path = bundle_dir / "node-inventory.json"
+        node_inv = json.loads(node_inv_path.read_text(encoding="utf-8"))
+        node_inv["node_ids"] = ["tests/ci/test_a.py::test_a", "tests/ci/test_b.py::test_b"]
+        node_inv["node_count"] = 2
+        node_inv_path.write_text(json.dumps(node_inv, indent=2), encoding="utf-8")
+        # Update marker-inventory to match (must have same node set)
+        marker_inv_path = bundle_dir / "node-marker-inventory.json"
+        marker_inv = json.loads(marker_inv_path.read_text(encoding="utf-8"))
+        marker_inv["node_markers"] = {
+            "tests/ci/test_a.py::test_a": [],
+            "tests/ci/test_b.py::test_b": [],
+        }
+        marker_inv_path.write_text(json.dumps(marker_inv, indent=2), encoding="utf-8")
+        # Telemetry still says tests_collected=1 (from original bundle creation)
+        with pytest.raises(ArtifactError, match="outcome/telemetry total mismatch"):
             verify_artifacts(
                 artifact_root=root,
                 manifest_path=manifest,

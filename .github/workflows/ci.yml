@@ -497,6 +497,7 @@ jobs:
         run: |
           uv run --locked pytest --collect-only -q \
             -p tests.ci.collect_nodes_plugin \
+            -p tests.ci.outcome_plugin \
             --hx-collection-scope global \
             --hx-node-output "nodes-pr-head-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json" \
             tests/ 2>collection-stderr-global.txt
@@ -579,6 +580,7 @@ jobs:
         run: |
           uv run --locked pytest --collect-only -q \
             -p tests.ci.collect_nodes_plugin \
+            -p tests.ci.outcome_plugin \
             --hx-collection-scope global \
             --hx-node-output "nodes-merge-ref-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json" \
             tests/ 2>collection-stderr-global.txt
@@ -660,6 +662,7 @@ jobs:
         run: |
           uv run --locked pytest --collect-only -q \
             -p tests.ci.collect_nodes_plugin \
+            -p tests.ci.outcome_plugin \
             --hx-collection-scope global \
             --hx-node-output "nodes-main-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json" \
             tests/ 2>collection-stderr-global.txt

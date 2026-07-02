@@ -1061,8 +1061,9 @@ def test_workflow_env_generates_fingerprint(tmp_path: Path) -> None:
         _cleanup(tmp_path)
 
 
-def test_pytest_timeout_enters_payload(tmp_path: Path) -> None:
-    """PYTEST_TIMEOUT is present in the behavior-environment.json payload."""
+def test_pytest_timeout_excluded_from_fingerprint_payload(tmp_path: Path) -> None:
+    """PYTEST_TIMEOUT is governed (fail-closed) but NOT in the collection
+    fingerprint payload — it's execution-only."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_timeout_payload.py"
     test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
@@ -1078,14 +1079,16 @@ def test_pytest_timeout_enters_payload(tmp_path: Path) -> None:
         assert result.returncode == 0, result.stderr
         beh = _read_behavior_env(tmp_path)
         env_map = beh["payload"]["environment"]
-        assert "PYTEST_TIMEOUT" in env_map, "PYTEST_TIMEOUT missing from payload"
-        assert env_map["PYTEST_TIMEOUT"] == "120"
+        assert "PYTEST_TIMEOUT" not in env_map, (
+            "PYTEST_TIMEOUT must NOT be in collection fingerprint payload"
+        )
     finally:
         _cleanup(tmp_path)
 
 
-def test_changing_timeout_changes_fingerprint(tmp_path: Path) -> None:
-    """Different PYTEST_TIMEOUT values produce different fingerprints."""
+def test_changing_timeout_preserves_fingerprint(tmp_path: Path) -> None:
+    """Different PYTEST_TIMEOUT values produce the SAME collection fingerprint
+    because timeout is execution authority, not collection behavior."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_timeout_diff.py"
     test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
@@ -1118,7 +1121,71 @@ def test_changing_timeout_changes_fingerprint(tmp_path: Path) -> None:
         beh = json.loads(beh_path.read_text(encoding="utf-8"))
         fingerprints.append(beh["canonical_json_sha256"])
     assert len(fingerprints) == 2
-    assert fingerprints[0] != fingerprints[1], "changing PYTEST_TIMEOUT must change fingerprint"
+    assert fingerprints[0] == fingerprints[1], (
+        "different PYTEST_TIMEOUT values must NOT change the collection fingerprint"
+    )
+
+
+def test_three_timeout_values_same_fingerprint(tmp_path: Path) -> None:
+    """Three different PYTEST_TIMEOUT values (120, 180, 300) — matching the
+    CI shard manifest — all produce the same collection fingerprint."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_timeout_three.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    fingerprints: list[str] = []
+    for timeout_val in ("120", "180", "300"):
+        out = tmp_path / f"inventory_{timeout_val}.json"
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            PLUGIN,
+            "--hx-collection-scope=shard",
+            "--hx-shard=s1",
+            f"--hx-node-output={out}",
+            rel,
+        ]
+        env = {**os.environ, **BASE_ENV, "PYTEST_TIMEOUT": timeout_val}
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+            timeout=60,
+        )
+        assert proc.returncode == 0, proc.stderr
+        beh_path = out.parent / "behavior-environment.json"
+        beh = json.loads(beh_path.read_text(encoding="utf-8"))
+        fingerprints.append(beh["canonical_json_sha256"])
+    assert len(fingerprints) == 3
+    assert len(set(fingerprints)) == 1, (
+        f"all three timeout values must produce the same fingerprint, got {fingerprints}"
+    )
+
+
+def test_governed_execution_var_still_rejected(tmp_path: Path) -> None:
+    """PYTEST_TIMEOUT is still governed: an unknown PYTEST_* variable is
+    rejected even though PYTEST_TIMEOUT itself is no longer in the fingerprint."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_exec_gov.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    try:
+        result = _run(
+            tmp_path,
+            [rel],
+            scope="shard",
+            shard="s1",
+            extra_env={"PYTEST_UNKNOWN_EXEC_PARAM": "banned"},
+        )
+        assert result.returncode != 0, (
+            "undeclared PYTEST_UNKNOWN_EXEC_PARAM must trigger fail-closed"
+        )
+    finally:
+        _cleanup(tmp_path)
 
 
 def test_undeclared_pytest_unknown_setting_fails_closed(tmp_path: Path) -> None:
@@ -1343,3 +1410,139 @@ def test_run_test_shard_counts_authoritative_fail(tmp_path: Path) -> None:
         + telemetry["tests_xpassed"]
     )
     assert telemetry["tests_collected"] == expected_total
+
+
+# ── P0-1: Static workflow plugin verification ────────────────────────────────
+
+
+def _load_ci_workflow() -> str:
+    """Load the CI workflow file content."""
+    ci_path = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    return ci_path.read_text(encoding="utf-8")
+
+
+def _find_global_collection_blocks(workflow: str) -> list[tuple[str, str]]:
+    """Extract (job_name, run_block) for global collection jobs."""
+    import re
+
+    blocks: list[tuple[str, str]] = []
+    # Match the run block inside each global collection job.
+    # The step name contains ${{ matrix.python }} so we use a more flexible match.
+    patterns = [
+        ("collect-global", r"Global collection \(py.*?\)\n\s+run: \|\n((?:.*\\\n)*)"),
+        (
+            "collect-global-merge-ref",
+            r"Global collection merge-ref \(py.*?\)\n\s+run: \|\n((?:.*\\\n)*)",
+        ),
+        ("collect-global-main", r"Global collection main \(py.*?\)\n\s+run: \|\n((?:.*\\\n)*)"),
+    ]
+    for job_name, pattern in patterns:
+        m = re.search(pattern, workflow)
+        if m:
+            blocks.append((job_name, m.group(1)))
+    return blocks
+
+
+def test_ci_workflow_global_plugins_included() -> None:
+    """P0-1: All three global collection commands must register BOTH
+    collect_nodes_plugin AND outcome_plugin to match shard fingerprint."""
+    workflow = _load_ci_workflow()
+    blocks = _find_global_collection_blocks(workflow)
+    assert len(blocks) == 3, f"expected 3 global collection blocks, got {len(blocks)}"
+    for job_name, run_block in blocks:
+        assert "-p tests.ci.collect_nodes_plugin" in run_block, (
+            f"{job_name} missing collect_nodes_plugin"
+        )
+        assert "-p tests.ci.outcome_plugin" in run_block, (
+            f"{job_name} missing outcome_plugin — fingerprint will mismatch"
+        )
+
+
+def test_ci_workflow_shard_plugins_included() -> None:
+    """Shard jobs use run_test_shard.py which auto-injects outcome_plugin,
+    but must also register collect_nodes_plugin."""
+    workflow = _load_ci_workflow()
+    # Verify shard steps have collect_nodes_plugin
+    shard_count = workflow.count("-p tests.ci.collect_nodes_plugin")
+    assert shard_count >= 6, (
+        f"expected at least 6 collect_nodes_plugin registrations "
+        f"(3 tracks × 2 Python), got {shard_count}"
+    )
+
+
+# ── P0-4: XPASS cross-validation acceptance tests ────────────────────────────
+
+
+def test_xpass_non_strict_runner_authoritative(tmp_path: Path) -> None:
+    """Non-strict XPASS: test marked xfail(strict=False) but passes.
+    Runner must be authoritative — XPASS is a valid outcome."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_xpass_ns.py"
+    test_file.write_text(
+        "import pytest\n@pytest.mark.xfail(strict=False)\ndef test_xpass():\n    assert True\n",
+        encoding="utf-8",
+    )
+    rel = test_file.as_posix()
+    try:
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            PLUGIN,
+            "--hx-collection-scope=shard",
+            "--hx-shard=s1",
+            f"--hx-node-output={tmp_path / 'inv.json'}",
+            rel,
+        ]
+        env = {**os.environ, **BASE_ENV}
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+            timeout=60,
+        )
+        assert proc.returncode == 0, proc.stderr
+        beh_path = tmp_path / "behavior-environment.json"
+        beh = json.loads(beh_path.read_text(encoding="utf-8"))
+        # XPASS should not affect fingerprint — just verify it ran
+        assert "canonical_json_sha256" in beh
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_xfail_normal_pass(tmp_path: Path) -> None:
+    """Normal xfail: test marked xfail and fails as expected."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_xfail.py"
+    test_file.write_text(
+        "import pytest\n@pytest.mark.xfail\ndef test_expected_fail():\n    assert False\n",
+        encoding="utf-8",
+    )
+    rel = test_file.as_posix()
+    try:
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            PLUGIN,
+            "--hx-collection-scope=shard",
+            "--hx-shard=s1",
+            f"--hx-node-output={tmp_path / 'inv.json'}",
+            rel,
+        ]
+        env = {**os.environ, **BASE_ENV}
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+            timeout=60,
+        )
+        assert proc.returncode == 0, proc.stderr
+    finally:
+        _cleanup(tmp_path)
