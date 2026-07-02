@@ -12,9 +12,12 @@ from typing import Any
 import pytest
 
 from tests.ci.artifact_identity import (
+    GLOBAL_REQUIRED_ARTIFACT_KINDS,
     REQUIRED_ARTIFACT_KINDS,
+    SHARD_REQUIRED_ARTIFACT_KINDS,
     ArtifactError,
     verify_artifacts,
+    verify_global_bundles,
 )
 from tests.ci.marker_inventory import (
     MarkerInventoryError,
@@ -68,6 +71,7 @@ _KIND_FILE_MAP: dict[str, str] = {
     "coverage-raw": "coverage-raw.raw",
     "coverage-xml": "coverage.xml",
     "pytest-stderr": "pytest-stderr.txt",
+    "pytest-outcomes": "pytest-outcomes.json",
     "resource-telemetry": "resource-telemetry.json",
 }
 
@@ -83,9 +87,13 @@ def _make_artifact_bundle(
     run_attempt: int,
     present: bool = True,
     bundle_name: str | None = None,
+    scope: str = "shard",
 ) -> Path:
     """Create a minimal artifact bundle with metadata AND real files."""
-    dir_name = bundle_name or f"{track}-{shard}-py{python_version}"
+    if scope == "global":
+        dir_name = bundle_name or f"{track}-global-py{python_version}"
+    else:
+        dir_name = bundle_name or f"{track}-{shard}-py{python_version}"
     bundle_dir = root / dir_name
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
@@ -105,52 +113,92 @@ def _make_artifact_bundle(
     )
     beh_digest = hashlib.sha256(beh_canonical.encode("utf-8")).hexdigest()
 
-    _json_content: dict[str, dict[str, Any]] = {
-        "node-inventory": {
-            "track": track,
-            "commit_sha": commit_sha,
-            "run_id": run_id,
-            "run_attempt": run_attempt,
-            "python_version": python_version,
-            "shard": shard,
-            "collection_scope": "shard",
-            "node_ids": node_ids,
-            "behavior_fingerprint_sha256": beh_digest,
-        },
-        "node-marker-inventory": {
-            "track": track,
-            "commit_sha": commit_sha,
-            "run_id": run_id,
-            "run_attempt": run_attempt,
-            "python_version": python_version,
-            "shard": shard,
-            "node_markers": node_markers,
-        },
-        "behavior-environment": {
-            "schema_version": "1",
-            "payload": beh_payload,
-            "canonical_json_sha256": f"sha256:{beh_digest}",
-        },
-        "resource-telemetry": None,  # built below with all required fields
-    }
-
-    # Build a valid resource-telemetry.json with all required authority fields
-    _json_content["resource-telemetry"] = {
-        "track": track,
-        "commit_sha": commit_sha,
-        "run_id": run_id,
-        "run_attempt": run_attempt,
-        "python_version": python_version,
-        "shard": shard,
-        "execution_status": "completed",
-        "junit_parse_status": "available",
-        "counts_authoritative": True,
-        "resource_measurement_status": "available",
-        "pytest_exit_code": 0,
-    }
+    if scope == "global":
+        required_kinds = GLOBAL_REQUIRED_ARTIFACT_KINDS
+        _json_content: dict[str, dict[str, Any] | None] = {
+            "node-inventory": {
+                "track": track,
+                "commit_sha": commit_sha,
+                "run_id": run_id,
+                "run_attempt": run_attempt,
+                "python_version": python_version,
+                "shard": None,
+                "collection_scope": "global",
+                "node_ids": node_ids,
+                "behavior_fingerprint_sha256": beh_digest,
+            },
+            "node-marker-inventory": {
+                "track": track,
+                "commit_sha": commit_sha,
+                "run_id": run_id,
+                "run_attempt": run_attempt,
+                "python_version": python_version,
+                "shard": None,
+                "node_markers": node_markers,
+            },
+            "behavior-environment": {
+                "schema_version": "1",
+                "payload": beh_payload,
+                "canonical_json_sha256": f"sha256:{beh_digest}",
+            },
+        }
+    else:
+        required_kinds = SHARD_REQUIRED_ARTIFACT_KINDS
+        _json_content = {
+            "node-inventory": {
+                "track": track,
+                "commit_sha": commit_sha,
+                "run_id": run_id,
+                "run_attempt": run_attempt,
+                "python_version": python_version,
+                "shard": shard,
+                "collection_scope": "shard",
+                "node_ids": node_ids,
+                "behavior_fingerprint_sha256": beh_digest,
+            },
+            "node-marker-inventory": {
+                "track": track,
+                "commit_sha": commit_sha,
+                "run_id": run_id,
+                "run_attempt": run_attempt,
+                "python_version": python_version,
+                "shard": shard,
+                "node_markers": node_markers,
+            },
+            "behavior-environment": {
+                "schema_version": "1",
+                "payload": beh_payload,
+                "canonical_json_sha256": f"sha256:{beh_digest}",
+            },
+            "pytest-outcomes": {
+                "schema_version": "1",
+                "outcomes": {"tests/ci/test_a.py::test_a": "passed"},
+                "total": 1,
+                "collection_complete": ["tests/ci/test_a.py::test_a"],
+            },
+            "resource-telemetry": {
+                "track": track,
+                "commit_sha": commit_sha,
+                "run_id": run_id,
+                "run_attempt": run_attempt,
+                "python_version": python_version,
+                "shard": shard,
+                "execution_status": "completed",
+                "junit_parse_status": "available",
+                "counts_authoritative": True,
+                "resource_measurement_status": "available",
+                "outcome_parse_status": "available",
+                "pytest_exit_code": 0,
+                "tests_passed": 1,
+                "tests_failed": 0,
+                "tests_skipped": 0,
+                "tests_xfailed": 0,
+                "tests_xpassed": 0,
+            },
+        }
 
     artifacts = []
-    for k in sorted(REQUIRED_ARTIFACT_KINDS):
+    for k in sorted(required_kinds):
         fname = _KIND_FILE_MAP.get(k, f"{k}.json")
         artifacts.append({"kind": k, "path": fname, "present": present})
         if present:
@@ -159,15 +207,24 @@ def _make_artifact_bundle(
                 (bundle_dir / fname).write_text(json.dumps(json_data, indent=2), encoding="utf-8")
             else:
                 (bundle_dir / fname).write_text(f"placeholder-{k}", encoding="utf-8")
+
+    # Build identity based on scope
+    identity: dict[str, Any] = {
+        "track": track,
+        "commit_sha": commit_sha,
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "python_version": python_version,
+    }
+    if scope == "global":
+        identity["collection_scope"] = "global"
+        # No shard field for global
+    else:
+        identity["shard"] = shard
+        # No collection_scope — defaults to "shard" in _parse_identity
+
     meta = {
-        "identity": {
-            "track": track,
-            "commit_sha": commit_sha,
-            "run_id": run_id,
-            "run_attempt": run_attempt,
-            "python_version": python_version,
-            "shard": shard,
-        },
+        "identity": identity,
         "artifacts": artifacts,
     }
     (bundle_dir / "artifact-metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
@@ -312,7 +369,7 @@ class TestArtifactIdentity:
             run_id="100",
             run_attempt=1,
         )
-        with pytest.raises(ArtifactError, match="MISSING producers"):
+        with pytest.raises(ArtifactError, match="MISSING.*producers"):
             verify_artifacts(
                 artifact_root=root,
                 manifest_path=manifest,
@@ -869,6 +926,251 @@ class TestArtifactIdentity:
             json.dumps(tel, indent=2), encoding="utf-8"
         )
         with pytest.raises(ArtifactError, match="counts_authoritative"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+
+# ---------------------------------------------------------------------------
+# Global bundle verification tests
+# ---------------------------------------------------------------------------
+
+
+class TestGlobalBundleVerification:
+    """Tests for global bundle verification."""
+
+    def test_pass_global_bundles(self, tmp_path: Path) -> None:
+        """Two global bundles (3.11, 3.12) with correct identity → PASS."""
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+            scope="global",
+            bundle_name="pr-head-global-py3.11",
+        )
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+            scope="global",
+            bundle_name="pr-head-global-py3.12",
+        )
+        verify_global_bundles(
+            artifact_root=root,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            expected_run_attempt=1,
+            python_versions=["3.11", "3.12"],
+        )
+
+    def test_reject_global_with_shard(self, tmp_path: Path) -> None:
+        """Global bundle that has shard set → fail."""
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = root / "pr-head-global-py3.11"
+        bundle_dir.mkdir()
+        # Create a global bundle with shard set (invalid)
+        meta = {
+            "identity": {
+                "track": "pr-head",
+                "commit_sha": _SHA40,
+                "run_id": "100",
+                "run_attempt": 1,
+                "python_version": "3.11",
+                "collection_scope": "global",
+                "shard": "ci",  # Invalid: global must not have shard
+            },
+            "artifacts": [],
+        }
+        (bundle_dir / "artifact-metadata.json").write_text(
+            json.dumps(meta, indent=2), encoding="utf-8"
+        )
+        with pytest.raises(ArtifactError, match="global scope must not have shard"):
+            verify_global_bundles(
+                artifact_root=root,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+                python_versions=["3.11"],
+            )
+
+    def test_reject_shard_as_global(self, tmp_path: Path) -> None:
+        """Shard bundle passed to global verifier → missing."""
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+            scope="shard",
+        )
+        with pytest.raises(ArtifactError, match="MISSING global bundles"):
+            verify_global_bundles(
+                artifact_root=root,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+                python_versions=["3.11"],
+            )
+
+    def test_reject_global_wrong_track(self, tmp_path: Path) -> None:
+        """Global bundle with wrong track → fail."""
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="wrong",
+            shard="",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+            scope="global",
+            bundle_name="wrong-global-py3.11",
+        )
+        with pytest.raises(ArtifactError, match="global track mismatch"):
+            verify_global_bundles(
+                artifact_root=root,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+                python_versions=["3.11"],
+            )
+
+
+# ---------------------------------------------------------------------------
+# Outcome cross-validation tests
+# ---------------------------------------------------------------------------
+
+
+class TestOutcomeCrossValidation:
+    """Tests for pytest-outcomes cross-validation with telemetry."""
+
+    def test_reject_mismatched_outcome_count(self, tmp_path: Path) -> None:
+        """pytest-outcomes total != telemetry tests_passed → fail."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Rewrite pytest-outcomes to claim 2 passed tests
+        outcomes = {
+            "schema_version": "1",
+            "outcomes": {
+                "tests/ci/test_a.py::test_a": "passed",
+                "tests/ci/test_b.py::test_b": "passed",
+            },
+            "total": 2,
+            "collection_complete": [
+                "tests/ci/test_a.py::test_a",
+                "tests/ci/test_b.py::test_b",
+            ],
+        }
+        (bundle_dir / "pytest-outcomes.json").write_text(
+            json.dumps(outcomes, indent=2), encoding="utf-8"
+        )
+        # Telemetry still says tests_passed=1 (from original bundle creation)
+        with pytest.raises(ArtifactError, match="outcome/telemetry count mismatch"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_invalid_outcome_value(self, tmp_path: Path) -> None:
+        """Invalid outcome value → fail."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Rewrite pytest-outcomes with invalid value
+        outcomes = {
+            "schema_version": "1",
+            "outcomes": {
+                "tests/ci/test_a.py::test_a": "invalid_value",
+            },
+            "total": 1,
+            "collection_complete": ["tests/ci/test_a.py::test_a"],
+        }
+        (bundle_dir / "pytest-outcomes.json").write_text(
+            json.dumps(outcomes, indent=2), encoding="utf-8"
+        )
+        with pytest.raises(ArtifactError, match="invalid outcome"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_duplicate_outcome_node(self, tmp_path: Path) -> None:
+        """Duplicate node_id in outcomes → fail."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Write raw JSON with duplicate keys (Python json.dumps can't do this)
+        raw_json = (
+            '{"schema_version": "1", '
+            '"outcomes": {"tests/ci/test_a.py::test_a": "passed", '
+            '"tests/ci/test_a.py::test_a": "failed"}, '
+            '"total": 2, '
+            '"collection_complete": ["tests/ci/test_a.py::test_a"]}'
+        )
+        (bundle_dir / "pytest-outcomes.json").write_text(raw_json, encoding="utf-8")
+        # json.loads normalizes to last key; total=2 != len(outcomes)=1 → rejected
+        with pytest.raises(ArtifactError, match="total.*!= len"):
             verify_artifacts(
                 artifact_root=root,
                 manifest_path=manifest,

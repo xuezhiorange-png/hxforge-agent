@@ -167,6 +167,7 @@ jobs:
           test -s "${COV_RAW}"
           test -s "resource-telemetry.json"
           test -s "node-marker-inventory.json"
+          test -s "pytest-outcomes.json"
           exit "${PYTEST_EXIT}"
       - name: Prepare artifact metadata
         if: always()
@@ -193,6 +194,7 @@ jobs:
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
               ('pytest-stderr', 'pytest-stderr.txt'),
+              ('pytest-outcomes', 'pytest-outcomes.json'),
               ('resource-telemetry', 'resource-telemetry.json'),
           ]
           for kind, path in required:
@@ -213,6 +215,7 @@ jobs:
             coverage-raw.*
             artifact-metadata.json
             pytest-stderr.txt
+            pytest-outcomes.json
             resource-telemetry.json
             node-marker-inventory.json
             behavior-environment.json
@@ -288,6 +291,7 @@ jobs:
           test -s "${COV_RAW}"
           test -s "resource-telemetry.json"
           test -s "node-marker-inventory.json"
+          test -s "pytest-outcomes.json"
           exit "${PYTEST_EXIT}"
       - name: Prepare artifact metadata
         if: always()
@@ -314,6 +318,7 @@ jobs:
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
               ('pytest-stderr', 'pytest-stderr.txt'),
+              ('pytest-outcomes', 'pytest-outcomes.json'),
               ('resource-telemetry', 'resource-telemetry.json'),
           ]
           for kind, path in required:
@@ -334,6 +339,7 @@ jobs:
             coverage-raw.*
             artifact-metadata.json
             pytest-stderr.txt
+            pytest-outcomes.json
             resource-telemetry.json
             node-marker-inventory.json
             behavior-environment.json
@@ -408,6 +414,7 @@ jobs:
           test -s "${COV_RAW}"
           test -s "resource-telemetry.json"
           test -s "node-marker-inventory.json"
+          test -s "pytest-outcomes.json"
           exit "${PYTEST_EXIT}"
       - name: Prepare artifact metadata
         if: always()
@@ -434,6 +441,7 @@ jobs:
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
               ('pytest-stderr', 'pytest-stderr.txt'),
+              ('pytest-outcomes', 'pytest-outcomes.json'),
               ('resource-telemetry', 'resource-telemetry.json'),
           ]
           for kind, path in required:
@@ -454,6 +462,7 @@ jobs:
             coverage-raw.*
             artifact-metadata.json
             pytest-stderr.txt
+            pytest-outcomes.json
             resource-telemetry.json
             node-marker-inventory.json
             behavior-environment.json
@@ -1096,28 +1105,41 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
-      - name: Download PR-head shard artifacts
+      - name: Download PR-head shard bundles
         uses: actions/download-artifact@v4
         with:
-          path: artifacts/
+          path: shard-artifacts/
           merge-multiple: false
-          pattern: pr-head-*-attempt*
-      - name: Validate artifact identity
+          pattern: pr-head-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py*-*-producer-bundle
+      - name: Download PR-head global bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: global-artifacts/
+          merge-multiple: false
+          pattern: pr-head-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py*-global-collection-bundle
+      - name: Validate shard + global artifact identity
         run: |
           uv run --locked python -c "
-          import json, sys
           from pathlib import Path
-          from tests.ci.artifact_identity import verify_artifacts
+          from tests.ci.artifact_identity import verify_shard_bundles, verify_global_bundles
 
-          verify_artifacts(
-              artifact_root=Path('artifacts'),
+          verify_shard_bundles(
+              artifact_root=Path('shard-artifacts'),
               manifest_path=Path('ci-shard-manifest.yml'),
               expected_track='pr-head',
               expected_commit_sha='${{ github.event.pull_request.head.sha }}',
               expected_run_id='${{ github.run_id }}',
               expected_run_attempt=int('${{ github.run_attempt }}'),
           )
-          print('PR-head artifact identity gate PASS')
+          verify_global_bundles(
+              artifact_root=Path('global-artifacts'),
+              expected_track='pr-head',
+              expected_commit_sha='${{ github.event.pull_request.head.sha }}',
+              expected_run_id='${{ github.run_id }}',
+              expected_run_attempt=int('${{ github.run_attempt }}'),
+              python_versions=['3.11', '3.12'],
+          )
+          print('PR-head artifact identity gate PASS (shard + global)')
           "
       - name: Combine coverage
         run: |
@@ -1127,7 +1149,7 @@ jobs:
           combine_dir = Path('coverage-combine')
           combine_dir.mkdir(exist_ok=True)
           found = []
-          for f in sorted(Path('artifacts').rglob('coverage-raw.*')):
+          for f in sorted(Path('shard-artifacts').rglob('coverage-raw.*')):
               dest = combine_dir / f.name
               shutil.copy2(f, dest)
               found.append(str(f))
@@ -1152,28 +1174,41 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
-      - name: Download merge-ref shard artifacts
+      - name: Download merge-ref shard bundles
         uses: actions/download-artifact@v4
         with:
-          path: artifacts/
+          path: shard-artifacts/
           merge-multiple: false
-          pattern: merge-ref-*-attempt*
-      - name: Validate merge-ref artifact identity
+          pattern: merge-ref-${{ needs.resolve-authority.outputs.merge-sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py*-*-producer-bundle
+      - name: Download merge-ref global bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: global-artifacts/
+          merge-multiple: false
+          pattern: merge-ref-${{ needs.resolve-authority.outputs.merge-sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py*-global-collection-bundle
+      - name: Validate merge-ref shard + global artifact identity
         run: |
           uv run --locked python -c "
-          import json, sys
           from pathlib import Path
-          from tests.ci.artifact_identity import verify_artifacts
+          from tests.ci.artifact_identity import verify_shard_bundles, verify_global_bundles
 
-          verify_artifacts(
-              artifact_root=Path('artifacts'),
+          verify_shard_bundles(
+              artifact_root=Path('shard-artifacts'),
               manifest_path=Path('ci-shard-manifest.yml'),
               expected_track='merge-ref',
               expected_commit_sha='${{ needs.resolve-authority.outputs.merge-sha }}',
               expected_run_id='${{ github.run_id }}',
               expected_run_attempt=int('${{ github.run_attempt }}'),
           )
-          print('Merge-ref artifact identity gate PASS')
+          verify_global_bundles(
+              artifact_root=Path('global-artifacts'),
+              expected_track='merge-ref',
+              expected_commit_sha='${{ needs.resolve-authority.outputs.merge-sha }}',
+              expected_run_id='${{ github.run_id }}',
+              expected_run_attempt=int('${{ github.run_attempt }}'),
+              python_versions=['3.11', '3.12'],
+          )
+          print('Merge-ref artifact identity gate PASS (shard + global)')
           "
       - name: Combine merge-ref coverage
         run: |
@@ -1183,7 +1218,7 @@ jobs:
           combine_dir = Path('coverage-combine')
           combine_dir.mkdir(exist_ok=True)
           found = []
-          for f in sorted(Path('artifacts').rglob('coverage-raw.*')):
+          for f in sorted(Path('shard-artifacts').rglob('coverage-raw.*')):
               dest = combine_dir / f.name
               shutil.copy2(f, dest)
               found.append(str(f))
@@ -1208,28 +1243,41 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
-      - name: Download main shard artifacts
+      - name: Download main shard bundles
         uses: actions/download-artifact@v4
         with:
-          path: artifacts/
+          path: shard-artifacts/
           merge-multiple: false
-          pattern: main-*-attempt*
-      - name: Validate main artifact identity
+          pattern: main-${{ github.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py*-*-producer-bundle
+      - name: Download main global bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: global-artifacts/
+          merge-multiple: false
+          pattern: main-${{ github.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py*-global-collection-bundle
+      - name: Validate main shard + global artifact identity
         run: |
           uv run --locked python -c "
-          import json, sys
           from pathlib import Path
-          from tests.ci.artifact_identity import verify_artifacts
+          from tests.ci.artifact_identity import verify_shard_bundles, verify_global_bundles
 
-          verify_artifacts(
-              artifact_root=Path('artifacts'),
+          verify_shard_bundles(
+              artifact_root=Path('shard-artifacts'),
               manifest_path=Path('ci-shard-manifest.yml'),
               expected_track='main',
               expected_commit_sha='${{ github.sha }}',
               expected_run_id='${{ github.run_id }}',
               expected_run_attempt=int('${{ github.run_attempt }}'),
           )
-          print('Main artifact identity gate PASS')
+          verify_global_bundles(
+              artifact_root=Path('global-artifacts'),
+              expected_track='main',
+              expected_commit_sha='${{ github.sha }}',
+              expected_run_id='${{ github.run_id }}',
+              expected_run_attempt=int('${{ github.run_attempt }}'),
+              python_versions=['3.11', '3.12'],
+          )
+          print('Main artifact identity gate PASS (shard + global)')
           "
       - name: Combine main coverage
         run: |
@@ -1239,7 +1287,7 @@ jobs:
           combine_dir = Path('coverage-combine')
           combine_dir.mkdir(exist_ok=True)
           found = []
-          for f in sorted(Path('artifacts').rglob('coverage-raw.*')):
+          for f in sorted(Path('shard-artifacts').rglob('coverage-raw.*')):
               dest = combine_dir / f.name
               shutil.copy2(f, dest)
               found.append(str(f))
