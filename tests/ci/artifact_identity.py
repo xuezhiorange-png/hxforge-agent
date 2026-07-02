@@ -57,9 +57,7 @@ ARTIFACT_KIND_POLICIES: Final[dict[str, dict[str, bool]]] = {
     "collection-stderr": {"required": True, "allow_empty": True},
 }
 
-_BUNDLE_CONTROL_FILES: Final[frozenset[str]] = frozenset(
-    {"artifact-metadata.json", "runner-diagnostic.txt"}
-)
+_BUNDLE_CONTROL_FILES: Final[frozenset[str]] = frozenset({"artifact-metadata.json"})
 
 _OUTCOME_VALID_VALUES = frozenset({"passed", "failed", "skipped", "xfailed", "xpassed"})
 
