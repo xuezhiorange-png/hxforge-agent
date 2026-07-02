@@ -151,8 +151,6 @@ jobs:
             --cov=src --cov-report=xml:coverage.xml \
             --tb=short \
             ${{ matrix.files }}
-            ${{ matrix.files }}
-          PYTEST_EXIT=$?
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
           COV_RAW="coverage-raw.pr-head.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
           if [ -f ".coverage" ] && [ -s ".coverage" ]; then
