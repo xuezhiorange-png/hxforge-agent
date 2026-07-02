@@ -34,6 +34,7 @@ BASE_ENV: dict[str, str] = {
     "TZ": "UTC",
     "LC_ALL": "C.UTF-8",
     "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTEST_TIMEOUT": "30",
 }
 
 
@@ -1024,3 +1025,321 @@ def test_behavior_environment_fingerprint_matches_payload(tmp_path: Path) -> Non
         assert beh["canonical_json_sha256"] == expected_fp
     finally:
         _cleanup(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Workflow-env acceptance tests for the behavior environment contract
+# ---------------------------------------------------------------------------
+
+
+def test_workflow_env_generates_fingerprint(tmp_path: Path) -> None:
+    """A real workflow environment with all governed and non-governed vars
+    generates a valid fingerprint."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_wfenv.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    workflow_env = {
+        **BASE_ENV,
+        # Non-governed workflow vars (run_test_shard.py consumer side)
+        "TRACK": "pr-head",
+        "COMMIT_SHA": "abc123",
+        "RUN_ID": "42",
+        "RUN_ATTEMPT": "1",
+        "PYTHON_VERSION": "3.12",
+        "SHARD": "s1",
+    }
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1", extra_env=workflow_env)
+        assert result.returncode == 0, result.stderr
+        beh = _read_behavior_env(tmp_path)
+        assert beh["schema_version"] == "1"
+        fp = beh["canonical_json_sha256"]
+        assert fp.startswith("sha256:")
+        assert len(fp) == 71
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_pytest_timeout_enters_payload(tmp_path: Path) -> None:
+    """PYTEST_TIMEOUT is present in the behavior-environment.json payload."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_timeout_payload.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    try:
+        result = _run(
+            tmp_path,
+            [rel],
+            scope="shard",
+            shard="s1",
+            extra_env={"PYTEST_TIMEOUT": "120"},
+        )
+        assert result.returncode == 0, result.stderr
+        beh = _read_behavior_env(tmp_path)
+        env_map = beh["payload"]["environment"]
+        assert "PYTEST_TIMEOUT" in env_map, "PYTEST_TIMEOUT missing from payload"
+        assert env_map["PYTEST_TIMEOUT"] == "120"
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_changing_timeout_changes_fingerprint(tmp_path: Path) -> None:
+    """Different PYTEST_TIMEOUT values produce different fingerprints."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_timeout_diff.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    fingerprints: list[str] = []
+    for timeout_val in ("30", "600"):
+        out = tmp_path / f"inventory_{timeout_val}.json"
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            PLUGIN,
+            "--hx-collection-scope=shard",
+            "--hx-shard=s1",
+            f"--hx-node-output={out}",
+            rel,
+        ]
+        env = {**os.environ, **BASE_ENV, "PYTEST_TIMEOUT": timeout_val}
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+            timeout=60,
+        )
+        assert proc.returncode == 0, proc.stderr
+        beh_path = out.parent / "behavior-environment.json"
+        beh = json.loads(beh_path.read_text(encoding="utf-8"))
+        fingerprints.append(beh["canonical_json_sha256"])
+    assert len(fingerprints) == 2
+    assert fingerprints[0] != fingerprints[1], "changing PYTEST_TIMEOUT must change fingerprint"
+
+
+def test_undeclared_pytest_unknown_setting_fails_closed(tmp_path: Path) -> None:
+    """An undeclared governed-namespace variable PYTEST_UNKNOWN_SETTING
+    triggers fail-closed (non-zero exit)."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_unk.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    try:
+        result = _run(
+            tmp_path,
+            [rel],
+            scope="shard",
+            shard="s1",
+            extra_env={"PYTEST_UNKNOWN_SETTING": "should-fail"},
+        )
+        assert result.returncode != 0, (
+            "undeclared PYTEST_UNKNOWN_SETTING must cause fail-closed error"
+        )
+        combined = result.stderr + result.stdout
+        assert (
+            "undeclared" in combined.lower()
+            or "unknown" in combined.lower()
+            or "behavior" in combined.lower()
+        ), f"expected fail-closed message, got: {combined[:500]}"
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_normal_github_runner_vars_not_rejected(tmp_path: Path) -> None:
+    """Standard GitHub runner env vars (CI, GITHUB_ACTIONS, etc.) do not
+    trigger the fail-closed check."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_ghevars.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    github_vars = {
+        "CI": "true",
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_EVENT_NAME": "push",
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "owner/repo",
+        "RUNNER_OS": "Linux",
+        "RUNNER_NAME": "test-runner",
+    }
+    try:
+        result = _run(
+            tmp_path,
+            [rel],
+            scope="shard",
+            shard="s1",
+            extra_env=github_vars,
+        )
+        assert result.returncode == 0, f"GitHub runner vars must not be rejected: {result.stderr}"
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_global_and_shard_same_behavior_env_same_fingerprint(tmp_path: Path) -> None:
+    """Same behavior env with different shard names produces the same
+    behavior fingerprint — the fingerprint is independent of scope."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_fp_match.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    fingerprints: list[str] = []
+    for shard_name in ("s1", "s2"):
+        out = tmp_path / f"inventory_{shard_name}.json"
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            PLUGIN,
+            "--hx-collection-scope=shard",
+            f"--hx-shard={shard_name}",
+            f"--hx-node-output={out}",
+            rel,
+        ]
+        env = {**os.environ, **BASE_ENV}
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+            timeout=60,
+        )
+        assert proc.returncode == 0, proc.stderr
+        beh_path = out.parent / "behavior-environment.json"
+        beh = json.loads(beh_path.read_text(encoding="utf-8"))
+        fingerprints.append(beh["canonical_json_sha256"])
+    assert len(fingerprints) == 2
+    assert fingerprints[0] == fingerprints[1], (
+        "same behavior env must produce same fingerprint regardless of shard/scope"
+    )
+
+
+# ---------------------------------------------------------------------------
+# run_test_shard.py telemetry acceptance tests
+# ---------------------------------------------------------------------------
+
+
+def test_run_test_shard_telemetry_fields_present(tmp_path: Path) -> None:
+    """Telemetry output contains execution_status, junit_parse_status,
+    and counts_authoritative fields."""
+    from tests.ci.run_test_shard import run_pytest
+
+    test_file = tmp_path / "test_tel.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    run_pytest(
+        [str(test_file)],
+        env={"PYTHONPATH": str(REPO_ROOT)},
+        timeout=30,
+        junit_path=str(tmp_path / "junit.xml"),
+        telemetry_path=str(tmp_path / "telemetry.json"),
+        stdout_path=str(tmp_path / "stdout.txt"),
+        stderr_path=str(tmp_path / "stderr.txt"),
+        track="pr-head",
+        commit_sha="abc123",
+        run_id="1",
+        run_attempt=1,
+        python_version="3.12",
+        shard="s1",
+    )
+    telemetry = json.loads((tmp_path / "telemetry.json").read_text(encoding="utf-8"))
+    # execution_status field
+    assert "execution_status" in telemetry
+    assert telemetry["execution_status"] in (
+        "completed",
+        "timeout",
+        "collection-error",
+        "internal-error",
+    )
+    # junit_parse_status field
+    assert "junit_parse_status" in telemetry
+    assert telemetry["junit_parse_status"] in ("available", "unavailable")
+    # counts_authoritative field
+    assert "counts_authoritative" in telemetry
+    assert isinstance(telemetry["counts_authoritative"], bool)
+
+
+def test_run_test_shard_counts_authoritative_pass(tmp_path: Path) -> None:
+    """When tests pass and JUnit is available, counts_authoritative is True
+    and count consistency holds."""
+    from tests.ci.run_test_shard import run_pytest
+
+    test_a = tmp_path / "test_a.py"
+    test_a.write_text("def test_alpha():\n    assert True\n", encoding="utf-8")
+    test_b = tmp_path / "test_b.py"
+    test_b.write_text("def test_beta():\n    assert True\n", encoding="utf-8")
+    exit_code = run_pytest(
+        [
+            str(test_a),
+            str(test_b),
+            f"--junitxml={tmp_path / 'junit.xml'}",
+        ],
+        env={"PYTHONPATH": str(REPO_ROOT)},
+        timeout=30,
+        junit_path=str(tmp_path / "junit.xml"),
+        telemetry_path=str(tmp_path / "telemetry.json"),
+        stdout_path=str(tmp_path / "stdout.txt"),
+        stderr_path=str(tmp_path / "stderr.txt"),
+        track="pr-head",
+        commit_sha="abc123",
+        run_id="1",
+        run_attempt=1,
+        python_version="3.12",
+        shard="s1",
+    )
+    telemetry = json.loads((tmp_path / "telemetry.json").read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert telemetry["junit_parse_status"] == "available"
+    assert telemetry["counts_authoritative"] is True
+    # Count consistency: tests_collected == sum of pass/fail/skip/xfail/xpass
+    expected_total = (
+        telemetry["tests_passed"]
+        + telemetry["tests_failed"]
+        + telemetry["tests_skipped"]
+        + telemetry["tests_xfailed"]
+        + telemetry["tests_xpassed"]
+    )
+    assert telemetry["tests_collected"] == expected_total
+
+
+def test_run_test_shard_counts_authoritative_fail(tmp_path: Path) -> None:
+    """When tests fail, counts_authoritative is still True if JUnit is
+    consistent, and tests_failed > 0."""
+    from tests.ci.run_test_shard import run_pytest
+
+    test_file = tmp_path / "test_fail.py"
+    test_file.write_text("def test_fails():\n    assert False\n", encoding="utf-8")
+    exit_code = run_pytest(
+        [
+            str(test_file),
+            f"--junitxml={tmp_path / 'junit.xml'}",
+        ],
+        env={"PYTHONPATH": str(REPO_ROOT)},
+        timeout=30,
+        junit_path=str(tmp_path / "junit.xml"),
+        telemetry_path=str(tmp_path / "telemetry.json"),
+        stdout_path=str(tmp_path / "stdout.txt"),
+        stderr_path=str(tmp_path / "stderr.txt"),
+        track="pr-head",
+        commit_sha="abc123",
+        run_id="1",
+        run_attempt=1,
+        python_version="3.12",
+        shard="s1",
+    )
+    telemetry = json.loads((tmp_path / "telemetry.json").read_text(encoding="utf-8"))
+    assert exit_code != 0
+    assert telemetry["tests_failed"] > 0
+    assert telemetry["counts_authoritative"] is True
+    # Count consistency
+    expected_total = (
+        telemetry["tests_passed"]
+        + telemetry["tests_failed"]
+        + telemetry["tests_skipped"]
+        + telemetry["tests_xfailed"]
+        + telemetry["tests_xpassed"]
+    )
+    assert telemetry["tests_collected"] == expected_total
