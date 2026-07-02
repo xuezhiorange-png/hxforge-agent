@@ -347,9 +347,9 @@ def run_pytest(
     # P0-5: Exit non-zero if not authoritative
     if not producer_authoritative and exit_code == 0:
         import sys as _sys
+
         print(
-            f"RUNNER: non-authoritative telemetry, returning 1. "
-            f"failures={authority_failures}",
+            f"RUNNER: non-authoritative telemetry, returning 1. failures={authority_failures}",
             file=_sys.stderr,
         )
         print(
