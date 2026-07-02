@@ -738,6 +738,13 @@ jobs:
         with:
           path: global-inventory/
           pattern: pr-head-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle
+      - name: Debug global inventory paths
+        if: always()
+        run: |
+          echo "=== global-inventory contents ==="
+          find global-inventory/ -type f 2>/dev/null || echo "No global-inventory dir"
+          echo "=== shard-inventories contents ==="
+          find shard-inventories/ -type f -name "node-inventory.json" 2>/dev/null | head -5
       - name: Verify per-version completeness (pr-head)
         run: |
           uv run --locked python -c "
