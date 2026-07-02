@@ -6,6 +6,7 @@ shards:
     files:
       - tests/ci/test_collect_acceptance.py
       - tests/ci/test_node_inventory.py
+      - tests/ci/test_outcome_plugin.py
       - tests/ci/test_shard_manifest.py
       - tests/ci/test_shared_infrastructure.py
       - tests/support/test_mypy_doubles.py
