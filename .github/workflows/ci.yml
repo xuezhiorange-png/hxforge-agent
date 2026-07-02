@@ -187,6 +187,8 @@ jobs:
           }
           required = [
               ('node-inventory', 'node-inventory.json'),
+              ('node-marker-inventory', 'node-marker-inventory.json'),
+              ('behavior-environment', 'behavior-environment.json'),
               ('junit', 'junit.xml'),
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
@@ -213,6 +215,7 @@ jobs:
             pytest-stderr.txt
             resource-telemetry.json
             node-marker-inventory.json
+            behavior-environment.json
           if-no-files-found: error
           retention-days: 7
 
@@ -305,6 +308,8 @@ jobs:
           }
           required = [
               ('node-inventory', 'node-inventory.json'),
+              ('node-marker-inventory', 'node-marker-inventory.json'),
+              ('behavior-environment', 'behavior-environment.json'),
               ('junit', 'junit.xml'),
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
@@ -331,6 +336,7 @@ jobs:
             pytest-stderr.txt
             resource-telemetry.json
             node-marker-inventory.json
+            behavior-environment.json
           if-no-files-found: error
           retention-days: 7
 
@@ -422,6 +428,8 @@ jobs:
           }
           required = [
               ('node-inventory', 'node-inventory.json'),
+              ('node-marker-inventory', 'node-marker-inventory.json'),
+              ('behavior-environment', 'behavior-environment.json'),
               ('junit', 'junit.xml'),
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
@@ -448,6 +456,7 @@ jobs:
             pytest-stderr.txt
             resource-telemetry.json
             node-marker-inventory.json
+            behavior-environment.json
           if-no-files-found: error
           retention-days: 7
 
@@ -662,7 +671,7 @@ jobs:
   # ── Verify completeness: Merge-ref ────────────────────────────────────────
   verify-completeness-merge-ref:
     if: github.event_name == 'pull_request' && needs.shard-merge-ref.result == 'success' && needs.collect-global-merge-ref.result == 'success'
-    needs: [shard-merge-ref, collect-global-merge-ref, parse-manifest]
+    needs: [shard-merge-ref, collect-global-merge-ref, parse-manifest, resolve-authority]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -799,28 +808,31 @@ jobs:
           uv run --locked python -c "
           import json, sys
           from pathlib import Path
-          from tests.ci.node_inventory import load_inventory
+          from tests.ci.marker_inventory import load_marker_inventory
 
-          all_per_python: dict[str, dict[str, object]] = {}
-          for p in sorted(Path('inventories').rglob('node-inventory.json')):
-              inv = load_inventory(p)
-              if inv.collection_scope == 'shard':
-                  key = (inv.python_version, inv.shard)
-                  all_per_python.setdefault(inv.python_version, {})[inv.shard] = inv
+          all_per_python: dict[str, dict[str, list]] = {}
+          for p in sorted(Path('inventories').rglob('node-marker-inventory.json')):
+              inv = load_marker_inventory(p)
+              if inv['collection_scope'] == 'shard':
+                  py = inv['python_version']
+                  shard_name = inv['shard']
+                  all_per_python.setdefault(py, []).append(inv)
 
           if not all_per_python:
-              print('ERROR: no shard inventories', file=sys.stderr); sys.exit(1)
+              print('ERROR: no marker inventories', file=sys.stderr); sys.exit(1)
 
-          for py, shards in sorted(all_per_python.items()):
+          for py, invs in sorted(all_per_python.items()):
               golden_nodes: set[str] = set()
               benchmark_nodes: set[str] = set()
               all_nodes: dict[str, set[str]] = {}
+              shard_node_sets: dict[str, set[str]] = {}
 
-              for shard_name, inv in sorted(shards.items()):
-                  for nid in inv.node_ids:
+              for inv in invs:
+                  shard_name = inv['shard']
+                  for nid, markers in inv['node_markers'].items():
+                      marker_set = set(markers)
                       all_nodes.setdefault(nid, set()).add(shard_name)
-                      markers_map = dict(inv.node_markers) if inv.node_markers else {}
-                      marker_set = set(markers_map.get(nid, ()))
+                      shard_node_sets.setdefault(shard_name, set()).add(nid)
                       if 'golden' in marker_set:
                           golden_nodes.add(nid)
                       if 'benchmark' in marker_set:
@@ -833,10 +845,7 @@ jobs:
                   sys.exit(1)
 
               # Check: golden shard isolation per-Python
-              golden_shard_nodes = set()
-              if 'golden' in shards:
-                  golden_shard_inv = shards['golden']
-                  golden_shard_nodes = set(golden_shard_inv.node_ids)
+              golden_shard_nodes = shard_node_sets.get('golden', set())
 
               golden_in_other = golden_nodes - golden_shard_nodes
               if golden_in_other:
@@ -850,7 +859,7 @@ jobs:
                   sys.exit(1)
 
               # Check: no benchmark in PR-blocking shards
-              pr_shards = {name for name in shards}
+              pr_shards = set(shard_node_sets.keys())
               benchmark_in_pr = set()
               for nid in benchmark_nodes:
                   if nid in all_nodes and all_nodes[nid] & pr_shards:
@@ -859,11 +868,7 @@ jobs:
                   print(f'VIOLATION Python {py}: {len(benchmark_in_pr)} benchmark nodes in PR shards', file=sys.stderr)
                   sys.exit(1)
 
-              # Per-node marker coverage: every node must have markers
-              for nid in all_nodes:
-                  pass  # markers are optional in v1
-
-              total = sum(inv.node_count for inv in shards.values())
+              total = sum(inv['node_count'] for inv in invs)
               print(f'Python {py}: golden={len(golden_nodes)} benchmark={len(benchmark_nodes)} total={total} PASS')
 
           print('Golden/benchmark per-Python separation: PASS')
@@ -872,7 +877,7 @@ jobs:
   # ── Verify golden/benchmark: Merge-ref ────────────────────────────────────
   verify-golden-benchmark-merge-ref:
     if: github.event_name == 'pull_request' && needs.shard-merge-ref.result == 'success' && needs.collect-global-merge-ref.result == 'success'
-    needs: [shard-merge-ref, collect-global-merge-ref]
+    needs: [shard-merge-ref, collect-global-merge-ref, resolve-authority]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -893,23 +898,26 @@ jobs:
           uv run --locked python -c "
           import json, sys
           from pathlib import Path
-          from tests.ci.node_inventory import load_inventory
+          from tests.ci.marker_inventory import load_marker_inventory
 
-          all_per_python: dict[str, dict[str, object]] = {}
-          for p in sorted(Path('inventories').rglob('node-inventory.json')):
-              inv = load_inventory(p)
-              if inv.collection_scope == 'shard':
-                  all_per_python.setdefault(inv.python_version, {})[inv.shard] = inv
+          all_per_python: dict[str, dict[str, list]] = {}
+          for p in sorted(Path('inventories').rglob('node-marker-inventory.json')):
+              inv = load_marker_inventory(p)
+              if inv['collection_scope'] == 'shard':
+                  py = inv['python_version']
+                  all_per_python.setdefault(py, []).append(inv)
 
-          for py, shards in sorted(all_per_python.items()):
+          for py, invs in sorted(all_per_python.items()):
               golden_nodes: set[str] = set()
               benchmark_nodes: set[str] = set()
               all_nodes: dict[str, set[str]] = {}
-              for shard_name, inv in sorted(shards.items()):
-                  for nid in inv.node_ids:
+              shard_node_sets: dict[str, set[str]] = {}
+              for inv in invs:
+                  shard_name = inv['shard']
+                  for nid, markers in inv['node_markers'].items():
+                      marker_set = set(markers)
                       all_nodes.setdefault(nid, set()).add(shard_name)
-                      markers_map = dict(inv.node_markers) if inv.node_markers else {}
-                      marker_set = set(markers_map.get(nid, ()))
+                      shard_node_sets.setdefault(shard_name, set()).add(nid)
                       if 'golden' in marker_set:
                           golden_nodes.add(nid)
                       if 'benchmark' in marker_set:
@@ -917,7 +925,7 @@ jobs:
               overlap = golden_nodes & benchmark_nodes
               if overlap:
                   print(f'VIOLATION Python {py}: {len(overlap)} nodes both golden+benchmark', file=sys.stderr); sys.exit(1)
-              golden_shard_nodes = set(shards['golden'].node_ids) if 'golden' in shards else set()
+              golden_shard_nodes = shard_node_sets.get('golden', set())
               golden_in_other = golden_nodes - golden_shard_nodes
               if golden_in_other:
                   print(f'VIOLATION Python {py}: golden nodes outside golden shard', file=sys.stderr); sys.exit(1)
@@ -954,23 +962,26 @@ jobs:
           uv run --locked python -c "
           import json, sys
           from pathlib import Path
-          from tests.ci.node_inventory import load_inventory
+          from tests.ci.marker_inventory import load_marker_inventory
 
-          all_per_python: dict[str, dict[str, object]] = {}
-          for p in sorted(Path('inventories').rglob('node-inventory.json')):
-              inv = load_inventory(p)
-              if inv.collection_scope == 'shard':
-                  all_per_python.setdefault(inv.python_version, {})[inv.shard] = inv
+          all_per_python: dict[str, dict[str, list]] = {}
+          for p in sorted(Path('inventories').rglob('node-marker-inventory.json')):
+              inv = load_marker_inventory(p)
+              if inv['collection_scope'] == 'shard':
+                  py = inv['python_version']
+                  all_per_python.setdefault(py, []).append(inv)
 
-          for py, shards in sorted(all_per_python.items()):
+          for py, invs in sorted(all_per_python.items()):
               golden_nodes: set[str] = set()
               benchmark_nodes: set[str] = set()
               all_nodes: dict[str, set[str]] = {}
-              for shard_name, inv in sorted(shards.items()):
-                  for nid in inv.node_ids:
+              shard_node_sets: dict[str, set[str]] = {}
+              for inv in invs:
+                  shard_name = inv['shard']
+                  for nid, markers in inv['node_markers'].items():
+                      marker_set = set(markers)
                       all_nodes.setdefault(nid, set()).add(shard_name)
-                      markers_map = dict(inv.node_markers) if inv.node_markers else {}
-                      marker_set = set(markers_map.get(nid, ()))
+                      shard_node_sets.setdefault(shard_name, set()).add(nid)
                       if 'golden' in marker_set:
                           golden_nodes.add(nid)
                       if 'benchmark' in marker_set:
@@ -978,7 +989,7 @@ jobs:
               overlap = golden_nodes & benchmark_nodes
               if overlap:
                   print(f'VIOLATION Python {py}: {len(overlap)} nodes both golden+benchmark', file=sys.stderr); sys.exit(1)
-              golden_shard_nodes = set(shards['golden'].node_ids) if 'golden' in shards else set()
+              golden_shard_nodes = shard_node_sets.get('golden', set())
               golden_in_other = golden_nodes - golden_shard_nodes
               if golden_in_other:
                   print(f'VIOLATION Python {py}: golden nodes outside golden shard', file=sys.stderr); sys.exit(1)

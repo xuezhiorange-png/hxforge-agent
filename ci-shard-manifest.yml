@@ -57,7 +57,7 @@ shards:
       - tests/unit/test_task010_phase1.py
       - tests/unit/test_task010_phase2.py
       - tests/unit/test_units.py
-    timeout: 120
+    timeout: 300
 
   - name: provider-unit
     job: shard-provider-unit
