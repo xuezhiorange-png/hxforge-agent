@@ -1,12 +1,7 @@
 """Shared pytest runner that captures real resource telemetry.
 
-P0-4: Strict telemetry:
-  - execution_status field (completed/timeout/collection-error)
-  - junit_parse_status (available/unavailable)
-  - counts_authoritative flag
-  - count consistency verification
-  - RUSAGE_CHILDREN with explicit failure status
-  - Fail-closed on resource unavailable when contract requires it
+P0-5: Telemetry fail-closed — runner exits non-zero if not authoritative.
+P1: Integrates outcome plugin for structured xfail/xpass.
 """
 
 from __future__ import annotations
@@ -23,10 +18,7 @@ from typing import Any
 
 
 def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
-    """Parse JUnit XML and extract test counts.
-
-    Returns (counts_dict, parse_status).
-    """
+    """Parse JUnit XML. Returns (counts, parse_status)."""
     counts = {
         "tests_collected": 0,
         "tests_passed": 0,
@@ -39,10 +31,13 @@ def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
         return counts, "unavailable"
     try:
         root = ET.parse(junit_path).getroot()
-        # pytest writes <testsuites> wrapper; the counts are on the child <testsuite>
-        suite = root.find("testsuite") if root.tag == "testsuites" else root
-        counts["tests_collected"] = int(suite.attrib.get("tests", 0)) if suite is not None else 0
-        for tc in (suite if suite is not None else root).iter("testcase"):
+        # Read from <testsuite> child element (pytest writes count there)
+        suite = root.find("testsuite")
+        if suite is not None:
+            counts["tests_collected"] = int(suite.attrib.get("tests", 0))
+        else:
+            counts["tests_collected"] = int(root.attrib.get("tests", 0))
+        for tc in root.iter("testcase"):
             is_failure = tc.find("failure") is not None
             is_error = tc.find("error") is not None
             skipped_el = tc.find("skipped")
@@ -50,8 +45,7 @@ def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
 
             if is_skipped:
                 message = skipped_el.attrib.get("message", "") if skipped_el is not None else ""
-                msg_lower = message.lower()
-                if "xfail" in msg_lower:
+                if "xfail" in message.lower():
                     counts["tests_xfailed"] += 1
                 else:
                     counts["tests_skipped"] += 1
@@ -64,6 +58,16 @@ def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
         return counts, "unavailable"
 
 
+def _read_outcomes(outcomes_path: Path) -> dict[str, Any] | None:
+    """Read structured outcome JSON if present."""
+    if not outcomes_path.is_file():
+        return None
+    try:
+        return json.loads(outcomes_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def run_pytest(
     pytest_args: list[str],
     *,
@@ -73,6 +77,7 @@ def run_pytest(
     telemetry_path: str | Path = "resource-telemetry.json",
     stdout_path: str | Path = "pytest-stdout.txt",
     stderr_path: str | Path = "pytest-stderr.txt",
+    outcomes_path: str | Path = "pytest-outcomes.json",
     track: str = "",
     commit_sha: str = "",
     run_id: str = "",
@@ -90,7 +95,15 @@ def run_pytest(
     if env:
         run_env.update(env)
 
-    cmd = [sys.executable, "-m", "pytest"] + pytest_args
+    # Add outcome plugin
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-p",
+        "tests.ci.outcome_plugin",
+        f"--hx-outcome-output={outcomes_path}",
+    ] + pytest_args
 
     exit_code = -1
     result_stdout = ""
@@ -125,7 +138,6 @@ def run_pytest(
     except Exception:
         exit_code = -1
         execution_status = "internal-error"
-        result_stdout = ""
         result_stderr = "Runner internal error"
     end_time = time.monotonic()
 
@@ -147,10 +159,10 @@ def run_pytest(
 
     wall_clock = round(end_time - start_time, 3)
 
-    # Parse JUnit — fail-closed
+    # Parse JUnit
     junit_counts, junit_parse_status = _parse_junit(junit)
 
-    # P0-4: Count consistency verification
+    # Count consistency
     expected_total = (
         junit_counts["tests_passed"]
         + junit_counts["tests_failed"]
@@ -162,7 +174,6 @@ def run_pytest(
         junit_parse_status == "available" and junit_counts["tests_collected"] == expected_total
     )
 
-    # Detect collection error: exit code 2 or no tests collected with non-zero exit
     if (
         exit_code == 2
         and junit_counts["tests_collected"] == 0
@@ -170,6 +181,21 @@ def run_pytest(
         and exit_code != 0
     ):
         execution_status = "collection-error"
+
+    # P0-5: Compute producer_authoritative
+    authority_failures: list[str] = []
+    if execution_status != "completed":
+        authority_failures.append(f"execution_status={execution_status}")
+    if junit_parse_status != "available":
+        authority_failures.append("junit_parse_status=unavailable")
+    if not counts_authoritative:
+        authority_failures.append("counts_authoritative=false")
+    if resource_status != "available":
+        authority_failures.append("resource_measurement_status=unavailable")
+    if exit_code != 0:
+        authority_failures.append(f"pytest_exit_code={exit_code}")
+
+    producer_authoritative = len(authority_failures) == 0
 
     telemetry_data: dict[str, Any] = {
         "track": track,
@@ -188,6 +214,8 @@ def run_pytest(
         "pytest_exit_code": exit_code,
         "junit_parse_status": junit_parse_status,
         "counts_authoritative": counts_authoritative,
+        "producer_authoritative": producer_authoritative,
+        "producer_authority_failures": authority_failures,
         "tests_collected": junit_counts["tests_collected"],
         "tests_passed": junit_counts["tests_passed"],
         "tests_failed": junit_counts["tests_failed"],
@@ -196,10 +224,25 @@ def run_pytest(
         "tests_xpassed": junit_counts["tests_xpassed"],
     }
 
+    # Add behavior fingerprint if available
+    beh_path = Path("behavior-environment.json")
+    if beh_path.is_file():
+        try:
+            beh = json.loads(beh_path.read_text(encoding="utf-8"))
+            digest = beh.get("canonical_json_sha256", "")
+            if digest.startswith("sha256:"):
+                telemetry_data["behavior_fingerprint_sha256"] = digest[7:]
+        except (json.JSONDecodeError, OSError):
+            pass
+
     telemetry.write_text(
         json.dumps(telemetry_data, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+    # P0-5: Exit non-zero if not authoritative
+    if not producer_authoritative and exit_code == 0:
+        return 1
 
     return exit_code
 
@@ -222,6 +265,7 @@ def main() -> None:
         telemetry_path="resource-telemetry.json",
         stdout_path="pytest-stdout.txt",
         stderr_path="pytest-stderr.txt",
+        outcomes_path="pytest-outcomes.json",
         track=os.environ.get("TRACK", ""),
         commit_sha=os.environ.get("COMMIT_SHA", ""),
         run_id=os.environ.get("RUN_ID", ""),

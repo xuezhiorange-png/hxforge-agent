@@ -497,6 +497,34 @@ jobs:
           HX_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+      - name: Prepare artifact metadata
+        if: always()
+        run: |
+          uv run --locked python -c "
+          import json, os
+          meta = {
+              'identity': {
+                  'track': 'pr-head',
+                  'commit_sha': '${{ github.event.pull_request.head.sha }}',
+                  'run_id': '${{ github.run_id }}',
+                  'run_attempt': int('${{ github.run_attempt }}'),
+                  'python_version': '${{ matrix.python }}',
+                  'collection_scope': 'global',
+              },
+              'artifacts': [],
+          }
+          required = [
+              ('node-inventory', 'nodes-pr-head-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json'),
+              ('node-marker-inventory', 'node-marker-inventory.json'),
+              ('behavior-environment', 'behavior-environment.json'),
+              ('collection-stderr', 'collection-stderr-global.txt'),
+          ]
+          for kind, path in required:
+              exists = os.path.exists(path)
+              meta['artifacts'].append({'kind': kind, 'path': path, 'present': exists})
+          with open('artifact-metadata.json', 'w') as f:
+              json.dump(meta, f, indent=2, sort_keys=True)
+          "
       - name: Upload global inventory
         if: always()
         uses: actions/upload-artifact@v4
@@ -504,6 +532,9 @@ jobs:
           name: pr-head-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle
           path: |
             nodes-pr-head-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json
+            node-marker-inventory.json
+            behavior-environment.json
+            artifact-metadata.json
             collection-stderr-global.txt
           if-no-files-found: error
           retention-days: 7
@@ -548,6 +579,34 @@ jobs:
           HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.merge-sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+      - name: Prepare artifact metadata
+        if: always()
+        run: |
+          uv run --locked python -c "
+          import json, os
+          meta = {
+              'identity': {
+                  'track': 'merge-ref',
+                  'commit_sha': '${{ needs.resolve-authority.outputs.merge-sha }}',
+                  'run_id': '${{ github.run_id }}',
+                  'run_attempt': int('${{ github.run_attempt }}'),
+                  'python_version': '${{ matrix.python }}',
+                  'collection_scope': 'global',
+              },
+              'artifacts': [],
+          }
+          required = [
+              ('node-inventory', 'nodes-merge-ref-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json'),
+              ('node-marker-inventory', 'node-marker-inventory.json'),
+              ('behavior-environment', 'behavior-environment.json'),
+              ('collection-stderr', 'collection-stderr-global.txt'),
+          ]
+          for kind, path in required:
+              exists = os.path.exists(path)
+              meta['artifacts'].append({'kind': kind, 'path': path, 'present': exists})
+          with open('artifact-metadata.json', 'w') as f:
+              json.dump(meta, f, indent=2, sort_keys=True)
+          "
       - name: Upload global inventory
         if: always()
         uses: actions/upload-artifact@v4
@@ -555,6 +614,9 @@ jobs:
           name: merge-ref-${{ needs.resolve-authority.outputs.merge-sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle
           path: |
             nodes-merge-ref-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json
+            node-marker-inventory.json
+            behavior-environment.json
+            artifact-metadata.json
             collection-stderr-global.txt
           if-no-files-found: error
           retention-days: 7
@@ -598,6 +660,34 @@ jobs:
           HX_COMMIT_SHA: ${{ github.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+      - name: Prepare artifact metadata
+        if: always()
+        run: |
+          uv run --locked python -c "
+          import json, os
+          meta = {
+              'identity': {
+                  'track': 'main',
+                  'commit_sha': '${{ github.sha }}',
+                  'run_id': '${{ github.run_id }}',
+                  'run_attempt': int('${{ github.run_attempt }}'),
+                  'python_version': '${{ matrix.python }}',
+                  'collection_scope': 'global',
+              },
+              'artifacts': [],
+          }
+          required = [
+              ('node-inventory', 'nodes-main-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json'),
+              ('node-marker-inventory', 'node-marker-inventory.json'),
+              ('behavior-environment', 'behavior-environment.json'),
+              ('collection-stderr', 'collection-stderr-global.txt'),
+          ]
+          for kind, path in required:
+              exists = os.path.exists(path)
+              meta['artifacts'].append({'kind': kind, 'path': path, 'present': exists})
+          with open('artifact-metadata.json', 'w') as f:
+              json.dump(meta, f, indent=2, sort_keys=True)
+          "
       - name: Upload global inventory
         if: always()
         uses: actions/upload-artifact@v4
@@ -605,6 +695,9 @@ jobs:
           name: main-${{ github.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle
           path: |
             nodes-main-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json
+            node-marker-inventory.json
+            behavior-environment.json
+            artifact-metadata.json
             collection-stderr-global.txt
           if-no-files-found: error
           retention-days: 7
@@ -630,16 +723,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: shard-inventories/
-          pattern: pr-head-*-attempt*-py${{ matrix.python }}-*
+          pattern: pr-head-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-*-producer-bundle
       - name: Download global inventory
         uses: actions/download-artifact@v4
         with:
           path: global-inventory/
-          pattern: pr-head-*-attempt*-py${{ matrix.python }}-global-collection-bundle
+          pattern: pr-head-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle
       - name: Verify per-version completeness (pr-head)
         run: |
           uv run --locked python -c "
-          import json, sys
+          import sys
           from pathlib import Path
           from tests.ci.node_inventory import load_inventory, verify_per_version
           from tests.ci.shard_manifest import load_manifest
@@ -647,12 +740,9 @@ jobs:
           python_version = '${{ matrix.python }}'
           manifest = load_manifest(Path('ci-shard-manifest.yml'), repo_root=Path('.'))
 
-          global_path = None
-          for p in Path('global-inventory').rglob('*.json'):
-              if 'global' in p.name and python_version in p.name:
-                  global_path = p; break
-          if global_path is None:
-              print('ERROR: no global inventory', file=sys.stderr); sys.exit(1)
+          global_path = Path('global-inventory') / 'pr-head-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle' / 'nodes-pr-head-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json'
+          if not global_path.is_file():
+              print(f'ERROR: no global inventory at {global_path}', file=sys.stderr); sys.exit(1)
           global_inv = load_inventory(global_path)
           print(f'Global: {global_inv.node_count} nodes')
 
@@ -689,12 +779,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: shard-inventories/
-          pattern: merge-ref-*-attempt*-py${{ matrix.python }}-*
+          pattern: merge-ref-${{ needs.resolve-authority.outputs.merge-sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-*-producer-bundle
       - name: Download global inventory
         uses: actions/download-artifact@v4
         with:
           path: global-inventory/
-          pattern: merge-ref-*-attempt*-py${{ matrix.python }}-global-collection-bundle
+          pattern: merge-ref-${{ needs.resolve-authority.outputs.merge-sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle
       - name: Verify per-version completeness (merge-ref)
         run: |
           uv run --locked python -c "
@@ -706,12 +796,9 @@ jobs:
           python_version = '${{ matrix.python }}'
           manifest = load_manifest(Path('ci-shard-manifest.yml'), repo_root=Path('.'))
 
-          global_path = None
-          for p in Path('global-inventory').rglob('*.json'):
-              if 'global' in p.name and python_version in p.name:
-                  global_path = p; break
-          if global_path is None:
-              print('ERROR: no global inventory', file=sys.stderr); sys.exit(1)
+          global_path = Path('global-inventory') / 'merge-ref-${{ needs.resolve-authority.outputs.merge-sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle' / 'nodes-merge-ref-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json'
+          if not global_path.is_file():
+              print(f'ERROR: no global inventory at {global_path}', file=sys.stderr); sys.exit(1)
           global_inv = load_inventory(global_path)
 
           shard_inventories = {}
@@ -748,12 +835,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: shard-inventories/
-          pattern: main-*-attempt*-py${{ matrix.python }}-*
+          pattern: main-${{ github.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-*-producer-bundle
       - name: Download global inventory
         uses: actions/download-artifact@v4
         with:
           path: global-inventory/
-          pattern: main-*-attempt*-py${{ matrix.python }}-global-collection-bundle
+          pattern: main-${{ github.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle
       - name: Verify per-version completeness (main)
         run: |
           uv run --locked python -c "
@@ -765,12 +852,9 @@ jobs:
           python_version = '${{ matrix.python }}'
           manifest = load_manifest(Path('ci-shard-manifest.yml'), repo_root=Path('.'))
 
-          global_path = None
-          for p in Path('global-inventory').rglob('*.json'):
-              if 'global' in p.name and python_version in p.name:
-                  global_path = p; break
-          if global_path is None:
-              print('ERROR: no global inventory', file=sys.stderr); sys.exit(1)
+          global_path = Path('global-inventory') / 'main-${{ github.sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-global-collection-bundle' / 'nodes-main-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json'
+          if not global_path.is_file():
+              print(f'ERROR: no global inventory at {global_path}', file=sys.stderr); sys.exit(1)
           global_inv = load_inventory(global_path)
 
           shard_inventories = {}

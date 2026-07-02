@@ -4,6 +4,7 @@ behavior environment contract, and run_test_shard telemetry runner.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -92,6 +93,19 @@ def _make_artifact_bundle(
     node_ids = ["tests/ci/test_a.py::test_a"]
     node_markers: dict[str, list[str]] = {"tests/ci/test_a.py::test_a": []}
 
+    # Build a valid behavior-environment.json with correct digest first,
+    # so the fingerprint can be embedded in node-inventory for cross-validation.
+    beh_payload: dict[str, Any] = {
+        "python_version": python_version,
+        "environment": {},
+        "file_digests": {},
+        "working_directory": "/test",
+    }
+    beh_canonical = json.dumps(
+        beh_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    beh_digest = hashlib.sha256(beh_canonical.encode("utf-8")).hexdigest()
+
     _json_content: dict[str, dict[str, Any]] = {
         "node-inventory": {
             "track": track,
@@ -102,6 +116,7 @@ def _make_artifact_bundle(
             "shard": shard,
             "collection_scope": "shard",
             "node_ids": node_ids,
+            "behavior_fingerprint_sha256": beh_digest,
         },
         "node-marker-inventory": {
             "track": track,
@@ -113,17 +128,26 @@ def _make_artifact_bundle(
             "node_markers": node_markers,
         },
         "behavior-environment": {
-            "canonical_json_sha256": "sha256:" + "a" * 64,
+            "schema_version": "1",
+            "payload": beh_payload,
+            "canonical_json_sha256": f"sha256:{beh_digest}",
         },
-        "resource-telemetry": {
-            "track": track,
-            "commit_sha": commit_sha,
-            "run_id": run_id,
-            "run_attempt": run_attempt,
-            "python_version": python_version,
-            "shard": shard,
-            "execution_status": "completed",
-        },
+        "resource-telemetry": None,  # built below with all required fields
+    }
+
+    # Build a valid resource-telemetry.json with all required authority fields
+    _json_content["resource-telemetry"] = {
+        "track": track,
+        "commit_sha": commit_sha,
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "python_version": python_version,
+        "shard": shard,
+        "execution_status": "completed",
+        "junit_parse_status": "available",
+        "counts_authoritative": True,
+        "resource_measurement_status": "available",
+        "pytest_exit_code": 0,
     }
 
     artifacts = []
@@ -551,6 +575,301 @@ class TestArtifactIdentity:
             json.dumps(tel, indent=2), encoding="utf-8"
         )
         with pytest.raises(ArtifactError, match="execution_status"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    # ── Per-kind artifact policy tests (P0-1) ──────────────────────────────
+
+    def test_accept_empty_pytest_stderr(self, tmp_path: Path) -> None:
+        """Empty pytest-stderr.txt is ACCEPTED (allow_empty=True)."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        # Create all expected bundles (ci/3.11, unit/3.11, unit/3.12)
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="unit",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="unit",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Overwrite the ci bundle's pytest-stderr.txt with empty content (allowed)
+        ci_dir = root / "pr-head-ci-py3.11"
+        (ci_dir / "pytest-stderr.txt").write_text("", encoding="utf-8")
+        # Should pass — empty stderr is allowed by allow_empty policy
+        verify_artifacts(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            expected_run_attempt=1,
+        )
+
+    def test_reject_empty_node_inventory(self, tmp_path: Path) -> None:
+        """Empty node-inventory.json → REJECTED (allow_empty=False)."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Overwrite node-inventory.json with empty content
+        (bundle_dir / "node-inventory.json").write_text("", encoding="utf-8")
+        with pytest.raises(ArtifactError, match="EMPTY REQUIRED FILE"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_empty_resource_telemetry(self, tmp_path: Path) -> None:
+        """Empty resource-telemetry.json → REJECTED (allow_empty=False)."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Overwrite resource-telemetry.json with empty content
+        (bundle_dir / "resource-telemetry.json").write_text("", encoding="utf-8")
+        with pytest.raises(ArtifactError, match="EMPTY REQUIRED FILE"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_unknown_artifact_kind(self, tmp_path: Path) -> None:
+        """Extra unknown artifact kind → REJECTED (EXTRA KINDS)."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Inject an extra unknown kind into metadata
+        meta_path = bundle_dir / "artifact-metadata.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["artifacts"].append(
+            {"kind": "unknown-extra-kind", "path": "unknown-extra-kind.json", "present": True}
+        )
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        # Create the file so the filesystem check passes
+        (bundle_dir / "unknown-extra-kind.json").write_text("extra", encoding="utf-8")
+        with pytest.raises(ArtifactError, match="EXTRA KINDS"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    # ── Behavior-environment digest recomputation tests (P0-2) ──────────────
+
+    def test_reject_behavior_environment_digest_mismatch(self, tmp_path: Path) -> None:
+        """Payload modified but digest unchanged → REJECTED."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Rewrite behavior-environment.json with tampered payload but original digest
+        beh = {
+            "schema_version": "1",
+            "payload": {
+                "python_version": "3.11",
+                "environment": {"TAMPERED": "yes"},
+                "file_digests": {},
+                "working_directory": "/tampered",
+            },
+            "canonical_json_sha256": "sha256:" + "a" * 64,  # wrong digest
+        }
+        (bundle_dir / "behavior-environment.json").write_text(
+            json.dumps(beh, indent=2), encoding="utf-8"
+        )
+        with pytest.raises(ArtifactError, match="digest mismatch"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_behavior_environment_wrong_schema_version(self, tmp_path: Path) -> None:
+        """behavior-environment.json with schema_version != '1' → REJECTED."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Rewrite behavior-environment.json with wrong schema_version
+        beh = {
+            "schema_version": "99",
+            "payload": {
+                "python_version": "3.11",
+                "environment": {},
+                "file_digests": {},
+                "working_directory": "/test",
+            },
+            "canonical_json_sha256": "sha256:" + "a" * 64,
+        }
+        (bundle_dir / "behavior-environment.json").write_text(
+            json.dumps(beh, indent=2), encoding="utf-8"
+        )
+        with pytest.raises(ArtifactError, match="schema_version"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    # ── Telemetry fail-closed checks (P0-5) ────────────────────────────────
+
+    def test_reject_telemetry_not_completed(self, tmp_path: Path) -> None:
+        """resource-telemetry with execution_status != completed → REJECTED."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Rewrite resource-telemetry.json with non-completed status
+        tel = {
+            "track": "pr-head",
+            "commit_sha": _SHA40,
+            "run_id": "100",
+            "run_attempt": 1,
+            "python_version": "3.11",
+            "shard": "ci",
+            "execution_status": "timeout",
+            "junit_parse_status": "available",
+            "counts_authoritative": True,
+            "resource_measurement_status": "available",
+            "pytest_exit_code": -9,
+        }
+        (bundle_dir / "resource-telemetry.json").write_text(
+            json.dumps(tel, indent=2), encoding="utf-8"
+        )
+        with pytest.raises(ArtifactError, match="execution_status"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_telemetry_counts_not_authoritative(self, tmp_path: Path) -> None:
+        """resource-telemetry with counts_authoritative=false → REJECTED."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Rewrite resource-telemetry.json with counts_authoritative=false
+        tel = {
+            "track": "pr-head",
+            "commit_sha": _SHA40,
+            "run_id": "100",
+            "run_attempt": 1,
+            "python_version": "3.11",
+            "shard": "ci",
+            "execution_status": "completed",
+            "junit_parse_status": "available",
+            "counts_authoritative": False,
+            "resource_measurement_status": "available",
+            "pytest_exit_code": 0,
+        }
+        (bundle_dir / "resource-telemetry.json").write_text(
+            json.dumps(tel, indent=2), encoding="utf-8"
+        )
+        with pytest.raises(ArtifactError, match="counts_authoritative"):
             verify_artifacts(
                 artifact_root=root,
                 manifest_path=manifest,

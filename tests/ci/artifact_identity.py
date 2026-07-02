@@ -1,11 +1,13 @@
 """Unified exact artifact identity verifier for all CI tracks.
 
-P0-2: Proves actual authoritative files == declared metadata files.
-      Fail-closed JSON parsing, full cross-validation, symlink safety.
+P0-1: Per-kind artifact policy (empty stderr OK, non-empty inventory required).
+P0-2: Full behavior-environment digest recomputation + cross-fingerprint.
+Fail-closed JSON parsing, symlink detection, exact file set proof.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -24,7 +26,18 @@ REQUIRED_ARTIFACT_KINDS: Final[frozenset[str]] = frozenset(
     }
 )
 
-# Files in the bundle that are NOT artifact content — allowed to be undeclared
+# P0-1: Per-kind policy
+ARTIFACT_KIND_POLICIES: Final[dict[str, dict[str, bool]]] = {
+    "node-inventory": {"required": True, "allow_empty": False},
+    "node-marker-inventory": {"required": True, "allow_empty": False},
+    "behavior-environment": {"required": True, "allow_empty": False},
+    "junit": {"required": True, "allow_empty": False},
+    "coverage-raw": {"required": True, "allow_empty": False},
+    "coverage-xml": {"required": True, "allow_empty": False},
+    "pytest-stderr": {"required": True, "allow_empty": True},
+    "resource-telemetry": {"required": True, "allow_empty": False},
+}
+
 _BUNDLE_CONTROL_FILES: Final[frozenset[str]] = frozenset({"artifact-metadata.json"})
 
 
@@ -87,12 +100,18 @@ def _read_json_strict(path: Path, label: str, identity: ArtifactIdentity) -> dic
     return raw
 
 
+def _canonicalize_behavior_payload(payload: dict[str, Any]) -> str:
+    """Re-canonicalize behavior payload for digest verification."""
+    stripped = {k: v for k, v in payload.items() if k != "plugin_versions"}
+    return json.dumps(stripped, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
 def _verify_bundle_contents(
     meta_path: Path,
     meta: dict[str, Any],
     identity: ArtifactIdentity,
 ) -> None:
-    """P0-2: Verify exact file set + fail-closed JSON + cross-validation."""
+    """Verify exact file set + per-kind policy + fail-closed cross-validation."""
     bundle_root = meta_path.parent
     artifacts = meta.get("artifacts", [])
     if not isinstance(artifacts, list):
@@ -122,7 +141,6 @@ def _verify_bundle_contents(
 
         artifact_path = bundle_root / path_str
 
-        # Symlink check
         if artifact_path.is_symlink():
             raise ArtifactError(f"SYMLINK detected: {path_str} in {identity}")
 
@@ -137,10 +155,13 @@ def _verify_bundle_contents(
             raise ArtifactError(
                 f"FILE EXISTS BUT NOT DECLARED: {path_str} (kind={kind}) in {identity}"
             )
-        if present and file_size == 0:
+
+        # P0-1: Per-kind empty check
+        policy = ARTIFACT_KIND_POLICIES.get(kind, {"allow_empty": False})
+        if present and file_size == 0 and not policy.get("allow_empty", False):
             raise ArtifactError(f"EMPTY REQUIRED FILE: {kind} at {path_str} in {identity}")
 
-    # P0-2: Required kinds check
+    # Required kinds check
     missing_kinds = REQUIRED_ARTIFACT_KINDS - set(declared_kinds)
     extra_kinds = set(declared_kinds) - REQUIRED_ARTIFACT_KINDS
     if missing_kinds:
@@ -148,7 +169,7 @@ def _verify_bundle_contents(
     if extra_kinds:
         raise ArtifactError(f"EXTRA KINDS in {identity}: {sorted(extra_kinds)}")
 
-    # P0-2: Prove actual files == declared files exactly
+    # Prove actual files == declared files
     actual_files: set[str] = set()
     for path in bundle_root.iterdir():
         if path.is_file():
@@ -156,19 +177,17 @@ def _verify_bundle_contents(
             if rel not in _BUNDLE_CONTROL_FILES:
                 actual_files.add(rel)
 
-    unexpected_files = actual_files - declared_paths
-    if unexpected_files:
-        raise ArtifactError(
-            f"UNDECLARED FILES in bundle for {identity}: {sorted(unexpected_files)}"
-        )
-    missing_files = declared_paths - actual_files
-    if missing_files:
-        raise ArtifactError(f"DECLARED BUT ABSENT FILES for {identity}: {sorted(missing_files)}")
+    unexpected = actual_files - declared_paths
+    if unexpected:
+        raise ArtifactError(f"UNDECLARED FILES in bundle for {identity}: {sorted(unexpected)}")
+    missing = declared_paths - actual_files
+    if missing:
+        raise ArtifactError(f"DECLARED BUT ABSENT FILES for {identity}: {sorted(missing)}")
 
-    # ── Fail-closed cross-validation ────────────────────────────────────────
-    # node-inventory.json
+    # ── Cross-validation ────────────────────────────────────────────────────
     node_inv_name = declared_kinds.get("node-inventory", "")
     node_inv_path = bundle_root / node_inv_name
+    node_inv: dict[str, Any] | None = None
     if node_inv_path.is_file():
         node_inv = _read_json_strict(node_inv_path, "node-inventory.json", identity)
         for field in ("track", "commit_sha", "run_id", "python_version", "shard"):
@@ -181,7 +200,6 @@ def _verify_bundle_contents(
                 )
         if int(node_inv.get("run_attempt", 0)) != identity.run_attempt:
             raise ArtifactError(f"node-inventory.run_attempt mismatch in {identity}")
-        # Verify collection_scope consistency
         scope = node_inv.get("collection_scope", "")
         shard_val = node_inv.get("shard")
         if scope == "global" and shard_val is not None:
@@ -191,7 +209,7 @@ def _verify_bundle_contents(
         if scope == "shard" and (not isinstance(shard_val, str) or not shard_val):
             raise ArtifactError(f"node-inventory: shard scope but missing shard in {identity}")
 
-    # node-marker-inventory.json
+    # marker-inventory
     marker_name = declared_kinds.get("node-marker-inventory", "")
     marker_path = bundle_root / marker_name
     if marker_path.is_file():
@@ -206,27 +224,49 @@ def _verify_bundle_contents(
                 )
         if int(marker_inv.get("run_attempt", 0)) != identity.run_attempt:
             raise ArtifactError(f"marker-inventory.run_attempt mismatch in {identity}")
-        # Verify marker node set == node inventory node set
-        if node_inv_path.is_file() and node_inv_path.is_file():
+        if node_inv is not None:
             inv_nodes = set(node_inv.get("node_ids", []))
             marker_nodes = set(marker_inv.get("node_markers", {}).keys())
             if inv_nodes != marker_nodes:
-                raise ArtifactError(
-                    f"marker/inventory node set mismatch in {identity}: "
-                    f"missing={sorted(inv_nodes - marker_nodes)}, "
-                    f"extra={sorted(marker_nodes - inv_nodes)}"
-                )
+                raise ArtifactError(f"marker/inventory node set mismatch in {identity}")
 
-    # behavior-environment.json
+    # P0-2: behavior-environment.json — full digest recomputation
     beh_name = declared_kinds.get("behavior-environment", "")
     beh_path = bundle_root / beh_name
+    beh_fingerprint: str | None = None
     if beh_path.is_file():
         beh = _read_json_strict(beh_path, "behavior-environment.json", identity)
+        # Schema validation
+        expected_beh_keys = {"schema_version", "payload", "canonical_json_sha256"}
+        actual_beh_keys = set(beh.keys())
+        if actual_beh_keys != expected_beh_keys:
+            raise ArtifactError(
+                f"behavior-environment schema keys mismatch in {identity}: "
+                f"extra={sorted(actual_beh_keys - expected_beh_keys)}, "
+                f"missing={sorted(expected_beh_keys - actual_beh_keys)}"
+            )
+        if beh.get("schema_version") != "1":
+            raise ArtifactError(f"behavior-environment schema_version must be '1' in {identity}")
+        payload = beh.get("payload")
+        if not isinstance(payload, dict):
+            raise ArtifactError(f"behavior-environment payload must be object in {identity}")
         digest_stored = beh.get("canonical_json_sha256", "")
         if not digest_stored.startswith("sha256:"):
             raise ArtifactError(f"behavior-environment: invalid digest format in {identity}")
+        stored_hex = digest_stored[7:]
+        if len(stored_hex) != 64:
+            raise ArtifactError(f"behavior-environment: invalid digest length in {identity}")
+        # Recompute canonical digest
+        canonical = _canonicalize_behavior_payload(payload)
+        recomputed = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        if recomputed != stored_hex:
+            raise ArtifactError(
+                f"behavior-environment: digest mismatch in {identity}: "
+                f"recomputed={recomputed}, stored={stored_hex}"
+            )
+        beh_fingerprint = recomputed
 
-    # resource-telemetry.json
+    # resource-telemetry.json — P0-5: full authority check
     tel_name = declared_kinds.get("resource-telemetry", "")
     tel_path = bundle_root / tel_name
     if tel_path.is_file():
@@ -241,11 +281,36 @@ def _verify_bundle_contents(
                 )
         if int(tel.get("run_attempt", 0)) != identity.run_attempt:
             raise ArtifactError(f"resource-telemetry.run_attempt mismatch in {identity}")
-        # Verify execution status is present
+        # P0-5: Strict authority checks
         exec_status = tel.get("execution_status", "")
-        if exec_status not in ("completed", "timeout", "collection-error", "internal-error"):
+        if exec_status != "completed":
             raise ArtifactError(
-                f"resource-telemetry: invalid execution_status={exec_status!r} in {identity}"
+                f"resource-telemetry: execution_status={exec_status!r} "
+                f"(expected 'completed') in {identity}"
+            )
+        if tel.get("junit_parse_status") != "available":
+            raise ArtifactError(
+                f"resource-telemetry: junit_parse_status != available in {identity}"
+            )
+        if not tel.get("counts_authoritative"):
+            raise ArtifactError(f"resource-telemetry: counts_authoritative=false in {identity}")
+        if tel.get("resource_measurement_status") != "available":
+            raise ArtifactError(
+                f"resource-telemetry: resource_measurement_status != available in {identity}"
+            )
+        if int(tel.get("pytest_exit_code", -1)) != 0:
+            raise ArtifactError(
+                f"resource-telemetry: pytest_exit_code={tel.get('pytest_exit_code')} "
+                f"(expected 0) in {identity}"
+            )
+
+    # P0-2: Cross-fingerprint — behavior digest == node inventory fingerprint
+    if beh_fingerprint is not None and node_inv is not None:
+        inv_fp = node_inv.get("behavior_fingerprint_sha256", "")
+        if inv_fp != beh_fingerprint:
+            raise ArtifactError(
+                f"behavior/node fingerprint mismatch in {identity}: "
+                f"beh={beh_fingerprint}, inv={inv_fp}"
             )
 
 
@@ -285,7 +350,9 @@ def verify_artifacts(
 
     for meta_path in metadata_files:
         meta = _read_json_strict(
-            meta_path, "artifact-metadata.json", ArtifactIdentity("", "", "", 0, "", "")
+            meta_path,
+            "artifact-metadata.json",
+            ArtifactIdentity("", "", "", 0, "", ""),
         )
         identity = _parse_identity(meta)
 
