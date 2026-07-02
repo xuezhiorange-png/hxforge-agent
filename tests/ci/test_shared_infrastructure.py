@@ -618,9 +618,7 @@ class TestRunTestShard:
         # Create a test file that sleeps to guarantee timeout
         slow_test = tmp_path / "test_slow.py"
         slow_test.write_text(
-            "import time\n"
-            "def test_slow():\n"
-            "    time.sleep(30)\n",
+            "import time\ndef test_slow():\n    time.sleep(30)\n",
             encoding="utf-8",
         )
         run_pytest(
