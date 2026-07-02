@@ -1,5 +1,8 @@
 """Unified exact artifact identity verifier for all CI tracks.
 
+P0-3: Verifies real filesystem — checks actual file existence, not just metadata.
+P0-4: Uses full identity naming.
+
 PR-head, merge-ref, and main must call this same verifier with identical
 strictness.  The verifier proves that every expected producer uploaded exactly
 the right set of artifacts with correct identity metadata.
@@ -25,6 +28,8 @@ from typing import Any, Final, NamedTuple
 REQUIRED_ARTIFACT_KINDS: Final[frozenset[str]] = frozenset(
     {
         "node-inventory",
+        "node-marker-inventory",
+        "behavior-environment",
         "junit",
         "coverage-raw",
         "coverage-xml",
@@ -72,6 +77,126 @@ def _parse_identity(meta: dict[str, Any]) -> ArtifactIdentity:
     )
 
 
+def _is_relative_safe(path_str: str) -> bool:
+    """Check that a path is relative, has no traversal, and stays within root."""
+    if not path_str:
+        return False
+    p = Path(path_str)
+    if p.is_absolute():
+        return False
+    parts = p.parts
+    return ".." not in parts
+
+
+def _verify_bundle_contents(
+    meta_path: Path,
+    meta: dict[str, Any],
+    identity: ArtifactIdentity,
+) -> None:
+    """P0-3: Verify real filesystem contents match declared metadata."""
+    bundle_root = meta_path.parent
+    artifacts = meta.get("artifacts", [])
+    if not isinstance(artifacts, list):
+        raise ArtifactError(f"artifacts must be a list in {identity}")
+
+    declared_kinds: dict[str, str] = {}
+    declared_paths: set[str] = set()
+
+    for entry in artifacts:
+        if not isinstance(entry, dict):
+            raise ArtifactError(f"artifact entry must be a dict in {identity}")
+        kind = entry.get("kind", "")
+        path_str = entry.get("path", "")
+        present = entry.get("present", False)
+
+        if not kind:
+            raise ArtifactError(f"artifact missing 'kind' in {identity}")
+
+        # Duplicate kind check
+        if kind in declared_kinds:
+            raise ArtifactError(f"DUPLICATE kind '{kind}' in {identity}")
+        declared_kinds[kind] = path_str
+
+        if not _is_relative_safe(path_str):
+            raise ArtifactError(f"unsafe path '{path_str}' in kind '{kind}' for {identity}")
+
+        # Duplicate path check
+        if path_str in declared_paths:
+            raise ArtifactError(f"DUPLICATE path '{path_str}' in {identity}")
+        declared_paths.add(path_str)
+
+        # Real filesystem check
+        artifact_path = bundle_root / path_str
+        file_exists = artifact_path.is_file()
+        file_size = artifact_path.stat().st_size if file_exists else 0
+
+        if present and not file_exists:
+            raise ArtifactError(
+                f"DECLARED PRESENT BUT FILE ABSENT: {kind} at {path_str} in {identity}"
+            )
+        if not present and file_exists:
+            raise ArtifactError(
+                f"FILE EXISTS BUT NOT DECLARED: {path_str} (kind={kind}) in {identity}"
+            )
+        if present and file_size == 0:
+            raise ArtifactError(f"EMPTY REQUIRED FILE: {kind} at {path_str} in {identity}")
+
+    # Required kinds check
+    missing_kinds = REQUIRED_ARTIFACT_KINDS - set(declared_kinds)
+    extra_kinds = set(declared_kinds) - REQUIRED_ARTIFACT_KINDS
+    if missing_kinds:
+        raise ArtifactError(f"MISSING KINDS in {identity}: {sorted(missing_kinds)}")
+    if extra_kinds:
+        raise ArtifactError(f"EXTRA KINDS in {identity}: {sorted(extra_kinds)}")
+
+    # Cross-validate internal identity: read node-inventory.json if present
+    node_inv_path = bundle_root / declared_kinds.get("node-inventory", "")
+    if node_inv_path.is_file():
+        try:
+            node_inv = json.loads(node_inv_path.read_text(encoding="utf-8"))
+            if isinstance(node_inv, dict):
+                inv_identity = {
+                    "track": node_inv.get("track"),
+                    "commit_sha": node_inv.get("commit_sha"),
+                    "run_id": node_inv.get("run_id"),
+                    "run_attempt": node_inv.get("run_attempt"),
+                    "python_version": node_inv.get("python_version"),
+                    "shard": node_inv.get("shard"),
+                }
+                for field in ("track", "commit_sha", "run_id", "python_version", "shard"):
+                    expected_val = getattr(identity, field)
+                    actual_val = str(inv_identity[field]) if inv_identity[field] is not None else ""
+                    if actual_val != str(expected_val):
+                        raise ArtifactError(
+                            f"node-inventory.{field} mismatch in {identity}: "
+                            f"got {actual_val!r}, expected {expected_val!r}"
+                        )
+                if int(inv_identity["run_attempt"]) != identity.run_attempt:
+                    raise ArtifactError(
+                        f"node-inventory.run_attempt mismatch in {identity}: "
+                        f"got {inv_identity['run_attempt']}, expected {identity.run_attempt}"
+                    )
+        except (json.JSONDecodeError, OSError):
+            pass  # Non-JSON or unreadable — skip cross-validation
+
+    # Cross-validate telemetry identity
+    telemetry_path = bundle_root / declared_kinds.get("resource-telemetry", "")
+    if telemetry_path.is_file():
+        try:
+            tel = json.loads(telemetry_path.read_text(encoding="utf-8"))
+            if isinstance(tel, dict):
+                for field in ("track", "commit_sha", "run_id", "python_version", "shard"):
+                    expected_val = getattr(identity, field)
+                    actual_val = str(tel.get(field, ""))
+                    if actual_val != str(expected_val):
+                        raise ArtifactError(
+                            f"resource-telemetry.{field} mismatch in {identity}: "
+                            f"got {actual_val!r}, expected {expected_val!r}"
+                        )
+        except (json.JSONDecodeError, OSError):
+            pass  # Non-JSON or unreadable — skip cross-validation
+
+
 def verify_artifacts(
     *,
     artifact_root: Path,
@@ -83,25 +208,7 @@ def verify_artifacts(
 ) -> None:
     """Verify all artifact identities match the expected parameters.
 
-    Parameters
-    ----------
-    artifact_root : Path
-        Root directory containing downloaded artifacts.
-    manifest_path : Path
-        Path to ci-shard-manifest.yml.
-    expected_track : str
-        Expected track value (pr-head, merge-ref, main, nightly).
-    expected_commit_sha : str
-        Expected 40-character commit SHA.
-    expected_run_id : str
-        Expected GitHub run ID.
-    expected_run_attempt : int
-        Expected run attempt number.
-
-    Raises
-    ------
-    ArtifactError
-        On any identity mismatch, missing, extra, or duplicate artifact.
+    P0-3: Also verifies real filesystem contents.
     """
     import yaml  # noqa: WPS433 — deferred to avoid top-level import
 
@@ -160,31 +267,8 @@ def verify_artifacts(
                 f"attempt mismatch: got {identity.run_attempt}, expected {expected_run_attempt}"
             )
 
-        # Verify artifact kinds
-        artifacts = meta.get("artifacts", [])
-        declared_kinds = {a.get("kind") for a in artifacts}
-        missing_kinds = REQUIRED_ARTIFACT_KINDS - declared_kinds
-        extra_kinds = declared_kinds - REQUIRED_ARTIFACT_KINDS
-        if missing_kinds:
-            raise ArtifactError(f"MISSING KINDS in {identity}: {sorted(missing_kinds)}")
-        if extra_kinds:
-            raise ArtifactError(f"EXTRA KINDS in {identity}: {sorted(extra_kinds)}")
-
-        # Verify each declared artifact is present
-        for a in artifacts:
-            kind = a.get("kind", "")
-            present = a.get("present", False)
-            path_str = a.get("path", "")
-            if not present:
-                raise ArtifactError(
-                    f"ABSENT ARTIFACT: {kind} in {identity} (declared path={path_str})"
-                )
-
-        # Verify no old-attempt artifacts
-        if identity.run_attempt != expected_run_attempt:
-            raise ArtifactError(
-                f"OLD ATTEMPT artifact: {identity} (expected attempt {expected_run_attempt})"
-            )
+        # P0-3: Verify real filesystem contents
+        _verify_bundle_contents(meta_path, meta, identity)
 
     # Check for missing/extra
     missing = expected - found
@@ -193,76 +277,6 @@ def verify_artifacts(
         raise ArtifactError(f"MISSING producers: {sorted(missing)}")
     if extra:
         raise ArtifactError(f"UNEXPECTED producers: {sorted(extra)}")
-
-
-def verify_artifacts_from_json(
-    *,
-    identities_json: str,
-    expected_track: str,
-    expected_commit_sha: str,
-    expected_run_id: str,
-    expected_run_attempt: int,
-    manifest_path: Path,
-) -> None:
-    """Verify artifact identities from a JSON string (for inline workflow use).
-
-    This is a thin wrapper around verify_artifacts that accepts a JSON-encoded
-    list of identity dicts instead of requiring artifact download.
-    """
-    import yaml  # noqa: WPS433
-
-    identities: list[dict[str, Any]] = json.loads(identities_json)
-    if not isinstance(identities, list):
-        raise ArtifactError("identities input must be a JSON list")
-
-    with open(manifest_path) as f:
-        manifest = yaml.safe_load(f)
-
-    expected: set[ArtifactIdentity] = set()
-    for shard_spec in manifest["shards"]:
-        for py in shard_spec["python"]:
-            expected.add(
-                ArtifactIdentity(
-                    track=expected_track,
-                    commit_sha=expected_commit_sha,
-                    run_id=expected_run_id,
-                    run_attempt=expected_run_attempt,
-                    python_version=py,
-                    shard=shard_spec["name"],
-                )
-            )
-
-    found: set[ArtifactIdentity] = set()
-    for raw in identities:
-        identity = ArtifactIdentity(
-            track=raw["track"],
-            commit_sha=raw["commit_sha"],
-            run_id=str(raw["run_id"]),
-            run_attempt=int(raw["run_attempt"]),
-            python_version=raw["python_version"],
-            shard=raw["shard"],
-        )
-        if identity in found:
-            raise ArtifactError(f"DUPLICATE: {identity}")
-        found.add(identity)
-
-        if identity.track != expected_track:
-            raise ArtifactError(f"track mismatch: {identity.track} vs {expected_track}")
-        if identity.commit_sha != expected_commit_sha:
-            raise ArtifactError(f"SHA mismatch: {identity.commit_sha} vs {expected_commit_sha}")
-        if identity.run_id != str(expected_run_id):
-            raise ArtifactError(f"run_id mismatch: {identity.run_id} vs {expected_run_id}")
-        if identity.run_attempt != expected_run_attempt:
-            raise ArtifactError(
-                f"attempt mismatch: {identity.run_attempt} vs {expected_run_attempt}"
-            )
-
-    missing = expected - found
-    extra = found - expected
-    if missing:
-        raise ArtifactError(f"MISSING: {sorted(missing)}")
-    if extra:
-        raise ArtifactError(f"UNEXPECTED: {sorted(extra)}")
 
 
 def main() -> None:

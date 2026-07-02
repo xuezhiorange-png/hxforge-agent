@@ -112,6 +112,16 @@ def _read_inv(tmp_path: Path) -> dict[str, Any]:
     return json.loads((tmp_path / "inventory.json").read_text(encoding="utf-8"))
 
 
+def _read_marker_inv(tmp_path: Path) -> dict[str, Any]:
+    """Read and parse the node-marker-inventory JSON."""
+    return json.loads((tmp_path / "node-marker-inventory.json").read_text(encoding="utf-8"))
+
+
+def _read_behavior_env(tmp_path: Path) -> dict[str, Any]:
+    """Read and parse the behavior-environment JSON."""
+    return json.loads((tmp_path / "behavior-environment.json").read_text(encoding="utf-8"))
+
+
 def _inv_for_file(inv: dict[str, Any], path: str) -> dict[str, Any] | None:
     """Return the ``FileRecord`` for *path*, or ``None``."""
     for rec in inv.get("file_records", []):
@@ -721,7 +731,7 @@ def test_deterministic_output(tmp_path: Path) -> None:
 
 
 def test_node_markers_present_in_inventory(tmp_path: Path) -> None:
-    """A test file with markers produces a node_markers dict in the output."""
+    """A test file with markers produces a node_markers dict in the marker inventory."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_markers.py"
     test_file.write_text(
@@ -745,13 +755,16 @@ def test_node_markers_present_in_inventory(tmp_path: Path) -> None:
         result = _run(tmp_path, [rel], scope="shard", shard="s1")
         assert result.returncode == 0, result.stderr
         inv = _read_inv(tmp_path)
-        assert "node_markers" in inv
-        assert isinstance(inv["node_markers"], dict)
+        # node-inventory.json must NOT contain node_markers (frozen schema v1)
+        assert "node_markers" not in inv, "node-inventory.json must not contain node_markers"
+        # Markers come exclusively from node-marker-inventory.json
+        minv = _read_marker_inv(tmp_path)
+        assert isinstance(minv["node_markers"], dict)
         # Every node_id should have an entry
         for nid in inv["node_ids"]:
-            assert nid in inv["node_markers"], f"missing node_markers for {nid}"
+            assert nid in minv["node_markers"], f"missing node_markers for {nid}"
         # Check specific marker content
-        markers = inv["node_markers"]
+        markers = minv["node_markers"]
         alpha_nid = next(nid for nid in inv["node_ids"] if "test_alpha" in nid)
         beta_nid = next(nid for nid in inv["node_ids"] if "test_beta" in nid)
         assert markers[alpha_nid] == ["pure"]
@@ -761,7 +774,7 @@ def test_node_markers_present_in_inventory(tmp_path: Path) -> None:
 
 
 def test_node_markers_sorted_and_deduplicated(tmp_path: Path) -> None:
-    """Markers are sorted lexicographically and deduplicated."""
+    """Markers are sorted lexicographically and deduplicated (marker inventory)."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_marksort.py"
     test_file.write_text(
@@ -783,7 +796,9 @@ def test_node_markers_sorted_and_deduplicated(tmp_path: Path) -> None:
         result = _run(tmp_path, [rel], scope="shard", shard="s1")
         assert result.returncode == 0, result.stderr
         inv = _read_inv(tmp_path)
-        markers = inv["node_markers"]
+        assert "node_markers" not in inv, "node-inventory.json must not contain node_markers"
+        minv = _read_marker_inv(tmp_path)
+        markers = minv["node_markers"]
         nid = next(nid for nid in inv["node_ids"] if "test_multi" in nid)
         # Must be sorted and deduplicated
         assert markers[nid] == ["golden", "pure"]
@@ -792,7 +807,7 @@ def test_node_markers_sorted_and_deduplicated(tmp_path: Path) -> None:
 
 
 def test_node_markers_empty_when_no_decorators(tmp_path: Path) -> None:
-    """Tests with no markers get an empty list in node_markers."""
+    """Tests with no markers get an empty list in node_markers (marker inventory)."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_nomark.py"
     test_file.write_text("def test_plain():\n    assert True\n", encoding="utf-8")
@@ -801,7 +816,9 @@ def test_node_markers_empty_when_no_decorators(tmp_path: Path) -> None:
         result = _run(tmp_path, [rel], scope="shard", shard="s1")
         assert result.returncode == 0, result.stderr
         inv = _read_inv(tmp_path)
-        markers = inv["node_markers"]
+        assert "node_markers" not in inv, "node-inventory.json must not contain node_markers"
+        minv = _read_marker_inv(tmp_path)
+        markers = minv["node_markers"]
         nid = inv["node_ids"][0]
         assert markers[nid] == []
     finally:
@@ -809,7 +826,7 @@ def test_node_markers_empty_when_no_decorators(tmp_path: Path) -> None:
 
 
 def test_node_markers_class_level_marker(tmp_path: Path) -> None:
-    """A marker on a class propagates to all its methods."""
+    """A marker on a class propagates to all its methods (marker inventory)."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_cls_mark.py"
     test_file.write_text(
@@ -832,7 +849,9 @@ def test_node_markers_class_level_marker(tmp_path: Path) -> None:
         result = _run(tmp_path, [rel], scope="shard", shard="s1")
         assert result.returncode == 0, result.stderr
         inv = _read_inv(tmp_path)
-        markers = inv["node_markers"]
+        assert "node_markers" not in inv, "node-inventory.json must not contain node_markers"
+        minv = _read_marker_inv(tmp_path)
+        markers = minv["node_markers"]
         for nid in inv["node_ids"]:
             assert markers[nid] == ["integration"], f"node {nid} missing class-level marker"
     finally:
@@ -840,7 +859,7 @@ def test_node_markers_class_level_marker(tmp_path: Path) -> None:
 
 
 def test_node_markers_module_level_marker(tmp_path: Path) -> None:
-    """A module-level pytestmark propagates to all collected nodes."""
+    """A module-level pytestmark propagates to all collected nodes (marker inventory)."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_modmark.py"
     test_file.write_text(
@@ -863,7 +882,9 @@ def test_node_markers_module_level_marker(tmp_path: Path) -> None:
         result = _run(tmp_path, [rel], scope="shard", shard="s1")
         assert result.returncode == 0, result.stderr
         inv = _read_inv(tmp_path)
-        markers = inv["node_markers"]
+        assert "node_markers" not in inv, "node-inventory.json must not contain node_markers"
+        minv = _read_marker_inv(tmp_path)
+        markers = minv["node_markers"]
         for nid in inv["node_ids"]:
             assert markers[nid] == ["benchmark"], f"node {nid} missing module-level marker"
     finally:
@@ -871,7 +892,7 @@ def test_node_markers_module_level_marker(tmp_path: Path) -> None:
 
 
 def test_node_markers_parametrized_test(tmp_path: Path) -> None:
-    """Parametrized tests each get their own marker list."""
+    """Parametrized tests each get their own marker list (marker inventory)."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_param_mark.py"
     test_file.write_text(
@@ -892,8 +913,10 @@ def test_node_markers_parametrized_test(tmp_path: Path) -> None:
         result = _run(tmp_path, [rel], scope="shard", shard="s1")
         assert result.returncode == 0, result.stderr
         inv = _read_inv(tmp_path)
+        assert "node_markers" not in inv, "node-inventory.json must not contain node_markers"
         assert inv["node_count"] == 3
-        markers = inv["node_markers"]
+        minv = _read_marker_inv(tmp_path)
+        markers = minv["node_markers"]
         for nid in inv["node_ids"]:
             assert "pure" in markers[nid], f"node {nid} missing pure marker"
     finally:
@@ -901,7 +924,7 @@ def test_node_markers_parametrized_test(tmp_path: Path) -> None:
 
 
 def test_node_markers_mixed_markers(tmp_path: Path) -> None:
-    """Tests with different combinations of the frozen marker taxonomy."""
+    """Tests with different combinations of the frozen marker taxonomy (marker inventory)."""
     d = _acceptance_dir(tmp_path)
     test_file = d / "test_mixed.py"
     test_file.write_text(
@@ -932,12 +955,72 @@ def test_node_markers_mixed_markers(tmp_path: Path) -> None:
         result = _run(tmp_path, [rel], scope="shard", shard="s1")
         assert result.returncode == 0, result.stderr
         inv = _read_inv(tmp_path)
-        markers = inv["node_markers"]
+        assert "node_markers" not in inv, "node-inventory.json must not contain node_markers"
+        minv = _read_marker_inv(tmp_path)
+        markers = minv["node_markers"]
         golden_nid = next(nid for nid in inv["node_ids"] if "test_golden_pure" in nid)
         coolprop_nid = next(nid for nid in inv["node_ids"] if "test_coolprop" in nid)
         integ_nid = next(nid for nid in inv["node_ids"] if "test_integ" in nid)
         assert markers[golden_nid] == ["golden", "pure"]
         assert markers[coolprop_nid] == ["coolprop", "provider"]
         assert markers[integ_nid] == ["integration", "slow"]
+    finally:
+        _cleanup(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# behavior-environment.json acceptance tests
+# ---------------------------------------------------------------------------
+
+
+def test_behavior_environment_json_produced(tmp_path: Path) -> None:
+    """A successful collection produces a valid behavior-environment.json artifact."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_behenv.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        beh = _read_behavior_env(tmp_path)
+        # Schema version
+        assert beh["schema_version"] == "1"
+        # Payload structure
+        payload = beh["payload"]
+        assert isinstance(payload, dict)
+        assert "python_version" in payload
+        assert "environment" in payload
+        assert isinstance(payload["environment"], dict)
+        assert "file_digests" in payload
+        assert isinstance(payload["file_digests"], dict)
+        assert "working_directory" in payload
+        # File digests include required files
+        assert "uv.lock" in payload["file_digests"]
+        assert "pyproject.toml" in payload["file_digests"]
+        # Fingerprint is sha256: hex string
+        fp = beh["canonical_json_sha256"]
+        assert fp.startswith("sha256:")
+        assert len(fp) == 71  # "sha256:" + 64 hex chars
+    finally:
+        _cleanup(tmp_path)
+
+
+def test_behavior_environment_fingerprint_matches_payload(tmp_path: Path) -> None:
+    """The canonical_json_sha256 in behavior-environment.json matches the payload."""
+    d = _acceptance_dir(tmp_path)
+    test_file = d / "test_behenv2.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    rel = test_file.as_posix()
+    try:
+        result = _run(tmp_path, [rel], scope="shard", shard="s1")
+        assert result.returncode == 0, result.stderr
+        beh = _read_behavior_env(tmp_path)
+        import hashlib as _hl
+
+        canonical = json.dumps(
+            beh["payload"], ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        expected_fp = "sha256:" + _hl.sha256(canonical.encode("utf-8")).hexdigest()
+        assert beh["canonical_json_sha256"] == expected_fp
     finally:
         _cleanup(tmp_path)

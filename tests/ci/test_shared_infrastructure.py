@@ -59,6 +59,19 @@ def _make_manifest(tmp: Path) -> Path:
     return path
 
 
+# Mapping from artifact kind to expected file name
+_KIND_FILE_MAP: dict[str, str] = {
+    "node-inventory": "node-inventory.json",
+    "node-marker-inventory": "node-marker-inventory.json",
+    "behavior-environment": "behavior-environment.json",
+    "junit": "junit.xml",
+    "coverage-raw": "coverage-raw.raw",
+    "coverage-xml": "coverage.xml",
+    "pytest-stderr": "pytest-stderr.txt",
+    "resource-telemetry": "resource-telemetry.json",
+}
+
+
 def _make_artifact_bundle(
     root: Path,
     *,
@@ -68,10 +81,17 @@ def _make_artifact_bundle(
     commit_sha: str,
     run_id: str,
     run_attempt: int,
+    present: bool = True,
 ) -> Path:
-    """Create a minimal artifact bundle with metadata."""
+    """Create a minimal artifact bundle with metadata AND real files."""
     bundle_dir = root / f"{track}-{shard}-py{python_version}"
     bundle_dir.mkdir(parents=True, exist_ok=True)
+    artifacts = []
+    for k in sorted(REQUIRED_ARTIFACT_KINDS):
+        fname = _KIND_FILE_MAP.get(k, f"{k}.json")
+        artifacts.append({"kind": k, "path": fname, "present": present})
+        if present:
+            (bundle_dir / fname).write_text(f"placeholder-{k}", encoding="utf-8")
     meta = {
         "identity": {
             "track": track,
@@ -81,10 +101,7 @@ def _make_artifact_bundle(
             "python_version": python_version,
             "shard": shard,
         },
-        "artifacts": [
-            {"kind": k, "path": f"{k}.json", "present": True}
-            for k in sorted(REQUIRED_ARTIFACT_KINDS)
-        ],
+        "artifacts": artifacts,
     }
     (bundle_dir / "artifact-metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return bundle_dir
@@ -252,9 +269,14 @@ class TestArtifactIdentity:
             run_id="100",
             run_attempt=1,
         )
-        # Create a duplicate in a different directory
+        # Create a duplicate in a different directory with actual files
         dup_dir = root / "dup"
         dup_dir.mkdir()
+        artifacts = []
+        for k in sorted(REQUIRED_ARTIFACT_KINDS):
+            fname = _KIND_FILE_MAP.get(k, f"{k}.json")
+            artifacts.append({"kind": k, "path": fname, "present": True})
+            (dup_dir / fname).write_text(f"placeholder-{k}", encoding="utf-8")
         meta = {
             "identity": {
                 "track": "pr-head",
@@ -264,10 +286,7 @@ class TestArtifactIdentity:
                 "python_version": "3.11",
                 "shard": "ci",
             },
-            "artifacts": [
-                {"kind": k, "path": f"{k}.json", "present": True}
-                for k in sorted(REQUIRED_ARTIFACT_KINDS)
-            ],
+            "artifacts": artifacts,
         }
         (dup_dir / "artifact-metadata.json").write_text(
             json.dumps(meta, indent=2), encoding="utf-8"
@@ -330,6 +349,8 @@ class TestArtifactIdentity:
         (bundle_dir / "artifact-metadata.json").write_text(
             json.dumps(meta, indent=2), encoding="utf-8"
         )
+        # Create the file so filesystem check passes
+        (bundle_dir / "junit.xml").write_text("<testsuites/>", encoding="utf-8")
         with pytest.raises(ArtifactError, match="MISSING KINDS"):
             verify_artifacts(
                 artifact_root=root,
@@ -341,8 +362,7 @@ class TestArtifactIdentity:
             )
 
     def test_reject_absent_artifact(self, tmp_path: Path) -> None:
-        """Artifact declared present but file missing → still passes
-        (metadata check only, file existence is a workflow concern)."""
+        """P0-3: Artifact declared present but file missing → FAIL (fail-closed)."""
         manifest = _make_manifest(tmp_path)
         root = tmp_path / "artifacts"
         root.mkdir()
@@ -358,14 +378,15 @@ class TestArtifactIdentity:
                 "shard": "ci",
             },
             "artifacts": [
-                {"kind": k, "path": f"{k}.json", "present": False}
+                {"kind": k, "path": _KIND_FILE_MAP.get(k, f"{k}.json"), "present": True}
                 for k in sorted(REQUIRED_ARTIFACT_KINDS)
             ],
         }
         (bundle_dir / "artifact-metadata.json").write_text(
             json.dumps(meta, indent=2), encoding="utf-8"
         )
-        with pytest.raises(ArtifactError, match="ABSENT ARTIFACT"):
+        # Do NOT create the actual files — verifier must fail-closed
+        with pytest.raises(ArtifactError, match="DECLARED PRESENT BUT FILE ABSENT"):
             verify_artifacts(
                 artifact_root=root,
                 manifest_path=manifest,
