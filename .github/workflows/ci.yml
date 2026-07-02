@@ -136,6 +136,10 @@ jobs:
           PYTHON_VERSION: ${{ matrix.python }}
           SHARD: ${{ matrix.name }}
           PYTEST_TIMEOUT: ${{ matrix.timeout }}
+          HX_TRACK: pr-head
+          HX_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
@@ -146,6 +150,7 @@ jobs:
             --junitxml="junit.xml" \
             --cov=src --cov-report=xml:coverage.xml \
             --tb=short \
+            ${{ matrix.files }}
             ${{ matrix.files }}
           PYTEST_EXIT=$?
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
@@ -248,6 +253,10 @@ jobs:
           PYTHON_VERSION: ${{ matrix.python }}
           SHARD: ${{ matrix.name }}
           PYTEST_TIMEOUT: ${{ matrix.timeout }}
+          HX_TRACK: merge-ref
+          HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.merge-sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
@@ -359,6 +368,10 @@ jobs:
           PYTHON_VERSION: ${{ matrix.python }}
           SHARD: ${{ matrix.name }}
           PYTEST_TIMEOUT: ${{ matrix.timeout }}
+          HX_TRACK: main
+          HX_COMMIT_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
