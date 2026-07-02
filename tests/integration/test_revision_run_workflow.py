@@ -55,6 +55,8 @@ from hexagent.repositories.memory import (
     InMemoryDesignCaseRevisionRepository,
 )
 
+pytestmark = pytest.mark.integration
+
 
 def _make_minimal_graph() -> ProvenanceGraph:
     """Minimal provenance graph with CASE_REVISION + CALCULATION_RUN."""

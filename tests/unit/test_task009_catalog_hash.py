@@ -37,6 +37,8 @@ from hexagent.optimization.models import (
     LengthSource,
 )
 
+pytestmark = pytest.mark.pure
+
 # ============================================================================
 # Helpers
 # ============================================================================

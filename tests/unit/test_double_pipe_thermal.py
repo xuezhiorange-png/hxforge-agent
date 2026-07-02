@@ -19,6 +19,8 @@ from hexagent.exchangers.double_pipe.thermal import (
     lmtd_parallel,
 )
 
+pytestmark = pytest.mark.pure
+
 # ---------------------------------------------------------------------------
 # Wall resistance
 # ---------------------------------------------------------------------------

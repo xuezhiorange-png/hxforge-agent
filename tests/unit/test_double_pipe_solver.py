@@ -30,6 +30,8 @@ from hexagent.exchangers.double_pipe.solver import (
     solve_rating,
 )
 
+pytestmark = pytest.mark.pure
+
 # ---------------------------------------------------------------------------
 # Helper: discontinuous residual for non-zero bracket width
 # ---------------------------------------------------------------------------

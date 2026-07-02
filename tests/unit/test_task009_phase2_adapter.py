@@ -75,6 +75,8 @@ from hexagent.optimization.models import (
 )
 from hexagent.properties.base import FluidIdentifier, PropertyProvider
 
+pytestmark = pytest.mark.provider
+
 # ============================================================================
 # Helpers
 # ============================================================================

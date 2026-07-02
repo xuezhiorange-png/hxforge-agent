@@ -25,6 +25,8 @@ from hexagent.domain.revisions import (
     is_valid_transition,
 )
 
+pytestmark = pytest.mark.pure
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

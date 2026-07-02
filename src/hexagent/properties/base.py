@@ -652,10 +652,17 @@ class PropertyCacheInfo:
 
 
 class PropertyProvider(Protocol):
-    name: str
-    version: str
-    git_revision: str
-    reference_state_policy: ReferenceStatePolicy
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def version(self) -> str: ...
+
+    @property
+    def git_revision(self) -> str: ...
+
+    @property
+    def reference_state_policy(self) -> ReferenceStatePolicy: ...
 
     def state_tp(
         self,

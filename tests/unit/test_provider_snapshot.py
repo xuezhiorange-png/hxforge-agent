@@ -12,12 +12,16 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from hexagent.core.heat_balance import ProviderIdentitySnapshot
 from hexagent.exchangers.double_pipe.rating import (
     _optional_string_attribute,
     _provider_snapshot,
 )
 from hexagent.properties.base import ReferenceStatePolicy
+
+pytestmark = pytest.mark.coolprop
 
 # ---------------------------------------------------------------------------
 # _optional_string_attribute unit tests

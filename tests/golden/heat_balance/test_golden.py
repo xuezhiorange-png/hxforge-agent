@@ -23,6 +23,8 @@ from hexagent.core.heat_balance import (
 from hexagent.properties import CoolPropProvider
 from hexagent.properties.base import FluidIdentifier
 
+pytestmark = pytest.mark.golden
+
 _GOLDEN_DIR = Path(__file__).parent
 
 

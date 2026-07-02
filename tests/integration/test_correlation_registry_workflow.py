@@ -5,6 +5,8 @@ End-to-end scenarios: register → get → assess → use → provenance.
 
 from __future__ import annotations
 
+import pytest
+
 from hexagent.correlations.models import (
     ApplicabilityEnvelope,
     ApplicabilityStatus,
@@ -25,6 +27,8 @@ from hexagent.correlations.models import (
 from hexagent.correlations.registry import InMemoryCorrelationRegistry
 from hexagent.correlations.usage import CorrelationUsageRecord
 from hexagent.domain.provenance import ProvenanceNodeType
+
+pytestmark = pytest.mark.integration
 
 # ---------------------------------------------------------------------------
 # Fixture definitions — fictional, not real engineering formulas

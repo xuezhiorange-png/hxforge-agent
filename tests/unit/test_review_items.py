@@ -66,6 +66,8 @@ from hexagent.repositories.memory import (
     InMemoryDesignCaseRevisionRepository,
 )
 
+pytestmark = pytest.mark.coolprop
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------

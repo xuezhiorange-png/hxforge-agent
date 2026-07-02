@@ -115,6 +115,8 @@ from hexagent.optimization.phase3_verifier import (
     verify_phase3_message_descriptor_or_raise,
 )
 
+pytestmark = pytest.mark.pure
+
 # ============================================================================
 # Shared digest pattern for tests
 # ============================================================================
