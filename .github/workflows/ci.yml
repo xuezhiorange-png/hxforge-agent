@@ -117,7 +117,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE=".coverage.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+          COVERAGE_FILE="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           export COVERAGE_FILE
           set +e
           uv run --locked pytest --timeout=${{ matrix.timeout }} -q \
@@ -155,7 +155,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE=".coverage.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+          COVERAGE_FILE="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           uv run --locked python -c "
           import json, os, xml.etree.ElementTree as ET
           duration = int('${DURATION}')
@@ -216,7 +216,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE=".coverage.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+          COVERAGE_FILE="coverage-raw.${TRACK}.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           uv run --locked python -c "
           import json, os
           meta = {
@@ -253,7 +253,7 @@ jobs:
             node-inventory.json
             junit.xml
             coverage.xml
-            .coverage.*
+            coverage-raw.*
             artifact-metadata.json
             collection-stderr.txt
             resource-telemetry.json
@@ -302,7 +302,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE=".coverage.merge-ref.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+          COVERAGE_FILE="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           export COVERAGE_FILE
           set +e
           uv run --locked pytest --timeout=${{ matrix.timeout }} -q \
@@ -338,7 +338,7 @@ jobs:
           MERGE_SHA="${{ steps.merge-sha.outputs.merge-sha }}"
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
-          COVERAGE_FILE=".coverage.merge-ref.${SHARD}.py${PYVER}.attempt${{ github.run_attempt }}"
+          COVERAGE_FILE="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${{ github.run_attempt }}"
           uv run --locked python -c "
           import json, os, xml.etree.ElementTree as ET
           duration = int('${DURATION}')
@@ -399,7 +399,7 @@ jobs:
           SHARD="${{ matrix.name }}"
           PYVER="${{ matrix.python }}"
           ATTEMPT="${{ github.run_attempt }}"
-          COVERAGE_FILE=".coverage.merge-ref.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
+          COVERAGE_FILE="coverage-raw.merge-ref.${SHARD}.py${PYVER}.attempt${ATTEMPT}"
           uv run --locked python -c "
           import json, os
           meta = {
@@ -436,7 +436,7 @@ jobs:
             node-inventory.json
             junit.xml
             coverage.xml
-            .coverage.*
+            coverage-raw.*
             artifact-metadata.json
             collection-stderr.txt
             resource-telemetry.json
@@ -834,7 +834,7 @@ jobs:
       - name: Combine coverage
         run: |
           mkdir -p coverage-combine
-          find artifacts/ -name '.coverage.*' | while read f; do cp "$f" coverage-combine/; done
+          find artifacts/ -name 'coverage-raw.*' | while read f; do cp "$f" coverage-combine/; done
           if [ -z "$(ls -A coverage-combine/ 2>/dev/null)" ]; then
             echo "ERROR: No coverage files found" >&2; exit 1
           fi
@@ -903,7 +903,7 @@ jobs:
       - name: Combine merge-ref coverage
         run: |
           mkdir -p coverage-combine
-          find artifacts/ -name '.coverage.*' | while read f; do cp "$f" coverage-combine/; done
+          find artifacts/ -name 'coverage-raw.*' | while read f; do cp "$f" coverage-combine/; done
           if [ -z "$(ls -A coverage-combine/ 2>/dev/null)" ]; then
             echo "ERROR: No coverage files found" >&2; exit 1
           fi
