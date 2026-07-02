@@ -135,7 +135,7 @@ def build_behavior_fingerprint(
                     )
         payload["plugin_versions"] = dict(sorted(plugin_versions.items()))
 
-    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    canonical = canonicalize_behavior_payload(payload)
     fingerprint = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     return {
@@ -143,6 +143,15 @@ def build_behavior_fingerprint(
         "canonical_json": canonical,
         "fingerprint": fingerprint,
     }
+
+
+def canonicalize_behavior_payload(payload: dict[str, Any]) -> str:
+    """Canonical JSON serialization of a behavior payload.
+
+    This is the SINGLE authority for payload canonicalization.
+    Both producer and verifier MUST import this function — no duplicates.
+    """
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def save_behavior_environment(
@@ -182,10 +191,3 @@ def verify_fingerprint_consistency(
             f"behavior fingerprint inconsistency in {context}: "
             f"found {len(unique)} distinct values: {sorted(unique)}"
         )
-
-
-def canonicalize_payload(payload: dict[str, Any]) -> str:
-    """Return the canonical JSON string for a payload (no plugin info)."""
-    # Strip plugin_versions if present (standalone re-canonicalization)
-    stripped = {k: v for k, v in payload.items() if k != "plugin_versions"}
-    return json.dumps(stripped, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

@@ -22,6 +22,7 @@ REQUIRED_ARTIFACT_KINDS: Final[frozenset[str]] = frozenset(
         "coverage-raw",
         "coverage-xml",
         "pytest-stderr",
+        "pytest-outcomes",
         "resource-telemetry",
     }
 )
@@ -35,6 +36,7 @@ ARTIFACT_KIND_POLICIES: Final[dict[str, dict[str, bool]]] = {
     "coverage-raw": {"required": True, "allow_empty": False},
     "coverage-xml": {"required": True, "allow_empty": False},
     "pytest-stderr": {"required": True, "allow_empty": True},
+    "pytest-outcomes": {"required": True, "allow_empty": False},
     "resource-telemetry": {"required": True, "allow_empty": False},
 }
 
@@ -98,12 +100,6 @@ def _read_json_strict(path: Path, label: str, identity: ArtifactIdentity) -> dic
     if not isinstance(raw, dict):
         raise ArtifactError(f"{label} root must be a JSON object for {identity}")
     return raw
-
-
-def _canonicalize_behavior_payload(payload: dict[str, Any]) -> str:
-    """Re-canonicalize behavior payload for digest verification."""
-    stripped = {k: v for k, v in payload.items() if k != "plugin_versions"}
-    return json.dumps(stripped, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def _verify_bundle_contents(
@@ -257,7 +253,9 @@ def _verify_bundle_contents(
         if len(stored_hex) != 64:
             raise ArtifactError(f"behavior-environment: invalid digest length in {identity}")
         # Recompute canonical digest
-        canonical = _canonicalize_behavior_payload(payload)
+        from tests.ci.behavior_environment import canonicalize_behavior_payload
+
+        canonical = canonicalize_behavior_payload(payload)
         recomputed = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         if recomputed != stored_hex:
             raise ArtifactError(

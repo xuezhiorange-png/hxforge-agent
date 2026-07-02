@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -1030,36 +1029,42 @@ class TestMarkerInventory:
 class TestBehaviorEnvironment:
     """Tests for P0-8 behavior environment contract."""
 
-    def test_fingerprint_deterministic(self, tmp_path: Path) -> None:
+    def test_fingerprint_deterministic(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Same environment → same fingerprint."""
         from tests.ci.behavior_environment import build_behavior_fingerprint
 
         (tmp_path / "uv.lock").write_text("lock v1", encoding="utf-8")
         (tmp_path / "pyproject.toml").write_text("[project]", encoding="utf-8")
-        os.chdir(tmp_path)
+        monkeypatch.chdir(tmp_path)
         fp1 = build_behavior_fingerprint(repo_root=tmp_path)
         fp2 = build_behavior_fingerprint(repo_root=tmp_path)
         assert fp1["fingerprint"] == fp2["fingerprint"]
 
-    def test_fingerprint_differs_with_different_lock(self, tmp_path: Path) -> None:
+    def test_fingerprint_differs_with_different_lock(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Different lock file → different fingerprint."""
         from tests.ci.behavior_environment import build_behavior_fingerprint
 
         (tmp_path / "pyproject.toml").write_text("[project]", encoding="utf-8")
-        os.chdir(tmp_path)
+        monkeypatch.chdir(tmp_path)
         (tmp_path / "uv.lock").write_text("lock v1", encoding="utf-8")
         fp1 = build_behavior_fingerprint(repo_root=tmp_path)
         (tmp_path / "uv.lock").write_text("lock v2", encoding="utf-8")
         fp2 = build_behavior_fingerprint(repo_root=tmp_path)
         assert fp1["fingerprint"] != fp2["fingerprint"]
 
-    def test_payload_is_canonical_json(self, tmp_path: Path) -> None:
+    def test_payload_is_canonical_json(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Payload canonical JSON is sorted and compact."""
         from tests.ci.behavior_environment import build_behavior_fingerprint
 
         (tmp_path / "uv.lock").write_text("x", encoding="utf-8")
         (tmp_path / "pyproject.toml").write_text("x", encoding="utf-8")
-        os.chdir(tmp_path)
+        monkeypatch.chdir(tmp_path)
         fp = build_behavior_fingerprint(repo_root=tmp_path)
         # Canonical JSON should have no spaces after separators
         assert ", " not in fp["canonical_json"]
@@ -1077,13 +1082,21 @@ class TestRunTestShard:
         """Running passing tests generates valid telemetry."""
         from tests.ci.run_test_shard import run_pytest
 
+        # Write a simple passing test so pytest actually executes
+        pass_test = tmp_path / "test_pass.py"
+        pass_test.write_text(
+            "def test_ok():\n    assert True\n",
+            encoding="utf-8",
+        )
+        junit_path = str(tmp_path / "junit.xml")
         exit_code = run_pytest(
-            ["-q", "--tb=short", "-x", "--co"],  # just collection, no execution
-            env={"PYTHONPATH": str(Path.cwd())},
-            junit_path=str(tmp_path / "junit.xml"),
+            ["-q", "--tb=short", f"--junitxml={junit_path}", str(pass_test)],
+            env={"PYTHONPATH": str(tmp_path)},
+            junit_path=junit_path,
             telemetry_path=str(tmp_path / "telemetry.json"),
             stdout_path=str(tmp_path / "stdout.txt"),
             stderr_path=str(tmp_path / "stderr.txt"),
+            outcomes_path=str(tmp_path / "outcomes.json"),
             track="pr-head",
             commit_sha=_SHA40,
             run_id="999",
@@ -1099,6 +1112,12 @@ class TestRunTestShard:
         assert telemetry["cpu_user_seconds"] >= 0
         assert telemetry["cpu_system_seconds"] >= 0
         assert telemetry["peak_rss_kb"] >= 0
+        assert telemetry["execution_status"] == "completed"
+        assert telemetry["counts_authoritative"]
+        assert telemetry["producer_authoritative"]
+        assert telemetry["pytest_exit_code"] == 0
+        assert telemetry["tests_passed"] > 0
+        assert exit_code == 0
 
     def test_telemetry_on_timeout(self, tmp_path: Path) -> None:
         """Timeout produces telemetry with exit code -9."""
@@ -1135,13 +1154,15 @@ class TestRunTestShard:
         # Write a failing test
         test_file = tmp_path / "test_fail.py"
         test_file.write_text("def test_fail(): assert False\n", encoding="utf-8")
+        junit_path = str(tmp_path / "junit.xml")
         exit_code = run_pytest(
-            ["-q", "--tb=short", f"--junitxml={tmp_path / 'junit.xml'}", str(test_file)],
+            ["-q", "--tb=short", f"--junitxml={junit_path}", str(test_file)],
             env={"PYTHONPATH": str(tmp_path)},
-            junit_path=str(tmp_path / "junit.xml"),
+            junit_path=junit_path,
             telemetry_path=str(tmp_path / "telemetry.json"),
             stdout_path=str(tmp_path / "stdout.txt"),
             stderr_path=str(tmp_path / "stderr.txt"),
+            outcomes_path=str(tmp_path / "outcomes.json"),
             track="test",
             commit_sha=_SHA40,
             run_id="1",
@@ -1153,3 +1174,5 @@ class TestRunTestShard:
         assert telemetry["pytest_exit_code"] == exit_code
         assert telemetry["pytest_exit_code"] != 0
         assert telemetry["tests_failed"] > 0
+        assert telemetry["execution_status"] == "completed"
+        assert not telemetry["producer_authoritative"]
