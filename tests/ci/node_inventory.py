@@ -1,4 +1,8 @@
-"""Strict structured node-inventory validation for TASK-015A."""
+"""Strict structured node-inventory validation for TASK-015A.
+
+P0-2: Frozen node inventory schema v1 does NOT include node_markers.
+       Markers live exclusively in node-marker-inventory.json.
+"""
 
 from __future__ import annotations
 
@@ -29,6 +33,7 @@ _ALLOWED_ZERO_NODE_REASONS: Final = {
     "hook-deselection",
     "unsupported-version",
 }
+# Frozen schema v1 keys — node_markers is NOT included
 _INVENTORY_KEYS: Final = {
     "schema_version",
     "collection_scope",
@@ -43,12 +48,7 @@ _INVENTORY_KEYS: Final = {
     "node_count",
     "node_ids",
     "file_records",
-    "node_markers",
 }
-(_INVENTORY_KEYS_OPTIONAL): Final = {
-    "node_markers",
-}
-_INVENTORY_KEYS_REQUIRED: Final = _INVENTORY_KEYS - _INVENTORY_KEYS_OPTIONAL
 _FILE_RECORD_KEYS: Final = {
     "file",
     "node_count",
@@ -87,7 +87,6 @@ class NodeInventory:
     behavior_fingerprint_sha256: str
     node_ids: tuple[str, ...]
     file_records: tuple[FileRecord, ...]
-    node_markers: tuple[tuple[str, tuple[str, ...]], ...]
 
     @property
     def node_count(self) -> int:
@@ -108,22 +107,6 @@ def _exact_keys(value: dict[str, Any], expected: set[str], context: str) -> None
         raise InventoryError(
             f"{context} keys mismatch; missing={sorted(expected - keys)!r}, "
             f"unknown={sorted(keys - expected)!r}"
-        )
-
-
-def _allow_optional_keys(
-    value: dict[str, Any],
-    required: set[str],
-    optional: set[str],
-    context: str,
-) -> None:
-    """Validate that required keys are present and no unknown keys exist."""
-    keys = set(value)
-    missing = required - keys
-    unknown = keys - required - optional
-    if missing or unknown:
-        raise InventoryError(
-            f"{context} keys mismatch; missing={sorted(missing)!r}, unknown={sorted(unknown)!r}"
         )
 
 
@@ -185,7 +168,11 @@ def _parse_file_record(raw: Any, index: int) -> FileRecord:
 
 
 def load_inventory(path: Path) -> NodeInventory:
-    """Load and strictly validate a structured node inventory."""
+    """Load and strictly validate a structured node inventory.
+
+    Frozen schema v1 — node_markers is NOT a valid key.
+    Markers live in node-marker-inventory.json.
+    """
 
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -194,7 +181,7 @@ def load_inventory(path: Path) -> NodeInventory:
     if not isinstance(raw, dict) or not all(isinstance(key, str) for key in raw):
         raise InventoryError("node inventory root must be an object with string keys")
     typed_raw = cast(dict[str, Any], raw)
-    _allow_optional_keys(typed_raw, _INVENTORY_KEYS_REQUIRED, _INVENTORY_KEYS_OPTIONAL, "inventory")
+    _exact_keys(typed_raw, _INVENTORY_KEYS, "inventory")
 
     if typed_raw["schema_version"] != "1":
         raise InventoryError("inventory schema_version must equal '1'")
@@ -262,37 +249,12 @@ def load_inventory(path: Path) -> NodeInventory:
     if node_counts != Counter(record_counts):
         raise InventoryError("file_records do not exactly match node_id file counts")
 
-    # --- node_markers (mandatory in authoritative CI) ---
-    raw_node_markers = typed_raw.get("node_markers")
-    if raw_node_markers is None:
-        raise InventoryError("node_markers is mandatory; inventory without markers is rejected")
-    else:
-        if not isinstance(raw_node_markers, dict):
-            raise InventoryError("node_markers must be a JSON object when present")
-        if not all(isinstance(k, str) for k in raw_node_markers):
-            raise InventoryError("node_markers keys must be strings")
-        # Must have an entry for every node_id.
-        marker_keys = set(raw_node_markers.keys())
-        node_id_set = set(node_ids)
-        missing = node_id_set - marker_keys
-        extra = marker_keys - node_id_set
-        if missing or extra:
-            raise InventoryError(
-                f"node_markers coverage mismatch; missing={sorted(missing)!r}, "
-                f"extra={sorted(extra)!r}"
-            )
-        parsed: list[tuple[str, tuple[str, ...]]] = []
-        for nid in node_ids:
-            entry = raw_node_markers[nid]
-            if not isinstance(entry, list):
-                raise InventoryError(f"node_markers[{nid!r}] must be a list")
-            if not all(isinstance(m, str) for m in entry):
-                raise InventoryError(f"node_markers[{nid!r}] entries must be strings")
-            deduped = sorted(set(entry))
-            if entry != deduped:
-                raise InventoryError(f"node_markers[{nid!r}] must be sorted and deduplicated")
-            parsed.append((nid, tuple(entry)))
-        node_markers = tuple(parsed)
+    # P0-2: node_markers MUST NOT appear in node-inventory.json
+    if "node_markers" in typed_raw:
+        raise InventoryError(
+            "node_markers must not appear in frozen schema v1 node-inventory.json; "
+            "use node-marker-inventory.json instead"
+        )
 
     return NodeInventory(
         schema_version="1",
@@ -307,7 +269,6 @@ def load_inventory(path: Path) -> NodeInventory:
         behavior_fingerprint_sha256=fingerprint,
         node_ids=node_ids,
         file_records=file_records,
-        node_markers=node_markers,
     )
 
 
@@ -378,22 +339,3 @@ def verify_per_version(
         raise InventoryError(
             f"per-version node union mismatch; missing={missing!r}, unexpected={unexpected!r}"
         )
-
-    # --- Marker consistency check ---
-    # When node_markers is present in both global and shard inventories,
-    # each node's markers must be identical across both.
-    if global_inventory.node_markers:
-        global_markers_map = dict(global_inventory.node_markers)
-        for shard_spec in applicable:
-            inventory = shard_inventories[shard_spec.name]
-            if inventory.node_markers:
-                shard_markers_map = dict(inventory.node_markers)
-                for node_id in inventory.node_ids:
-                    g_marks = global_markers_map.get(node_id)
-                    s_marks = shard_markers_map.get(node_id)
-                    if g_marks != s_marks:
-                        raise InventoryError(
-                            f"marker mismatch for node {node_id!r} between "
-                            f"global and shard {shard_spec.name!r}: "
-                            f"global={g_marks!r}, shard={s_marks!r}"
-                        )
