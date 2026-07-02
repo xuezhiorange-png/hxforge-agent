@@ -82,16 +82,60 @@ def _make_artifact_bundle(
     run_id: str,
     run_attempt: int,
     present: bool = True,
+    bundle_name: str | None = None,
 ) -> Path:
     """Create a minimal artifact bundle with metadata AND real files."""
-    bundle_dir = root / f"{track}-{shard}-py{python_version}"
+    dir_name = bundle_name or f"{track}-{shard}-py{python_version}"
+    bundle_dir = root / dir_name
     bundle_dir.mkdir(parents=True, exist_ok=True)
+
+    node_ids = ["tests/ci/test_a.py::test_a"]
+    node_markers: dict[str, list[str]] = {"tests/ci/test_a.py::test_a": []}
+
+    _json_content: dict[str, dict[str, Any]] = {
+        "node-inventory": {
+            "track": track,
+            "commit_sha": commit_sha,
+            "run_id": run_id,
+            "run_attempt": run_attempt,
+            "python_version": python_version,
+            "shard": shard,
+            "collection_scope": "shard",
+            "node_ids": node_ids,
+        },
+        "node-marker-inventory": {
+            "track": track,
+            "commit_sha": commit_sha,
+            "run_id": run_id,
+            "run_attempt": run_attempt,
+            "python_version": python_version,
+            "shard": shard,
+            "node_markers": node_markers,
+        },
+        "behavior-environment": {
+            "canonical_json_sha256": "sha256:" + "a" * 64,
+        },
+        "resource-telemetry": {
+            "track": track,
+            "commit_sha": commit_sha,
+            "run_id": run_id,
+            "run_attempt": run_attempt,
+            "python_version": python_version,
+            "shard": shard,
+            "execution_status": "completed",
+        },
+    }
+
     artifacts = []
     for k in sorted(REQUIRED_ARTIFACT_KINDS):
         fname = _KIND_FILE_MAP.get(k, f"{k}.json")
         artifacts.append({"kind": k, "path": fname, "present": present})
         if present:
-            (bundle_dir / fname).write_text(f"placeholder-{k}", encoding="utf-8")
+            json_data = _json_content.get(k)
+            if json_data is not None:
+                (bundle_dir / fname).write_text(json.dumps(json_data, indent=2), encoding="utf-8")
+            else:
+                (bundle_dir / fname).write_text(f"placeholder-{k}", encoding="utf-8")
     meta = {
         "identity": {
             "track": track,
@@ -270,26 +314,15 @@ class TestArtifactIdentity:
             run_attempt=1,
         )
         # Create a duplicate in a different directory with actual files
-        dup_dir = root / "dup"
-        dup_dir.mkdir()
-        artifacts = []
-        for k in sorted(REQUIRED_ARTIFACT_KINDS):
-            fname = _KIND_FILE_MAP.get(k, f"{k}.json")
-            artifacts.append({"kind": k, "path": fname, "present": True})
-            (dup_dir / fname).write_text(f"placeholder-{k}", encoding="utf-8")
-        meta = {
-            "identity": {
-                "track": "pr-head",
-                "commit_sha": _SHA40,
-                "run_id": "100",
-                "run_attempt": 1,
-                "python_version": "3.11",
-                "shard": "ci",
-            },
-            "artifacts": artifacts,
-        }
-        (dup_dir / "artifact-metadata.json").write_text(
-            json.dumps(meta, indent=2), encoding="utf-8"
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+            bundle_name="dup",
         )
         with pytest.raises(ArtifactError, match="DUPLICATE"):
             verify_artifacts(
@@ -402,6 +435,122 @@ class TestArtifactIdentity:
         root = tmp_path / "artifacts"
         root.mkdir()
         with pytest.raises(ArtifactError, match="no artifact-metadata"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_symlink(self, tmp_path: Path) -> None:
+        """Symlink in bundle → FAIL."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Replace one file with a symlink
+        target = bundle_dir / "junit.xml"
+        target.unlink()
+        target.symlink_to(bundle_dir / "node-inventory.json")
+        with pytest.raises(ArtifactError, match="SYMLINK"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_corrupt_json(self, tmp_path: Path) -> None:
+        """Corrupt JSON in artifact → FAIL (fail-closed)."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Corrupt node-inventory.json
+        (bundle_dir / "node-inventory.json").write_text("NOT VALID JSON {{{", encoding="utf-8")
+        with pytest.raises(ArtifactError, match="CORRUPT JSON"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_undeclared_file(self, tmp_path: Path) -> None:
+        """Extra undeclared file in bundle → FAIL."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Add an undeclared file
+        (bundle_dir / "undeclared-extra.txt").write_text("surprise!", encoding="utf-8")
+        with pytest.raises(ArtifactError, match="UNDECLARED FILES"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_missing_execution_status(self, tmp_path: Path) -> None:
+        """resource-telemetry.json without execution_status → FAIL."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        # Rewrite resource-telemetry.json without execution_status
+        tel = {
+            "track": "pr-head",
+            "commit_sha": _SHA40,
+            "run_id": "100",
+            "run_attempt": 1,
+            "python_version": "3.11",
+            "shard": "ci",
+        }
+        (bundle_dir / "resource-telemetry.json").write_text(
+            json.dumps(tel, indent=2), encoding="utf-8"
+        )
+        with pytest.raises(ArtifactError, match="execution_status"):
             verify_artifacts(
                 artifact_root=root,
                 manifest_path=manifest,
