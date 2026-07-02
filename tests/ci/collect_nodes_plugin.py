@@ -1,13 +1,16 @@
 """Structured pytest collection inventory for TASK-015A.
 
-The plugin is intentionally self-contained and uses only the standard library plus
-pytest so that collection authority does not depend on application imports.
+The plugin is intentionally self-contained and uses only the standard library
+plus pytest so that collection authority does not depend on application imports.
+
+P0-1: Uses canonical behavior_environment.build_behavior_fingerprint().
+P0-2: node_markers are NOT included in node-inventory.json (frozen schema v1).
+       Markers go exclusively to node-marker-inventory.json.
 """
 
 from __future__ import annotations
 
 import fnmatch
-import hashlib
 import json
 import os
 import sys
@@ -105,48 +108,6 @@ def _parse_positive_int_environment(name: str) -> int:
     if value <= 0:
         raise pytest.UsageError(f"{name} must be positive, got {value}")
     return value
-
-
-def _sha256_file(path: Path) -> str:
-    if not path.is_file():
-        raise pytest.UsageError(f"required fingerprint input is missing: {path.as_posix()}")
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    return f"sha256:{digest}"
-
-
-def _plugin_versions(config: pytest.Config) -> dict[str, str]:
-    versions: dict[str, str] = {}
-    for _plugin, distribution in config.pluginmanager.list_plugin_distinfo():
-        name = getattr(distribution, "project_name", None)
-        version = getattr(distribution, "version", None)
-        if isinstance(name, str) and isinstance(version, str):
-            previous = versions.setdefault(name, version)
-            if previous != version:
-                raise pytest.UsageError(
-                    f"conflicting versions reported for pytest plugin {name!r}: "
-                    f"{previous!r} versus {version!r}"
-                )
-    return dict(sorted(versions.items()))
-
-
-def _behavior_fingerprint(config: pytest.Config) -> str:
-    locale = os.environ.get("LC_ALL") or os.environ.get("LANG") or ""
-    payload: dict[str, Any] = {
-        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
-        "pytest_version": pytest.__version__,
-        "plugin_versions": _plugin_versions(config),
-        "lock_digest": _sha256_file(Path("uv.lock")),
-        "pyproject_digest": _sha256_file(Path("pyproject.toml")),
-        "working_directory": _normalize_path(Path.cwd()),
-        "python_hash_seed": _required_environment("PYTHONHASHSEED"),
-        "timezone": _required_environment("TZ"),
-        "locale": locale,
-        "pytest_addopts": os.environ.get("PYTEST_ADDOPTS", ""),
-    }
-    if not locale:
-        raise pytest.UsageError("TASK-015A requires LC_ALL or LANG")
-    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _python_file_patterns(config: pytest.Config) -> tuple[str, ...]:
@@ -333,7 +294,6 @@ def pytest_collection_finish(session: pytest.Session) -> None:
         raise pytest.UsageError(f"duplicate collected node IDs are prohibited: {duplicates!r}")
 
     # Collect per-node markers via item.iter_markers().
-    # Build a mapping from normalised node_id -> sorted tuple of marker names.
     node_markers: dict[str, tuple[str, ...]] = {}
     for item in session.items:
         node_id = item.nodeid.replace("\\", "/")
@@ -350,6 +310,21 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     if not commit_sha:
         raise pytest.UsageError("TASK-015A requires HX_COMMIT_SHA or GITHUB_SHA")
 
+    # ── P0-1: Use canonical behavior environment fingerprint ────────────────
+    from tests.ci.behavior_environment import build_behavior_fingerprint, save_behavior_environment
+
+    fingerprint_result = build_behavior_fingerprint(config=config)
+    fingerprint_sha = fingerprint_result["fingerprint"]
+
+    # Save auditable behavior-enventory.json alongside the inventory
+    inv_output_path = Path(output)
+    behavior_env_path = inv_output_path.parent / "behavior-environment.json"
+    save_behavior_environment(
+        output_path=behavior_env_path,
+        config=config,
+    )
+
+    # ── P0-2: Frozen node inventory schema v1 — NO node_markers ────────────
     payload: dict[str, Any] = {
         "schema_version": "1",
         "collection_scope": scope,
@@ -360,24 +335,23 @@ def pytest_collection_finish(session: pytest.Session) -> None:
         "shard": shard,
         "run_id": _required_environment("GITHUB_RUN_ID"),
         "run_attempt": _parse_positive_int_environment("GITHUB_RUN_ATTEMPT"),
-        "behavior_fingerprint_sha256": _behavior_fingerprint(config),
+        "behavior_fingerprint_sha256": fingerprint_sha,
         "node_count": len(node_ids),
         "node_ids": node_ids,
         "file_records": file_records,
-        "node_markers": {nid: node_markers[nid] for nid in node_ids},
     }
 
     if payload["node_count"] != len(payload["node_ids"]):
         raise pytest.UsageError("node_count does not match node_ids length")
 
-    output_path = Path(output)
+    output_path = inv_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
-    # --- P1-1: Separate marker inventory artifact ---
+    # ── P1-1: Separate marker inventory artifact (sole marker authority) ───
     marker_output = output_path.parent / "node-marker-inventory.json"
     marker_payload: dict[str, Any] = {
         "schema_version": "1",
