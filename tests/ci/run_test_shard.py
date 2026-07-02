@@ -112,8 +112,14 @@ def run_pytest(
         exit_code = result.returncode
     except subprocess.TimeoutExpired as exc:
         exit_code = -9
-        result_stdout = exc.stdout or ""
-        result_stderr = (exc.stderr or "") + f"\nTIMEOUT after {timeout}s"
+        stdout_raw = exc.stdout or b""
+        stderr_raw = exc.stderr or b""
+        if isinstance(stdout_raw, bytes):
+            stdout_raw = stdout_raw.decode("utf-8", errors="replace")
+        if isinstance(stderr_raw, bytes):
+            stderr_raw = stderr_raw.decode("utf-8", errors="replace")
+        result_stdout = stdout_raw
+        result_stderr = stderr_raw + f"\nTIMEOUT after {timeout}s"
     else:
         result_stdout = result.stdout
         result_stderr = result.stderr
