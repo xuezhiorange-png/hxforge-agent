@@ -141,6 +141,7 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
+          set +e
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
             -p tests.ci.collect_nodes_plugin \
@@ -151,6 +152,8 @@ jobs:
             --cov=src --cov-report=xml:coverage.xml \
             --tb=short \
             ${{ matrix.files }}
+          PYTEST_EXIT=$?
+          set -e
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
           COV_RAW="coverage-raw.pr-head.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
           if [ -f ".coverage" ] && [ -s ".coverage" ]; then
@@ -256,6 +259,7 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
+          set +e
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
             -p tests.ci.collect_nodes_plugin \
@@ -267,6 +271,7 @@ jobs:
             --tb=short \
             ${{ matrix.files }}
           PYTEST_EXIT=$?
+          set -e
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
           COV_RAW="coverage-raw.merge-ref.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
           if [ -f ".coverage" ] && [ -s ".coverage" ]; then
@@ -371,6 +376,7 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
+          set +e
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
             -p tests.ci.collect_nodes_plugin \
@@ -382,6 +388,7 @@ jobs:
             --tb=short \
             ${{ matrix.files }}
           PYTEST_EXIT=$?
+          set -e
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
           COV_RAW="coverage-raw.main.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
           if [ -f ".coverage" ] && [ -s ".coverage" ]; then
