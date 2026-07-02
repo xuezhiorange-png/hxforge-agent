@@ -20,6 +20,7 @@ env:
   LC_ALL: C.UTF-8
 
 jobs:
+  # ── Lint ───────────────────────────────────────────────────────────────────
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -42,11 +43,39 @@ jobs:
       - run: uv run --locked mypy
       - run: uv run --locked pip-audit
 
-  shard-py3.11:
+  # ── Resolve authority: freeze main SHA ─────────────────────────────────────
+  resolve-authority:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 5
+    outputs:
+      main-sha: ${{ steps.resolve.outputs.main-sha }}
     steps:
       - uses: actions/checkout@v4
+      - name: Freeze main SHA
+        id: resolve
+        run: |
+          MAIN_SHA="$(git rev-parse HEAD)"
+          echo "main-sha=${MAIN_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Frozen main SHA for nightly: ${MAIN_SHA}"
+
+  # ── Full test suite: Python 3.11 ──────────────────────────────────────────
+  shard-py3.11:
+    needs: [resolve-authority]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TRACK: nightly
+      COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
+      RUN_ID: ${{ github.run_id }}
+      RUN_ATTEMPT: ${{ github.run_attempt }}
+      PYTHON_VERSION: "3.11"
+      SHARD: full
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-authority.outputs.main-sha }}
+      - name: Assert frozen main SHA
+        run: test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.main-sha }}"
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
@@ -55,9 +84,9 @@ jobs:
         run: test "$(uv --version | cut -d' ' -f2 | sed 's/[-+].*//')" = "0.11.25"
       - name: Install from lock
         run: uv sync --locked --all-extras
-      - name: Run all tests (py3.11)
+      - name: Run all tests (py3.11) with real telemetry
         run: >
-          uv run --locked pytest
+          uv run --locked python -m tests.ci.run_test_shard
           --timeout=300 -q
           --junitxml=nightly-py3.11-junit.xml
           --cov=src --cov-report=xml:nightly-py3.11-coverage.xml
@@ -67,7 +96,7 @@ jobs:
         env:
           PYTHONPATH: "."
           HX_TRACK: nightly
-          HX_COMMIT_SHA: ${{ github.sha }}
+          HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
         run: PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 uv run --locked pytest --collect-only -p tests.ci.collect_nodes_plugin --hx-collection-scope global --hx-node-output nightly-py3.11-nodes.json tests/
       - name: Upload test results
         if: always()
@@ -79,12 +108,13 @@ jobs:
             nightly-py3.11-junit.xml
             nightly-py3.11-coverage.xml
             nightly-py3.11-nodes.json
+            resource-telemetry.json
+            node-marker-inventory.json
       - name: Open issue on failure
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HX_COMMIT_SHA: ${{ github.sha }}
-          HX_RUN_ID: ${{ github.run_id }}
+          HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
           HX_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh issue create \
@@ -99,11 +129,24 @@ jobs:
           @${{ github.actor }} please investigate." \
             --label "nightly-failure,ci"
 
+  # ── Full test suite: Python 3.12 ──────────────────────────────────────────
   shard-py3.12:
+    needs: [resolve-authority]
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      TRACK: nightly
+      COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
+      RUN_ID: ${{ github.run_id }}
+      RUN_ATTEMPT: ${{ github.run_attempt }}
+      PYTHON_VERSION: "3.12"
+      SHARD: full
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-authority.outputs.main-sha }}
+      - name: Assert frozen main SHA
+        run: test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.main-sha }}"
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
@@ -112,9 +155,9 @@ jobs:
         run: test "$(uv --version | cut -d' ' -f2 | sed 's/[-+].*//')" = "0.11.25"
       - name: Install from lock
         run: uv sync --locked --all-extras
-      - name: Run all tests (py3.12)
+      - name: Run all tests (py3.12) with real telemetry
         run: >
-          uv run --locked pytest
+          uv run --locked python -m tests.ci.run_test_shard
           --timeout=300 -q
           --junitxml=nightly-py3.12-junit.xml
           --cov=src --cov-report=xml:nightly-py3.12-coverage.xml
@@ -124,7 +167,7 @@ jobs:
         env:
           PYTHONPATH: "."
           HX_TRACK: nightly
-          HX_COMMIT_SHA: ${{ github.sha }}
+          HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
         run: PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 uv run --locked pytest --collect-only -p tests.ci.collect_nodes_plugin --hx-collection-scope global --hx-node-output nightly-py3.12-nodes.json tests/
       - name: Upload test results
         if: always()
@@ -136,12 +179,13 @@ jobs:
             nightly-py3.12-junit.xml
             nightly-py3.12-coverage.xml
             nightly-py3.12-nodes.json
+            resource-telemetry.json
+            node-marker-inventory.json
       - name: Open issue on failure
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HX_COMMIT_SHA: ${{ github.sha }}
-          HX_RUN_ID: ${{ github.run_id }}
+          HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
           HX_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh issue create \
@@ -156,11 +200,58 @@ jobs:
           @${{ github.actor }} please investigate." \
             --label "nightly-failure,ci"
 
+  # ── Benchmark shard: only benchmark-marked tests ──────────────────────────
+  benchmark:
+    needs: [resolve-authority]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TRACK: nightly
+      COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
+      RUN_ID: ${{ github.run_id }}
+      RUN_ATTEMPT: ${{ github.run_attempt }}
+      PYTHON_VERSION: "3.12"
+      SHARD: benchmark
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-authority.outputs.main-sha }}
+      - name: Assert frozen main SHA
+        run: test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.main-sha }}"
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --all-extras
+      - name: Run benchmark tests only
+        run: >
+          uv run --locked python -m tests.ci.run_test_shard
+          --timeout=300 -q
+          -m benchmark
+          --junitxml=nightly-benchmark-junit.xml
+          tests/
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-benchmark-results
+          retention-days: 30
+          path: |
+            nightly-benchmark-junit.xml
+            resource-telemetry.json
+
+  # ── Golden regression ─────────────────────────────────────────────────────
   golden-regression:
+    needs: [resolve-authority]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-authority.outputs.main-sha }}
+      - name: Assert frozen main SHA
+        run: test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.main-sha }}"
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
@@ -186,7 +277,7 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HX_COMMIT_SHA: ${{ github.sha }}
+          HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
           HX_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh issue create \
@@ -200,3 +291,40 @@ jobs:
 
           @${{ github.actor }} please investigate.  Golden regressions are correctness authority failures." \
             --label "nightly-failure,golden-regression,ci"
+
+  # ── Nightly final gate ────────────────────────────────────────────────────
+  final-gate:
+    if: always()
+    needs:
+      - lint
+      - resolve-authority
+      - shard-py3.11
+      - shard-py3.12
+      - benchmark
+      - golden-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Nightly final gate
+        run: |
+          FAILED=0
+          check() {
+            name="$1"; result="$2"
+            if [ "$result" != "success" ]; then
+              echo "FAIL: $name = $result" >&2
+              FAILED=1
+            else
+              echo "PASS: $name = success"
+            fi
+          }
+          check "lint" "${{ needs.lint.result }}"
+          check "resolve-authority" "${{ needs.resolve-authority.result }}"
+          check "shard-py3.11" "${{ needs.shard-py3.11.result }}"
+          check "shard-py3.12" "${{ needs.shard-py3.12.result }}"
+          check "benchmark" "${{ needs.benchmark.result }}"
+          check "golden-regression" "${{ needs.golden-regression.result }}"
+          if [ "$FAILED" -ne 0 ]; then
+            echo "NIGHTLY FINAL GATE: FAILED" >&2
+            exit 1
+          fi
+          echo "NIGHTLY FINAL GATE: ALL PASSED"

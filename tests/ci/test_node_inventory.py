@@ -280,8 +280,8 @@ def test_load_inventory_accepts_node_markers(tmp_path: Path) -> None:
     )
 
 
-def test_load_inventory_backward_compat_no_node_markers(tmp_path: Path) -> None:
-    """Inventories without node_markers field are still accepted."""
+def test_load_inventory_rejects_missing_node_markers(tmp_path: Path) -> None:
+    """Inventories without node_markers field are rejected (P1-1 mandatory markers)."""
     payload = _payload(
         scope="global",
         shard=None,
@@ -290,8 +290,8 @@ def test_load_inventory_backward_compat_no_node_markers(tmp_path: Path) -> None:
         },
     )
     del payload["node_markers"]
-    inventory = load_inventory(_write_inventory(tmp_path, "no_markers.json", payload))
-    assert inventory.node_markers == ()
+    with pytest.raises(InventoryError, match="node_markers is mandatory"):
+        load_inventory(_write_inventory(tmp_path, "no_markers.json", payload))
 
 
 def test_load_inventory_rejects_unsorted_node_markers(tmp_path: Path) -> None:

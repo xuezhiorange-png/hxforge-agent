@@ -376,3 +376,22 @@ def pytest_collection_finish(session: pytest.Session) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+    # --- P1-1: Separate marker inventory artifact ---
+    marker_output = output_path.parent / "node-marker-inventory.json"
+    marker_payload: dict[str, Any] = {
+        "schema_version": "1",
+        "track": track,
+        "commit_sha": commit_sha,
+        "run_id": _required_environment("GITHUB_RUN_ID"),
+        "run_attempt": _parse_positive_int_environment("GITHUB_RUN_ATTEMPT"),
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
+        "shard": shard,
+        "collection_scope": scope,
+        "node_markers": {nid: list(node_markers[nid]) for nid in sorted(node_markers)},
+        "node_count": len(node_ids),
+    }
+    marker_output.write_text(
+        json.dumps(marker_payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )

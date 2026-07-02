@@ -262,11 +262,10 @@ def load_inventory(path: Path) -> NodeInventory:
     if node_counts != Counter(record_counts):
         raise InventoryError("file_records do not exactly match node_id file counts")
 
-    # --- node_markers (optional for backward compat) ---
+    # --- node_markers (mandatory in authoritative CI) ---
     raw_node_markers = typed_raw.get("node_markers")
     if raw_node_markers is None:
-        # Backward compatibility: inventories without node_markers are still valid.
-        node_markers: tuple[tuple[str, tuple[str, ...]], ...] = ()
+        raise InventoryError("node_markers is mandatory; inventory without markers is rejected")
     else:
         if not isinstance(raw_node_markers, dict):
             raise InventoryError("node_markers must be a JSON object when present")
