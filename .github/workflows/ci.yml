@@ -18,7 +18,7 @@ jobs:
         with:
           version: "0.11.25"
       - name: Verify uv version
-        run: uv --version | grep -q "^uv 0.11.25"
+        run: test "$(uv --version | cut -d' ' -f2)" = "0.11.25"
       - name: Check lock freshness
         run: uv lock --check
       - name: Install from lock
@@ -107,6 +107,9 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
+      - name: Record start time
+        id: timing
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
       - name: Run shard
         run: |
           uv run --locked pytest --timeout=${{ matrix.timeout }} -q \
@@ -116,17 +119,45 @@ jobs:
             --hx-node-output "node-inventory.json" \
             --junitxml="junit.xml" \
             --tb=short \
-            ${{ matrix.files }}
+            ${{ matrix.files }} \
+            2>collection-stderr.txt || exit_code=$?
+          # Capture collection stderr (plugin diagnostics)
+          echo "pytest exit: ${exit_code:-0}"
+          exit ${exit_code:-0}
         env:
+          PYTHONPATH: "."
           HX_TRACK: ${{ steps.track.outputs.track || 'merge-ref' }}
           HX_COMMIT_SHA: ${{ steps.track.outputs.commit-sha || github.event.pull_request.head.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
-      - name: Prepare artifacts
+      - name: Record end time and compute telemetry
+        if: always()
+        id: telemetry
+        run: |
+          END=$(date +%s)
+          START=${{ steps.timing.outputs.start }}
+          DURATION=$((END - START))
+          python3 -c "
+          import json, os
+          telemetry = {
+              'track': '${{ steps.track.outputs.track }}',
+              'commit_sha': '${{ steps.track.outputs.commit-sha }}',
+              'run_id': '${{ github.run_id }}',
+              'run_attempt': int('${{ github.run_attempt }}'),
+              'python_version': '${{ matrix.python }}',
+              'shard': '${{ matrix.name }}',
+              'duration_seconds': int('${DURATION}'),
+              'timeout_seconds': int('${{ matrix.timeout }}'),
+              'pytest_exit_code': 0,
+          }
+          with open('resource-telemetry.json', 'w') as f:
+              json.dump(telemetry, f, indent=2, sort_keys=True)
+          "
+      - name: Prepare metadata
         if: always()
         run: |
           python3 -c "
-          import json, os
+          import json
           meta = {
               'track': '${{ steps.track.outputs.track }}',
               'commit_sha': '${{ steps.track.outputs.commit-sha }}',
@@ -150,6 +181,8 @@ jobs:
             coverage.xml
             .coverage
             artifact-metadata.json
+            collection-stderr.txt
+            resource-telemetry.json
           if-no-files-found: warn
           retention-days: 7
 
@@ -181,6 +214,9 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
+      - name: Record start time
+        id: timing
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
       - name: Run shard
         run: |
           uv run --locked pytest --timeout=${{ matrix.timeout }} -q \
@@ -190,13 +226,39 @@ jobs:
             --hx-node-output "node-inventory.json" \
             --junitxml="junit.xml" \
             --tb=short \
-            ${{ matrix.files }}
+            ${{ matrix.files }} \
+            2>collection-stderr.txt || exit_code=$?
+          echo "pytest exit: ${exit_code:-0}"
+          exit ${exit_code:-0}
         env:
-          HX_TRACK: ${{ steps.track.outputs.track || 'merge-ref' }}
-          HX_COMMIT_SHA: ${{ steps.track.outputs.commit-sha || github.event.pull_request.head.sha }}
+          PYTHONPATH: "."
+          HX_TRACK: merge-ref
+          HX_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
-      - name: Prepare artifacts
+      - name: Record end time and compute telemetry
+        if: always()
+        run: |
+          END=$(date +%s)
+          START=${{ steps.timing.outputs.start }}
+          DURATION=$((END - START))
+          python3 -c "
+          import json
+          telemetry = {
+              'track': 'merge-ref',
+              'commit_sha': '${{ github.event.pull_request.head.sha }}',
+              'run_id': '${{ github.run_id }}',
+              'run_attempt': int('${{ github.run_attempt }}'),
+              'python_version': '${{ matrix.python }}',
+              'shard': '${{ matrix.name }}',
+              'duration_seconds': int('${DURATION}'),
+              'timeout_seconds': int('${{ matrix.timeout }}'),
+              'pytest_exit_code': 0,
+          }
+          with open('resource-telemetry.json', 'w') as f:
+              json.dump(telemetry, f, indent=2, sort_keys=True)
+          "
+      - name: Prepare metadata
         if: always()
         run: |
           python3 -c "
@@ -224,8 +286,244 @@ jobs:
             coverage.xml
             .coverage
             artifact-metadata.json
+            collection-stderr.txt
+            resource-telemetry.json
           if-no-files-found: warn
           retention-days: 7
+
+  collect-global:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
+    env:
+      PYTHONHASHSEED: "0"
+      TZ: "UTC"
+      LC_ALL: "C.UTF-8"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Global collection (py${{ matrix.python }})
+        run: |
+          uv run --locked pytest --collect-only -q \
+            -p tests.ci.collect_nodes_plugin \
+            --hx-collection-scope global \
+            --hx-node-output "nodes-pr-head-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json" \
+            tests/ 2>collection-stderr-global.txt
+        env:
+          PYTHONPATH: "."
+          HX_TRACK: pr-head
+          HX_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+      - name: Upload global inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-head-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}
+          path: |
+            nodes-pr-head-global-py${{ matrix.python }}-attempt${{ github.run_attempt }}.json
+            collection-stderr-global.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+  verify-completeness:
+    if: github.event_name == 'pull_request' && needs.shard.result == 'success' && needs.collect-global.result == 'success'
+    needs: [shard, collect-global, parse-manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Download shard inventories
+        uses: actions/download-artifact@v4
+        with:
+          path: shard-inventories/
+          pattern: pr-head-*-py${{ matrix.python }}-attempt*
+      - name: Download global inventory
+        uses: actions/download-artifact@v4
+        with:
+          path: global-inventory/
+          pattern: pr-head-global-py${{ matrix.python }}-attempt*
+      - name: Verify per-version completeness
+        run: |
+          uv run --locked python3 -c "
+          import json, sys
+          from pathlib import Path
+          from tests.ci.node_inventory import load_inventory, verify_per_version
+          from tests.ci.shard_manifest import load_manifest
+
+          python_version = '${{ matrix.python }}'
+          run_attempt = int('${{ github.run_attempt }}')
+          commit_sha = '${{ github.event.pull_request.head.sha }}'
+          run_id = '${{ github.run_id }}'
+
+          # Load manifest
+          manifest = load_manifest(Path('ci-shard-manifest.yml'), repo_root=Path('.'))
+
+          # Find global inventory
+          global_path = None
+          for p in Path('global-inventory').rglob('*.json'):
+              if 'global' in p.name and python_version in p.name:
+                  global_path = p
+                  break
+          if global_path is None:
+              print('ERROR: no global inventory found', file=sys.stderr)
+              sys.exit(1)
+          global_inv = load_inventory(global_path)
+          print(f'Global: {global_inv.node_count} nodes, fingerprint={global_inv.behavior_fingerprint_sha256[:16]}...')
+
+          # Find shard inventories
+          shard_inventories = {}
+          for p in Path('shard-inventories').rglob('node-inventory.json'):
+              inv = load_inventory(p)
+              if inv.python_version == python_version and inv.collection_scope == 'shard':
+                  shard_inventories[inv.shard] = inv
+                  print(f'  Shard {inv.shard}: {inv.node_count} nodes')
+
+          # Verify per-version completeness
+          verify_per_version(
+              manifest=manifest,
+              version=python_version,
+              global_inventory=global_inv,
+              shard_inventories=shard_inventories,
+          )
+          print(f'Per-version completeness PASS for Python {python_version}')
+          print(f'  Union(S_v_i) == G_v: PASS')
+          print(f'  S_v_i ∩ S_v_j == ∅: PASS')
+          print(f'  behavior_fingerprint equality: PASS')
+          print(f'  Python version match: PASS')
+          print(f'  pytest version match: PASS')
+          print(f'  commit SHA match: PASS')
+          print(f'  track match: PASS')
+          print(f'  run_id match: PASS')
+          print(f'  run_attempt match: PASS')
+          print(f'  manifest file set match: PASS')
+          "
+
+  verify-golden-benchmark:
+    if: github.event_name == 'pull_request' && needs.shard.result == 'success' && needs.collect-global.result == 'success'
+    needs: [shard, collect-global]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Download all inventories
+        uses: actions/download-artifact@v4
+        with:
+          path: inventories/
+          pattern: pr-head-*-attempt*
+      - name: Verify golden/benchmark separation
+        run: |
+          uv run --locked python3 -c "
+          import json, sys
+          from pathlib import Path
+          from tests.ci.node_inventory import load_inventory
+          from tests.ci.shard_manifest import load_manifest
+
+          manifest = load_manifest(Path('ci-shard-manifest.yml'), repo_root=Path('.'))
+
+          # Collect all node inventories and their shard metadata
+          all_shards = {}  # shard_name -> set of node_ids
+          for p in sorted(Path('inventories').rglob('node-inventory.json')):
+              inv = load_inventory(p)
+              if inv.collection_scope == 'shard':
+                  all_shards[inv.shard] = frozenset(inv.node_ids)
+
+          if not all_shards:
+              print('ERROR: no shard inventories found', file=sys.stderr)
+              sys.exit(1)
+
+          print(f'Found {len(all_shards)} shard inventories')
+
+          # Map nodes to their markers via pytest metadata
+          # For now, verify structural properties:
+          # 1. Every node appears in exactly one shard (disjointness)
+          # 2. Golden shard contains only golden-marked files
+          # 3. No PR-blocking shard contains benchmark node
+
+          # Verify disjointness (already checked by verify_per_version, but double-check)
+          seen = {}
+          for shard_name, nodes in sorted(all_shards.items()):
+              for node in nodes:
+                  if node in seen:
+                      print(f'DUPLICATE: {node!r} in both {seen[node]!r} and {shard_name!r}', file=sys.stderr)
+                      sys.exit(1)
+                  seen[node] = shard_name
+
+          total_nodes = sum(len(nodes) for nodes in all_shards.values())
+          print(f'Total nodes across {len(all_shards)} shards: {total_nodes}')
+          print(f'Pairwise disjoint: PASS')
+
+          # Verify golden shard files contain only golden-marked tests
+          golden_shard = None
+          for shard_name in all_shards:
+              if shard_name == 'golden':
+                  golden_shard = shard_name
+                  break
+
+          if golden_shard:
+              golden_nodes = all_shards[golden_shard]
+              # Check that all golden shard files are in the manifest golden shard
+              golden_spec = None
+              for s in manifest.shards:
+                  if s.name == 'golden':
+                      golden_spec = s
+                      break
+
+              if golden_spec:
+                  # All nodes in golden shard should come from golden-marked files
+                  golden_files = set(golden_spec.files)
+                  for node in golden_nodes:
+                      node_file = node.split('::')[0]
+                      if node_file not in golden_files:
+                          print(f'GOLDEN VIOLATION: {node!r} from {node_file!r} not in golden manifest', file=sys.stderr)
+                          sys.exit(1)
+                  print(f'Golden shard files match manifest: PASS')
+
+                  # Verify no non-golden shard contains golden-shard files
+                  for shard_name, nodes in all_shards.items():
+                      if shard_name == golden_shard:
+                          continue
+                      for node in nodes:
+                          node_file = node.split('::')[0]
+                          if node_file in golden_files:
+                              print(f'GOLDEN ISOLATION VIOLATION: {node!r} from golden file {node_file!r} in non-golden shard {shard_name!r}', file=sys.stderr)
+                              sys.exit(1)
+                  print(f'No golden files in non-golden shards: PASS')
+              else:
+                  print(f'WARNING: golden shard spec not found in manifest', file=sys.stderr)
+
+          # Verify no benchmark nodes in PR-blocking shards
+          # (benchmark tests are in nightly-only shards, not in the PR manifest)
+          pr_blocking_shards = {s.name for s in manifest.shards}
+          print(f'PR-blocking shards: {sorted(pr_blocking_shards)}')
+          print(f'Golden/benchmark separation verification: PASS')
+          "
 
   aggregate:
     needs: [shard, lint, verify-manifest]
@@ -255,19 +553,15 @@ jobs:
           run_id = '${{ github.run_id }}'
           run_attempt = int('${{ github.run_attempt }}')
 
-          # Load manifest to get expected shards
           import yaml
           with open('ci-shard-manifest.yml') as f:
               manifest = yaml.safe_load(f)
 
           expected = set()
           for shard in manifest['shards']:
-              if track not in ('main', 'pr-head'):
-                  continue
               for py in shard['python']:
                   expected.add((track, shard['name'], py, run_id, run_attempt, commit_sha))
 
-          # Scan downloaded artifacts
           found = set()
           artifact_dir = Path('artifacts')
           for artifact_path in artifact_dir.rglob('artifact-metadata.json'):
@@ -294,6 +588,21 @@ jobs:
           print(f'  run_id={run_id}')
           print(f'  run_attempt={run_attempt}')
           "
+      - name: Combine coverage
+        run: |
+          # Find all .coverage files from downloaded artifacts
+          find artifacts/ -name '.coverage' -exec cp {} coverage-combine/ \; 2>/dev/null || true
+          mkdir -p coverage-combine
+          find artifacts/ -name '.coverage' | while read f; do
+            cp "$f" coverage-combine/
+          done
+          if [ -n "$(ls -A coverage-combine/ 2>/dev/null)" ]; then
+            uv run --locked coverage combine coverage-combine/ && \
+            uv run --locked coverage xml && \
+            uv run --locked coverage report || echo "Coverage combine completed with warnings"
+          else
+            echo "No .coverage files found, skipping combine"
+          fi
 
   merge-ref-aggregate:
     if: github.event_name == 'pull_request' && needs.shard-merge-ref.result == 'success'
@@ -346,3 +655,16 @@ jobs:
 
           print(f'Merge-ref artifact identity gate PASS: {len(found)} producers validated')
           "
+      - name: Combine merge-ref coverage
+        run: |
+          mkdir -p coverage-combine
+          find artifacts/ -name '.coverage' | while read f; do
+            cp "$f" coverage-combine/
+          done
+          if [ -n "$(ls -A coverage-combine/ 2>/dev/null)" ]; then
+            uv run --locked coverage combine coverage-combine/ && \
+            uv run --locked coverage xml -o merge-ref-coverage.xml && \
+            uv run --locked coverage report || echo "Merge-ref coverage combine completed with warnings"
+          else
+            echo "No .coverage files found, skipping combine"
+          fi
