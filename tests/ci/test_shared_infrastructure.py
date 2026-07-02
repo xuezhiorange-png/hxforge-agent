@@ -615,10 +615,17 @@ class TestRunTestShard:
         """Timeout produces telemetry with exit code -9."""
         from tests.ci.run_test_shard import run_pytest
 
-        # Use a very short timeout on a slow test
+        # Create a test file that sleeps to guarantee timeout
+        slow_test = tmp_path / "test_slow.py"
+        slow_test.write_text(
+            "import time\n"
+            "def test_slow():\n"
+            "    time.sleep(30)\n",
+            encoding="utf-8",
+        )
         run_pytest(
-            ["-q", "-c", "/dev/null", "tests/"],  # will take time
-            env={"PYTHONPATH": str(Path.cwd())},
+            ["-q", "--tb=short", str(slow_test)],
+            env={"PYTHONPATH": str(tmp_path)},
             timeout=1,
             junit_path=str(tmp_path / "junit.xml"),
             telemetry_path=str(tmp_path / "telemetry.json"),
