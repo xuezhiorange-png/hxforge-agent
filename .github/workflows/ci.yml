@@ -190,7 +190,7 @@ jobs:
               ('junit', 'junit.xml'),
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
-              ('collection-stderr', 'collection-stderr.txt'),
+              ('pytest-stderr', 'pytest-stderr.txt'),
               ('resource-telemetry', 'resource-telemetry.json'),
           ]
           for kind, path in required:
@@ -210,7 +210,7 @@ jobs:
             coverage.xml
             coverage-raw.*
             artifact-metadata.json
-            collection-stderr.txt
+            pytest-stderr.txt
             resource-telemetry.json
             node-marker-inventory.json
           if-no-files-found: error
@@ -308,7 +308,7 @@ jobs:
               ('junit', 'junit.xml'),
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
-              ('collection-stderr', 'collection-stderr.txt'),
+              ('pytest-stderr', 'pytest-stderr.txt'),
               ('resource-telemetry', 'resource-telemetry.json'),
           ]
           for kind, path in required:
@@ -328,7 +328,7 @@ jobs:
             coverage.xml
             coverage-raw.*
             artifact-metadata.json
-            collection-stderr.txt
+            pytest-stderr.txt
             resource-telemetry.json
             node-marker-inventory.json
           if-no-files-found: error
@@ -425,7 +425,7 @@ jobs:
               ('junit', 'junit.xml'),
               ('coverage-raw', '${COV_RAW}'),
               ('coverage-xml', 'coverage.xml'),
-              ('collection-stderr', 'collection-stderr.txt'),
+              ('pytest-stderr', 'pytest-stderr.txt'),
               ('resource-telemetry', 'resource-telemetry.json'),
           ]
           for kind, path in required:
@@ -445,7 +445,7 @@ jobs:
             coverage.xml
             coverage-raw.*
             artifact-metadata.json
-            collection-stderr.txt
+            pytest-stderr.txt
             resource-telemetry.json
             node-marker-inventory.json
           if-no-files-found: error

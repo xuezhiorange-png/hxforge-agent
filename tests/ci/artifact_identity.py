@@ -28,7 +28,7 @@ REQUIRED_ARTIFACT_KINDS: Final[frozenset[str]] = frozenset(
         "junit",
         "coverage-raw",
         "coverage-xml",
-        "collection-stderr",
+        "pytest-stderr",
         "resource-telemetry",
     }
 )
