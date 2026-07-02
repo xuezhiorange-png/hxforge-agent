@@ -155,6 +155,11 @@ jobs:
           PYTEST_EXIT=$?
           set -e
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
+          if [ -f "runner-diagnostic.txt" ]; then
+            echo "::group::Runner Diagnostic"
+            cat runner-diagnostic.txt
+            echo "::endgroup::"
+          fi
           COV_RAW="coverage-raw.pr-head.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
           if [ -f ".coverage" ] && [ -s ".coverage" ]; then
             mv ".coverage" "${COV_RAW}"
@@ -217,6 +222,7 @@ jobs:
             pytest-stderr.txt
             pytest-outcomes.json
             resource-telemetry.json
+            runner-diagnostic.txt
             node-marker-inventory.json
             behavior-environment.json
           if-no-files-found: error
@@ -279,6 +285,11 @@ jobs:
           PYTEST_EXIT=$?
           set -e
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
+          if [ -f "runner-diagnostic.txt" ]; then
+            echo "::group::Runner Diagnostic"
+            cat runner-diagnostic.txt
+            echo "::endgroup::"
+          fi
           COV_RAW="coverage-raw.merge-ref.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
           if [ -f ".coverage" ] && [ -s ".coverage" ]; then
             mv ".coverage" "${COV_RAW}"
@@ -341,6 +352,7 @@ jobs:
             pytest-stderr.txt
             pytest-outcomes.json
             resource-telemetry.json
+            runner-diagnostic.txt
             node-marker-inventory.json
             behavior-environment.json
           if-no-files-found: error
@@ -402,6 +414,11 @@ jobs:
           PYTEST_EXIT=$?
           set -e
           echo "pytest_exit_code=${PYTEST_EXIT}" >> "$GITHUB_OUTPUT"
+          if [ -f "runner-diagnostic.txt" ]; then
+            echo "::group::Runner Diagnostic"
+            cat runner-diagnostic.txt
+            echo "::endgroup::"
+          fi
           COV_RAW="coverage-raw.main.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
           if [ -f ".coverage" ] && [ -s ".coverage" ]; then
             mv ".coverage" "${COV_RAW}"
@@ -464,6 +481,7 @@ jobs:
             pytest-stderr.txt
             pytest-outcomes.json
             resource-telemetry.json
+            runner-diagnostic.txt
             node-marker-inventory.json
             behavior-environment.json
           if-no-files-found: error

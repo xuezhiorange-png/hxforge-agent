@@ -346,24 +346,23 @@ def run_pytest(
 
     # P0-5: Exit non-zero if not authoritative
     if not producer_authoritative and exit_code == 0:
+        diag = (
+            f"RUNNER: non-authoritative telemetry, returning 1.\n"
+            f"  failures={authority_failures}\n"
+            f"  exit={exit_code} exec={execution_status}\n"
+            f"  junit={junit_parse_status} outcome={outcome_parse_status}\n"
+            f"  resource={resource_status}\n"
+            f"  collected={junit_counts['tests_collected']}\n"
+            f"  passed={final_counts['tests_passed']} failed={final_counts['tests_failed']}\n"
+            f"  cnt_auth={counts_authoritative} mismatch={counts_mismatch_detail}"
+        )
+        # Write to both stderr and diagnostic file for CI visibility
+        import contextlib
         import sys as _sys
 
-        print(
-            f"RUNNER: non-authoritative telemetry, returning 1. failures={authority_failures}",
-            file=_sys.stderr,
-        )
-        print(
-            f"RUNNER: telemetry detail: "
-            f"exit={exit_code} exec={execution_status} "
-            f"junit={junit_parse_status} outcome={outcome_parse_status} "
-            f"resource={resource_status} "
-            f"collected={junit_counts['tests_collected']} "
-            f"passed={final_counts['tests_passed']} "
-            f"failed={final_counts['tests_failed']} "
-            f"cnt_auth={counts_authoritative} "
-            f"mismatch={counts_mismatch_detail}",
-            file=_sys.stderr,
-        )
+        print(diag, file=_sys.stderr)
+        with contextlib.suppress(OSError):
+            Path("runner-diagnostic.txt").write_text(diag + "\n", encoding="utf-8")
         return 1
 
     return exit_code
