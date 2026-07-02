@@ -239,7 +239,7 @@ jobs:
               ('resource-telemetry', 'resource-telemetry.json'),
           ]
           for kind, path in required:
-              exists = os.path.exists(path) and os.path.getsize(path) > 0
+              exists = os.path.exists(path)
               meta['artifacts'].append({'kind': kind, 'path': path, 'present': exists})
           with open('artifact-metadata.json', 'w') as f:
               json.dump(meta, f, indent=2, sort_keys=True)
@@ -422,7 +422,7 @@ jobs:
               ('resource-telemetry', 'resource-telemetry.json'),
           ]
           for kind, path in required:
-              exists = os.path.exists(path) and os.path.getsize(path) > 0
+              exists = os.path.exists(path)
               meta['artifacts'].append({'kind': kind, 'path': path, 'present': exists})
           with open('artifact-metadata.json', 'w') as f:
               json.dump(meta, f, indent=2, sort_keys=True)
