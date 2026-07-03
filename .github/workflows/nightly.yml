@@ -59,7 +59,7 @@ jobs:
           echo "Frozen main SHA for nightly: ${MAIN_SHA}"
 
   # ── Full test suite: Python 3.11 ──────────────────────────────────────────
-  shard-py3.11:
+  shard-py311:
     needs: [resolve-authority]
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -130,7 +130,7 @@ jobs:
             --label "nightly-failure,ci"
 
   # ── Full test suite: Python 3.12 ──────────────────────────────────────────
-  shard-py3.12:
+  shard-py312:
     needs: [resolve-authority]
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -298,8 +298,8 @@ jobs:
     needs:
       - lint
       - resolve-authority
-      - shard-py3.11
-      - shard-py3.12
+      - shard-py311
+      - shard-py312
       - benchmark
       - golden-regression
     runs-on: ubuntu-latest
@@ -319,8 +319,8 @@ jobs:
           }
           check "lint" "${{ needs.lint.result }}"
           check "resolve-authority" "${{ needs.resolve-authority.result }}"
-          check "shard-py3.11" "${{ needs.shard-py3.11.result }}"
-          check "shard-py3.12" "${{ needs.shard-py3.12.result }}"
+          check "shard-py311" "${{ needs.shard-py311.result }}"
+          check "shard-py312" "${{ needs.shard-py312.result }}"
           check "benchmark" "${{ needs.benchmark.result }}"
           check "golden-regression" "${{ needs.golden-regression.result }}"
           if [ "$FAILED" -ne 0 ]; then
