@@ -224,23 +224,26 @@ jobs:
           version: "0.11.25"
       - name: Install from lock
         run: uv sync --locked --all-extras
-      - name: Collect global marker inventory
+      - name: Collect global marker inventory (fail-closed)
         env:
           PYTHONPATH: "."
           HX_TRACK: nightly
           HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
         run: |
+          set -eo pipefail
           PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 \
           uv run --locked pytest --collect-only \
             -p tests.ci.collect_nodes_plugin \
             --hx-collection-scope global \
             --hx-node-output benchmark-node-inventory.json \
-            tests/ 2>pytest-stderr.txt || true
-          mv node-marker-inventory.json benchmark-node-marker-inventory.json 2>/dev/null || true
+            tests/ 2>pytest-stderr.txt
+          if [ -f node-marker-inventory.json ]; then
+            mv node-marker-inventory.json benchmark-node-marker-inventory.json
+          fi
       - name: Derive benchmark node set
         id: bench-nodes
         run: |
-          python3 -c "
+          uv run --locked python -c "
           import json, sys
           try:
               inv = json.load(open('benchmark-node-marker-inventory.json'))
@@ -257,7 +260,7 @@ jobs:
       - name: Generate N/A authority (zero benchmark nodes)
         if: steps.bench-nodes.outputs.count == '0'
         run: |
-          uv run --locked python -m tests.ci.benchmark_authority \
+          uv run --locked python -m tests.ci.benchmark_authority generate \
             --marker-inventory benchmark-node-marker-inventory.json \
             --output benchmark-authority.json \
             --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
@@ -267,24 +270,27 @@ jobs:
       - name: Execute benchmark tests (nonzero nodes)
         if: steps.bench-nodes.outputs.count != '0'
         run: |
+          set -eo pipefail
+          NODE_ARGS=$(uv run --locked python -c "
+          import json
+          ids = json.load(open('benchmark-node-ids.json'))
+          print(' '.join(ids))
+          ")
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=300 -q \
-            -m benchmark \
             --junitxml=nightly-benchmark-junit.xml \
-            tests/
+            $NODE_ARGS
           PYTEST_RC=$?
-          python3 -c "
+          PRODUCER_AUTH=$(uv run --locked python -c "
           import json
           tel = {}
           try:
               tel = json.load(open('resource-telemetry.json'))
           except (FileNotFoundError, json.JSONDecodeError):
               pass
-          auth = tel.get('producer_authoritative', False)
-          print(f'producer_authoritative={auth}')
-          " > bench-telemetry-info.txt
-          PRODUCER_AUTH=$(grep producer_authoritative bench-telemetry-info.txt | cut -d= -f2)
-          uv run --locked python -m tests.ci.benchmark_authority \
+          print(tel.get('producer_authoritative', False))
+          ")
+          uv run --locked python -m tests.ci.benchmark_authority generate \
             --marker-inventory benchmark-node-marker-inventory.json \
             --output benchmark-authority.json \
             --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
@@ -297,22 +303,12 @@ jobs:
       - name: Validate authority artifact
         if: always()
         run: |
-          python3 -c "
-          import json, sys
-          try:
-              a = json.load(open('benchmark-authority.json'))
-              print(json.dumps(a, indent=2))
-              if not a.get('authority_valid'):
-                  print('FAIL: authority_valid is not true', file=sys.stderr)
-                  sys.exit(1)
-              print(f'Benchmark authority: status={a[\"status\"]}, '
-                    f'node_count={a[\"benchmark_node_count\"]}, '
-                    f'authority_valid={a[\"authority_valid\"]}')
-          except (FileNotFoundError, json.JSONDecodeError) as exc:
-              print(f'FAIL: cannot parse benchmark-authority.json: {exc}',
-                    file=sys.stderr)
-              sys.exit(1)
-          "
+          uv run --locked python -m tests.ci.benchmark_authority validate \
+            --artifact benchmark-authority.json \
+            --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --python-version "3.12"
       - name: Upload benchmark evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -436,27 +432,13 @@ jobs:
             echo "FAIL: benchmark-authority.json not found at $AUTH_FILE" >&2
             exit 1
           fi
-          uv run python -c "
-          import json, sys
-          from tests.ci.benchmark_authority import (
-              validate_authority_artifact, BenchmarkAuthorityError,
-          )
-          a = json.load(open('$AUTH_FILE'))
-          try:
-              validate_authority_artifact(
-                  a,
-                  expected_commit_sha='${{ needs.resolve-authority.outputs.main-sha }}',
-                  expected_run_id='${{ github.run_id }}',
-                  expected_run_attempt=${{ github.run_attempt }},
-                  expected_python_version='3.12',
-              )
-              print(f'Benchmark authority: status={a[\"status\"]}, '
-                    f'node_count={a[\"benchmark_node_count\"]}, '
-                    f'authority_valid={a[\"authority_valid\"]}')
-          except BenchmarkAuthorityError as exc:
-              print(f'FAIL: benchmark authority: {exc}', file=sys.stderr)
-              sys.exit(1)
-          "
+          cp "$AUTH_FILE" benchmark-authority.json
+          uv run --locked python -m tests.ci.benchmark_authority validate \
+            --artifact benchmark-authority.json \
+            --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --python-version "3.12"
       - name: NIGHTLY FINAL GATE
         run: |
           echo "NIGHTLY FINAL GATE: ALL PASSED"

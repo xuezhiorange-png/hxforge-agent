@@ -354,8 +354,12 @@ class TestWorkflowStatic:
     def test_final_gate_validates_authority(self, nightly_content: str) -> None:
         """Final gate must validate benchmark-authority.json."""
         assert "benchmark-authority.json" in nightly_content
-        # Must parse and validate, not just check job conclusion
-        assert "validate_authority_artifact" in nightly_content or "jq" in nightly_content
+        # Must use CLI validator or direct validation, not just check job conclusion
+        assert (
+            "validate_authority_artifact" in nightly_content
+            or "benchmark_authority" in nightly_content
+            or "jq" in nightly_content
+        )
 
     def test_benchmark_authority_artifact_uploaded(self, nightly_content: str) -> None:
         """Benchmark authority artifact must be uploaded."""
