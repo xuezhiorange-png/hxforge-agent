@@ -568,6 +568,9 @@ class TestEndToEndPositive:
             )
 
             # ── 6. Move outputs from project root to exec_dir ──────────
+            # Also clean up files that would pollute the shard artifact bundle
+            import shutil
+
             for fname in [
                 "benchmark-execution-node-inventory.json",
                 "pytest-outcomes.json",
@@ -576,9 +579,19 @@ class TestEndToEndPositive:
             ]:
                 src = Path(project_root) / fname
                 if src.exists():
-                    import shutil
-
                     shutil.move(str(src), str(exec_dir / fname))
+
+            # Clean up files written by inner collect_nodes_plugin
+            # that would contaminate the shard artifact bundle
+            for fname in [
+                "node-marker-inventory.json",
+                "pytest-stdout.txt",
+                "pytest-stderr.txt",
+                "behavior-environment.json",
+            ]:
+                src = Path(project_root) / fname
+                if src.exists():
+                    src.unlink()
 
             # ── 6. Verify all evidence files exist ────────────────────
             exec_inv_path = exec_dir / "benchmark-execution-node-inventory.json"
