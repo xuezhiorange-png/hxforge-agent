@@ -225,12 +225,20 @@ jobs:
       - name: Install from lock
         run: uv sync --locked --all-extras
       - name: Run benchmark tests only
-        run: >
-          uv run --locked python -m tests.ci.run_test_shard
-          --timeout=300 -q
-          -m benchmark
-          --junitxml=nightly-benchmark-junit.xml
-          tests/
+        run: |
+          set +e
+          uv run --locked python -m tests.ci.run_test_shard \
+            --timeout=300 -q \
+            -m benchmark \
+            --junitxml=nightly-benchmark-junit.xml \
+            tests/
+          RC=$?
+          set -e
+          if [ "$RC" -eq 5 ]; then
+            echo "No benchmark-marked tests collected (exit 5), treating as pass"
+            exit 0
+          fi
+          exit "$RC"
       - name: Upload benchmark results
         if: always()
         uses: actions/upload-artifact@v4
