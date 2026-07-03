@@ -200,7 +200,7 @@ jobs:
           @${{ github.actor }} please investigate." \
             --label "nightly-failure,ci"
 
-  # ── Benchmark shard: only benchmark-marked tests ──────────────────────────
+  # ── Benchmark shard: governed benchmark authority ──────────────────────
   benchmark:
     needs: [resolve-authority]
     runs-on: ubuntu-latest
@@ -224,30 +224,109 @@ jobs:
           version: "0.11.25"
       - name: Install from lock
         run: uv sync --locked --all-extras
-      - name: Run benchmark tests only
+      - name: Collect global marker inventory
+        env:
+          PYTHONPATH: "."
+          HX_TRACK: nightly
+          HX_COMMIT_SHA: ${{ needs.resolve-authority.outputs.main-sha }}
         run: |
-          set +e
+          PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 \
+          uv run --locked pytest --collect-only \
+            -p tests.ci.collect_nodes_plugin \
+            --hx-collection-scope global \
+            --hx-node-output benchmark-node-inventory.json \
+            tests/ 2>pytest-stderr.txt || true
+          mv node-marker-inventory.json benchmark-node-marker-inventory.json 2>/dev/null || true
+      - name: Derive benchmark node set
+        id: bench-nodes
+        run: |
+          python3 -c "
+          import json, sys
+          try:
+              inv = json.load(open('benchmark-node-marker-inventory.json'))
+          except (FileNotFoundError, json.JSONDecodeError):
+              print('count=0')
+              sys.exit(0)
+          nodes = sorted(nid for nid, mk in inv.get('node_markers', {}).items()
+                         if 'benchmark' in mk)
+          print(f'count={len(nodes)}')
+          if nodes:
+              with open('benchmark-node-ids.json', 'w') as f:
+                  json.dump(nodes, f)
+          "
+      - name: Generate N/A authority (zero benchmark nodes)
+        if: steps.bench-nodes.outputs.count == '0'
+        run: |
+          uv run --locked python -m tests.ci.benchmark_authority \
+            --marker-inventory benchmark-node-marker-inventory.json \
+            --output benchmark-authority.json \
+            --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --python-version "3.12"
+      - name: Execute benchmark tests (nonzero nodes)
+        if: steps.bench-nodes.outputs.count != '0'
+        run: |
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=300 -q \
             -m benchmark \
             --junitxml=nightly-benchmark-junit.xml \
             tests/
-          RC=$?
-          set -e
-          if [ "$RC" -eq 5 ]; then
-            echo "No benchmark-marked tests collected (exit 5), treating as pass"
-            exit 0
-          fi
-          exit "$RC"
-      - name: Upload benchmark results
+          PYTEST_RC=$?
+          python3 -c "
+          import json
+          tel = {}
+          try:
+              tel = json.load(open('resource-telemetry.json'))
+          except (FileNotFoundError, json.JSONDecodeError):
+              pass
+          auth = tel.get('producer_authoritative', False)
+          print(f'producer_authoritative={auth}')
+          " > bench-telemetry-info.txt
+          PRODUCER_AUTH=$(grep producer_authoritative bench-telemetry-info.txt | cut -d= -f2)
+          uv run --locked python -m tests.ci.benchmark_authority \
+            --marker-inventory benchmark-node-marker-inventory.json \
+            --output benchmark-authority.json \
+            --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --python-version "3.12" \
+            --pytest-exit-code "$PYTEST_RC" \
+            $( [ "$PRODUCER_AUTH" = "True" ] && echo "--producer-authoritative" || true )
+          exit "$PYTEST_RC"
+      - name: Validate authority artifact
+        if: always()
+        run: |
+          python3 -c "
+          import json, sys
+          try:
+              a = json.load(open('benchmark-authority.json'))
+              print(json.dumps(a, indent=2))
+              if not a.get('authority_valid'):
+                  print('FAIL: authority_valid is not true', file=sys.stderr)
+                  sys.exit(1)
+              print(f'Benchmark authority: status={a[\"status\"]}, '
+                    f'node_count={a[\"benchmark_node_count\"]}, '
+                    f'authority_valid={a[\"authority_valid\"]}')
+          except (FileNotFoundError, json.JSONDecodeError) as exc:
+              print(f'FAIL: cannot parse benchmark-authority.json: {exc}',
+                    file=sys.stderr)
+              sys.exit(1)
+          "
+      - name: Upload benchmark evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: nightly-benchmark-results
           retention-days: 30
           path: |
+            benchmark-authority.json
+            benchmark-node-inventory.json
+            benchmark-node-marker-inventory.json
             nightly-benchmark-junit.xml
             resource-telemetry.json
+            pytest-outcomes.json
+            pytest-stderr.txt
 
   # ── Golden regression ─────────────────────────────────────────────────────
   golden-regression:
@@ -311,8 +390,22 @@ jobs:
       - benchmark
       - golden-regression
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - name: Install from lock
+        run: uv sync --locked --all-extras
+      - name: Download nightly-benchmark-results artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-benchmark-results
+          path: nightly-benchmark-results
+          run-id: ${{ github.run_id }}
       - name: Nightly final gate
         run: |
           FAILED=0
@@ -332,7 +425,38 @@ jobs:
           check "benchmark" "${{ needs.benchmark.result }}"
           check "golden-regression" "${{ needs.golden-regression.result }}"
           if [ "$FAILED" -ne 0 ]; then
-            echo "NIGHTLY FINAL GATE: FAILED" >&2
+            echo "NIGHTLY FINAL GATE: FAILED (job conclusion)" >&2
             exit 1
           fi
+          echo "All job conclusions: PASS"
+      - name: Validate benchmark authority artifact
+        run: |
+          AUTH_FILE="nightly-benchmark-results/benchmark-authority.json"
+          if [ ! -f "$AUTH_FILE" ]; then
+            echo "FAIL: benchmark-authority.json not found at $AUTH_FILE" >&2
+            exit 1
+          fi
+          uv run python -c "
+          import json, sys
+          from tests.ci.benchmark_authority import (
+              validate_authority_artifact, BenchmarkAuthorityError,
+          )
+          a = json.load(open('$AUTH_FILE'))
+          try:
+              validate_authority_artifact(
+                  a,
+                  expected_commit_sha='${{ needs.resolve-authority.outputs.main-sha }}',
+                  expected_run_id='${{ github.run_id }}',
+                  expected_run_attempt=${{ github.run_attempt }},
+                  expected_python_version='3.12',
+              )
+              print(f'Benchmark authority: status={a[\"status\"]}, '
+                    f'node_count={a[\"benchmark_node_count\"]}, '
+                    f'authority_valid={a[\"authority_valid\"]}')
+          except BenchmarkAuthorityError as exc:
+              print(f'FAIL: benchmark authority: {exc}', file=sys.stderr)
+              sys.exit(1)
+          "
+      - name: NIGHTLY FINAL GATE
+        run: |
           echo "NIGHTLY FINAL GATE: ALL PASSED"
