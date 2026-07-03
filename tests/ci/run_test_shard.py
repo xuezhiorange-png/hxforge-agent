@@ -431,6 +431,16 @@ def main() -> None:
             junit_xml = pytest_args[i + 1]
             break
 
+    # Extract --hx-node-output path for cross-validation with outcomes
+    node_inv_path = "node-inventory.json"
+    for i, arg in enumerate(pytest_args):
+        if arg.startswith("--hx-node-output="):
+            node_inv_path = arg.split("=", 1)[1]
+            break
+        if arg == "--hx-node-output" and i + 1 < len(pytest_args):
+            node_inv_path = pytest_args[i + 1]
+            break
+
     exit_code = run_pytest(
         pytest_args,
         junit_path=junit_xml,
@@ -438,6 +448,7 @@ def main() -> None:
         stdout_path="pytest-stdout.txt",
         stderr_path="pytest-stderr.txt",
         outcomes_path="pytest-outcomes.json",
+        node_inventory_path=node_inv_path,
         track=os.environ.get("TRACK", ""),
         commit_sha=os.environ.get("COMMIT_SHA", ""),
         run_id=os.environ.get("RUN_ID", ""),
