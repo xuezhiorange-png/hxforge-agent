@@ -534,13 +534,25 @@ class TestEndToEndPositive:
             assert len(bench_beta) == 1, f"Expected beta node, got: {bench_beta}"
 
             # ── 5. Run execution via real run_test_shard (P0-4) ────────
-            # run_test_shard writes outputs relative to cwd, so we use
-            # project_root as cwd (same as nightly workflow) and then
-            # move outputs to a temp dir for isolation.
+            # Use an isolated directory to avoid polluting the project root.
+            # Symlink tests/ and src/ so imports and test discovery work.
             exec_dir = tmp_path / "exec"
             exec_dir.mkdir()
+            (exec_dir / "tests").symlink_to(Path(project_root) / "tests")
+            (exec_dir / "src").symlink_to(Path(project_root) / "src")
+            (exec_dir / "conftest.py").symlink_to(
+                Path(project_root) / "conftest.py"
+            )
+            (exec_dir / "pyproject.toml").symlink_to(
+                Path(project_root) / "pyproject.toml"
+            )
+            (exec_dir / "uv.lock").symlink_to(
+                Path(project_root) / "uv.lock"
+            )
 
             exec_env = {**env, "SHARD": "benchmark"}
+            # Use relative paths (tests/...) so collect_nodes_plugin accepts them
+            # Symlinks make tests/ discoverable from exec_dir
             run_shard_cmd = [
                 sys.executable,
                 "-m",
@@ -562,42 +574,20 @@ class TestEndToEndPositive:
                 run_shard_cmd,
                 capture_output=True,
                 text=True,
-                cwd=project_root,
+                cwd=str(exec_dir),
                 env=exec_env,
                 timeout=120,
             )
-
-            # ── 6. Move outputs from project root to exec_dir ──────────
-            # Also clean up files that would pollute the shard artifact bundle
-            import shutil
-
-            for fname in [
-                "benchmark-execution-node-inventory.json",
-                "pytest-outcomes.json",
-                "resource-telemetry.json",
-                "nightly-benchmark-junit.xml",
-            ]:
-                src = Path(project_root) / fname
-                if src.exists():
-                    shutil.move(str(src), str(exec_dir / fname))
-
-            # Clean up files written by inner collect_nodes_plugin
-            # that would contaminate the shard artifact bundle
-            for fname in [
-                "node-marker-inventory.json",
-                "pytest-stdout.txt",
-                "pytest-stderr.txt",
-                "behavior-environment.json",
-            ]:
-                src = Path(project_root) / fname
-                if src.exists():
-                    src.unlink()
 
             # ── 6. Verify all evidence files exist ────────────────────
             exec_inv_path = exec_dir / "benchmark-execution-node-inventory.json"
             outcomes_path = exec_dir / "pytest-outcomes.json"
             junit_path = exec_dir / "nightly-benchmark-junit.xml"
             telemetry_path = exec_dir / "resource-telemetry.json"
+
+            # Also check for files in exec_dir root (run_test_shard writes relative to cwd)
+            if not outcomes_path.exists():
+                outcomes_path = exec_dir / "pytest-outcomes.json"
 
             assert exec_inv_path.exists(), "benchmark-execution-node-inventory.json not produced"
             assert outcomes_path.exists(), "pytest-outcomes.json not produced by run_test_shard"
