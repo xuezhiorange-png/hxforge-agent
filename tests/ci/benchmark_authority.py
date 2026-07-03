@@ -20,11 +20,14 @@ P0-3: Complete identity binding — load_marker_inventory() and
        load_and_validate_node_inventory() enforce exact match on
        track=='nightly', commit_sha (40 hex), run_id, run_attempt,
        python_version=='3.12', collection_scope=='global', shard==None.
+P0-6: Evidence digests — SHA-256 digests of all evidence files are
+       computed and stored in the authority artifact for tamper-evidence.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -39,7 +42,8 @@ _ALLOWED_PYTHON_VERSIONS: Final = frozenset({"3.11", "3.12"})
 _VALID_STATUSES: Final = frozenset({"not_applicable", "executed"})
 _VALID_REASONS: Final = frozenset({None, "no-benchmark-nodes"})
 _HEX_40: Final = re.compile(r"^[0-9a-f]{40}$")
-_VALID_SHARDS: Final = frozenset({None, "shard-0", "shard-1", "shard-2"})
+_VALID_SHARDS: Final = frozenset({None, "shard-0", "shard-1", "shard-2", "benchmark"})
+_VALID_OUTCOMES: Final = frozenset({"passed", "failed", "skipped", "xfailed", "xpassed"})
 
 
 # ── Exceptions ──────────────────────────────────────────────────────────
@@ -47,6 +51,20 @@ _VALID_SHARDS: Final = frozenset({None, "shard-0", "shard-1", "shard-2"})
 
 class BenchmarkAuthorityError(Exception):
     """Raised when benchmark authority validation fails."""
+
+
+# ── SHA-256 helpers (P0-6) ─────────────────────────────────────────────
+
+
+def _compute_file_sha256(path: Path) -> str:
+    """Read *path* and return its SHA-256 hex digest.
+
+    The file is read in binary mode to ensure reproducibility regardless
+    of text-mode normalisation.
+    """
+    h = hashlib.sha256()
+    h.update(path.read_bytes())
+    return h.hexdigest()
 
 
 # ── Schema helpers ────────────────────────────────────────────────────────
@@ -58,14 +76,18 @@ def _build_not_applicable_artifact(
     run_id: str,
     run_attempt: int,
     python_version: str,
+    evidence: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build the authority artifact for the zero-benchmark-node case.
 
     P0-2: Only callable after paired inventory validation has passed.
     The caller must have validated both marker and node inventories
     with matching identity fields before invoking this function.
+
+    P0-6: When *evidence* is provided its SHA-256 digests are included
+    in the artifact for tamper-evidence.
     """
-    return {
+    artifact: dict[str, Any] = {
         "schema_version": _SCHEMA_VERSION,
         "track": "nightly",
         "commit_sha": commit_sha,
@@ -82,6 +104,9 @@ def _build_not_applicable_artifact(
         "pytest_exit_code": None,
         "producer_authoritative": None,
     }
+    if evidence is not None:
+        artifact["evidence"] = dict(evidence)
+    return artifact
 
 
 def _build_executed_artifact(
@@ -95,12 +120,16 @@ def _build_executed_artifact(
     pytest_exit_code: int,
     producer_authoritative: bool,
     validated_evidence_node_ids: frozenset[str],
+    evidence: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build the authority artifact for the executed benchmark case.
 
     P0-1: *validated_evidence_node_ids* is mandatory. Every element of
     *benchmark_node_ids* must appear in that set. This prevents
     fabricated node IDs from entering the authority artifact.
+
+    P0-6: When *evidence* is provided its SHA-256 digests are included
+    in the artifact for tamper-evidence.
     """
     if benchmark_node_count <= 0:
         raise BenchmarkAuthorityError("executed artifact requires positive benchmark_node_count")
@@ -116,7 +145,7 @@ def _build_executed_artifact(
             f"node_ids not present in validated evidence: {sorted(unknown)}"
         )
 
-    return {
+    artifact: dict[str, Any] = {
         "schema_version": _SCHEMA_VERSION,
         "track": "nightly",
         "commit_sha": commit_sha,
@@ -133,6 +162,9 @@ def _build_executed_artifact(
         "pytest_exit_code": pytest_exit_code,
         "producer_authoritative": producer_authoritative,
     }
+    if evidence is not None:
+        artifact["evidence"] = dict(evidence)
+    return artifact
 
 
 # ── Identity validation (P0-3) ─────────────────────────────────────────
@@ -372,6 +404,73 @@ def load_and_validate_node_inventory(
     return raw
 
 
+# ── Execution node inventory (benchmark shard) ───────────────────────────
+
+
+def load_execution_node_inventory(
+    path: Path,
+    *,
+    expected_commit_sha: str,
+    expected_run_id: str,
+    expected_run_attempt: int,
+    expected_python_version: str,
+) -> dict[str, Any]:
+    """Load an execution node-inventory.json and enforce identity binding.
+
+    Similar to ``load_and_validate_node_inventory`` but expects
+    ``collection_scope='shard'`` and ``shard='benchmark'``.
+    """
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BenchmarkAuthorityError(f"cannot parse execution node inventory: {path}") from exc
+
+    if not isinstance(raw, dict):
+        raise BenchmarkAuthorityError("execution node inventory root must be a dict")
+
+    if raw.get("schema_version") != _SCHEMA_VERSION:
+        raise BenchmarkAuthorityError(
+            f"execution node inventory schema_version must be {_SCHEMA_VERSION!r}, "
+            f"got {raw.get('schema_version')!r}"
+        )
+
+    node_ids = raw.get("node_ids")
+    if not isinstance(node_ids, list):
+        raise BenchmarkAuthorityError("execution node inventory node_ids must be a list")
+    if not all(isinstance(nid, str) for nid in node_ids):
+        raise BenchmarkAuthorityError("execution node inventory node_ids must contain only strings")
+    if len(node_ids) != len(set(node_ids)):
+        raise BenchmarkAuthorityError("execution node inventory node_ids must be unique")
+    if node_ids != sorted(node_ids):
+        raise BenchmarkAuthorityError(
+            "execution node inventory node_ids must be canonically sorted"
+        )
+
+    node_count = raw.get("node_count")
+    if not isinstance(node_count, int) or node_count < 0:
+        raise BenchmarkAuthorityError(
+            "execution node inventory node_count must be non-negative int"
+        )
+    if len(node_ids) != node_count:
+        raise BenchmarkAuthorityError(
+            f"execution node inventory node_ids length ({len(node_ids)}) "
+            f"!= node_count ({node_count})"
+        )
+
+    _validate_identity_fields(
+        raw,
+        expected_commit_sha=expected_commit_sha,
+        expected_run_id=expected_run_id,
+        expected_run_attempt=expected_run_attempt,
+        expected_python_version=expected_python_version,
+        expected_collection_scope="shard",
+        expected_shard="benchmark",
+        context="execution_node_inventory",
+    )
+
+    return raw
+
+
 # ── Paired inventory validation (P0-1, P0-2) ────────────────────────────
 
 
@@ -467,11 +566,21 @@ def _load_json_file(path: Path, label: str) -> dict[str, Any]:
 
 
 def _extract_outcome_nodes(outcomes: dict[str, Any]) -> set[str]:
-    """Extract the set of node IDs from an outcomes file."""
-    results = outcomes.get("results")
-    if not isinstance(results, dict):
-        raise BenchmarkAuthorityError("outcomes.results must be a dict (node_id -> outcome)")
-    return set(results.keys())
+    """Extract the set of node IDs from an outcomes file.
+
+    Reads from the ``outcomes["outcomes"]`` mapping and validates that
+    every key is a non-empty string and every value is a recognised
+    outcome category.
+    """
+    outcomes_map = outcomes.get("outcomes")
+    if not isinstance(outcomes_map, dict):
+        raise BenchmarkAuthorityError("outcomes.outcomes must be a dict")
+    for node_id, outcome_val in outcomes_map.items():
+        if not isinstance(node_id, str) or not node_id:
+            raise BenchmarkAuthorityError("outcomes node IDs must be non-empty strings")
+        if outcome_val not in _VALID_OUTCOMES:
+            raise BenchmarkAuthorityError(f"invalid outcome {outcome_val!r} for {node_id!r}")
+    return set(outcomes_map.keys())
 
 
 def _extract_execution_inventory_nodes(
@@ -484,18 +593,53 @@ def _extract_execution_inventory_nodes(
     return set(node_ids)
 
 
-def _extract_collection_complete_nodes(
-    marker_inventory: dict[str, Any],
-) -> set[str]:
-    """Extract node_ids that have collection_complete marker."""
-    node_markers = marker_inventory.get("node_markers")
-    if not isinstance(node_markers, dict):
-        raise BenchmarkAuthorityError("marker_inventory.node_markers must be a dict")
-    nodes: set[str] = set()
-    for node_id, markers in node_markers.items():
-        if isinstance(markers, list) and "collection_complete" in markers:
-            nodes.add(node_id)
-    return nodes
+def _extract_collection_complete_nodes(outcomes: dict[str, Any]) -> set[str]:
+    """Extract collection_complete set from outcomes file."""
+    cc = outcomes.get("collection_complete")
+    if not isinstance(cc, list):
+        raise BenchmarkAuthorityError("outcomes.collection_complete must be a list")
+    for item in cc:
+        if not isinstance(item, str) or not item:
+            raise BenchmarkAuthorityError(
+                "outcomes.collection_complete items must be non-empty strings"
+            )
+    return set(cc)
+
+
+def _validate_outcomes_schema(outcomes: dict[str, Any]) -> None:
+    """Strictly validate outcomes file schema."""
+    if outcomes.get("schema_version") != "1":
+        raise BenchmarkAuthorityError("outcomes.schema_version must be '1'")
+    outcomes_map = outcomes.get("outcomes")
+    if not isinstance(outcomes_map, dict):
+        raise BenchmarkAuthorityError("outcomes.outcomes must be a dict")
+    for node_id, outcome_val in outcomes_map.items():
+        if not isinstance(node_id, str) or not node_id:
+            raise BenchmarkAuthorityError("outcomes node IDs must be non-empty strings")
+        if outcome_val not in _VALID_OUTCOMES:
+            raise BenchmarkAuthorityError(f"invalid outcome {outcome_val!r} for {node_id!r}")
+    total = outcomes.get("total")
+    if not isinstance(total, int) or total < 0:
+        raise BenchmarkAuthorityError("outcomes.total must be non-negative int")
+    if total != len(outcomes_map):
+        raise BenchmarkAuthorityError(
+            f"outcomes.total={total} != len(outcomes)={len(outcomes_map)}"
+        )
+    cc = outcomes.get("collection_complete")
+    if not isinstance(cc, list):
+        raise BenchmarkAuthorityError("outcomes.collection_complete must be a list")
+    if len(cc) != len(set(cc)):
+        raise BenchmarkAuthorityError("outcomes.collection_complete must have unique entries")
+    for item in cc:
+        if not isinstance(item, str) or not item:
+            raise BenchmarkAuthorityError(
+                "outcomes.collection_complete items must be non-empty strings"
+            )
+    if set(outcomes_map.keys()) != set(cc):
+        raise BenchmarkAuthorityError("outcomes.outcomes keys != collection_complete")
+
+
+# ── Telemetry validation ─────────────────────────────────────────────────
 
 
 def _validate_telemetry(
@@ -503,8 +647,57 @@ def _validate_telemetry(
     *,
     expected_pytest_exit_code: int,
     expected_node_count: int,
+    expected_commit_sha: str,
+    expected_run_id: str,
+    expected_run_attempt: int,
+    expected_python_version: str,
 ) -> None:
-    """Validate telemetry file contents against expected values."""
+    """Validate telemetry file contents against expected values.
+
+    Enforces identity fields (P0-3), execution status, pytest exit code,
+    producer/count authority flags, outcome/junit/resource parse status,
+    and tests_collected count.
+    """
+    # Validate identity fields directly (telemetry has no collection_scope)
+    actual_sha = str(telemetry.get("commit_sha", ""))
+    if not _HEX_40.match(actual_sha):
+        raise BenchmarkAuthorityError(
+            f"telemetry.commit_sha must be 40 hex chars, got {actual_sha!r}"
+        )
+    if actual_sha != expected_commit_sha:
+        raise BenchmarkAuthorityError(
+            f"telemetry.commit_sha mismatch: got {actual_sha!r}, expected {expected_commit_sha!r}"
+        )
+    actual_track = telemetry.get("track", "")
+    if actual_track != "nightly":
+        raise BenchmarkAuthorityError(f"telemetry.track must be 'nightly', got {actual_track!r}")
+    actual_run_id = str(telemetry.get("run_id", ""))
+    if actual_run_id != expected_run_id:
+        raise BenchmarkAuthorityError(
+            f"telemetry.run_id mismatch: got {actual_run_id!r}, expected {expected_run_id!r}"
+        )
+    actual_attempt = telemetry.get("run_attempt")
+    if not isinstance(actual_attempt, int) or actual_attempt != expected_run_attempt:
+        raise BenchmarkAuthorityError(
+            f"telemetry.run_attempt mismatch: got {actual_attempt}, expected {expected_run_attempt}"
+        )
+    actual_python = str(telemetry.get("python_version", ""))
+    if actual_python != expected_python_version:
+        raise BenchmarkAuthorityError(
+            f"telemetry.python_version mismatch: got {actual_python!r}, "
+            f"expected {expected_python_version!r}"
+        )
+    # shard must be 'benchmark'
+    shard = telemetry.get("shard")
+    if shard != "benchmark":
+        raise BenchmarkAuthorityError(f"telemetry.shard must be 'benchmark', got {shard!r}")
+    # execution_status
+    exec_status = telemetry.get("execution_status")
+    if exec_status != "completed":
+        raise BenchmarkAuthorityError(
+            f"telemetry.execution_status must be 'completed', got {exec_status!r}"
+        )
+    # pytest_exit_code
     actual_exit_code = telemetry.get("pytest_exit_code")
     if not isinstance(actual_exit_code, int):
         raise BenchmarkAuthorityError(
@@ -514,13 +707,37 @@ def _validate_telemetry(
         raise BenchmarkAuthorityError(
             f"telemetry.pytest_exit_code={actual_exit_code} != expected {expected_pytest_exit_code}"
         )
-
+    # producer_authoritative
     producer_auth = telemetry.get("producer_authoritative")
     if producer_auth is not True:
         raise BenchmarkAuthorityError(
             f"telemetry.producer_authoritative must be true, got {producer_auth!r}"
         )
-
+    # counts_authoritative
+    counts_auth = telemetry.get("counts_authoritative")
+    if counts_auth is not True:
+        raise BenchmarkAuthorityError(
+            f"telemetry.counts_authoritative must be true, got {counts_auth!r}"
+        )
+    # outcome_parse_status
+    outcome_status = telemetry.get("outcome_parse_status")
+    if outcome_status != "available":
+        raise BenchmarkAuthorityError(
+            f"telemetry.outcome_parse_status must be 'available', got {outcome_status!r}"
+        )
+    # junit_parse_status
+    junit_status = telemetry.get("junit_parse_status")
+    if junit_status != "available":
+        raise BenchmarkAuthorityError(
+            f"telemetry.junit_parse_status must be 'available', got {junit_status!r}"
+        )
+    # resource_measurement_status
+    resource_status = telemetry.get("resource_measurement_status")
+    if resource_status != "available":
+        raise BenchmarkAuthorityError(
+            f"telemetry.resource_measurement_status must be 'available', got {resource_status!r}"
+        )
+    # tests_collected
     tests_collected = telemetry.get("tests_collected")
     if not isinstance(tests_collected, int):
         raise BenchmarkAuthorityError(
@@ -536,40 +753,93 @@ def _validate_outcome_category_counts(
     outcomes: dict[str, Any],
     telemetry: dict[str, Any],
 ) -> None:
-    """Verify that the five-category counts in outcomes match telemetry."""
-    summary = outcomes.get("summary")
-    if not isinstance(summary, dict):
-        raise BenchmarkAuthorityError("outcomes.summary must be a dict")
+    """Verify that outcome category counts from outcomes map match telemetry.
 
-    categories = ("passed", "failed", "skipped", "error", "xfail")
-    total_from_summary = 0
-    for cat in categories:
-        val = summary.get(cat)
-        if not isinstance(val, int) or val < 0:
-            raise BenchmarkAuthorityError(
-                f"outcomes.summary.{cat} must be non-negative int, got {val!r}"
-            )
-        total_from_summary += val
-
-    total_from_results = outcomes.get("summary", {}).get("total")
-    if total_from_results != total_from_summary:
-        raise BenchmarkAuthorityError(
-            f"outcomes.summary.total={total_from_results} != sum of categories={total_from_summary}"
+    Counts are derived from the real ``outcomes.outcomes`` mapping (not a
+    pre-computed summary) and cross-validated against telemetry fields.
+    The sum of all five categories must equal ``tests_collected``.
+    """
+    outcomes_map = outcomes.get("outcomes")
+    if not isinstance(outcomes_map, dict):
+        raise BenchmarkAuthorityError("outcomes.outcomes must be a dict")
+    # Count from real outcomes map
+    counts = {
+        k: 0
+        for k in (
+            "tests_passed",
+            "tests_failed",
+            "tests_skipped",
+            "tests_xfailed",
+            "tests_xpassed",
         )
+    }
+    for outcome_val in outcomes_map.values():
+        key = f"tests_{outcome_val}"
+        if key in counts:
+            counts[key] += 1
+    # Cross-validate with telemetry
+    for key in counts:
+        tel_val = telemetry.get(key)
+        if not isinstance(tel_val, int):
+            raise BenchmarkAuthorityError(f"telemetry.{key} must be int")
+        if tel_val != counts[key]:
+            raise BenchmarkAuthorityError(f"telemetry.{key}={tel_val} != computed {counts[key]}")
+    # Verify sum == tests_collected
+    total = sum(counts.values())
+    tests_collected = telemetry.get("tests_collected")
+    if total != tests_collected:
+        raise BenchmarkAuthorityError(f"sum of counts={total} != tests_collected={tests_collected}")
 
-    # Cross-validate with telemetry if present
-    telemetry_summary = telemetry.get("outcome_summary", {})
-    if isinstance(telemetry_summary, dict):
-        for cat in categories:
-            tel_val = telemetry_summary.get(cat)
-            out_val = summary.get(cat)
-            if tel_val is not None and tel_val != out_val:
-                raise BenchmarkAuthorityError(
-                    f"outcomes.summary.{cat}={out_val} != telemetry.outcome_summary.{cat}={tel_val}"
-                )
+
+# ── Evidence digest validation helper (P0-6) ────────────────────────────
 
 
-# ── Executed benchmark evidence validation (P0-1) ──────────────────────
+_DIGEST_RE: Final = re.compile(r"^[0-9a-f]{64}$")
+
+_REQUIRED_EVIDENCE_KEYS_EXECUTED: Final = frozenset(
+    {
+        "global_marker_inventory_sha256",
+        "global_node_inventory_sha256",
+        "execution_node_inventory_sha256",
+        "outcomes_sha256",
+        "telemetry_sha256",
+        "junit_sha256",
+    }
+)
+
+_REQUIRED_EVIDENCE_KEYS_NA: Final = frozenset(
+    {
+        "global_marker_inventory_sha256",
+        "global_node_inventory_sha256",
+    }
+)
+
+
+def _validate_evidence_digests(
+    evidence: dict[str, str],
+    *,
+    required_keys: frozenset[str],
+    context: str,
+) -> None:
+    """Validate that *evidence* contains exactly *required_keys*, each a
+    64-char lowercase hex SHA-256 digest."""
+    if not isinstance(evidence, dict):
+        raise BenchmarkAuthorityError(f"{context}.evidence must be a dict")
+    actual_keys = set(evidence.keys())
+    if actual_keys != required_keys:
+        missing = required_keys - actual_keys
+        extra = actual_keys - required_keys
+        raise BenchmarkAuthorityError(
+            f"{context}.evidence keys mismatch: missing={sorted(missing)}, extra={sorted(extra)}"
+        )
+    for key, val in evidence.items():
+        if not isinstance(val, str) or not _DIGEST_RE.match(val):
+            raise BenchmarkAuthorityError(
+                f"{context}.evidence.{key} must be 64-char lowercase hex, got {val!r}"
+            )
+
+
+# ── Executed benchmark evidence validation (P0-1, P0-6) ─────────────────
 
 
 def validate_executed_benchmark_evidence(
@@ -579,13 +849,14 @@ def validate_executed_benchmark_evidence(
     execution_node_inventory_path: Path | None,
     outcomes_path: Path,
     telemetry_path: Path,
+    junit_path: Path,
     expected_commit_sha: str,
     expected_run_id: str,
     expected_run_attempt: int,
     expected_python_version: str,
-) -> frozenset[str]:
+) -> tuple[frozenset[str], dict[str, str]]:
     """Read and cross-validate ALL evidence files, then return the frozen
-    set of validated benchmark node IDs.
+    set of validated benchmark node IDs and evidence SHA-256 digests.
 
     P0-1: This function reads REAL files — it does NOT accept caller-
     supplied booleans.  It enforces:
@@ -596,15 +867,16 @@ def validate_executed_benchmark_evidence(
        equal the marker inventory node set (P0-1 exact-node equality).
     3. Outcomes file node set must match the marker benchmark nodes.
     4. Execution inventory node set must match the marker benchmark nodes.
-    5. Collection_complete nodes from marker inventory must match.
-    6. Telemetry must confirm pytest_exit_code==0,
-       producer_authoritative==true, tests_collected==len(nodes).
-    7. Outcomes five-category counts must match telemetry.
+    5. Collection_complete nodes from outcomes must match.
+    6. Telemetry must confirm execution_status=='completed',
+       pytest_exit_code matches, producer_authoritative==true,
+       counts_authoritative==true, tests_collected==len(nodes).
+    7. Outcomes category counts must match telemetry.
 
-    All node sets must be non-empty for the executed path.
+    P0-6: SHA-256 digests are computed for every evidence file and
+    returned alongside the validated node set.
 
-    Returns the frozen set of benchmark node IDs suitable for
-    ``_build_executed_artifact(validated_evidence_node_ids=...)``.
+    Returns ``(validated_node_ids, evidence_digests)``.
     """
     # 1. Load and validate marker inventory with identity binding
     marker_inv = load_marker_inventory(
@@ -643,6 +915,7 @@ def validate_executed_benchmark_evidence(
 
     # 3. Load and validate outcomes file
     outcomes = _load_json_file(outcomes_path, "outcomes")
+    _validate_outcomes_schema(outcomes)
     outcome_nodes = _extract_outcome_nodes(outcomes)
     if not outcome_nodes:
         raise BenchmarkAuthorityError("outcomes file has no node results (empty)")
@@ -671,12 +944,10 @@ def validate_executed_benchmark_evidence(
                 f"extra_in_exec={sorted(extra_in_exec)}"
             )
 
-    # 5. Validate collection_complete nodes from marker inventory
-    collection_complete_nodes = _extract_collection_complete_nodes(marker_inv)
+    # 5. Validate collection_complete nodes from outcomes
+    collection_complete_nodes = _extract_collection_complete_nodes(outcomes)
     if not collection_complete_nodes:
-        raise BenchmarkAuthorityError(
-            "no nodes have collection_complete marker in marker inventory"
-        )
+        raise BenchmarkAuthorityError("no nodes have collection_complete in outcomes")
     if collection_complete_nodes != set(benchmark_nodes):
         missing_cc = set(benchmark_nodes) - collection_complete_nodes
         extra_cc = collection_complete_nodes - set(benchmark_nodes)
@@ -691,12 +962,32 @@ def validate_executed_benchmark_evidence(
         telemetry,
         expected_pytest_exit_code=0,
         expected_node_count=len(benchmark_nodes),
+        expected_commit_sha=expected_commit_sha,
+        expected_run_id=expected_run_id,
+        expected_run_attempt=expected_run_attempt,
+        expected_python_version=expected_python_version,
     )
 
     # 7. Validate outcome category counts match telemetry
     _validate_outcome_category_counts(outcomes, telemetry)
 
-    return benchmark_set
+    # 8. Compute evidence SHA-256 digests (P0-6)
+    evidence: dict[str, str] = {
+        "global_marker_inventory_sha256": _compute_file_sha256(marker_inventory_path),
+        "global_node_inventory_sha256": (
+            _compute_file_sha256(node_inventory_path) if node_inventory_path is not None else ""
+        ),
+        "execution_node_inventory_sha256": (
+            _compute_file_sha256(execution_node_inventory_path)
+            if execution_node_inventory_path is not None
+            else ""
+        ),
+        "outcomes_sha256": _compute_file_sha256(outcomes_path),
+        "telemetry_sha256": _compute_file_sha256(telemetry_path),
+        "junit_sha256": _compute_file_sha256(junit_path),
+    }
+
+    return benchmark_set, evidence
 
 
 # ── Artifact validation ───────────────────────────────────────────────────
@@ -720,6 +1011,9 @@ def validate_authority_artifact(
 
     P0-3: Identity fields are checked via ``_validate_identity_fields``
     for consistent exact-match comparison.
+
+    P0-6: When an ``evidence`` field is present, its digests are validated
+    against the expected set for the given status.
     """
     # Schema version
     if artifact.get("schema_version") != _SCHEMA_VERSION:
@@ -790,6 +1084,22 @@ def validate_authority_artifact(
         raise BenchmarkAuthorityError(
             f"authority_valid must be true, got {artifact.get('authority_valid')!r}"
         )
+
+    # ── P0-6: evidence digest validation ──────────────────────────────────
+    evidence = artifact.get("evidence")
+    if evidence is not None:
+        if status == "not_applicable":
+            _validate_evidence_digests(
+                evidence,
+                required_keys=_REQUIRED_EVIDENCE_KEYS_NA,
+                context="not_applicable",
+            )
+        elif status == "executed":
+            _validate_evidence_digests(
+                evidence,
+                required_keys=_REQUIRED_EVIDENCE_KEYS_EXECUTED,
+                context="executed",
+            )
 
     # ── State A: not_applicable ──────────────────────────────────────────
     if status == "not_applicable":
@@ -917,11 +1227,18 @@ def _cli_generate(args: argparse.Namespace) -> None:
             f"missing={sorted(missing)}, extra={sorted(extra)}"
         )
 
+    # P0-6: compute evidence digests for N/A artifact
+    evidence: dict[str, str] = {
+        "global_marker_inventory_sha256": _compute_file_sha256(Path(marker_inv_path)),
+        "global_node_inventory_sha256": _compute_file_sha256(Path(node_inv_path)),
+    }
+
     artifact = _build_not_applicable_artifact(
         commit_sha=args.commit_sha,
         run_id=args.run_id,
         run_attempt=args.run_attempt,
         python_version=args.python_version,
+        evidence=evidence,
     )
 
     save_authority_artifact(artifact, Path(args.output))
@@ -937,7 +1254,7 @@ def _cli_execute(args: argparse.Namespace) -> None:
 
     P0-1: Requires ALL evidence file paths. Cannot proceed if any are
     missing. Reads and cross-validates outcomes, execution inventory,
-    telemetry, and marker inventory.
+    telemetry, junit, and marker inventory.
     """
 
     # P0-1: require ALL evidence paths
@@ -953,14 +1270,16 @@ def _cli_execute(args: argparse.Namespace) -> None:
     eni = _req("execution_node_inventory")
     outcomes_file = _req("outcomes")
     tel_file = _req("telemetry")
+    junit_file = _req("junit")
     output_val = _req("output")
 
-    validated_nodes = validate_executed_benchmark_evidence(
+    validated_nodes, evidence = validate_executed_benchmark_evidence(
         marker_inventory_path=Path(gmi),
         node_inventory_path=Path(gni),
         execution_node_inventory_path=Path(eni),
         outcomes_path=Path(outcomes_file),
         telemetry_path=Path(tel_file),
+        junit_path=Path(junit_file),
         expected_commit_sha=args.commit_sha,
         expected_run_id=args.run_id,
         expected_run_attempt=args.run_attempt,
@@ -983,6 +1302,7 @@ def _cli_execute(args: argparse.Namespace) -> None:
         pytest_exit_code=telemetry["pytest_exit_code"],
         producer_authoritative=telemetry["producer_authoritative"],
         validated_evidence_node_ids=validated_nodes,
+        evidence=evidence,
     )
 
     save_authority_artifact(artifact, Path(output_val))
@@ -997,7 +1317,9 @@ def _cli_validate(args: argparse.Namespace) -> None:
     """CLI subcommand: validate an existing authority artifact.
 
     Validates the authority artifact itself, then optionally validates
-    all source evidence files when provided.
+    all source evidence files when provided.  For executed artifacts the
+    complete evidence set (including --junit) is required; for N/A
+    artifacts only marker + node inventory are required.
     """
     artifact = load_authority_artifact(Path(args.artifact))
 
@@ -1011,11 +1333,12 @@ def _cli_validate(args: argparse.Namespace) -> None:
 
     # Optional: cross-validate against all source evidence files
     evidence_files = {
-        "marker_inventory": getattr(args, "marker_inventory", None),
-        "node_inventory": getattr(args, "node_inventory", None),
+        "global_marker_inventory": getattr(args, "global_marker_inventory", None),
+        "global_node_inventory": getattr(args, "global_node_inventory", None),
         "execution_node_inventory": getattr(args, "execution_node_inventory", None),
         "outcomes": getattr(args, "outcomes", None),
         "telemetry": getattr(args, "telemetry", None),
+        "junit": getattr(args, "junit", None),
     }
 
     provided = {k: v for k, v in evidence_files.items() if v}
@@ -1023,58 +1346,112 @@ def _cli_validate(args: argparse.Namespace) -> None:
     if provided:
         # For N/A artifacts, validate paired inventories
         if artifact.get("status") == "not_applicable":
-            if "marker_inventory" in provided and "node_inventory" in provided:
+            if "global_marker_inventory" in provided and "global_node_inventory" in provided:
                 marker_inv = load_marker_inventory(
-                    Path(provided["marker_inventory"]),
+                    Path(provided["global_marker_inventory"]),
                     expected_commit_sha=args.commit_sha,
                     expected_run_id=args.run_id,
                     expected_run_attempt=args.run_attempt,
                     expected_python_version=args.python_version,
                 )
                 node_inv = load_and_validate_node_inventory(
-                    Path(provided["node_inventory"]),
+                    Path(provided["global_node_inventory"]),
                     expected_commit_sha=args.commit_sha,
                     expected_run_id=args.run_id,
                     expected_run_attempt=args.run_attempt,
                     expected_python_version=args.python_version,
                 )
                 validate_inventory_identity_match(node_inv, marker_inv)
+
+                # P0-6: verify digests match if evidence present in artifact
+                stored_evidence = artifact.get("evidence")
+                if stored_evidence is not None:
+                    computed_evidence = {
+                        "global_marker_inventory_sha256": _compute_file_sha256(
+                            Path(provided["global_marker_inventory"])
+                        ),
+                        "global_node_inventory_sha256": _compute_file_sha256(
+                            Path(provided["global_node_inventory"])
+                        ),
+                    }
+                    for key in _REQUIRED_EVIDENCE_KEYS_NA:
+                        if stored_evidence.get(key) != computed_evidence.get(key):
+                            raise BenchmarkAuthorityError(
+                                f"evidence digest mismatch for {key}: "
+                                f"artifact={stored_evidence.get(key)!r}, "
+                                f"computed={computed_evidence.get(key)!r}"
+                            )
+                    print("Evidence digest verification passed ✓")
+
                 print("Paired inventory validation passed ✓")
             else:
                 print(
-                    "WARNING: N/A artifact — provide both --marker-inventory "
-                    "and --node-inventory for full validation"
+                    "WARNING: N/A artifact — provide both --global-marker-inventory "
+                    "and --global-node-inventory for full validation"
                 )
 
         # For executed artifacts, validate all evidence
         elif artifact.get("status") == "executed":
-            marker_path = provided.get("marker_inventory")
+            gmi_path = provided.get("global_marker_inventory")
             outcomes_path = provided.get("outcomes")
             telemetry_path = provided.get("telemetry")
+            junit_path = provided.get("junit")
 
-            if marker_path and outcomes_path and telemetry_path:
-                validated_nodes = validate_executed_benchmark_evidence(
-                    marker_inventory_path=Path(marker_path),
-                    node_inventory_path=(
-                        Path(provided["node_inventory"]) if "node_inventory" in provided else None
-                    ),
-                    execution_node_inventory_path=(
-                        Path(provided["execution_node_inventory"])
-                        if "execution_node_inventory" in provided
-                        else None
-                    ),
+            if gmi_path and outcomes_path and telemetry_path and junit_path:
+                node_inv_arg = (
+                    Path(provided["global_node_inventory"])
+                    if "global_node_inventory" in provided
+                    else None
+                )
+                exec_inv_arg = (
+                    Path(provided["execution_node_inventory"])
+                    if "execution_node_inventory" in provided
+                    else None
+                )
+                validated_nodes, evidence = validate_executed_benchmark_evidence(
+                    marker_inventory_path=Path(gmi_path),
+                    node_inventory_path=node_inv_arg,
+                    execution_node_inventory_path=exec_inv_arg,
                     outcomes_path=Path(outcomes_path),
                     telemetry_path=Path(telemetry_path),
+                    junit_path=Path(junit_path),
                     expected_commit_sha=args.commit_sha,
                     expected_run_id=args.run_id,
                     expected_run_attempt=args.run_attempt,
                     expected_python_version=args.python_version,
                 )
                 print(f"Evidence cross-validation passed ✓ ({len(validated_nodes)} nodes)")
+
+                # P0-6: verify digests match
+                stored_evidence = artifact.get("evidence")
+                if stored_evidence is not None:
+                    source_files: dict[str, str] = {}
+                    if gmi_path:
+                        source_files["global_marker_inventory_sha256"] = gmi_path
+                    if "global_node_inventory" in provided:
+                        gni_key = "global_node_inventory_sha256"
+                        source_files[gni_key] = provided["global_node_inventory"]
+                    if "execution_node_inventory" in provided:
+                        eni_key = "execution_node_inventory_sha256"
+                        source_files[eni_key] = provided["execution_node_inventory"]
+                    source_files["outcomes_sha256"] = outcomes_path
+                    source_files["telemetry_sha256"] = telemetry_path
+                    source_files["junit_sha256"] = junit_path
+
+                    for key in _REQUIRED_EVIDENCE_KEYS_EXECUTED:
+                        if key in source_files:
+                            computed = _compute_file_sha256(Path(source_files[key]))
+                            if stored_evidence.get(key) != computed:
+                                raise BenchmarkAuthorityError(
+                                    f"evidence digest mismatch for {key}: "
+                                    f"artifact={stored_evidence.get(key)!r}, "
+                                    f"computed={computed!r}"
+                                )
+                    print("Evidence digest verification passed ✓")
             else:
                 print(
-                    "WARNING: executed artifact — provide --marker-inventory, "
-                    "--outcomes, and --telemetry for full validation"
+                    "WARNING: executed artifact — provide --global-marker-inventory, "
+                    "--outcomes, --telemetry, and --junit for full validation"
                 )
 
     print(
@@ -1155,6 +1532,11 @@ def main() -> None:
         help="Path to telemetry JSON file",
     )
     execute_p.add_argument(
+        "--junit",
+        required=True,
+        help="Path to JUnit XML file for SHA-256 digest",
+    )
+    execute_p.add_argument(
         "--output",
         required=True,
         help="Output path for benchmark-authority.json",
@@ -1172,14 +1554,14 @@ def main() -> None:
         help="Path to benchmark-authority.json",
     )
     validate_p.add_argument(
-        "--marker-inventory",
+        "--global-marker-inventory",
         default=None,
-        help="Optional path to marker inventory for cross-validation",
+        help="Optional path to global marker inventory for cross-validation",
     )
     validate_p.add_argument(
-        "--node-inventory",
+        "--global-node-inventory",
         default=None,
-        help="Optional path to node inventory for cross-validation",
+        help="Optional path to global node inventory for cross-validation",
     )
     validate_p.add_argument(
         "--execution-node-inventory",
@@ -1195,6 +1577,11 @@ def main() -> None:
         "--telemetry",
         default=None,
         help="Optional path to telemetry file",
+    )
+    validate_p.add_argument(
+        "--junit",
+        default=None,
+        help="Optional path to JUnit XML file for digest verification",
     )
     _add_identity_args(validate_p)
 

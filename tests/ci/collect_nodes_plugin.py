@@ -131,7 +131,9 @@ def _discover_test_files(root: Path, patterns: tuple[str, ...]) -> list[str]:
 def _validate_collection_targets(
     config: pytest.Config, scope: CollectionScope, shard: str | None
 ) -> list[str]:
-    args = [_normalize_path(arg) for arg in config.args]
+    # Strip ::test_name suffix from node IDs before normalizing
+    raw_args = [arg.split("::", maxsplit=1)[0] for arg in config.args]
+    args = [_normalize_path(arg) for arg in raw_args]
     if scope == "global":
         if shard is not None:
             raise pytest.UsageError("global collection requires --hx-shard to be absent")
@@ -151,7 +153,9 @@ def _validate_collection_targets(
 
     explicit_files: list[str] = []
     for raw, normalized in zip(config.args, args, strict=True):
-        path = Path(raw)
+        # Support both file paths and node IDs (tests/foo.py::test_bar)
+        file_part = raw.split("::", maxsplit=1)[0]
+        path = Path(file_part)
         if not path.is_file():
             raise pytest.UsageError(f"shard target must be an existing file: {raw}")
         if path.suffix != ".py":

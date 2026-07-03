@@ -297,6 +297,12 @@ jobs:
               'uv', 'run', '--locked', 'python',
               '-m', 'tests.ci.run_test_shard',
               '--timeout=300', '-q',
+              '-p', 'tests.ci.collect_nodes_plugin',
+              '--hx-collection-scope', 'shard',
+              '--hx-shard', 'benchmark',
+              '--hx-node-output', 'benchmark-execution-node-inventory.json',
+              '-p', 'tests.ci.outcome_plugin',
+              '--hx-outcome-output=pytest-outcomes.json',
               '--junitxml=nightly-benchmark-junit.xml',
           ]
           cmd.extend(node_ids)
@@ -331,6 +337,7 @@ jobs:
             --execution-node-inventory benchmark-execution-node-inventory.json \
             --outcomes pytest-outcomes.json \
             --telemetry resource-telemetry.json \
+            --junit nightly-benchmark-junit.xml \
             --output benchmark-authority.json \
             --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
             --run-id "${{ github.run_id }}" \
@@ -481,6 +488,12 @@ jobs:
           cp "$AUTH_FILE" benchmark-authority.json
           uv run --locked python -m tests.ci.benchmark_authority validate \
             --artifact benchmark-authority.json \
+            --global-marker-inventory nightly-benchmark-results/benchmark-node-marker-inventory.json \
+            --global-node-inventory nightly-benchmark-results/benchmark-node-inventory.json \
+            --execution-node-inventory nightly-benchmark-results/benchmark-execution-node-inventory.json \
+            --outcomes nightly-benchmark-results/pytest-outcomes.json \
+            --telemetry nightly-benchmark-results/resource-telemetry.json \
+            --junit nightly-benchmark-results/nightly-benchmark-junit.xml \
             --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
             --run-id "${{ github.run_id }}" \
             --run-attempt "${{ github.run_attempt }}" \
