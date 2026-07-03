@@ -146,26 +146,31 @@ def _validate_collection_targets(
 
     if not shard:
         raise pytest.UsageError("shard collection requires a non-empty --hx-shard")
-    if not args:
+    if not config.args:
         raise pytest.UsageError("shard collection requires explicit test files")
-    if "tests" in args:
+    if "tests" in [_normalize_path(a.split("::", maxsplit=1)[0]) for a in config.args]:
         raise pytest.UsageError("shard collection must not target the whole tests/ directory")
 
-    explicit_files: list[str] = []
-    for raw, normalized in zip(config.args, args, strict=True):
-        # Support both file paths and node IDs (tests/foo.py::test_bar)
+    # P0-3: reject duplicate full node targets, but allow distinct nodes from same file
+    if len(config.args) != len(set(config.args)):
+        dup = sorted(n for n, c in __import__("collections").Counter(config.args).items() if c > 1)
+        raise pytest.UsageError(f"duplicate explicit pytest targets are prohibited: {dup}")
+
+    # Deduplicate file paths for file_records accounting
+    file_targets = sorted({_normalize_path(raw.split("::", maxsplit=1)[0]) for raw in config.args})
+
+    for raw in config.args:
         file_part = raw.split("::", maxsplit=1)[0]
         path = Path(file_part)
         if not path.is_file():
             raise pytest.UsageError(f"shard target must be an existing file: {raw}")
         if path.suffix != ".py":
             raise pytest.UsageError(f"shard target must be a Python test file: {raw}")
+        normalized = _normalize_path(raw.split("::", maxsplit=1)[0])
         if not normalized.startswith("tests/"):
             raise pytest.UsageError(f"shard target must remain under tests/: {raw}")
-        explicit_files.append(normalized)
-    if len(explicit_files) != len(set(explicit_files)):
-        raise pytest.UsageError("duplicate explicit test files are prohibited")
-    return sorted(explicit_files)
+
+    return file_targets
 
 
 def _load_zero_node_metadata(config: pytest.Config) -> dict[str, ZeroNodeMetadata]:

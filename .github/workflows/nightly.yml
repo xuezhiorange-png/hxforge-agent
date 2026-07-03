@@ -301,8 +301,6 @@ jobs:
               '--hx-collection-scope', 'shard',
               '--hx-shard', 'benchmark',
               '--hx-node-output', 'benchmark-execution-node-inventory.json',
-              '-p', 'tests.ci.outcome_plugin',
-              '--hx-outcome-output=pytest-outcomes.json',
               '--junitxml=nightly-benchmark-junit.xml',
           ]
           cmd.extend(node_ids)

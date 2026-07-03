@@ -106,6 +106,29 @@ def _make_node_inv(
     }
 
 
+def _make_exec_inv(
+    node_ids: list[str],
+    *,
+    python_version: str = _PYTHON_VERSION,
+    commit_sha: str = _SHA,
+    run_id: str = _RUN_ID,
+    run_attempt: int = _RUN_ATTEMPT,
+) -> dict[str, Any]:
+    """Build a minimal execution node inventory (scope=shard, shard=benchmark)."""
+    return {
+        "schema_version": "1",
+        "collection_scope": "shard",
+        "python_version": python_version,
+        "commit_sha": commit_sha,
+        "track": "nightly",
+        "shard": "benchmark",
+        "run_id": run_id,
+        "run_attempt": run_attempt,
+        "node_count": len(node_ids),
+        "node_ids": sorted(node_ids),
+    }
+
+
 def _make_outcomes(
     outcomes_map: dict[str, str],
     *,
@@ -177,12 +200,17 @@ def _write_junit(path: Path) -> Path:
 
 
 def _valid_na_artifact() -> dict[str, Any]:
-    """Build a valid N/A authority artifact."""
+    """Build a valid N/A authority artifact with mandatory evidence."""
+    na_evidence = {
+        "global_marker_inventory_sha256": "a" * 64,
+        "global_node_inventory_sha256": "b" * 64,
+    }
     return _build_not_applicable_artifact(
         commit_sha=_SHA,
         run_id=_RUN_ID,
         run_attempt=_RUN_ATTEMPT,
         python_version=_PYTHON_VERSION,
+        evidence=na_evidence,
     )
 
 
@@ -195,6 +223,15 @@ def _valid_executed_artifact(
 ) -> dict[str, Any]:
     """Build a valid executed authority artifact with mandatory evidence set."""
     validated_set = frozenset(node_ids)
+    if evidence is None:
+        evidence = {
+            "global_marker_inventory_sha256": "a" * 64,
+            "global_node_inventory_sha256": "b" * 64,
+            "execution_node_inventory_sha256": "c" * 64,
+            "outcomes_sha256": "d" * 64,
+            "telemetry_sha256": "e" * 64,
+            "junit_sha256": "f" * 64,
+        }
     return _build_executed_artifact(
         commit_sha=_SHA,
         run_id=_RUN_ID,
@@ -398,17 +435,24 @@ class TestEndToEndPositive:
     """
 
     def test_real_benchmark_execution(self, tmp_path: Path) -> None:
-        """Scenario 5: Full end-to-end benchmark authority flow."""
-        # ── 1. Create a temp test file under tests/ with @pytest.mark.benchmark
+        """P0-4: Full end-to-end benchmark authority flow using real run_test_shard.
+
+        Creates two benchmark tests in the same file (P0-3), runs global
+        collection, executes via run_test_shard, and validates all evidence.
+        """
+        # ── 1. Create a temp test file with TWO benchmark tests (P0-3) ──
         tests_dir = Path(__file__).resolve().parent.parent  # tests/
-        bench_file = tests_dir / "_tmp_bench_authority_test.py"
+        bench_file = tests_dir / "_tmp_bench_e2e_test.py"
         try:
             bench_file.write_text(
                 "import pytest\n\n"
                 "@pytest.mark.benchmark\n"
-                "def test_example_benchmark():\n"
+                "def test_e2e_bench_alpha():\n"
                 "    assert 1 + 1 == 2\n\n"
-                "def test_non_benchmark():\n"
+                "@pytest.mark.benchmark\n"
+                "def test_e2e_bench_beta():\n"
+                "    assert 2 * 3 == 6\n\n"
+                "def test_e2e_non_benchmark():\n"
                 "    assert True\n",
                 encoding="utf-8",
             )
@@ -430,7 +474,6 @@ class TestEndToEndPositive:
                 "HX_COMMIT_SHA": _SHA,
                 "GITHUB_RUN_ID": _RUN_ID,
                 "GITHUB_RUN_ATTEMPT": str(_RUN_ATTEMPT),
-                # run_test_shard reads these env vars
                 "TRACK": "nightly",
                 "COMMIT_SHA": _SHA,
                 "RUN_ID": _RUN_ID,
@@ -441,7 +484,7 @@ class TestEndToEndPositive:
                 "LC_ALL": "C.UTF-8",
             }
 
-            # ── 2. Run pytest --collect-only with collect_nodes_plugin ──
+            # ── 2. Run global collection ──────────────────────────────
             collect_result = subprocess.run(
                 [
                     sys.executable,
@@ -467,7 +510,7 @@ class TestEndToEndPositive:
                 f"stderr={collect_result.stderr}"
             )
 
-            # ── 3. Validate marker inventory was produced ───────────────
+            # ── 3. Validate marker inventory ──────────────────────────
             marker_inv_path = inv_output_dir / "node-marker-inventory.json"
             assert marker_inv_path.exists(), "node-marker-inventory.json not produced"
 
@@ -479,29 +522,29 @@ class TestEndToEndPositive:
                 expected_python_version=actual_python,
             )
 
-            # ── 4. Extract benchmark nodes from marker inventory ────────
+            # ── 4. Extract TWO benchmark nodes ────────────────────────
             benchmark_nodes = extract_benchmark_nodes(marker_inv)
             tmp_bench_nodes = [n for n in benchmark_nodes if "_tmp_bench" in n]
-            assert len(tmp_bench_nodes) == 1, (
-                f"Expected 1 temp benchmark node, got: {tmp_bench_nodes}"
+            assert len(tmp_bench_nodes) == 2, (
+                f"Expected 2 temp benchmark nodes, got: {tmp_bench_nodes}"
             )
-            assert any("test_example_benchmark" in nid for nid in tmp_bench_nodes)
+            bench_alpha = [n for n in tmp_bench_nodes if "alpha" in n]
+            bench_beta = [n for n in tmp_bench_nodes if "beta" in n]
+            assert len(bench_alpha) == 1, f"Expected alpha node, got: {bench_alpha}"
+            assert len(bench_beta) == 1, f"Expected beta node, got: {bench_beta}"
 
-            # ── 5. Run execution via pytest directly (not run_test_shard,
-            #    to avoid cwd collision with the outer shard) ─────────
-            exec_node_inv_path = tmp_path / "benchmark-execution-node-inventory.json"
-            outcomes_path = tmp_path / "pytest-outcomes.json"
-            junit_path = tmp_path / "nightly-benchmark-junit.xml"
-            telemetry_path = tmp_path / "resource-telemetry.json"
+            # ── 5. Run execution via real run_test_shard (P0-4) ────────
+            # run_test_shard writes outputs relative to cwd, so we use
+            # project_root as cwd (same as nightly workflow) and then
+            # move outputs to a temp dir for isolation.
+            exec_dir = tmp_path / "exec"
+            exec_dir.mkdir()
 
             exec_env = {**env, "SHARD": "benchmark"}
-            run_cmd = [
+            run_shard_cmd = [
                 sys.executable,
                 "-m",
-                "pytest",
-                "-p",
-                "tests.ci.outcome_plugin",
-                f"--hx-outcome-output={outcomes_path}",
+                "tests.ci.run_test_shard",
                 "--timeout=300",
                 "-q",
                 "-p",
@@ -511,12 +554,12 @@ class TestEndToEndPositive:
                 "--hx-shard",
                 "benchmark",
                 "--hx-node-output",
-                str(exec_node_inv_path),
-                f"--junitxml={junit_path}",
+                "benchmark-execution-node-inventory.json",
+                "--junitxml=nightly-benchmark-junit.xml",
             ] + tmp_bench_nodes
 
-            run_result = subprocess.run(
-                run_cmd,
+            shard_result = subprocess.run(
+                run_shard_cmd,
                 capture_output=True,
                 text=True,
                 cwd=project_root,
@@ -524,68 +567,46 @@ class TestEndToEndPositive:
                 timeout=120,
             )
 
-            # ── 6. Generate telemetry from the inner run ──────────────
-            # (replicate run_test_shard telemetry logic)
-            import time as _time
+            # ── 6. Move outputs from project root to exec_dir ──────────
+            for fname in [
+                "benchmark-execution-node-inventory.json",
+                "pytest-outcomes.json",
+                "resource-telemetry.json",
+                "nightly-benchmark-junit.xml",
+            ]:
+                src = Path(project_root) / fname
+                if src.exists():
+                    import shutil
 
-            _end = _time.monotonic()
-            _junit_counts = {
-                "tests_collected": 0,
-                "tests_passed": 0,
-                "tests_failed": 0,
-                "tests_skipped": 0,
-                "tests_xfailed": 0,
-                "tests_xpassed": 0,
-            }
-            if junit_path.exists():
-                try:
-                    import xml.etree.ElementTree as _ET
+                    shutil.move(str(src), str(exec_dir / fname))
 
-                    _root = _ET.parse(str(junit_path)).getroot()
-                    _suite = _root.find("testsuite")
-                    if _suite is not None:
-                        _junit_counts["tests_collected"] = int(_suite.attrib.get("tests", 0))
-                    for _tc in _root.iter("testcase"):
-                        if _tc.find("failure") is not None or _tc.find("error") is not None:
-                            _junit_counts["tests_failed"] += 1
-                        elif _tc.find("skipped") is not None:
-                            _junit_counts["tests_skipped"] += 1
-                        else:
-                            _junit_counts["tests_passed"] += 1
-                except Exception:
-                    pass
+            # ── 6. Verify all evidence files exist ────────────────────
+            exec_inv_path = exec_dir / "benchmark-execution-node-inventory.json"
+            outcomes_path = exec_dir / "pytest-outcomes.json"
+            junit_path = exec_dir / "nightly-benchmark-junit.xml"
+            telemetry_path = exec_dir / "resource-telemetry.json"
 
-            _exit_code = run_result.returncode
-            _telemetry_data = {
-                "track": exec_env.get("TRACK", ""),
-                "commit_sha": exec_env.get("COMMIT_SHA", ""),
-                "run_id": exec_env.get("RUN_ID", ""),
-                "run_attempt": int(exec_env.get("RUN_ATTEMPT", "1")),
-                "python_version": exec_env.get("PYTHON_VERSION", ""),
-                "shard": "benchmark",
-                "execution_status": "completed",
-                "pytest_exit_code": _exit_code,
-                "junit_parse_status": "available" if junit_path.exists() else "unavailable",
-                "outcome_parse_status": "available" if outcomes_path.exists() else "unavailable",
-                "counts_authoritative": True,
-                "resource_measurement_status": "available",
-                "producer_authoritative": (
-                    _exit_code == 0 and junit_path.exists() and outcomes_path.exists()
-                ),
-                "tests_collected": _junit_counts["tests_collected"],
-                "tests_passed": _junit_counts["tests_passed"],
-                "tests_failed": _junit_counts["tests_failed"],
-                "tests_skipped": _junit_counts["tests_skipped"],
-                "tests_xfailed": 0,
-                "tests_xpassed": 0,
-            }
-            telemetry_path.write_text(
-                json.dumps(_telemetry_data, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
+            assert exec_inv_path.exists(), "benchmark-execution-node-inventory.json not produced"
+            assert outcomes_path.exists(), "pytest-outcomes.json not produced by run_test_shard"
+            assert telemetry_path.exists(), "resource-telemetry.json not produced by run_test_shard"
+            assert junit_path.exists(), "nightly-benchmark-junit.xml not produced"
+
+            # Verify telemetry was generated by real runner (not hand-crafted)
+            telemetry_data = json.loads(telemetry_path.read_text(encoding="utf-8"))
+            assert telemetry_data.get("shard") == "benchmark"
+            assert telemetry_data.get("track") == "nightly"
+            assert telemetry_data.get("commit_sha") == _SHA
+            assert telemetry_data.get("pytest_exit_code") == 0, (
+                f"run_test_shard pytest_exit_code={telemetry_data.get('pytest_exit_code')}, "
+                f"stderr={shard_result.stderr[:500]}"
+            )
+            assert telemetry_data.get("producer_authoritative") is True, (
+                f"producer_authoritative=false, "
+                f"failures={telemetry_data.get('producer_authority_failures')}"
             )
 
-            # ── 7. Verify four-set equality ────────────────────────────
-            exec_inv = json.loads(exec_node_inv_path.read_text(encoding="utf-8"))
+            # ── 7. Verify four-set equality ───────────────────────────
+            exec_inv = json.loads(exec_inv_path.read_text(encoding="utf-8"))
             exec_node_set = set(exec_inv.get("node_ids", []))
             outcomes_data = json.loads(outcomes_path.read_text(encoding="utf-8"))
             outcome_node_set = set(outcomes_data.get("outcomes", {}).keys())
@@ -608,8 +629,8 @@ class TestEndToEndPositive:
                 f"bench_only={bench_set - cc_set}"
             )
 
-            # ── 8. Call real CLI 'benchmark_authority execute' ──────────
-            authority_output = tmp_path / "benchmark-authority.json"
+            # ── 8. Call real CLI 'benchmark_authority execute' ─────────
+            authority_output = exec_dir / "benchmark-authority.json"
             execute_cmd = [
                 sys.executable,
                 "-m",
@@ -620,7 +641,7 @@ class TestEndToEndPositive:
                 "--global-node-inventory",
                 str(node_inv_output),
                 "--execution-node-inventory",
-                str(exec_node_inv_path),
+                str(exec_inv_path),
                 "--outcomes",
                 str(outcomes_path),
                 "--telemetry",
@@ -652,7 +673,7 @@ class TestEndToEndPositive:
             )
             assert authority_output.exists(), "benchmark-authority.json not produced"
 
-            # ── 9. Call real CLI 'benchmark_authority validate' ─────────
+            # ── 9. Call real CLI 'benchmark_authority validate' ────────
             validate_cmd = [
                 sys.executable,
                 "-m",
@@ -665,7 +686,7 @@ class TestEndToEndPositive:
                 "--global-node-inventory",
                 str(node_inv_output),
                 "--execution-node-inventory",
-                str(exec_node_inv_path),
+                str(exec_inv_path),
                 "--outcomes",
                 str(outcomes_path),
                 "--telemetry",
@@ -694,16 +715,16 @@ class TestEndToEndPositive:
                 f"stdout={val_result.stdout}\nstderr={val_result.stderr}"
             )
 
-            # ── 10. Verify status == 'executed' ────────────────────────
+            # ── 10. Verify artifact status ────────────────────────────
             artifact = load_authority_artifact(authority_output)
             assert artifact["status"] == "executed"
             assert artifact["authority_valid"] is True
             assert artifact["pytest_exit_code"] == 0
             assert artifact["producer_authoritative"] is True
-            assert artifact["benchmark_node_count"] == len(tmp_bench_nodes)
+            assert artifact["benchmark_node_count"] == 2
 
-            # ── 11. Verify evidence digests ────────────────────────────
-            evidence = artifact.get("evidence", {})
+            # ── 11. Verify evidence digests (6 mandatory) ─────────────
+            evidence = artifact.get("evidence")
             assert isinstance(evidence, dict), "artifact.evidence must be a dict"
             expected_keys = {
                 "global_marker_inventory_sha256",
@@ -716,18 +737,26 @@ class TestEndToEndPositive:
             assert set(evidence.keys()) == expected_keys, (
                 f"Evidence keys mismatch: got {set(evidence.keys())}"
             )
-            # Verify actual SHA-256 values match file contents
-            assert evidence["global_marker_inventory_sha256"] == _compute_file_sha256(
-                marker_inv_path
-            )
-            assert evidence["global_node_inventory_sha256"] == _compute_file_sha256(node_inv_output)
-            assert evidence["outcomes_sha256"] == _compute_file_sha256(outcomes_path)
-            assert evidence["telemetry_sha256"] == _compute_file_sha256(telemetry_path)
-            assert evidence["junit_sha256"] == _compute_file_sha256(junit_path)
+            for key, path in [
+                ("global_marker_inventory_sha256", marker_inv_path),
+                ("global_node_inventory_sha256", node_inv_output),
+                ("execution_node_inventory_sha256", exec_inv_path),
+                ("outcomes_sha256", outcomes_path),
+                ("telemetry_sha256", telemetry_path),
+                ("junit_sha256", junit_path),
+            ]:
+                assert evidence[key] == _compute_file_sha256(path), (
+                    f"Evidence digest mismatch for {key}"
+                )
 
-            # ── 12. Verify four-set equality on final artifact ─────────
+            # ── 12. Verify four-set equality on final artifact ────────
             artifact_bench_set = set(artifact["benchmark_node_ids"])
             assert artifact_bench_set == bench_set
+
+            print(
+                f"E2E PASS: {len(tmp_bench_nodes)} benchmark nodes, "
+                f"run_test_shard used=YES, telemetry real=YES"
+            )
 
         finally:
             bench_file.unlink(missing_ok=True)
@@ -1269,6 +1298,14 @@ class TestOutcomesSchema:
         marker_path = tmp_path / "marker.json"
         marker_path.write_text(json.dumps(marker_inv), encoding="utf-8")
 
+        node_inv = _make_node_inv(["a"])
+        node_inv_path = tmp_path / "node.json"
+        node_inv_path.write_text(json.dumps(node_inv), encoding="utf-8")
+
+        exec_inv = _make_exec_inv(["a"])
+        exec_inv_path = tmp_path / "exec_inv.json"
+        exec_inv_path.write_text(json.dumps(exec_inv), encoding="utf-8")
+
         outcomes_path = tmp_path / "nonexistent-outcomes.json"
         tel_path = tmp_path / "telemetry.json"
         tel_path.write_text(json.dumps(_make_telemetry()), encoding="utf-8")
@@ -1278,8 +1315,8 @@ class TestOutcomesSchema:
         with pytest.raises(BenchmarkAuthorityError, match="cannot parse"):
             validate_executed_benchmark_evidence(
                 marker_inventory_path=marker_path,
-                node_inventory_path=None,
-                execution_node_inventory_path=None,
+                node_inventory_path=node_inv_path,
+                execution_node_inventory_path=exec_inv_path,
                 outcomes_path=outcomes_path,
                 telemetry_path=tel_path,
                 junit_path=junit_path,
@@ -1297,6 +1334,14 @@ class TestOutcomesSchema:
         marker_path = tmp_path / "marker.json"
         marker_path.write_text(json.dumps(marker_inv), encoding="utf-8")
 
+        node_inv = _make_node_inv(["a"])
+        node_inv_path = tmp_path / "node.json"
+        node_inv_path.write_text(json.dumps(node_inv), encoding="utf-8")
+
+        exec_inv = _make_exec_inv(["a"])
+        exec_inv_path = tmp_path / "exec_inv.json"
+        exec_inv_path.write_text(json.dumps(exec_inv), encoding="utf-8")
+
         outcomes_path = tmp_path / "outcomes.json"
         outcomes_path.write_text("{not valid json", encoding="utf-8")
         tel_path = tmp_path / "telemetry.json"
@@ -1307,8 +1352,8 @@ class TestOutcomesSchema:
         with pytest.raises(BenchmarkAuthorityError, match="cannot parse"):
             validate_executed_benchmark_evidence(
                 marker_inventory_path=marker_path,
-                node_inventory_path=None,
-                execution_node_inventory_path=None,
+                node_inventory_path=node_inv_path,
+                execution_node_inventory_path=exec_inv_path,
                 outcomes_path=outcomes_path,
                 telemetry_path=tel_path,
                 junit_path=junit_path,
@@ -1387,6 +1432,14 @@ class TestTelemetryValidation:
         marker_path = tmp_path / "marker.json"
         marker_path.write_text(json.dumps(marker_inv), encoding="utf-8")
 
+        node_inv = _make_node_inv(["a"])
+        node_inv_path = tmp_path / "node.json"
+        node_inv_path.write_text(json.dumps(node_inv), encoding="utf-8")
+
+        exec_inv = _make_exec_inv(["a"])
+        exec_inv_path = tmp_path / "exec_inv.json"
+        exec_inv_path.write_text(json.dumps(exec_inv), encoding="utf-8")
+
         outcomes = _make_outcomes({"a": "passed"})
         outcomes_path = tmp_path / "outcomes.json"
         outcomes_path.write_text(json.dumps(outcomes), encoding="utf-8")
@@ -1398,8 +1451,8 @@ class TestTelemetryValidation:
         with pytest.raises(BenchmarkAuthorityError, match="cannot parse"):
             validate_executed_benchmark_evidence(
                 marker_inventory_path=marker_path,
-                node_inventory_path=None,
-                execution_node_inventory_path=None,
+                node_inventory_path=node_inv_path,
+                execution_node_inventory_path=exec_inv_path,
                 outcomes_path=outcomes_path,
                 telemetry_path=tel_path,
                 junit_path=junit_path,
@@ -1417,6 +1470,14 @@ class TestTelemetryValidation:
         marker_path = tmp_path / "marker.json"
         marker_path.write_text(json.dumps(marker_inv), encoding="utf-8")
 
+        node_inv = _make_node_inv(["a"])
+        node_inv_path = tmp_path / "node.json"
+        node_inv_path.write_text(json.dumps(node_inv), encoding="utf-8")
+
+        exec_inv = _make_exec_inv(["a"])
+        exec_inv_path = tmp_path / "exec_inv.json"
+        exec_inv_path.write_text(json.dumps(exec_inv), encoding="utf-8")
+
         outcomes = _make_outcomes({"a": "passed"})
         outcomes_path = tmp_path / "outcomes.json"
         outcomes_path.write_text(json.dumps(outcomes), encoding="utf-8")
@@ -1429,8 +1490,8 @@ class TestTelemetryValidation:
         with pytest.raises(BenchmarkAuthorityError, match="cannot parse"):
             validate_executed_benchmark_evidence(
                 marker_inventory_path=marker_path,
-                node_inventory_path=None,
-                execution_node_inventory_path=None,
+                node_inventory_path=node_inv_path,
+                execution_node_inventory_path=exec_inv_path,
                 outcomes_path=outcomes_path,
                 telemetry_path=tel_path,
                 junit_path=junit_path,
@@ -1659,6 +1720,265 @@ class TestEvidenceDigests:
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# Section 9b: Mandatory evidence (P0-5), N/A emptiness (P0-6),
+#             CLI mandatory args (P0-7), multi-node file (P0-3)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestMandatoryEvidence:
+    """P0-5: Evidence is mandatory for both N/A and executed artifacts."""
+
+    def test_na_artifact_without_evidence_fails(self) -> None:
+        artifact = _build_not_applicable_artifact(
+            commit_sha=_SHA,
+            run_id=_RUN_ID,
+            run_attempt=_RUN_ATTEMPT,
+            python_version=_PYTHON_VERSION,
+        )
+        with pytest.raises(BenchmarkAuthorityError, match="requires evidence"):
+            _validate(artifact)
+
+    def test_executed_artifact_without_evidence_fails(self) -> None:
+        artifact = _build_executed_artifact(
+            commit_sha=_SHA,
+            run_id=_RUN_ID,
+            run_attempt=_RUN_ATTEMPT,
+            python_version=_PYTHON_VERSION,
+            benchmark_node_count=1,
+            benchmark_node_ids=["a"],
+            pytest_exit_code=0,
+            producer_authoritative=True,
+            validated_evidence_node_ids=frozenset(["a"]),
+        )
+        with pytest.raises(BenchmarkAuthorityError, match="requires evidence"):
+            _validate(artifact)
+
+    def test_na_evidence_empty_dict_fails(self) -> None:
+        artifact = _valid_na_artifact()
+        artifact["evidence"] = {}
+        with pytest.raises(BenchmarkAuthorityError, match="keys mismatch"):
+            _validate(artifact)
+
+    def test_executed_evidence_empty_dict_fails(self) -> None:
+        artifact = _valid_executed_artifact(["a"])
+        artifact["evidence"] = {}
+        with pytest.raises(BenchmarkAuthorityError, match="keys mismatch"):
+            _validate(artifact)
+
+    def test_na_evidence_wrong_key_count_fails(self) -> None:
+        artifact = _valid_na_artifact()
+        artifact["evidence"] = {
+            "global_marker_inventory_sha256": "a" * 64,
+        }
+        with pytest.raises(BenchmarkAuthorityError, match="keys mismatch"):
+            _validate(artifact)
+
+    def test_executed_evidence_extra_key_fails(self) -> None:
+        artifact = _valid_executed_artifact(["a"])
+        artifact["evidence"]["extra_key"] = "x" * 64
+        with pytest.raises(BenchmarkAuthorityError, match="keys mismatch"):
+            _validate(artifact)
+
+
+class TestNABenchmarkEmptiness:
+    """P0-6: N/A validate must prove benchmark marker set is empty."""
+
+    def test_na_validate_with_benchmark_nodes_in_marker_fails(self, tmp_path: Path) -> None:
+        """N/A artifact + inventories where marker has benchmark nodes → FAIL."""
+        # Create a marker inventory with a benchmark node
+        marker_inv = {
+            "schema_version": "1",
+            "track": "nightly",
+            "commit_sha": _SHA,
+            "run_id": _RUN_ID,
+            "run_attempt": _RUN_ATTEMPT,
+            "python_version": _PYTHON_VERSION,
+            "collection_scope": "global",
+            "shard": None,
+            "node_markers": {
+                "tests/test_foo.py::test_bar": ["benchmark"],
+            },
+            "node_count": 1,
+        }
+        node_inv = {
+            "schema_version": "1",
+            "track": "nightly",
+            "commit_sha": _SHA,
+            "run_id": _RUN_ID,
+            "run_attempt": _RUN_ATTEMPT,
+            "python_version": _PYTHON_VERSION,
+            "collection_scope": "global",
+            "shard": None,
+            "node_ids": ["tests/test_foo.py::test_bar"],
+            "node_count": 1,
+            "file_records": [],
+            "behavior_fingerprint_sha256": "x" * 64,
+        }
+
+        marker_path = tmp_path / "marker.json"
+        node_path = tmp_path / "node.json"
+        marker_path.write_text(json.dumps(marker_inv), encoding="utf-8")
+        node_path.write_text(json.dumps(node_inv), encoding="utf-8")
+
+        # Build N/A artifact (wrongly claimed no benchmark nodes)
+        na_artifact = _valid_na_artifact()
+        auth_path = tmp_path / "authority.json"
+        save_authority_artifact(na_artifact, auth_path)
+
+        # validate CLI must fail because marker inventory has benchmark nodes
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "tests.ci.benchmark_authority",
+                "validate",
+                "--artifact",
+                str(auth_path),
+                "--global-marker-inventory",
+                str(marker_path),
+                "--global-node-inventory",
+                str(node_path),
+                "--commit-sha",
+                _SHA,
+                "--run-id",
+                _RUN_ID,
+                "--run-attempt",
+                str(_RUN_ATTEMPT),
+                "--python-version",
+                _PYTHON_VERSION,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0, (
+            f"Expected non-zero exit for N/A with benchmark nodes, "
+            f"stdout={result.stdout}, stderr={result.stderr}"
+        )
+        assert "requires zero benchmark-marked nodes" in result.stderr
+
+
+class TestCLIMandatoryEvidence:
+    """P0-7: validate CLI must fail closed when required evidence args missing."""
+
+    def test_na_missing_global_marker_fails(self, tmp_path: Path) -> None:
+        artifact = _valid_na_artifact()
+        auth_path = tmp_path / "authority.json"
+        save_authority_artifact(artifact, auth_path)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "tests.ci.benchmark_authority",
+                "validate",
+                "--artifact",
+                str(auth_path),
+                "--commit-sha",
+                _SHA,
+                "--run-id",
+                _RUN_ID,
+                "--run-attempt",
+                str(_RUN_ATTEMPT),
+                "--python-version",
+                _PYTHON_VERSION,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+        assert "missing" in result.stderr
+
+    def test_na_missing_global_node_fails(self, tmp_path: Path) -> None:
+        artifact = _valid_na_artifact()
+        auth_path = tmp_path / "authority.json"
+        save_authority_artifact(artifact, auth_path)
+        # Create a dummy marker file
+        marker_path = tmp_path / "marker.json"
+        marker_path.write_text("{}", encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "tests.ci.benchmark_authority",
+                "validate",
+                "--artifact",
+                str(auth_path),
+                "--global-marker-inventory",
+                str(marker_path),
+                "--commit-sha",
+                _SHA,
+                "--run-id",
+                _RUN_ID,
+                "--run-attempt",
+                str(_RUN_ATTEMPT),
+                "--python-version",
+                _PYTHON_VERSION,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+        assert "missing" in result.stderr
+
+    def test_executed_missing_execution_inventory_fails(self, tmp_path: Path) -> None:
+        artifact = _valid_executed_artifact(["a"])
+        auth_path = tmp_path / "authority.json"
+        save_authority_artifact(artifact, auth_path)
+        # Provide only some evidence files
+        for name in ["marker", "node", "outcomes", "telemetry", "junit"]:
+            (tmp_path / f"{name}.json").write_text("{}", encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "tests.ci.benchmark_authority",
+                "validate",
+                "--artifact",
+                str(auth_path),
+                "--global-marker-inventory",
+                str(tmp_path / "marker.json"),
+                "--global-node-inventory",
+                str(tmp_path / "node.json"),
+                "--commit-sha",
+                _SHA,
+                "--run-id",
+                _RUN_ID,
+                "--run-attempt",
+                str(_RUN_ATTEMPT),
+                "--python-version",
+                _PYTHON_VERSION,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+        assert "execution_node_inventory" in result.stderr
+
+
+class TestMultiNodeSameFile:
+    """P0-3: Multiple benchmark nodes from same file must be allowed."""
+
+    def test_duplicate_full_target_rejected(self) -> None:
+        """Same full node target passed twice → FAIL."""
+        # This is tested at the pytest level via collect_nodes_plugin
+        # We verify the plugin logic here
+        from unittest.mock import MagicMock
+
+        from tests.ci.collect_nodes_plugin import _validate_collection_targets
+
+        mock_config = MagicMock()
+        mock_config.args = [
+            "tests/test_foo.py::test_a",
+            "tests/test_foo.py::test_a",
+        ]
+        with pytest.raises(pytest.UsageError, match="duplicate explicit pytest targets"):
+            _validate_collection_targets(mock_config, "shard", "benchmark")
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # Section 10: Workflow static tests
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -1773,6 +2093,66 @@ class TestWorkflowStatic:
         assert validate_start != -1, f"Step '{step_name}' not found"
         following = nightly_content[validate_start : validate_start + 200]
         assert "always()" in following, f"Step '{step_name}' must have if: always()"
+
+    def test_no_duplicate_outcome_plugin_in_benchmark(self, nightly_content: str) -> None:
+        """P0-2: run_test_shard owns outcome plugin; nightly must not duplicate it."""
+        # Find the benchmark execution step (nonzero path)
+        bench_exec_start = nightly_content.find("Execute benchmark tests via Python launcher")
+        assert bench_exec_start != -1, "benchmark execution step not found"
+        # Find the next step boundary
+        next_step = nightly_content.find("- name:", bench_exec_start + 10)
+        if next_step == -1:
+            next_step = len(nightly_content)
+        bench_section = nightly_content[bench_exec_start:next_step]
+
+        assert "tests.ci.run_test_shard" in bench_section
+        # Must NOT contain these (they are owned by run_test_shard internally)
+        assert "-p', 'tests.ci.outcome_plugin'" not in bench_section, (
+            "Duplicate outcome_plugin in benchmark execution step"
+        )
+        assert "'--hx-outcome-output=pytest-outcomes.json'" not in bench_section, (
+            "Duplicate hx-outcome-output in benchmark execution step"
+        )
+
+    def test_benchmark_execution_step_contains_required_args(self, nightly_content: str) -> None:
+        """P0-10: Verify benchmark execution step contains all required arguments."""
+        bench_exec_start = nightly_content.find("Execute benchmark tests via Python launcher")
+        assert bench_exec_start != -1
+        next_step = nightly_content.find("- name:", bench_exec_start + 10)
+        if next_step == -1:
+            next_step = len(nightly_content)
+        bench_section = nightly_content[bench_exec_start:next_step]
+
+        required = [
+            "tests.ci.run_test_shard",
+            "tests.ci.collect_nodes_plugin",
+            "--hx-collection-scope",
+            "shard",
+            "--hx-shard",
+            "benchmark",
+            "--hx-node-output",
+            "benchmark-execution-node-inventory.json",
+            "--junitxml=nightly-benchmark-junit.xml",
+        ]
+        for s in required:
+            assert s in bench_section, f"Benchmark step missing: {s!r}"
+
+    def test_final_gate_contains_all_evidence_args(self, nightly_content: str) -> None:
+        """P0-10: Verify final gate command contains all evidence arguments."""
+        gate_start = nightly_content.find("final-gate:")
+        assert gate_start != -1
+        gate_section = nightly_content[gate_start:]
+        required = [
+            "--artifact",
+            "--global-marker-inventory",
+            "--global-node-inventory",
+            "--execution-node-inventory",
+            "--outcomes",
+            "--telemetry",
+            "--junit",
+        ]
+        for s in required:
+            assert s in gate_section, f"Final gate missing: {s!r}"
 
 
 # ══════════════════════════════════════════════════════════════════════════
