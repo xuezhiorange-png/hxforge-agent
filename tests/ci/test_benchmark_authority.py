@@ -540,15 +540,9 @@ class TestEndToEndPositive:
             exec_dir.mkdir()
             (exec_dir / "tests").symlink_to(Path(project_root) / "tests")
             (exec_dir / "src").symlink_to(Path(project_root) / "src")
-            (exec_dir / "conftest.py").symlink_to(
-                Path(project_root) / "conftest.py"
-            )
-            (exec_dir / "pyproject.toml").symlink_to(
-                Path(project_root) / "pyproject.toml"
-            )
-            (exec_dir / "uv.lock").symlink_to(
-                Path(project_root) / "uv.lock"
-            )
+            (exec_dir / "conftest.py").symlink_to(Path(project_root) / "conftest.py")
+            (exec_dir / "pyproject.toml").symlink_to(Path(project_root) / "pyproject.toml")
+            (exec_dir / "uv.lock").symlink_to(Path(project_root) / "uv.lock")
 
             exec_env = {**env, "SHARD": "benchmark"}
             # Use relative paths (tests/...) so collect_nodes_plugin accepts them
