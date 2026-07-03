@@ -20,22 +20,94 @@ from typing import Any
 _OUTCOME_VALID_VALUES = frozenset({"passed", "failed", "skipped", "xfailed", "xpassed"})
 
 
-def _read_node_inventory(inventory_path: Path) -> dict[str, Any] | None:
-    """Read and validate node-inventory.json. Returns validated dict or None."""
-    if not inventory_path.is_file():
-        return None
-    try:
-        raw = json.loads(inventory_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
+# P0-2 (round 4627109299): Structured node-inventory validation result.
+# Status values:
+#   "available"        — inventory exists, schema valid, set matches outcomes
+#   "missing"          — file does not exist (when path was configured)
+#   "malformed"        — JSON broken or not a dict
+#   "invalid_schema"   — schema_version / fields incorrect
+#   "invalid_node_count" — node_count != len(node_ids)
+#   "duplicate_nodes"  — node_ids contain duplicates
+#   "unsorted_nodes"   — node_ids not canonically sorted
+#   "set_mismatch"     — inventory set != outcomes set
+#   "unrequired"       — no inventory path was configured
+# Runner always fails closed when an inventory path is configured and
+# validation status != "available".
+class NodeInventoryValidation:
+    __slots__ = ("status", "node_ids", "error", "data")
+
+    def __init__(
+        self,
+        status: str,
+        node_ids: frozenset[str],
+        error: str | None,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        self.status = status
+        self.node_ids = node_ids
+        self.error = error
+        self.data = data
+
+
+def _strict_validate_inventory_data(raw: object) -> NodeInventoryValidation:
+    """Validate a parsed node-inventory object. Returns structured status."""
     if not isinstance(raw, dict):
-        return None
+        return NodeInventoryValidation("malformed", frozenset(), "root is not a dict")
+    if raw.get("schema_version") != "1":
+        return NodeInventoryValidation("invalid_schema", frozenset(), "schema_version != '1'")
     node_ids = raw.get("node_ids")
     if not isinstance(node_ids, list):
-        return None
-    if raw.get("node_count") != len(node_ids):
-        return None
-    return raw
+        return NodeInventoryValidation("invalid_schema", frozenset(), "node_ids is not a list")
+    for item in node_ids:
+        if not isinstance(item, str) or not item:
+            return NodeInventoryValidation(
+                "invalid_schema",
+                frozenset(),
+                "node_ids contain non-string/empty value",
+            )
+    if len(node_ids) != len(set(node_ids)):
+        return NodeInventoryValidation(
+            "duplicate_nodes", frozenset(), "node_ids contain duplicates"
+        )
+    sorted_ids = sorted(node_ids)
+    if list(node_ids) != sorted_ids:
+        return NodeInventoryValidation(
+            "unsorted_nodes", frozenset(), "node_ids not canonically sorted"
+        )
+    node_count = raw.get("node_count")
+    if not isinstance(node_count, int) or node_count < 0:
+        return NodeInventoryValidation(
+            "invalid_schema", frozenset(), "node_count is not a non-negative int"
+        )
+    if node_count != len(node_ids):
+        return NodeInventoryValidation(
+            "invalid_node_count",
+            frozenset(),
+            f"node_count={node_count} != len(node_ids)={len(node_ids)}",
+        )
+    return NodeInventoryValidation(
+        status="available",
+        node_ids=frozenset(node_ids),
+        error=None,
+        data=raw,
+    )
+
+
+def _read_node_inventory(inventory_path: Path) -> NodeInventoryValidation:
+    """Read and validate node-inventory.json. Returns NodeInventoryValidation.
+
+    Always returns a structured result — never silently collapses failure
+    to None. Callers must inspect ``status``.
+    """
+    if not inventory_path.is_file():
+        return NodeInventoryValidation("missing", frozenset(), "file does not exist")
+    try:
+        raw = json.loads(inventory_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return NodeInventoryValidation("malformed", frozenset(), f"json error: {exc}")
+    except OSError as exc:
+        return NodeInventoryValidation("missing", frozenset(), f"read error: {exc}")
+    return _strict_validate_inventory_data(raw)
 
 
 def _parse_junit(junit_path: Path) -> tuple[dict[str, int], str]:
@@ -83,68 +155,85 @@ def _read_and_validate_outcomes(
     outcomes_path: Path,
     *,
     node_inventory_path: Path | None = None,
-) -> dict[str, Any] | None:
+) -> tuple[
+    dict[str, Any] | None,
+    NodeInventoryValidation,
+]:
     """Read, parse, and validate structured outcome JSON.
 
-    P0-3: When node_inventory_path is provided, enforces strict set equality
-    between outcomes keys, collection_complete list, and node_inventory.node_ids.
-
-    Returns validated outcomes dict or None if invalid/missing.
-    Validation is strict — any schema violation returns None.
+    Returns ``(outcomes_data, inventory_validation)``.
+    When ``node_inventory_path`` is configured, the inventory validation
+    must yield status ``"available"`` and the inventory node-set must
+    exactly equal the outcome node-set, otherwise outcomes_data is None
+    (P0-2 fail-closed contract).
     """
+    inventory_validation = NodeInventoryValidation(
+        "unrequired", frozenset(), "node_inventory_path not provided"
+    )
+    if node_inventory_path is not None:
+        inventory_validation = _read_node_inventory(node_inventory_path)
+        if inventory_validation.status != "available":
+            return None, inventory_validation
+
     if not outcomes_path.is_file():
-        return None
+        return None, inventory_validation
     try:
         raw = json.loads(outcomes_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return None
+        return None, inventory_validation
 
     # Schema validation — fail closed
     if not isinstance(raw, dict):
-        return None
+        return None, inventory_validation
     if raw.get("schema_version") != "1":
-        return None
+        return None, inventory_validation
     outcomes_map = raw.get("outcomes")
     if not isinstance(outcomes_map, dict):
-        return None
+        return None, inventory_validation
     if not isinstance(raw.get("total"), int):
-        return None
+        return None, inventory_validation
     if raw["total"] != len(outcomes_map):
-        return None
+        return None, inventory_validation
 
     # Validate every outcome value and collect unique node IDs
     for node_id, outcome_val in outcomes_map.items():
         if not isinstance(node_id, str) or not node_id:
-            return None
+            return None, inventory_validation
         if outcome_val not in _OUTCOME_VALID_VALUES:
-            return None
+            return None, inventory_validation
 
     # Validate collection_complete: must be list of strings, unique, non-empty
     cc = raw.get("collection_complete")
     if not isinstance(cc, list):
-        return None
+        return None, inventory_validation
     for item in cc:
         if not isinstance(item, str) or not item:
-            return None
+            return None, inventory_validation
     if len(cc) != len(set(cc)):
-        return None  # duplicates in collection_complete
+        return None, inventory_validation  # duplicates in collection_complete
 
-    # P0-3: Exact 3-way node set equality
+    # P0-3: Exact 3-way node set equality (outcomes vs collection_complete)
     outcome_node_ids = set(outcomes_map.keys())
     cc_node_ids = set(cc)
 
     if outcome_node_ids != cc_node_ids:
-        return None
+        return None, inventory_validation
 
+    # P0-2: outcomes vs execution inventory (fail closed)
     if node_inventory_path is not None:
-        inv = _read_node_inventory(node_inventory_path)
-        if inv is not None:
-            # Only cross-validate if file exists and is valid
-            inv_node_ids = set(inv["node_ids"])
-            if inv_node_ids != outcome_node_ids:
-                return None
+        if inventory_validation.status != "available":
+            return None, inventory_validation
+        if inventory_validation.node_ids != frozenset(outcome_node_ids):
+            return None, NodeInventoryValidation(
+                status="set_mismatch",
+                node_ids=inventory_validation.node_ids,
+                error=(
+                    f"inventory {sorted(inventory_validation.node_ids)} != "
+                    f"outcomes {sorted(outcome_node_ids)}"
+                ),
+            )
 
-    return raw
+    return raw, inventory_validation
 
 
 def _aggregate_outcomes(outcomes_data: dict[str, Any]) -> dict[str, int]:
@@ -174,7 +263,7 @@ def run_pytest(
     stdout_path: str | Path = "pytest-stdout.txt",
     stderr_path: str | Path = "pytest-stderr.txt",
     outcomes_path: str | Path = "pytest-outcomes.json",
-    node_inventory_path: str | Path = "node-inventory.json",
+    node_inventory_path: str | Path = "",
     track: str = "",
     commit_sha: str = "",
     run_id: str = "",
@@ -261,20 +350,29 @@ def run_pytest(
     junit_counts, junit_parse_status = _parse_junit(junit)
 
     # Parse and validate structured outcomes (P0-2)
-    # P0-3: Also cross-validate against node-inventory (if present alongside outcomes)
+    # P0-2 (round 4627109299): Always cross-validate against inventory path
+    # when one is configured (non-empty). Empty path = unrequired.
     effective_inv_path: Path | None = None
-    if node_inventory_path:
+    if node_inventory_path and str(node_inventory_path):
         inv_candidate = Path(node_inventory_path)
         # Resolve relative to outcomes file directory to avoid stale repo-root files
         if not inv_candidate.is_absolute():
             inv_candidate = outcomes_file.parent / inv_candidate
-        if inv_candidate.is_file():
-            effective_inv_path = inv_candidate
-    outcomes_data = _read_and_validate_outcomes(
+        effective_inv_path = inv_candidate
+    outcomes_data, inventory_validation = _read_and_validate_outcomes(
         outcomes_file, node_inventory_path=effective_inv_path
     )
     outcome_parse_status = "available" if outcomes_data is not None else "unavailable"
     outcome_counts = _aggregate_outcomes(outcomes_data) if outcomes_data is not None else None
+
+    # Inventory status for telemetry — must always be present, even when
+    # the inventory path is unrequired. Empty path = unrequired sentinel.
+    if not node_inventory_path or not str(node_inventory_path):
+        node_inventory_parse_status = "unrequired"
+        node_inventory_validation_error: str | None = None
+    else:
+        node_inventory_parse_status = inventory_validation.status
+        node_inventory_validation_error = inventory_validation.error
 
     # ── Cross-validate outcomes vs JUnit (P0-4: XPASS-safe) ────────────────
     # Structured outcomes are the five-category authority.
@@ -321,7 +419,7 @@ def run_pytest(
     ):
         execution_status = "collection-error"
 
-    # P0-5: Compute producer_authoritative
+    # P0-5 / P0-2 (4627109299): Compute producer_authoritative
     authority_failures: list[str] = []
     if execution_status != "completed":
         authority_failures.append(f"execution_status={execution_status}")
@@ -335,6 +433,27 @@ def run_pytest(
         authority_failures.append("resource_measurement_status=unavailable")
     if exit_code != 0:
         authority_failures.append(f"pytest_exit_code={exit_code}")
+
+    # P0-2 (round 4627109299): When a non-empty inventory path is configured,
+    # the producer MUST have performed inventory cross-validation. Any status
+    # other than "available" (and matching outcomes) is an authority failure.
+    if node_inventory_path and str(node_inventory_path):
+        if node_inventory_parse_status == "missing":
+            authority_failures.append("node_inventory_parse_status=missing")
+        elif node_inventory_parse_status == "malformed":
+            authority_failures.append("node_inventory_parse_status=malformed")
+        elif node_inventory_parse_status == "invalid_schema":
+            authority_failures.append("node_inventory_parse_status=invalid")
+        elif node_inventory_parse_status == "invalid_node_count":
+            authority_failures.append("node_inventory_node_count_mismatch")
+        elif node_inventory_parse_status == "duplicate_nodes":
+            authority_failures.append("node_inventory_duplicate_nodes")
+        elif node_inventory_parse_status == "unsorted_nodes":
+            authority_failures.append("node_inventory_unsorted_nodes")
+        elif node_inventory_parse_status == "set_mismatch":
+            authority_failures.append("node_inventory_outcome_set_mismatch")
+        elif node_inventory_parse_status != "available":
+            authority_failures.append(f"node_inventory_parse_status={node_inventory_parse_status}")
 
     producer_authoritative = len(authority_failures) == 0
 
@@ -367,6 +486,8 @@ def run_pytest(
         "pytest_exit_code": exit_code,
         "junit_parse_status": junit_parse_status,
         "outcome_parse_status": outcome_parse_status,
+        "node_inventory_parse_status": node_inventory_parse_status,
+        "node_inventory_validation_error": node_inventory_validation_error,
         "counts_authoritative": counts_authoritative,
         "counts_mismatch_detail": counts_mismatch_detail if counts_mismatch_detail else None,
         "producer_authoritative": producer_authoritative,
@@ -431,14 +552,19 @@ def main() -> None:
             junit_xml = pytest_args[i + 1]
             break
 
-    # Extract --hx-node-output path for cross-validation with outcomes
-    node_inv_path = "node-inventory.json"
+    # Extract --hx-node-output path for cross-validation with outcomes.
+    # If the flag is not supplied, leave the path empty so that the runner
+    # treats the inventory as "unrequired" (no authority failure).
+    node_inv_path = ""
+    has_node_inv = False
     for i, arg in enumerate(pytest_args):
         if arg.startswith("--hx-node-output="):
             node_inv_path = arg.split("=", 1)[1]
+            has_node_inv = True
             break
         if arg == "--hx-node-output" and i + 1 < len(pytest_args):
             node_inv_path = pytest_args[i + 1]
+            has_node_inv = True
             break
 
     exit_code = run_pytest(
@@ -448,7 +574,7 @@ def main() -> None:
         stdout_path="pytest-stdout.txt",
         stderr_path="pytest-stderr.txt",
         outcomes_path="pytest-outcomes.json",
-        node_inventory_path=node_inv_path,
+        node_inventory_path=node_inv_path if has_node_inv else "",
         track=os.environ.get("TRACK", ""),
         commit_sha=os.environ.get("COMMIT_SHA", ""),
         run_id=os.environ.get("RUN_ID", ""),

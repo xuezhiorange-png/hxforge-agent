@@ -148,7 +148,7 @@ class TestOutcomePlugin:
         # Corrupt the file
         outcomes_path.write_text("NOT VALID JSON {{{", encoding="utf-8")
         # Verify validation rejects it
-        result = _read_and_validate_outcomes(outcomes_path)
+        result, _inv = _read_and_validate_outcomes(outcomes_path)
         assert result is None
 
     def test_missing_outcomes_file(self, tmp_path: Path) -> None:
@@ -177,7 +177,7 @@ class TestOutcomePlugin:
         )
         # Check a different (missing) path
         missing_path = tmp_path / "definitely-not-there.json"
-        result = _read_and_validate_outcomes(missing_path)
+        result, _inv = _read_and_validate_outcomes(missing_path)
         assert result is None
 
 
@@ -232,7 +232,7 @@ def test_p03_outcomes_missing_node_rejected(tmp_path: Path) -> None:
         ],
     )
     inv_path = _make_node_inventory(tmp_path, list(outcomes.keys()))
-    result = _read_and_validate_outcomes(
+    result, _inv = _read_and_validate_outcomes(
         tmp_path / "pytest-outcomes.json",
         node_inventory_path=inv_path,
     )
@@ -258,7 +258,7 @@ def test_p03_outcomes_extra_node_rejected(tmp_path: Path) -> None:
         ],
     )
     inv_path = _make_node_inventory(tmp_path, list(outcomes.keys()))
-    result = _read_and_validate_outcomes(
+    result, _inv = _read_and_validate_outcomes(
         tmp_path / "pytest-outcomes.json",
         node_inventory_path=inv_path,
     )
@@ -278,7 +278,7 @@ def test_p03_collection_complete_has_duplicates_rejected(tmp_path: Path) -> None
             "a/test_one.py::test_a",  # duplicate
         ],
     )
-    result = _read_and_validate_outcomes(tmp_path / "pytest-outcomes.json")
+    result, _inv = _read_and_validate_outcomes(tmp_path / "pytest-outcomes.json")
     assert result is None, "must reject: duplicate in collection_complete"
 
 
@@ -294,7 +294,7 @@ def test_p03_collection_complete_differs_from_outcomes(tmp_path: Path) -> None:
             "a/test_different.py::test_x",  # different node, same count
         ],
     )
-    result = _read_and_validate_outcomes(tmp_path / "pytest-outcomes.json")
+    result, _inv = _read_and_validate_outcomes(tmp_path / "pytest-outcomes.json")
     assert result is None, "must reject: collection_complete has different node"
 
 
@@ -305,7 +305,7 @@ def test_p03_node_inventory_differs_from_outcomes(tmp_path: Path) -> None:
     outcomes = {"a/test_one.py::test_a": "passed"}
     _make_outcomes_json(tmp_path, outcomes)
     inv_path = _make_node_inventory(tmp_path, ["b/test_other.py::test_x"])
-    result = _read_and_validate_outcomes(
+    result, _inv = _read_and_validate_outcomes(
         tmp_path / "pytest-outcomes.json",
         node_inventory_path=inv_path,
     )
@@ -320,11 +320,12 @@ def test_p03_valid_three_way_equality(tmp_path: Path) -> None:
     outcomes = {n: "passed" for n in nodes}
     _make_outcomes_json(tmp_path, outcomes)
     inv_path = _make_node_inventory(tmp_path, nodes)
-    result = _read_and_validate_outcomes(
+    result, inv = _read_and_validate_outcomes(
         tmp_path / "pytest-outcomes.json",
         node_inventory_path=inv_path,
     )
     assert result is not None, "valid three-way equality should be accepted"
+    assert inv.status == "available"
 
 
 # ── P0-4: XPASS runner cross-validation tests ────────────────────────────────

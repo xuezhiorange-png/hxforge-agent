@@ -748,6 +748,29 @@ def _validate_telemetry(
             f"telemetry.tests_collected={tests_collected} != node_count={expected_node_count}"
         )
 
+    # P0-3 (round 4627109299): authoritatively require that the runner
+    # performed execution-inventory cross-validation. The telemetry must
+    # carry node_inventory_parse_status == "available" (or "unrequired"
+    # when no inventory path was configured) and node_inventory_validation_error
+    # must be null when status is "available".
+    if "node_inventory_parse_status" not in telemetry:
+        raise BenchmarkAuthorityError(
+            "telemetry.node_inventory_parse_status missing "
+            "(runner did not perform inventory cross-validation)"
+        )
+    inv_status = telemetry.get("node_inventory_parse_status")
+    if inv_status not in ("available", "unrequired"):
+        raise BenchmarkAuthorityError(
+            f"telemetry.node_inventory_parse_status must be 'available' "
+            f"or 'unrequired', got {inv_status!r}"
+        )
+    inv_err = telemetry.get("node_inventory_validation_error")
+    if inv_status == "available" and inv_err is not None:
+        raise BenchmarkAuthorityError(
+            f"telemetry.node_inventory_validation_error must be null when "
+            f"status=='available', got {inv_err!r}"
+        )
+
 
 def _validate_outcome_category_counts(
     outcomes: dict[str, Any],
@@ -1434,6 +1457,30 @@ def _cli_validate(args: argparse.Namespace) -> None:
         )
         print(f"Executed evidence cross-validation passed ✓ ({len(validated_nodes)} nodes)")
 
+        # P0-1 (round 4627109299): Strictly bind artifact's benchmark_node_ids
+        # and benchmark_node_count to the validated evidence node set.
+        # Same-count authority node replacement must be rejected here,
+        # not only at construction time.
+        artifact_node_ids = artifact.get("benchmark_node_ids")
+        if not isinstance(artifact_node_ids, list):
+            raise BenchmarkAuthorityError("executed authority benchmark_node_ids must be a list")
+        artifact_nodes = frozenset(artifact_node_ids)
+        if artifact_nodes != validated_nodes:
+            missing_in_authority = sorted(validated_nodes - artifact_nodes)
+            extra_in_authority = sorted(artifact_nodes - validated_nodes)
+            raise BenchmarkAuthorityError(
+                "authority benchmark node set mismatch with validated evidence: "
+                f"missing_in_authority={missing_in_authority}, "
+                f"extra_in_authority={extra_in_authority}"
+            )
+        artifact_node_count = artifact.get("benchmark_node_count")
+        if artifact_node_count != len(validated_nodes):
+            raise BenchmarkAuthorityError(
+                "authority benchmark_node_count mismatch with validated evidence: "
+                f"authority={artifact_node_count}, "
+                f"validated={len(validated_nodes)}"
+            )
+
         # Verify digests match
         stored_evidence = artifact.get("evidence")
         assert isinstance(stored_evidence, dict)  # enforced by P0-5
@@ -1454,6 +1501,7 @@ def _cli_validate(args: argparse.Namespace) -> None:
                     f"computed={computed!r}"
                 )
         print("Evidence digest verification passed ✓")
+        print("Authority benchmark node set bound to validated evidence ✓")
 
     print(
         f"Authority artifact validation PASS: "

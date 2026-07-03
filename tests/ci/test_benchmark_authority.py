@@ -164,8 +164,15 @@ def _make_telemetry(
     outcome_parse_status: str = "available",
     junit_parse_status: str = "available",
     resource_measurement_status: str = "available",
+    node_inventory_parse_status: str = "available",
+    node_inventory_validation_error: str | None = None,
 ) -> dict[str, Any]:
-    """Build a minimal telemetry dict."""
+    """Build a minimal telemetry dict.
+
+    P0-3 (round 4627109299): telemetry MUST carry inventory cross-validation
+    status. Defaults are ``available`` / ``null`` (the authoritative state)
+    but tests can override.
+    """
     tel: dict[str, Any] = {
         "track": "nightly",
         "commit_sha": commit_sha,
@@ -180,6 +187,8 @@ def _make_telemetry(
         "outcome_parse_status": outcome_parse_status,
         "junit_parse_status": junit_parse_status,
         "resource_measurement_status": resource_measurement_status,
+        "node_inventory_parse_status": node_inventory_parse_status,
+        "node_inventory_validation_error": node_inventory_validation_error,
         "tests_collected": tests_collected,
         "tests_passed": tests_collected,
         "tests_failed": 0,
@@ -2304,3 +2313,502 @@ class TestArtifactFieldValidation:
                 expected_run_attempt=_RUN_ATTEMPT,
                 expected_python_version=_PYTHON_VERSION,
             )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Section 11: Review 4627109299 — authority/source node binding tests (P0-1)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestAuthoritySourceNodeBinding:
+    """P0-1 (round 4627109299): real CLI validate must reject artifacts whose
+    benchmark_node_ids / benchmark_node_count are tampered relative to the
+    validated source evidence node set. Same-count replacement must fail.
+    """
+
+    def _write_full_evidence(self, tmp_path: Path, *, node_ids: list[str]) -> dict[str, Any]:
+        """Write a complete evidence set with the given benchmark node IDs."""
+        marker_inv_data = _make_marker_inv({n: ["benchmark"] for n in node_ids})
+        global_node_inv_data = _make_node_inv(node_ids, collection_scope="global", shard=None)
+        exec_inv_data = _make_exec_inv(node_ids)
+        outcomes_data = _make_outcomes({n: "passed" for n in node_ids})
+        telemetry_data = _make_telemetry(tests_collected=len(node_ids))
+        junit_path = tmp_path / "junit.xml"
+        _write_junit(junit_path)
+
+        paths = {
+            "marker": tmp_path / "marker.json",
+            "node": tmp_path / "node.json",
+            "exec": tmp_path / "exec.json",
+            "outcomes": tmp_path / "outcomes.json",
+            "telemetry": tmp_path / "telemetry.json",
+            "junit": junit_path,
+        }
+        paths["marker"].write_text(json.dumps(marker_inv_data), encoding="utf-8")
+        paths["node"].write_text(json.dumps(global_node_inv_data), encoding="utf-8")
+        paths["exec"].write_text(json.dumps(exec_inv_data), encoding="utf-8")
+        paths["outcomes"].write_text(json.dumps(outcomes_data), encoding="utf-8")
+        paths["telemetry"].write_text(json.dumps(telemetry_data), encoding="utf-8")
+        return {
+            "paths": paths,
+            "marker": marker_inv_data,
+            "node": global_node_inv_data,
+            "exec": exec_inv_data,
+            "outcomes": outcomes_data,
+            "telemetry": telemetry_data,
+        }
+
+    def _run_validate(self, artifact: dict[str, Any], paths: dict[str, Path]) -> Any:
+        return subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "tests.ci.benchmark_authority",
+                "validate",
+                "--artifact",
+                str(paths["artifact"]),
+                "--global-marker-inventory",
+                str(paths["marker"]),
+                "--global-node-inventory",
+                str(paths["node"]),
+                "--execution-node-inventory",
+                str(paths["exec"]),
+                "--outcomes",
+                str(paths["outcomes"]),
+                "--telemetry",
+                str(paths["telemetry"]),
+                "--junit",
+                str(paths["junit"]),
+                "--commit-sha",
+                _SHA,
+                "--run-id",
+                _RUN_ID,
+                "--run-attempt",
+                str(_RUN_ATTEMPT),
+                "--python-version",
+                _PYTHON_VERSION,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    def test_authority_same_count_node_replacement_rejected(self, tmp_path: Path) -> None:
+        """Same-count authority node replacement → FAIL at real validate CLI."""
+        fixture = self._write_full_evidence(tmp_path, node_ids=["alpha", "beta"])
+        # Build artifact with same count (2) but different nodes
+        artifact = _valid_executed_artifact(["alpha", "fake_beta"])
+        assert artifact["benchmark_node_count"] == 2
+        artifact_paths = {**fixture["paths"], "artifact": tmp_path / "authority.json"}
+        save_authority_artifact(artifact, artifact_paths["artifact"])
+
+        result = self._run_validate(artifact, artifact_paths)
+        assert result.returncode != 0, (
+            f"validate CLI must FAIL on same-count replacement; "
+            f"stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
+        assert "mismatch" in result.stderr.lower()
+
+    def test_authority_missing_node_rejected(self, tmp_path: Path) -> None:
+        """Authority artifact missing one node vs evidence → FAIL."""
+        fixture = self._write_full_evidence(tmp_path, node_ids=["alpha", "beta"])
+        # Authority claims only "alpha" (missing beta)
+        artifact = _valid_executed_artifact(["alpha"])
+        artifact_paths = {**fixture["paths"], "artifact": tmp_path / "authority.json"}
+        save_authority_artifact(artifact, artifact_paths["artifact"])
+
+        result = self._run_validate(artifact, artifact_paths)
+        assert result.returncode != 0, (
+            f"validate CLI must FAIL on missing authority node; stderr={result.stderr!r}"
+        )
+        assert "missing_in_authority" in result.stderr
+
+    def test_authority_extra_node_rejected(self, tmp_path: Path) -> None:
+        """Authority artifact with extra node not in evidence → FAIL."""
+        fixture = self._write_full_evidence(tmp_path, node_ids=["alpha"])
+        # Authority claims extra node "ghost" not in evidence
+        artifact = _valid_executed_artifact(["alpha", "ghost"])
+        artifact["benchmark_node_count"] = 2  # wrong count, but matches length
+        artifact_paths = {**fixture["paths"], "artifact": tmp_path / "authority.json"}
+        save_authority_artifact(artifact, artifact_paths["artifact"])
+
+        result = self._run_validate(artifact, artifact_paths)
+        assert result.returncode != 0, (
+            f"validate CLI must FAIL on extra authority node; stderr={result.stderr!r}"
+        )
+        assert "extra_in_authority" in result.stderr
+
+    def test_authority_count_mismatch_rejected(self, tmp_path: Path) -> None:
+        """Authority benchmark_node_count != len(validated_nodes) → FAIL."""
+        fixture = self._write_full_evidence(tmp_path, node_ids=["alpha", "beta"])
+        artifact = _valid_executed_artifact(["alpha", "beta"])
+        # Tamper: change count but keep same node IDs
+        artifact["benchmark_node_count"] = 99
+        artifact_paths = {**fixture["paths"], "artifact": tmp_path / "authority.json"}
+        save_authority_artifact(artifact, artifact_paths["artifact"])
+
+        result = self._run_validate(artifact, artifact_paths)
+        assert result.returncode != 0, (
+            f"validate CLI must FAIL on count mismatch; stderr={result.stderr!r}"
+        )
+        assert (
+            "benchmark_node_count" in result.stderr.lower()
+            or "count mismatch" in result.stderr.lower()
+            or "length" in result.stderr.lower()
+        )
+
+    def test_authority_consistent_passes(self, tmp_path: Path) -> None:
+        """Sanity: artifact consistent with evidence → PASS at validate CLI."""
+        fixture = self._write_full_evidence(tmp_path, node_ids=["alpha", "beta"])
+        artifact = _valid_executed_artifact(["alpha", "beta"])
+        # Recompute evidence digests against the actual files we wrote
+        # so the digest verification step also passes.
+        artifact["evidence"] = {
+            "global_marker_inventory_sha256": _compute_file_sha256(fixture["paths"]["marker"]),
+            "global_node_inventory_sha256": _compute_file_sha256(fixture["paths"]["node"]),
+            "execution_node_inventory_sha256": _compute_file_sha256(fixture["paths"]["exec"]),
+            "outcomes_sha256": _compute_file_sha256(fixture["paths"]["outcomes"]),
+            "telemetry_sha256": _compute_file_sha256(fixture["paths"]["telemetry"]),
+            "junit_sha256": _compute_file_sha256(fixture["paths"]["junit"]),
+        }
+        artifact_paths = {**fixture["paths"], "artifact": tmp_path / "authority.json"}
+        save_authority_artifact(artifact, artifact_paths["artifact"])
+
+        result = self._run_validate(artifact, artifact_paths)
+        assert result.returncode == 0, (
+            f"validate CLI must PASS when artifact matches evidence; stderr={result.stderr!r}"
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Section 12: Review 4627109299 — runner inventory fail-closed (P0-2/P0-3)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestRunnerInventoryFailClosed:
+    """P0-2 (round 4627109299): run_test_shard must fail closed on any
+    inventory path failure, returning non-zero and writing telemetry
+    with the failure status.
+    """
+
+    @staticmethod
+    def _make_well_formed_inv(tmp_path: Path, node_ids: list[str]) -> Path:
+        inv = Path(tmp_path) / "node-inventory.json"
+        inv.write_text(
+            json.dumps(
+                {
+                    "schema_version": "1",
+                    "node_ids": sorted(node_ids),
+                    "node_count": len(node_ids),
+                }
+            ),
+            encoding="utf-8",
+        )
+        return inv
+
+    @staticmethod
+    def _run_shard_with_inv(
+        tmp_path: Path,
+        node_inventory_path: Path | None,
+    ) -> tuple[int, dict[str, Any]]:
+        """Run the inner run_pytest with a controlled inventory path.
+
+        Returns ``(returncode, telemetry_dict)``.
+        """
+        from tests.ci.run_test_shard import run_pytest
+
+        # Prepare a passing test in tmp_path
+        base = Path(tmp_path)
+        test_dir = base / "tests_under_test"
+        test_dir.mkdir(parents=True, exist_ok=True)
+        test_file = test_dir / "test_pass.py"
+        test_file.write_text("def test_pass():\n    assert True\n", encoding="utf-8")
+
+        outcomes = base / "outcomes.json"
+        inv_arg: str | Path = node_inventory_path if node_inventory_path is not None else ""
+        rc = run_pytest(
+            [str(test_file)],
+            junit_path=base / "junit.xml",
+            telemetry_path=base / "telemetry.json",
+            stdout_path=base / "stdout.txt",
+            stderr_path=base / "stderr.txt",
+            outcomes_path=outcomes,
+            node_inventory_path=inv_arg,
+            track="nightly",
+            commit_sha=_SHA,
+            run_id=_RUN_ID,
+            run_attempt=1,
+            python_version=_PYTHON_VERSION,
+            shard="benchmark",
+            timeout=60,
+            env={"PYTHONHASHSEED": "0", "TZ": "UTC", "LC_ALL": "C.UTF-8"},
+        )
+        tel: dict[str, Any] = {}
+        tel_path = base / "telemetry.json"
+        if tel_path.is_file():
+            tel = json.loads(tel_path.read_text(encoding="utf-8"))
+        return rc, tel
+
+    def test_missing_inventory_produces_non_authoritative(self, tmp_path: Path) -> None:
+        """Configured inventory path that doesn't exist → fail closed."""
+        missing = Path(tmp_path) / "does_not_exist.json"
+        rc, tel = self._run_shard_with_inv(tmp_path, missing)
+        assert tel.get("node_inventory_parse_status") == "missing"
+        assert tel.get("producer_authoritative") is False
+        assert rc != 0
+
+    def test_malformed_inventory_produces_non_authoritative(self, tmp_path: Path) -> None:
+        """Configured inventory that is broken JSON → fail closed."""
+        bad = Path(tmp_path) / "bad.json"
+        bad.write_text("NOT JSON {{{", encoding="utf-8")
+        rc, tel = self._run_shard_with_inv(tmp_path, bad)
+        assert tel.get("node_inventory_parse_status") == "malformed"
+        assert tel.get("producer_authoritative") is False
+        assert rc != 0
+
+    def test_wrong_schema_version_rejected(self, tmp_path: Path) -> None:
+        """Inventory with wrong schema_version → fail closed."""
+        bad = Path(tmp_path) / "wrong_schema.json"
+        bad.write_text(
+            json.dumps(
+                {
+                    "schema_version": "999",
+                    "node_ids": [str(Path(tmp_path) / "t.py::t")],
+                    "node_count": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        rc, tel = self._run_shard_with_inv(tmp_path, bad)
+        assert tel.get("producer_authoritative") is False
+        assert rc != 0
+
+    def test_wrong_node_count_rejected(self, tmp_path: Path) -> None:
+        """Inventory with node_count != len(node_ids) → fail closed."""
+        nid = str(Path(tmp_path) / "t.py::t")
+        bad = Path(tmp_path) / "wrong_nc.json"
+        bad.write_text(
+            json.dumps({"schema_version": "1", "node_ids": [nid], "node_count": 3}),
+            encoding="utf-8",
+        )
+        rc, tel = self._run_shard_with_inv(tmp_path, bad)
+        assert tel.get("node_inventory_parse_status") == "invalid_node_count"
+        assert tel.get("producer_authoritative") is False
+        assert rc != 0
+
+    def test_duplicate_node_ids_rejected(self, tmp_path: Path) -> None:
+        """Inventory with duplicate node_ids → fail closed."""
+        nid = str(Path(tmp_path) / "t.py::t")
+        bad = Path(tmp_path) / "dup.json"
+        bad.write_text(
+            json.dumps({"schema_version": "1", "node_ids": [nid, nid], "node_count": 2}),
+            encoding="utf-8",
+        )
+        rc, tel = self._run_shard_with_inv(tmp_path, bad)
+        assert tel.get("node_inventory_parse_status") == "duplicate_nodes"
+        assert tel.get("producer_authoritative") is False
+        assert rc != 0
+
+    def test_unsorted_node_ids_rejected(self, tmp_path: Path) -> None:
+        """Inventory not canonically sorted → fail closed."""
+        n1, n2 = str(Path(tmp_path) / "a.py::t"), str(Path(tmp_path) / "b.py::t")
+        if n1 < n2:
+            n1, n2 = n2, n1
+        bad = Path(tmp_path) / "unsorted.json"
+        bad.write_text(
+            json.dumps({"schema_version": "1", "node_ids": [n1, n2], "node_count": 2}),
+            encoding="utf-8",
+        )
+        rc, tel = self._run_shard_with_inv(tmp_path, bad)
+        assert tel.get("node_inventory_parse_status") == "unsorted_nodes"
+        assert tel.get("producer_authoritative") is False
+        assert rc != 0
+
+    def test_set_mismatch_rejected(self, tmp_path: Path) -> None:
+        """Inventory same count but different nodes vs outcomes → fail closed."""
+        bad = Path(tmp_path) / "mismatch.json"
+        bad.write_text(
+            json.dumps(
+                {
+                    "schema_version": "1",
+                    "node_ids": ["unrelated/path.py::no_such_test"],
+                    "node_count": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        rc, tel = self._run_shard_with_inv(tmp_path, bad)
+        assert tel.get("node_inventory_parse_status") == "set_mismatch"
+        assert tel.get("producer_authoritative") is False
+        assert rc != 0
+
+    def test_inventory_status_present_in_telemetry(self, tmp_path: Path) -> None:
+        """Telemetry ALWAYS carries inventory parse status when configured."""
+        bad = Path(tmp_path) / "missing.json"
+        rc, tel = self._run_shard_with_inv(tmp_path, bad)
+        assert tel.get("node_inventory_parse_status") == "missing"
+        assert "node_inventory_validation_error" in tel
+        assert rc != 0
+
+
+class TestAuthorityTelemetryInventoryStatus:
+    """P0-3 (round 4627109299): authority telemetry validator must require
+    inventory cross-validation status.
+    """
+
+    def test_validate_telemetry_rejects_missing_status(self) -> None:
+        from tests.ci.benchmark_authority import _validate_telemetry
+
+        tel = _make_telemetry()
+        del tel["node_inventory_parse_status"]
+        with pytest.raises(BenchmarkAuthorityError, match="node_inventory_parse_status missing"):
+            _validate_telemetry(
+                tel,
+                expected_pytest_exit_code=0,
+                expected_node_count=2,
+                expected_commit_sha=_SHA,
+                expected_run_id=_RUN_ID,
+                expected_run_attempt=_RUN_ATTEMPT,
+                expected_python_version=_PYTHON_VERSION,
+            )
+
+    def test_validate_telemetry_rejects_invalid_status(self) -> None:
+        from tests.ci.benchmark_authority import _validate_telemetry
+
+        tel = _make_telemetry(node_inventory_parse_status="bogus_status")
+        with pytest.raises(
+            BenchmarkAuthorityError,
+            match="node_inventory_parse_status must be",
+        ):
+            _validate_telemetry(
+                tel,
+                expected_pytest_exit_code=0,
+                expected_node_count=2,
+                expected_commit_sha=_SHA,
+                expected_run_id=_RUN_ID,
+                expected_run_attempt=_RUN_ATTEMPT,
+                expected_python_version=_PYTHON_VERSION,
+            )
+
+    def test_validate_telemetry_accepts_available(self) -> None:
+        from tests.ci.benchmark_authority import _validate_telemetry
+
+        tel = _make_telemetry(node_inventory_parse_status="available")
+        _validate_telemetry(
+            tel,
+            expected_pytest_exit_code=0,
+            expected_node_count=2,
+            expected_commit_sha=_SHA,
+            expected_run_id=_RUN_ID,
+            expected_run_attempt=_RUN_ATTEMPT,
+            expected_python_version=_PYTHON_VERSION,
+        )  # no raise
+
+    def test_validate_telemetry_accepts_unrequired(self) -> None:
+        from tests.ci.benchmark_authority import _validate_telemetry
+
+        tel = _make_telemetry(node_inventory_parse_status="unrequired")
+        _validate_telemetry(
+            tel,
+            expected_pytest_exit_code=0,
+            expected_node_count=2,
+            expected_commit_sha=_SHA,
+            expected_run_id=_RUN_ID,
+            expected_run_attempt=_RUN_ATTEMPT,
+            expected_python_version=_PYTHON_VERSION,
+        )  # no raise
+
+    def test_validate_telemetry_rejects_available_with_error(self) -> None:
+        from tests.ci.benchmark_authority import _validate_telemetry
+
+        tel = _make_telemetry(
+            node_inventory_parse_status="available",
+            node_inventory_validation_error="some lurking error",
+        )
+        with pytest.raises(
+            BenchmarkAuthorityError,
+            match="node_inventory_validation_error must be null",
+        ):
+            _validate_telemetry(
+                tel,
+                expected_pytest_exit_code=0,
+                expected_node_count=2,
+                expected_commit_sha=_SHA,
+                expected_run_id=_RUN_ID,
+                expected_run_attempt=_RUN_ATTEMPT,
+                expected_python_version=_PYTHON_VERSION,
+            )
+
+
+class TestStrictInventoryValidation:
+    """Unit-level: run_test_shard._strict_validate_inventory_data / _read_node_inventory
+    must classify failures precisely.
+    """
+
+    def test_missing_file_status(self, tmp_path: Path) -> None:
+        from tests.ci.run_test_shard import _read_node_inventory
+
+        v = _read_node_inventory(tmp_path / "no.json")
+        assert v.status == "missing"
+        assert v.node_ids == frozenset()
+
+    def test_malformed_status(self, tmp_path: Path) -> None:
+        from tests.ci.run_test_shard import _read_node_inventory
+
+        f = tmp_path / "bad.json"
+        f.write_text("NOT JSON", encoding="utf-8")
+        v = _read_node_inventory(f)
+        assert v.status == "malformed"
+
+    def test_invalid_schema_status(self, tmp_path: Path) -> None:
+        from tests.ci.run_test_shard import _read_node_inventory
+
+        f = tmp_path / "x.json"
+        f.write_text(json.dumps({"node_ids": [], "node_count": 0}), encoding="utf-8")
+        v = _read_node_inventory(f)
+        assert v.status == "invalid_schema"
+
+    def test_duplicate_nodes_status(self, tmp_path: Path) -> None:
+        from tests.ci.run_test_shard import _read_node_inventory
+
+        f = tmp_path / "x.json"
+        f.write_text(
+            json.dumps({"schema_version": "1", "node_ids": ["a", "a"], "node_count": 2}),
+            encoding="utf-8",
+        )
+        v = _read_node_inventory(f)
+        assert v.status == "duplicate_nodes"
+
+    def test_unsorted_status(self, tmp_path: Path) -> None:
+        from tests.ci.run_test_shard import _read_node_inventory
+
+        f = tmp_path / "x.json"
+        f.write_text(
+            json.dumps({"schema_version": "1", "node_ids": ["b", "a"], "node_count": 2}),
+            encoding="utf-8",
+        )
+        v = _read_node_inventory(f)
+        assert v.status == "unsorted_nodes"
+
+    def test_invalid_node_count_status(self, tmp_path: Path) -> None:
+        from tests.ci.run_test_shard import _read_node_inventory
+
+        f = tmp_path / "x.json"
+        f.write_text(
+            json.dumps({"schema_version": "1", "node_ids": ["a", "b"], "node_count": 5}),
+            encoding="utf-8",
+        )
+        v = _read_node_inventory(f)
+        assert v.status == "invalid_node_count"
+
+    def test_available_status(self, tmp_path: Path) -> None:
+        from tests.ci.run_test_shard import _read_node_inventory
+
+        f = tmp_path / "x.json"
+        f.write_text(
+            json.dumps({"schema_version": "1", "node_ids": ["a", "b"], "node_count": 2}),
+            encoding="utf-8",
+        )
+        v = _read_node_inventory(f)
+        assert v.status == "available"
+        assert v.node_ids == frozenset({"a", "b"})
