@@ -348,6 +348,12 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.benchmark_authority validate \
             --artifact benchmark-authority.json \
+            --global-marker-inventory benchmark-node-marker-inventory.json \
+            --global-node-inventory benchmark-node-inventory.json \
+            --execution-node-inventory benchmark-execution-node-inventory.json \
+            --outcomes pytest-outcomes.json \
+            --telemetry resource-telemetry.json \
+            --junit nightly-benchmark-junit.xml \
             --commit-sha "${{ needs.resolve-authority.outputs.main-sha }}" \
             --run-id "${{ github.run_id }}" \
             --run-attempt "${{ github.run_attempt }}" \
