@@ -1,0 +1,51 @@
+{
+  "applicability_envelope": {
+    "scope": "all TASK-012 rule-pack artifacts",
+    "units": "bytes (256-bit digest)"
+  },
+  "approval_status": "approved",
+  "bibliographic_reference": "internal://engineering-handbook/canonicalization/v1",
+  "canonical_hash": "ccb8414aac8d41e68854ca7035233ea352f6daa6a3471ec2ca4257681eb684e0",
+  "forbidden_content_marker_check": [],
+  "human_entered_evidence": {
+    "author_identity": "internal_engineer@example.invalid",
+    "author_role": "internal engineer",
+    "entry_timestamp_utc": "2026-07-04T09:00:00Z",
+    "review": {
+      "review_thread_reference": "internal_seed_review_001",
+      "review_timestamp_utc": "2026-07-04T09:15:00Z",
+      "reviewer_identity": "internal_reviewer@example.invalid"
+    }
+  },
+  "jurisdiction": "INTL",
+  "license_evidence": "project_internal_authority",
+  "provenance_edges": [
+    "internal_seed_edge_002"
+  ],
+  "review_status": "accepted",
+  "rule_body": {
+    "envelope_units": "bytes (256-bit digest)",
+    "statement": "canonical_hash = sha256(rfc8785_canonical_json(rule)) with UAX-15 NFC and excluded_hash_fields applied.",
+    "summary": "Canonicalization identity per Section 13."
+  },
+  "rule_id": "internal_seed_rule_002",
+  "rule_title": "Internal engineering rule: canonical JSON hash identity",
+  "rule_version": "1.0.0",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "source_evidence": {
+    "license_evidence": "project_internal_authority",
+    "source_access_date": "n/a",
+    "source_class": "INTERNAL_ENGINEERING_RULE",
+    "source_jurisdiction": "INTL",
+    "source_locator_or_citation": "Chapter 1",
+    "source_publisher": "internal",
+    "source_reference": "internal://engineering-handbook/canonicalization/v1",
+    "source_title_or_identifier": "Canonicalization",
+    "source_version_or_publication_date": "2026-01-15"
+  },
+  "standard_family": "INTERNAL",
+  "uncertainty": {
+    "note": "exact",
+    "type": "structural"
+  }
+}

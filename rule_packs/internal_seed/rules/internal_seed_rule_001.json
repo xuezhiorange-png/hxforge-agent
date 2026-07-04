@@ -1,0 +1,51 @@
+{
+  "applicability_envelope": {
+    "scope": "all TASK-012 rule-packs",
+    "units": "dimensionless"
+  },
+  "approval_status": "approved",
+  "bibliographic_reference": "internal://engineering-handbook/identity/v1",
+  "canonical_hash": "27aa54b2f2707ee9bc089243b08d6ee21a1e1ed0e5cad10f104e8e69e377821e",
+  "forbidden_content_marker_check": [],
+  "human_entered_evidence": {
+    "author_identity": "internal_engineer@example.invalid",
+    "author_role": "internal engineer",
+    "entry_timestamp_utc": "2026-07-04T09:00:00Z",
+    "review": {
+      "review_thread_reference": "internal_seed_review_001",
+      "review_timestamp_utc": "2026-07-04T09:15:00Z",
+      "reviewer_identity": "internal_reviewer@example.invalid"
+    }
+  },
+  "jurisdiction": "INTL",
+  "license_evidence": "project_internal_authority",
+  "provenance_edges": [
+    "internal_seed_edge_001"
+  ],
+  "review_status": "accepted",
+  "rule_body": {
+    "envelope_units": "dimensionless",
+    "statement": "rule_identity is the 12-field tuple enumerated in Section 7.2 of the TASK-012 frozen contract.",
+    "summary": "Identity tuple per Section 7.2 direct-field policy."
+  },
+  "rule_id": "internal_seed_rule_001",
+  "rule_title": "Internal engineering rule: identity is a 12-field tuple",
+  "rule_version": "1.0.0",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "source_evidence": {
+    "license_evidence": "project_internal_authority",
+    "source_access_date": "n/a",
+    "source_class": "INTERNAL_ENGINEERING_RULE",
+    "source_jurisdiction": "INTL",
+    "source_locator_or_citation": "Chapter 1",
+    "source_publisher": "internal",
+    "source_reference": "internal://engineering-handbook/identity/v1",
+    "source_title_or_identifier": "Identity",
+    "source_version_or_publication_date": "2026-01-15"
+  },
+  "standard_family": "INTERNAL",
+  "uncertainty": {
+    "note": "exact",
+    "type": "structural"
+  }
+}

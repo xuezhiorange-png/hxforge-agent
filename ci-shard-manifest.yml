@@ -12,6 +12,13 @@ shards:
       - tests/ci/test_shared_infrastructure.py
       - tests/support/test_mypy_doubles.py
       - tests/support/test_property_provider_doubles.py
+      - tests/canonical_json/test_shared_canonical_json.py
+      - tests/rule_packs/test_canonical_json_integration.py
+      - tests/rule_packs/test_license_boundary.py
+      - tests/rule_packs/test_provenance.py
+      - tests/rule_packs/test_schema.py
+      - tests/rule_packs/test_seed_rule_pack.py
+      - tests/rule_packs/test_validation.py
     timeout: 300
 
   - name: ci-acceptance
