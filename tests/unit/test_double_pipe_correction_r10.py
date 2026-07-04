@@ -39,6 +39,8 @@ from hexagent.properties.base import (
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
 
+pytestmark = pytest.mark.coolprop
+
 # -----------------------------------------------------------------------
 # Fixtures & constants
 # -----------------------------------------------------------------------

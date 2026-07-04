@@ -58,6 +58,8 @@ from hexagent.domain.revisions import (
     IntegrityError,
 )
 
+pytestmark = pytest.mark.coolprop
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------

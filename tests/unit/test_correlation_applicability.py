@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from hexagent.correlations.applicability import assess_applicability
 from hexagent.correlations.models import (
     ApplicabilityEnvelope,
@@ -19,6 +21,8 @@ from hexagent.correlations.models import (
     OutOfRangePolicy,
     PhaseRegime,
 )
+
+pytestmark = pytest.mark.pure
 
 # ---------------------------------------------------------------------------
 # Fixture helpers

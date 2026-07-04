@@ -1,0 +1,97 @@
+version: "1"
+shards:
+  - name: ci
+    job: shard-ci
+    python: ["3.11", "3.12"]
+    files:
+      - tests/ci/test_benchmark_authority.py
+      - tests/ci/test_node_inventory.py
+      - tests/ci/test_outcome_plugin.py
+      - tests/ci/test_shard_manifest.py
+      - tests/ci/test_shared_infrastructure.py
+      - tests/support/test_mypy_doubles.py
+      - tests/support/test_property_provider_doubles.py
+    timeout: 300
+
+  - name: ci-acceptance
+    job: shard-ci-acceptance
+    python: ["3.11", "3.12"]
+    files:
+      - tests/ci/test_collect_acceptance.py
+    timeout: 900
+
+  - name: pure-unit
+    job: shard-pure-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/unit/test_calculation_runs.py
+      - tests/unit/test_canonical_serialization.py
+      - tests/unit/test_correlation_applicability.py
+      - tests/unit/test_correlation_models.py
+      - tests/unit/test_correlation_registry.py
+      - tests/unit/test_correlation_usage.py
+      - tests/unit/test_design_case_revisions.py
+      - tests/unit/test_double_pipe_geometry.py
+      - tests/unit/test_double_pipe_solver.py
+      - tests/unit/test_double_pipe_thermal.py
+      - tests/unit/test_provenance_graph.py
+      - tests/unit/test_task009_catalog_hash.py
+      - tests/unit/test_task009_phase1.py
+      - tests/unit/test_task009_phase2_contract.py
+      - tests/unit/test_task009_phase3.py
+      - tests/unit/test_thermal.py
+      - tests/unit/test_tube_annulus_correlations.py
+    timeout: 120
+
+  - name: coolprop-unit
+    job: shard-coolprop-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/unit/test_double_pipe_correction_r5.py
+      - tests/unit/test_double_pipe_correction_r6.py
+      - tests/unit/test_double_pipe_correction_r8.py
+      - tests/unit/test_double_pipe_correction_r10.py
+      - tests/unit/test_double_pipe_correction_r12.py
+      - tests/unit/test_double_pipe_correction_r13.py
+      - tests/unit/test_double_pipe_rating_kernel.py
+      - tests/unit/test_engineering_messages.py
+      - tests/unit/test_heat_balance.py
+      - tests/unit/test_properties.py
+      - tests/unit/test_provider_snapshot.py
+      - tests/unit/test_review02.py
+      - tests/unit/test_review03.py
+      - tests/unit/test_review_items.py
+      - tests/unit/test_task010_final.py
+      - tests/unit/test_task010_phase1.py
+      - tests/unit/test_task010_phase2.py
+      - tests/unit/test_units.py
+    timeout: 300
+
+  - name: provider-unit
+    job: shard-provider-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/unit/test_task009_phase2_adapter.py
+      - tests/unit/test_task009_phase2_canonicalization.py
+    timeout: 120
+
+  - name: golden
+    job: shard-golden
+    python: ["3.11", "3.12"]
+    files:
+      - tests/golden/double_pipe_rating/test_golden_double_pipe.py
+      - tests/golden/double_pipe_rating/test_independent_references.py
+      - tests/golden/heat_balance/test_golden.py
+    timeout: 300
+
+  - name: integration
+    job: shard-integration
+    python: ["3.11", "3.12"]
+    files:
+      - tests/integration/test_api.py
+      - tests/integration/test_correlation_registry_workflow.py
+      - tests/integration/test_double_pipe_rating.py
+      - tests/integration/test_heat_balance_property_provider.py
+      - tests/integration/test_revision_run_workflow.py
+      - tests/integration/test_task002_round3.py
+    timeout: 120

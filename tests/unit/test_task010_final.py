@@ -77,6 +77,8 @@ from hexagent.reporting import (
     verify_report_section_status_matrix,
 )
 
+pytestmark = pytest.mark.coolprop
+
 # ===================================================================
 # Module-level cached test app (CoolProp init takes ~1s)
 # ===================================================================

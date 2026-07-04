@@ -21,6 +21,8 @@ from hexagent.domain.revisions import (
 )
 from hexagent.repositories.memory import InMemoryDesignCaseRevisionRepository
 
+pytestmark = pytest.mark.pure
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

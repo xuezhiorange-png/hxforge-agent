@@ -29,6 +29,8 @@ from hexagent.domain.quantities import (
     VolumeFlow,
 )
 
+pytestmark = pytest.mark.coolprop
+
 
 @pytest.mark.parametrize(
     ("kind", "unit"),

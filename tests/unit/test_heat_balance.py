@@ -54,6 +54,8 @@ from hexagent.properties.base import (
 )
 from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
 
+pytestmark = pytest.mark.coolprop
+
 # ---------------------------------------------------------------------------
 # Mock property provider — simple linear Cp model
 # ---------------------------------------------------------------------------

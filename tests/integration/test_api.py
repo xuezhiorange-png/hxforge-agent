@@ -24,6 +24,8 @@ from hexagent.domain.quantities import (
 )
 from hexagent.exchangers.double_pipe.service import DoublePipeService
 
+pytestmark = pytest.mark.integration
+
 EXAMPLE_PATH = Path(__file__).resolve().parents[2] / "examples" / "water_water_double_pipe.json"
 
 

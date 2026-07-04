@@ -26,6 +26,8 @@ from hexagent.correlations.models import (
 )
 from hexagent.correlations.registry import InMemoryCorrelationRegistry
 
+pytestmark = pytest.mark.pure
+
 # ---------------------------------------------------------------------------
 # Fixture helpers
 # ---------------------------------------------------------------------------

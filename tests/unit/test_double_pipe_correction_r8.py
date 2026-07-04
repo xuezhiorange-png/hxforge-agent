@@ -62,6 +62,8 @@ from hexagent.properties.base import (
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from hexagent.properties.errors import PropertyErrorCode, PropertyServiceError
 
+pytestmark = pytest.mark.coolprop
+
 # -----------------------------------------------------------------------
 # Fixtures & constants
 # -----------------------------------------------------------------------
