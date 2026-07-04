@@ -204,15 +204,16 @@ following rules:
 
 1. The repository's primary license is recorded in `LICENSE` and is
    the ceiling for any rule's redistribution rights.
-2. Every rule MUST record its `source_class` and (where applicable)
-   its `license_evidence` (see Section 10).
+2. Every rule MUST record its `source_class` and `license_evidence`
+   (see Section 10).
 3. Rules whose `source_class` is `OPEN_LICENSE` MUST record the SPDX
    identifier of the open license and MUST NOT include any clause
    whose redistribution would violate that license.
-4. Rules whose `source_class` is `USER_PROVIDED_LICENSED_SUMMARY`,
-   `REFERENCE_ONLY_RESTRICTED_STANDARD`, or `VENDOR_PERMISSIONED`
-   MUST record the permission / license evidence and MUST NOT be
-   treated as redistributable.
+4. Rules whose `source_class` is `USER_PROVIDED_LICENSED_SUMMARY`
+   or `REFERENCE_ONLY_RESTRICTED_STANDARD` MUST NOT be treated as
+   redistributable. `VENDOR_PERMISSIONED` redistribution is governed
+   solely by the Section 4.1 matrix and the explicit vendor permission
+   scope recorded in Section 16.3a.
 5. The license boundary is enforced at future CI; this design
    contract does not authorize CI implementation but defines what
    the future CI checks MUST enforce.
