@@ -26,9 +26,7 @@ def test_task011_corpus_contains_exactly_twenty_approved_cases() -> None:
 
 def test_task011_synthetic_cases_are_explicitly_marked() -> None:
     synthetic_ids = {
-        case["case_id"]
-        for case in approved_cases()
-        if case.get("is_synthetic") is True
+        case["case_id"] for case in approved_cases() if case.get("is_synthetic") is True
     }
 
     assert synthetic_ids == {
