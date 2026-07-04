@@ -338,20 +338,35 @@ def _check_cost_value(record: dict[str, Any]) -> list[ValidationIssue]:
                         )
                     )
 
-        if not isinstance(cv.get("value"), str):
+        if not _is_decimal_string(cv.get("value")):
             issues.append(
                 _issue(
                     "blocker",
                     f"{path}.value",
-                    "cost_value.value must be a decimal string (Section 6.4)",
+                    "cost_value.value must be a decimal string (RFC 8785 §3.3.1) (Section 6.4)",
                 )
             )
-        if not isinstance(cv.get("quantity_value_si"), str):
+        if not _is_decimal_string(cv.get("quantity_value_si")):
             issues.append(
                 _issue(
                     "blocker",
                     f"{path}.quantity_value_si",
-                    "cost_value.quantity_value_si must be a decimal string",
+                    "cost_value.quantity_value_si must be a decimal string "
+                    "(RFC 8785 §3.3.1) (Section 6.4)",
+                )
+            )
+        # Section 6.4: normalized_unit_price is OPTIONAL (may be
+        # ``null`` or absent); when present and non-null it MUST be a
+        # decimal string per RFC 8785 §3.3.1.
+        normalized = cv.get("normalized_unit_price")
+        if normalized is not None and not _is_decimal_string(normalized):
+            issues.append(
+                _issue(
+                    "blocker",
+                    f"{path}.normalized_unit_price",
+                    "cost_value.normalized_unit_price, when present and "
+                    "non-null, must be a decimal string "
+                    "(RFC 8785 §3.3.1) (Section 6.4)",
                 )
             )
         if not isinstance(cv.get("source_pointer"), str):

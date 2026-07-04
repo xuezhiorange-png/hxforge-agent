@@ -97,9 +97,40 @@ def _has_usage_scope(record: dict[str, Any]) -> bool:
     return isinstance(usage, str) and bool(usage.strip())
 
 
+def _license_posture_allows_runtime_consumption(record: dict[str, Any]) -> bool:
+    """Section 14 gate #5 — license posture forbids runtime consumption.
+
+    * ``RESTRICTED_REFERENCE_METADATA_ONLY`` is metadata-only and is
+      NEVER consumable at runtime (Section 9).
+    * ``VENDOR_PERMISSIONED`` is consumable at runtime ONLY if it
+      records a non-empty ``usage_scope`` in
+      ``human_entered_evidence`` (Section 4 / 5.5 rule #2 / 6.4
+      rule #2). The presence of ``permission_scope`` alone is NOT
+      sufficient — runtime consumption must be explicitly scoped.
+    * All other source classes whose source-authority rank is
+      defined (USER / INTERNAL / PUBLIC) are consumable at runtime.
+
+    This gate is independent of priority demotion: a vendor without
+    ``usage_scope`` MUST be rejected before it can be ranked.
+    """
+    source_class = str(record.get("source_class", ""))
+    if source_class == SourceClass.RESTRICTED_REFERENCE_METADATA_ONLY.value:
+        return False
+    if source_class == SourceClass.VENDOR_PERMISSIONED.value:
+        return _has_usage_scope(record)
+    return source_class in SOURCE_AUTHORITY_PRIORITY
+
+
 def _vendor_priority(record: dict[str, Any]) -> int:
     """Vendor may only consume at USER priority if it carries usage_scope;
-    otherwise it is demoted to RESTRICTED-equivalent (sentinel)."""
+    otherwise it is demoted to RESTRICTED-equivalent (sentinel).
+
+    Note: callers MUST also pass :func:`_candidate_passes_gates`
+    (which calls :func:`_license_posture_allows_runtime_consumption`)
+    before ranking — the priority demotion alone is not sufficient
+    to fail-closed against a sole vendor-without-usage_scope
+    candidate (Section 14 gate #5).
+    """
     if not _has_usage_scope(record):
         return _RESTRICTED_PRIORITY_SENTINEL
     return SOURCE_AUTHORITY_PRIORITY[SourceClass.VENDOR_PERMISSIONED.value]
@@ -126,6 +157,12 @@ def _candidate_passes_gates(
     if _is_retired(record, selection_time):
         return False
     if record.get("source_class") == SourceClass.RESTRICTED_REFERENCE_METADATA_ONLY.value:
+        return False
+    # Section 14 gate #5 — license posture forbids runtime consumption
+    # for RESTRICTED_REFERENCE_METADATA_ONLY or for VENDOR_PERMISSIONED
+    # without usage_scope. Reject BEFORE ranking so a sole
+    # vendor-without-usage_scope candidate cannot be selected.
+    if not _license_posture_allows_runtime_consumption(record):
         return False
     # Region must match the requested region.
     return _candidate_region(record) == region

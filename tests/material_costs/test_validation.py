@@ -206,3 +206,99 @@ def test_escalation_index_record_with_public_index_passes_escalation_check() -> 
     # so we only assert that no escalation-specific blocker exists.
     result = validate_cost_record(record)
     assert not any("public_index" in b.message and "reserved" in b.message for b in result.blockers)
+
+
+# ---------- Section 6.4 — cost_value decimal-string enforcement ----------
+
+
+def _cost_record_with_cost_value(
+    *,
+    cost_value: dict[str, object],
+    source_class: str = SourceClass.INTERNAL_ENGINEERING_ASSUMPTION.value,
+) -> dict[str, object]:
+    """Return a base_cost_record fixture augmented with a cost_value."""
+    record = base_cost_record()
+    record["source_class"] = source_class
+    record["cost_value"] = cost_value
+    record["record_hash"] = canonical_sha256(
+        {k: v for k, v in record.items() if k != "record_hash"}
+    )
+    return record
+
+
+def _valid_cost_value() -> dict[str, object]:
+    return {
+        "value": "12.50",
+        "currency": "USD",
+        "quantity_value_si": "1.0",
+        "unit_basis": "kg",
+        "source_pointer": "internal://handbook/SA-106-B-price",
+    }
+
+
+def test_cost_value_value_must_be_decimal_string() -> None:
+    """P0-2 — Section 6.4: cost_value.value MUST be a decimal string
+    (RFC 8785 §3.3.1). A non-decimal string surfaces as a blocker.
+    """
+    cv = _valid_cost_value()
+    cv["value"] = "abc"  # not a decimal string
+    record = _cost_record_with_cost_value(cost_value=cv)
+    result = validate_cost_record(record)
+    assert not result.ok
+    assert any(
+        b.path == "cost_record.cost_value.value" and "decimal string" in b.message
+        for b in result.blockers
+    )
+
+
+def test_cost_value_quantity_value_si_must_be_decimal_string() -> None:
+    """P0-2 — Section 6.4: cost_value.quantity_value_si MUST be a
+    decimal string. A non-decimal string surfaces as a blocker.
+    """
+    cv = _valid_cost_value()
+    cv["quantity_value_si"] = "not-a-number"
+    record = _cost_record_with_cost_value(cost_value=cv)
+    result = validate_cost_record(record)
+    assert not result.ok
+    assert any(
+        b.path == "cost_record.cost_value.quantity_value_si" and "decimal string" in b.message
+        for b in result.blockers
+    )
+
+
+def test_cost_value_normalized_unit_price_must_be_decimal_string_when_present() -> None:
+    """P0-2 — Section 6.4: cost_value.normalized_unit_price, when
+    present and non-null, MUST be a decimal string. A non-decimal
+    value surfaces as a blocker.
+    """
+    cv = _valid_cost_value()
+    cv["normalized_unit_price"] = "NaN-ish"
+    record = _cost_record_with_cost_value(cost_value=cv)
+    result = validate_cost_record(record)
+    assert not result.ok
+    assert any(
+        b.path == "cost_record.cost_value.normalized_unit_price" and "decimal string" in b.message
+        for b in result.blockers
+    )
+
+
+def test_cost_value_normalized_unit_price_may_be_null_or_absent() -> None:
+    """P0-2 — Section 6.4: normalized_unit_price is OPTIONAL. It
+    may be explicitly null or absent, and the record MUST still
+    pass decimal-string enforcement for it (no blocker raised).
+    """
+    cv_null = _valid_cost_value()
+    cv_null["normalized_unit_price"] = None
+    record_null = _cost_record_with_cost_value(cost_value=cv_null)
+    result_null = validate_cost_record(record_null)
+    assert not any(
+        b.path == "cost_record.cost_value.normalized_unit_price" for b in result_null.blockers
+    )
+
+    cv_absent = _valid_cost_value()
+    # normalized_unit_price is not set
+    record_absent = _cost_record_with_cost_value(cost_value=cv_absent)
+    result_absent = validate_cost_record(record_absent)
+    assert not any(
+        b.path == "cost_record.cost_value.normalized_unit_price" for b in result_absent.blockers
+    )

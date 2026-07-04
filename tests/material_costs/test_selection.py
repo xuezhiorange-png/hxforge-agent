@@ -296,6 +296,99 @@ def test_vendor_with_usage_scope_beats_internal() -> None:
     assert winner["source_class"] == SourceClass.VENDOR_PERMISSIONED.value
 
 
+# ---------- Section 14 gate #5 — license posture forbids runtime
+#            consumption for vendor-without-usage_scope, even as
+#            sole candidate ----------
+
+
+def test_vendor_without_usage_scope_as_sole_material_candidate_is_rejected() -> None:
+    """P0-1 — gate #5 rejects a sole VENDOR_PERMISSIONED candidate
+    that lacks usage_scope, BEFORE ranking. The selector MUST raise
+    MaterialNotFound (NOT return the candidate).
+    """
+    vendor_no_scope = _make_variant(
+        record_id="MAT-001",
+        source_class=SourceClass.VENDOR_PERMISSIONED.value,
+        permission_scope=["permission_only"],
+        usage_scope=None,  # missing usage_scope
+    )
+    try:
+        select_material_record(
+            [vendor_no_scope],
+            "MAT-001",
+            region="US",
+            selection_time=SELECTION_TIME,
+        )
+    except MaterialNotFound as exc:
+        assert exc.material_record_id == "MAT-001"
+        assert exc.region == "US"
+        assert exc.selection_time == SELECTION_TIME
+        assert exc.reason == "no_candidate_passed_selection_chain"
+        # 1 candidate matched the id+region filter, but failed gates.
+        assert exc.rejected_candidate_count == 1
+    else:
+        raise AssertionError(
+            "expected MaterialNotFound for sole vendor-without-usage_scope material"
+        )
+
+
+def test_vendor_without_usage_scope_as_sole_cost_candidate_is_rejected() -> None:
+    """P0-1 — symmetric behavior for cost selector."""
+    record = base_cost_record()
+    record["source_class"] = SourceClass.VENDOR_PERMISSIONED.value
+    record["human_entered_evidence"] = {
+        "actor": "vendor-rep",
+        "entered_at": "2026-01-01T00:00:00Z",
+        "permission_scope": ["permission_only"],
+        # usage_scope intentionally absent
+    }
+    record["record_hash"] = canonical_sha256(
+        {k: v for k, v in record.items() if k != "record_hash"}
+    )
+    try:
+        select_cost_record(
+            [record],
+            "COST-001",
+            region="US",
+            selection_time=SELECTION_TIME,
+        )
+    except CostNotFound as exc:
+        assert exc.cost_record_id == "COST-001"
+        assert exc.region == "US"
+        assert exc.selection_time == SELECTION_TIME
+        assert exc.reason == "no_candidate_passed_selection_chain"
+        assert exc.rejected_candidate_count == 1
+    else:
+        raise AssertionError("expected CostNotFound for sole vendor-without-usage-scope cost")
+
+
+def test_vendor_with_usage_scope_still_beats_internal() -> None:
+    """P0-1 — gate #5 only rejects vendor WITHOUT usage_scope. A
+    vendor WITH usage_scope must still rank above INTERNAL
+    (Section 4: USER > VENDOR (with usage_scope) > INTERNAL).
+    """
+    vendor = _make_variant(
+        record_id="MAT-001",
+        source_class=SourceClass.VENDOR_PERMISSIONED.value,
+        permission_scope=["usage_scope"],
+        usage_scope="vendor_internal_consumption_only",
+    )
+    internal = _make_variant(
+        record_id="MAT-001",
+        source_class=SourceClass.INTERNAL_ENGINEERING_ASSUMPTION.value,
+    )
+    winner = select_material_record(
+        [vendor, internal],
+        "MAT-001",
+        region="US",
+        selection_time=SELECTION_TIME,
+    )
+    assert winner["source_class"] == SourceClass.VENDOR_PERMISSIONED.value
+    assert winner.get("human_entered_evidence", {}).get("usage_scope") == (
+        "vendor_internal_consumption_only"
+    )
+
+
 # ---------- cost selector ----------
 
 
