@@ -1,0 +1,202 @@
+{
+  "case_id": "task011_case_13",
+  "case_version": "1.0.0",
+  "case_title": "TASK-011 benchmark case 13 — Single-phase heat-balance closure",
+  "category": "Single-phase heat-balance closure",
+  "source_type": "internal_reviewed_case",
+  "source_evidence": {
+    "source_type": "internal_reviewed_case",
+    "source_reference": "issue-36-taska011-internal-review-task011_case_13",
+    "source_title_or_identifier": "TASK-011 internal review of task011_case_13",
+    "source_locator_or_citation": "Issue #36 comment thread — task011_case_13 thread anchor",
+    "source_version_or_publication_date": "2026-07-04",
+    "source_access_date": "n/a",
+    "extracted_input_fields": {
+      "hot_fluid_name": "Water",
+      "cold_fluid_name": "Water",
+      "hot_temperature_K": "363.15",
+      "cold_temperature_K": "293.15",
+      "hot_pressure_Pa": "400000",
+      "cold_pressure_Pa": "300000",
+      "hot_mass_flow_kg_s": "2.0",
+      "cold_mass_flow_kg_s": "2.0"
+    },
+    "extracted_expected_output_fields": {
+      "heat_duty_w": "see case expected_output_schema"
+    },
+    "unit_provenance": {
+      "temperature": "K (SI)",
+      "pressure": "Pa (SI)",
+      "mass_flow": "kg/s (SI)",
+      "length": "m (SI)",
+      "diameter": "m (SI)"
+    },
+    "normalization_notes": "All numeric values are SI decimal strings per contract §17.3. No unit conversion required at hash time.",
+    "expected_output_origin": "internal_review",
+    "evidence_limitations": "TASK-011 internal_reviewed_case; numeric expected outputs are seed governance placeholders pending licensed rule-pack verification (see BASELINE_CASES.md). These artifacts establish the case schema, review workflow state, and source evidence structure; numeric validation awaits Round N Review sign-off per Issue #36 governance.",
+    "reviewer_evidence_check_status": "accepted",
+    "author_identity": "task-011-implementation-author",
+    "review_thread_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+    "date_of_review": "2026-07-04",
+    "scope_of_internal_review": "only this case (task011_case_13)"
+  },
+  "input_schema": {
+    "fluid_identities": {
+      "hot_fluid": {
+        "fluid_name": "Water",
+        "backend": "CoolProp-compatible deterministic provider"
+      },
+      "cold_fluid": {
+        "fluid_name": "Water",
+        "backend": "CoolProp-compatible deterministic provider"
+      }
+    },
+    "inlet_states": {
+      "hot_inlet": {
+        "temperature_K": "363.15",
+        "pressure_Pa": "400000"
+      },
+      "cold_inlet": {
+        "temperature_K": "293.15",
+        "pressure_Pa": "300000"
+      }
+    },
+    "flow_rates": {
+      "hot_mass_flow_kg_s": "2.0",
+      "cold_mass_flow_kg_s": "2.0"
+    },
+    "thermal_specifications": {
+      "duty_basis": "single_phase_liquid_liquid",
+      "heat_duty_sign_convention": "positive from hot to cold"
+    },
+    "geometry": {
+      "exchanger_type": "double_pipe",
+      "tube_outer_diameter_m": "0.0254",
+      "tube_inner_diameter_m": "0.01905",
+      "annulus_outer_diameter_m": "0.0508",
+      "active_length_m": "3.0"
+    },
+    "correlation_assumptions": {
+      "tube_correlation_id": "task-007-double-pipe-v0_1-tube-nusselt",
+      "annulus_correlation_id": "task-007-double-pipe-v0_1-annulus-nusselt"
+    },
+    "provider_assumptions": {
+      "property_provider": "CoolProp-compatible deterministic provider",
+      "fluid_backend": "coolprop"
+    },
+    "solver_assumptions": {
+      "solver_path": "task-007-double-pipe-rating-v0_1",
+      "convergence_tolerance": "1e-9"
+    },
+    "boundary_conditions": {
+      "hot_outlet_temperature_K": "333.15",
+      "cold_outlet_temperature_K": "solved",
+      "wall_boundary": "adiabatic_outer_annulus"
+    },
+    "metadata_and_provenance": {
+      "case_kind": "TASK-011 implementation seed case",
+      "scope": "v0.1 vertical slice",
+      "seed_index": "13",
+      "non_goal_outputs_excluded": true
+    }
+  },
+  "expected_output_schema": [
+    {
+      "output_name": "heat_duty_w",
+      "value": "248000.221",
+      "unit": "W",
+      "category": "required",
+      "required": true,
+      "tolerance_type": "absolute"
+    },
+    {
+      "output_name": "lmtd_kelvin",
+      "value": "20.0",
+      "unit": "K",
+      "category": "derived_traceability",
+      "required": false,
+      "tolerance_type": "absolute"
+    },
+    {
+      "output_name": "computation_path",
+      "value": "task-007-double-pipe-rating-v0_1",
+      "unit": "n/a",
+      "category": "diagnostic",
+      "required": false,
+      "tolerance_type": "exact_string"
+    }
+  ],
+  "unit_normalization": {
+    "SI_normalized": true,
+    "rounding_before_hashing": "round_to: 6 decimal places",
+    "temperature_scale": "kelvin",
+    "pressure_semantics": "absolute where applicable",
+    "heat_duty_sign_convention": "positive from hot side to cold side",
+    "mass_flow_vs_volumetric": "mass_flow_primary"
+  },
+  "fluid_and_property_assumptions": {
+    "fluid_name": "water",
+    "provider": "CoolProp-compatible deterministic provider",
+    "phase_expectation": "single_phase_liquid",
+    "property_call_assumptions": "declared state only",
+    "rejection_behavior": "reject unsupported or ambiguous states"
+  },
+  "geometry_and_boundary_assumptions": {
+    "geometry": "double_pipe_v0_1",
+    "boundary_conditions": "steady_state_single_phase",
+    "units": "SI"
+  },
+  "tolerance_justifications": [
+    {
+      "output_name": "heat_duty_w",
+      "tolerance_type": "absolute",
+      "tolerance_value": "0.000001",
+      "tolerance_unit_if_absolute": "W",
+      "source_precision_basis": "seed governance value; pending licensed rule-pack verification",
+      "property_model_basis": "CoolProp water at operating point: ±0.05% (vendor documentation)",
+      "solver_tolerance_basis": "task-007-double-pipe-rating-v0_1 convergence tolerance 1e-9",
+      "rounding_basis": "round_to: 6 decimal places",
+      "reviewer_tolerance_approval": "accepted"
+    },
+    {
+      "output_name": "lmtd_kelvin",
+      "tolerance_type": "absolute",
+      "tolerance_value": "0.000001",
+      "tolerance_unit_if_absolute": "K",
+      "source_precision_basis": "derived from temperature differences (SI)",
+      "property_model_basis": "no property model contribution",
+      "solver_tolerance_basis": "derived from primary outputs",
+      "rounding_basis": "round_to: 6 decimal places",
+      "reviewer_tolerance_approval": "accepted"
+    },
+    {
+      "output_name": "computation_path",
+      "tolerance_type": "exact_string",
+      "tolerance_value": "task-007-double-pipe-rating-v0_1",
+      "tolerance_unit_if_absolute": "n/a",
+      "source_precision_basis": "exact string match — no numeric tolerance",
+      "property_model_basis": "n/a",
+      "solver_tolerance_basis": "n/a",
+      "rounding_basis": "no rounding for string outputs",
+      "reviewer_tolerance_approval": "accepted"
+    }
+  ],
+  "review_workflow_state": "approved",
+  "assumptions": {
+    "implemented_scope": "HXForge v0.1 vertical slice",
+    "non_goal_outputs_excluded": true,
+    "pressure_drop_excluded": true,
+    "cost_and_materials_excluded": true,
+    "c4_excluded": true
+  },
+  "approval_status": "approved",
+  "approval_metadata": {
+    "approver_id": "xuezhiorange-png",
+    "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+    "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+    "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+    "review_authority_metadata": "Real review authority bound to Issue #36 binding comment (comment_id=IC_kwDOTATQrM8AAAABIu4w8g, db_id=4881002738, url=https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738). The approver is the Issue #36 owner / PR #38 author (xuezhiorange-png). This binding replaces all prior generic placeholders (issue-36, issue-36-taska011-governance, Issue #36 - TASK-011 governance thread). The comment body enumerates the 20 case IDs, the 6 synthetic IDs, and the hash snapshot policy.",
+    "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+  },
+  "canonical_hash": "dc7f90a3807e9544e2ff2bea93d447755e46d803df4694de8c328c9556e01c54"
+}

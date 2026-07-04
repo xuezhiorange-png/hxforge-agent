@@ -5,6 +5,7 @@ shards:
     python: ["3.11", "3.12"]
     files:
       - tests/ci/test_benchmark_authority.py
+      - tests/benchmark/test_task011_corpus.py
       - tests/ci/test_node_inventory.py
       - tests/ci/test_outcome_plugin.py
       - tests/ci/test_shard_manifest.py

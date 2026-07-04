@@ -16,6 +16,7 @@ dependencies = [
   "scipy>=1.14",
   "pint>=0.24",
   "coolprop>=7.0",
+  "rfc8785>=0.1.4",
 ]
 
 [project.optional-dependencies]

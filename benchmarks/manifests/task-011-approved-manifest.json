@@ -1,0 +1,228 @@
+{
+  "manifest_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "case_count": 20,
+  "case_ids": [
+    "task011_case_01",
+    "task011_case_02",
+    "task011_case_03",
+    "task011_case_04",
+    "task011_case_05",
+    "task011_case_06",
+    "task011_case_07",
+    "task011_case_08",
+    "task011_case_09",
+    "task011_case_10",
+    "task011_case_11",
+    "task011_case_12",
+    "task011_case_13",
+    "task011_case_14",
+    "task011_case_15",
+    "task011_case_16",
+    "task011_case_17",
+    "task011_case_18",
+    "task011_case_19",
+    "task011_case_20"
+  ],
+  "case_hashes": {
+    "task011_case_01": "d9c154292036bc02e7285cad9ded17c6693adf35661a17de19e528715b132910",
+    "task011_case_02": "cffb082b509b2f9effe377868b44291d1573894f984395fd1b6dead9adec267d",
+    "task011_case_03": "0d61e93651cbba7ccd0a631cdde17c1f35e5608ff2da5398eaf2b6e9cdd5f347",
+    "task011_case_04": "da98b883b044dd451d58005a7f93514eca92dd7ac3987069f4f9e098d8b336c0",
+    "task011_case_05": "a8185f1fc54b51aee7d6d9394d5367d3ec021260ff83658f1886abe417e09530",
+    "task011_case_06": "b26639bf417005d6359bfb87f3cfb88bcfb924c5c741799d9b3261bcfcffc746",
+    "task011_case_07": "30c43901b9792a05b9f9f1eae28dc4dce3a96a755e6bd9ab51d5e66db1cf56be",
+    "task011_case_08": "53ede6a67e7d9ffc2e5d6822bd3c787b0d4fa778fd34f5f9d651ebb2fe3ffd63",
+    "task011_case_09": "b6dd2ef1a16d24c0a1fec1c56ede3022c2abd0e2ffebcc7deafd308bd9025eff",
+    "task011_case_10": "859711f485ad6b8243b52e98615d803cc0b0818b31efd3786fa03d76115bc880",
+    "task011_case_11": "b03ea749ac5978faf1f8003692bf4d6b17b50704a09d8938f5af1bcc2575fe44",
+    "task011_case_12": "e3556dd838432aa40e7bb693a093ba4add616a67390b22eeb52fcfac10574973",
+    "task011_case_13": "dc7f90a3807e9544e2ff2bea93d447755e46d803df4694de8c328c9556e01c54",
+    "task011_case_14": "5ffadb4da3862bba592a7e348d9561856f4f66ef37d3e805a7f52aa68a6b6ec3",
+    "task011_case_15": "c55a42a7977fecca5d61f7799b204f8fa49395555f705fe9e26b15b5eed39015",
+    "task011_case_16": "eb084954a7cbb41802fae02c2459e461b434e1b91907a960bc3b1b300db02864",
+    "task011_case_17": "f07ce7bbcb2b849dd6977a2fe27512410c3b840d6437df8981ebeb1e32291097",
+    "task011_case_18": "75473065f3edd26f0156741688578ef4c31ddabf92562f3f2b719f1b75b57b88",
+    "task011_case_19": "3ded1dc5dca760dab6636950f17435d8bc5886de3d435f0e1b1c8253f3531ac9",
+    "task011_case_20": "d676aeac355dca3079647bd68db7d9f6ad90927cc7b9c27a31aa8816559e4e19"
+  },
+  "approval_snapshot": [
+    {
+      "case_id": "task011_case_01",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_02",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_03",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_04",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_05",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_06",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_07",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_08",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_09",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_10",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_11",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_12",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_13",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_14",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_15",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_16",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_17",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_18",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_19",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    },
+    {
+      "case_id": "task011_case_20",
+      "approver_id": "xuezhiorange-png",
+      "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+    }
+  ],
+  "synthetic_case_ids": [
+    "task011_case_03",
+    "task011_case_06",
+    "task011_case_09",
+    "task011_case_12",
+    "task011_case_15",
+    "task011_case_18"
+  ],
+  "reviewer_sign_off": [
+    {
+      "reviewer_id": "xuezhiorange-png",
+      "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+      "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+      "scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)",
+      "timestamp_utc": "2026-07-04T03:30:00Z"
+    }
+  ]
+}
