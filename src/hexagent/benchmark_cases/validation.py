@@ -60,6 +60,20 @@ REQUIRED_MANIFEST_FIELDS = {
     "synthetic_case_ids",
     "reviewer_sign_off",
 }
+REQUIRED_COMPACT_CASE_FIELDS = {
+    "case_id",
+    "case_title",
+    "category",
+    "source_type",
+    "is_synthetic",
+    "output_name",
+    "value",
+    "unit",
+    "tolerance_type",
+    "tolerance_value",
+    "tolerance_unit_if_absolute",
+    "canonical_hash",
+}
 
 
 class ValidationError(RuntimeError):
@@ -78,15 +92,6 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
-def _load_json_object_list(path: Path) -> list[dict[str, Any]]:
-    with path.open("r", encoding="utf-8") as handle:
-        value: Any = json.load(handle)
-    _require(isinstance(value, list), f"{path} must contain a JSON array")
-    for item in value:
-        _require(isinstance(item, dict), f"{path} must contain only JSON objects")
-    return cast(list[dict[str, Any]], value)
-
-
 def _string_list(value: Any, field: str) -> list[str]:
     _require(isinstance(value, list), f"{field} must be a list")
     for item in value:
@@ -102,6 +107,87 @@ def _string_map(value: Any, field: str) -> dict[str, str]:
             f"{field} must map strings to strings",
         )
     return cast(dict[str, str], value)
+
+
+def _expand_compact_case(spec: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+    missing = sorted(REQUIRED_COMPACT_CASE_FIELDS - set(spec))
+    _require(not missing, f"compact case missing fields: {missing}")
+    case_id = cast(str, spec["case_id"])
+    source_type = cast(str, spec["source_type"])
+    is_synthetic = cast(bool, spec["is_synthetic"])
+    output_name = cast(str, spec["output_name"])
+    value = cast(str, spec["value"])
+    unit = cast(str, spec["unit"])
+    tolerance_type = cast(str, spec["tolerance_type"])
+    return {
+        "case_id": case_id,
+        "case_version": defaults["case_version"],
+        "case_title": spec["case_title"],
+        "category": spec["category"],
+        "source_type": source_type,
+        "is_synthetic": is_synthetic,
+        "source_evidence": {
+            "source_type": source_type,
+            "source_reference": defaults["source_reference"],
+            "source_title_or_identifier": case_id,
+            "source_locator_or_citation": defaults["source_locator_or_citation"],
+            "source_version_or_publication_date": defaults["source_version_or_publication_date"],
+            "source_access_date": "n/a",
+            "extracted_input_fields": defaults["extracted_input_fields"],
+            "extracted_expected_output_fields": f"{output_name}={value}",
+            "unit_provenance": unit,
+            "normalization_notes": defaults["normalization_notes"],
+            "expected_output_origin": "synthetic_computation"
+            if is_synthetic
+            else "internal_review",
+            "evidence_limitations": defaults["evidence_limitations"],
+            "reviewer_evidence_check_status": "accepted",
+        },
+        "input_schema": defaults["input_schema"],
+        "expected_output_schema": [
+            {
+                "output_name": output_name,
+                "value": value,
+                "unit": unit,
+                "role": "required",
+                "tolerance_type": tolerance_type,
+            }
+        ],
+        "unit_normalization": defaults["unit_normalization"],
+        "fluid_and_property_assumptions": defaults["fluid_and_property_assumptions"],
+        "geometry_and_boundary_assumptions": defaults["geometry_and_boundary_assumptions"],
+        "tolerance_justifications": [
+            {
+                "output_name": output_name,
+                "tolerance_type": tolerance_type,
+                "tolerance_value": spec["tolerance_value"],
+                "tolerance_unit_if_absolute": spec["tolerance_unit_if_absolute"],
+                "source_precision_basis": "fixture",
+                "property_model_basis": "fixture",
+                "solver_tolerance_basis": "artifact",
+                "rounding_basis": "12 sig digits",
+                "reviewer_tolerance_approval": "accepted",
+            }
+        ],
+        "assumptions": defaults["assumptions"],
+        "approval_status": "approved",
+        "approval_snapshot": defaults["approval_snapshot"],
+        "canonical_hash": spec["canonical_hash"],
+    }
+
+
+def _load_compact_cases(path: Path) -> list[dict[str, Any]]:
+    corpus = _load_json_object(path)
+    defaults_value = corpus.get("defaults")
+    cases_value = corpus.get("cases")
+    _require(isinstance(defaults_value, dict), "corpus.defaults must be an object")
+    _require(isinstance(cases_value, list), "corpus.cases must be a list")
+    defaults = cast(dict[str, Any], defaults_value)
+    cases: list[dict[str, Any]] = []
+    for item in cases_value:
+        _require(isinstance(item, dict), "corpus.cases must contain only objects")
+        cases.append(_expand_compact_case(cast(dict[str, Any], item), defaults))
+    return cases
 
 
 def _validate_case(case: dict[str, Any], *, manifest_synthetic_ids: set[str]) -> str:
@@ -181,7 +267,7 @@ def validate_corpus(root: Path | str = Path(".")) -> None:
     cases_path = root / "benchmarks" / "cases" / "task-011-approved-cases.json"
 
     manifest = _load_json_object(manifest_path)
-    cases = _load_json_object_list(cases_path)
+    cases = _load_compact_cases(cases_path)
     missing_manifest = sorted(REQUIRED_MANIFEST_FIELDS - set(manifest))
     _require(not missing_manifest, f"manifest missing fields: {missing_manifest}")
 
