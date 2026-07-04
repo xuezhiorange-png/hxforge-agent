@@ -19,11 +19,17 @@ def test_task011_corpus_contains_exactly_twenty_approved_cases() -> None:
 
     assert len(cases) == 20
     assert all(case["approval_status"] == "approved" for case in cases)
-    assert {case["case_id"] for case in cases} == {f"task011_case_{index:02d}" for index in range(1, 21)}
+    expected_ids = {f"task011_case_{index:02d}" for index in range(1, 21)}
+    actual_ids = {case["case_id"] for case in cases}
+    assert actual_ids == expected_ids
 
 
 def test_task011_synthetic_cases_are_explicitly_marked() -> None:
-    synthetic_ids = {case["case_id"] for case in approved_cases() if case.get("is_synthetic") is True}
+    synthetic_ids = {
+        case["case_id"]
+        for case in approved_cases()
+        if case.get("is_synthetic") is True
+    }
 
     assert synthetic_ids == {
         "task011_case_03",
