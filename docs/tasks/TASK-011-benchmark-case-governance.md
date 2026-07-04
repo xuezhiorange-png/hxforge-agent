@@ -186,14 +186,13 @@ Expected outputs must define tolerance type:
 
 ```text
 absolute
-a relative
 relative
 exact_string
 exact_enum
 hash_only
 ```
 
-The final design must correct or reject any malformed tolerance type before implementation.
+The final design must reject any malformed tolerance type before implementation.
 
 ## 12. Unit and SI normalization rules
 
