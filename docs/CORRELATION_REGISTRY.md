@@ -193,12 +193,13 @@ engineering formulas (heat transfer, friction factor, etc.) consumed by
 the runtime engineering kernel. Correlations are evaluated at calculation
 time; their results are numerical outputs bound to a calculation run.
 
-The TASK-012 rule-pack registry (introduced by PR #43) governs
-standards-derived rule artifacts and internal engineering rules:
-declarative rules, license metadata, provenance graphs, and approval
-state. Rule-packs are loaded, validated, and (in future implementation)
-applied at runtime. A rule-pack artifact does NOT contain a numerical
-correlation; it contains rule statements, citations, and audit data.
+The TASK-012 rule-pack registry (introduced by TASK-012 implementation
+Issue #43 / PR #44) governs standards-derived rule artifacts and
+internal engineering rules: declarative rules, license metadata,
+provenance graphs, and approval state. Rule-packs are loaded,
+validated, and (in future implementation) applied at runtime. A
+rule-pack artifact does NOT contain a numerical correlation; it
+contains rule statements, citations, and audit data.
 
 The two registries are deliberately separate:
 
