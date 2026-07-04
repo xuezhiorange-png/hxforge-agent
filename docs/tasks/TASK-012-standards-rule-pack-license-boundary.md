@@ -117,6 +117,84 @@ whether a rule may be committed, distributed, or executed.
 
 A rule that does not fit one of these classes is FORBIDDEN.
 
+### 4.1 source_class governance matrix (normative)
+
+The following eight governance columns are evaluated against each
+source class. Values are `YES`, `NO`, or `CONDITIONAL`. Every
+`CONDITIONAL` cell MUST be accompanied by an explicit condition
+in Section 4.2. The matrix is normative and binding; any conflict
+between this matrix and Section 6.1 / Section 16 / Section 14 is
+resolved in favor of this matrix.
+
+Column meanings:
+
+- `repo_allowed` — MAY the rule artifact live in this repository?
+- `dist_allowed` — MAY the rule body be redistributed with the
+  repository (cloned, packaged, published)?
+- `ci_allowed` — MAY the rule be processed by the future rule-pack
+  CI validators (Section 15)?
+- `review_required` — MUST a human reviewer sign off before the
+  rule may reach `approval_status == "approved"`?
+- `license_evidence_required` — MUST `license_evidence` be present
+  on the rule artifact (the field is REQUIRED in Section 7.2;
+  this column confirms it)?
+- `runtime_rulepack_allowed` — MAY the rule be referenced by a
+  runtime-loaded rule-pack manifest?
+- `public_artifact_allowed` — MAY the rule body appear in any
+  public artifact emitted by the project (docs, reports, exports)?
+
+| source_class                       | repo   | dist   | ci | review | lic-ev | runtime | public |
+|------------------------------------|:------:|:------:|:--:|:------:|:------:|:-------:|:------:|
+| `PUBLIC_DOMAIN`                    | YES    | YES    | YES | YES   | YES    | YES     | YES    |
+| `OPEN_LICENSE`                     | YES    | YES    | YES | YES   | YES    | YES     | YES    |
+| `USER_PROVIDED_LICENSED_SUMMARY`   | YES    | NO     | YES | YES   | YES    | YES     | NO     |
+| `INTERNAL_ENGINEERING_RULE`        | YES    | YES    | YES | YES   | YES    | YES     | YES    |
+| `DERIVED_ENGINEERING_RULE`         | YES    | YES    | YES | YES   | YES    | YES     | YES    |
+| `REFERENCE_ONLY_RESTRICTED_STANDARD` | NO (metadata only) | NO | YES | YES | YES | YES (metadata only) | NO |
+| `VENDOR_PERMISSIONED`              | CONDITIONAL | CONDITIONAL | YES | YES | YES | CONDITIONAL | CONDITIONAL |
+
+### 4.2 CONDITIONAL condition clauses (normative)
+
+The `CONDITIONAL` cells in the Section 4.1 matrix MUST be evaluated
+against the following clauses. Every `CONDITIONAL` cell MUST be
+checked against its clause; if any clause is not satisfied, the
+cell resolves to `NO` for that rule.
+
+- `VENDOR_PERMISSIONED.repo_allowed = CONDITIONAL`:
+  permitted only if `vendor_permission_evidence.permission_scope`
+  includes `repository_storage`. The permission evidence artifact
+  MUST be stored at
+  `rule_packs/<rule_pack_id>/permissions/<permission_id>.json`
+  and recorded on the rule under
+  `human_entered_evidence.permission_evidence_ref`. If the scope
+  does not include `repository_storage`, the rule MUST be stored
+  as metadata-only (citation + permission pointer) and never as
+  a body in the repository.
+- `VENDOR_PERMISSIONED.dist_allowed = CONDITIONAL`:
+  permitted only if `vendor_permission_evidence.permission_scope`
+  explicitly includes `repository_redistribution`. Otherwise the
+  rule body is non-redistributable and MUST NOT appear in any
+  shipped artifact. See Section 16 for the matching distribution
+  rule.
+- `VENDOR_PERMISSIONED.runtime_rulepack_allowed = CONDITIONAL`:
+  permitted only if the local engineering kernel's deployment
+  context satisfies `vendor_permission_evidence.usage_scope`. The
+  rule-pack manifest MUST record
+  `local_kernel_usage_scope` and a kernel-time gate MUST verify
+  the scope before loading the body.
+- `VENDOR_PERMISSIONED.public_artifact_allowed = CONDITIONAL`:
+  permitted only if the vendor permission explicitly covers public
+  artifact emission. Otherwise any public artifact emission MUST
+  strip the rule body and emit only metadata + permission pointer.
+
+### 4.3 Cross-reference
+
+The Section 4.1 matrix is the single source of truth for source-class
+governance. Section 6.1, Section 16, and Section 14 frozen state
+machine MUST be interpreted consistently with this matrix. The
+reviewer checklist in Section 20 (item B) requires that every cell
+in this matrix be filled.
+
 ## 5. License boundary model
 
 The repository has a single global license boundary that applies to all
@@ -159,8 +237,19 @@ The repository MAY contain:
   evidenced (`PUBLIC_DOMAIN`).
 - Open-license text where the SPDX license permits redistribution
   (`OPEN_LICENSE`), with the SPDX identifier recorded.
-- Vendor-permissioned excerpts under recorded permission evidence
-  (`VENDOR_PERMISSIONED`), limited to the scope of the permission.
+- Vendor-permissioned content (`VENDOR_PERMISSIONED`) is restricted
+  to citation metadata, permission metadata, and external pointers,
+  and MAY include a body only when an explicit vendor permission
+  artifact records a scope that covers repository storage. The
+  permission evidence artifact MUST be stored under
+  `rule_packs/<rule_pack_id>/permissions/<permission_id>.json` and
+  MUST be referenced from the rule. No vendor excerpt / vendor body
+  MAY be committed unless the permission explicitly allows
+  repository storage; if storage is not permitted, only metadata
+  and pointers MAY be stored. No vendor excerpt / vendor body MAY
+  be redistributed unless the permission explicitly allows
+  repository redistribution (see Section 16 for the matching
+  distribution rule).
 
 ### 6.2 Forbidden content
 
@@ -190,10 +279,23 @@ A **rule-pack** is the smallest governance unit that may be loaded by
 the runtime engineering kernel in a future implementation. A rule-pack
 contains one or more rules, each with full provenance.
 
-Rule-pack artifacts MUST be stored under
-`benchmarks/rule_packs/` (future implementation; this design
-contract does not authorize creating this directory) and MUST have
-the following top-level structure (informational, not normative):
+Rule-pack artifacts MUST be stored under `rule_packs/` at the
+repository root (future implementation; this design contract does
+not authorize creating this directory). The `rule_packs/` namespace
+is the authoritative home for TASK-012 standards rule-packs.
+
+> **Separation of concerns (normative):** Benchmark fixtures, if
+> any, are test-only and MUST NOT be the authoritative standards
+> rule-pack source. The TASK-011 benchmark corpus under
+> `benchmarks/cases/` is the test-only fixture set for the
+> `hexagent.benchmark_cases` package. The TASK-012 standards
+> rule-packs under `rule_packs/` are the authoritative artifact
+> set for the future `hexagent.rule_packs` package. These two
+> namespaces MUST NOT be conflated: a benchmark fixture is NOT a
+> rule-pack, and a rule-pack is NOT a benchmark fixture.
+
+and MUST have the following top-level structure (informational, not
+normative):
 
 ```text
 rule_packs/
@@ -226,24 +328,56 @@ binding.
 
 ### 7.2 rule artifact fields
 
+The 12 identity fields below are the canonical rule artifact
+schema. Any rule MUST record all 12 fields directly on the rule
+artifact (no nested indirection); the rule identity model in
+Section 12 is grounded in this direct field set.
+
 | Field                       | Required | Notes                                              |
 |-----------------------------|----------|----------------------------------------------------|
 | `rule_id`                   | REQUIRED | Stable, unique within the rule-pack.               |
-| `rule_version`              | REQUIRED | Semver-compatible.                                  |
+| `rule_version`              | REQUIRED | Semver-compatible (Section 12).                    |
 | `rule_title`                | REQUIRED | Human-readable title.                               |
 | `source_class`              | REQUIRED | One of Section 4 classes.                           |
+| `jurisdiction`              | REQUIRED | ISO 3166-1 alpha-2 country or `INTL`. Mirrors `source_evidence.source_jurisdiction`; recorded directly on the rule for schema clarity. |
+| `standard_family`           | REQUIRED | ASME / TEMA / API / ISO / GB / EN / JIS / DIN / NFPA / ASTM / VENDOR / INTERNAL. Mirrors `source_evidence.standard_family`; recorded directly on the rule for schema clarity. |
+| `bibliographic_reference`   | REQUIRED | Stable bibliographic identifier (e.g., DOI, ISO number, ISBN). Mirrors `source_evidence.source_reference`; recorded directly on the rule for schema clarity. |
+| `license_evidence`          | REQUIRED | REQUIRED for every rule. The value MUST be one of: (a) an SPDX identifier (e.g., `CC-BY-4.0`, `Apache-2.0`), (b) `public_domain`, (c) a permission-evidence pointer to a recorded artifact, or (d) `project_internal_authority` (used for `INTERNAL_ENGINEERING_RULE` and `DERIVED_ENGINEERING_RULE` that cite no external standard body). |
 | `source_evidence`           | REQUIRED | Section 10 metadata.                               |
-| `human_entered_evidence`    | CONDITIONAL | Required when `source_class` is `USER_PROVIDED_LICENSED_SUMMARY` or `INTERNAL_ENGINEERING_RULE`. |
+| `human_entered_evidence`    | CONDITIONAL | Required when `source_class` is `USER_PROVIDED_LICENSED_SUMMARY`, `INTERNAL_ENGINEERING_RULE`, or `VENDOR_PERMISSIONED`. |
 | `derived_rule_evidence`     | CONDITIONAL | Required when `source_class` is `DERIVED_ENGINEERING_RULE`. |
-| `license_evidence`          | CONDITIONAL | Required when redistribution scope is non-trivial. |
 | `rule_body`                 | REQUIRED | The rule's authoritative textual / structural representation. |
 | `forbidden_content_marker_check` | REQUIRED | Self-attested array (must be empty).             |
 | `applicability_envelope`    | REQUIRED | Domain of validity (units, ranges, conditions).   |
 | `uncertainty`               | REQUIRED | Stated uncertainty / precision.                    |
 | `review_status`             | REQUIRED | One of `pending`, `accepted`, `accepted_with_caveats`, `rejected`. |
-| `approval_status`           | REQUIRED | One of `draft`, `needs_source`, `under_review`, `approved`, `rejected`, `superseded`. |
-| `canonical_hash`            | REQUIRED | SHA-256 of the canonical serialization.            |
+| `approval_status`           | REQUIRED | One of: `draft`, `needs_source`, `needs_license_evidence`, `needs_normalization`, `needs_expected_outputs`, `under_review`, `approved`, `rejected`, `superseded`. The frozen state machine in Section 14 enumerates the same set. |
+| `canonical_hash`            | REQUIRED | SHA-256 of the canonical serialization (Section 13). |
 | `provenance_edges`          | REQUIRED | Array of edge IDs pointing to provenance artifacts. |
+
+Notes on the direct-field policy (P1-3, scheme A):
+
+- The 12 identity fields (`rule_id`, `rule_version`, `source_class`,
+  `jurisdiction`, `standard_family`, `bibliographic_reference`,
+  `license_evidence`, `review_status`, `approval_status`,
+  `canonical_hash`, `provenance_edges`, plus `rule_pack_id` on the
+  manifest) are recorded directly on the rule artifact. Reviewers
+  MUST be able to read every identity field from the rule JSON
+  without traversing into nested source-evidence objects.
+- The `source_evidence` object remains present and records the
+  full Section 10 metadata for audit. The identity-field mirrors
+  (`jurisdiction`, `standard_family`, `bibliographic_reference`)
+  MUST be byte-equal to their counterparts in `source_evidence`
+  (e.g., `source_evidence.source_jurisdiction`) and the future CI
+  validator MUST enforce this consistency.
+- `license_evidence` is REQUIRED for every rule. There is no
+  `CONDITIONAL` exemption. For `INTERNAL_ENGINEERING_RULE` and
+  `DERIVED_ENGINEERING_RULE`, the value `project_internal_authority`
+  is the controlled marker indicating the rule cites no external
+  standard body and is governed solely by the project's own
+  engineering authority.
+- `approval_status` enum MUST match Section 14 exactly; any future
+  extension is a design-contract revision.
 
 ### 7.3 provenance edge fields
 
@@ -377,9 +511,16 @@ canonical serialization is FROZEN:
 | `numeric_representation`   | Shortest round-trippable decimal (RFC 8785 §3.3.1).   |
 | `non_finite_floats`        | FORBIDDEN at hash time.                               |
 
-Implementation MUST use the same RFC 8785 reference behavior adopted
-for TASK-011 (`hexagent.benchmark_cases.canonical`) to ensure
-consistent canonicalization across the project.
+Implementation MUST use a project-wide shared canonical JSON
+behavior. The future implementation MUST expose this as a
+dedicated module under
+`src/hexagent/canonical_json.py` (the shared canonicalization
+helper) so that both TASK-011 benchmark cases and TASK-012 rule-
+packs consume the same canonicalization code path. The TASK-012
+runtime (`hexagent.rule_packs`) MUST NOT depend on
+`hexagent.benchmark_cases`; cross-domain coupling is forbidden.
+TASK-011 benchmark cases and TASK-012 rule-packs MUST use the
+same shared canonical JSON behavior.
 
 ## 14. Review and approval workflow
 
@@ -430,9 +571,13 @@ boundary is:
    provenance edge; provenance edges MUST reference real rules or
    recorded external sources.
 5. License metadata presence: every rule MUST have a
-   `license_evidence` field; the SPDX identifier (or recorded
-   permission evidence) MUST be present when the source is not
-   public-domain.
+   `license_evidence` field whose value is one of the four
+   controlled forms listed in Section 7.2 (SPDX identifier,
+   `public_domain`, permission-evidence pointer, or
+   `project_internal_authority`). For `INTERNAL_ENGINEERING_RULE`
+   and `DERIVED_ENGINEERING_RULE`, the value MUST be
+   `project_internal_authority`. This check is consistent with
+   Section 7.2, Section 10, and Section 4.1.
 6. Approval state consistency: only rules with
    `approval_status == "approved"` may be referenced by an
    `approved` rule-pack manifest.
@@ -450,11 +595,28 @@ The distribution boundary defines what may be redistributed to whom:
 2. Rules whose `source_class` is `PUBLIC_DOMAIN` or `OPEN_LICENSE`
    (with SPDX recorded) are redistributable as part of the
    repository.
-3. Rules whose `source_class` is `USER_PROVIDED_LICENSED_SUMMARY`,
-   `REFERENCE_ONLY_RESTRICTED_STANDARD`, or `VENDOR_PERMISSIONED`
-   are NOT redistributable. They may be referenced by the local
-   engineering kernel under their recorded license, but their bodies
-   MUST NOT be exported, copied, or shipped.
+3. Rules whose `source_class` is `USER_PROVIDED_LICENSED_SUMMARY`
+   or `REFERENCE_ONLY_RESTRICTED_STANDARD` are NOT redistributable.
+   They may be referenced by the local engineering kernel under
+   their recorded license, but their bodies (or, for
+   `REFERENCE_ONLY_RESTRICTED_STANDARD`, any body at all) MUST
+   NOT be exported, copied, or shipped.
+3a. Rules whose `source_class` is `VENDOR_PERMISSIONED` are
+   governed by the vendor permission evidence. The repository MAY
+   store only citation metadata, permission metadata, and external
+   pointers for the rule. The repository MAY additionally store a
+   rule body only when an explicit vendor permission artifact
+   records a scope that covers `repository_storage`. The rule
+   body is redistributable (i.e., may be exported, copied, or
+   shipped with the repository) only when the vendor permission
+   evidence explicitly includes `repository_redistribution` in
+   `permission_scope`; otherwise the body MUST NOT be redistributed.
+   When `repository_redistribution` is absent, any public artifact
+   emission MUST strip the rule body and emit only metadata +
+   permission pointer. The Section 4.1 matrix's
+   `VENDOR_PERMISSIONED.dist_allowed = CONDITIONAL` is the
+   authoritative reference; this Section 16.3a rule is a restatement
+   of the same condition.
 4. Rules whose `source_class` is `INTERNAL_ENGINEERING_RULE` or
    `DERIVED_ENGINEERING_RULE` are redistributable as part of the
    repository subject to the project primary license.
@@ -502,9 +664,11 @@ will be required (informational, not binding for this design PR):
    validating, and resolving rule-pack artifacts.
 2. `src/hexagent/rule_packs/license_boundary.py` enforcing the
    Section 5 / Section 6 license boundary at load time.
-3. `src/hexagent/rule_packs/canonical.py` shared with the TASK-011
-   canonicalization helper to ensure consistent SHA-256 over
-   rule-packs and benchmark cases.
+3. Use of the shared `src/hexagent/canonical_json.py` canonical
+   helper for both TASK-011 benchmark cases and TASK-012 rule-
+   pack artifacts (per Section 13). The TASK-012 runtime package
+   `hexagent.rule_packs` MUST NOT introduce a parallel canonical
+   module; canonical JSON behavior is shared.
 4. `src/hexagent/rule_packs/provenance.py` exposing provenance
    queries for audit.
 5. CLI: `python -m hexagent.rule_packs.validate` for the rule-pack
