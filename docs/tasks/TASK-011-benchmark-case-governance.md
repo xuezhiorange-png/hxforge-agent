@@ -192,15 +192,52 @@ contain the following mandatory fields regardless of source class:
 
 ### 9.1 Mandatory rejection rules (Section 9 — source evidence)
 
-- A case MISSING any mandatory field of `source_evidence` MUST be rejected
-  at schema validation.
-- A case whose `reviewer_evidence_check_status` is `pending` or
-  `accepted_with_caveats` MUST NOT enter the `approved` state.
-- A case whose source evidence is rejected MUST transition directly to
-  `rejected` and MUST NOT be re-entered as `under_review` without a new
-  reviewer sign-off and a new `case_version`.
+The state transitions in this section are deterministic. Each trigger
+MUST resolve to exactly one terminal or intermediate state. The
+distinction between `needs_source` and `rejected` is encoded by the
+**lifecycle stage** at which the trigger fires (see Section 9.3):
+
+- `needs_source` is reachable ONLY from `draft` or other
+  pre-approval states. It signals an evidence gap that the case
+  author is expected to repair before re-submission.
+- `rejected` is reachable from ANY lifecycle stage that touches
+  approval, manifest inclusion, or CI acceptance. It is terminal
+  for the current `case_version`; re-entry into the review pipeline
+  requires a new `case_version`.
+
+Mandatory rules:
+
+- A case in `draft` (or any other pre-approval state) whose mandatory
+  source-evidence fields are missing MUST transition to `needs_source`.
+  It MUST NOT transition directly to `rejected` from `draft` for a
+  missing-field defect alone.
+- A case that attempts to enter `approved` while any mandatory
+  source-evidence field is missing MUST be rejected.
+- A case that is included in a manifest while any mandatory
+  source-evidence field is missing MUST be rejected at the manifest
+  validation gate (Section 19.1).
+- A case whose canonical-hash recomputation (Section 17) reveals a
+  missing mandatory source-evidence field at CI validation MUST be
+  rejected at the CI acceptance gate (Section 19.1).
+- A case whose `reviewer_evidence_check_status` is `pending` MUST NOT
+  enter `approved`. It MUST remain in `under_review` until the
+  reviewer check resolves.
+- A case whose `reviewer_evidence_check_status` is `accepted_with_caveats`
+  MUST NOT enter `approved`. It MUST transition to `under_review`
+  if there is a reviewer follow-up, or to `needs_source` if the
+  caveat identifies a missing or corrected evidence field. It MUST
+  NOT be silently approved.
+- A case whose `reviewer_evidence_check_status` is `rejected` MUST
+  transition directly to `rejected` and MUST NOT be re-entered as
+  `under_review` without a new reviewer sign-off and a new
+  `case_version`.
+- A case whose `reviewer_evidence_check_status` is `accepted` AND
+  whose all other Section 16 approval gates pass is eligible to
+  transition to `approved`.
 - A `synthetic_regression_case` whose source evidence is missing or
-  whose reviewer sign-off is missing MUST be rejected.
+  whose reviewer sign-off is missing MUST be rejected at the
+  manifest or CI validation gate that first observes the defect,
+  not silently transitioned to `needs_source`.
 - A `synthetic_regression_case` is FORBIDDEN from being treated as
   `independent validation evidence`. The case file MUST contain an
   explicit `is_synthetic: true` marker, AND the manifest MUST list it
@@ -210,8 +247,10 @@ contain the following mandatory fields regardless of source class:
 
 In addition to the universal mandatory fields, each source class
 MUST satisfy the additional minimum evidence requirements listed below.
-A case failing its class-specific minimum MUST be rejected or moved to
-`needs_source`.
+A case failing its class-specific minimum follows the deterministic
+state-transition rules of Section 9.3 (lifecycle-stage aware): from a
+pre-approval state it transitions to `needs_source`; from any
+approval-, manifest-, or CI-touched stage it transitions to `rejected`.
 
 #### 9.2.1 `published_reference`
 
@@ -259,12 +298,86 @@ A case failing its class-specific minimum MUST be rejected or moved to
 
 ### 9.3 State transitions triggered by source evidence
 
-| State                      | Trigger                                                |
-|----------------------------|--------------------------------------------------------|
-| `needs_source`             | Mandatory source-evidence fields missing.              |
-| `rejected`                 | Source-evidence minimum unmet, or class-specific minimum unmet, or `is_synthetic` claim contradicted. |
-| `under_review`             | All mandatory source-evidence fields present AND class-specific minimum met AND reviewer check in `pending`. |
-| `approved`                 | Same as above AND `reviewer_evidence_check_status` is `accepted`. |
+The transition table below is the binding authority for any
+implementation. Each row encodes exactly one `(lifecycle_stage,
+condition)` pair and resolves to exactly one target state.
+Implementation MUST encode the table verbatim; no alternative
+grouping of conditions into states is permitted.
+
+The lifecycle stages used in the condition column are:
+
+- `pre_approval` — the case is in `draft`, `needs_source`,
+  `needs_normalization`, `needs_expected_outputs`, or any other state
+  that has not yet reached `under_review`.
+- `approval_attempt` — a reviewer attempts to transition the case to
+  `approved` (Section 16 gate).
+- `manifest_inclusion` — the case is added to or scanned as part of a
+  manifest (Section 18).
+- `ci_validation` — CI recomputes canonical hash and runs the
+  Section 19.1 validation forms on the case.
+
+#### 9.3.1 Mandatory source-evidence missing — terminal rules
+
+| Lifecycle stage      | Condition                                                        | Target state   |
+|----------------------|------------------------------------------------------------------|----------------|
+| `pre_approval`       | One or more universal mandatory source-evidence fields missing   | `needs_source` |
+| `pre_approval`       | One or more class-specific source-evidence fields missing        | `needs_source` |
+| `approval_attempt`   | Any mandatory source-evidence field missing                     | `rejected`     |
+| `manifest_inclusion` | Any mandatory source-evidence field missing                     | `rejected`     |
+| `ci_validation`      | Any mandatory source-evidence field missing                     | `rejected`     |
+
+#### 9.3.2 `reviewer_evidence_check_status` resolution
+
+The status field is REQUIRED to take one of four values: `pending`,
+`accepted`, `accepted_with_caveats`, `rejected`. Each value has a
+single target state at every lifecycle stage. The status is set by the
+reviewer; self-asserted values are FORBIDDEN.
+
+| Lifecycle stage      | `reviewer_evidence_check_status`     | Target state                                            |
+|----------------------|--------------------------------------|---------------------------------------------------------|
+| any                  | `pending`                            | `under_review` (MUST NOT enter `approved`)              |
+| `pre_approval`       | `accepted`                           | eligible to advance to `under_review`                   |
+| `approval_attempt`   | `accepted`                           | eligible for `approved` (all other Section 16 gates MUST also pass) |
+| any                  | `accepted_with_caveats`              | `under_review` if reviewer follow-up needed; `needs_source` if caveat identifies missing or corrected evidence field; MUST NOT enter `approved` |
+| any                  | `rejected`                           | `rejected` (terminal for current `case_version`)        |
+
+#### 9.3.3 Synthetic regression cases
+
+For `synthetic_regression_case`, the following additional rules
+apply on top of Sections 9.3.1 and 9.3.2:
+
+| Lifecycle stage      | Condition                                              | Target state   |
+|----------------------|--------------------------------------------------------|----------------|
+| `pre_approval`       | `is_synthetic: true` missing or manifest listing absent | `needs_source` |
+| `approval_attempt`   | `is_synthetic: true` missing or manifest listing absent | `rejected`     |
+| `manifest_inclusion` | `is_synthetic: true` missing or manifest listing absent | `rejected`     |
+| `ci_validation`      | `is_synthetic: true` missing or manifest listing absent | `rejected`     |
+| any                  | cited as `independent validation evidence`             | `rejected`     |
+
+The corpus MUST contain at least one non-synthetic approved case
+for any validation claim. A corpus consisting solely of
+`synthetic_regression_case` cases MUST be rejected at the
+`manifest_inclusion` and `ci_validation` stages.
+
+#### 9.3.4 Encoding requirements
+
+Implementation MUST encode the table above as a deterministic
+function. The signature is informational, not normative:
+
+```text
+transition(stage, condition, current_state) -> next_state
+```
+
+- The function MUST be total: every `(stage, condition)` pair in the
+  table MUST have exactly one `next_state` mapping.
+- The function MUST NOT have side effects on canonical hash, manifest
+  membership, or approval_snapshot.
+- The function MUST be reentrant: invoking it twice with identical
+  inputs MUST produce identical outputs.
+- The CI gate (Section 19.1, source-evidence validation form) MUST
+  call this function for every case at every lifecycle stage and
+  MUST reject any case whose actual transition diverges from the
+  table.
 
 ## 10. Input schema domains
 
