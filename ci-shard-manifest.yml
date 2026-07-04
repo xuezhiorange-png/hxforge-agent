@@ -19,6 +19,12 @@ shards:
       - tests/rule_packs/test_schema.py
       - tests/rule_packs/test_seed_rule_pack.py
       - tests/rule_packs/test_validation.py
+      - tests/material_costs/test_material_record_schema.py
+      - tests/material_costs/test_cost_record_schema.py
+      - tests/material_costs/test_license_boundary.py
+      - tests/material_costs/test_selection.py
+      - tests/material_costs/test_validation.py
+      - tests/material_costs/test_frozen_contract_unchanged.py
     timeout: 300
 
   - name: ci-acceptance
