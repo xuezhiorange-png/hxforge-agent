@@ -23,7 +23,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-004 | Implement immutable design-case revisions, calculation provenance and structured errors | DONE | TASK-001 |
 | TASK-005 | Implement correlation registry and applicability engine | DONE | TASK-001 |
 | TASK-006 | Implement heat-balance and specification closure | DONE | TASK-002, TASK-003, TASK-005 |
-| TASK-011 | Collect and approve the first 20 benchmark cases | PLANNED | TASK-001 |
+| TASK-011 | Collect and approve the first 20 benchmark cases | DRAFT | TASK-001 |
 | TASK-012 | Define standards rule-pack and license boundary | PLANNED | TASK-001 |
 | TASK-013 | Define material and cost data governance | PLANNED | TASK-001 |
 | TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
@@ -41,7 +41,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-009 (Issue #26) | Fix inherited heat-balance golden and rating test failures | DONE | TASK-009 Phase 3 |
 | TASK-010 (design) | Freeze versioned API and traceable report contract | DONE | TASK-009 |
 | TASK-010 (impl) | Implement versioned API and traceable report | DONE | TASK-010 design |
-| TASK-015A | Deterministic test environment and CI sharding | READY_FOR_REVIEW | TASK-010 |
+| TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 | Add materials, mass and preliminary mechanical checks | PLANNED | TASK-012, TASK-013, TASK-016 |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
@@ -79,9 +79,10 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 
 1. Complete project-governance closeout for TASK-000 through TASK-010.
 2. Design and approve TASK-015A deterministic test environment and CI sharding.
-3. Implement TASK-015A without changing frozen TASK-010 behavior.
-4. Design and implement TASK-011 benchmark cases.
-5. Complete TASK-012 through TASK-019 before starting shell-and-tube development.
+3. Implement and merge TASK-015A without changing frozen TASK-010 behavior.
+4. Design and approve TASK-011 benchmark-case governance.
+5. Implement TASK-011 only after the design contract is reviewed, frozen and explicitly authorized.
+6. Complete TASK-012 through TASK-019 before starting shell-and-tube development.
 
 ## Merge evidence
 
@@ -99,6 +100,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-009 | #24 |
 | TASK-010 design | #29 |
 | TASK-010 impl | #31 |
+| TASK-015A | #35 |
 
 | Item | Value |
 |---|---|
@@ -114,3 +116,11 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | Main Post-Merge CI (PR #32) | `28526790197` |
 | Frozen Contract SHA | `9a1faeb92f4015a62f9d9add0739f3853a876415` |
 | Contract Closure | APPROVED |
+| TASK-015A PR | #35 |
+| TASK-015A Issue | #33 — CLOSED |
+| TASK-015A reviewed Head | `393be83fb6282929495ee309759884aedf178bcf` |
+| TASK-015A merge SHA | `9b45f96adc5a58c207570c69f7a58c77cfe1d4cc` |
+| TASK-015A PR CI | `28678326754` — SUCCESS |
+| TASK-015A Nightly | `28678519599` — SUCCESS |
+| TASK-015A Main Post-Merge CI | `28689412008` — SUCCESS |
+| TASK-011 Design Issue | #36 — OPEN |
