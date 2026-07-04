@@ -25,7 +25,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-006 | Implement heat-balance and specification closure | DONE | TASK-002, TASK-003, TASK-005 |
 | TASK-011 (design) | Freeze benchmark-case governance contract | DONE | TASK-001 |
 | TASK-011 (impl) | Collect, normalize, review and approve the first 20 benchmark cases | DONE | TASK-011 design |
-| TASK-012 | Define standards rule-pack and license boundary | PLANNED | TASK-001 |
+| TASK-012 | Define standards rule-pack and license boundary | IN_PROGRESS | TASK-001 |
 | TASK-013 | Define material and cost data governance | PLANNED | TASK-001 |
 | TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
 | TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
@@ -85,9 +85,13 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 5. TASK-011 implementation is merged and closed out by PR #38 (Issue #36
    CLOSED, main post-merge CI SUCCESS). The TASK-011 closeout docs PR
    records this milestone in the evidence tables below.
-6. Start TASK-012 design only after TASK-011 closeout is merged.
-7. Complete TASK-012 through TASK-019 before starting shell-and-tube
-   development.
+6. TASK-012 design may start after TASK-011 closeout is merged.
+   TASK-012 implementation requires separate explicit authorization
+   after the design contract is reviewed, merged, and frozen.
+7. TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018,
+   TASK-019, and TASK-020+ (shell-and-tube) remain blocked /
+   PLANNED until TASK-012 design is reviewed and frozen, unless
+   later governance changes grant a separate explicit authorization.
 
 ## Merge evidence
 
@@ -144,3 +148,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-011 Impl Main Post-Merge CI | `28698630316` — SUCCESS |
 | TASK-011 Impl authority comment | `4881002738` / `IC_kwDOTATQrM8AAAABIu4w8g` |
 | TASK-011 Impl status | DONE / ISSUE CLOSED |
+| TASK-012 Design Issue | #40 — OPEN |
+| TASK-012 Design branch | `docs/task-012-standards-license-boundary` |
+| TASK-012 Design base | `f78716e4cd348e46157a2a610c8fc4191a0c9dd9` (main @ TASK-011 closeout merge) |
+| TASK-012 Design status | IN PROGRESS / IMPLEMENTATION NOT AUTHORIZED |
