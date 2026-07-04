@@ -1,0 +1,8 @@
+{
+  "case_count": 20,
+  "case_source": "hexagent.benchmark_cases.corpus.approved_cases",
+  "manifest": "benchmarks/manifests/task-011-approved-manifest.json",
+  "status": "approved",
+  "task": "TASK-011",
+  "validation_entrypoint": "python -m hexagent.benchmark_cases.validation"
+}
