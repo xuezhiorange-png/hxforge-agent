@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from hexagent.benchmark_cases.canonical import canonical_sha256
+from hexagent.benchmark_cases.corpus import approved_cases
 
 ALLOWED_CATEGORIES = {
     "Single-phase heat-balance closure",
@@ -147,10 +148,12 @@ def validate_corpus(root: Path | str = Path(".")) -> None:
     _require(set(case_hashes) == set(case_ids), "case_hashes keys mismatch")
     _require(synthetic_ids <= set(case_ids), "synthetic_case_ids must be subset of case_ids")
 
+    cases_by_id = {case["case_id"]: case for case in approved_cases()}
+    _require(set(cases_by_id) == set(case_ids), "approved case ids must match manifest")
+
     actual_synthetic_ids: set[str] = set()
     for case_id in case_ids:
-        case = _object(root / "benchmarks" / "cases" / f"{case_id}.json")
-        _require(case["case_id"] == case_id, f"{case_id} file mismatch")
+        case = cases_by_id[case_id]
         digest = _validate_case(case, synthetic_ids=synthetic_ids)
         _require(case_hashes[case_id] == digest, f"{case_id} manifest hash mismatch")
         if case.get("is_synthetic") is True:
