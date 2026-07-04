@@ -553,19 +553,36 @@ The following are hash blockers:
   reference with embedded numeric content.
 - Payload contains a copied standard table.
 
-### 12.5 Warnings (non-blocking)
+### 12.5 Concurrency blockers
+
+The following are concurrency blockers:
+
+- `expected_parent_revision_id` is present but does not equal the
+  current head revision of the same `root_case_id`.
+- A request attempts to commit a duplicate
+  `(root_case_id, revision_number)`.
+- A request attempts to create a concurrent sibling revision
+  without satisfying the expected-parent contract.
+- An `optimistic_concurrency_token` is present but stale.
+
+A stale `expected_parent_revision_id` MUST raise
+`StaleParentRevision`, MUST be treated as a hard rejection, and
+MUST NOT appear in warnings.
+
+### 12.6 Warnings (non-blocking)
 
 - `effective_date` older than 5 years.
-- `expected_parent_revision_id` set but stale.
 - `escalation_date` present without `escalation_index_reference`
   but with documented justification.
 - `engineering_estimate` quality flag set.
 - Tombstone chain length greater than 5.
 
-### 12.6 Structural separation
+### 12.7 Structural separation
 
 `blockers` and `warnings` are kept in disjoint lists per Section 15
-of TASK-013. A blocker MUST NOT be downgraded to a warning.
+of TASK-013. A blocker MUST NOT be downgraded to a warning. A stale
+`expected_parent_revision_id` is a blocker and MUST NOT be emitted as
+a warning.
 
 ## 13. Concurrency and transaction semantics
 
@@ -938,7 +955,7 @@ This design PR does NOT introduce:
 
 This design PR satisfies the TASK-014 design authorization when:
 
-- [ ] Sections 1-21 of this document are present.
+- [ ] Sections 1-22 of this document are present.
 - [ ] Source-class discipline carries over from TASK-012 and
       TASK-013.
 - [ ] Identity guarantees are explicit (Section 5).
