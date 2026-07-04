@@ -16,7 +16,6 @@ ALLOWED_CATEGORIES = {
     "Manufacturable sizing and selection-evaluation cases",
     "API/report traceability cases already supported by TASK-010",
 }
-
 FORBIDDEN_OUTPUT_PREFIXES = ("pressure_drop_", "c4_", "material_", "cost_")
 REQUIRED_CASE_FIELDS = {
     "case_id",
@@ -35,7 +34,7 @@ REQUIRED_CASE_FIELDS = {
     "approval_status",
     "canonical_hash",
 }
-REQUIRED_SOURCE_EVIDENCE_FIELDS = {
+REQUIRED_SOURCE_FIELDS = {
     "source_type",
     "source_reference",
     "source_title_or_identifier",
@@ -71,156 +70,96 @@ def _require(condition: bool, message: str) -> None:
         raise ValidationError(message)
 
 
-def _load_json_object(path: Path) -> dict[str, Any]:
+def _object(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         value: Any = json.load(handle)
     _require(isinstance(value, dict), f"{path} must contain a JSON object")
     return cast(dict[str, Any], value)
 
 
-def _load_case_objects(path: Path) -> list[dict[str, Any]]:
-    with path.open("r", encoding="utf-8") as handle:
-        value: Any = json.load(handle)
-    _require(isinstance(value, list), f"{path} must contain a JSON array")
-    cases: list[dict[str, Any]] = []
-    for item in value:
-        _require(isinstance(item, dict), f"{path} must contain only JSON objects")
-        cases.append(cast(dict[str, Any], item))
-    return cases
-
-
 def _string_list(value: Any, field: str) -> list[str]:
     _require(isinstance(value, list), f"{field} must be a list")
-    for item in value:
-        _require(isinstance(item, str), f"{field} must contain only strings")
+    _require(all(isinstance(item, str) for item in value), f"{field} must contain strings")
     return cast(list[str], value)
 
 
 def _string_map(value: Any, field: str) -> dict[str, str]:
     _require(isinstance(value, dict), f"{field} must be a map")
-    for key, item in value.items():
-        _require(
-            isinstance(key, str) and isinstance(item, str),
-            f"{field} must map strings to strings",
-        )
+    _require(
+        all(isinstance(key, str) and isinstance(item, str) for key, item in value.items()),
+        f"{field} must map strings to strings",
+    )
     return cast(dict[str, str], value)
 
 
-def _validate_case(case: dict[str, Any], *, manifest_synthetic_ids: set[str]) -> str:
-    missing = sorted(REQUIRED_CASE_FIELDS - set(case))
-    _require(not missing, f"{case.get('case_id', '<unknown>')} missing fields: {missing}")
-
-    case_id = cast(str, case["case_id"])
-    _require(isinstance(case_id, str) and case_id, "case_id must be a non-empty string")
-    category = cast(str, case["category"])
-    _require(category in ALLOWED_CATEGORIES, f"{case_id} has unsupported category")
+def _validate_case(case: dict[str, Any], *, synthetic_ids: set[str]) -> str:
+    case_id = cast(str, case.get("case_id", "<unknown>"))
+    _require(not REQUIRED_CASE_FIELDS - set(case), f"{case_id} missing required fields")
     _require(case["approval_status"] == "approved", f"{case_id} is not approved")
+    _require(case["category"] in ALLOWED_CATEGORIES, f"{case_id} has unsupported category")
 
-    source_evidence_value = case["source_evidence"]
-    _require(isinstance(source_evidence_value, dict), f"{case_id} source_evidence must be object")
-    source_evidence = cast(dict[str, Any], source_evidence_value)
-    missing_source = sorted(REQUIRED_SOURCE_EVIDENCE_FIELDS - set(source_evidence))
-    _require(not missing_source, f"{case_id} missing source fields: {missing_source}")
-    _require(
-        source_evidence["reviewer_evidence_check_status"] == "accepted",
-        f"{case_id} evidence review is not accepted",
-    )
+    source = cast(dict[str, Any], case["source_evidence"])
+    _require(isinstance(source, dict), f"{case_id} source_evidence must be object")
+    _require(not REQUIRED_SOURCE_FIELDS - set(source), f"{case_id} missing source evidence")
+    _require(source["reviewer_evidence_check_status"] == "accepted", f"{case_id} not accepted")
 
     if case["source_type"] == "synthetic_regression_case":
+        _require(case.get("is_synthetic") is True, f"{case_id} missing synthetic marker")
+        _require(case_id in synthetic_ids, f"{case_id} missing from synthetic_case_ids")
         _require(
-            case.get("is_synthetic") is True,
-            f"{case_id} synthetic case missing is_synthetic=true",
-        )
-        _require(
-            case_id in manifest_synthetic_ids,
-            f"{case_id} synthetic case missing from manifest",
-        )
-        _require(
-            source_evidence["expected_output_origin"] == "synthetic_computation",
-            f"{case_id} synthetic case must declare synthetic_computation origin",
+            source["expected_output_origin"] == "synthetic_computation",
+            f"{case_id} synthetic origin mismatch",
         )
 
-    expected_outputs = case["expected_output_schema"]
-    _require(
-        isinstance(expected_outputs, list) and bool(expected_outputs),
-        f"{case_id} has no expected outputs",
-    )
-    output_names: list[str] = []
-    for output_value in expected_outputs:
-        _require(isinstance(output_value, dict), f"{case_id} expected outputs must be objects")
-        output = cast(dict[str, Any], output_value)
-        name = output.get("output_name")
-        _require(isinstance(name, str) and name, f"{case_id} expected output missing output_name")
-        output_names.append(name)
-        _require(
-            not name.startswith(FORBIDDEN_OUTPUT_PREFIXES),
-            f"{case_id} uses forbidden expected output prefix: {name}",
-        )
+    outputs = cast(list[dict[str, Any]], case["expected_output_schema"])
+    _require(isinstance(outputs, list) and bool(outputs), f"{case_id} has no outputs")
+    output_names: set[str] = set()
+    for output in outputs:
+        name = cast(str, output.get("output_name"))
+        _require(isinstance(name, str) and name, f"{case_id} output missing name")
+        _require(not name.startswith(FORBIDDEN_OUTPUT_PREFIXES), f"{case_id} forbidden output")
+        output_names.add(name)
 
-    tolerance_values = case["tolerance_justifications"]
-    _require(
-        isinstance(tolerance_values, list),
-        f"{case_id} tolerance_justifications must be a list",
-    )
+    tolerances = cast(list[dict[str, Any]], case["tolerance_justifications"])
     tolerance_names = {
-        item.get("output_name")
-        for item in tolerance_values
+        cast(str, item.get("output_name"))
+        for item in tolerances
         if isinstance(item, dict) and isinstance(item.get("output_name"), str)
     }
-    _require(
-        set(output_names) <= tolerance_names,
-        f"{case_id} lacks tolerance justification coverage",
-    )
+    _require(output_names <= tolerance_names, f"{case_id} tolerance coverage mismatch")
 
-    recomputed_hash = canonical_sha256(case)
-    _require(recomputed_hash == case["canonical_hash"], f"{case_id} canonical hash mismatch")
-    return recomputed_hash
+    digest = canonical_sha256(case)
+    _require(digest == case["canonical_hash"], f"{case_id} canonical hash mismatch")
+    return digest
 
 
 def validate_corpus(root: Path | str = Path(".")) -> None:
     root = Path(root)
-    manifest_path = root / "benchmarks" / "manifests" / "task-011-approved-manifest.json"
-    cases_path = root / "benchmarks" / "cases" / "task-011-approved-cases.json"
+    manifest = _object(root / "benchmarks" / "manifests" / "task-011-approved-manifest.json")
+    _require(not REQUIRED_MANIFEST_FIELDS - set(manifest), "manifest missing required fields")
 
-    manifest = _load_json_object(manifest_path)
-    missing_manifest = sorted(REQUIRED_MANIFEST_FIELDS - set(manifest))
-    _require(not missing_manifest, f"manifest missing fields: {missing_manifest}")
-
-    case_ids = _string_list(manifest["case_ids"], "manifest.case_ids")
-    case_hashes = _string_map(manifest["case_hashes"], "manifest.case_hashes")
-    synthetic_case_ids = _string_list(manifest["synthetic_case_ids"], "manifest.synthetic_case_ids")
-
-    _require(case_ids == sorted(case_ids), "manifest case_ids must be sorted")
-    _require(len(case_ids) == len(set(case_ids)), "manifest case_ids must be unique")
-    _require(manifest["case_count"] == len(case_ids), "manifest case_count mismatch")
-    _require(
-        manifest["case_count"] == 20,
-        "TASK-011 first implementation target must contain 20 cases",
-    )
-    _require(set(case_hashes) == set(case_ids), "manifest case_hashes keys mismatch")
-
-    synthetic_ids = set(synthetic_case_ids)
-    _require(synthetic_ids <= set(case_ids), "synthetic_case_ids must be a subset of case_ids")
-
-    cases_by_id = {cast(str, case.get("case_id")): case for case in _load_case_objects(cases_path)}
-    _require(set(cases_by_id) == set(case_ids), "case corpus ids must match manifest case_ids")
+    case_ids = _string_list(manifest["case_ids"], "case_ids")
+    case_hashes = _string_map(manifest["case_hashes"], "case_hashes")
+    synthetic_ids = set(_string_list(manifest["synthetic_case_ids"], "synthetic_case_ids"))
+    _require(case_ids == sorted(case_ids), "case_ids must be sorted")
+    _require(len(case_ids) == len(set(case_ids)), "case_ids must be unique")
+    _require(manifest["case_count"] == len(case_ids) == 20, "case_count must be exactly 20")
+    _require(set(case_hashes) == set(case_ids), "case_hashes keys mismatch")
+    _require(synthetic_ids <= set(case_ids), "synthetic_case_ids must be subset of case_ids")
 
     actual_synthetic_ids: set[str] = set()
     for case_id in case_ids:
-        case = cases_by_id[case_id]
-        recomputed_hash = _validate_case(case, manifest_synthetic_ids=synthetic_ids)
-        _require(case_hashes[case_id] == recomputed_hash, f"manifest hash mismatch for {case_id}")
+        case = _object(root / "benchmarks" / "cases" / f"{case_id}.json")
+        _require(case["case_id"] == case_id, f"{case_id} file mismatch")
+        digest = _validate_case(case, synthetic_ids=synthetic_ids)
+        _require(case_hashes[case_id] == digest, f"{case_id} manifest hash mismatch")
         if case.get("is_synthetic") is True:
             actual_synthetic_ids.add(case_id)
 
-    _require(actual_synthetic_ids == synthetic_ids, "synthetic_case_ids mismatch corpus contents")
-    approval_snapshot = manifest["approval_snapshot"]
-    _require(isinstance(approval_snapshot, list), "manifest approval_snapshot must be a list")
-    _require(
-        len(approval_snapshot) == manifest["case_count"],
-        "manifest approval_snapshot must contain one record per case",
-    )
-    _require(bool(manifest["reviewer_sign_off"]), "manifest reviewer_sign_off is required")
+    _require(actual_synthetic_ids == synthetic_ids, "synthetic_case_ids mismatch")
+    approval_snapshot = cast(list[dict[str, Any]], manifest["approval_snapshot"])
+    _require(len(approval_snapshot) == 20, "approval_snapshot must contain 20 records")
+    _require(bool(manifest["reviewer_sign_off"]), "reviewer_sign_off is required")
 
 
 def main() -> int:
