@@ -25,7 +25,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-006 | Implement heat-balance and specification closure | DONE | TASK-002, TASK-003, TASK-005 |
 | TASK-011 (design) | Freeze benchmark-case governance contract | DONE | TASK-001 |
 | TASK-011 (impl) | Collect, normalize, review and approve the first 20 benchmark cases | DONE | TASK-011 design |
-| TASK-012 | Define standards rule-pack and license boundary | IN_PROGRESS | TASK-001 |
+| TASK-012 (design) | Define standards rule-pack and license boundary | DONE | TASK-001 |
+| TASK-012 (impl) | Implement standards rule-pack runtime, license validator and CI boundary | PLANNED | TASK-012 design |
 | TASK-013 | Define material and cost data governance | PLANNED | TASK-001 |
 | TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
 | TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
@@ -44,7 +45,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-010 (impl) | Implement versioned API and traceable report | DONE | TASK-010 design |
 | TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
-| TASK-017 | Add materials, mass and preliminary mechanical checks | PLANNED | TASK-012, TASK-013, TASK-016 |
+| TASK-017 | Add materials, mass and preliminary mechanical checks | PLANNED | TASK-012 (impl), TASK-013, TASK-016 |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
@@ -85,13 +86,17 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 5. TASK-011 implementation is merged and closed out by PR #38 (Issue #36
    CLOSED, main post-merge CI SUCCESS). The TASK-011 closeout docs PR
    records this milestone in the evidence tables below.
-6. TASK-012 design may start after TASK-011 closeout is merged.
-   TASK-012 implementation requires separate explicit authorization
-   after the design contract is reviewed, merged, and frozen.
+6. TASK-012 design contract is merged and frozen by PR #41
+   (merge commit `d1e5c316ee1b0b71211e932ff7fbcb5935f77246`,
+   reviewed Head `28b6330f8c5221d75f101f6810157d81a428f446`,
+   main post-merge CI `28700595841` — SUCCESS). TASK-012
+   implementation requires separate explicit authorization after
+   the design contract is reviewed, merged, frozen, and recorded.
+   TASK-012 implementation is NOT yet authorized.
 7. TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018,
-   TASK-019, and TASK-020+ (shell-and-tube) remain blocked /
-   PLANNED until TASK-012 design is reviewed and frozen, unless
-   later governance changes grant a separate explicit authorization.
+   TASK-019, and TASK-020+ (shell-and-tube) remain PLANNED /
+   NOT STARTED unless later governance grants separate explicit
+   authorization. TASK-012 implementation remains NOT AUTHORIZED.
 
 ## Merge evidence
 
@@ -149,6 +154,19 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-011 Impl authority comment | `4881002738` / `IC_kwDOTATQrM8AAAABIu4w8g` |
 | TASK-011 Impl status | DONE / ISSUE CLOSED |
 | TASK-012 Design Issue | #40 — OPEN |
+| TASK-012 Design PR | #41 |
 | TASK-012 Design branch | `docs/task-012-standards-license-boundary` |
 | TASK-012 Design base | `f78716e4cd348e46157a2a610c8fc4191a0c9dd9` (main @ TASK-011 closeout merge) |
-| TASK-012 Design status | IN PROGRESS / IMPLEMENTATION NOT AUTHORIZED |
+| TASK-012 Design reviewed Head | `28b6330f8c5221d75f101f6810157d81a428f446` |
+| TASK-012 Design merge SHA | `d1e5c316ee1b0b71211e932ff7fbcb5935f77246` |
+| TASK-012 Design merged_at | `2026-07-04T08:30:52Z` |
+| TASK-012 Design PR CI | `28700361861` — SUCCESS |
+| TASK-012 Design Main Post-Merge CI | `28700595841` — SUCCESS |
+| TASK-012 Design freeze comment | `4881316929` |
+| TASK-012 Design additional freeze comment | `4881320152` |
+| TASK-012 Design frozen contract file | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` |
+| TASK-012 Design status | DONE / DESIGN FROZEN / IMPLEMENTATION NOT AUTHORIZED |
+| TASK-012 Impl Issue | not yet opened — requires separate explicit authorization |
+| TASK-012 Impl PR | not yet opened — requires separate explicit authorization |
+| TASK-012 Impl status | PLANNED / NOT STARTED / AUTHORIZATION NOT GRANTED |
+| TASK-013 | PLANNED / NOT STARTED — requires separate explicit authorization |
