@@ -23,7 +23,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-004 | Implement immutable design-case revisions, calculation provenance and structured errors | DONE | TASK-001 |
 | TASK-005 | Implement correlation registry and applicability engine | DONE | TASK-001 |
 | TASK-006 | Implement heat-balance and specification closure | DONE | TASK-002, TASK-003, TASK-005 |
-| TASK-011 | Collect and approve the first 20 benchmark cases | DRAFT | TASK-001 |
+| TASK-011 (design) | Freeze benchmark-case governance contract | DONE | TASK-001 |
+| TASK-011 (impl) | Collect, normalize, review and approve the first 20 benchmark cases | PLANNED | TASK-011 design |
 | TASK-012 | Define standards rule-pack and license boundary | PLANNED | TASK-001 |
 | TASK-013 | Define material and cost data governance | PLANNED | TASK-001 |
 | TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
@@ -80,7 +81,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 1. Complete project-governance closeout for TASK-000 through TASK-010.
 2. Design and approve TASK-015A deterministic test environment and CI sharding.
 3. Implement and merge TASK-015A without changing frozen TASK-010 behavior.
-4. Design and approve TASK-011 benchmark-case governance.
+4. TASK-011 benchmark-case governance design is merged and frozen by PR #37.
 5. Implement TASK-011 only after the design contract is reviewed, frozen and explicitly authorized.
 6. Complete TASK-012 through TASK-019 before starting shell-and-tube development.
 
@@ -101,6 +102,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-010 design | #29 |
 | TASK-010 impl | #31 |
 | TASK-015A | #35 |
+| TASK-011 design | #37 |
 
 | Item | Value |
 |---|---|
@@ -124,3 +126,8 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-015A Nightly | `28678519599` — SUCCESS |
 | TASK-015A Main Post-Merge CI | `28689412008` — SUCCESS |
 | TASK-011 Design Issue | #36 — OPEN |
+| TASK-011 Design PR | #37 |
+| TASK-011 Design reviewed Head | `7cfdb4f0989b6d384533c7a29e9a2156c731bd0f` |
+| TASK-011 Design merge SHA | `bee6b57b8004b6c257ec81738430781fe0b7ee19` |
+| TASK-011 Design final review | `4628651936` — PASS |
+| TASK-011 Design status | DESIGN FROZEN / IMPLEMENTATION NOT AUTHORIZED |
