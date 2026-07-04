@@ -26,7 +26,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-011 (design) | Freeze benchmark-case governance contract | DONE | TASK-001 |
 | TASK-011 (impl) | Collect, normalize, review and approve the first 20 benchmark cases | DONE | TASK-011 design |
 | TASK-012 (design) | Define standards rule-pack and license boundary | DONE | TASK-001 |
-| TASK-012 (impl) | Implement standards rule-pack runtime, license validator and CI boundary | PLANNED | TASK-012 design |
+| TASK-012 (impl) | Implement standards rule-pack runtime, license validator and CI boundary | DONE | TASK-012 design |
 | TASK-013 | Define material and cost data governance | PLANNED | TASK-001 |
 | TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
 | TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
@@ -90,13 +90,20 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
    (merge commit `d1e5c316ee1b0b71211e932ff7fbcb5935f77246`,
    reviewed Head `28b6330f8c5221d75f101f6810157d81a428f446`,
    main post-merge CI `28700595841` — SUCCESS). TASK-012
-   implementation requires separate explicit authorization after
-   the design contract is reviewed, merged, frozen, and recorded.
-   TASK-012 implementation is NOT yet authorized.
-7. TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018,
+   implementation was merged by PR #44 (reviewed head
+   `7b1a6bd4bdc5111b2ead53849b0e96e0e3f5fcf9`, merge commit
+   `ea3b898e57aa6abc73b9367552cffae3d24c027d`,
+   merged_at `2026-07-04T11:05:02Z`).
+7. TASK-012 implementation is merged and closed out by PR #44
+   (Issue #43 CLOSED with state_reason=completed at
+   `2026-07-04T11:13:03Z`, closeout comment `4881751607`,
+   main post-merge CI `28704210885` — SUCCESS).
+   The TASK-012 implementation closeout docs PR records this
+   milestone in the evidence tables below.
+8. TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018,
    TASK-019, and TASK-020+ (shell-and-tube) remain PLANNED /
    NOT STARTED unless later governance grants separate explicit
-   authorization. TASK-012 implementation remains NOT AUTHORIZED.
+   authorization.
 
 ## Merge evidence
 
@@ -117,6 +124,8 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-015A | #35 |
 | TASK-011 design | #37 |
 | TASK-011 impl | #38 |
+| TASK-012 design | #41 |
+| TASK-012 impl | #44 |
 
 | Item | Value |
 |---|---|
@@ -166,7 +175,18 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-012 Design additional freeze comment | `4881320152` |
 | TASK-012 Design frozen contract file | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` |
 | TASK-012 Design status | DONE / DESIGN FROZEN / IMPLEMENTATION NOT AUTHORIZED |
-| TASK-012 Impl Issue | not yet opened — requires separate explicit authorization |
-| TASK-012 Impl PR | not yet opened — requires separate explicit authorization |
-| TASK-012 Impl status | PLANNED / NOT STARTED / AUTHORIZATION NOT GRANTED |
+| TASK-012 Impl Issue | #43 — CLOSED (state_reason=completed) |
+| TASK-012 Impl PR | #44 |
+| TASK-012 Impl branch | `codex/task-012-rule-pack-runtime-license-boundary` |
+| TASK-012 Impl base | `b5a2ecdc3cc75afb7086c70ca3bd12ae275b8609` (main @ TASK-012 closeout docs merge) |
+| TASK-012 Impl reviewed Head | `7b1a6bd4bdc5111b2ead53849b0e96e0e3f5fcf9` |
+| TASK-012 Impl merge SHA | `ea3b898e57aa6abc73b9367552cffae3d24c027d` |
+| TASK-012 Impl merged_at | `2026-07-04T11:05:02Z` |
+| TASK-012 Impl PR CI | `28703861025` — SUCCESS |
+| TASK-012 Impl Main Post-Merge CI | `28704210885` — SUCCESS |
+| TASK-012 Impl review comment | `4629345980` (CHANGES REQUESTED) — addressed in PR #44 head |
+| TASK-012 Impl Issue closed_at | `2026-07-04T11:13:03Z` |
+| TASK-012 Impl closeout comment | `4881751607` |
+| TASK-012 Impl frozen contract file | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` (unchanged) |
+| TASK-012 Impl status | DONE / MERGED / VERIFIED / CLOSED |
 | TASK-013 | PLANNED / NOT STARTED — requires separate explicit authorization |
