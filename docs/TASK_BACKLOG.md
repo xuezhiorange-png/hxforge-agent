@@ -27,7 +27,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-011 (impl) | Collect, normalize, review and approve the first 20 benchmark cases | DONE | TASK-011 design |
 | TASK-012 (design) | Define standards rule-pack and license boundary | DONE | TASK-001 |
 | TASK-012 (impl) | Implement standards rule-pack runtime, license validator and CI boundary | DONE | TASK-012 design |
-| TASK-013 | Define material and cost data governance | PLANNED | TASK-001 |
+| TASK-013 (design) | Define material and cost data governance | READY_FOR_REVIEW | TASK-001 |
+| TASK-013 (impl) | Implement material and cost data governance | PLANNED | TASK-013 design |
 | TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
 | TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
 
@@ -100,10 +101,15 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
    main post-merge CI `28704210885` — SUCCESS).
    The TASK-012 implementation closeout docs PR records this
    milestone in the evidence tables below.
-8. TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018,
-   TASK-019, and TASK-020+ (shell-and-tube) remain PLANNED /
-   NOT STARTED unless later governance grants separate explicit
-   authorization.
+8. TASK-013 design contract is in review (Issue #46 OPEN, design PR
+   open with reviewed head to be recorded once review lands). TASK-013
+   implementation requires separate explicit authorization after the
+   design contract is reviewed, merged, frozen, and recorded.
+   TASK-013 implementation is NOT yet authorized.
+9. TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, and
+   TASK-020+ (shell-and-tube / plate / air-cooler / two-phase /
+   refrigerant) remain PLANNED / NOT STARTED unless later governance
+   grants separate explicit authorization.
 
 ## Merge evidence
 
@@ -126,6 +132,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-011 impl | #38 |
 | TASK-012 design | #41 |
 | TASK-012 impl | #44 |
+| TASK-013 design | TBD (this PR) |
 
 | Item | Value |
 |---|---|
@@ -189,4 +196,15 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-012 Impl closeout comment | `4881751607` |
 | TASK-012 Impl frozen contract file | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` (unchanged) |
 | TASK-012 Impl status | DONE / MERGED / VERIFIED / CLOSED |
-| TASK-013 | PLANNED / NOT STARTED — requires separate explicit authorization |
+| TASK-013 Design Issue | #46 — OPEN |
+| TASK-013 Design PR | TBD (this PR) |
+| TASK-013 Design branch | `docs/task-013-material-cost-data-governance` |
+| TASK-013 Design base | `56e7ec01d54fb938ac1c4c14b318eb34b03e3f86` (main @ TASK-012 implementation closeout merge) |
+| TASK-013 Design reviewed Head | TBD (to be filled by freeze reviewer) |
+| TASK-013 Design merge SHA | TBD (to be filled when merged) |
+| TASK-013 Design frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` |
+| TASK-013 Design status | READY_FOR_REVIEW / IMPLEMENTATION NOT AUTHORIZED |
+| TASK-013 Impl Issue | not yet opened — requires separate explicit authorization |
+| TASK-013 Impl PR | not yet opened — requires separate explicit authorization |
+| TASK-013 Impl status | PLANNED / NOT STARTED / AUTHORIZATION NOT GRANTED |
+| TASK-014 | PLANNED / NOT STARTED — requires separate explicit authorization |
