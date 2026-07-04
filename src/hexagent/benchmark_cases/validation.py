@@ -78,6 +78,15 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
+def _load_json_object_list(path: Path) -> list[dict[str, Any]]:
+    with path.open("r", encoding="utf-8") as handle:
+        value: Any = json.load(handle)
+    _require(isinstance(value, list), f"{path} must contain a JSON array")
+    for item in value:
+        _require(isinstance(item, dict), f"{path} must contain only JSON objects")
+    return cast(list[dict[str, Any]], value)
+
+
 def _string_list(value: Any, field: str) -> list[str]:
     _require(isinstance(value, list), f"{field} must be a list")
     for item in value:
@@ -169,9 +178,10 @@ def _validate_case(case: dict[str, Any], *, manifest_synthetic_ids: set[str]) ->
 def validate_corpus(root: Path | str = Path(".")) -> None:
     root = Path(root)
     manifest_path = root / "benchmarks" / "manifests" / "task-011-approved-manifest.json"
-    case_dir = root / "benchmarks" / "cases"
+    cases_path = root / "benchmarks" / "cases" / "task-011-approved-cases.json"
 
     manifest = _load_json_object(manifest_path)
+    cases = _load_json_object_list(cases_path)
     missing_manifest = sorted(REQUIRED_MANIFEST_FIELDS - set(manifest))
     _require(not missing_manifest, f"manifest missing fields: {missing_manifest}")
 
@@ -188,13 +198,16 @@ def validate_corpus(root: Path | str = Path(".")) -> None:
     )
     _require(set(case_hashes) == set(case_ids), "manifest case_hashes keys mismatch")
 
+    cases_by_id = {case.get("case_id"): case for case in cases}
+    _require(set(cases_by_id) == set(case_ids), "case corpus ids do not match manifest")
+    _require(len(cases_by_id) == len(cases), "case corpus must not contain duplicate ids")
+
     synthetic_ids = set(synthetic_case_ids)
     _require(synthetic_ids <= set(case_ids), "synthetic_case_ids must be a subset of case_ids")
 
     actual_synthetic_ids: set[str] = set()
     for case_id in case_ids:
-        case = _load_json_object(case_dir / f"{case_id}.json")
-        _require(case["case_id"] == case_id, f"{case_id} file contains mismatched case_id")
+        case = cases_by_id[case_id]
         recomputed_hash = _validate_case(case, manifest_synthetic_ids=synthetic_ids)
         _require(case_hashes[case_id] == recomputed_hash, f"manifest hash mismatch for {case_id}")
         if case.get("is_synthetic") is True:
