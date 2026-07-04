@@ -9,7 +9,11 @@ body (standard text, vendor catalog body, restricted price list,
 restricted material property table, scanned page, formula image, or
 copyrighted excerpt) into the repository or its deliverables.
 
-TASK-013 freezes seven interlocking governance objects:
+TASK-013 design draft defines seven interlocking candidate
+governance objects. The candidate design contract will be frozen
+only after review, merge, post-merge CI, and a recorded frozen SHA
+on main; until then this document is a design draft, NOT a frozen
+contract.
 
 1. A **source-class taxonomy** that classifies every material record
    and every cost record by where it came from and what license
@@ -62,11 +66,15 @@ Frozen prerequisite contracts (binding for TASK-013 design):
   benchmark case's source-class and license posture; they may NOT
   relax it.
 - `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` —
-  freezes the source-class taxonomy, license boundary model,
-  provenance graph model, and canonical hashing model that TASK-013
-  re-uses for material and cost records. TASK-013 does NOT redefine
-  those mechanisms; it specializes them for the material / cost data
-  shapes and adds record-specific fields.
+  freezes the license boundary model, provenance graph model,
+  canonical hashing model, and approval / review governance patterns
+  that TASK-013 re-uses for material and cost records. TASK-013 does
+  NOT redefine those mechanisms; it specializes them for the
+  material / cost data shapes and adds record-specific fields.
+- **TASK-013 defines its own TASK-013-specific source-class taxonomy
+  (see Section 4). This taxonomy is intentionally distinct from the
+  TASK-012 rule source classes; it is NOT a replacement for them and
+  TASK-012 source-class definitions remain unchanged.**
 
 The TASK-013 design contract MUST be reviewed and frozen (with a
 dedicated SHA) before any TASK-013 implementation may begin.
@@ -88,14 +96,19 @@ dedicated SHA) before any TASK-013 implementation may begin.
   paid-vendor catalog excerpts.
 - **Source class** — a closed enumeration token classifying where a
   record came from and what license posture it carries. Section 4
-  freezes the source-class taxonomy for material and cost records.
+  freezes the **TASK-013-specific** source-class taxonomy for
+  material and cost records. This taxonomy is intentionally
+  distinct from the TASK-012 rule source-class taxonomy; it is NOT
+  a replacement for it and TASK-012 source-class definitions remain
+  unchanged.
 - **License evidence** — REQUIRED token identifying the controlled
   form under which a record may be stored, redistributed, or
   consumed at runtime. Re-uses TASK-012 Section 7.2 evidence forms.
-- **Approval state** — frozen state machine inherited from TASK-012
-  Section 14. Material and cost records MUST traverse the same
-  approval ladder as standards rules; the runtime may NOT consume a
-  record whose `approval_state != approved`.
+- **Approval state** — TASK-013-specific state machine specialized
+  from TASK-012 Section 14 review governance (see Section 13).
+  Material and cost records MUST traverse the TASK-013-specific
+  approval ladder; the runtime may NOT consume a record whose
+  `approval_state != approved`.
 - **Record hash** — content-addressable SHA-256 hex digest computed
   over the record's canonical JSON form, identical to TASK-012
   Section 13. Re-uses the shared canonical JSON helper.
@@ -107,12 +120,16 @@ dedicated SHA) before any TASK-013 implementation may begin.
 ## 4. Source classes and source authority hierarchy
 
 Material records and cost records each carry ONE `source_class` token.
-The taxonomy is intentionally **separate** from the seven
-TASK-012 rule source classes; the rule-pack runtime may consume
-material and cost records, but material and cost records are NOT
-themselves rule-packs.
+The TASK-013-specific source-class taxonomy (closed set below) is
+intentionally **separate** from the seven TASK-012 rule source
+classes; the rule-pack runtime may consume material and cost records,
+but material and cost records are NOT themselves rule-packs. The
+TASK-013-specific taxonomy is NOT a replacement for the TASK-012
+rule source classes, and TASK-012 source-class definitions remain
+unchanged by this contract.
 
-Frozen source-class taxonomy for TASK-013 (closed set):
+TASK-013-specific source-class taxonomy for material and cost
+records (closed set):
 
 | Token                        | Meaning                                                                                                                                          | License posture                                |
 |------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
@@ -161,10 +178,11 @@ contract revision.
 | `source_reference`             | string              | yes      | Metadata pointer (URI or internal pointer). NEVER stores source body.                                                          |
 | `license_evidence`             | string              | yes      | One of the four TASK-012 Section 7.2 evidence forms.                                                                          |
 | `engineering_properties`       | object              | no       | Metadata-only property schema; see Section 5.4. NEVER stores restricted property tables.                                       |
+| `property_values`              | array of objects    | no       | Fielded SI-normalized engineering values permitted only for source classes allowed to carry values; MUST be absent for `RESTRICTED_REFERENCE_METADATA_ONLY`. See Section 5.5. |
 | `dimensional_units`            | object              | yes      | Maps every numeric metadata field in this record to its declared unit. See Section 10.                                          |
 | `quality_flags`                | array of strings    | yes      | Frozen enum; see Section 12.                                                                                                   |
 | `uncertainty`                  | object              | no       | See Section 12.                                                                                                               |
-| `approval_state`               | enum string         | yes      | Frozen TASK-012 Section 14 ladder. Runtime may only consume `approved`.                                                        |
+| `approval_state`               | enum string         | yes      | TASK-013-specific ladder; see Section 13. Runtime may only consume `approved`.                                                        |
 | `supersedes`                   | array of strings    | no       | Material record ids this record replaces.                                                                                      |
 | `superseded_by`                | string              | no       | Material record id that replaces this record. If populated, runtime MUST NOT select this record.                               |
 | `provenance_edges`             | array of strings    | yes      | Edge ids into the shared provenance graph (TASK-012 Section 11).                                                               |
@@ -180,7 +198,7 @@ contract revision.
 
 ### 5.2 `form_factor` closed set
 
-`plate`, `sheet`, `bar`, `billett`, `tube`, `pipe`, `fitting`,
+| `plate`, `sheet`, `bar`, `billet`, `tube`, `pipe`, `fitting`,
 `flange`, `forging`, `casting`, `brazed_assembly`, `welded_assembly`,
 `gasket`, `fastener`, `fluid_bulk`, `fluid_charge`, `other`.
 
@@ -238,7 +256,60 @@ Engineering property **values themselves** (e.g. `yield_strength =
 property values only from records whose `source_class` is in
 {`INTERNAL_ENGINEERING_ASSUMPTION`, `PUBLIC_METADATA`,
 `VENDOR_PERMISSIONED` (with `usage_scope`),
-`USER_PROVIDED_PROJECT_DATA`}.
+`USER_PROVIDED_PROJECT_DATA`}, and only via the canonical
+`property_values` array defined in Section 5.5 below.
+
+### 5.5 `property_values` canonical value payload
+
+`property_values` is the canonical location for consumable,
+SI-normalized numeric engineering property values that future
+runtime selectors may read. It is distinct from the metadata-only
+descriptor `engineering_properties` (Section 5.4). A record MAY
+carry both, MUST carry them consistently, and MUST NOT use one to
+bypass the constraints on the other.
+
+```text
+property_values: [
+  {
+    "property_name":           <canonical enum or string>,
+    "value_si":                <decimal string>,
+    "unit_si":                 <SI unit string from dimensional_units>,
+    "applicability_envelope":  <object | null>,
+    "uncertainty":             <object | null>,
+    "source_pointer":          <metadata pointer>,
+    "quality_flags":           <array of strings, see Section 12>
+  },
+  ...
+]
+```
+
+Mandatory rules for `property_values`:
+
+1. `RESTRICTED_REFERENCE_METADATA_ONLY` records MUST NOT carry any
+   `property_values` entry. A `RESTRICTED_REFERENCE_METADATA_ONLY`
+   record with `property_values` present is a **blocker**.
+2. `property_values` MAY be present only for records whose
+   `source_class` is one of:
+   - `INTERNAL_ENGINEERING_ASSUMPTION`
+   - `PUBLIC_METADATA`
+   - `VENDOR_PERMISSIONED` (with a non-empty `usage_scope` recorded
+     in `license_evidence` / `human_entered_evidence`)
+   - `USER_PROVIDED_PROJECT_DATA`
+   A record whose `source_class` is not in this list with
+   `property_values` present is a **blocker**.
+3. Every `property_values[*].unit_si` MUST appear as a declared
+   unit in `dimensional_units` for the same record. A mismatch is a
+   **blocker**.
+4. `property_values` is included in the canonical hashing input
+   (Section 16). Changing any value, unit, source pointer, or
+   quality flag MUST change the record's `record_hash`.
+5. Missing required consumable value payload (when a downstream
+   computation declares that it consumes this property from this
+   record) is a **blocker**.
+6. A forbidden numeric value present in a `RESTRICTED` record is a
+   **blocker** AND triggers the Section 9 license-boundary failure
+   posture (the record MUST be rejected by future CI scanner; in
+   this contract it is forbidden by construction).
 
 ## 6. Cost data record model
 
@@ -261,8 +332,9 @@ fields. All field names are fixed.
 | `source_reference`     | string              | yes      | Metadata pointer (URI or internal pointer). NEVER stores restricted price-list body.                                                       |
 | `license_evidence`     | string              | yes      | One of the four TASK-012 Section 7.2 evidence forms.                                                                                       |
 | `uncertainty_band`     | object              | no       | See Section 12.                                                                                                                            |
+| `cost_value`           | object              | no       | Fielded SI-normalized cost value permitted only for source classes allowed to carry values; MUST be absent for `RESTRICTED_REFERENCE_METADATA_ONLY`. See Section 6.4. |
 | `quality_flags`        | array of strings    | yes      | Frozen enum; see Section 12.                                                                                                                |
-| `approval_state`       | enum string         | yes      | Frozen TASK-012 Section 14 ladder. Runtime may only consume `approved`.                                                                     |
+| `approval_state`       | enum string         | yes      | TASK-013-specific ladder; see Section 13. Runtime may only consume `approved`.                                                  |
 | `supersedes`           | array of strings    | no       | Cost record ids this record replaces.                                                                                                       |
 | `superseded_by`        | string              | no       | Cost record id that replaces this record. If populated, runtime MUST NOT select this record.                                                |
 | `provenance_edges`     | array of strings    | yes      | Edge ids into the shared provenance graph.                                                                                                  |
@@ -275,7 +347,12 @@ fields. All field names are fixed.
 `fabrication_labor`, `fabrication_overhead`, `installation_labor`,
 `engineering_hours`, `transportation`, `taxes_and_duties`,
 `operating_energy`, `operating_utility`, `maintenance`, `insurance`,
-`decommissioning`, `compliance_permit`, `other`.
+`decommissioning`, `compliance_permit`,
+`cost_escalation_index`, `price_index`, `other`.
+
+`cost_escalation_index` and `price_index` are reserved for the
+escalation index records themselves (see Section 11). They MUST
+NOT be used to tag the cost items being escalated.
 
 ### 6.2 `cost_basis` closed set
 
@@ -291,11 +368,61 @@ list price, NOT the full catalog body), `internal_assumption`,
 
 Cost record **fielded body** (e.g. `unit_price = 4.20 USD/kg`,
 `escalation_index_reference = BLS-WPU-101700`) MAY be recorded only
-when the source posture is in {`INTERNAL_ENGINEERING_ASSUMPTION`,
+via the canonical `cost_value` object defined in Section 6.4 below,
+and only when the source posture is in {`INTERNAL_ENGINEERING_ASSUMPTION`,
 `PUBLIC_METADATA`, `VENDOR_PERMISSIONED` (with `usage_scope`),
 `USER_PROVIDED_PROJECT_DATA`}. For
 `RESTRICTED_REFERENCE_METADATA_ONLY`, only the metadata fields above
-are permitted; numeric unit-price values MUST be absent.
+are permitted; `cost_value` MUST be absent.
+
+### 6.4 `cost_value` canonical value payload
+
+`cost_value` is the canonical location for a consumable,
+SI-normalized numeric cost value that future runtime selectors may
+read. It carries the unit price / total cost / normalized unit
+price, the quantity basis that denominates it, and (when relevant)
+the escalation index it is anchored to.
+
+```text
+cost_value: {
+  "value":                         <decimal string>,
+  "currency":                      <ISO 4217 alphabetic code>,
+  "quantity_value_si":             <decimal string>,
+  "unit_basis":                    <SI unit string, matches record.unit_basis>,
+  "normalized_unit_price":         <decimal string | null>,
+  "escalation_index_reference":    <metadata pointer | null>,
+  "source_pointer":                <metadata pointer>,
+  "uncertainty_band":              <object | null>
+}
+```
+
+Mandatory rules for `cost_value`:
+
+1. `RESTRICTED_REFERENCE_METADATA_ONLY` records MUST NOT carry
+   `cost_value`. A `RESTRICTED_REFERENCE_METADATA_ONLY` record with
+   `cost_value` present is a **blocker**.
+2. `cost_value` MAY be present only for records whose
+   `source_class` is one of:
+   - `INTERNAL_ENGINEERING_ASSUMPTION`
+   - `PUBLIC_METADATA`
+   - `VENDOR_PERMISSIONED` (with a non-empty `usage_scope`)
+   - `USER_PROVIDED_PROJECT_DATA`
+   A record whose `source_class` is not in this list with `cost_value`
+   present is a **blocker**.
+3. `cost_value` is included in the canonical hashing input
+   (Section 16). Changing any sub-field MUST change the record's
+   `record_hash`.
+4. `cost_value` is bound by validation to the surrounding record's
+   `unit_basis`, `currency`, `effective_date`, and `escalation_date`:
+   - `cost_value.unit_basis` MUST equal the record's `unit_basis`.
+   - `cost_value.currency` MUST equal the record's `currency`.
+   - If `escalation_date` is set, the escalation index referenced by
+     `cost_value.escalation_index_reference` MUST have an
+     `effective_date` no later than `escalation_date`.
+   A mismatch is a **blocker**.
+5. A forbidden numeric cost value present in a `RESTRICTED` record
+   is a **blocker** AND triggers the Section 9 license-boundary
+   failure posture.
 
 ## 7. Identity, versioning, supersession and retirement
 
@@ -406,13 +533,22 @@ Additional TASK-013-specific boundary rules:
   It MUST be RFC 3339 UTC with `Z` suffix.
 - `escalation_date` is OPTIONAL. When present, it represents the
   reference date used for cost escalation index computation; the
-  escalation index itself is a separate `PUBLIC_METADATA` cost record
-  (`cost_category=operating_energy` or
-  `cost_category=operating_utility`, `cost_basis=public_index`).
-- Records with `escalation_date` MUST declare
-  `escalation_index_reference` as a `source_reference` pointer to the
-  public index record. The runtime MUST NOT embed escalation math in
-  the cost record itself.
+  escalation index itself MUST be recorded as a separate cost
+  record with:
+  - `cost_category = cost_escalation_index` or `cost_category = price_index`
+  - `cost_basis = public_index`
+  Escalation index records are themselves a distinct record class
+  and MUST NOT be tagged with `cost_category=operating_energy`,
+  `operating_utility`, or any other cost-item category.
+- `cost_value.escalation_index_reference` is the canonical location
+  for the pointer from a consuming cost record to an escalation
+  index record. Records with `escalation_date` MUST populate
+  `cost_value.escalation_index_reference` unless an explicit
+  justification is recorded in `human_entered_evidence`; a
+  consuming cost record with `escalation_date` set but no
+  `cost_value.escalation_index_reference` and no documented
+  justification is a **blocker**. The runtime MUST NOT embed
+  escalation math in the cost record itself.
 
 ## 12. Uncertainty, confidence and quality flags
 
@@ -432,19 +568,52 @@ Additional TASK-013-specific boundary rules:
 
 ## 13. Review and approval workflow
 
-The TASK-012 Section 14 frozen approval ladder applies verbatim:
+The TASK-013-specific approval ladder for material and cost records
+is:
 
-`draft` → `needs_source` → `needs_license_evidence` →
-`needs_normalization` → `needs_expected_outputs` → `under_review` →
-`approved` / `rejected` / `superseded`.
+```text
+draft
+  → needs_source
+  → needs_license_evidence
+  → needs_value_normalization
+  → needs_unit_validation
+  → needs_record_validation
+  → under_review
+  → approved / rejected / superseded
+```
 
-Additional TASK-013-specific requirements:
+This ladder is intentionally distinct from the TASK-012 rule-pack
+approval ladder: it adds `needs_value_normalization` and
+`needs_unit_validation` (for the canonical `property_values` /
+`cost_value` payloads introduced in Section 5.5 / Section 6.4), it
+removes `needs_expected_outputs` (which is not meaningful for
+material / cost records), and the gate transitions are specialized
+as below.
 
-- A material or cost record MUST NOT enter `under_review` unless its
-  `provenance_edges` is non-empty and `dimensional_units` /
-  `unit_basis` are present.
+Gate semantics and missing-data → state / blocker mapping:
+
+| Gate                       | Record MUST satisfy                                                          | Missing condition (blocker)                                              |
+|----------------------------|------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| `needs_source`             | non-empty `source_class`, non-empty `source_reference`                       | record lands in `rejected`                                              |
+| `needs_license_evidence`   | valid `license_evidence` token (Section 9 + TASK-012 Section 7.2)            | record lands in `rejected`                                              |
+| `needs_value_normalization`| `property_values` / `cost_value` (when present) carry SI units + decimal strings | record regresses to `needs_source` with `blocked_for_normalization=true` |
+| `needs_unit_validation`    | every `property_values[*].unit_si` declared in `dimensional_units`; `cost_value.unit_basis` == record `unit_basis`; `cost_value.currency` == record `currency` | record regresses to `needs_value_normalization` with `blocked_for_unit_validation=true` |
+| `needs_record_validation`  | `provenance_edges` non-empty; `record_hash` matches canonical form           | record lands in `rejected`                                              |
+| `under_review`             | all five gates passed                                                       | (cannot enter `under_review`)                                           |
+
+Runtime consumption rules:
+
+- The future runtime selector (Section 14) MAY only consume a record
+  whose `approval_state == approved`.
+- A `RESTRICTED_REFERENCE_METADATA_ONLY` record MAY reach
+  `approved`, but an approved `RESTRICTED_REFERENCE_METADATA_ONLY`
+  record MUST NOT participate in runtime **numeric value
+  selection**: its `property_values` and `cost_value` MUST be
+  absent by construction (Section 5.5 / Section 6.4), and any
+  attempt to read a numeric value from it is a blocker.
 - An approver MUST verify that no restricted content is embedded in
-  any field. CI (future, NOT this contract) MAY support this with a
+  any field before transitioning a record to `approved`. CI
+  (future, NOT this contract) MAY support this with a
   forbidden-token / fingerprint scanner; the contract specifies the
   intent, not the implementation.
 

@@ -101,11 +101,15 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
    main post-merge CI `28704210885` — SUCCESS).
    The TASK-012 implementation closeout docs PR records this
    milestone in the evidence tables below.
-8. TASK-013 design contract is in review (Issue #46 OPEN, design PR
-   open with reviewed head to be recorded once review lands). TASK-013
-   implementation requires separate explicit authorization after the
-   design contract is reviewed, merged, frozen, and recorded.
-   TASK-013 implementation is NOT yet authorized.
+8. TASK-013 design contract is under review following review comment
+   `4629537005` (CHANGES_REQUESTED). Docs-only remediation is being
+   applied on `docs/task-013-material-cost-data-governance`; the
+   reviewed Head was `9b23af758a7cccf6ad0257d6c008ecc266012d32` and
+   the new Head / freeze SHA will be recorded once the remediation
+   commit lands and review passes. TASK-013 implementation requires
+   separate explicit authorization after the design contract is
+   reviewed, merged, frozen, and recorded. TASK-013 implementation
+   is NOT yet authorized.
 9. TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, and
    TASK-020+ (shell-and-tube / plate / air-cooler / two-phase /
    refrigerant) remain PLANNED / NOT STARTED unless later governance
@@ -132,7 +136,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-011 impl | #38 |
 | TASK-012 design | #41 |
 | TASK-012 impl | #44 |
-| TASK-013 design | TBD (this PR) |
+| TASK-013 design | #47 (this PR, currently DRAFT) |
 
 | Item | Value |
 |---|---|
@@ -197,10 +201,12 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-012 Impl frozen contract file | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` (unchanged) |
 | TASK-012 Impl status | DONE / MERGED / VERIFIED / CLOSED |
 | TASK-013 Design Issue | #46 — OPEN |
-| TASK-013 Design PR | TBD (this PR) |
+| TASK-013 Design PR | #47 (this PR) |
 | TASK-013 Design branch | `docs/task-013-material-cost-data-governance` |
 | TASK-013 Design base | `56e7ec01d54fb938ac1c4c14b318eb34b03e3f86` (main @ TASK-012 implementation closeout merge) |
-| TASK-013 Design reviewed Head | TBD (to be filled by freeze reviewer) |
+| TASK-013 Design reviewed Head | `9b23af758a7cccf6ad0257d6c008ecc266012d32` |
+| TASK-013 Design review comment id | `4629537005` — CHANGES_REQUESTED |
+| TASK-013 Design remediation Head | TBD (filled by remediation commit — see Section 8 above) |
 | TASK-013 Design merge SHA | TBD (to be filled when merged) |
 | TASK-013 Design frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` |
 | TASK-013 Design status | READY_FOR_REVIEW / IMPLEMENTATION NOT AUTHORIZED |
