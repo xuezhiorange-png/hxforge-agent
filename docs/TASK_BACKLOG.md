@@ -101,8 +101,8 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
    main post-merge CI `28704210885` — SUCCESS).
    The TASK-012 implementation closeout docs PR records this
    milestone in the evidence tables below.
-8. TASK-013 design contract is under review on
-   `docs/task-013-material-cost-data-governance`:
+8. TASK-013 design contract has been merged and is now
+   DESIGN FROZEN on main:
    - Initial reviewed Head `9b23af758a7cccf6ad0257d6c008ecc266012d32`
      received review comment `4629537005` (CHANGES_REQUESTED).
    - Remediation commit `bc0856da6a4c99a04afb03fca6caf2c4a563f6ac`
@@ -112,12 +112,20 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
      PR CI run `28706044096` (completed / success).
    - Final-flow preflight review `4629613493` flagged a
      `docs/TASK_BACKLOG.md` evidence-staleness blocker before
-     Ready / Merge and is being addressed by a docs-only evidence
-     fix commit on the same branch (merge SHA still pending final
-     merge / to be recorded by post-merge closeout docs).
-   TASK-013 implementation requires separate explicit authorization
-   after the design contract is reviewed, merged, frozen, and
-   recorded. TASK-013 implementation is NOT yet authorized.
+     Ready / Merge.
+   - Evidence-fix commit `10e7335015289a2b6bf6561e1e5e629cdaeeadf7`
+     on the same branch received final-flow evidence-fix review
+     `4629635280` (PASS / preflight clear) with PR CI run
+     `28706983959` (completed / success).
+   - PR #47 was merged at `2026-07-04T13:10:58Z` (merge commit
+     `ee7aa092bca854316be961b536c7a121490aa385`); main post-merge
+     CI run `28707278871` completed / success.
+   - Closeout docs PR (on branch `docs/task-013-design-closeout`)
+     records the merge SHA, main post-merge CI, and frozen design
+     status in the Merge evidence table.
+   TASK-013 implementation requires a separate explicit
+   authorization after the closeout docs PR is merged; TASK-013
+   implementation remains NOT authorized.
 9. TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, and
    TASK-020+ (shell-and-tube / plate / air-cooler / two-phase /
    refrigerant) remain PLANNED / NOT STARTED unless later governance
@@ -144,7 +152,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-011 impl | #38 |
 | TASK-012 design | #41 |
 | TASK-012 impl | #44 |
-| TASK-013 design | #47 (this PR, currently DRAFT) |
+| TASK-013 design | #47 |
 
 | Item | Value |
 |---|---|
@@ -219,9 +227,13 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-013 Design final review | `4629604406` — PASS |
 | TASK-013 Design PR CI | `28706044096` — SUCCESS |
 | TASK-013 Design final-flow preflight review | `4629613493` — BLOCKED pending evidence fix |
-| TASK-013 Design merge SHA | pending final merge / to be recorded by post-merge closeout docs |
+| TASK-013 Design final-flow evidence-fix review | `4629635280` — PASS / preflight clear |
+| TASK-013 Design merge SHA | `ee7aa092bca854316be961b536c7a121490aa385` |
+| TASK-013 Design merged_at | `2026-07-04T13:10:58Z` |
+| TASK-013 Design main post-merge CI | `28707278871` — SUCCESS |
+| TASK-013 Design freeze comment | to be recorded on Issue #46 by closeout docs PR merge |
 | TASK-013 Design frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` |
-| TASK-013 Design status | READY_FOR_REVIEW / IMPLEMENTATION NOT AUTHORIZED |
+| TASK-013 Design status | DONE / DESIGN FROZEN / IMPLEMENTATION NOT AUTHORIZED |
 | TASK-013 Impl Issue | not yet opened — requires separate explicit authorization |
 | TASK-013 Impl PR | not yet opened — requires separate explicit authorization |
 | TASK-013 Impl status | PLANNED / NOT STARTED / AUTHORIZATION NOT GRANTED |
