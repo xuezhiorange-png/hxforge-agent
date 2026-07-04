@@ -634,8 +634,11 @@ fresh `revision_number`.
 - `expected_parent_revision_id`
 - `actual_parent_revision_id`
 - `attempted_revision_number`
-- `conflict_reason` (one of `{stale_parent, token_mismatch,
+- `conflict_reason` (one of `{token_mismatch,
    duplicate_idempotency_key, concurrent_sibling}`)
+
+Stale expected-parent conflicts are represented by
+`StaleParentRevision`, not by `CaseRevisionConflict`.
 
 ## 14. Provenance and audit integration
 
@@ -732,11 +735,14 @@ Task014Error (base)
 - **`CaseRevisionConflict`**
   - `error_code = "case_revision_conflict"`
   - `context.conflict_reason` ∈
-    `{stale_parent, token_mismatch, duplicate_idempotency_key,
-     concurrent_sibling}`
+    `{token_mismatch, duplicate_idempotency_key, concurrent_sibling}`
   - `context.expected_parent_revision_id`
   - `context.actual_parent_revision_id`
   - `context.attempted_revision_number`
+
+A stale expected-parent condition MUST be represented by
+`StaleParentRevision` with `error_code = "stale_parent_revision"`.
+It MUST NOT be represented as `CaseRevisionConflict`.
 
 - **`StaleParentRevision`**
   - `error_code = "stale_parent_revision"`
