@@ -73,6 +73,75 @@ def _make_internal_rule(rid: str, *, missing_license: bool = False) -> dict:
     return _hash_in_place(r)
 
 
+# All four required VENDOR_PERMISSIONED scope tokens
+# (Section 4.2 / Section 16.3a).
+_ALL_VENDOR_SCOPE_TOKENS = [
+    "repository_storage",
+    "repository_redistribution",
+    "usage_scope",
+    "public_artifact_allowed",
+]
+
+
+def _make_vendor_rule(
+    rid: str,
+    *,
+    permission_scope: list[str] | None = None,
+    missing_permission_scope: bool = False,
+) -> dict:
+    """Build a VENDOR_PERMISSIONED rule with full license boundary fields.
+
+    ``permission_scope`` defaults to all four required tokens (passes).
+    ``missing_permission_scope=True`` removes the scope list entirely.
+    """
+    scope = None if missing_permission_scope else list(permission_scope or _ALL_VENDOR_SCOPE_TOKENS)
+    r: dict = {
+        "rule_id": rid,
+        "rule_version": "1.0.0",
+        "rule_title": f"Vendor rule {rid}",
+        "source_class": "VENDOR_PERMISSIONED",
+        "jurisdiction": "INTL",
+        "standard_family": "VENDOR",
+        "bibliographic_reference": f"vendor://test/{rid}",
+        "license_evidence": "permission-evidence://vendor/test",
+        "source_evidence": {
+            "source_class": "VENDOR_PERMISSIONED",
+            "source_reference": f"vendor://test/{rid}",
+            "source_title_or_identifier": "Test Vendor Catalog",
+            "source_locator_or_citation": "section 1.0",
+            "source_jurisdiction": "INTL",
+            "license_evidence": "permission-evidence://vendor/test",
+        },
+        "human_entered_evidence": {
+            "author_identity": "eng@test.invalid",
+            "author_role": "vendor liaison",
+            "entry_timestamp_utc": "2026-07-04T09:00:00Z",
+            "review": {
+                "reviewer_identity": "rev@test.invalid",
+                "review_thread_reference": "review_vendor_test",
+                "review_timestamp_utc": "2026-07-04T09:15:00Z",
+            },
+            "vendor_permission_evidence": {
+                "permission_scope": scope,
+                "vendor_identity": "vendor_acme",
+                "permission_grant_reference": "grant_001",
+            },
+        },
+        "rule_body": {"statement": "vendor-provided selection rule"},
+        "forbidden_content_marker_check": [],
+        "applicability_envelope": {"scope": "test", "units": "dimensionless"},
+        "uncertainty": {"type": "structural", "note": "exact"},
+        "review_status": "accepted",
+        "approval_status": "approved",
+        "provenance_edges": [f"{rid}_edge"],
+    }
+    if missing_permission_scope:
+        # Remove the entire vendor_permission_evidence block so the
+        # permission_scope field is genuinely missing, not just empty.
+        r["human_entered_evidence"].pop("vendor_permission_evidence", None)
+    return _hash_in_place(r)
+
+
 def _make_manifest(rule_ids: list[str]) -> dict:
     m = {
         "rule_pack_id": "rp_test",
@@ -254,3 +323,119 @@ def test_cli_returns_nonzero_on_invalid_rule_pack(tmp_path: Path) -> None:
     )
     assert proc.returncode == 1
     assert "FAIL" in proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# P0-1: VENDOR_PERMISSIONED scope enforcement is wired into the main
+# validator path. These tests go end-to-end through validate_rule_pack so
+# helper-only coverage cannot mask the gap.
+# ---------------------------------------------------------------------------
+
+
+def _build_vendor_rule_pack(tmp_path: Path, vendor_rule: dict) -> Path:
+    rp = tmp_path / "rp"
+    rid = vendor_rule["rule_id"]
+    edge_id = f"{rid}_edge"
+    _write_json(rp / "manifest.json", _make_manifest([rid]))
+    _write_json(rp / "rules" / f"{rid}.json", vendor_rule)
+    _write_json(
+        rp / "provenance" / f"{edge_id}.json",
+        _make_edge(edge_id, rid),
+    )
+    return rp
+
+
+def test_validate_rule_pack_vendor_full_scope_passes(tmp_path: Path) -> None:
+    """VENDOR rule with all four required scope tokens passes validation."""
+    rp = _build_vendor_rule_pack(tmp_path, _make_vendor_rule("vr1"))
+    report = validate_rule_pack(rp)
+    assert report["status"] == "ok", report["errors"]
+    assert report["rule_count"] == 1
+
+
+def test_validate_rule_pack_vendor_missing_permission_scope_rejected(tmp_path: Path) -> None:
+    """VENDOR rule with vendor_permission_evidence absent entirely is rejected."""
+    rp = _build_vendor_rule_pack(
+        tmp_path,
+        _make_vendor_rule("vr1", missing_permission_scope=True),
+    )
+    report = validate_rule_pack(rp)
+    assert report["status"] == "fail"
+    paths = [e["path"] for e in report["errors"]]
+    assert any("permission_scope" in p for p in paths), report["errors"]
+
+
+def test_validate_rule_pack_vendor_missing_repository_storage_rejected(tmp_path: Path) -> None:
+    """VENDOR rule missing repository_storage is rejected at validator level."""
+    scope = [t for t in _ALL_VENDOR_SCOPE_TOKENS if t != "repository_storage"]
+    rp = _build_vendor_rule_pack(tmp_path, _make_vendor_rule("vr1", permission_scope=scope))
+    report = validate_rule_pack(rp)
+    assert report["status"] == "fail"
+    paths = [e["path"] for e in report["errors"]]
+    messages = [e["message"] for e in report["errors"]]
+    assert any("permission_scope" in p for p in paths)
+    assert any("repository_storage" in m for m in messages)
+
+
+def test_validate_rule_pack_vendor_missing_repository_redistribution_rejected(
+    tmp_path: Path,
+) -> None:
+    """VENDOR rule missing repository_redistribution is rejected at validator level."""
+    scope = [t for t in _ALL_VENDOR_SCOPE_TOKENS if t != "repository_redistribution"]
+    rp = _build_vendor_rule_pack(tmp_path, _make_vendor_rule("vr1", permission_scope=scope))
+    report = validate_rule_pack(rp)
+    assert report["status"] == "fail"
+    paths = [e["path"] for e in report["errors"]]
+    messages = [e["message"] for e in report["errors"]]
+    assert any("permission_scope" in p for p in paths)
+    assert any("repository_redistribution" in m for m in messages)
+
+
+def test_validate_rule_pack_vendor_missing_usage_scope_rejected(tmp_path: Path) -> None:
+    """VENDOR rule missing usage_scope is rejected.
+
+    The validator declares VENDOR_PERMISSIONED rules require
+    ``usage_scope`` (Section 4.2 — runtime loading is part of the
+    contract), so a VENDOR rule-pack missing this token cannot pass.
+    """
+    scope = [t for t in _ALL_VENDOR_SCOPE_TOKENS if t != "usage_scope"]
+    rp = _build_vendor_rule_pack(tmp_path, _make_vendor_rule("vr1", permission_scope=scope))
+    report = validate_rule_pack(rp)
+    assert report["status"] == "fail"
+    paths = [e["path"] for e in report["errors"]]
+    messages = [e["message"] for e in report["errors"]]
+    assert any("permission_scope" in p for p in paths)
+    assert any("usage_scope" in m for m in messages)
+
+
+def test_validate_rule_pack_vendor_missing_public_artifact_allowed_rejected(
+    tmp_path: Path,
+) -> None:
+    """VENDOR rule missing public_artifact_allowed is rejected.
+
+    The validator declares VENDOR_PERMISSIONED rules require
+    ``public_artifact_allowed`` (Section 4.2 — public artifact
+    emission is part of the contract), so a VENDOR rule-pack missing
+    this token cannot pass.
+    """
+    scope = [t for t in _ALL_VENDOR_SCOPE_TOKENS if t != "public_artifact_allowed"]
+    rp = _build_vendor_rule_pack(tmp_path, _make_vendor_rule("vr1", permission_scope=scope))
+    report = validate_rule_pack(rp)
+    assert report["status"] == "fail"
+    paths = [e["path"] for e in report["errors"]]
+    messages = [e["message"] for e in report["errors"]]
+    assert any("permission_scope" in p for p in paths)
+    assert any("public_artifact_allowed" in m for m in messages)
+
+
+def test_validate_rule_pack_non_vendor_without_vendor_scope_passes(tmp_path: Path) -> None:
+    """NON-VENDOR rules do not require vendor_permission_evidence at all.
+
+    The new VENDOR scope enforcement is a no-op for non-VENDOR source
+    classes. This guards against regressions where the no-op branch
+    starts rejecting rules that have no permission_scope field.
+    """
+    rp = _build_valid_rule_pack(tmp_path)
+    report = validate_rule_pack(rp)
+    assert report["status"] == "ok"
+    assert report["rule_count"] == 2

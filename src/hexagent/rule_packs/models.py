@@ -99,6 +99,20 @@ NON_REDISTRIBUTABLE_SOURCES: frozenset[SourceClass] = frozenset(
     {SourceClass.USER_PROVIDED_LICENSED_SUMMARY, SourceClass.REFERENCE_ONLY_RESTRICTED_STANDARD}
 )
 
+# VENDOR_PERMISSIONED rules MUST declare every permission_scope token that
+# any operation (repository storage / redistribution / runtime loading /
+# public artifact emission) will eventually require (Section 4.2 /
+# Section 16.3a). The validator enforces this set on the rule-pack so
+# operations cannot discover a missing scope at operation time.
+VENDOR_PERMISSION_SCOPE_REQUIRED_TOKENS: frozenset[str] = frozenset(
+    {
+        VendorPermissionScope.REPOSITORY_STORAGE.value,
+        VendorPermissionScope.REPOSITORY_REDISTRIBUTION.value,
+        VendorPermissionScope.USAGE_SCOPE.value,
+        VendorPermissionScope.PUBLIC_ARTIFACT_ALLOWED.value,
+    }
+)
+
 # Top-level manifest fields per Section 7.1.
 MANIFEST_REQUIRED_FIELDS: frozenset[str] = frozenset(
     {
@@ -179,10 +193,13 @@ SOURCE_EVIDENCE_REQUIRED_FIELDS: frozenset[str] = frozenset(
 )
 
 # Mirror fields where rule identity MUST be byte-equal to source_evidence
-# (Section 7.2 direct-field policy). Limited to fields Section 10 actually
-# requires in source_evidence; standard_family is recorded on the rule
-# only (Section 7.2 standard_family column).
+# (Section 7.2 direct-field policy). Section 10 requires these four fields
+# on source_evidence, and the rule-level identity tuple (Section 7.2 +
+# RULE_IDENTITY_DIRECT_FIELDS) carries the same four on the rule artifact
+# itself. Mirror enforcement guarantees they agree.
 SOURCE_EVIDENCE_MIRROR_FIELDS: dict[str, str] = {
+    "source_class": "source_class",
+    "license_evidence": "license_evidence",
     "jurisdiction": "source_jurisdiction",
     "bibliographic_reference": "source_reference",
 }

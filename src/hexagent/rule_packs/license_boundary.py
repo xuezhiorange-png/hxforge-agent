@@ -30,6 +30,7 @@ from hexagent.rule_packs.models import (
     INTERNAL_AUTHORITY_SOURCES,
     METADATA_ONLY_SOURCES,
     NON_REDISTRIBUTABLE_SOURCES,
+    VENDOR_PERMISSION_SCOPE_REQUIRED_TOKENS,
     ForbiddenContentMarker,
     LicenseEvidenceForm,
     SourceClass,
@@ -221,6 +222,51 @@ def enforce_no_forbidden_marker(rule: dict[str, Any]) -> None:
         )
 
 
+def enforce_vendor_permission_scope_full_recorded(rule: dict[str, Any]) -> None:
+    """Enforce that a VENDOR_PERMISSIONED rule records every required scope token.
+
+    Wired into ``enforce_full_license_boundary`` so the top-level
+    ``validate_rule_pack`` rejects a VENDOR_PERMISSIONED rule-pack whose
+    ``human_entered_evidence.vendor_permission_evidence.permission_scope``
+    is missing any of the four required tokens:
+
+    * ``repository_storage`` — required for any future storage operation.
+    * ``repository_redistribution`` — required for any future
+      redistribution operation.
+    * ``usage_scope`` — required for any future runtime loading.
+    * ``public_artifact_allowed`` — required for any future public
+      artifact emission.
+
+    For non-VENDOR rules this is a no-op.
+
+    See Section 4.2 / Section 16.3a.
+    """
+    source_class = rule.get("source_class")
+    if source_class != SourceClass.VENDOR_PERMISSIONED.value:
+        return
+    human = rule.get("human_entered_evidence") or {}
+    permission = human.get("vendor_permission_evidence") or {}
+    scope = permission.get("permission_scope")
+    if not isinstance(scope, list):
+        raise RulePackValidationError(
+            "VENDOR_PERMISSIONED rule missing "
+            "human_entered_evidence.vendor_permission_evidence."
+            "permission_scope list (Section 4.2)",
+            path="human_entered_evidence.vendor_permission_evidence.permission_scope",
+        )
+    scope_set = set(scope)
+    missing = sorted(VENDOR_PERMISSION_SCOPE_REQUIRED_TOKENS - scope_set)
+    if missing:
+        raise RulePackValidationError(
+            "VENDOR_PERMISSIONED rule permission_scope is missing "
+            f"required tokens {missing}; got {sorted(scope_set)} "
+            "(Section 4.2 / Section 16.3a — repository_storage / "
+            "repository_redistribution / usage_scope / "
+            "public_artifact_allowed)",
+            path="human_entered_evidence.vendor_permission_evidence.permission_scope",
+        )
+
+
 def enforce_vendor_permission_scope(
     rule: dict[str, Any],
     *,
@@ -346,3 +392,8 @@ def enforce_full_license_boundary(rule: dict[str, Any]) -> None:
     enforce_no_forbidden_marker(rule)
     enforce_metadata_only(rule)
     enforce_non_redistribution(rule)
+    # VENDOR_PERMISSIONED scope enforcement: every VENDOR rule must record
+    # all four permission_scope tokens required by the four operations
+    # (repository_storage / repository_redistribution / runtime usage /
+    # public artifact emission). See Section 4.2 / Section 16.3a.
+    enforce_vendor_permission_scope_full_recorded(rule)

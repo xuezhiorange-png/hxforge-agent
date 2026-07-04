@@ -153,6 +153,30 @@ def test_rule_jurisdiction_mirror_mismatch_rejected() -> None:
         validate_rule(r)
 
 
+def test_rule_source_class_mirror_mismatch_rejected() -> None:
+    r = _valid_rule()
+    r["source_evidence"]["source_class"] = "PUBLIC_DOMAIN"
+    with pytest.raises(RulePackValidationError) as exc:
+        validate_rule(r)
+    assert exc.value.path == "rule.source_class"
+
+
+def test_rule_license_evidence_mirror_mismatch_rejected() -> None:
+    r = _valid_rule()
+    r["source_evidence"]["license_evidence"] = "Apache-2.0"
+    with pytest.raises(RulePackValidationError) as exc:
+        validate_rule(r)
+    assert exc.value.path == "rule.license_evidence"
+
+
+def test_rule_bibliographic_reference_mirror_mismatch_rejected() -> None:
+    r = _valid_rule()
+    r["source_evidence"]["source_reference"] = "internal://other-handbook/v1"
+    with pytest.raises(RulePackValidationError) as exc:
+        validate_rule(r)
+    assert exc.value.path == "rule.bibliographic_reference"
+
+
 def test_rule_canonical_hash_mismatch_rejected() -> None:
     r = _valid_rule()
     r["canonical_hash"] = "f" * 64
