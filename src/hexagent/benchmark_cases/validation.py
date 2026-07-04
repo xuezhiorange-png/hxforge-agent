@@ -117,7 +117,7 @@ def _validate_case(case: dict[str, Any], *, synthetic_ids: set[str]) -> str:
     output_names: set[str] = set()
     for output in outputs:
         name = cast(str, output.get("output_name"))
-        _require(isinstance(name, str) and name, f"{case_id} output missing name")
+        _require(bool(isinstance(name, str) and name), f"{case_id} output missing name")
         _require(not name.startswith(FORBIDDEN_OUTPUT_PREFIXES), f"{case_id} forbidden output")
         output_names.add(name)
 
