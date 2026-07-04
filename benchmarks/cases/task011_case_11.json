@@ -36,7 +36,7 @@
     "evidence_limitations": "TASK-011 internal_reviewed_case; numeric expected outputs are seed governance placeholders pending licensed rule-pack verification (see BASELINE_CASES.md). These artifacts establish the case schema, review workflow state, and source evidence structure; numeric validation awaits Round N Review sign-off per Issue #36 governance.",
     "reviewer_evidence_check_status": "accepted",
     "author_identity": "task-011-implementation-author",
-    "review_thread_reference": "Issue #36 — TASK-011 thread",
+    "review_thread_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
     "date_of_review": "2026-07-04",
     "scope_of_internal_review": "only this case (task011_case_11)"
   },
@@ -191,11 +191,12 @@
   },
   "approval_status": "approved",
   "approval_metadata": {
-    "approver_id": "issue-36-taska011-governance",
-    "approval_timestamp_utc": "2026-07-04T02:30:00Z",
-    "review_id": "issue-36",
-    "review_authority_reference": "Issue #36 — TASK-011 governance thread",
-    "review_authority_metadata": "Approval granted by TASK-011 governance process anchored at Issue #36 (TASK-011 — Collect and approve the first 20 benchmark cases). The reviewer sign-off is recorded as part of the Issue #36 thread per contract §9.2.4 / §16.7. This metadata binds the case to a real review authority and is NOT self-asserted by the implementation author."
+    "approver_id": "xuezhiorange-png",
+    "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+    "review_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+    "review_authority_reference": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+    "review_authority_metadata": "Real review authority bound to Issue #36 binding comment (comment_id=IC_kwDOTATQrM8AAAABIu4w8g, db_id=4881002738, url=https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738). The approver is the Issue #36 owner / PR #38 author (xuezhiorange-png). This binding replaces all prior generic placeholders (issue-36, issue-36-taska011-governance, Issue #36 - TASK-011 governance thread). The comment body enumerates the 20 case IDs, the 6 synthetic IDs, and the hash snapshot policy.",
+    "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
   },
-  "canonical_hash": "afc621b3fe04006438b2e09b255d24cc25af5c8c53b645163243d44b6661c9ea"
+  "canonical_hash": "b03ea749ac5978faf1f8003692bf4d6b17b50704a09d8938f5af1bcc2575fe44"
 }

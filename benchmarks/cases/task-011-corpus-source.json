@@ -1,8 +1,34 @@
 {
-  "case_count": 20,
-  "case_source": "hexagent.benchmark_cases.corpus.approved_cases",
-  "manifest": "benchmarks/manifests/task-011-approved-manifest.json",
-  "status": "approved",
   "task": "TASK-011",
-  "validation_entrypoint": "python -m hexagent.benchmark_cases.validation"
+  "status": "approved",
+  "corpus_source": "repository_artifact_set",
+  "corpus_source_description": "The TASK-011 benchmark corpus is the set of on-disk JSON artifacts under benchmarks/cases/. There is no Python-side case generator. approved_cases() is a read-only loader that reads each task011_case_*.json file from disk.",
+  "case_path_pattern": "benchmarks/cases/task011_case_*.json",
+  "case_path_pattern_description": "Each case is one independently reviewable JSON file named task011_case_NN.json where NN is the zero-padded decimal index in [01, 20]. The validator reads these files by case_id and recomputes their canonical hashes from on-disk contents.",
+  "manifest_path": "benchmarks/manifests/task-011-approved-manifest.json",
+  "manifest_path_description": "The manifest binds case_hashes to recomputed canonical hashes from the artifact set. case_ids must point to existing files; missing artifacts or hash mismatches are rejection-level errors per contract section 19.1.",
+  "validation_entrypoint": "python -m hexagent.benchmark_cases.validation",
+  "validation_entrypoint_description": "Exit 0 means the corpus passes every section 19.1 validation form plus the section 9.3 transition table execution.",
+  "loader_module": "hexagent.benchmark_cases.corpus",
+  "loader_module_description": "Read-only artifact loader. approved_cases() reads benchmarks/cases/task011_case_*.json; it does NOT synthesize case payloads. case_file_path(root, case_id) maps case_id -> file path.",
+  "approval_authority": {
+    "comment_id": "IC_kwDOTATQrM8AAAABIu4w8g",
+    "comment_db_id": "4881002738",
+    "comment_url": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36#issuecomment-4881002738",
+    "issue": "#36",
+    "issue_url": "https://github.com/xuezhiorange-png/hxforge-agent/issues/36",
+    "approver_id": "xuezhiorange-png",
+    "approval_timestamp_utc": "2026-07-04T03:30:00Z",
+    "approval_scope": "TASK-011 benchmark corpus approval (all 20 case artifacts + manifest)"
+  },
+  "synthetic_case_ids": [
+    "task011_case_03",
+    "task011_case_06",
+    "task011_case_09",
+    "task011_case_12",
+    "task011_case_15",
+    "task011_case_18"
+  ],
+  "synthetic_case_ids_description": "These case IDs MUST be listed in manifest.synthetic_case_ids and MUST NOT be cited as independent validation evidence (contract section 9.2.5).",
+  "case_count": 20
 }
