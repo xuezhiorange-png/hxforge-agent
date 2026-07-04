@@ -27,7 +27,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-011 (impl) | Collect, normalize, review and approve the first 20 benchmark cases | DONE | TASK-011 design |
 | TASK-012 (design) | Define standards rule-pack and license boundary | DONE | TASK-001 |
 | TASK-012 (impl) | Implement standards rule-pack runtime, license validator and CI boundary | DONE | TASK-012 design |
-| TASK-013 | Define material and cost data governance | PLANNED | TASK-001 |
+| TASK-013 (design) | Define material and cost data governance | READY_FOR_REVIEW | TASK-001 |
+| TASK-013 (impl) | Implement material and cost data governance | PLANNED | TASK-013 design |
 | TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
 | TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
 
@@ -100,10 +101,27 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
    main post-merge CI `28704210885` — SUCCESS).
    The TASK-012 implementation closeout docs PR records this
    milestone in the evidence tables below.
-8. TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018,
-   TASK-019, and TASK-020+ (shell-and-tube) remain PLANNED /
-   NOT STARTED unless later governance grants separate explicit
-   authorization.
+8. TASK-013 design contract is under review on
+   `docs/task-013-material-cost-data-governance`:
+   - Initial reviewed Head `9b23af758a7cccf6ad0257d6c008ecc266012d32`
+     received review comment `4629537005` (CHANGES_REQUESTED).
+   - Remediation commit `bc0856da6a4c99a04afb03fca6caf2c4a563f6ac`
+     on the same branch addressed P0/P1/P2 items and produced
+     final reviewed Head `bc0856da6a4c99a04afb03fca6caf2c4a563f6ac`,
+     which received round 2 review `4629604406` (PASS) with
+     PR CI run `28706044096` (completed / success).
+   - Final-flow preflight review `4629613493` flagged a
+     `docs/TASK_BACKLOG.md` evidence-staleness blocker before
+     Ready / Merge and is being addressed by a docs-only evidence
+     fix commit on the same branch (merge SHA still pending final
+     merge / to be recorded by post-merge closeout docs).
+   TASK-013 implementation requires separate explicit authorization
+   after the design contract is reviewed, merged, frozen, and
+   recorded. TASK-013 implementation is NOT yet authorized.
+9. TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, and
+   TASK-020+ (shell-and-tube / plate / air-cooler / two-phase /
+   refrigerant) remain PLANNED / NOT STARTED unless later governance
+   grants separate explicit authorization.
 
 ## Merge evidence
 
@@ -126,6 +144,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-011 impl | #38 |
 | TASK-012 design | #41 |
 | TASK-012 impl | #44 |
+| TASK-013 design | #47 (this PR, currently DRAFT) |
 
 | Item | Value |
 |---|---|
@@ -189,4 +208,21 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-012 Impl closeout comment | `4881751607` |
 | TASK-012 Impl frozen contract file | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` (unchanged) |
 | TASK-012 Impl status | DONE / MERGED / VERIFIED / CLOSED |
-| TASK-013 | PLANNED / NOT STARTED — requires separate explicit authorization |
+| TASK-013 Design Issue | #46 — OPEN |
+| TASK-013 Design PR | #47 (this PR) |
+| TASK-013 Design branch | `docs/task-013-material-cost-data-governance` |
+| TASK-013 Design base | `56e7ec01d54fb938ac1c4c14b318eb34b03e3f86` (main @ TASK-012 implementation closeout merge) |
+| TASK-013 Design initial reviewed Head | `9b23af758a7cccf6ad0257d6c008ecc266012d32` |
+| TASK-013 Design initial review | `4629537005` — CHANGES_REQUESTED |
+| TASK-013 Design remediation Head | `bc0856da6a4c99a04afb03fca6caf2c4a563f6ac` |
+| TASK-013 Design final reviewed Head | `bc0856da6a4c99a04afb03fca6caf2c4a563f6ac` |
+| TASK-013 Design final review | `4629604406` — PASS |
+| TASK-013 Design PR CI | `28706044096` — SUCCESS |
+| TASK-013 Design final-flow preflight review | `4629613493` — BLOCKED pending evidence fix |
+| TASK-013 Design merge SHA | pending final merge / to be recorded by post-merge closeout docs |
+| TASK-013 Design frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` |
+| TASK-013 Design status | READY_FOR_REVIEW / IMPLEMENTATION NOT AUTHORIZED |
+| TASK-013 Impl Issue | not yet opened — requires separate explicit authorization |
+| TASK-013 Impl PR | not yet opened — requires separate explicit authorization |
+| TASK-013 Impl status | PLANNED / NOT STARTED / AUTHORIZATION NOT GRANTED |
+| TASK-014 | PLANNED / NOT STARTED — requires separate explicit authorization |
