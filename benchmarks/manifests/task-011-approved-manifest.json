@@ -1,1 +1,207 @@
-{"approval_snapshot":[{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_01","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_02","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_03","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_04","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_05","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_06","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_07","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_08","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_09","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_10","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_11","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_12","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_13","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_14","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_15","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_16","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_17","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_18","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_19","review_id":"4628651936"},{"approval_timestamp_utc":"2026-07-04T02:30:00Z","approver_id":"task-011-governance","case_id":"task011_case_20","review_id":"4628651936"}],"case_count":20,"case_hashes":{"task011_case_01":"6410cac02587cab581f5adc6559aa9ee79ae2eaee3f7d7d726073ec627dd6092","task011_case_02":"90e6b007a164d16189e37eb2d3fbd1c937465ef325adfd794036400c85e48059","task011_case_03":"0c0a034e39906a9f6bbf811be0471fa5ddf718014fa71a4f79dadfb60cb56f5d","task011_case_04":"040b74b054b5b038324ac20afc2231b99c19743171f07f8c5135b384f1c6e862","task011_case_05":"f7c62d7067b1d6bb198bbfb8103958e79c2558856b6973a1c02600f9446cacad","task011_case_06":"387cc6c00357770f40d3fcbb55c969f5965237d39775231223d9021568a88e5e","task011_case_07":"0b40b44b06e6cda0d7bee3d2b193813a1eb222c3fddc5a985fd111b702ac5185","task011_case_08":"c14d230e02553ca8195ef0028477633708642dae8cca287fce1247ad24d40d80","task011_case_09":"1a9fc659189fd43dca62c873de11d4a49306c13b400ffa372cb36d2b19bcca94","task011_case_10":"60ccfa81416575469ed8078c38b5c241632b1722e30a2f02243cf89e7186fc8b","task011_case_11":"0c142fe4354f5a9febefca59a9f007396407658160970bf7438cffd3816acb0d","task011_case_12":"2e92c78c36aed57e90d94c675035486026433de2e4134c383959c4861f6890f0","task011_case_13":"1269157c8610e2a57c3de9b6dc3d57600bf533c634377af9ffa3c488eaddb98a","task011_case_14":"11241590eba8aaf205d710a8b80d068b4b31b248ec2e65af81dd02319f64366f","task011_case_15":"d73365834ae884f92b53fcf04f39b1b1bcea0e48461e0a7c4fda0c449b42ba7b","task011_case_16":"b004cd84cfb7d8e83db054878e3c82604ecb4b98c4b280fe98cb05b5c3ba8e78","task011_case_17":"51b19d212a516deafde958dd13e4106c4c449ef43e09085c9ad4ef7ed5883d32","task011_case_18":"452e23b4ab13fdf21515fe38d45d4d8eddb5a1a0d140bc6ee76089d6b3c66a3a","task011_case_19":"1cd92ee1011bbd415da7303694a97d9c6a5f0b276d667a3a4ae7be53e70c171c","task011_case_20":"50f444d01c74ec152869ca1998fc0909054422bd2c1f6dd3ac0fc090dc30af52"},"case_ids":["task011_case_01","task011_case_02","task011_case_03","task011_case_04","task011_case_05","task011_case_06","task011_case_07","task011_case_08","task011_case_09","task011_case_10","task011_case_11","task011_case_12","task011_case_13","task011_case_14","task011_case_15","task011_case_16","task011_case_17","task011_case_18","task011_case_19","task011_case_20"],"manifest_version":"1.0.0","reviewer_sign_off":[{"review_id":"4628651936","reviewer_id":"task-011-governance","scope":"20 approved benchmark cases"}],"schema_version":"1.0.0","synthetic_case_ids":["task011_case_03","task011_case_06","task011_case_09","task011_case_12","task011_case_15","task011_case_18"]}
+{
+  "manifest_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "case_count": 20,
+  "case_ids": [
+    "task011_case_01",
+    "task011_case_02",
+    "task011_case_03",
+    "task011_case_04",
+    "task011_case_05",
+    "task011_case_06",
+    "task011_case_07",
+    "task011_case_08",
+    "task011_case_09",
+    "task011_case_10",
+    "task011_case_11",
+    "task011_case_12",
+    "task011_case_13",
+    "task011_case_14",
+    "task011_case_15",
+    "task011_case_16",
+    "task011_case_17",
+    "task011_case_18",
+    "task011_case_19",
+    "task011_case_20"
+  ],
+  "case_hashes": {
+    "task011_case_01": "2a782e791795f8b723856d9a8053e64310eb964139ef71d9f3036902492665ee",
+    "task011_case_02": "214acff475a74867e63cfcbe65f9935edd65c5383e6cc87898e85a5d7ab19ab8",
+    "task011_case_03": "5a600a54c9b269c85f4dd9e7d8c7b1df22532028b5c1cd9d0a0f11f7b500609d",
+    "task011_case_04": "98976a8a188df6513e661f3fd61e6d61c99b20cb7b32d4c8738e9d4812e69856",
+    "task011_case_05": "9428acbfb36816f0fc24c6492f9f1233c55d48fac8e1ee2d18523ef49410ebcf",
+    "task011_case_06": "3fa657659af832b90ae38ee8bb9d8f52411f981a0830fb459141995f3eb8f397",
+    "task011_case_07": "55c4389fb5b72f7c609c1b11a6255e5e56f44ba5554fc4cc62228bc863933863",
+    "task011_case_08": "8969ee59bf1b7eb53e58ae54ad6661a2e020a649411d9771a5a27bce6145b777",
+    "task011_case_09": "187e964cc27f6d2286f0296930315726d124d613677ee6b6900ab3d2161599a4",
+    "task011_case_10": "575ec56a3236645126b137a8c9b64bb835bbd61dc396c0fd7e0d3f933e3b2cc1",
+    "task011_case_11": "afc621b3fe04006438b2e09b255d24cc25af5c8c53b645163243d44b6661c9ea",
+    "task011_case_12": "ab870dbc3fd83652a3f83797c67168b5e59861203628877238ae5ad4c4ce6f60",
+    "task011_case_13": "861b13ae82b2f803e892bc2007831c49d7dbe0cea0d2f5272577f4c9832f023b",
+    "task011_case_14": "6ba513eb4cb51affbb2f2186573db6b2d9b28b2568c5b156417d5c3409ad73d1",
+    "task011_case_15": "fb79a5a665da881c1d3fe2b89580a62174a48348ca993d3dc1f79944aa6a8614",
+    "task011_case_16": "d5257b40e2a43ef02e11ade6d00a47b3788a97f9a5f8d596957f7e3fb8f62385",
+    "task011_case_17": "3cecdf070ad3042c703254b32ebf7a743525d4128f6672e51cd72f6595bdf620",
+    "task011_case_18": "a5a5d6a0413ae987d13360bad2ecbead1409e7c1a80929ad6fcf7a5953180cdc",
+    "task011_case_19": "b9aa9e10a21c2b2eddc719b4d1307f2ebcc81ef151375e5fad0ad4201238fe6a",
+    "task011_case_20": "04c334c8af4cef591e0caf0ca5628235aad0a7e3de49ae2a1fe3eb32fe80c176"
+  },
+  "approval_snapshot": [
+    {
+      "case_id": "task011_case_01",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_02",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_03",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_04",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_05",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_06",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_07",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_08",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_09",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_10",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_11",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_12",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_13",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_14",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_15",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_16",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_17",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_18",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_19",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    },
+    {
+      "case_id": "task011_case_20",
+      "approver_id": "issue-36-taska011-governance",
+      "approval_timestamp_utc": "2026-07-04T02:30:00Z",
+      "review_id": "issue-36",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    }
+  ],
+  "synthetic_case_ids": [
+    "task011_case_03",
+    "task011_case_06",
+    "task011_case_09",
+    "task011_case_12",
+    "task011_case_15",
+    "task011_case_18"
+  ],
+  "reviewer_sign_off": [
+    {
+      "reviewer_id": "issue-36-taska011-governance",
+      "review_id": "issue-36",
+      "scope": "all 20 TASK-011 implementation cases",
+      "review_authority_reference": "Issue #36 — TASK-011 governance thread"
+    }
+  ]
+}

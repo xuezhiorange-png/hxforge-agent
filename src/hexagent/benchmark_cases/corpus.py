@@ -1,127 +1,71 @@
-"""Approved TASK-011 benchmark corpus generation.
+"""Approved TASK-011 benchmark case loader.
 
-The case payloads are deterministic and intentionally compact. Each generated
-case contains the mandatory TASK-011 approval, source-evidence, tolerance, and
-hash fields; the public manifest records the resulting case hashes.
+The TASK-011 frozen design contract mandates that every benchmark case be
+an independently reviewable JSON artifact under ``benchmarks/cases/`` (per
+contract §19.1.1 / §19.1.7 and the implementation file boundary §20).
+
+This module is the read-only loader. It MUST NOT synthesize, mutate, or
+recompute case payloads — every case payload is the on-disk JSON file. The
+canonical hash is recomputed by the validator via the canonicalization
+helper; this module only reads raw JSON.
 """
 
 from __future__ import annotations
 
-from typing import Any
+import json
+from pathlib import Path
+from typing import Any, cast
 
-from hexagent.benchmark_cases.canonical import canonical_sha256
+# File-name prefix per the implementation boundary in contract §20.
+CASE_FILE_PREFIX = "task011_case_"
+CASE_FILE_SUFFIX = ".json"
 
-_CATEGORIES = (
-    "Single-phase heat-balance closure",
-    "Tube-side correlation cases",
-    "Annulus-side correlation cases",
-    "Fixed-geometry double-pipe rating cases",
-    "Manufacturable sizing and selection-evaluation cases",
-    "API/report traceability cases already supported by TASK-010",
-)
-_OUTPUTS = (
-    "heat_duty_w",
-    "nusselt_number",
-    "annulus_nusselt_number",
-    "rated_heat_duty_w",
-    "selected_area_m2",
-    "trace_node_count",
-)
-_SYNTHETIC_INDEXES = {3, 6, 9, 12, 15, 18}
+# Expected case count per the implementation authorization.
+APPROVED_CASES_COUNT = 20
 
 
-def _build_case(index: int) -> dict[str, Any]:
-    case_id = f"task011_case_{index:02d}"
-    category = _CATEGORIES[(index - 1) % len(_CATEGORIES)]
-    output_name = _OUTPUTS[(index - 1) % len(_OUTPUTS)]
-    source_type = (
-        "synthetic_regression_case" if index in _SYNTHETIC_INDEXES else "internal_reviewed_case"
-    )
-    expected_origin = (
-        "synthetic_computation" if source_type == "synthetic_regression_case" else "internal_review"
-    )
-    inputs = {"i": str(index), "scope": "v0.1"}
-    case: dict[str, Any] = {
-        "case_id": case_id,
-        "case_version": "1.0.0",
-        "case_title": f"Benchmark case {index:02d}",
-        "category": category,
-        "source_type": source_type,
-        "source_evidence": {
-            "source_type": source_type,
-            "source_reference": f"issue-36-case-{index:02d}",
-            "source_title_or_identifier": f"case-{index:02d}",
-            "source_locator_or_citation": f"slot-{index:02d}",
-            "source_version_or_publication_date": "2026-07-04",
-            "source_access_date": "n/a",
-            "extracted_input_fields": inputs,
-            "extracted_expected_output_fields": {output_name: str(index)},
-            "unit_provenance": {"i": "dimensionless", "scope": "n/a"},
-            "normalization_notes": "SI decimal strings; exact text fields.",
-            "expected_output_origin": expected_origin,
-            "evidence_limitations": "Seed governance case; no external validation claim.",
-            "reviewer_evidence_check_status": "accepted",
-        },
-        "input_schema": inputs,
-        "expected_output_schema": [
-            {
-                "output_name": output_name,
-                "value": str(index),
-                "unit": "dimensionless",
-                "required": True,
-                "tolerance_type": "absolute",
-            }
-        ],
-        "unit_normalization": {
-            "SI_normalized": True,
-            "rounding_before_hashing": "round_to: 6 decimal places",
-            "temperature_scale": "kelvin",
-            "pressure_semantics": "absolute where applicable",
-            "heat_duty_sign_convention": "positive from hot side to cold side",
-        },
-        "fluid_and_property_assumptions": {
-            "fluid_name": "water",
-            "provider": "CoolProp-compatible deterministic provider",
-            "phase_expectation": "single_phase_liquid",
-            "property_call_assumptions": "declared state only",
-            "rejection_behavior": "reject unsupported or ambiguous states",
-        },
-        "geometry_and_boundary_assumptions": {
-            "geometry": "double_pipe_v0_1",
-            "boundary_conditions": "steady_state_single_phase",
-            "units": "SI",
-        },
-        "tolerance_justifications": [
-            {
-                "output_name": output_name,
-                "tolerance_type": "absolute",
-                "tolerance_value": "0.000001",
-                "tolerance_unit_if_absolute": "dimensionless",
-                "source_precision_basis": "6 decimal places",
-                "property_model_basis": "single provider assumption",
-                "solver_tolerance_basis": "deterministic v0.1 path",
-                "rounding_basis": "round_to: 6 decimal places",
-                "reviewer_tolerance_approval": "accepted",
-            }
-        ],
-        "assumptions": {
-            "implemented_scope": "HXForge v0.1 vertical slice",
-            "non_goal_outputs_excluded": True,
-            "pressure_drop_excluded": True,
-            "cost_and_materials_excluded": True,
-        },
-        "approval_status": "approved",
-        "approval_metadata": {
-            "approver_id": "task-011-governance",
-            "approval_timestamp_utc": "2026-07-04T02:30:00Z",
-            "review_id": "4628651936",
-        },
-    }
-    if source_type == "synthetic_regression_case":
-        case["is_synthetic"] = True
-    case["canonical_hash"] = canonical_sha256(case)
-    return case
+def case_file_path(root: Path, case_id: str) -> Path:
+    """Return the canonical on-disk path for a given ``case_id``.
+
+    ``case_id`` MUST match ``task011_case_NN`` where ``NN`` is the zero-padded
+    decimal index in [01, 20].
+    """
+    if not case_id.startswith(CASE_FILE_PREFIX):
+        raise ValueError(f"case_id {case_id!r} does not match {CASE_FILE_PREFIX}NN")
+    return root / "benchmarks" / "cases" / f"{case_id}{CASE_FILE_SUFFIX}"
 
 
-def approved_cases() -> list[dict[str, Any]]:
-    return [_build_case(index) for index in range(1, 21)]
+def load_case(root: Path, case_id: str) -> dict[str, Any]:
+    """Read and JSON-parse the case file for ``case_id``.
+
+    Raises ``FileNotFoundError`` if the artifact does not exist; raises
+    ``ValueError`` on malformed JSON.
+    """
+    path = case_file_path(root, case_id)
+    with path.open("r", encoding="utf-8") as handle:
+        value: Any = json.load(handle)
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    return cast(dict[str, Any], value)
+
+
+def approved_cases(root: Path | str = Path(".")) -> list[dict[str, Any]]:
+    """Return all 20 approved benchmark cases, sorted by ``case_id``.
+
+    Reads from ``<root>/benchmarks/cases/task011_case_*.json`` only. The
+    loader does NOT mutate, regenerate, or fall back to Python-side
+    synthesis — every payload is the on-disk artifact.
+    """
+    root = Path(root)
+    case_dir = root / "benchmarks" / "cases"
+    case_files = sorted(case_dir.glob(f"{CASE_FILE_PREFIX}*{CASE_FILE_SUFFIX}"))
+    if len(case_files) != APPROVED_CASES_COUNT:
+        raise FileNotFoundError(
+            f"expected {APPROVED_CASES_COUNT} case files under {case_dir}, found {len(case_files)}"
+        )
+    cases = [load_case(root, path.stem) for path in case_files]
+    cases.sort(key=lambda case: cast(str, case["case_id"]))
+    return cases
+
+
+__all__ = ["APPROVED_CASES_COUNT", "approved_cases", "case_file_path", "load_case"]
