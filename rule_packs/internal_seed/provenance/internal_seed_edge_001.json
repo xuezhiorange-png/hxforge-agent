@@ -1,0 +1,7 @@
+{
+  "edge_id": "internal_seed_edge_001",
+  "evidence_ref": "internal://engineering-handbook/identity/v1",
+  "from_rule_id": "external:INTERNAL_ENGINEERING_RULE:engineering-handbook-identity-v1",
+  "relation": "paraphrases",
+  "to_rule_id": "internal_seed_rule_001"
+}

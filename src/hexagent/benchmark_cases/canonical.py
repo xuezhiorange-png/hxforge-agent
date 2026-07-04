@@ -1,5 +1,11 @@
 """Canonical JSON and SHA-256 helpers for benchmark cases.
 
+This module is a thin backward-compatible re-export of the shared canonical
+JSON helpers in ``hexagent.canonical_json``. The shared module is the single
+source of truth for canonical JSON behavior across TASK-011 benchmark cases
+and TASK-012 rule-packs (per the TASK-012 frozen design contract, Section 13
+and Section 18, deliverable 3).
+
 The TASK-011 frozen design contract (docs/tasks/TASK-011-benchmark-case-governance.md,
 SHA 7cfdb4f0989b6d384533c7a29e9a2156c731bd0f) requires Section 17:
 
@@ -22,55 +28,17 @@ SHA 7cfdb4f0989b6d384533c7a29e9a2156c731bd0f) requires Section 17:
 The reference implementation is delegated to the third-party ``rfc8785``
 package for §3.2.3 key ordering, §3.3.1 shortest-decimal numeric
 serialization, and JSON byte emission. Because the rfc8785 package does
-NOT perform UAX #15 NFC normalization on string keys/values, this module
-applies NFC normalization explicitly before serialization. Hash-time
-exclusion semantics are enforced by the wrapper.
+NOT perform UAX #15 NFC normalization on string keys/values, the shared
+module applies NFC normalization explicitly before serialization. Hash-time
+exclusion semantics are enforced by the shared wrapper.
 """
 
 from __future__ import annotations
 
-import hashlib
-import unicodedata
-from typing import Any
+from hexagent.canonical_json import (
+    EXCLUDED_HASH_FIELDS,
+    canonical_json_bytes,
+    canonical_sha256,
+)
 
-import rfc8785
-
-# Fields excluded from hash input per contract §17.1.
-# ``canonical_hash`` is the hash field itself; ``mutable_review_comments`` is
-# explicitly excluded; ``approval_comments`` is excluded unless it is part of
-# ``approval_snapshot`` (which is NOT excluded — it is part of the case
-# snapshot and IS hashed when present).
-EXCLUDED_HASH_FIELDS: frozenset[str] = frozenset({"canonical_hash", "mutable_review_comments"})
-
-
-def _strip_excluded(value: Any) -> Any:
-    """Recursively drop top-level ``EXCLUDED_HASH_FIELDS`` from dicts and
-    apply NFC normalization (UAX #15) to every string.
-    """
-    if isinstance(value, dict):
-        return {
-            unicodedata.normalize("NFC", str(key)): _strip_excluded(item)
-            for key, item in value.items()
-            if key not in EXCLUDED_HASH_FIELDS
-        }
-    if isinstance(value, list):
-        return [_strip_excluded(item) for item in value]
-    if isinstance(value, str):
-        return unicodedata.normalize("NFC", value)
-    return value
-
-
-def canonical_json_bytes(value: dict[str, Any]) -> bytes:
-    """Return the RFC 8785 canonical JSON byte string for ``value``.
-
-    ``value`` must be a JSON-compatible mapping; non-finite floats raise
-    ``ValueError`` (rfc8785 enforces this) and unhashable types raise
-    ``TypeError``.
-    """
-    cleaned = _strip_excluded(value)
-    return rfc8785.dumps(cleaned)
-
-
-def canonical_sha256(value: dict[str, Any]) -> str:
-    """Return the SHA-256 hex digest of the canonical JSON of ``value``."""
-    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+__all__ = ["EXCLUDED_HASH_FIELDS", "canonical_json_bytes", "canonical_sha256"]

@@ -1,0 +1,7 @@
+{
+  "edge_id": "internal_seed_edge_002",
+  "evidence_ref": "internal://engineering-handbook/canonicalization/v1",
+  "from_rule_id": "external:INTERNAL_ENGINEERING_RULE:engineering-handbook-canonicalization-v1",
+  "relation": "paraphrases",
+  "to_rule_id": "internal_seed_rule_002"
+}

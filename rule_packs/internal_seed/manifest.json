@@ -1,0 +1,14 @@
+{
+  "canonical_hash": "77a0dabbd369fdce43a2502275b8f9c262d69ac9dddeeba53fe34479221c9f80",
+  "creation_timestamp_utc": "2026-07-04T09:30:00Z",
+  "review_id": "internal_seed_review_001",
+  "rule_count": 2,
+  "rule_pack_id": "internal_seed",
+  "rule_pack_version": "1.0.0",
+  "rules": [
+    "internal_seed_rule_001",
+    "internal_seed_rule_002"
+  ],
+  "target_jurisdiction": "INTL",
+  "target_standard_family": "INTERNAL"
+}

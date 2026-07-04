@@ -185,3 +185,38 @@ assessment = assess_applicability(definition, inputs)
 # - allows_evaluation: whether calculation can proceed
 # - assessment_hash: deterministic content hash
 ```
+
+## Relationship to the TASK-012 Rule-Pack Registry
+
+The correlation registry governs calculation correlations: deterministic
+engineering formulas (heat transfer, friction factor, etc.) consumed by
+the runtime engineering kernel. Correlations are evaluated at calculation
+time; their results are numerical outputs bound to a calculation run.
+
+The TASK-012 rule-pack registry (introduced by PR #43) governs
+standards-derived rule artifacts and internal engineering rules:
+declarative rules, license metadata, provenance graphs, and approval
+state. Rule-packs are loaded, validated, and (in future implementation)
+applied at runtime. A rule-pack artifact does NOT contain a numerical
+correlation; it contains rule statements, citations, and audit data.
+
+The two registries are deliberately separate:
+
+- **Correlation registry** — calculation-time numeric formulas with
+  applicability envelopes.
+- **Rule-pack registry** — declarative rules with license boundary,
+  provenance, and approval state.
+
+Benchmark fixtures (the TASK-011 corpus under
+``benchmarks/cases/``) are NOT authoritative rule-packs. They are
+test-only fixtures for the ``hexagent.benchmark_cases`` package.
+Rule-pack artifacts under ``rule_packs/`` are the authoritative
+artifact set for the ``hexagent.rule_packs`` package. These two
+namespaces MUST NOT be conflated: a benchmark fixture is NOT a
+rule-pack, and a rule-pack is NOT a benchmark fixture.
+
+Both registries use the same shared canonical JSON helper
+(``hexagent.canonical_json``) and SHA-256 hashing for content
+identity. This shared module is the single source of truth for
+canonical JSON behavior; the TASK-012 runtime MUST NOT introduce
+a parallel canonical module.
