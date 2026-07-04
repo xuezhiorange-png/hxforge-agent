@@ -94,10 +94,9 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
    the design contract is reviewed, merged, frozen, and recorded.
    TASK-012 implementation is NOT yet authorized.
 7. TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018,
-   TASK-019, and TASK-020+ (shell-and-tube) remain blocked /
-   PLANNED until TASK-012 implementation is separately authorized,
-   unless later governance changes grant a separate explicit
-   authorization. TASK-013+ is NOT yet started.
+   TASK-019, and TASK-020+ (shell-and-tube) remain PLANNED /
+   NOT STARTED unless later governance grants separate explicit
+   authorization. TASK-012 implementation remains NOT AUTHORIZED.
 
 ## Merge evidence
 
@@ -170,4 +169,4 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-012 Impl Issue | not yet opened — requires separate explicit authorization |
 | TASK-012 Impl PR | not yet opened — requires separate explicit authorization |
 | TASK-012 Impl status | PLANNED / NOT STARTED / AUTHORIZATION NOT GRANTED |
-| TASK-013 | PLANNED / NOT STARTED — blocked behind TASK-012 implementation authorization |
+| TASK-013 | PLANNED / NOT STARTED — requires separate explicit authorization |
