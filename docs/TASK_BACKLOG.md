@@ -27,8 +27,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-011 (impl) | Collect, normalize, review and approve the first 20 benchmark cases | DONE | TASK-011 design |
 | TASK-012 (design) | Define standards rule-pack and license boundary | DONE | TASK-001 |
 | TASK-012 (impl) | Implement standards rule-pack runtime, license validator and CI boundary | DONE | TASK-012 design |
-| TASK-013 (design) | Define material and cost data governance | READY_FOR_REVIEW | TASK-001 |
-| TASK-013 (impl) | Implement material and cost data governance | PLANNED | TASK-013 design |
+| TASK-013 (design) | Define material and cost data governance | DONE | TASK-001 |
+| TASK-013 (impl) | Implement material and cost data governance | DONE | TASK-013 design |
 | TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
 | TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
 
@@ -123,24 +123,38 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
    - Closeout docs PR (on branch `docs/task-013-design-closeout`)
      records the merge SHA, main post-merge CI, and frozen design
      status in the Merge evidence table.
-   TASK-013 implementation requires a separate explicit
-   authorization after the closeout docs PR is merged; TASK-013
-   implementation is now authorized by Issue #49 (OPEN), and a
-   docs-only implementation PR is being opened against main.
+   TASK-013 implementation has been merged and closed out
+   (Issue #49 CLOSED / completed). See item 10 below for the
+   implementation evidence; the TASK-013 implementation closeout
+   docs PR records this milestone in the evidence tables below.
 9. TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, and
    TASK-020+ (shell-and-tube / plate / air-cooler / two-phase /
    refrigerant) remain PLANNED / NOT STARTED unless later governance
    grants separate explicit authorization.
-10. TASK-013 implementation (Issue #49 OPEN) — implementation PR on
-    `codex/task-013-material-cost-governance-runtime` referencing
-    frozen design contract authority SHA
-    `ee7aa092bca854316be961b536c7a121490aa385` (PR #47 merge). The
-    implementation creates only the files allowed by the TASK-013
-    design contract Section 19 envelope
-    (`src/hexagent/material_costs/`, `tests/material_costs/`) and
-    MUST NOT modify any frozen TASK-011 / TASK-012 / TASK-013
-    contract body, any workflow, any benchmark artifact, or any
-    runtime persistence / API / DB artifact.
+10. TASK-013 implementation has been merged and closed out:
+    - Implementation Issue #49: CLOSED (state_reason=completed)
+    - Implementation PR #50 on branch
+      `codex/task-013-material-cost-governance-runtime`
+    - PR #50 reviewed Head: `d85f1c70236527a104f3f3ed9231cdf66d896150`
+    - PR #50 merge SHA: `917bd3a761824fc8d11dcf187dbd8d6c91bfc942`
+    - PR #50 merged_at: `2026-07-04T16:19:19Z`
+    - PR #50 PR-head CI: `28710499786` — SUCCESS
+    - PR #50 Main Post-Merge CI: `28712202985` — SUCCESS
+    - Frozen Contract Authority SHA:
+      `ee7aa092bca854316be961b536c7a121490aa385` (PR #47 design
+      merge)
+    - Final closeout comment id: `4883048106`
+    - Issue #49 closed_at: `2026-07-04T16:26:04Z`
+    - The implementation created only the files allowed by the
+      TASK-013 design contract Section 19 envelope
+      (`src/hexagent/material_costs/`, `tests/material_costs/`) and
+      did NOT modify any frozen TASK-011 / TASK-012 / TASK-013
+      contract body, any workflow, any benchmark artifact, or any
+      runtime persistence / API / DB artifact.
+    - TASK-013 implementation status: DONE / MERGED / MAIN-CI-VERIFIED /
+      CLOSED.
+    - TASK-014+ remains PLANNED / NOT STARTED unless later
+      governance grants separate explicit authorization.
 
 ## Merge evidence
 
@@ -164,6 +178,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-012 design | #41 |
 | TASK-012 impl | #44 |
 | TASK-013 design | #47 |
+| TASK-013 impl | #50 |
 
 | Item | Value |
 |---|---|
@@ -247,7 +262,18 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-013 Design closeout merge SHA | `aa19e096c3a662687b1ef8dcc0fe2cb12a3b8b60` |
 | TASK-013 Design closeout main post-merge CI | `28707812178` — SUCCESS |
 | TASK-013 Design frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` |
-| TASK-013 Design status | DONE / DESIGN FROZEN / IMPLEMENTATION NOT AUTHORIZED |
-| TASK-013 Impl Issue | #49 — OPEN |
-| TASK-013 Impl status | AUTHORIZED / NOT YET IMPLEMENTED |
+| TASK-013 Design status | DONE / DESIGN FROZEN / IMPLEMENTATION AUTHORIZED |
+| TASK-013 Impl Issue | #49 — CLOSED (state_reason=completed) |
+| TASK-013 Impl PR | #50 |
+| TASK-013 Impl branch | `codex/task-013-material-cost-governance-runtime` |
+| TASK-013 Impl base | `aa19e096c3a662687b1ef8dcc0fe2cb12a3b8b60` (main @ TASK-013 design closeout merge) |
+| TASK-013 Impl reviewed Head | `d85f1c70236527a104f3f3ed9231cdf66d896150` |
+| TASK-013 Impl merge SHA | `917bd3a761824fc8d11dcf187dbd8d6c91bfc942` |
+| TASK-013 Impl merged_at | `2026-07-04T16:19:19Z` |
+| TASK-013 Impl PR-head CI | `28710499786` — SUCCESS |
+| TASK-013 Impl Main Post-Merge CI | `28712202985` — SUCCESS |
+| TASK-013 Impl closeout comment | `4883048106` |
+| TASK-013 Impl Issue closed_at | `2026-07-04T16:26:04Z` |
+| TASK-013 Impl frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` (unchanged) |
+| TASK-013 Impl status | DONE / MERGED / MAIN-CI-VERIFIED / CLOSED |
 | TASK-014 | PLANNED / NOT STARTED — requires separate explicit authorization |
