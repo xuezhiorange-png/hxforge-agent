@@ -30,8 +30,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-013 (design) | Define material and cost data governance | DONE | TASK-001 |
 | TASK-013 (impl) | Implement material and cost data governance | DONE | TASK-013 design |
 | TASK-014 (design) | Define immutable case revisions and persistence contract | DONE | TASK-002, TASK-003, TASK-004, TASK-005, TASK-011, TASK-012, TASK-013 |
-| TASK-014 (impl) | Implement immutable case revisions and persistence | PLANNED | TASK-014 design |
-| TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
+| TASK-014 (impl) | Implement immutable case revisions and persistence | DONE | TASK-014 design |
+| TASK-015 (design) | Design CI, security and release automation hardening contract | DESIGN IN DRAFT | TASK-000 |
 
 ## M2 — Double-pipe vertical slice
 
@@ -128,10 +128,12 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
    (Issue #49 CLOSED / completed). See item 10 below for the
    implementation evidence; the TASK-013 implementation closeout
    docs PR records this milestone in the evidence tables below.
-9. TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, and
-   TASK-020+ (shell-and-tube / plate / air-cooler / two-phase /
-   refrigerant) remain PLANNED / NOT STARTED unless later governance
-   grants separate explicit authorization.
+9. TASK-014 has been merged and closed out. TASK-015 design is now
+   IN DRAFT (Issue #57, design PR not yet opened in this snapshot).
+   TASK-016, TASK-017, TASK-018, TASK-019, and TASK-020+
+   (shell-and-tube / plate / air-cooler / two-phase / refrigerant)
+   remain PLANNED / NOT STARTED unless later governance grants
+   separate explicit authorization.
 10. TASK-013 implementation has been merged and closed out:
     - Implementation Issue #49: CLOSED (state_reason=completed)
     - Implementation PR #50 on branch
@@ -154,8 +156,48 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
       runtime persistence / API / DB artifact.
     - TASK-013 implementation status: DONE / MERGED / MAIN-CI-VERIFIED /
       CLOSED.
-    - TASK-014+ remains PLANNED / NOT STARTED unless later
+    - TASK-014 implementation status: DONE / MERGED / MAIN-CI-VERIFIED /
+      CLOSED (see items 11+ for the implementation closeout evidence).
+    - TASK-015 design status: AUTHORIZED BY Issue #57 / IN DRAFT PR.
+    - TASK-015 implementation: NOT AUTHORIZED.
+    - TASK-015A historical: CLOSED / MERGED (unchanged).
+    - TASK-016+ remains PLANNED / NOT STARTED unless later
       governance grants separate explicit authorization.
+
+11. TASK-014 implementation has been merged and closed out:
+    - Implementation Issue #55: CLOSED (state_reason=completed)
+    - Implementation PR #56 on branch
+      `codex/task-014-immutable-case-revisions-persistence`
+    - PR #56 reviewed Head: `df351f07f86ac9c6c827375ceb5410fce8249607`
+    - PR #56 merge SHA: `66e718c90a54f84ab0f9b0bedc34e67a3f5177bc`
+    - PR #56 merged_at: `2026-07-05T05:05:08Z`
+    - PR #56 PR-head CI: `28729781313` — SUCCESS
+    - PR #56 Main Post-Merge CI: `28730227363` — SUCCESS
+    - Frozen Contract Authority SHA:
+      `6f337a6e81a8c2a7ba8059285aeef39bba59c7cb` (PR #53 design
+      merge)
+    - Final closeout comment id: `4884933296`
+    - Issue #55 closed_at: `2026-07-05T05:14:36Z`
+    - The implementation created only the files allowed by the
+      TASK-014 design contract Section 17 envelope
+      (`src/hexagent/case_revisions/`, `tests/case_revisions/`) and
+      did NOT modify any frozen TASK-011 / TASK-012 / TASK-013 /
+      TASK-014 contract body, any workflow, any benchmark artifact,
+      or any runtime persistence / API / DB artifact.
+    - TASK-014 implementation status: DONE / MERGED / MAIN-CI-VERIFIED /
+      CLOSED.
+
+12. TASK-015 design is now AUTHORIZED by Issue #57:
+    - Design Issue #57: OPEN
+    - Design branch: `docs/task-015-ci-security-and-release-automation-design`
+    - Design PR: (this PR — DRAFT)
+    - Design status: AUTHORIZED BY Issue #57 / IN DRAFT PR
+    - Design contract file:
+      `docs/tasks/TASK-015-ci-security-and-release-automation.md`
+    - TASK-015 implementation: NOT AUTHORIZED
+    - TASK-015A historical: CLOSED / MERGED (unchanged; this design
+      does not mutate, reopen, or supersede any TASK-015A asset)
+    - TASK-016+ : PLANNED / NOT STARTED
 
 ## Merge evidence
 
@@ -181,6 +223,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-013 design | #47 |
 | TASK-013 impl | #50 |
 | TASK-014 design | #53 |
+| TASK-014 impl | #56 |
 
 | Item | Value |
 |---|---|
@@ -278,7 +321,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-013 Impl Issue closed_at | `2026-07-04T16:26:04Z` |
 | TASK-013 Impl frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` (unchanged) |
 | TASK-013 Impl status | DONE / MERGED / MAIN-CI-VERIFIED / CLOSED |
-| TASK-014 design Issue | #52 — OPEN pending closeout PR merge |
+| TASK-014 design Issue | #52 — CLOSED (state_reason=completed) |
 | TASK-014 design PR | #53 — MERGED |
 | TASK-014 design reviewed Head | `807e6afc77a3ae38b6a639b436b177d96ccf0f60` |
 | TASK-014 design merge SHA / Frozen Contract Authority SHA | `6f337a6e81a8c2a7ba8059285aeef39bba59c7cb` |
@@ -286,12 +329,28 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-014 design PR-head CI | `28714724247` — completed / success |
 | TASK-014 design main post-merge CI | `28727736263` — completed / success |
 | TASK-014 design frozen contract file | `docs/tasks/TASK-014-immutable-case-revisions-persistence.md` |
-| TASK-014 design status | DONE / DESIGN FROZEN pending closeout PR merge |
-| TASK-014 implementation status | NOT AUTHORIZED |
-| TASK-014 implementation remains NOT AUTHORIZED. |
-| TASK-015+ remains PLANNED / NOT STARTED. |
-| TASK-014 implementation Issue | #55 — OPEN |
-| TASK-014 implementation status | IN DRAFT PR / NOT MERGED |
+| TASK-014 design status | DONE / DESIGN FROZEN |
+| TASK-014 design closeout PR | #54 — MERGED |
+| TASK-014 design closeout merge SHA | `4e0a6413004d4c23ae89f45713796631d624d6cb` |
+| TASK-014 design closeout merged_at | `2026-07-05T03:24:22Z` |
+| TASK-014 design closeout main post-merge CI | `28728146017` — completed / success |
+| TASK-014 implementation Issue | #55 — CLOSED (state_reason=completed) |
+| TASK-014 implementation PR | #56 — MERGED |
 | TASK-014 implementation branch | `codex/task-014-immutable-case-revisions-persistence` |
-| TASK-014 implementation PR | (pending — see Issue #55) |
-| TASK-015+ | PLANNED / NOT STARTED |
+| TASK-014 implementation reviewed Head | `df351f07f86ac9c6c827375ceb5410fce8249607` |
+| TASK-014 implementation merge SHA | `66e718c90a54f84ab0f9b0bedc34e67a3f5177bc` |
+| TASK-014 implementation merged_at | `2026-07-05T05:05:08Z` |
+| TASK-014 implementation PR-head CI | `28729781313` — completed / success |
+| TASK-014 implementation Main Post-Merge CI | `28730227363` — completed / success |
+| TASK-014 implementation closeout comment | `4884933296` |
+| TASK-014 implementation Issue closed_at | `2026-07-05T05:14:36Z` |
+| TASK-014 implementation frozen contract file | `docs/tasks/TASK-014-immutable-case-revisions-persistence.md` (unchanged) |
+| TASK-014 implementation status | DONE / MERGED / MAIN-CI-VERIFIED / CLOSED |
+| TASK-015 design Issue | #57 — OPEN |
+| TASK-015 design PR | (pending — see this branch's Draft PR) |
+| TASK-015 design branch | `docs/task-015-ci-security-and-release-automation-design` |
+| TASK-015 design base | `66e718c90a54f84ab0f9b0bedc34e67a3f5177bc` (main @ TASK-014 implementation merge) |
+| TASK-015 design status | AUTHORIZED BY Issue #57 / IN DRAFT PR |
+| TASK-015 implementation status | NOT AUTHORIZED |
+| TASK-015A historical | CLOSED / MERGED (unchanged; this design does not mutate, reopen, or supersede any TASK-015A asset) |
+| TASK-016+ | PLANNED / NOT STARTED |
