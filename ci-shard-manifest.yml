@@ -10,6 +10,8 @@ shards:
       - tests/ci/test_outcome_plugin.py
       - tests/ci/test_shard_manifest.py
       - tests/ci/test_shared_infrastructure.py
+      - tests/governance/test_errors.py
+      - tests/governance/test_spec_validator.py
       - tests/support/test_mypy_doubles.py
       - tests/support/test_property_provider_doubles.py
       - tests/canonical_json/test_shared_canonical_json.py
