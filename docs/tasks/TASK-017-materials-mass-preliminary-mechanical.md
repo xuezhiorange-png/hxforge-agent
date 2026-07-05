@@ -23,8 +23,14 @@
 | Design file | `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md` |
 | Base authority | TASK-016 implementation merge `fbb05ae71f21e6cfd4d1041afb5958c863166248` (PR #71, merged 2026-07-05T16:37:19Z) |
 | Upstream contracts consumed (read-only) | TASK-013 material/cost governance contract (frozen), TASK-016 geometry catalog contract (frozen) |
-| Implementation status | NOT AUTHORIZED |
-| Frozen contract SHA | NOT ESTABLISHED until this design PR is merged |
+| **Design contract status** | **DESIGN FROZEN** (see §19.4) |
+| **Frozen Contract Authority Commit SHA** | **`6ed5b7dc7d8df163796eacb838afcf5702a4c53a`** (see §19.1) |
+| **Frozen Contract Authority Base SHA** | **`fbb05ae71f21e6cfd4d1041afb5958c863166248`** (see §19.2) |
+| Implementation status | **NOT AUTHORIZED** |
+| Implementation Issue | NOT YET CREATED |
+| TASK-018+ status | NOT AUTHORIZED |
+| PR #73 status | DRAFT / NOT READY / NOT MERGED |
+| Issue #72 status | OPEN (not closed) |
 
 Implementation work is explicitly blocked until this design contract
 is reviewed, merged, and closed out under Charles authorization.
@@ -704,18 +710,82 @@ This design contract does NOT authorize:
 Future TASK-017 implementation requires a separate
 implementation Issue and separate authorization.
 
-## 19. Frozen contract checksum placeholder
+## 19. Frozen contract authority
 
-The Frozen Contract Authority SHA is **NOT** established by this
-design PR. It will be filled in at merge time by the closeout
-PR. Format:
+The TASK-017 design contract is **DESIGN FROZEN** as of the
+freeze event. Implementation is **NOT AUTHORIZED** — it requires
+a separate implementation Issue and explicit Charles
+authorization.
+
+### 19.1 Frozen Contract Authority Commit SHA
 
 ```
-Frozen Contract Authority SHA: <to-be-filled-at-merge>
+Frozen Contract Authority Commit SHA: 6ed5b7dc7d8df163796eacb838afcf5702a4c53a
 ```
 
-This section must not be edited to a real SHA before the
-design PR has been merged.
+This SHA identifies the design contract content **at the moment
+of freeze**. It is the head commit of PR #73 immediately prior to
+the freeze commit (which carries this SHA as a literal value).
+Any subsequent wording-cleanup amend will rotate this SHA and
+will itself become the new Frozen Contract Authority Commit SHA;
+the Base SHA in §19.2 below remains stable.
+
+### 19.2 Frozen Contract Authority Base SHA
+
+```
+Frozen Contract Authority Base SHA: fbb05ae71f21e6cfd4d1041afb5958c863166248
+```
+
+This is the main-tip commit at the time the design branch was
+created — PR #71 merge commit (`fbb05ae71f21e6cfd4d1041afb5958c863166248`,
+merged `2026-07-05T16:37:19Z`). It is **stable** against
+docs-only amends (which only touch PR #73 branch and do not move
+`main`). Used for the Base+Content SHA split pattern from the
+frozen-task governance pattern.
+
+### 19.3 Self-reference guard
+
+The Frozen Contract Authority Commit SHA (§19.1) MUST NOT be
+equal to the SHA of any commit that adds or modifies §19.1
+itself. Verification:
+
+- The freeze commit (this round's commit) modifies §19.1 by
+  replacing the `<to-be-filled-at-merge>` placeholder with the
+  literal `6ed5b7dc7d8df163796eacb838afcf5702a4c53a`.
+- The freeze commit's own SHA will be different from
+  `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (since it is a new
+  commit on top of that parent).
+- Future wording-cleanup amends that touch §19.1 MUST update
+  §19.1 to point to the new commit SHA, and MUST be reviewed for
+  the same self-reference guard.
+
+### 19.4 Status declarations
+
+| Field | Value |
+|---|---|
+| TASK-017 design contract status | **DESIGN FROZEN** |
+| TASK-017 implementation status | **NOT AUTHORIZED** |
+| TASK-018+ status | NOT AUTHORIZED |
+| PR #73 status | DRAFT / NOT READY / NOT MERGED |
+| Issue #72 status | OPEN (not closed) |
+| Implementation Issue | NOT YET CREATED |
+| Required next-step authority | Charles explicit implementation authorization, new implementation Issue, new implementation PR |
+
+### 19.5 Three-way SHA synchronization
+
+Per frozen-task governance pattern, the Frozen Contract Authority
+Commit SHA MUST be recorded in three places at freeze time:
+
+1. This design contract body — §19.1 (above)
+2. PR #73 body — "Frozen Design Authority SHA" section (updated
+   by the freeze commit's PR body editor)
+3. `docs/TASK_BACKLOG.md` evidence row — "TASK-017 design frozen
+   commit SHA" (updated by the freeze commit)
+
+The three locations are equivalent: any post-freeze wording amend
+rotates all three together. Any divergence between the three
+locations is an audit-trail defect to be corrected at the next
+amend.
 
 ## 20. Document history and prior-report wording notes
 
@@ -758,4 +828,16 @@ truth for TASK-017 governance, not the prior kickoff report.
 | Revision | Author | Date | Notes |
 |---|---|---|---|
 | Rev 1 (initial) | Charles via TASK-017 design kickoff | 2026-07-05 | Commit `06232fc710017e36d145d797333309cf59d8265a` — 19 sections |
-| Rev 2 (remediation) | Charles via TASK-017 design remediation | 2026-07-05 | (this commit) — fixes P1-1, P1-2, P1-3, P2-1, P2-2, P2-4, P2-5; adds §13.1 (naming rationale), §20 (this note) |
+| Rev 2 (remediation) | Charles via TASK-017 design remediation | 2026-07-05 | Commit `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` — fixes P1-1, P1-2, P1-3, P2-1, P2-2, P2-4, P2-5; adds §13.1 (naming rationale), §20 (this note). 20 sections. |
+| Rev 3 (freeze) | Charles via TASK-017 design freeze | 2026-07-05 | Freeze commit (this round). Updates §1 status table to DESIGN FROZEN, §19 from placeholder to Frozen Contract Authority (Commit SHA = `6ed5b7dc7d8df163796eacb838afcf5702a4c53a`, Base SHA = `fbb05ae71f21e6cfd4d1041afb5958c863166248`). Self-reference guard added (§19.3). Three-way SHA synchronization rule added (§19.5). |
+
+### 20.3 Freeze anchor
+
+| Anchor | Value |
+|---|---|
+| Design freeze verdict | TASK017_DESIGN_FROZEN_PENDING_READY_AUTHORIZATION |
+| Frozen Contract Authority Commit SHA | `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` |
+| Frozen Contract Authority Base SHA | `fbb05ae71f21e6cfd4d1041afb5958c863166248` |
+| PR #73 reviewed Head at freeze | `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (= Commit SHA, no subsequent wording-cleanup amend at freeze time) |
+| Latest CI for reviewed Head | run `28748836440` / completed / success / head_sha exact match |
+| Freeze commit (this round) | (created after freeze anchor SHA is recorded; not the Frozen Contract Authority Commit SHA itself — see §19.3 self-reference guard) |
