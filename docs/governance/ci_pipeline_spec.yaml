@@ -1,0 +1,30 @@
+# CI Pipeline Spec (TASK-015 Section 4.1)
+#
+# Frozen contract: docs/tasks/TASK-015-ci-security-and-release-automation.md
+# Frozen Contract Authority SHA: 39135e269b014e9c9310ac403a60591393d46b2d
+# Section: 4.1 / 4.2 / 4.3 / 9.1 / 9.2 / 11.1
+
+schema_version: 1
+owner: xuezhiorange-png
+updated_at: "2026-07-05T07:00:00Z"
+
+# Stable repository-wide identifier (Section 4.3). lowercase kebab-case.
+canonical_name: ci-pipeline
+
+# failure_modes: closed enum drawn from docs/governance/failure_taxonomy.yaml
+# (Section 4.2.4). Empty until CI jobs are added.
+failure_modes: []
+
+# content_hash: sha256 over canonical in-memory representation (Section 9.2).
+# Recomputed by the spec validator on every change.
+content_hash: "37b4f66dad3b105a1e59a5d9ce1848f5f7ee1a842c7d17d038a17dffd86e5d26"
+
+# CI jobs (Section 4.1: job names, triggers, required-status names).
+# Empty skeleton; jobs added via design + impl PRs (Section 4.2: append-only).
+jobs: []
+
+# Required status check naming convention (Section 2 / Section 9 cross-cutting).
+# `task-015/<spec-name>/blockers` MUST be RED on any blocker.
+required_status_checks:
+  - task-015/ci-pipeline/blockers
+  - task-015/ci-pipeline/warnings

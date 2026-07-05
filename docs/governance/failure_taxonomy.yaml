@@ -1,0 +1,45 @@
+# Failure Taxonomy (TASK-015 Section 4.1 / 7)
+#
+# Frozen contract: docs/tasks/TASK-015-ci-security-and-release-automation.md
+# Frozen Contract Authority SHA: 39135e269b014e9c9310ac403a60591393d46b2d
+# Section: 4.1 / 4.2 / 7 / 11.1 (item 4) / 11.2 (item 12)
+#
+# Closed set of failure-mode categories with classification (Section 4.1).
+# Adding a new failure mode is a taxonomy amendment, not a spec edit
+# (Section 4.2.4).
+
+schema_version: 1
+owner: xuezhiorange-png
+updated_at: "2026-07-05T07:00:00Z"
+
+# failure_modes: closed enum (Section 7 + 4.2.4).
+# Three base classification categories from Section 7:
+#   - transient: re-run likely to succeed; surface as warning + auto-retry
+#   - non_transient: re-run unlikely to succeed; BLOCKER with remediation
+#   - manual_intervention: human action required; BLOCKER + issue-template
+failure_modes:
+  - transient
+  - non_transient
+  - manual_intervention
+
+# content_hash: sha256 over canonical in-memory representation (Section 9.2).
+content_hash: "fbd6d2df23398d46c217dc7d39198c479934107c64a055c11144875579ca89f0"
+
+# Classification rules (Section 7):
+classification_rules:
+  transient:
+    description: re-run likely to succeed (network blip, registry hiccup)
+    severity: warning
+    retry: auto
+  non_transient:
+    description: re-run unlikely to succeed (schema violation, hash mismatch)
+    severity: blocker
+    retry: none
+  manual_intervention:
+    description: human action required (secret rotation, OIDC trust renewal)
+    severity: blocker
+    retry: none
+
+# Required status check names.
+required_status_checks:
+  - task-015/failure-taxonomy/classification
