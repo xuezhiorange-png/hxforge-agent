@@ -1,0 +1,60 @@
+# TASK-015 spec validation workflow (follow-up slice, Section 9 cross-cutting).
+#
+# This is a NEW workflow file added by the TASK-015 follow-up slice
+# (Draft PR #63). It does NOT modify any existing `.github/workflows/**`
+# file (per the frozen TASK-015 contract Section 14.3).
+#
+# Contract reference:
+#   docs/tasks/TASK-015-ci-security-and-release-automation.md
+#   Frozen Contract Authority SHA: 39135e269b014e9c9310ac403a60591393d46b2d
+#
+# Purpose:
+#   Run validate_all_specs() against the four governance YAML specs
+#   (ci_pipeline_spec / security_gate_spec / release_spec /
+#   failure_taxonomy). Emit one status check per spec in the shape
+#   `task-015/<spec-name>/blockers`. RED on any blocker; GREEN on
+#   clean (Section 9 cross-cutting governance).
+#
+# Boundary (Section 14):
+#   * No secrets are read.
+#   * No environment variables are read for secret material.
+#   * No OIDC trust is created.
+#   * No registry artifacts are pushed.
+#   * No external service integration (Slack / sigstore / etc.).
+#   * This workflow is purely a local validator hook (simulated / local
+#     validation only per Section 14.13).
+
+name: task-015-spec-validation
+
+on:
+  pull_request:
+    paths:
+      - "docs/governance/**"
+      - "src/hexagent/governance/**"
+      - "tests/governance/**"
+  push:
+    branches: [main]
+    paths:
+      - "docs/governance/**"
+      - "src/hexagent/governance/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-task-015-specs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - name: Verify uv version
+        run: test "$(uv --version | cut -d ' ' -f2 | sed 's/[-+].*//')" = "0.11.25"
+      - name: Check lock freshness
+        run: uv lock --check
+      - name: Install from lock
+        run: uv sync --locked --all-extras
+      - name: Run TASK-015 spec validation
+        run: uv run --locked python scripts/run_task015_spec_validation.py

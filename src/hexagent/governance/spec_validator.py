@@ -689,19 +689,152 @@ def _identifier_field_for(spec_path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _validate_deprecated_references(
+    spec_path: str,
+    spec_data: Mapping[str, Any],
+    deprecated_identifiers: Mapping[str, str],
+) -> list[ValidationFinding]:
+    """Section 11.1.7 — a spec referencing a deprecated identifier
+    surfaces a ``spec_deprecated_reference`` finding as a **warning**
+    (not a blocker). This is the Section 7 contract:
+    deprecated-reference is warning, not blocker.
+
+    ``deprecated_identifiers`` maps the canonical identifier
+    (e.g. ``ci-pipeline``) to its ``deprecated_at`` ISO-8601
+    timestamp. The validator scans the spec's identifier field (per
+    :data:`SPEC_IDENTIFIER_FIELDS`) and, when matched, emits a
+    warning finding carrying ``identifier`` / ``deprecated_at`` in
+    its context.
+    """
+    if not deprecated_identifiers:
+        return []
+    field_name = SPEC_IDENTIFIER_FIELDS.get(spec_path, "")
+    if not field_name:
+        return []
+    identifier = spec_data.get(field_name)
+    if not isinstance(identifier, str):
+        return []
+    deprecated_at = deprecated_identifiers.get(identifier)
+    if deprecated_at is None:
+        return []
+    return [
+        ValidationFinding(
+            severity="warning",
+            error_code="spec_deprecated_reference",
+            field_path=field_name,
+            message=(
+                f"identifier {identifier!r} is deprecated "
+                f"(deprecated_at={deprecated_at!r}); new workflows MUST NOT reference it"
+            ),
+            context={
+                "spec_path": spec_path,
+                "identifier": identifier,
+                "deprecated_at": deprecated_at,
+            },
+        )
+    ]
+
+
+def _validate_frozen_contract_authority(
+    spec_path: str,
+    spec_data: Mapping[str, Any],
+    established: frozenset[str],
+) -> list[ValidationFinding]:
+    """Section 11.2.8 — check ``release_gate.frozen_contract_references``
+    against the set of established frozen contracts.
+
+    Each reference that is NOT in ``established`` raises a BLOCKER
+    ``governance_authority_error``. References that are valid governed
+    frozen contracts (per :data:`GOVERNED_FROZEN_CONTRACTS`) but not
+    yet established are surfaced as missing-authority blockers per
+    Section 8.1 + Section 8.2.
+
+    References that are NOT in :data:`GOVERNED_FROZEN_CONTRACTS` at all
+    are out-of-scope for this helper (they would be a different error
+    class — the spec author is using an unknown identifier).
+    """
+    from hexagent.governance.errors import GOVERNED_FROZEN_CONTRACTS
+
+    findings: list[ValidationFinding] = []
+    release_gate = spec_data.get("release_gate")
+    if not isinstance(release_gate, Mapping):
+        return findings
+    references = release_gate.get("frozen_contract_references")
+    if not isinstance(references, list):
+        return findings
+    for ref in references:
+        if not isinstance(ref, str):
+            continue
+        if ref not in GOVERNED_FROZEN_CONTRACTS:
+            # Out of scope: unknown identifier. Surface as a schema
+            # blocker so the author knows.
+            findings.append(
+                ValidationFinding(
+                    severity="blocker",
+                    error_code="spec_schema_error",
+                    field_path="release_gate.frozen_contract_references",
+                    message=(
+                        f"unknown frozen-contract reference {ref!r}; "
+                        f"must be one of {sorted(GOVERNED_FROZEN_CONTRACTS)}"
+                    ),
+                    context={
+                        "spec_path": spec_path,
+                        "reference": ref,
+                    },
+                )
+            )
+            continue
+        if ref not in established:
+            findings.append(
+                ValidationFinding(
+                    severity="blocker",
+                    error_code="governance_authority_error",
+                    field_path="release_gate.frozen_contract_references",
+                    message=(f"frozen contract {ref!r} is referenced but not yet established"),
+                    context={
+                        "spec_path": spec_path,
+                        "missing_authority": ref,
+                    },
+                )
+            )
+    return findings
+
+
 def validate_spec(
     spec_path: str,
     spec_data: Mapping[str, Any],
     *,
     known_failure_modes: frozenset[str] | None = None,
+    established_frozen_contracts: frozenset[str] | None = None,
+    deprecated_identifiers: Mapping[str, str] | None = None,
 ) -> ValidationReport:
     """Validate a single spec (Section 11.1).
 
     Returns a :class:`ValidationReport`. The report's ``blockers`` and
     ``warnings`` are disjoint (Section 7); see
     :meth:`ValidationReport.assert_disjoint`.
+
+    ``established_frozen_contracts`` (Section 11.2.8) is the set of
+    governed frozen-contract identifiers that are currently established
+    on ``main``. ``None`` (the default) means ALL governed frozen
+    contracts are established — matching the production state after
+    TASK-015 first-slice merge. Tests that exercise the
+    unestablished path pass an explicit ``frozenset(...)``.
+
+    ``deprecated_identifiers`` (Section 11.1.7) maps an identifier to
+    its ``deprecated_at`` ISO-8601 timestamp. ``None`` (the default)
+    means no identifiers are deprecated — matching the production
+    state where no spec has been moved to ``deprecated:``.
     """
+    from hexagent.governance.errors import GOVERNED_FROZEN_CONTRACTS
+
     known = known_failure_modes if known_failure_modes is not None else FAILURE_TAXONOMY_MODES
+    established = (
+        established_frozen_contracts
+        if established_frozen_contracts is not None
+        else GOVERNED_FROZEN_CONTRACTS
+    )
+    deprecated = deprecated_identifiers if deprecated_identifiers is not None else {}
 
     blockers: list[ValidationFinding] = []
     warnings: list[ValidationFinding] = []
@@ -746,6 +879,12 @@ def validate_spec(
                 },
             )
         )
+
+    # 6. Frozen-contract authority (Section 11.2.8 / 8.2).
+    blockers.extend(_validate_frozen_contract_authority(spec_path, spec_data, established))
+
+    # 7. Deprecated-reference warning (Section 11.1.7 / Section 7).
+    warnings.extend(_validate_deprecated_references(spec_path, spec_data, deprecated))
 
     report = ValidationReport(
         spec_path=spec_path,

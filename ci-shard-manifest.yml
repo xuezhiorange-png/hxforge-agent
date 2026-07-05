@@ -12,6 +12,10 @@ shards:
       - tests/ci/test_shared_infrastructure.py
       - tests/governance/test_errors.py
       - tests/governance/test_spec_validator.py
+      - tests/governance/test_11_2_8_frozen_contract_reference.py
+      - tests/governance/test_11_3_13_branch_protection_assertion.py
+      - tests/governance/test_11_3_14_release_gate_assertion.py
+      - tests/governance/test_9_2_provenance_chain.py
       - tests/support/test_mypy_doubles.py
       - tests/support/test_property_provider_doubles.py
       - tests/canonical_json/test_shared_canonical_json.py
