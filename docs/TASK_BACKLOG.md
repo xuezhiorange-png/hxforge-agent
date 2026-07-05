@@ -29,7 +29,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-012 (impl) | Implement standards rule-pack runtime, license validator and CI boundary | DONE | TASK-012 design |
 | TASK-013 (design) | Define material and cost data governance | DONE | TASK-001 |
 | TASK-013 (impl) | Implement material and cost data governance | DONE | TASK-013 design |
-| TASK-014 (design) | Define immutable case revisions and persistence contract | DRAFT | TASK-002, TASK-003, TASK-004, TASK-005, TASK-011, TASK-012, TASK-013 |
+| TASK-014 (design) | Define immutable case revisions and persistence contract | DONE | TASK-002, TASK-003, TASK-004, TASK-005, TASK-011, TASK-012, TASK-013 |
 | TASK-014 (impl) | Implement immutable case revisions and persistence | PLANNED | TASK-014 design |
 | TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
 
@@ -180,7 +180,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-012 impl | #44 |
 | TASK-013 design | #47 |
 | TASK-013 impl | #50 |
-| TASK-014 design | (pending — see Issue #52) |
+| TASK-014 design | #53 |
 
 | Item | Value |
 |---|---|
@@ -278,7 +278,15 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-013 Impl Issue closed_at | `2026-07-04T16:26:04Z` |
 | TASK-013 Impl frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` (unchanged) |
 | TASK-013 Impl status | DONE / MERGED / MAIN-CI-VERIFIED / CLOSED |
-| TASK-014 design Issue | #52 — OPEN |
-| TASK-014 design status | AUTHORIZED / DRAFT |
+| TASK-014 design Issue | #52 — OPEN pending closeout PR merge |
+| TASK-014 design PR | #53 — MERGED |
+| TASK-014 design reviewed Head | `807e6afc77a3ae38b6a639b436b177d96ccf0f60` |
+| TASK-014 design merge SHA / Frozen Contract Authority SHA | `6f337a6e81a8c2a7ba8059285aeef39bba59c7cb` |
+| TASK-014 design merged_at | `2026-07-05T03:05:30Z` |
+| TASK-014 design PR-head CI | `28714724247` — completed / success |
+| TASK-014 design main post-merge CI | `28727736263` — completed / success |
+| TASK-014 design frozen contract file | `docs/tasks/TASK-014-immutable-case-revisions-persistence.md` |
+| TASK-014 design status | DONE / DESIGN FROZEN pending closeout PR merge |
 | TASK-014 implementation status | NOT AUTHORIZED |
-| TASK-014 | PLANNED / NOT STARTED — requires separate explicit authorization |
+| TASK-014 implementation remains NOT AUTHORIZED. |
+| TASK-015+ remains PLANNED / NOT STARTED. |
