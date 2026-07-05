@@ -1,0 +1,17 @@
+{
+  "trial_version": "task-016-alpha-preview-v0.1",
+  "case_id": "case_002_hairpin_success",
+  "status": "success",
+  "catalog_content_hash": "3e23c1981f0cb116c4fbe8fe27d60c3be3c084322c4af7e9e651a89c3dcc8991",
+  "ordered_geometry_ids": [
+    "hairpin/utube1/r1",
+    "pipe/nps1/sch40/r1",
+    "tube/std/od0.019/id0.015/r1"
+  ],
+  "record_hashes": {
+    "hairpin/utube1/r1": "48eaaab3ef757a0ffdbd415f888ecff63927bd2bbd27c0d4a84bd42617f48570",
+    "pipe/nps1/sch40/r1": "31493eed9a5d159aeddd53cfb31fb1760e6e26f4ea0667e7a1c0267704d2cc54",
+    "tube/std/od0.019/id0.015/r1": "a645076186713e5c2dfdba7dc7169c9afcc24b40ac7cc8e204573edbf21ec4f3"
+  },
+  "notes": "Expected success output for case_002_hairpin_success. Hashes were computed from the corresponding hairpin_success.input.json fixture using the merged TASK-016 implementation (PR #67 merge commit ac7a4152698f039b4d6795f6a814228cb3c43def) at the time of TASK-016-TRIAL-002. The hairpin record references both approved tube and approved pipe records; both reference validations pass and the catalog loads successfully. The canonical ordering rule sorts by (geometry_type, geometry_id, revision, record_hash) per design section 7.2: hairpin comes first because geometry_type 'hairpin' sorts before 'pipe' and 'tube'."
+}

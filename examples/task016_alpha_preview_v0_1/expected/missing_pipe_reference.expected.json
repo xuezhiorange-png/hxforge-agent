@@ -1,0 +1,12 @@
+{
+  "trial_version": "task-016-alpha-preview-v0.1",
+  "case_id": "case_004_blocker_missing_pipe_reference",
+  "status": "blocked",
+  "error_code": "geometry_reference_missing",
+  "context": {
+    "hairpin_id": "utube1",
+    "reference_field": "pipe_geometry_id",
+    "missing_id": "pipe/does/not/exist/r1"
+  },
+  "notes": "Expected blocker output for case_004_blocker_missing_pipe_reference. The fixture's hairpin record references pipe_geometry_id='pipe/does/not/exist/r1' which does not exist in the catalog's record set, triggering the geometry_reference_missing blocker per catalog.py _enforce_approved_and_references (the for-loop iterates over ('tube_geometry_id', 'pipe_geometry_id') and raises when by_id.get(ref_id) returns None). The context.reference_field value 'pipe_geometry_id' explicitly identifies the pipe-side reference failure (not tube-side) per TASK-016-TRIAL-001 acceptance criteria."
+}
