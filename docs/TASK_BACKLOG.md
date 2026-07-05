@@ -31,7 +31,9 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-013 (impl) | Implement material and cost data governance | DONE | TASK-013 design |
 | TASK-014 (design) | Define immutable case revisions and persistence contract | DONE | TASK-002, TASK-003, TASK-004, TASK-005, TASK-011, TASK-012, TASK-013 |
 | TASK-014 (impl) | Implement immutable case revisions and persistence | DONE | TASK-014 design |
-| TASK-015 (design) | Design CI, security and release automation hardening contract | DESIGN IN DRAFT | TASK-000 |
+| TASK-015 (design) | Design CI, security and release automation hardening contract | DONE / DESIGN FROZEN | TASK-000 |
+| TASK-015 (impl first slice) | Implement CI, security and release automation hardening (first slice) | DONE / MERGED / MAIN-CI-VERIFIED / CLOSED | TASK-015 design |
+| TASK-015 (follow-up) | Follow-up implementation slice for CI/security/release automation hardening | FOLLOW-UP IN PROGRESS | TASK-015 impl first slice |
 
 ## M2 — Double-pipe vertical slice
 
@@ -346,11 +348,32 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-014 implementation Issue closed_at | `2026-07-05T05:14:36Z` |
 | TASK-014 implementation frozen contract file | `docs/tasks/TASK-014-immutable-case-revisions-persistence.md` (unchanged) |
 | TASK-014 implementation status | DONE / MERGED / MAIN-CI-VERIFIED / CLOSED |
-| TASK-015 design Issue | #57 — OPEN |
-| TASK-015 design PR | (pending — see this branch's Draft PR) |
-| TASK-015 design branch | `docs/task-015-ci-security-and-release-automation-design` |
-| TASK-015 design base | `66e718c90a54f84ab0f9b0bedc34e67a3f5177bc` (main @ TASK-014 implementation merge) |
-| TASK-015 design status | AUTHORIZED BY Issue #57 / IN DRAFT PR |
-| TASK-015 implementation status | NOT AUTHORIZED |
-| TASK-015A historical | CLOSED / MERGED (unchanged; this design does not mutate, reopen, or supersede any TASK-015A asset) |
+| TASK-015 design Issue | #57 — CLOSED (state_reason=completed) |
+| TASK-015 design PR | #58 — MERGED |
+| TASK-015 design reviewed Head | `13722b591409c38c65c187083154e50d0088f655` |
+| TASK-015 design merge SHA / Frozen Contract Authority SHA | `39135e269b014e9c9310ac403a60591393d46b2d` |
+| TASK-015 design merged_at | `2026-07-05T05:54:09Z` |
+| TASK-015 design PR-head CI | `28730839821` — completed / success |
+| TASK-015 design closeout PR | #59 — MERGED |
+| TASK-015 design closeout merge SHA | `1f3b5de42c4d51c3261d45ab4899a7be5bbfdaed` |
+| TASK-015 design closeout merged_at | `2026-07-05T06:07:08Z` |
+| TASK-015 design status | DONE / DESIGN FROZEN |
+| TASK-015 implementation Issue | #60 — CLOSED (state_reason=completed) |
+| TASK-015 implementation PR | #61 — MERGED |
+| TASK-015 implementation branch | `codex/task-015-ci-security-release-automation-implementation` |
+| TASK-015 implementation reviewed Head | `63b82e1af6d92940e4b3acd420258faf4ea41e62` |
+| TASK-015 implementation merge SHA | `eec63cb9a3e52f481f5278281186c0d99b3e196b` |
+| TASK-015 implementation merged_at | `2026-07-05T08:43:29Z` |
+| TASK-015 implementation PR-head CI | `28733615928` — completed / success |
+| TASK-015 implementation Main Post-Merge CI | `28735155632` — completed / success (local/direct REST; connector `workflow_runs: []` recorded as evidence-source mismatch, NOT failure) |
+| TASK-015 implementation closeout comment | `4885427862` |
+| TASK-015 implementation Issue closed_at | `2026-07-05T08:45:07Z` |
+| TASK-015 implementation frozen contract file | `docs/tasks/TASK-015-ci-security-and-release-automation.md` (unchanged) |
+| TASK-015 implementation status | DONE / MERGED / MAIN-CI-VERIFIED / CLOSED |
+| TASK-015 follow-up Issue | #62 — OPEN |
+| TASK-015 follow-up PR | #63 — OPEN / DRAFT / NOT MERGED |
+| TASK-015 follow-up branch | `codex/task-015-followup-slice-ci-security-release-hardening` |
+| TASK-015 follow-up base | `eec63cb9a3e52f481f5278281186c0d99b3e196b` (main @ TASK-015 implementation merge) |
+| TASK-015 follow-up status | AUTHORIZED BY Issue #62 / DRAFT / NOT READY / NOT MERGED |
+| TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
