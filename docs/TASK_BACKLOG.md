@@ -50,7 +50,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
-| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | NOT AUTHORIZED | TASK-017 design |
+| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **AUTHORIZED FOR KICKOFF / NOT AUTHORIZED FOR CORE LOGIC** | TASK-017 design |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
@@ -384,18 +384,33 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 Frozen Contract Authority Base SHA | `fbb05ae71f21e6cfd4d1041afb5958c863166248` |
 | TASK-017 design PR CI | `28748836440` — completed / success / head_sha `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` exact match |
 | TASK-017 design frozen contract file | `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md` |
-| TASK-017 design status | **DESIGN FROZEN** / Implementation NOT AUTHORIZED / Implementation Issue NOT YET CREATED |
-| TASK-017 implementation | NOT AUTHORIZED |
+| TASK-017 design status | **DESIGN FROZEN** / Implementation Issue: #74 OPEN |
+| TASK-017 implementation Issue | #74 — OPEN |
+| TASK-017 implementation branch | `codex/task-017-materials-mass-mechanical-implementation` |
+| TASK-017 implementation base | `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge) |
+| TASK-017 implementation planning doc | `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md` |
+| TASK-017 implementation status | **AUTHORIZED FOR KICKOFF / NOT AUTHORIZED FOR CORE LOGIC** |
 | TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
 
 13. TASK-017 design kickoff was AUTHORIZED by Issue #72:
-    - Design Issue #72: OPEN
+    - Design Issue #72: CLOSED / COMPLETED / `2026-07-05T18:36:26Z`
     - Design branch: `docs/task-017-materials-mass-preliminary-mechanical-design`
     - Design file: `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md`
     - Design base: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (main @ PR #71 merge)
     - Design status: **DESIGN FROZEN** (Frozen Contract Authority Commit SHA = `6ed5b7dc7d8df163796eacb838afcf5702a4c53a`, Base SHA = `fbb05ae71f21e6cfd4d1041afb5958c863166248`)
     - Design contract file: `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md`
     - Design PR CI: `28748836440` — completed / success / head_sha exact match
-    - TASK-017 implementation: **NOT AUTHORIZED** / Implementation Issue: NOT YET CREATED
+    - Design PR #73: MERGED at `2026-07-05T18:19:27Z` (merge commit `757e748dcef825b13397473977b181913c0cbfa8`)
+    - TASK-017 implementation: **AUTHORIZED FOR KICKOFF / NOT AUTHORIZED FOR CORE LOGIC**
     - TASK-018+ : PLANNED / NOT STARTED
+
+14. TASK-017 implementation kickoff is now AUTHORIZED by Issue #74:
+    - Implementation Issue #74: OPEN
+    - Implementation branch: `codex/task-017-materials-mass-mechanical-implementation`
+    - Implementation file: `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md`
+    - Implementation base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge)
+    - Implementation status: **AUTHORIZED FOR KICKOFF / NOT AUTHORIZED FOR CORE LOGIC** (planning + slice plan only; no production code in this commit)
+    - Implementation contract file: `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md`
+    - TASK-017 implementation Slices A / B / C / D / Closeout: NOT YET AUTHORIZED (each requires separate authorization)
+    - TASK-018+: PLANNED / NOT STARTED
