@@ -290,3 +290,8 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-014 implementation status | NOT AUTHORIZED |
 | TASK-014 implementation remains NOT AUTHORIZED. |
 | TASK-015+ remains PLANNED / NOT STARTED. |
+| TASK-014 implementation Issue | #55 — OPEN |
+| TASK-014 implementation status | IN DRAFT PR / NOT MERGED |
+| TASK-014 implementation branch | `codex/task-014-immutable-case-revisions-persistence` |
+| TASK-014 implementation PR | (pending — see Issue #55) |
+| TASK-015+ | PLANNED / NOT STARTED |
