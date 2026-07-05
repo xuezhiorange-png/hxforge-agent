@@ -113,6 +113,14 @@ def transition_with_audit(
     superseded_by: str | None = None
     archived_at: datetime | None = None
     tombstone_at: datetime | None = None
+    # Section 6.7 — committed identity is written ONCE on the
+    # ``validated -> committed`` transition; subsequent transitions
+    # (committed -> superseded / archived / tombstoned) MUST preserve
+    # the existing committed_at / committed_by. The lifecycle helper
+    # below explicitly only sets these on the commit transition and
+    # leaves them at ``None`` (i.e., "preserve existing") otherwise.
+    committed_at: datetime | None = None
+    committed_by: str | None = None
     if dst == RevisionStatus.SUPERSEDED:
         if supersede_with is None:
             raise RevisionPersistenceFailure(
@@ -124,6 +132,14 @@ def transition_with_audit(
         archived_at = occurred_at
     if dst == RevisionStatus.TOMBSTONED:
         tombstone_at = occurred_at
+    if dst == RevisionStatus.COMMITTED:
+        # Section 6.7 — set committed identity EXACTLY ONCE on the
+        # validated -> committed transition. The model helper
+        # (``transition_revision``) only overwrites a field when the
+        # kwarg is non-None, so a ``None`` kwarg on later transitions
+        # preserves the existing committed identity.
+        committed_at = occurred_at
+        committed_by = actor_id
 
     new_revision = transition_revision(
         revision,
@@ -131,6 +147,8 @@ def transition_with_audit(
         superseded_by=superseded_by,
         archived_at=archived_at,
         tombstone_at=tombstone_at,
+        committed_at=committed_at,
+        committed_by=committed_by,
     )
 
     audit_type = _status_to_audit_type(dst)

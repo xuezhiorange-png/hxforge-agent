@@ -301,6 +301,8 @@ def transition_revision(
     superseded_by: str | None = None,
     archived_at: datetime | None = None,
     tombstone_at: datetime | None = None,
+    committed_at: datetime | None = None,
+    committed_by: str | None = None,
 ) -> CaseRevision:
     """Return a new ``CaseRevision`` transitioned to ``new_status``.
 
@@ -308,18 +310,35 @@ def transition_revision(
     to ``RevisionPersistenceFailure``) on a forbidden transition.
     ``Section 6.5`` — payload / identity / hashes remain unchanged; only
     status and metadata-transition fields are updated.
+
+    Section 6.7 — committed identity (``committed_at`` / ``committed_by``)
+    is set EXACTLY ONCE on the ``validated -> committed`` transition. On
+    subsequent transitions (committed -> superseded / archived /
+    tombstoned, or superseded -> archived / tombstoned), the caller MUST
+    pass ``committed_at=None, committed_by=None`` so the existing
+    committed identity is preserved unchanged (Section 6.5 / 6.7
+    immutability).
     """
     if not is_allowed_transition(revision.status, new_status):
         raise ValueError(
             f"forbidden transition {revision.status.value} -> {new_status.value} (Section 7.3)"
         )
-    return replace(
-        revision,
-        status=new_status,
-        superseded_by=superseded_by,
-        archived_at=archived_at,
-        tombstone_at=tombstone_at,
-    )
+    # Section 6.7 — committed_at / committed_by are write-once.
+    # ``replace`` only overwrites a field when the kwarg is non-None; a
+    # ``None`` kwarg means "preserve the existing value". This guarantees
+    # later metadata transitions (archived / tombstoned / superseded)
+    # never rewrite the committed identity fields.
+    replace_kwargs: dict[str, Any] = {
+        "status": new_status,
+        "superseded_by": superseded_by,
+        "archived_at": archived_at,
+        "tombstone_at": tombstone_at,
+    }
+    if committed_at is not None:
+        replace_kwargs["committed_at"] = committed_at
+    if committed_by is not None:
+        replace_kwargs["committed_by"] = committed_by
+    return replace(revision, **replace_kwargs)
 
 
 __all__ = [
