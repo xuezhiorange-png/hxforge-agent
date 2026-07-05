@@ -1,0 +1,110 @@
+{
+  "trial_version": "task-016-alpha-preview-v0.1",
+  "case_id": "case_002_hairpin_success",
+  "case_type": "success",
+  "intent": "Prove that a hairpin record with approved tube and pipe references is accepted by hexagent.geometry_catalogs.load_geometry_catalog. No blockers expected.",
+  "expected_status": "pass",
+  "_slice": "TASK-016-TRIAL-001",
+  "_design_reference": "docs/trials/TASK-016-alpha-preview-v0.1.md section 8.2",
+  "notes": "This skeleton uses the same approved tube and pipe placeholder identifiers as case_001_catalog_success, plus an additional approved hairpin record that references both. References both tube_geometry_id and pipe_geometry_id with approved underlying records. No engineering calculation output is implied.",
+  "fixture_input": {
+    "payload": {
+      "catalog_id": "approved-geometry-catalog",
+      "catalog_version": "0.1.0",
+      "authority": "internal-review",
+      "source_revision": "rev-1",
+      "records": [
+        {
+          "geometry_id": "tube/std/od0.019/id0.015/r1",
+          "geometry_type": "tube",
+          "approval_state": "approved",
+          "nominal_label": "3/4 in BWG (placeholder)",
+          "outer_diameter_m": 0.019,
+          "inner_diameter_m": 0.015,
+          "wall_thickness_m": 0.002,
+          "cross_section_area_m2": 0.00019635,
+          "flow_area_m2": 0.00017671,
+          "hydraulic_diameter_m": 0.0168,
+          "source_binding": {
+            "source_id": "src-tube-placeholder",
+            "source_type": "internal",
+            "source_revision": "rev-1",
+            "source_location": "fixtures/task016_alpha_preview_v0_1",
+            "evidence_ref": "ev-tube-placeholder",
+            "approved_by": "internal-review",
+            "approved_at": "2026-07-05T00:00:00Z"
+          },
+          "revision": "r1",
+          "tags": ["tube", "placeholder"]
+        },
+        {
+          "geometry_id": "pipe/nps1/sch40/r1",
+          "geometry_type": "pipe",
+          "approval_state": "approved",
+          "nominal_label": "NPS 1 SCH 40 (placeholder)",
+          "nominal_pipe_size_label": "NPS 1",
+          "schedule_label": "SCH 40",
+          "outer_diameter_m": 0.0334,
+          "inner_diameter_m": 0.0266,
+          "wall_thickness_m": 0.0034,
+          "flow_area_m2": 0.00055597,
+          "hydraulic_diameter_m": 0.0266,
+          "source_binding": {
+            "source_id": "src-pipe-placeholder",
+            "source_type": "internal",
+            "source_revision": "rev-1",
+            "source_location": "fixtures/task016_alpha_preview_v0_1",
+            "evidence_ref": "ev-pipe-placeholder",
+            "approved_by": "internal-review",
+            "approved_at": "2026-07-05T00:00:00Z"
+          },
+          "revision": "r1",
+          "tags": ["pipe", "placeholder"]
+        },
+        {
+          "geometry_id": "hairpin/utube1/r1",
+          "geometry_type": "hairpin",
+          "approval_state": "approved",
+          "nominal_label": "utube1 (placeholder)",
+          "hairpin_id": "utube1",
+          "tube_geometry_id": "tube/std/od0.019/id0.015/r1",
+          "pipe_geometry_id": "pipe/nps1/sch40/r1",
+          "number_of_tubes": 1,
+          "effective_length_m": 2.0,
+          "bend_radius_m": 0.05,
+          "centerline_spacing_m": 0.05,
+          "flow_path_descriptor": "u-tube",
+          "source_binding": {
+            "source_id": "src-hairpin-placeholder",
+            "source_type": "internal",
+            "source_revision": "rev-1",
+            "source_location": "fixtures/task016_alpha_preview_v0_1",
+            "evidence_ref": "ev-hairpin-placeholder",
+            "approved_by": "internal-review",
+            "approved_at": "2026-07-05T00:00:00Z"
+          },
+          "revision": "r1",
+          "tags": ["hairpin", "placeholder"]
+        }
+      ]
+    }
+  },
+  "expected_runner_output_categories": [
+    "hairpin_geometry_id",
+    "referenced_tube_geometry_id",
+    "referenced_pipe_geometry_id",
+    "content_hash (catalog-level)",
+    "no_blockers"
+  ],
+  "prohibited_content_checklist": {
+    "material_grade": false,
+    "mass_or_weight": false,
+    "cost_value": false,
+    "pressure_drop_calculation": false,
+    "fouling_factor": false,
+    "mechanical_suitability": false,
+    "vendor_availability": false,
+    "procurement_status": false,
+    "engineering_calculation_output": false
+  }
+}
