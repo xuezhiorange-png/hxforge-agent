@@ -49,7 +49,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-010 (impl) | Implement versioned API and traceable report | DONE | TASK-010 design |
 | TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
-| TASK-017 | Add materials, mass and preliminary mechanical checks | PLANNED | TASK-012 (impl), TASK-013, TASK-016 |
+| TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | DRAFT / NOT READY / NOT MERGED | TASK-012 (impl), TASK-013, TASK-016 |
+| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | NOT AUTHORIZED | TASK-017 design |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
@@ -375,5 +376,21 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-015 follow-up branch | `codex/task-015-followup-slice-ci-security-release-hardening` |
 | TASK-015 follow-up base | `eec63cb9a3e52f481f5278281186c0d99b3e196b` (main @ TASK-015 implementation merge) |
 | TASK-015 follow-up status | AUTHORIZED BY Issue #62 / DRAFT / NOT READY / NOT MERGED |
+| TASK-017 design Issue | #72 — OPEN |
+| TASK-017 design branch | `docs/task-017-materials-mass-preliminary-mechanical-design` |
+| TASK-017 design base | `fbb05ae71f21e6cfd4d1041afb5958c863166248` (main @ PR #71 merge) |
+| TASK-017 design frozen contract file | `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md` |
+| TASK-017 design status | AUTHORIZED BY Issue #72 / DRAFT / NOT READY / NOT MERGED |
+| TASK-017 implementation | NOT AUTHORIZED |
 | TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
+
+13. TASK-017 design kickoff is now AUTHORIZED by Issue #72:
+    - Design Issue #72: OPEN
+    - Design branch: `docs/task-017-materials-mass-preliminary-mechanical-design`
+    - Design file: `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md`
+    - Design base: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (main @ PR #71 merge)
+    - Design status: AUTHORIZED BY Issue #72 / DRAFT / NOT READY / NOT MERGED
+    - Design contract file: `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md`
+    - TASK-017 implementation: NOT AUTHORIZED
+    - TASK-018+ : PLANNED / NOT STARTED
