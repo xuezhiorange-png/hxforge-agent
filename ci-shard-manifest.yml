@@ -25,6 +25,18 @@ shards:
       - tests/material_costs/test_selection.py
       - tests/material_costs/test_validation.py
       - tests/material_costs/test_frozen_contract_unchanged.py
+      - tests/case_revisions/test_canonical.py
+      - tests/case_revisions/test_concurrency.py
+      - tests/case_revisions/test_errors.py
+      - tests/case_revisions/test_frozen_contract_unchanged.py
+      - tests/case_revisions/test_identity.py
+      - tests/case_revisions/test_immutability.py
+      - tests/case_revisions/test_lifecycle.py
+      - tests/case_revisions/test_parent_chain.py
+      - tests/case_revisions/test_persistence.py
+      - tests/case_revisions/test_remediation_p01_to_p1.py
+      - tests/case_revisions/test_restricted_content.py
+      - tests/case_revisions/test_validation.py
     timeout: 300
 
   - name: ci-acceptance
