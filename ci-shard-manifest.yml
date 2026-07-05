@@ -66,11 +66,17 @@ shards:
       - tests/unit/test_double_pipe_geometry.py
       - tests/unit/test_double_pipe_solver.py
       - tests/unit/test_double_pipe_thermal.py
+      - tests/unit/test_geometry_catalog.py
       - tests/unit/test_provenance_graph.py
       - tests/unit/test_task009_catalog_hash.py
       - tests/unit/test_task009_phase1.py
       - tests/unit/test_task009_phase2_contract.py
       - tests/unit/test_task009_phase3.py
+      - tests/unit/test_task010_final.py
+      - tests/unit/test_task010_phase1.py
+      - tests/unit/test_task010_phase2.py
+      - tests/unit/test_task016_geometry_catalog.py
+      - tests/unit/test_task016_geometry_catalog_pipe_refs.py
       - tests/unit/test_thermal.py
       - tests/unit/test_tube_annulus_correlations.py
     timeout: 120
@@ -93,9 +99,6 @@ shards:
       - tests/unit/test_review02.py
       - tests/unit/test_review03.py
       - tests/unit/test_review_items.py
-      - tests/unit/test_task010_final.py
-      - tests/unit/test_task010_phase1.py
-      - tests/unit/test_task010_phase2.py
       - tests/unit/test_units.py
     timeout: 300
 
