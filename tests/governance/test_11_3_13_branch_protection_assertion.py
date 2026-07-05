@@ -33,7 +33,6 @@ import pytest
 
 from hexagent.governance import (
     SPEC_PATH_CI_PIPELINE,
-    ValidationFinding,
     compute_content_hash,
     validate_spec,
 )
@@ -61,10 +60,7 @@ def test_11_3_13_clean_spec_when_content_hash_matches_canonical() -> None:
     # Factory has stamped the correct content_hash.
     assert spec["content_hash"] == compute_content_hash(_spec_for_hash(spec))
     report = validate_spec(SPEC_PATH_CI_PIPELINE, spec)
-    content_hash_blockers = [
-        f for f in report.blockers
-        if f.field_path == "content_hash"
-    ]
+    content_hash_blockers = [f for f in report.blockers if f.field_path == "content_hash"]
     assert content_hash_blockers == [], (
         "content_hash matches canonical → expected no content_hash blocker; "
         f"got {[f.to_dict() for f in content_hash_blockers]}"
@@ -85,10 +81,7 @@ def test_11_3_13_blocker_when_content_hash_does_not_match_canonical() -> None:
         spec, "0000000000000000000000000000000000000000000000000000000000000000"
     )
     report = validate_spec(SPEC_PATH_CI_PIPELINE, stale_spec)
-    content_hash_blockers = [
-        f for f in report.blockers
-        if f.field_path == "content_hash"
-    ]
+    content_hash_blockers = [f for f in report.blockers if f.field_path == "content_hash"]
     assert len(content_hash_blockers) == 1, (
         "expected exactly one content_hash blocker on stale spec; "
         f"got {[(f.error_code, f.severity, f.message) for f in content_hash_blockers]}"
@@ -118,9 +111,7 @@ def test_11_3_13_branch_protection_status_check_name_shape() -> None:
     # CIPipelineSpec (``ci-pipeline``), NOT the spec_path.
     expected_check_name = "task-015/ci-pipeline/blockers"
     parts = expected_check_name.split("/")
-    assert len(parts) == 3, (
-        f"status check name must have 3 slash-delimited parts; got {parts}"
-    )
+    assert len(parts) == 3, f"status check name must have 3 slash-delimited parts; got {parts}"
     assert parts[0] == "task-015", f"first segment must be 'task-015'; got {parts[0]}"
     assert parts[2] == "blockers", f"last segment must be 'blockers'; got {parts[2]}"
     # Spec-name segment is the canonical kebab-case identifier of the
@@ -137,13 +128,11 @@ def test_11_3_13_validator_emits_disjoint_blocker_for_stale_hash() -> None:
     """
     spec = build_ci_pipeline_spec()
     stale_spec = _with_overridden_content_hash(
-        spec, "deadbeef" * 8  # 64 hex chars, but wrong
+        spec,
+        "deadbeef" * 8,  # 64 hex chars, but wrong
     )
     report = validate_spec(SPEC_PATH_CI_PIPELINE, stale_spec)
-    content_hash_warnings = [
-        f for f in report.warnings
-        if f.field_path == "content_hash"
-    ]
+    content_hash_warnings = [f for f in report.warnings if f.field_path == "content_hash"]
     assert content_hash_warnings == [], (
         "Section 11.3.13 — content_hash mismatch MUST NOT be downgraded to a warning; "
         f"got {[f.to_dict() for f in content_hash_warnings]}"
@@ -170,7 +159,6 @@ def test_11_3_13_various_stale_content_hashes_are_blocked(wrong_hash: str) -> No
     report = validate_spec(SPEC_PATH_CI_PIPELINE, stale_spec)
     blockers = [f for f in report.blockers if f.field_path == "content_hash"]
     assert len(blockers) == 1, (
-        f"expected one content_hash blocker for stale hash {wrong_hash!r}; "
-        f"got {len(blockers)}"
+        f"expected one content_hash blocker for stale hash {wrong_hash!r}; got {len(blockers)}"
     )
     assert blockers[0].severity == "blocker"

@@ -468,7 +468,8 @@ def test_11_1_7_deprecated_reference_surfaces_as_warning() -> None:
 
     # The deprecated-reference finding appears in warnings.
     deprecated_warnings = [
-        f for f in report.warnings
+        f
+        for f in report.warnings
         if f.error_code == "spec_deprecated_reference"
         and f.context.get("identifier") == "ci-pipeline"
     ]
@@ -481,8 +482,7 @@ def test_11_1_7_deprecated_reference_surfaces_as_warning() -> None:
 
     # The deprecated-reference finding does NOT appear in blockers.
     deprecated_blockers = [
-        f for f in report.blockers
-        if f.error_code == "spec_deprecated_reference"
+        f for f in report.blockers if f.error_code == "spec_deprecated_reference"
     ]
     assert deprecated_blockers == [], (
         "Section 11.1.7 — spec_deprecated_reference MUST NOT surface as a BLOCKER; "
@@ -491,4 +491,3 @@ def test_11_1_7_deprecated_reference_surfaces_as_warning() -> None:
 
     # Section 7 invariant — blockers and warnings are disjoint.
     report.assert_disjoint()
-

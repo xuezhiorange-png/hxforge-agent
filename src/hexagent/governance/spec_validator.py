@@ -790,9 +790,7 @@ def _validate_frozen_contract_authority(
                     severity="blocker",
                     error_code="governance_authority_error",
                     field_path="release_gate.frozen_contract_references",
-                    message=(
-                        f"frozen contract {ref!r} is referenced but not yet established"
-                    ),
+                    message=(f"frozen contract {ref!r} is referenced but not yet established"),
                     context={
                         "spec_path": spec_path,
                         "missing_authority": ref,
@@ -883,14 +881,10 @@ def validate_spec(
         )
 
     # 6. Frozen-contract authority (Section 11.2.8 / 8.2).
-    blockers.extend(
-        _validate_frozen_contract_authority(spec_path, spec_data, established)
-    )
+    blockers.extend(_validate_frozen_contract_authority(spec_path, spec_data, established))
 
     # 7. Deprecated-reference warning (Section 11.1.7 / Section 7).
-    warnings.extend(
-        _validate_deprecated_references(spec_path, spec_data, deprecated)
-    )
+    warnings.extend(_validate_deprecated_references(spec_path, spec_data, deprecated))
 
     report = ValidationReport(
         spec_path=spec_path,

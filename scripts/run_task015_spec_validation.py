@@ -48,12 +48,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from hexagent.governance import (
     ALL_SPEC_PATHS,
-    ValidationFinding,
     ValidationReport,
     load_spec,
     validate_all_specs,
@@ -120,14 +120,10 @@ def _format_report(report: ValidationReport) -> str:
     lines.append(f"spec_path: {report.spec_path}")
     lines.append(f"  blockers: {len(report.blockers)}")
     for blocker in report.blockers:
-        lines.append(
-            f"    - [{blocker.error_code}] {blocker.field_path}: {blocker.message}"
-        )
+        lines.append(f"    - [{blocker.error_code}] {blocker.field_path}: {blocker.message}")
     lines.append(f"  warnings: {len(report.warnings)}")
     for warning in report.warnings:
-        lines.append(
-            f"    - [{warning.error_code}] {warning.field_path}: {warning.message}"
-        )
+        lines.append(f"    - [{warning.error_code}] {warning.field_path}: {warning.message}")
     return "\n".join(lines)
 
 
@@ -143,8 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         "--repo-root",
         type=Path,
         default=Path("."),
-        help="Repository root for resolving canonical spec paths "
-        "(default: current directory).",
+        help="Repository root for resolving canonical spec paths (default: current directory).",
     )
     parser.add_argument(
         "--spec-root",

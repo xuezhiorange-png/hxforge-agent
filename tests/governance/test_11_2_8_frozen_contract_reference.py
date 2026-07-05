@@ -32,9 +32,7 @@ import pytest
 
 from hexagent.governance import (
     GOVERNED_FROZEN_CONTRACTS,
-    GovernanceAuthorityError,
     SPEC_PATH_RELEASE,
-    ValidationFinding,
     validate_spec,
 )
 
@@ -72,7 +70,7 @@ def test_11_2_8_all_governed_frozen_contracts_are_known() -> None:
         "task_015_frozen_contract",
         "task_015a_frozen_contract",
     }
-    assert GOVERNED_FROZEN_CONTRACTS == frozenset(expected)
+    assert frozenset(expected) == GOVERNED_FROZEN_CONTRACTS
 
 
 def test_11_2_8_established_frozen_contract_reference_passes() -> None:
@@ -83,7 +81,8 @@ def test_11_2_8_established_frozen_contract_reference_passes() -> None:
     data = _spec_with_frozen_contract_ref("task_014_frozen_contract")
     report = validate_spec(spec_path, data)
     governance_findings = [
-        f for f in (*report.blockers, *report.warnings)
+        f
+        for f in (*report.blockers, *report.warnings)
         if f.error_code == "governance_authority_error"
     ]
     assert governance_findings == [], (
@@ -124,7 +123,8 @@ def test_11_2_8_unestablished_frozen_contract_reference_raises_blocker(
         established_frozen_contracts=frozenset(),
     )
     blocker = [
-        f for f in report.blockers
+        f
+        for f in report.blockers
         if f.error_code == "governance_authority_error"
         and f.context.get("missing_authority") == unestablished_reference
     ]
@@ -153,8 +153,7 @@ def test_11_2_8_governance_authority_error_is_distinct_from_identifier_collision
     codes = {f.error_code for f in report.blockers}
     assert "governance_authority_error" in codes
     assert "spec_identifier_collision" not in codes, (
-        "Section 8.2 — GovernanceAuthorityError MUST NOT be conflated "
-        "with SpecIdentifierCollision"
+        "Section 8.2 — GovernanceAuthorityError MUST NOT be conflated with SpecIdentifierCollision"
     )
 
 
@@ -185,10 +184,7 @@ def test_11_2_8_partial_established_set_only_flags_unestablished() -> None:
         data,
         established_frozen_contracts=frozenset({"task_011_frozen_contract"}),
     )
-    blockers = [
-        f for f in report.blockers
-        if f.error_code == "governance_authority_error"
-    ]
+    blockers = [f for f in report.blockers if f.error_code == "governance_authority_error"]
     assert len(blockers) == 1, (
         f"expected exactly one blocker (task_015_frozen_contract); "
         f"got {[(f.error_code, f.context.get('missing_authority')) for f in blockers]}"

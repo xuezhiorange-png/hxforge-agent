@@ -100,9 +100,7 @@ def test_9_2_provenance_each_spec_declares_owner_updated_at_content_hash(
         (SPEC_PATH_FAILURE_TAXONOMY, build_failure_taxonomy_spec),
     ],
 )
-def test_9_2_provenance_missing_owner_fails_validation(
-    spec_path: str, builder
-) -> None:
+def test_9_2_provenance_missing_owner_fails_validation(spec_path: str, builder) -> None:
     """Section 9.3 — missing ``owner`` MUST fail validation as a
     BLOCKER (spec_schema_error on the ``owner`` field).
     """
@@ -116,7 +114,8 @@ def test_9_2_provenance_missing_owner_fails_validation(
     data["content_hash"] = compute_content_hash(_spec_for_hash(data))
     report = validate_spec(spec_path, data)
     owner_blockers = [
-        f for f in report.blockers
+        f
+        for f in report.blockers
         if f.field_path == "owner" and f.error_code == "spec_schema_error"
     ]
     assert len(owner_blockers) >= 1, (
@@ -134,9 +133,7 @@ def test_9_2_provenance_missing_owner_fails_validation(
         (SPEC_PATH_FAILURE_TAXONOMY, build_failure_taxonomy_spec),
     ],
 )
-def test_9_2_provenance_missing_content_hash_fails_validation(
-    spec_path: str, builder
-) -> None:
+def test_9_2_provenance_missing_content_hash_fails_validation(spec_path: str, builder) -> None:
     """Section 9.2 — missing ``content_hash`` MUST fail validation as
     a BLOCKER (the field is in :data:`COMMON_REQUIRED_FIELDS`).
     """
@@ -144,9 +141,9 @@ def test_9_2_provenance_missing_content_hash_fails_validation(
     del data["content_hash"]
     report = validate_spec(spec_path, data)
     content_hash_blockers = [
-        f for f in report.blockers
-        if f.field_path == "content_hash"
-        and f.error_code == "spec_schema_error"
+        f
+        for f in report.blockers
+        if f.field_path == "content_hash" and f.error_code == "spec_schema_error"
     ]
     assert len(content_hash_blockers) >= 1, (
         f"{spec_path}: expected at least one content_hash BLOCKER on missing; "
@@ -215,12 +212,8 @@ def test_9_3_pr_body_cites_prior_and_new_content_hash() -> None:
     # Shape check 1 — both content_hash values are cited as 64-hex sha256.
     hex_re = re.compile(r"`([0-9a-f]{64})`")
     cited_hashes = hex_re.findall(pr_body)
-    assert prior_hash in cited_hashes, (
-        f"PR body MUST cite the prior content_hash ({prior_hash})"
-    )
-    assert new_hash in cited_hashes, (
-        f"PR body MUST cite the new content_hash ({new_hash})"
-    )
+    assert prior_hash in cited_hashes, f"PR body MUST cite the prior content_hash ({prior_hash})"
+    assert new_hash in cited_hashes, f"PR body MUST cite the new content_hash ({new_hash})"
     # Shape check 2 — explicit "prior content_hash" / "new content_hash" labels.
     assert re.search(r"prior\s+content_hash", pr_body, re.IGNORECASE), (
         "PR body MUST contain the label 'prior content_hash'"
@@ -232,9 +225,7 @@ def test_9_3_pr_body_cites_prior_and_new_content_hash() -> None:
     assert "RATIONALE" in pr_body or "rationale" in pr_body.lower(), (
         "PR body MUST contain a RATIONALE paragraph (Section 9.3)"
     )
-    assert len(rationale) > 50, (
-        "rationale MUST be a one-paragraph explanation (>50 chars)"
-    )
+    assert len(rationale) > 50, "rationale MUST be a one-paragraph explanation (>50 chars)"
 
 
 def test_9_3_pr_body_missing_prior_content_hash_rejected() -> None:
@@ -258,9 +249,6 @@ def test_9_3_pr_body_cites_frozen_contract_authority_sha() -> None:
     MUST cite the Frozen Contract Authority SHA in the PR body.
     """
     fcas = "39135e269b014e9c9310ac403a60591393d46b2d"
-    pr_body = (
-        "## TASK-015 follow-up scope\n"
-        f"\nFrozen Contract Authority SHA: `{fcas}`\n"
-    )
+    pr_body = f"## TASK-015 follow-up scope\n\nFrozen Contract Authority SHA: `{fcas}`\n"
     assert fcas in pr_body
     assert re.search(rf"`{fcas}`", pr_body)

@@ -85,9 +85,9 @@ def test_11_3_14_release_gate_passes_when_all_preconditions_met() -> None:
     # references are established.
     report = validate_spec(SPEC_PATH_RELEASE, spec)
     gate_blockers = [
-        f for f in report.blockers
-        if f.field_path.startswith("release_gate")
-        or f.field_path == "content_hash"
+        f
+        for f in report.blockers
+        if f.field_path.startswith("release_gate") or f.field_path == "content_hash"
     ]
     assert gate_blockers == [], (
         "release-gate should pass; got blockers: "
@@ -105,10 +105,7 @@ def test_11_3_14_release_gate_fails_when_content_hash_unstable() -> None:
     # value while keeping require_content_hash_stability=True.
     spec["content_hash"] = "f" * 64
     report = validate_spec(SPEC_PATH_RELEASE, spec)
-    content_hash_blockers = [
-        f for f in report.blockers
-        if f.field_path == "content_hash"
-    ]
+    content_hash_blockers = [f for f in report.blockers if f.field_path == "content_hash"]
     assert len(content_hash_blockers) == 1
     assert content_hash_blockers[0].severity == "blocker"
     # The expected hash in the blocker context lets the release-gate
@@ -145,8 +142,7 @@ def test_11_3_14_release_gate_fails_when_frozen_contract_reference_missing() -> 
     # when the list is empty). The test asserts this explicitly so any
     # future change is intentional.
     governance_blockers = [
-        f for f in report.blockers
-        if f.error_code == "governance_authority_error"
+        f for f in report.blockers if f.error_code == "governance_authority_error"
     ]
     assert governance_blockers == [], (
         "validator does not synthesize governance_authority_error on empty references; "
@@ -170,9 +166,9 @@ def test_11_3_14_release_gate_fails_when_frozen_contract_unestablished() -> None
         established_frozen_contracts=frozenset(),
     )
     gate_blockers = [
-        f for f in report.blockers
-        if f.error_code == "governance_authority_error"
-        and f.field_path.startswith("release_gate")
+        f
+        for f in report.blockers
+        if f.error_code == "governance_authority_error" and f.field_path.startswith("release_gate")
     ]
     assert len(gate_blockers) == 1
     assert gate_blockers[0].context.get("missing_authority") == "task_011_frozen_contract"
