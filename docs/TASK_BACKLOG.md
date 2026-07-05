@@ -29,7 +29,8 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-012 (impl) | Implement standards rule-pack runtime, license validator and CI boundary | DONE | TASK-012 design |
 | TASK-013 (design) | Define material and cost data governance | DONE | TASK-001 |
 | TASK-013 (impl) | Implement material and cost data governance | DONE | TASK-013 design |
-| TASK-014 | Implement immutable case revisions and persistence | PLANNED | TASK-002, TASK-003, TASK-005 |
+| TASK-014 (design) | Define immutable case revisions and persistence contract | DRAFT | TASK-002, TASK-003, TASK-004, TASK-005, TASK-011, TASK-012, TASK-013 |
+| TASK-014 (impl) | Implement immutable case revisions and persistence | PLANNED | TASK-014 design |
 | TASK-015 | Harden CI, security scans and release automation | PLANNED | TASK-000 |
 
 ## M2 — Double-pipe vertical slice
@@ -179,6 +180,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-012 impl | #44 |
 | TASK-013 design | #47 |
 | TASK-013 impl | #50 |
+| TASK-014 design | (pending — see Issue #52) |
 
 | Item | Value |
 |---|---|
@@ -276,4 +278,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-013 Impl Issue closed_at | `2026-07-04T16:26:04Z` |
 | TASK-013 Impl frozen contract file | `docs/tasks/TASK-013-material-cost-data-governance.md` (unchanged) |
 | TASK-013 Impl status | DONE / MERGED / MAIN-CI-VERIFIED / CLOSED |
+| TASK-014 design Issue | #52 — OPEN |
+| TASK-014 design status | AUTHORIZED / DRAFT |
+| TASK-014 implementation status | NOT AUTHORIZED |
 | TASK-014 | PLANNED / NOT STARTED — requires separate explicit authorization |
