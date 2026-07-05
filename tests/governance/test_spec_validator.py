@@ -437,3 +437,58 @@ def test_spec_validator_imports_resolve() -> None:
 
     assert SPEC_PATH_CI_PIPELINE in ALL_SPEC_PATHS
     assert 1 in SUPPORTED_SCHEMA_VERSIONS
+
+
+# ---------------------------------------------------------------------------
+# Section 11.1.7 — deprecated-reference surfaces as WARNING, NOT blocker
+# ---------------------------------------------------------------------------
+
+
+def test_11_1_7_deprecated_reference_surfaces_as_warning() -> None:
+    """Section 11.1.7 — a spec referencing a deprecated identifier
+    surfaces ``spec_deprecated_reference`` as a **warning**, NOT a
+    blocker.
+
+    The Section 7 contract is explicit:
+    "The failure-mode taxonomy classifies each CI / security / release
+    step's failure as one of: transient, non_transient,
+    manual_intervention. ... The forbidden-pattern taxonomy
+    (Section 10 restricted-content boundary) raises BLOCKERS, never
+    warnings — it carries the discipline from TASK-012 / TASK-013 /
+    TASK-014."
+
+    Deprecated references do NOT raise blockers; they surface as
+    warnings only. This test pins the invariant.
+    """
+    spec_path = SPEC_PATH_CI_PIPELINE
+    data = build_ci_pipeline_spec()
+    # Mark the canonical ``ci-pipeline`` identifier as deprecated.
+    deprecated = {"ci-pipeline": "2026-08-01T00:00:00Z"}
+    report = validate_spec(spec_path, data, deprecated_identifiers=deprecated)
+
+    # The deprecated-reference finding appears in warnings.
+    deprecated_warnings = [
+        f for f in report.warnings
+        if f.error_code == "spec_deprecated_reference"
+        and f.context.get("identifier") == "ci-pipeline"
+    ]
+    assert len(deprecated_warnings) == 1, (
+        "expected exactly one spec_deprecated_reference warning; "
+        f"got warnings={[f.to_dict() for f in report.warnings]}"
+    )
+    assert deprecated_warnings[0].severity == "warning"
+    assert deprecated_warnings[0].context.get("deprecated_at") == "2026-08-01T00:00:00Z"
+
+    # The deprecated-reference finding does NOT appear in blockers.
+    deprecated_blockers = [
+        f for f in report.blockers
+        if f.error_code == "spec_deprecated_reference"
+    ]
+    assert deprecated_blockers == [], (
+        "Section 11.1.7 — spec_deprecated_reference MUST NOT surface as a BLOCKER; "
+        f"got blockers={[f.to_dict() for f in deprecated_blockers]}"
+    )
+
+    # Section 7 invariant — blockers and warnings are disjoint.
+    report.assert_disjoint()
+
