@@ -154,37 +154,119 @@ The TASK-017 application layer must be:
 ### 5.1 MaterialSelector
 
 A `MaterialSelector` resolves a `MaterialResolutionRequest`
-(component_role, design_temperature, design_pressure,
-corrosion_allowance_mm, applicable_standard_id) to a
-`MaterialResolutionResult`:
+(component_role, design_temperature_c, design_pressure_mpa,
+corrosion_allowance_mm, applicable_standard_id,
+material_record_id) to a `MaterialResolutionResult`.
+
+#### 5.1.1 TASK-013 property_values lookup
+
+TASK-013 frozen contract §5.5 carries material engineering values
+in a `property_values: [{property_name, value_si, unit_si, ...}]`
+array — NOT as typed top-level fields. The TASK-017 selector
+MUST therefore walk the TASK-013 record's `property_values[]`
+array and read the entries whose `property_name` matches the
+TASK-017 required canonical property names listed in §5.1.2.
+
+The `value_si` field is a decimal string; the selector MUST convert
+it to a Python `float` using `Decimal(value_si)` (not `float(...)`)
+to preserve precision. The `unit_si` field MUST be checked against
+the canonical SI unit expected for that property; a unit mismatch
+returns `MATERIAL_GOVERNANCE_INCOMPLETE`.
+
+#### 5.1.2 TASK-017 required canonical property names
+
+The TASK-017 selector reads the following property entries from
+TASK-013 `property_values[]`. These names are **declared by
+TASK-017** as the canonical names it requires — they are NOT
+claimed to be a frozen enum of TASK-013. If a future TASK-013
+amendment uses different property_name strings, the TASK-017
+selector must be updated to match (this is a contract revision,
+not a runtime concern).
+
+| TASK-017 required `property_name` | Type | SI unit | Used for |
+|---|---|---|---|
+| `density` | `float` | `kg/m^3` | MassCalculator (§5.2, §6) |
+| `youngs_modulus` | `float` | `GPa` | PreliminaryMechanicalChecker §9.3 |
+| `allowable_stress` | `dict[float, float]` (temperature_c → MPa) | `MPa` | PreliminaryMechanicalChecker §9.1 |
+
+Notes:
+
+- `allowable_stress` is a **table**, not a scalar. The TASK-013
+  `property_values[]` entry for this property MUST carry
+  `value_si` as a JSON-encoded string of the table shape
+  `{"<temperature_c>": "<stress_mpa_decimal_string>", ...}`,
+  with `unit_si = "MPa"`. The selector parses this JSON, converts
+  each decimal string to `float`, and returns the table as
+  `dict[float, float]` keyed by °C. If the TASK-013 record's
+  `property_values[]` does not contain an `allowable_stress`
+  entry, the selector returns `MATERIAL_GOVERNANCE_INCOMPLETE`.
+- `youngs_modulus` MAY be absent from TASK-013 for materials
+  where it is not applicable; the selector returns `None` for
+  this field in that case (and mechanical checks that need it
+  return `BLOCKED_FOR_DETAILED_DESIGN` if invoked without it).
+- The selector MUST NOT perform any derivation, interpolation,
+  extrapolation, or unit conversion outside what TASK-013
+  already provides. If a required property is missing, the
+  selector returns `MATERIAL_GOVERNANCE_INCOMPLETE` (see §7).
+
+#### 5.1.3 MaterialResolutionResult shape
+
+The selector returns:
 
 - `material_record_id: str` — the resolved TASK-013 governance
   record id (e.g. `"mat:astm-sa-106-b:rev:2026-Q2"`).
-- `material_grade: str` — the material grade label from TASK-013.
-- `density_kg_m3: float` — copied verbatim from TASK-013.
-- `modulus_pressure_gpa: float | None` — copied verbatim; `None`
-  if not provided by the governance record.
-- `allowable_stress_mpa: dict[float, float]` — temperature →
-  allowable stress table from TASK-013, keyed by °C.
+- `material_grade: str` — the material grade label from TASK-013
+  (copied verbatim from `material_grade_or_designation`).
+- `density_kg_m3: float | None` — converted from TASK-013
+  `property_values[*].value_si` for `property_name="density"`.
+  `None` if the property is absent.
+- `youngs_modulus_gpa: float | None` — same shape for
+  `property_name="youngs_modulus"`.
+- `allowable_stress_mpa: dict[float, float] | None` — same
+  shape for `property_name="allowable_stress"`. Key is °C,
+  value is MPa.
 - `provenance: MaterialProvenance` — see §8.
 
-The selector MUST NOT perform any derivation outside the TASK-013
-record. If a parameter required by TASK-017 is absent from
-TASK-013, the selector returns
-`MATERIAL_GOVERNANCE_INCOMPLETE` (see §7 error codes).
+Any field that depends on a TASK-013 property_name listed in
+§5.1.2 but absent from the resolved record's `property_values[]`
+MUST be set to `None` AND the selector MUST return
+`MATERIAL_GOVERNANCE_INCOMPLETE` (i.e. the resolution is
+unsuccessful — see §7).
 
 ### 5.2 MassCalculator
 
 A `MassCalculator` takes a `MassCalculationRequest`
-(geometry_record, material_resolution, fitting_overrides_kg,
-include_hairpin: bool) and returns a `MassBreakdown`:
+(geometry_record, material_resolutions_by_component_role,
+fitting_overrides_kg, include_hairpin: bool) and returns a
+`MassBreakdown`.
+
+#### 5.2.1 component_role enumeration (frozen closed set)
+
+TASK-017 defines the following closed set of component_role
+strings, each corresponding to a metal component of the
+double-pipe geometry:
+
+| `component_role` | Metal component | TASK-016 geometry fields consumed |
+|---|---|---|
+| `inner_tube` | inner tube metal mass | `outer_diameter_m`, `inner_diameter_m`, `effective_length_m` |
+| `outer_pipe` | outer pipe metal mass | `outer_diameter_m`, `inner_diameter_m`, `effective_length_m` |
+| `hairpin_bend` | hairpin return-bend metal mass | `bend_radius_m`, `effective_length_m`, `number_of_tubes` |
+| `fittings` | end-fitting placeholder mass | not geometry-derived; uses `fitting_overrides_kg` |
+
+`material_resolutions_by_component_role` MUST contain a
+`MaterialResolutionResult` for **every** component_role listed
+above. Any missing role returns `MATERIAL_RESOLUTION_MISSING_ROLE`
+(see §7). This single-source-of-truth design replaces the
+earlier single-material simplification.
+
+#### 5.2.2 MassBreakdown
 
 | Field | Type | Meaning |
 |---|---|---|
-| `inner_tube_kg` | `float` | inner tube metal mass |
-| `outer_pipe_kg` | `float` | outer pipe metal mass |
-| `hairpin_bend_kg` | `float` | hairpin return bend mass (0 if not applicable) |
-| `fittings_kg` | `float` | end-fitting placeholder mass (0 if no overrides) |
+| `inner_tube_kg` | `float` | inner tube metal mass (uses `component_role="inner_tube"` resolution) |
+| `outer_pipe_kg` | `float` | outer pipe metal mass (uses `component_role="outer_pipe"` resolution) |
+| `hairpin_bend_kg` | `float` | hairpin return-bend metal mass (uses `component_role="hairpin_bend"` resolution; 0 if not applicable) |
+| `fittings_kg` | `float` | end-fitting placeholder mass (uses `component_role="fittings"` resolution; 0 if no overrides) |
 | `total_kg` | `float` | sum of the four component masses |
 | `calculation_hash: str` | deterministic 64-char SHA-256 over the canonical inputs (see §10) |
 | `provenance: MassProvenance` | see §8 |
@@ -196,9 +278,19 @@ input. The component allocation is defined in §6.
 
 A `PreliminaryMechanicalChecker` takes a
 `MechanicalCheckRequest` (geometry_record,
-material_resolution, design_pressure_mpa, design_temperature_c,
-unsupported_span_m, corrosion_allowance_mm) and returns a
-`MechanicalCheckReport`:
+material_resolutions_by_component_role, design_pressure_mpa,
+design_temperature_c, unsupported_span_m, corrosion_allowance_mm,
+component_under_check) and returns a `MechanicalCheckReport`.
+
+`component_under_check` selects which `component_role`'s
+`MaterialResolutionResult` from
+`material_resolutions_by_component_role` is used for the
+mechanical checks. Valid values: `"inner_tube"` or `"outer_pipe"`
+(the preliminary envelope covers pressure-bearing metal
+components). Selecting `"hairpin_bend"` or `"fittings"` returns
+`MECHANICAL_CHECK_UNSUPPORTED_ROLE` (see §7).
+
+The returned report has:
 
 - `allowable_stress_check: CheckVerdict` — see §9.1.
 - `minimum_wall_check: CheckVerdict` — see §9.2.
@@ -218,19 +310,57 @@ Otherwise `PASS`.
 
 To keep the mass breakdown deterministic and reproducible:
 
-1. **Inner tube mass** = `material_density_kg_m3 * π *
-   ((outer_diameter_m / 2)² − (inner_diameter_m / 2)²) *
-   effective_length_m`.
-2. **Outer pipe mass** = `material_density_kg_m3 * π *
-   ((outer_diameter_m / 2)² − (inner_diameter_m / 2)²) *
-   effective_length_m`.
-3. **Hairpin bend mass** = `material_density_kg_m3 * bend_volume_m3`,
-   where `bend_volume_m3` is provided by the TASK-016 catalog
-   record under the hairpin geometry entry. If the geometry
-   record is straight-pipe only (no hairpin entry), this field
-   is 0.
-4. **Fittings mass** = sum of `fitting_overrides_kg` values. If
-   no overrides are supplied, this field is 0.
+1. **Inner tube mass** = `material_resolutions_by_component_role["inner_tube"].density_kg_m3
+   * π * ((outer_diameter_m / 2)² − (inner_diameter_m / 2)²)
+   * effective_length_m`.
+   - `outer_diameter_m`, `inner_diameter_m`, `effective_length_m`
+     are read from the TASK-016 tube geometry record.
+2. **Outer pipe mass** = `material_resolutions_by_component_role["outer_pipe"].density_kg_m3
+   * π * ((outer_diameter_m / 2)² − (inner_diameter_m / 2)²)
+   * effective_length_m`.
+   - `outer_diameter_m`, `inner_diameter_m`, `effective_length_m`
+     are read from the TASK-016 pipe geometry record.
+3. **Hairpin bend mass** is computed from TASK-016 hairpin
+   geometry fields using the following normative formula:
+
+   ```
+   bend_cross_section_area_m2 =
+       π * ((tube_outer_diameter_m / 2)² − (tube_inner_diameter_m / 2)²)
+   bend_centerline_arc_length_m =
+       π * bend_radius_m          # half-torus centerline approximation
+   single_bend_volume_m3 =
+       bend_cross_section_area_m2 * bend_centerline_arc_length_m
+   total_bend_volume_m3 =
+       single_bend_volume_m3 * number_of_tubes
+   hairpin_bend_kg =
+       material_resolutions_by_component_role["hairpin_bend"].density_kg_m3
+       * total_bend_volume_m3
+   ```
+
+   Fields used (all TASK-016 frozen contract §5.5 hairpin
+   fields): `tube_outer_diameter_m`, `tube_inner_diameter_m`
+   (resolved from the hairpin record's `tube_geometry_id`
+   reference via TASK-016 catalog lookup), `bend_radius_m`,
+   `effective_length_m` (used as a sanity check; if
+   `effective_length_m < π * bend_radius_m`, the geometry is
+   flagged as inconsistent — see §7), `number_of_tubes`.
+
+   If the geometry record is straight-pipe only (no hairpin
+   entry), `hairpin_bend_kg` is 0.
+
+   If a required hairpin field is missing, the calculator
+   returns `HAIRPIN_BEND_INPUT_INCOMPLETE` (see §7) and the
+   `hairpin_bend_kg` field is `NaN` (NOT zero, to distinguish
+   "not applicable" from "applicable but unresolved").
+
+4. **Fittings mass** = sum of `fitting_overrides_kg` values,
+   scaled by `material_resolutions_by_component_role["fittings"].density_kg_m3 / 7850.0`
+   where 7850.0 kg/m³ is a documented reference carbon-steel
+   density (the override is supplied as a mass, not a volume,
+   so this scale factor only applies if the caller opts in via
+   `fitting_density_normalization: bool = True` in the request;
+   otherwise `fittings_kg = sum(fitting_overrides_kg)` exactly).
+   If no overrides are supplied, `fittings_kg` is 0.
 
 These formulas are normative; the future implementation must not
 introduce alternative formulas without an updated frozen design
@@ -240,14 +370,17 @@ contract.
 
 | Error code | Meaning | Recovery |
 |---|---|---|
-| `MATERIAL_GOVERNANCE_INCOMPLETE` | A required field is missing from the resolved TASK-013 material record. | Caller must either supply an alternative governance record id or fix the upstream TASK-013 record (out of scope for TASK-017). |
-| `MATERIAL_GOVERNANCE_UNAPPROVED` | The TASK-013 material record is in a non-approved state. | Caller must select an approved alternative. |
+| `MATERIAL_GOVERNANCE_INCOMPLETE` | A required property_name from §5.1.2 is missing from the resolved TASK-013 material record's `property_values[]`, OR a unit mismatch was detected. | Caller must either supply an alternative governance record id or open a TASK-013 follow-up to add the missing property (out of scope for TASK-017). |
+| `MATERIAL_GOVERNANCE_UNAPPROVED` | The TASK-013 material record is in a non-approved state (`approval_state != "approved"`). | Caller must select an approved alternative. |
+| `MATERIAL_RESOLUTION_MISSING_ROLE` | `material_resolutions_by_component_role` is missing one or more of the four frozen component_role keys (`inner_tube`, `outer_pipe`, `hairpin_bend`, `fittings`). | Caller must supply a MaterialResolutionResult for every role. |
 | `GEOMETRY_CATALOG_UNAPPROVED` | The TASK-016 geometry record is in a non-approved state. | Caller must select an approved geometry. |
-| `GEOMETRY_CATALOG_INCONSISTENT` | The geometry record has inconsistent dimensions (e.g. `outer_diameter < inner_diameter`). | Caller must select a different geometry or open a TASK-016 follow-up. |
+| `GEOMETRY_CATALOG_INCONSISTENT` | The geometry record has inconsistent dimensions (e.g. `outer_diameter_m < inner_diameter_m`, OR hairpin `effective_length_m < π * bend_radius_m`). | Caller must select a different geometry or open a TASK-016 follow-up. |
+| `HAIRPIN_BEND_INPUT_INCOMPLETE` | A hairpin geometry record is present but lacks one or more required fields (`tube_geometry_id`, `bend_radius_m`, `effective_length_m`, `number_of_tubes`, OR the referenced tube geometry record cannot be resolved). | Caller must supply a complete hairpin geometry record. The `hairpin_bend_kg` field in the breakdown is `NaN` (not 0). |
 | `ALLOWABLE_STRESS_EXCEEDED` | Design pressure / diameter / wall-thickness ratio exceeds TASK-013 allowable stress at design temperature. | Caller must select a thicker wall, lower design pressure, or a higher-allowable material. |
 | `MINIMUM_WALL_VIOLATED` | Selected wall thickness is below the documented minimum. | Caller must select a geometry with thicker wall. |
 | `UNSUPPORTED_SPAN_EXCEEDED` | Unsupported span exceeds the documented default. | Caller must add intermediate supports or escalate to detailed design. |
 | `BLOCKED_FOR_DETAILED_DESIGN` | The check is outside the preliminary envelope. | Caller must escalate to detailed mechanical design (FEA, fatigue, creep, seismic). |
+| `MECHANICAL_CHECK_UNSUPPORTED_ROLE` | `component_under_check` is `"hairpin_bend"` or `"fittings"` — the preliminary mechanical check envelope covers pressure-bearing metal components only. | Caller must use `"inner_tube"` or `"outer_pipe"`. |
 | `INPUT_DIMENSIONAL_INCONSISTENT` | Caller supplied an inconsistent input dimension (e.g. negative length). | Caller must correct the input. |
 | `INPUT_UNIT_INCONSISTENT` | Caller supplied a value with non-SI units. | Caller must convert to SI before retry. |
 
@@ -311,20 +444,59 @@ it returns `BLOCKED_FOR_DETAILED_DESIGN`.
 ### 9.3 Straight-pipe span check
 
 - **Input**: `unsupported_span_m` (caller input),
-  `outer_diameter_m`, `material_modulus_gpa`.
-- **Formula**: a documented elastic-deflection formula using
-  the input modulus, conservative loading factor 1.5,
-  allowable deflection `L / 360`.
-- **Verdict**:
-  - `PASS` if computed deflection ≤ allowable.
-  - `BLOCKED_PRELIMINARY` if exceeded.
-  - `BLOCKED_FOR_DETAILED_DESIGN` if any input is outside the
-    preliminary envelope (e.g. unsupported span > 12 m).
+  `outer_diameter_m`, `material_modulus_gpa`,
+  `material_resolutions_by_component_role[component_under_check].density_kg_m3`,
+  `component_under_check`.
+- **Formula** (normative, computed under the conservative
+  loading factor `K_load = 1.5` and the allowable deflection
+  ratio `L / 360`):
 
-The full formula details are documented in §11 of the future
-implementation, but the envelope above is normative for the
-design contract and must not change without an updated frozen
-contract.
+  ```
+  # weight per unit length (kg/m), conservatively using only
+  # the metal cross-section area for the component_under_check
+  outer_d = outer_diameter_m
+  inner_d = inner_diameter_m
+  cross_section_area_m2 =
+      π * ((outer_d / 2)² − (inner_d / 2)²)
+  weight_per_length_n_per_m =
+      material_density_kg_m3 * cross_section_area_m2 * 9.80665
+
+  # distributed load (N/m), scaled by K_load
+  w = weight_per_length_n_per_m * K_load
+
+  # second moment of area (m^4) for thin-walled circular tube
+  I = (π / 64) * (outer_d⁴ − inner_d⁴)
+
+  # elastic deflection (m) for a simply-supported beam under
+  # uniform load
+  L = unsupported_span_m
+  E_gpa = material_modulus_gpa
+  E_pa = E_gpa * 1e9
+  deflection_m = (5 * w * L⁴) / (384 * E_pa * I)
+
+  # allowable deflection (m)
+  allowable_deflection_m = L / 360
+
+  verdict_input = (deflection_m, allowable_deflection_m, L)
+  ```
+
+- **Verdict**:
+  - `PASS` if `deflection_m <= allowable_deflection_m`.
+  - `BLOCKED_PRELIMINARY` if `deflection_m > allowable_deflection_m`.
+  - `BLOCKED_FOR_DETAILED_DESIGN` if any input is outside the
+    preliminary envelope (e.g. `unsupported_span_m > 12 m`,
+    or `material_modulus_gpa is None`,
+    or `outer_diameter_m > 1.0 m`).
+  - The check returns `BLOCKED_FOR_DETAILED_DESIGN` (NOT
+    `MECHANICAL_CHECK_UNSUPPORTED_ROLE`) when `material_modulus_gpa`
+    is missing for the component_under_check, because the
+    preliminary envelope for span checking inherently requires
+    modulus. The caller must escalate to detailed mechanical
+    design.
+
+This formula is normative for the design contract and is part
+of the contract body (not deferred to implementation docs). It
+MUST NOT change without an updated frozen contract.
 
 ## 10. JSON / hash / ordering rules
 
@@ -393,6 +565,26 @@ contract) may only add files under:
 - `src/hexagent/material_mass_mechanical/`
 - `tests/material_mass_mechanical/`
 
+#### 13.1 Naming rationale and boundary relationship
+
+The proposed path `src/hexagent/material_mass_mechanical/` is
+intentionally distinct from the existing TASK-013 path
+(`src/hexagent/material_costs/`) and the TASK-016 path
+(`src/hexagent/geometry_catalogs/`). The boundary is:
+
+| Path | Owning task | Role | Authority |
+|---|---|---|---|
+| `src/hexagent/material_costs/` | TASK-013 (frozen) | Material / cost **data governance** — record schema, validation, license boundary, selection | Read-only canonical source for material properties |
+| `src/hexagent/geometry_catalogs/` | TASK-016 (frozen) | Approved geometry **catalog** — record schema, validation, hashing | Read-only canonical source for geometry records |
+| `src/hexagent/material_mass_mechanical/` | TASK-017 (this design) | Material / mass / preliminary mechanical **application layer** — consumes from TASK-013 + TASK-016, derives mass + mechanical checks | Application-layer derivation; never a canonical source |
+
+The empty directory `src/hexagent/materials/` that pre-exists
+in the repo is **NOT** part of any frozen contract and is **NOT**
+claimed by TASK-017. TASK-017's chosen path deliberately avoids
+that name to prevent future confusion with TASK-013's
+`material_costs/` (the data layer) and to make the
+"application-layer" semantics explicit in the directory name.
+
 It MUST NOT modify:
 
 - Any file under `src/hexagent/` outside the
@@ -437,12 +629,16 @@ small enough to keep review risk bounded.
 
 This design contract is acceptable to Charles only if:
 
-1. All 17 sections in the user's authorization (background /
+1. All 19 sections in this design contract (background /
    non-goals / scope / forbidden scope / input-output /
    domain model / error model / provenance / determinism /
    JSON / test / CI / slice plan / acceptance / closeout /
-   boundary to TASK-016 / non-authorization declaration) are
-   present and concrete.
+   boundary to TASK-016 / non-authorization declaration /
+   naming rationale / frozen contract checksum placeholder)
+   are present and concrete. The minimum was 17 sections per
+   Charles's authorization; this contract provides 19
+   (the two extras are §13.1 naming rationale and §19 frozen
+   contract checksum placeholder).
 2. The `BLOCKED_FOR_DETAILED_DESIGN` boundary is documented
    and bounded.
 3. The non-scope list explicitly excludes pressure-drop, C4,
@@ -450,7 +646,10 @@ This design contract is acceptable to Charles only if:
 4. Provenance is mandatory on every result.
 5. The future implementation file boundary restricts new code
    to a single new subtree.
-6. The CI ownership plan documents the four standard jobs.
+6. The CI ownership plan documents **at least the four
+   standard jobs** (`lint`, `typecheck`, `unit-tests`,
+   `regression-tests`) plus optional `docs-check` and
+   `ci-shard-manifest` jobs (§12).
 7. The slice plan is small enough that each slice is reviewable
    in one round.
 
@@ -517,3 +716,46 @@ Frozen Contract Authority SHA: <to-be-filled-at-merge>
 
 This section must not be edited to a real SHA before the
 design PR has been merged.
+
+## 20. Document history and prior-report wording notes
+
+### 20.1 Prior-report wording issue (non-contractual)
+
+The TASK-017 design-kickoff report (saved at
+`.hermes/agents/.../sessions/.../task017-design-kickoff-report.md`)
+wrote:
+
+> "本轮 5 mutations: Issue #72 → design branch → design doc →
+>  backlog update → push → Draft PR #73"
+
+This enumerated **6** items (counting "push" and "Draft PR #73"
+as two separate items) under a "5 mutations" label. The actual
+mutational breakdown for that round was:
+
+1. `POST /repos/.../issues` (Issue #72 creation) — 1 mutation
+2. `git checkout -b` (design branch creation) — local-only, not a
+   remote mutation
+3. `git add` + `git commit` (design doc + backlog update, single
+   commit) — 1 commit
+4. `git push` (push to origin) — 1 mutation
+5. `gh pr create --draft` (Draft PR #73) — 1 mutation
+
+Net remote-side mutations: **3** (issue creation + commit push +
+PR creation). The original "5 mutations" phrasing conflated the
+3 remote mutations with 2 local operations (branch creation +
+commit, both prerequisites of the push) and then enumerated all
+6 action types. The label "5" was therefore a wording bug; the
+correct count is 3 remote mutations.
+
+This note is recorded here for audit transparency. It is
+**non-contractual**: it does not modify any §1–§19 contract
+provision and does not change the design intent. The design
+contract itself (this document) is the canonical source of
+truth for TASK-017 governance, not the prior kickoff report.
+
+### 20.2 Document revision history
+
+| Revision | Author | Date | Notes |
+|---|---|---|---|
+| Rev 1 (initial) | Charles via TASK-017 design kickoff | 2026-07-05 | Commit `06232fc710017e36d145d797333309cf59d8265a` — 19 sections |
+| Rev 2 (remediation) | Charles via TASK-017 design remediation | 2026-07-05 | (this commit) — fixes P1-1, P1-2, P1-3, P2-1, P2-2, P2-4, P2-5; adds §13.1 (naming rationale), §20 (this note) |
