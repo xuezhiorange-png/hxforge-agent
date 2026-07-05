@@ -67,6 +67,8 @@ from scripts.run_task016_alpha_preview_case import (
     _build_success_output,
 )
 
+pytestmark = pytest.mark.golden
+
 # ---------------------------------------------------------------------------
 # Canonical paths and constants
 # ---------------------------------------------------------------------------
