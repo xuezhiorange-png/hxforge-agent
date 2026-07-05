@@ -1,0 +1,61 @@
+{
+  "trial_version": "task-016-alpha-preview-v0.1",
+  "case_id": "case_005_blocker_dimension_inconsistent",
+  "case_type": "blocker",
+  "intent": "Prove that inconsistent tube dimensions (e.g. wall_thickness_m does not match (outer_diameter_m - inner_diameter_m) / 2) are rejected by hexagent.geometry_catalogs.load_geometry_catalog via the geometry_dimension_inconsistent blocker.",
+  "expected_status": "blocked",
+  "_slice": "TASK-016-TRIAL-001",
+  "_design_reference": "docs/trials/TASK-016-alpha-preview-v0.1.md section 8.5",
+  "notes": "Skeleton uses a tube record with deliberately inconsistent wall_thickness_m. For outer=0.019 and inner=0.015, the canonical wall thickness would be (0.019 - 0.015) / 2 = 0.002. This skeleton declares wall_thickness_m=0.005 (intentionally inconsistent) to trigger the geometry_dimension_inconsistent blocker. Future runner should produce context identifying the offending geometry_id and the dimension that was inconsistent.",
+  "expected_blocker": {
+    "error_code": "geometry_dimension_inconsistent",
+    "context_invariants": {
+      "must_include_geometry_id": true,
+      "must_identify_dimension_mismatch": true
+    }
+  },
+  "fixture_input": {
+    "payload": {
+      "catalog_id": "approved-geometry-catalog",
+      "catalog_version": "0.1.0",
+      "authority": "internal-review",
+      "source_revision": "rev-1",
+      "records": [
+        {
+          "geometry_id": "tube/inconsistent/od0.019/id0.015/r1",
+          "geometry_type": "tube",
+          "approval_state": "approved",
+          "nominal_label": "3/4 in BWG (inconsistent placeholder)",
+          "outer_diameter_m": 0.019,
+          "inner_diameter_m": 0.015,
+          "wall_thickness_m": 0.005,
+          "cross_section_area_m2": 0.00019635,
+          "flow_area_m2": 0.00017671,
+          "hydraulic_diameter_m": 0.0168,
+          "source_binding": {
+            "source_id": "src-tube-inconsistent-placeholder",
+            "source_type": "internal",
+            "source_revision": "rev-1",
+            "source_location": "fixtures/task016_alpha_preview_v0_1",
+            "evidence_ref": "ev-tube-inconsistent-placeholder",
+            "approved_by": "internal-review",
+            "approved_at": "2026-07-05T00:00:00Z"
+          },
+          "revision": "r1",
+          "tags": ["tube", "inconsistent-dimension-placeholder"]
+        }
+      ]
+    }
+  },
+  "prohibited_content_checklist": {
+    "material_grade": false,
+    "mass_or_weight": false,
+    "cost_value": false,
+    "pressure_drop_calculation": false,
+    "fouling_factor": false,
+    "mechanical_suitability": false,
+    "vendor_availability": false,
+    "procurement_status": false,
+    "engineering_calculation_output": false
+  }
+}

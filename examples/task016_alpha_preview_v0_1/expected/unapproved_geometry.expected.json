@@ -1,0 +1,11 @@
+{
+  "trial_version": "task-016-alpha-preview-v0.1",
+  "case_id": "case_003_blocker_unapproved_geometry",
+  "status": "blocked",
+  "error_code": "geometry_record_unapproved",
+  "context": {
+    "geometry_id": "tube/pending/od0.019/id0.015/r1",
+    "approval_state": "invalid_state"
+  },
+  "notes": "Expected blocker output for case_003_blocker_unapproved_geometry. The fixture uses approval_state='invalid_state' (not in VALID_APPROVAL_STATES = {approved, pending, rejected, retired}) which triggers the geometry_record_unapproved blocker at load_geometry_catalog time per catalog.py lines 381-384. NOTE: TASK-016-TRIAL-001 originally used 'pending' here, but TASK-016 implementation PR #67 explicitly does NOT raise geometry_record_unapproved at load time for the 'pending' state (line 414 in catalog.py is a no-op `continue`). The fixture was corrected in TASK-016-TRIAL-002 to use 'invalid_state' instead so the fixture actually triggers the intended blocker. The approval_state value 'invalid_state' appears verbatim in the context dict because that is what the implementation includes (it does not normalize the value before raising)."
+}

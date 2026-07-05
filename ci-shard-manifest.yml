@@ -117,6 +117,7 @@ shards:
       - tests/golden/double_pipe_rating/test_golden_double_pipe.py
       - tests/golden/double_pipe_rating/test_independent_references.py
       - tests/golden/heat_balance/test_golden.py
+      - tests/golden/task016_alpha_preview_v0_1/test_trial005_alpha_preview.py
     timeout: 300
 
   - name: integration

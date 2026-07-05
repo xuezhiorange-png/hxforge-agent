@@ -1,0 +1,85 @@
+{
+  "trial_version": "task-016-alpha-preview-v0.1",
+  "case_id": "case_001_catalog_success",
+  "case_type": "success",
+  "intent": "Prove that an approved tube + pipe catalog fixture can be loaded by hexagent.geometry_catalogs.load_geometry_catalog, ordered deterministically by canonical_order_records, and hashed deterministically by compute_record_hash / compute_catalog_content_hash. No blockers expected.",
+  "expected_status": "pass",
+  "_slice": "TASK-016-TRIAL-001",
+  "_design_reference": "docs/trials/TASK-016-alpha-preview-v0.1.md section 8.1",
+  "notes": "This skeleton uses placeholder tube / pipe geometry identifiers of the form 'tube/std/od0.019/id0.015/r1' and 'pipe/nps1/sch40/r1'. These identifiers are NOT vendor data; they are internal canonical labels chosen for deterministic hashing. No engineering calculation output is implied. The fixture_input.payload below is a JSON-compatible mapping suitable for direct pass-through to load_geometry_catalog().",
+  "fixture_input": {
+    "payload": {
+      "catalog_id": "approved-geometry-catalog",
+      "catalog_version": "0.1.0",
+      "authority": "internal-review",
+      "source_revision": "rev-1",
+      "records": [
+        {
+          "geometry_id": "tube/std/od0.019/id0.015/r1",
+          "geometry_type": "tube",
+          "approval_state": "approved",
+          "nominal_label": "3/4 in BWG (placeholder)",
+          "outer_diameter_m": 0.019,
+          "inner_diameter_m": 0.015,
+          "wall_thickness_m": 0.002,
+          "cross_section_area_m2": 0.00019635,
+          "flow_area_m2": 0.00017671,
+          "hydraulic_diameter_m": 0.0168,
+          "source_binding": {
+            "source_id": "src-tube-placeholder",
+            "source_type": "internal",
+            "source_revision": "rev-1",
+            "source_location": "fixtures/task016_alpha_preview_v0_1",
+            "evidence_ref": "ev-tube-placeholder",
+            "approved_by": "internal-review",
+            "approved_at": "2026-07-05T00:00:00Z"
+          },
+          "revision": "r1",
+          "tags": ["tube", "placeholder"]
+        },
+        {
+          "geometry_id": "pipe/nps1/sch40/r1",
+          "geometry_type": "pipe",
+          "approval_state": "approved",
+          "nominal_label": "NPS 1 SCH 40 (placeholder)",
+          "nominal_pipe_size_label": "NPS 1",
+          "schedule_label": "SCH 40",
+          "outer_diameter_m": 0.0334,
+          "inner_diameter_m": 0.0266,
+          "wall_thickness_m": 0.0034,
+          "flow_area_m2": 0.00055597,
+          "hydraulic_diameter_m": 0.0266,
+          "source_binding": {
+            "source_id": "src-pipe-placeholder",
+            "source_type": "internal",
+            "source_revision": "rev-1",
+            "source_location": "fixtures/task016_alpha_preview_v0_1",
+            "evidence_ref": "ev-pipe-placeholder",
+            "approved_by": "internal-review",
+            "approved_at": "2026-07-05T00:00:00Z"
+          },
+          "revision": "r1",
+          "tags": ["pipe", "placeholder"]
+        }
+      ]
+    }
+  },
+  "expected_runner_output_categories": [
+    "catalog_identity (catalog_id, catalog_version, authority, source_revision)",
+    "ordered_geometry_ids (sorted by geometry_type, geometry_id, revision, record_hash per design section 7.2)",
+    "record_hashes (per-geometry SHA-256 from canonical JSON per design section 7.3)",
+    "catalog_content_hash (catalog-level SHA-256 excluding generated_at / effective_at per design section 5.1)",
+    "no_blockers"
+  ],
+  "prohibited_content_checklist": {
+    "material_grade": false,
+    "mass_or_weight": false,
+    "cost_value": false,
+    "pressure_drop_calculation": false,
+    "fouling_factor": false,
+    "mechanical_suitability": false,
+    "vendor_availability": false,
+    "procurement_status": false,
+    "engineering_calculation_output": false
+  }
+}

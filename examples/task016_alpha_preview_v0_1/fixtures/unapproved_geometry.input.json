@@ -1,0 +1,62 @@
+{
+  "trial_version": "task-016-alpha-preview-v0.1",
+  "case_id": "case_003_blocker_unapproved_geometry",
+  "case_type": "blocker",
+  "intent": "Prove that a non-approved (pending) geometry record is rejected by hexagent.geometry_catalogs.load_geometry_catalog via the geometry_record_unapproved blocker.",
+  "expected_status": "blocked",
+  "_slice": "TASK-016-TRIAL-001+TASK-016-TRIAL-002-defect-fix",
+  "_design_reference": "docs/trials/TASK-016-alpha-preview-v0.1.md section 8.3",
+  "_defect_note": "TASK-016-TRIAL-002 defect-fix: approval_state changed from 'pending' to 'invalid_state' so the geometry_record_unapproved blocker actually triggers. The original 'pending' value did not trigger the blocker at load time per TASK-016 implementation PR #67 (catalog.py line 414 is a no-op `continue` for non-approved states). Future slices may revisit.",
+  "notes": "Skeleton uses a single tube record with approval_state='invalid_state' (not in VALID_APPROVAL_STATES = {approved, pending, rejected, retired}). This triggers the geometry_record_unapproved blocker at load_geometry_catalog time per catalog.py line 381-384. NOTE: TASK-016-TRIAL-001 originally used 'pending' here, but TASK-016 implementation PR #67 explicitly does NOT raise geometry_record_unapproved at load time for the 'pending' state (line 414 in catalog.py is a no-op `continue`). To preserve the fixture intent (showing the unapproved-path blocker) while making the fixture actually trigger the blocker, this slice uses 'invalid_state' instead. Future slices may revisit this once the TASK-016 implementation's blocker semantics for the 'pending' state are clarified. Future runner should produce context identifying the offending geometry_id and its actual approval_state.",
+  "expected_blocker": {
+    "error_code": "geometry_record_unapproved",
+    "context_invariants": {
+      "must_include_geometry_id": true,
+      "must_include_approval_state": true
+    }
+  },
+  "fixture_input": {
+    "payload": {
+      "catalog_id": "approved-geometry-catalog",
+      "catalog_version": "0.1.0",
+      "authority": "internal-review",
+      "source_revision": "rev-1",
+      "records": [
+        {
+          "geometry_id": "tube/pending/od0.019/id0.015/r1",
+          "geometry_type": "tube",
+          "approval_state": "invalid_state",
+          "nominal_label": "3/4 in BWG (unapproved-placeholder)",
+          "outer_diameter_m": 0.019,
+          "inner_diameter_m": 0.015,
+          "wall_thickness_m": 0.002,
+          "cross_section_area_m2": 0.00019635,
+          "flow_area_m2": 0.00017671,
+          "hydraulic_diameter_m": 0.0168,
+          "source_binding": {
+            "source_id": "src-tube-unapproved-placeholder",
+            "source_type": "internal",
+            "source_revision": "rev-1",
+            "source_location": "fixtures/task016_alpha_preview_v0_1",
+            "evidence_ref": "ev-tube-unapproved-placeholder",
+            "approved_by": "internal-review",
+            "approved_at": "2026-07-05T00:00:00Z"
+          },
+          "revision": "r1",
+          "tags": ["tube", "unapproved-placeholder"]
+        }
+      ]
+    }
+  },
+  "prohibited_content_checklist": {
+    "material_grade": false,
+    "mass_or_weight": false,
+    "cost_value": false,
+    "pressure_drop_calculation": false,
+    "fouling_factor": false,
+    "mechanical_suitability": false,
+    "vendor_availability": false,
+    "procurement_status": false,
+    "engineering_calculation_output": false
+  }
+}

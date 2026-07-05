@@ -1,0 +1,14 @@
+{
+  "trial_version": "task-016-alpha-preview-v0.1",
+  "case_id": "case_005_blocker_dimension_inconsistent",
+  "status": "blocked",
+  "error_code": "geometry_dimension_inconsistent",
+  "context": {
+    "geometry_id": "tube/inconsistent/od0.019/id0.015/r1",
+    "field_name": "wall_thickness_m",
+    "expected": 0.002,
+    "actual": 0.005,
+    "tolerance": 1e-09
+  },
+  "notes": "Expected blocker output for case_005_blocker_dimension_inconsistent. The fixture declares wall_thickness_m=0.005 for outer_diameter_m=0.019 and inner_diameter_m=0.015. The canonical wall thickness identity requires wall_thickness_m == (outer_diameter_m - inner_diameter_m) / 2 = (0.019 - 0.015) / 2 = 0.002. Since |0.005 - 0.002| > GEOMETRY_DIMENSION_TOLERANCE_M (1e-9), the geometry_dimension_inconsistent blocker is raised per catalog.py _require_dimension check. The context dict identifies the geometry_id, the failing field_name, the expected value (0.002), the actual value (0.005), and the tolerance (1e-9) for audit traceability."
+}
