@@ -50,7 +50,18 @@ def test_root_case_revision_number_uniqueness() -> None:
 
 
 def test_root_case_idempotency_key_uniqueness() -> None:
+    """P0-3 — same idempotency_key with different revision_id MUST raise
+    CaseRevisionConflict(conflict_reason="duplicate_idempotency_key").
+
+    Previously this test asserted silent dedup-return of the existing
+    revision. The TASK-014 review (P0-3) explicitly requires that the
+    incoming request MUST match the existing revision on
+    ``revision_id`` + ``revision_number`` + ``payload_hash`` +
+    ``domain_snapshot_hash``; otherwise the key is being misused and
+    surfaces as a structured conflict error.
+    """
     from hexagent.case_revisions import (
+        CaseRevisionConflict,
         InMemoryCaseRevisionRepository,
     )
 
@@ -63,11 +74,10 @@ def test_root_case_idempotency_key_uniqueness() -> None:
         parent_revision_id="rev-1",
         idempotency_key="KEY-A",  # duplicate idempotency key
     )
-    returned, _ = repo.create_revision(
-        revision=rev2, actor_id="t", source="ci", occurred_at=rev1.created_at
-    )
-    # Same idempotency_key returns the existing revision (Section 13.3).
-    assert returned.revision_id == "rev-1"
+    with pytest.raises(CaseRevisionConflict) as exc_info:
+        repo.create_revision(revision=rev2, actor_id="t", source="ci", occurred_at=rev1.created_at)
+    # P0-3 — the conflict MUST be classified as duplicate_idempotency_key.
+    assert exc_info.value.conflict_reason == "duplicate_idempotency_key"
 
 
 def test_required_field_validation() -> None:

@@ -110,6 +110,13 @@ def test_repo_wide_fixture_scan_finds_no_restricted_content() -> None:
     excluded = {
         TASK014_DIR / "restricted.py",
         TASK014_TESTS_DIR / "test_restricted_content.py",
+        # P0-2 remediation test: builds the restricted phrases at
+        # runtime via chr() concatenation so no literal token appears
+        # in source. Even so, the docstring + comment contain the
+        # phrases for reader clarity — excluded from the fixture
+        # scan by design, the same way the scanner source itself is
+        # excluded.
+        TASK014_TESTS_DIR / "test_remediation_p01_to_p1.py",
     }
     found: list[tuple[Path, str, str]] = []
     # Scan TASK-014 source + tests (only — not the whole repo).
