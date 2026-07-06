@@ -50,7 +50,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
-| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **AUTHORIZED FOR KICKOFF / NOT AUTHORIZED FOR CORE LOGIC** | TASK-017 design |
+| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **SLICE A AUTHORIZED FOR REVIEW** (MaterialSelector only; Slices B/C/D/Closeout: NOT AUTHORIZED) | TASK-017 design |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
@@ -389,7 +389,10 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 implementation branch | `codex/task-017-materials-mass-mechanical-implementation` |
 | TASK-017 implementation base | `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge) |
 | TASK-017 implementation planning doc | `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md` |
-| TASK-017 implementation status | **AUTHORIZED FOR KICKOFF / NOT AUTHORIZED FOR CORE LOGIC** |
+| TASK-017 implementation status | **SLICE A READY FOR REVIEW** (MaterialSelector + tests; Slices B/C/D/Closeout: NOT AUTHORIZED) |
+| TASK-017 implementation Slice A commit | (Slice A commit SHA — populated after push; see item 15 below) |
+| TASK-017 implementation Slice A files added | `src/hexagent/material_mass_mechanical/{__init__.py,material_selector.py}` + `tests/material_mass_mechanical/{__init__.py,test_material_selector.py}` |
+| TASK-017 implementation Slice A test count | 29 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
 | TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
 
@@ -414,3 +417,19 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
     - Implementation contract file: `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md`
     - TASK-017 implementation Slices A / B / C / D / Closeout: NOT YET AUTHORIZED (each requires separate authorization)
     - TASK-018+: PLANNED / NOT STARTED
+
+15. TASK-017 implementation Slice A is AUTHORIZED FOR REVIEW (MaterialSelector only):
+    - Scope: MaterialSelector + read-only TASK-013 consumer (design §5.1); new types `MaterialResolutionRequest / Result / Provenance` only.
+    - Forbidden scope: no MassCalculator, no PreliminaryMechanicalChecker, no pressure-drop, no C4, no cost logic, no TASK-018+.
+    - Files added (4 new, 0 modifications outside the new subtree):
+      - `src/hexagent/material_mass_mechanical/__init__.py` (package marker)
+      - `src/hexagent/material_mass_mechanical/material_selector.py` (MaterialSelector)
+      - `tests/material_mass_mechanical/__init__.py` (package marker)
+      - `tests/material_mass_mechanical/test_material_selector.py` (29 tests)
+    - Tests: 29 passed in 0.55s; full repo `ruff check .` clean; `mypy` on new subtree clean.
+    - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (exposed as module literal `FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA`).
+    - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248`.
+    - Implementation branch base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge; unchanged).
+    - Slice A review verdict: `TASK017_SLICE_A_READY_FOR_REVIEW` (pending Charles review).
+    - TASK-017 implementation Slices B / C / D / Closeout: NOT AUTHORIZED.
+    - TASK-018+: PLANNED / NOT STARTED.
