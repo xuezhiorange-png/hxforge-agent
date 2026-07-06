@@ -1140,7 +1140,12 @@ def check_straight_pipe_span(
     allowable_deflection_m = _quantize_6dp(allowable_deflection_m_raw)
 
     # §9.3 verdict.
-    verdict = "pass" if deflection_m <= allowable_deflection_m else "blocked_preliminary"
+    # Type-annotated as PreliminaryVerdict Literal so mypy accepts
+    # the ternary return value (otherwise mypy widens to str and
+    # the dataclass Literal field rejects it).
+    verdict: PreliminaryVerdict = (
+        "pass" if deflection_m <= allowable_deflection_m else "blocked_preliminary"
+    )
 
     provenance = StraightPipeSpanCheckProvenance(
         material_record_id=request.material_resolution.material_record_id,
