@@ -295,3 +295,4 @@ When the final implementation slice (D + Closeout) is merged:
 | Revision | Author | Date | Notes |
 |---|---|---|---|
 | Rev 1 (kickoff) | Charles via TASK-017 implementation kickoff | 2026-07-05 | Initial planning document. 16 sections covering authority, scope, slice plan, file boundary, forbidden scope, test plan, CI ownership, JSON/hash rules, error codes, slice authorization template, self-reference guard, three-way SHA sync, acceptance criteria, closeout criteria. |
+| Rev 2 (Slice B) | TASK-017 implementation Slice B round | 2026-07-06 | Slice B implementation: MassCalculator + MassBreakdown + 43 tests + 1-line manifest registration. 5 new frozen error codes introduced per design §7; Slice A `MaterialSelectorError` reused as the unified exception class. Slice A exports preserved. Slices C/D/Closeout: NOT AUTHORIZED. |

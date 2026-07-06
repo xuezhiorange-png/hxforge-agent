@@ -50,7 +50,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
-| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **SLICE A CI MANIFEST REPAIR READY FOR REVIEW** (manifest registered; Slices B/C/D/Closeout: NOT AUTHORIZED) | TASK-017 design |
+| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **SLICE B IMPLEMENTATION READY FOR REVIEW** (MaterialSelector + MassCalculator; Slices C/D/Closeout: NOT AUTHORIZED) | TASK-017 design |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
@@ -389,11 +389,15 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 implementation branch | `codex/task-017-materials-mass-mechanical-implementation` |
 | TASK-017 implementation base | `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge) |
 | TASK-017 implementation planning doc | `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md` |
-| TASK-017 implementation status | **SLICE A READY FOR REVIEW** (MaterialSelector + tests; Slices B/C/D/Closeout: NOT AUTHORIZED) |
-| TASK-017 implementation Slice A commit | (Slice A commit SHA — populated after push; see item 15 below) |
+| TASK-017 implementation status | **SLICE B IMPLEMENTATION READY FOR REVIEW** (MaterialSelector + MassCalculator + tests; Slices C/D/Closeout: NOT AUTHORIZED) |
+| TASK-017 implementation Slice A commit | `384333a4742a7de5e77308dda0f10fa9d46df939` (governance-repair commit; supersedes `f6afeda` Slice A format-fix) |
 | TASK-017 implementation Slice A files added | `src/hexagent/material_mass_mechanical/{__init__.py,material_selector.py}` + `tests/material_mass_mechanical/{__init__.py,test_material_selector.py}` |
 | TASK-017 implementation Slice A test count | 29 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
 | TASK-017 Slice A CI manifest registration | 1 line added to existing `ci` shard (per design §13.2 governance repair) |
+| TASK-017 implementation Slice B commit | (Slice B commit SHA — populated after push) |
+| TASK-017 implementation Slice B files added | `src/hexagent/material_mass_mechanical/{__init__.py,mass_calculator.py}` + `tests/material_mass_mechanical/test_mass_calculator.py` |
+| TASK-017 implementation Slice B test count | 43 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
+| TASK-017 Slice B CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A test entry kept, Slice B entry inserted immediately after) |
 | TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
 
@@ -454,3 +458,30 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
     - TASK-018+: PLANNED / NOT STARTED.
     - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (UNCHANGED — §13.2 is a governance clarification, not a content hash rotation).
     - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (UNCHANGED).
+
+
+17. TASK-017 implementation Slice B is AUTHORIZED FOR REVIEW (MassCalculator only):
+    - Scope: MassCalculator + MassBreakdown (design §5.2 + §6); consumes Slice A MaterialResolutionResult per component_role (read-only); consumes TASK-016 GeometryCatalog for hairpin tube-geometry lookup (read-only).
+    - Forbidden scope: no PreliminaryMechanicalChecker (Slices C+D), no pressure-drop, no C4, no cost logic, no new solver, no TASK-018+, no mutation of TASK-013 records or TASK-016 catalog.
+    - Files added (2 new, 1 modification to Slice A subtree package marker, 1-line manifest registration):
+      - `src/hexagent/material_mass_mechanical/mass_calculator.py` (MassCalculator + 5 new frozen error codes + MassCalculationRequest / MassProvenance / MassBreakdown dataclasses)
+      - `tests/material_mass_mechanical/test_mass_calculator.py` (43 tests covering §6 formulas, §7 errors, §10 determinism, §8 provenance, forbidden-scope guards)
+      - `src/hexagent/material_mass_mechanical/__init__.py` (re-exports Slice B public types; Slice A exports preserved)
+      - `ci-shard-manifest.yml` (1 line added immediately after Slice A test entry, preserving shard structure / python versions / timeout)
+    - Tests: 43 passed in 0.54s; combined Slice A + Slice B + TASK-013 = 234 passed in 1.07s (no regression); full repo `ruff check .` clean; `mypy src/hexagent/material_mass_mechanical/ tests/material_mass_mechanical/` clean.
+    - Slice B design §6 formulas implemented:
+      - §6.1 inner_tube: density × π × ((outer/2)² − (inner/2)²) × length
+      - §6.2 outer_pipe: same formula
+      - §6.3 hairpin: density × π × ((outer/2)² − (inner/2)²) × π × bend_radius_m × number_of_tubes
+      - §6.4 fittings: Σ overrides (× density / 7850.0 if density_normalization=True)
+    - Slice B frozen error codes (5 of 13): `GEOMETRY_CATALOG_UNAPPROVED`, `GEOMETRY_CATALOG_INCONSISTENT`, `HAIRPIN_BEND_INPUT_INCOMPLETE`, `INPUT_DIMENSIONAL_INCONSISTENT`, `INPUT_UNIT_INCONSISTENT` — defined as Final[str] in `mass_calculator.py`. Remaining 3 codes (`MATERIAL_GOVERNANCE_*`, `MATERIAL_RESOLUTION_MISSING_ROLE`) re-imported from Slice A's single source of truth. Remaining 5 mechanical / input codes reserved for Slices C+D.
+    - Slice B reuses Slice A's `MaterialSelectorError` exception class (extends via positional code / message / context), so the Slice A and Slice B exception hierarchies remain unified and the design §7 single-error-class contract is satisfied.
+    - Provenance: 9 fields per §8 (8 minimum + `result_hash`); correlation_ids empty for mass per §8.
+    - JSON / hash / ordering: §10 RFC 8785 canonical-JSON SHA-256 (lowercase hex, 64-char); 6-decimal kg quantization per §10.3.
+    - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (UNCHANGED — Slice B is implementation-only).
+    - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (UNCHANGED).
+    - Implementation branch base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge; unchanged).
+    - Slice B review verdict: `TASK017_SLICE_B_READY_FOR_REVIEW` (pending Charles review).
+    - TASK-017 implementation Slices C / D / Closeout: NOT AUTHORIZED.
+    - TASK-018+: PLANNED / NOT STARTED.
+
