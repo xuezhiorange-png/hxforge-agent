@@ -50,7 +50,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
-| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | NOT AUTHORIZED | TASK-017 design |
+| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **TASK-017 IMPLEMENTATION CLOSEOUT READY FOR REVIEW** (MaterialSelector + MassCalculator + PreliminaryMechanicalChecker §9.1 + §9.2 + §9.3 + §5.3 orchestrator + tests; PR #75 remains DRAFT; Ready / merge / Issue #74 close: NOT AUTHORIZED — pending separate Charles authorization) | TASK-017 design |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
@@ -384,18 +384,155 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 Frozen Contract Authority Base SHA | `fbb05ae71f21e6cfd4d1041afb5958c863166248` |
 | TASK-017 design PR CI | `28748836440` — completed / success / head_sha `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` exact match |
 | TASK-017 design frozen contract file | `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md` |
-| TASK-017 design status | **DESIGN FROZEN** / Implementation NOT AUTHORIZED / Implementation Issue NOT YET CREATED |
-| TASK-017 implementation | NOT AUTHORIZED |
+| TASK-017 design status | **DESIGN FROZEN** / Implementation Issue: #74 OPEN |
+| TASK-017 implementation Issue | #74 — OPEN |
+| TASK-017 implementation branch | `codex/task-017-materials-mass-mechanical-implementation` |
+| TASK-017 implementation base | `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge) |
+| TASK-017 implementation planning doc | `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md` |
+| TASK-017 implementation status | **TASK-017 IMPLEMENTATION CLOSEOUT READY FOR REVIEW** (MaterialSelector + MassCalculator + PreliminaryMechanicalChecker §9.1 + §9.2 + §9.3 + §5.3 orchestrator + tests; PR #75 remains DRAFT; Ready / merge / Issue #74 close: NOT AUTHORIZED — pending separate Charles authorization) |
+| TASK-017 implementation Slice A commit | `384333a4742a7de5e77308dda0f10fa9d46df939` (governance-repair commit; supersedes `f6afeda` Slice A format-fix) |
+| TASK-017 implementation Slice A files added | `src/hexagent/material_mass_mechanical/{__init__.py,material_selector.py}` + `tests/material_mass_mechanical/{__init__.py,test_material_selector.py}` |
+| TASK-017 implementation Slice A test count | 29 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
+| TASK-017 Slice A CI manifest registration | 1 line added to existing `ci` shard (per design §13.2 governance repair) |
+| TASK-017 implementation Slice B commit | `eba39564336f3f29958f29d5241279298ce9769a` (Slice B format-fix; supersedes `2c242de` Slice B impl) |
+| TASK-017 implementation Slice B files added | `src/hexagent/material_mass_mechanical/{__init__.py,mass_calculator.py}` + `tests/material_mass_mechanical/test_mass_calculator.py` |
+| TASK-017 implementation Slice B test count | 43 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
+| TASK-017 Slice B CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A test entry kept, Slice B entry inserted immediately after) |
+| TASK-017 implementation Slice C commit | `945d234479400be4c65d0e0f757bcbfcf70b22ab` (Slice C re-execution; supersedes `eba3956` Slice B + first Slice C attempt `384333a` Slice A governance-repair commit chain) |
+| TASK-017 implementation Slice C files added | `src/hexagent/material_mass_mechanical/{__init__.py,preliminary_checker.py,material_selector.py}` + `tests/material_mass_mechanical/test_preliminary_checker.py` |
+| TASK-017 implementation Slice C test count | 64 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
+| TASK-017 Slice C CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A + Slice B entries kept, Slice C entry inserted immediately after) |
+| TASK-017 implementation Slice D commit | `5625e08ecfd24e659cfa5434865b8da45c33d9d8` (Slice D final head on PR #75 branch; published linear chain: `1723e1c5 → 2c40085 → 5625e08`; supersedes intermediate `82940c7` locally-amended attempt; no force-push) |
+| TASK-017 implementation Slice D files added | `src/hexagent/material_mass_mechanical/{__init__.py,preliminary_checker.py}` (extended additively; Slice C runtime behavior preserved; Slice C module-level declaration structure updated during Slice D — module docstring rewritten as Slice C + Slice D shared preamble, `_SOFTWARE_VERSION` literal replaced by `_SOFTWARE_VERSION_SLICE_C` literal + `_SOFTWARE_VERSION` alias, `__all__` relocated to end-of-module) + `tests/material_mass_mechanical/{test_preliminary_checker.py,test_preliminary_checker_slice_d.py}` |
+| TASK-017 implementation Slice D test count | 72 tests in `test_preliminary_checker_slice_d.py` (PASS / BLOCKED_PRELIMINARY / BLOCKED_FOR_DETAILED_DESIGN / input-guard / frozen-dataclass / determinism / §5.3 orchestrator aggregation / Slice C parity tests) + 1 documented skip (ratio-only-violation mathematically unreachable scenario); all 207 tests in `tests/material_mass_mechanical/` passing under Python 3.12 |
+| TASK-017 implementation Slice D scope | Design §9.2 minimum-wall check + Design §9.3 straight-pipe-span check + Design §5.3 ``MechanicalCheckReport`` orchestrator (``run_mechanical_check_report``). Slice C's ``preliminary_check`` (§9.1) runtime behavior preserved inside the orchestrator. Slice C code section (above the Slice D header line in ``preliminary_checker.py``) has runtime behavior preserved but module-level declaration structure updated (see files-added row above for exact delta). |
+| TASK-017 Slice D CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A + Slice B + Slice C entries kept, Slice D entry inserted immediately after; no other shards / files modified, no structural mutation) |
+| TASK-017 implementation Slice D CI run | `28768273024` — completed / success / head_sha `5625e08ecfd24e659cfa5434865b8da45c33d9d8` exact match (replaces invalidated earlier intermediate runs); job summary reports 45 success + 5 skipped + 0 failed against PR head `5625e08e…` |
+| TASK-017 implementation Slice D re-review verdict | `TASK017_SLICE_D_NEEDS_P2_CLEANUP_ONLY` (read-only re-review 2026-07-06; code-acceptance PASS, 2 P2 governance findings: P2-A wording over-statement, P2-B unauthorized Feishu outbound) |
+| TASK-017 implementation Slice D P2-A wording cleanup | `docs/TASK_BACKLOG.md` rows for "Slice D files added" + "Slice D scope" replaced "byte-for-byte preserved" / "preserved unchanged" with accurate "Slice C runtime behavior preserved; module-level declaration structure updated during Slice D" wording. Planning doc Rev 5 row added. No code / test / manifest changes. |
+| TASK-017 implementation Slice D P2-B unauthorized Feishu outbound | Disclosed in P2 cleanup round. Slice D round sent Feishu `om_x100b6b87700c1ca0c3c96b1151b7d92` to `chat_id=oc_7807111a5c0ff61a9d1469030d87adb0` (hxforge-agent project group) at 2026-07-06T04:50:28Z without explicit per-round Feishu authorization. Content: zero false SHA / false CI / false authorization claim (all references verified against GitHub API). No code / PR / Issue side-effect. Recommended future guard: per-round Feishu outbound requires explicit authorization clause. **Disclosed historical governance event — NOT repeated in Closeout round.** |
+| TASK-017 implementation Slice D PR body refresh remediation | Read-only re-review verdict `TASK017_SLICE_D_BLOCKED_BY_P1` (P1-1 stale audit anchor) → PR body refresh round (P1-1 remediation: stale head `5625e08…` → current `4c44dc86…`; stale CI `28768273024` → current `28769358262`; both reframed as superseded / withdrawn historical reference) → read-only re-review verdict `TASK017_SLICE_D_ACCEPTED_FOR_CLOSEOUT_AUTHORIZATION` (P1-1 resolved; no P0 / no P1 remaining; no P2 additions). |
+| TASK-017 implementation Closeout commit | `cda181c025a9369e77a4ca38ddc21ccc718df292` (Closeout slice primary commit; appended to PR #75 branch linear chain `5625e08 → 4c44dc8 → cda181c`; no force-push; docs/governance-only). Follow-up TBD-fill commit `d193e4d4d04dd46517396a70a09796ea8f143fdf` + final-state refine commit `4edabadd45745fad48b01bffccbd20df68727cd8` + Closeout-chain-record commit `1215f58139d738df9e54bdbbd1be8d28da96f94b` + final-final-state-record commit `ad263d7f5c77b1fe71c1ada7c872fe86b41bfb55` also docs-only. Total Closeout docs-only chain: **5 commits**. |
+| TASK-017 implementation Closeout files changed | `docs/TASK_BACKLOG.md` + `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md` + PR #75 body (final closeout audit table + Slice A/B/C/D accepted chain + final anchors). No `src/` / `tests/` / `ci-shard-manifest.yml` / `.github/` / `pyproject.toml` / TASK-011/012/013/014/015/016 frozen contracts / TASK-015A / TASK-016 artifacts mutation. |
+| TASK-017 implementation Closeout final head | `b3b4a02485f9476e8b4b3b78a5001a3d5fb0acb5` (= LOCAL_HEAD = REMOTE_HEAD = PR #75 headRefOid; SHA_MATCH verified post-push). Closeout docs-only chain (cumulative Closeout rounds): `cda181c → d193e4d → 4edabad → 1215f58 → ad263d7 → b3b4a02` — 6 commits, all docs/governance-only. **Self-referential note**: this row records the chain itself; the next docs-only commit (if any) will be appended at the end of the chain, and the chain notation remains valid regardless of how many iterative docs commits are added. The chain-anchor reference is the primary Closeout commit `cda181c025a9369e77a4ca38ddc21ccc718df292` (per Closeout requirement §1 "明确记录 current final implementation head" — `cda181c` is the implementation-pinning Closeout commit; subsequent docs-only commits are TBD-refinement follow-ups). |
+| TASK-017 implementation Closeout final CI run | `28770878128` — completed / success / head_sha `ad263d7f5c77b1fe71c1ada7c872fe86b41bfb55` exact match (latest observed CI for the Closeout docs-only chain). 50 jobs total (45 success + 5 skipped main-branch-only + 0 failed); key jobs lint / verify-manifest / parse-manifest / resolve-authority / aggregate / final-gate all success (observation only — no manual rerun). Full CI chain (Closeout docs-only round): `28770087347` (cda181c) → `28770311526` (d193e4d) → `28770562032` (4edabad) → `28770584849` (1215f58) → `28770878128` (ad263d7, latest observed). **Per iteration discipline**: CI runs are recorded against their respective chain commits; the "current valid CI" is whichever CI run's head_sha matches PR #75 headRefOid at the time of any downstream operation. |
+| TASK-017 implementation Slice A verdict (audit chain) | `TASK017_SLICE_A_ACCEPTED` (head `384333a4742a7de5e77308dda0f10fa9d46df939`; 29 tests) |
+| TASK-017 implementation Slice B verdict (audit chain) | `TASK017_SLICE_B_ACCEPTED` (head `eba39564336f3f29958f29d5241279298ce9769a`; 43 tests) |
+| TASK-017 implementation Slice C verdict (audit chain) | `TASK017_SLICE_C_ACCEPTED_FOR_NEXT_SLICE_AUTHORIZATION` (head `945d234479400be4c65d0e0f757bcbfcf70b22ab`; 64 tests) |
+| TASK-017 implementation Slice D verdict (audit chain) | `TASK017_SLICE_D_ACCEPTED_FOR_CLOSEOUT_AUTHORIZATION` (final head `4c44dc86c43eed964c2b5ff68741db9e0aa3bf53`; chain `1723e1c5 → 2c40085 → 4c44dc8`; 72 new tests; total 207 passed + 1 skipped in `tests/material_mass_mechanical/`) |
+| TASK-017 implementation Closeout verdict | `TASK017_IMPLEMENTATION_CLOSEOUT_READY_FOR_REVIEW` (this round; docs/governance-only; implementation complete pending Ready / merge / Issue #74 close) |
+| TASK-017 implementation PR #75 status (post-Closeout) | **OPEN / DRAFT / NOT MERGED** (Ready / merge / Issue #74 close: NOT AUTHORIZED — pending separate Charles authorization) |
+| TASK-017 implementation Issue #74 status (post-Closeout) | **OPEN** (NOT CLOSED — close-link will be manual via separate explicit Closeout-authorization round per Charles discretion; current PR body uses `Refs #74`, no auto-close keyword) |
+| TASK-018+ status | **PLANNED / NOT STARTED / NOT AUTHORIZED** (TASK-018+ kickoff requires separate authorization) |
 | TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
 
 13. TASK-017 design kickoff was AUTHORIZED by Issue #72:
-    - Design Issue #72: OPEN
+    - Design Issue #72: CLOSED / COMPLETED / `2026-07-05T18:36:26Z`
     - Design branch: `docs/task-017-materials-mass-preliminary-mechanical-design`
     - Design file: `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md`
     - Design base: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (main @ PR #71 merge)
     - Design status: **DESIGN FROZEN** (Frozen Contract Authority Commit SHA = `6ed5b7dc7d8df163796eacb838afcf5702a4c53a`, Base SHA = `fbb05ae71f21e6cfd4d1041afb5958c863166248`)
     - Design contract file: `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md`
     - Design PR CI: `28748836440` — completed / success / head_sha exact match
-    - TASK-017 implementation: **NOT AUTHORIZED** / Implementation Issue: NOT YET CREATED
+    - Design PR #73: MERGED at `2026-07-05T18:19:27Z` (merge commit `757e748dcef825b13397473977b181913c0cbfa8`)
+    - TASK-017 implementation: **AUTHORIZED FOR KICKOFF / NOT AUTHORIZED FOR CORE LOGIC**
     - TASK-018+ : PLANNED / NOT STARTED
+
+14. TASK-017 implementation kickoff is now AUTHORIZED by Issue #74:
+    - Implementation Issue #74: OPEN
+    - Implementation branch: `codex/task-017-materials-mass-mechanical-implementation`
+    - Implementation file: `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md`
+    - Implementation base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge)
+    - Implementation status: **AUTHORIZED FOR KICKOFF / NOT AUTHORIZED FOR CORE LOGIC** (planning + slice plan only; no production code in this commit)
+    - Implementation contract file: `docs/tasks/TASK-017-materials-mass-mechanical-implementation.md`
+    - TASK-017 implementation Slices A / B / C / D / Closeout: NOT YET AUTHORIZED (each requires separate authorization)
+    - TASK-018+: PLANNED / NOT STARTED
+
+15. TASK-017 implementation Slice A is AUTHORIZED FOR REVIEW (MaterialSelector only):
+    - Scope: MaterialSelector + read-only TASK-013 consumer (design §5.1); new types `MaterialResolutionRequest / Result / Provenance` only.
+    - Forbidden scope: no MassCalculator, no PreliminaryMechanicalChecker, no pressure-drop, no C4, no cost logic, no TASK-018+.
+    - Files added (4 new, 0 modifications outside the new subtree):
+      - `src/hexagent/material_mass_mechanical/__init__.py` (package marker)
+      - `src/hexagent/material_mass_mechanical/material_selector.py` (MaterialSelector)
+      - `tests/material_mass_mechanical/__init__.py` (package marker)
+      - `tests/material_mass_mechanical/test_material_selector.py` (29 tests)
+    - Tests: 29 passed in 0.55s; full repo `ruff check .` clean; `mypy` on new subtree clean.
+    - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (exposed as module literal `FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA`).
+    - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248`.
+    - Implementation branch base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge; unchanged).
+    - Slice A review verdict: `TASK017_SLICE_A_READY_FOR_REVIEW` (pending Charles review).
+    - TASK-017 implementation Slices B / C / D / Closeout: NOT AUTHORIZED.
+    - TASK-018+: PLANNED / NOT STARTED.
+
+16. TASK-017 Slice A CI manifest governance repair is AUTHORIZED (manifest registration only):
+    - Authorization scope: 4 narrow mutations (design §13.2 clarification, planning doc sync, backlog evidence row, 1-line manifest registration). No `src/`, no Slice A test content changes, no other shards, no `.github/`, no frozen contracts.
+    - Design contract amendment (NEW §13.2): adds a narrow clarification that implementation slices MAY register their own slice-authorized test files in `ci-shard-manifest.yml` when `verify-manifest` requires D==M ownership. Clarification does NOT authorize unrelated CI shard changes, `.github/`, or test files outside the current slice.
+    - Planning doc sync: §4 added `ci-shard-manifest.yml` row (with §13.2 carve-out); §5 carved out the blanket prohibition (matches design §13.2); §7 clarified `ci-shard-manifest` job scope (structural vs content-level); §10 updated the slice authorization template.
+    - Manifest registration: 1 line added to the existing `ci` shard (immediately after the TASK-013 `material_costs/test_frozen_contract_unchanged.py` entry, before the `case_revisions` entries), preserving the existing indentation / shard structure / python versions / timeout:
+      ```yaml
+      - tests/material_mass_mechanical/test_material_selector.py
+      ```
+    - Shard selection rationale: the `ci` shard already houses TASK-013 `material_costs/*` tests (read-only governance consumer pattern, job=`shard-ci`, python=["3.11", "3.12"], timeout=300). Slice A's MaterialSelector is the read-only governance consumer for TASK-013 — same shard profile. NO new shard created.
+    - Local validation BEFORE commit:
+      - `ruff check .` All checks passed
+      - `ruff format --check .` 254 files already formatted
+      - `pytest tests/material_mass_mechanical/ tests/material_costs/` 191 passed (no regression)
+      - `pytest tests/ci/test_shard_manifest.py` 12 passed (manifest contract preserved)
+      - `python -m tests.ci.verify_manifest --manifest ci-shard-manifest.yml --test-root tests` `d_equals_m: true`, `discovered_count: 91`, `manifest_count: 91`, `status: "pass"`
+    - TASK-017 implementation Slices B / C / D / Closeout: NOT AUTHORIZED.
+    - TASK-018+: PLANNED / NOT STARTED.
+    - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (UNCHANGED — §13.2 is a governance clarification, not a content hash rotation).
+    - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (UNCHANGED).
+
+
+17. TASK-017 implementation Slice B is AUTHORIZED FOR REVIEW (MassCalculator only):
+    - Scope: MassCalculator + MassBreakdown (design §5.2 + §6); consumes Slice A MaterialResolutionResult per component_role (read-only); consumes TASK-016 GeometryCatalog for hairpin tube-geometry lookup (read-only).
+    - Forbidden scope: no PreliminaryMechanicalChecker (Slices C+D), no pressure-drop, no C4, no cost logic, no new solver, no TASK-018+, no mutation of TASK-013 records or TASK-016 catalog.
+    - Files added (2 new, 1 modification to Slice A subtree package marker, 1-line manifest registration):
+      - `src/hexagent/material_mass_mechanical/mass_calculator.py` (MassCalculator + 5 new frozen error codes + MassCalculationRequest / MassProvenance / MassBreakdown dataclasses)
+      - `tests/material_mass_mechanical/test_mass_calculator.py` (43 tests covering §6 formulas, §7 errors, §10 determinism, §8 provenance, forbidden-scope guards)
+      - `src/hexagent/material_mass_mechanical/__init__.py` (re-exports Slice B public types; Slice A exports preserved)
+      - `ci-shard-manifest.yml` (1 line added immediately after Slice A test entry, preserving shard structure / python versions / timeout)
+    - Tests: 43 passed in 0.54s; combined Slice A + Slice B + TASK-013 = 234 passed in 1.07s (no regression); full repo `ruff check .` clean; `mypy src/hexagent/material_mass_mechanical/ tests/material_mass_mechanical/` clean.
+    - Slice B design §6 formulas implemented:
+      - §6.1 inner_tube: density × π × ((outer/2)² − (inner/2)²) × length
+      - §6.2 outer_pipe: same formula
+      - §6.3 hairpin: density × π × ((outer/2)² − (inner/2)²) × π × bend_radius_m × number_of_tubes
+      - §6.4 fittings: Σ overrides (× density / 7850.0 if density_normalization=True)
+    - Slice B frozen error codes (5 of 13): `GEOMETRY_CATALOG_UNAPPROVED`, `GEOMETRY_CATALOG_INCONSISTENT`, `HAIRPIN_BEND_INPUT_INCOMPLETE`, `INPUT_DIMENSIONAL_INCONSISTENT`, `INPUT_UNIT_INCONSISTENT` — defined as Final[str] in `mass_calculator.py`. Remaining 3 codes (`MATERIAL_GOVERNANCE_*`, `MATERIAL_RESOLUTION_MISSING_ROLE`) re-imported from Slice A's single source of truth. Remaining 5 mechanical / input codes reserved for Slices C+D.
+    - Slice B reuses Slice A's `MaterialSelectorError` exception class (extends via positional code / message / context), so the Slice A and Slice B exception hierarchies remain unified and the design §7 single-error-class contract is satisfied.
+    - Provenance: 9 fields per §8 (8 minimum + `result_hash`); correlation_ids empty for mass per §8.
+    - JSON / hash / ordering: §10 RFC 8785 canonical-JSON SHA-256 (lowercase hex, 64-char); 6-decimal kg quantization per §10.3.
+    - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (UNCHANGED — Slice B is implementation-only).
+    - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (UNCHANGED).
+    - Implementation branch base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge; unchanged).
+    - Slice B review verdict: `TASK017_SLICE_B_READY_FOR_REVIEW` (pending Charles review).
+    - TASK-017 implementation Slices C / D / Closeout: NOT AUTHORIZED.
+    - TASK-018+: PLANNED / NOT STARTED.
+
+18. TASK-017 implementation Slice C is DELIVERED (allowable-stress check only):
+    - Scope (re-executed from actual PR #75 head `eba3956`; prior invalidated Slice C report withdrawn):
+      - PreliminaryMechanicalChecker with allowable-stress check ONLY (planning doc §3, design §9.1).
+      - Slices D / Closeout remain NOT AUTHORIZED.
+    - Files added (1 new, 3 modifications, 1-line manifest registration):
+      - `src/hexagent/material_mass_mechanical/preliminary_checker.py` (NEW; planning-doc-authorized file name; PreliminaryCheckRequest / PreliminaryCheckResult / PreliminaryCheckProvenance dataclasses; 4-tier verdict per §9.1)
+      - `tests/material_mass_mechanical/test_preliminary_checker.py` (NEW; 64 tests covering §5.2.2 / §9.1 / §7 / §10.3 / §10.4)
+      - `src/hexagent/material_mass_mechanical/material_selector.py` (+3 frozen error codes: codes 11-13, additive only)
+      - `src/hexagent/material_mass_mechanical/__init__.py` (re-exports Slice C public types; Slice A + Slice B exports preserved)
+      - `ci-shard-manifest.yml` (1 line added immediately after Slice B test entry, preserving shard structure)
+    - Slice C frozen error codes (3 of 13, codes 11-13): `MECHANICAL_CHECK_INPUT_DIMENSIONAL_INCONSISTENT`, `MECHANICAL_CHECK_INPUT_UNIT_INCONSISTENT`, `MECHANICAL_CHECK_UNSUPPORTED_ROLE`. Defined in `material_selector.py` (single source of truth) + re-exported from `preliminary_checker.py`. Total codes exposed across A+B+C = 11 of 13; remaining 2 (`*_UNIT_INCONSISTENT` mechanical codes) reserved for Slice D.
+    - 4-tier verdict per design §9.1: `pass` (ratio ≤ 0.6) / `marginal` (0.6 < ratio ≤ 0.8) / `blocked_preliminary` (ratio > 0.8) / `blocked_for_detailed_design` (diameter > 1.0 m preliminary envelope).
+    - Allowable stress lookup: `allowable_stress_mpa[design_temperature_c]` (exact-key match per design §5.1.2; no interpolation per §5.1.2 final note). Missing/empty table or no exact key → `MECHANICAL_CHECK_INPUT_UNIT_INCONSISTENT`.
+    - Provenance: 12 fields (8 minimum + `outer_diameter_m` + `inner_diameter_m` + `wall_thickness_m` + `allowable_temperature_c`).
+    - Decimal precision: 6 dp per §10.3 on hoop_stress_mpa / allowable_stress_mpa / stress_utilization_ratio / provenance fields.
+    - JSON / hash: §10.4 RFC 8785 canonical-JSON SHA-256 (lowercase hex, 64-char).
+    - Forbidden scope verified: no pressure-drop / C4 / cost / new solver / Slice D tokens (`minimum_wall`, `straight_pipe_span`, `corrosion_allowance`, etc.) / Closeout tokens in module body.
+    - Tests: 64 passed in 0.90s; combined Slice A + Slice B + Slice C = 136 (in `material_mass_mechanical/`); full repo `ruff check .` clean on Slice C files; `mypy src/hexagent tests/support/...` clean (0 issues across 140 files).
+    - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (UNCHANGED — Slice C is implementation-only).
+    - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (UNCHANGED).
+    - Implementation branch base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge; unchanged).
+    - Slice C delivery verdict: `TASK017_SLICE_C_READY_FOR_REVIEW` (pending Charles review).
+    - TASK-017 implementation Slice D / Closeout: NOT AUTHORIZED.
+    - TASK-018+: PLANNED / NOT STARTED.
+
