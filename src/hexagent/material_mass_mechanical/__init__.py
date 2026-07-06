@@ -11,8 +11,8 @@ and the TASK-016 approved geometry catalog.
 
 Slice A: MaterialSelector only.
 Slice B: MassCalculator + MassBreakdown (consumes Slice A).
-Slices C / D / Closeout are NOT YET IMPLEMENTED.
-
+Slice C: PreliminaryMechanicalChecker (allowable-stress check only; consumes Slice A).
+Slices D / Closeout are NOT YET IMPLEMENTED.
 The TASK-017 application layer NEVER modifies TASK-013 records,
 NEVER introduces pressure-drop / C4 / cost / new-solver logic,
 and NEVER bypasses the TASK-013 closed-set enums.
@@ -35,6 +35,9 @@ from hexagent.material_mass_mechanical.material_selector import (
     ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
     ERROR_MATERIAL_GOVERNANCE_UNAPPROVED,
     ERROR_MATERIAL_RESOLUTION_MISSING_ROLE,
+    ERROR_MECHANICAL_CHECK_INPUT_DIMENSIONAL_INCONSISTENT,
+    ERROR_MECHANICAL_CHECK_INPUT_UNIT_INCONSISTENT,
+    ERROR_MECHANICAL_CHECK_UNSUPPORTED_ROLE,
     FROZEN_CONTRACT_AUTHORITY_BASE_SHA,
     FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA,
     PROPERTY_NAME_ALLOWABLE_STRESS,
@@ -50,6 +53,14 @@ from hexagent.material_mass_mechanical.material_selector import (
     float_to_decimal_string,
     resolve_material,
 )
+from hexagent.material_mass_mechanical.preliminary_checker import (
+    MECHANICAL_ROLES_FROZEN_ORDER,
+    SUPPORTED_MECHANICAL_ROLES,
+    PreliminaryCheckProvenance,
+    PreliminaryCheckRequest,
+    PreliminaryCheckResult,
+    preliminary_check,
+)
 
 __all__ = [
     "COMPONENT_ROLE_CLOSED_SET",
@@ -62,8 +73,12 @@ __all__ = [
     "ERROR_MATERIAL_GOVERNANCE_INCOMPLETE",
     "ERROR_MATERIAL_GOVERNANCE_UNAPPROVED",
     "ERROR_MATERIAL_RESOLUTION_MISSING_ROLE",
+    "ERROR_MECHANICAL_CHECK_INPUT_DIMENSIONAL_INCONSISTENT",
+    "ERROR_MECHANICAL_CHECK_INPUT_UNIT_INCONSISTENT",
+    "ERROR_MECHANICAL_CHECK_UNSUPPORTED_ROLE",
     "FROZEN_CONTRACT_AUTHORITY_BASE_SHA",
     "FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA",
+    "MECHANICAL_ROLES_FROZEN_ORDER",
     "MassBreakdown",
     "MassCalculationRequest",
     "MassProvenance",
@@ -71,13 +86,18 @@ __all__ = [
     "MaterialResolutionRequest",
     "MaterialResolutionResult",
     "MaterialSelectorError",
+    "PreliminaryCheckProvenance",
+    "PreliminaryCheckRequest",
+    "PreliminaryCheckResult",
     "PROPERTY_NAME_ALLOWABLE_STRESS",
     "PROPERTY_NAME_DENSITY",
     "PROPERTY_NAME_YOUNGS_MODULUS",
+    "SUPPORTED_MECHANICAL_ROLES",
     "UNIT_ALLOWABLE_STRESS",
     "UNIT_DENSITY",
     "UNIT_YOUNGS_MODULUS",
     "calculate_mass_breakdown",
     "float_to_decimal_string",
+    "preliminary_check",
     "resolve_material",
 ]

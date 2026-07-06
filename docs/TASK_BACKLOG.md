@@ -394,10 +394,14 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 implementation Slice A files added | `src/hexagent/material_mass_mechanical/{__init__.py,material_selector.py}` + `tests/material_mass_mechanical/{__init__.py,test_material_selector.py}` |
 | TASK-017 implementation Slice A test count | 29 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
 | TASK-017 Slice A CI manifest registration | 1 line added to existing `ci` shard (per design §13.2 governance repair) |
-| TASK-017 implementation Slice B commit | (Slice B commit SHA — populated after push) |
+| TASK-017 implementation Slice B commit | `eba39564336f3f29958f29d5241279298ce9769a` (Slice B format-fix; supersedes `2c242de` Slice B impl) |
 | TASK-017 implementation Slice B files added | `src/hexagent/material_mass_mechanical/{__init__.py,mass_calculator.py}` + `tests/material_mass_mechanical/test_mass_calculator.py` |
 | TASK-017 implementation Slice B test count | 43 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
 | TASK-017 Slice B CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A test entry kept, Slice B entry inserted immediately after) |
+| TASK-017 implementation Slice C commit | (Slice C commit SHA — populated after push) |
+| TASK-017 implementation Slice C files added | `src/hexagent/material_mass_mechanical/{__init__.py,preliminary_checker.py,material_selector.py}` + `tests/material_mass_mechanical/test_preliminary_checker.py` |
+| TASK-017 implementation Slice C test count | 64 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
+| TASK-017 Slice C CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A + Slice B entries kept, Slice C entry inserted immediately after) |
 | TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
 
@@ -483,5 +487,30 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
     - Implementation branch base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge; unchanged).
     - Slice B review verdict: `TASK017_SLICE_B_READY_FOR_REVIEW` (pending Charles review).
     - TASK-017 implementation Slices C / D / Closeout: NOT AUTHORIZED.
+    - TASK-018+: PLANNED / NOT STARTED.
+
+18. TASK-017 implementation Slice C is DELIVERED (allowable-stress check only):
+    - Scope (re-executed from actual PR #75 head `eba3956`; prior invalidated Slice C report withdrawn):
+      - PreliminaryMechanicalChecker with allowable-stress check ONLY (planning doc §3, design §9.1).
+      - Slices D / Closeout remain NOT AUTHORIZED.
+    - Files added (1 new, 3 modifications, 1-line manifest registration):
+      - `src/hexagent/material_mass_mechanical/preliminary_checker.py` (NEW; planning-doc-authorized file name; PreliminaryCheckRequest / PreliminaryCheckResult / PreliminaryCheckProvenance dataclasses; 4-tier verdict per §9.1)
+      - `tests/material_mass_mechanical/test_preliminary_checker.py` (NEW; 64 tests covering §5.2.2 / §9.1 / §7 / §10.3 / §10.4)
+      - `src/hexagent/material_mass_mechanical/material_selector.py` (+3 frozen error codes: codes 11-13, additive only)
+      - `src/hexagent/material_mass_mechanical/__init__.py` (re-exports Slice C public types; Slice A + Slice B exports preserved)
+      - `ci-shard-manifest.yml` (1 line added immediately after Slice B test entry, preserving shard structure)
+    - Slice C frozen error codes (3 of 13, codes 11-13): `MECHANICAL_CHECK_INPUT_DIMENSIONAL_INCONSISTENT`, `MECHANICAL_CHECK_INPUT_UNIT_INCONSISTENT`, `MECHANICAL_CHECK_UNSUPPORTED_ROLE`. Defined in `material_selector.py` (single source of truth) + re-exported from `preliminary_checker.py`. Total codes exposed across A+B+C = 11 of 13; remaining 2 (`*_UNIT_INCONSISTENT` mechanical codes) reserved for Slice D.
+    - 4-tier verdict per design §9.1: `pass` (ratio ≤ 0.6) / `marginal` (0.6 < ratio ≤ 0.8) / `blocked_preliminary` (ratio > 0.8) / `blocked_for_detailed_design` (diameter > 1.0 m preliminary envelope).
+    - Allowable stress lookup: `allowable_stress_mpa[design_temperature_c]` (exact-key match per design §5.1.2; no interpolation per §5.1.2 final note). Missing/empty table or no exact key → `MECHANICAL_CHECK_INPUT_UNIT_INCONSISTENT`.
+    - Provenance: 12 fields (8 minimum + `outer_diameter_m` + `inner_diameter_m` + `wall_thickness_m` + `allowable_temperature_c`).
+    - Decimal precision: 6 dp per §10.3 on hoop_stress_mpa / allowable_stress_mpa / stress_utilization_ratio / provenance fields.
+    - JSON / hash: §10.4 RFC 8785 canonical-JSON SHA-256 (lowercase hex, 64-char).
+    - Forbidden scope verified: no pressure-drop / C4 / cost / new solver / Slice D tokens (`minimum_wall`, `straight_pipe_span`, `corrosion_allowance`, etc.) / Closeout tokens in module body.
+    - Tests: 64 passed in 0.90s; combined Slice A + Slice B + Slice C = 136 (in `material_mass_mechanical/`); full repo `ruff check .` clean on Slice C files; `mypy src/hexagent tests/support/...` clean (0 issues across 140 files).
+    - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (UNCHANGED — Slice C is implementation-only).
+    - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (UNCHANGED).
+    - Implementation branch base: `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge; unchanged).
+    - Slice C delivery verdict: `TASK017_SLICE_C_READY_FOR_REVIEW` (pending Charles review).
+    - TASK-017 implementation Slice D / Closeout: NOT AUTHORIZED.
     - TASK-018+: PLANNED / NOT STARTED.
 
