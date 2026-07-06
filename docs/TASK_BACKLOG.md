@@ -50,7 +50,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
-| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **SLICE A AUTHORIZED FOR REVIEW** (MaterialSelector only; Slices B/C/D/Closeout: NOT AUTHORIZED) | TASK-017 design |
+| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **SLICE A CI MANIFEST REPAIR READY FOR REVIEW** (manifest registered; Slices B/C/D/Closeout: NOT AUTHORIZED) | TASK-017 design |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
@@ -393,6 +393,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 implementation Slice A commit | (Slice A commit SHA — populated after push; see item 15 below) |
 | TASK-017 implementation Slice A files added | `src/hexagent/material_mass_mechanical/{__init__.py,material_selector.py}` + `tests/material_mass_mechanical/{__init__.py,test_material_selector.py}` |
 | TASK-017 implementation Slice A test count | 29 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
+| TASK-017 Slice A CI manifest registration | 1 line added to existing `ci` shard (per design §13.2 governance repair) |
 | TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
 
@@ -433,3 +434,23 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
     - Slice A review verdict: `TASK017_SLICE_A_READY_FOR_REVIEW` (pending Charles review).
     - TASK-017 implementation Slices B / C / D / Closeout: NOT AUTHORIZED.
     - TASK-018+: PLANNED / NOT STARTED.
+
+16. TASK-017 Slice A CI manifest governance repair is AUTHORIZED (manifest registration only):
+    - Authorization scope: 4 narrow mutations (design §13.2 clarification, planning doc sync, backlog evidence row, 1-line manifest registration). No `src/`, no Slice A test content changes, no other shards, no `.github/`, no frozen contracts.
+    - Design contract amendment (NEW §13.2): adds a narrow clarification that implementation slices MAY register their own slice-authorized test files in `ci-shard-manifest.yml` when `verify-manifest` requires D==M ownership. Clarification does NOT authorize unrelated CI shard changes, `.github/`, or test files outside the current slice.
+    - Planning doc sync: §4 added `ci-shard-manifest.yml` row (with §13.2 carve-out); §5 carved out the blanket prohibition (matches design §13.2); §7 clarified `ci-shard-manifest` job scope (structural vs content-level); §10 updated the slice authorization template.
+    - Manifest registration: 1 line added to the existing `ci` shard (immediately after the TASK-013 `material_costs/test_frozen_contract_unchanged.py` entry, before the `case_revisions` entries), preserving the existing indentation / shard structure / python versions / timeout:
+      ```yaml
+      - tests/material_mass_mechanical/test_material_selector.py
+      ```
+    - Shard selection rationale: the `ci` shard already houses TASK-013 `material_costs/*` tests (read-only governance consumer pattern, job=`shard-ci`, python=["3.11", "3.12"], timeout=300). Slice A's MaterialSelector is the read-only governance consumer for TASK-013 — same shard profile. NO new shard created.
+    - Local validation BEFORE commit:
+      - `ruff check .` All checks passed
+      - `ruff format --check .` 254 files already formatted
+      - `pytest tests/material_mass_mechanical/ tests/material_costs/` 191 passed (no regression)
+      - `pytest tests/ci/test_shard_manifest.py` 12 passed (manifest contract preserved)
+      - `python -m tests.ci.verify_manifest --manifest ci-shard-manifest.yml --test-root tests` `d_equals_m: true`, `discovered_count: 91`, `manifest_count: 91`, `status: "pass"`
+    - TASK-017 implementation Slices B / C / D / Closeout: NOT AUTHORIZED.
+    - TASK-018+: PLANNED / NOT STARTED.
+    - Frozen design contract SHA: `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` (UNCHANGED — §13.2 is a governance clarification, not a content hash rotation).
+    - Frozen design contract Base SHA: `fbb05ae71f21e6cfd4d1041afb5958c863166248` (UNCHANGED).

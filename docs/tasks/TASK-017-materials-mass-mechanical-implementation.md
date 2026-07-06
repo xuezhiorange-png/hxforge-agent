@@ -64,7 +64,8 @@ Each slice requires:
 
 ## 4. Allowed file boundary
 
-Per design contract §13 (with §13.1 naming rationale):
+Per design contract §13 (with §13.1 naming rationale and §13.2
+CI manifest ownership clarification):
 
 | Path | Allowed for implementation |
 |---|---|
@@ -76,6 +77,7 @@ Per design contract §13 (with §13.1 naming rationale):
 | `tests/material_mass_mechanical/` | YES — test files only |
 | `docs/tasks/TASK-017-*.md` (planning docs, this file) | YES — docs only |
 | `docs/TASK_BACKLOG.md` (evidence rows) | YES — docs only |
+| `ci-shard-manifest.yml` | **YES** (registration of slice-authorized test files only, per design §13.2 — NO structural mutation, NO other shards, NO other test files) |
 
 ## 5. Forbidden scope
 
@@ -90,7 +92,10 @@ Per design contract §3.2:
   subtree.
 - **No** mutation of `docs/tasks/TASK-011-*.md` …
   `docs/tasks/TASK-016-*.md`.
-- **No** mutation of `ci-shard-manifest.yml`.
+- **No mutation of `ci-shard-manifest.yml`** EXCEPT as
+  carved out in design §13.2 (slice-authorized test file
+  registration only — NO structural mutation, NO other
+  shards, NO other test files).
 - **No** mutation of `.github/`.
 - **No** mutation of TASK-011 / TASK-012 / TASK-013 / TASK-014 /
   TASK-015 / TASK-015A / TASK-016 frozen contracts or
@@ -145,10 +150,19 @@ Each implementation slice PR must be observed against all of:
   `uv run --locked pytest tests/material_mass_mechanical -q`
 - `regression-tests` job: full suite, no regression vs. base.
 - `ci-shard-manifest` job: confirms `ci-shard-manifest.yml` was
-  not modified by the implementation PR.
+  NOT modified **structurally** (no new shards, no removed
+  shards, no shard rename, no python-version / timeout
+  changes). Content-level registration of the slice's own
+  newly-introduced test files in an existing shard's `files:`
+  list IS permitted under design §13.2.
+- `verify-manifest` / `parse-manifest` jobs: enforce `D == M`
+  ownership (every discovered `test_*.py` / `*_test.py` under
+  `tests/` MUST be registered in the manifest).
 
 The implementation PR is **NOT** authorized to modify
-`ci-shard-manifest.yml` or `.github/`.
+`ci-shard-manifest.yml` **structurally**, nor to modify
+`.github/` (except as expressly carved out by §13.2 above for
+manifest registration).
 
 ## 8. JSON / hash / ordering rules (per design §10)
 
@@ -197,7 +211,8 @@ Authorization:
 - Branch: codex/task-017-materials-mass-mechanical-implementation
 - PR base: <main SHA at slice time>
 - Files allowed: src/hexagent/material_mass_mechanical/<slice>.py + tests/material_mass_mechanical/<slice>_test.py
-- Files NOT allowed: src/ outside subtree, tests/ outside subtree, .github/, ci-shard-manifest.yml, frozen contracts
+- Files NOT allowed: src/ outside subtree, tests/ outside subtree, .github/, frozen contracts
+- ci-shard-manifest.yml: ONLY registration of this slice's own test file in an existing shard's `files:` list (per design §13.2); NO structural mutation
 
 Forbidden mutations:
 - No pressure-drop / C4 / cost / new-solver / production-solver-mutation

@@ -598,7 +598,9 @@ It MUST NOT modify:
 - Any file under `tests/` outside the
   `material_mass_mechanical/` subtree.
 - Any file under `docs/tasks/TASK-011-*.md` … `docs/tasks/TASK-016-*.md`.
-- `ci-shard-manifest.yml`.
+- `ci-shard-manifest.yml`, **except as carved out in
+  §13.2 (CI manifest ownership for slice-authorized test
+  files)**.
 - Any file under `.github/`.
 - `pyproject.toml` except for adding the new subtree to
   `[tool.setuptools.packages.find]` (no version bump, no new
@@ -606,6 +608,32 @@ It MUST NOT modify:
 
 If a future implementation needs to touch any other file, it
 must open a separate Issue and obtain separate authorization.
+
+#### 13.2 CI manifest ownership for slice-authorized test files (clarification)
+
+The blanket prohibition on modifying `ci-shard-manifest.yml`
+above is narrowed as follows for the implementation phase:
+
+- TASK-017 implementation slices MAY register their own
+  **explicitly slice-authorized** test files in
+  `ci-shard-manifest.yml` when repository governance requires
+  manifest registration (i.e. the `verify-manifest` CI job
+  enforces `D == M` ownership). This is a content-level
+  registration of the slice's own newly-introduced test file
+  in an existing shard's `files:` list; it is NOT a structural
+  mutation (no new shards, no removed shards, no shard rename,
+  no python-version / timeout changes).
+- This clarification does NOT authorize:
+  - unrelated CI shard changes (other shards, other files);
+  - changes to `.github/`;
+  - test files outside the current slice's authorized scope;
+  - moving, re-ordering, or deleting other manifest entries;
+  - slice B / C / D / Closeout test registration before that
+    slice is explicitly authorized.
+- Each implementation slice MUST surface its manifest
+  registration as a separate evidence row in
+  `docs/TASK_BACKLOG.md` (Slice A governance-repair evidence
+  pattern).
 
 ## 14. Slice plan
 
