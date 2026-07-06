@@ -46,12 +46,8 @@ from hexagent.material_costs.models import ApprovalState, MaterialRecord
 # Frozen Contract Authority Commit SHA — literal frozen at design freeze
 # (design §19.1). MUST match the design contract SHA recorded in the
 # implementation planning doc §1 and in the PR body / backlog row.
-FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA: Final[str] = (
-    "6ed5b7dc7d8df163796eacb838afcf5702a4c53a"
-)
-FROZEN_CONTRACT_AUTHORITY_BASE_SHA: Final[str] = (
-    "fbb05ae71f21e6cfd4d1041afb5958c863166248"
-)
+FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA: Final[str] = "6ed5b7dc7d8df163796eacb838afcf5702a4c53a"
+FROZEN_CONTRACT_AUTHORITY_BASE_SHA: Final[str] = "fbb05ae71f21e6cfd4d1041afb5958c863166248"
 
 # Closed set of component_role values consumed by the application layer
 # (design §5.2.1). MaterialSelector only validates membership at the
@@ -83,9 +79,7 @@ UNIT_ALLOWABLE_STRESS: Final[str] = "MPa"
 # and are exported here for the public error-code enum reference.
 ERROR_MATERIAL_GOVERNANCE_INCOMPLETE: Final[str] = "MATERIAL_GOVERNANCE_INCOMPLETE"
 ERROR_MATERIAL_GOVERNANCE_UNAPPROVED: Final[str] = "MATERIAL_GOVERNANCE_UNAPPROVED"
-ERROR_MATERIAL_RESOLUTION_MISSING_ROLE: Final[str] = (
-    "MATERIAL_RESOLUTION_MISSING_ROLE"
-)
+ERROR_MATERIAL_RESOLUTION_MISSING_ROLE: Final[str] = "MATERIAL_RESOLUTION_MISSING_ROLE"
 
 
 @dataclass(frozen=True)
@@ -222,9 +216,7 @@ def float_to_decimal_string(value: float) -> str:
     return repr(value)
 
 
-def _find_property(
-    property_values: list[Any], property_name: str
-) -> dict[str, Any] | None:
+def _find_property(property_values: list[Any], property_name: str) -> dict[str, Any] | None:
     """Return the TASK-013 ``property_values[]`` entry matching the
     given canonical property name, or ``None`` if absent.
 
@@ -276,8 +268,7 @@ def _parse_allowable_stress_entry(
         raise MaterialSelectorError(
             code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
             message=(
-                "allowable_stress property_values entry value_si is not "
-                "valid JSON-encoded table"
+                "allowable_stress property_values entry value_si is not valid JSON-encoded table"
             ),
             context={
                 "property_name": PROPERTY_NAME_ALLOWABLE_STRESS,
@@ -305,8 +296,7 @@ def _parse_allowable_stress_entry(
             raise MaterialSelectorError(
                 code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
                 message=(
-                    "allowable_stress table entry has non-decimal temperature "
-                    "or stress value"
+                    "allowable_stress table entry has non-decimal temperature or stress value"
                 ),
                 context={
                     "property_name": PROPERTY_NAME_ALLOWABLE_STRESS,
@@ -391,10 +381,7 @@ def resolve_material(
     if record_id != request.material_record_id:
         raise MaterialSelectorError(
             code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
-            message=(
-                "TASK-013 material_record_id does not match the requested "
-                "material_record_id"
-            ),
+            message=("TASK-013 material_record_id does not match the requested material_record_id"),
             context={
                 "request_material_record_id": request.material_record_id,
                 "observed_material_record_id": record_id,
@@ -419,9 +406,7 @@ def resolve_material(
     if not isinstance(property_values, list):
         raise MaterialSelectorError(
             code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
-            message=(
-                "TASK-013 material record property_values is not a list"
-            ),
+            message=("TASK-013 material record property_values is not a list"),
             context={
                 "material_record_id": record_id,
                 "observed_type": type(property_values).__name__,
@@ -450,16 +435,11 @@ def resolve_material(
     from decimal import Decimal, InvalidOperation
 
     try:
-        density_kg_m3: float | None = float(
-            Decimal(str(density_entry.get("value_si")))
-        )
+        density_kg_m3: float | None = float(Decimal(str(density_entry.get("value_si"))))
     except (InvalidOperation, ValueError) as exc:
         raise MaterialSelectorError(
             code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
-            message=(
-                f"{PROPERTY_NAME_DENSITY!r} value_si is not a valid decimal "
-                "string"
-            ),
+            message=(f"{PROPERTY_NAME_DENSITY!r} value_si is not a valid decimal string"),
             context={
                 "material_record_id": record_id,
                 "property_name": PROPERTY_NAME_DENSITY,
@@ -479,15 +459,12 @@ def resolve_material(
             property_name=PROPERTY_NAME_YOUNGS_MODULUS,
         )
         try:
-            youngs_modulus_gpa = float(
-                Decimal(str(youngs_entry.get("value_si")))
-            )
+            youngs_modulus_gpa = float(Decimal(str(youngs_entry.get("value_si"))))
         except (InvalidOperation, ValueError) as exc:
             raise MaterialSelectorError(
                 code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
                 message=(
-                    f"{PROPERTY_NAME_YOUNGS_MODULUS!r} value_si is not a "
-                    "valid decimal string"
+                    f"{PROPERTY_NAME_YOUNGS_MODULUS!r} value_si is not a valid decimal string"
                 ),
                 context={
                     "material_record_id": record_id,
@@ -497,9 +474,7 @@ def resolve_material(
             ) from exc
 
     # allowable_stress (required, design §5.1.2 note: TABLE shape).
-    allowable_entry = _find_property(
-        property_values, PROPERTY_NAME_ALLOWABLE_STRESS
-    )
+    allowable_entry = _find_property(property_values, PROPERTY_NAME_ALLOWABLE_STRESS)
     if allowable_entry is None:
         raise MaterialSelectorError(
             code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
@@ -532,9 +507,7 @@ def resolve_material(
 
     result = MaterialResolutionResult(
         material_record_id=record_id,
-        material_grade=str(
-            material_record.get("material_grade_or_designation", "")
-        ),
+        material_grade=str(material_record.get("material_grade_or_designation", "")),
         density_kg_m3=density_kg_m3,
         youngs_modulus_gpa=youngs_modulus_gpa,
         allowable_stress_mpa=allowable_stress_mpa,

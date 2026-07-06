@@ -45,9 +45,7 @@ from hexagent.material_mass_mechanical.material_selector import (
 
 # Captured at import time so tests assert against the actual frozen
 # design SHAs (design §19.1 / §19.2).
-EXPECTED_AUTHORITY_COMMIT_SHA = (
-    "6ed5b7dc7d8df163796eacb838afcf5702a4c53a"
-)
+EXPECTED_AUTHORITY_COMMIT_SHA = "6ed5b7dc7d8df163796eacb838afcf5702a4c53a"
 EXPECTED_AUTHORITY_BASE_SHA = "fbb05ae71f21e6cfd4d1041afb5958c863166248"
 
 
@@ -167,9 +165,10 @@ def _base_request(
 
 def test_component_role_closed_set_has_four_roles() -> None:
     """Design §5.2.1 closes the component_role set on four tokens."""
-    assert frozenset(
-        {"inner_tube", "outer_pipe", "hairpin_bend", "fittings"}
-    ) == COMPONENT_ROLE_CLOSED_SET
+    assert (
+        frozenset({"inner_tube", "outer_pipe", "hairpin_bend", "fittings"})
+        == COMPONENT_ROLE_CLOSED_SET
+    )
 
 
 def test_resolve_rejects_unknown_component_role() -> None:
@@ -218,9 +217,7 @@ def test_resolve_rejects_record_id_mismatch() -> None:
     with pytest.raises(MaterialSelectorError) as exc_info:
         resolve_material(request, _as_record(record))
     assert exc_info.value.code == ERROR_MATERIAL_GOVERNANCE_INCOMPLETE
-    assert exc_info.value.context["request_material_record_id"] == (
-        "mat:astm-sa-106-b:rev:2026-Q2"
-    )
+    assert exc_info.value.context["request_material_record_id"] == ("mat:astm-sa-106-b:rev:2026-Q2")
     assert exc_info.value.context["observed_material_record_id"] == (
         "mat:different-record:rev:2026-Q2"
     )
@@ -282,9 +279,7 @@ def test_resolve_missing_allowable_stress_returns_incomplete() -> None:
     with pytest.raises(MaterialSelectorError) as exc_info:
         resolve_material(request, _as_record(record))
     assert exc_info.value.code == ERROR_MATERIAL_GOVERNANCE_INCOMPLETE
-    assert exc_info.value.context["property_name"] == (
-        PROPERTY_NAME_ALLOWABLE_STRESS
-    )
+    assert exc_info.value.context["property_name"] == (PROPERTY_NAME_ALLOWABLE_STRESS)
 
 
 @pytest.mark.parametrize(
@@ -347,9 +342,7 @@ def test_resolve_allowable_stress_table_parses_json() -> None:
     )
     request = _base_request()
     result = resolve_material(request, _as_record(record))
-    assert result.allowable_stress_mpa == pytest.approx(
-        {-20.0: 150.0, 100.0: 120.5}
-    )
+    assert result.allowable_stress_mpa == pytest.approx({-20.0: 150.0, 100.0: 120.5})
 
 
 def test_resolve_allowable_stress_invalid_json_returns_incomplete() -> None:
@@ -389,10 +382,7 @@ def test_resolve_is_deterministic_across_invocations() -> None:
     result_1 = resolve_material(request, _as_record(record))
     # Use a deep copy so the underlying record is not mutated.
     result_2 = resolve_material(request, _as_record(copy.deepcopy(record)))
-    assert (
-        result_1.provenance.result_hash
-        == result_2.provenance.result_hash
-    )
+    assert result_1.provenance.result_hash == result_2.provenance.result_hash
     assert result_1.to_dict() == result_2.to_dict()
 
 
@@ -418,12 +408,8 @@ def test_frozen_contract_authority_shas_are_exposed() -> None:
     assert FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA == EXPECTED_AUTHORITY_COMMIT_SHA
     assert FROZEN_CONTRACT_AUTHORITY_BASE_SHA == EXPECTED_AUTHORITY_BASE_SHA
     # And they must round-trip to the design §19 SHA literals.
-    assert FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA == (
-        "6ed5b7dc7d8df163796eacb838afcf5702a4c53a"
-    )
-    assert FROZEN_CONTRACT_AUTHORITY_BASE_SHA == (
-        "fbb05ae71f21e6cfd4d1041afb5958c863166248"
-    )
+    assert FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA == ("6ed5b7dc7d8df163796eacb838afcf5702a4c53a")
+    assert FROZEN_CONTRACT_AUTHORITY_BASE_SHA == ("fbb05ae71f21e6cfd4d1041afb5958c863166248")
 
 
 # ----------------- Tests: forbidden-scope guards -----------------
@@ -455,8 +441,7 @@ def test_no_pressure_drop_correlation_id_anywhere_in_module() -> None:
     )
     for token in forbidden:
         assert token not in no_docstrings, (
-            f"forbidden pressure-drop token {token!r} found in "
-            f"material_selector.py"
+            f"forbidden pressure-drop token {token!r} found in material_selector.py"
         )
 
 
@@ -481,10 +466,7 @@ def test_no_cost_or_currency_or_capex_anywhere_in_module() -> None:
         "select_cost_record",
     )
     for token in forbidden:
-        assert token not in src, (
-            f"forbidden cost token {token!r} found in "
-            f"material_selector.py"
-        )
+        assert token not in src, f"forbidden cost token {token!r} found in material_selector.py"
 
 
 def test_module_does_not_import_geometry_catalogs_or_exchangers() -> None:
@@ -519,6 +501,5 @@ def test_module_does_not_implement_slices_b_c_d() -> None:
     )
     for token in forbidden:
         assert token not in no_docstrings, (
-            f"slice B/C/D token {token!r} found in "
-            f"material_selector.py executable code"
+            f"slice B/C/D token {token!r} found in material_selector.py executable code"
         )
