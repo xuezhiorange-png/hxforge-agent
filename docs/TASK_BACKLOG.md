@@ -50,7 +50,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-015A | Deterministic test environment and CI sharding | DONE | TASK-010 |
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
-| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **SLICE B IMPLEMENTATION READY FOR REVIEW** (MaterialSelector + MassCalculator; Slices C/D/Closeout: NOT AUTHORIZED) | TASK-017 design |
+| TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **SLICE C IMPLEMENTATION READY FOR REVIEW** (MaterialSelector + MassCalculator + PreliminaryMechanicalChecker allowable-stress check + tests; Slices D/Closeout: NOT AUTHORIZED) | TASK-017 design |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
@@ -398,10 +398,15 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 implementation Slice B files added | `src/hexagent/material_mass_mechanical/{__init__.py,mass_calculator.py}` + `tests/material_mass_mechanical/test_mass_calculator.py` |
 | TASK-017 implementation Slice B test count | 43 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
 | TASK-017 Slice B CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A test entry kept, Slice B entry inserted immediately after) |
-| TASK-017 implementation Slice C commit | (Slice C commit SHA — populated after push) |
+| TASK-017 implementation Slice C commit | `945d234479400be4c65d0e0f757bcbfcf70b22ab` (Slice C re-execution; supersedes `eba3956` Slice B + first Slice C attempt `384333a` Slice A governance-repair commit chain) |
 | TASK-017 implementation Slice C files added | `src/hexagent/material_mass_mechanical/{__init__.py,preliminary_checker.py,material_selector.py}` + `tests/material_mass_mechanical/test_preliminary_checker.py` |
 | TASK-017 implementation Slice C test count | 64 tests (pytest `tests/material_mass_mechanical/`); all passing under Python 3.12 |
 | TASK-017 Slice C CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A + Slice B entries kept, Slice C entry inserted immediately after) |
+| TASK-017 implementation Slice D commit | (Slice D commit SHA — populated after push) |
+| TASK-017 implementation Slice D files added | `src/hexagent/material_mass_mechanical/{__init__.py,preliminary_checker.py}` (extended additively; Slice C code region preserved byte-for-byte above the Slice D boundary) + `tests/material_mass_mechanical/{test_preliminary_checker.py,test_preliminary_checker_slice_d.py}` |
+| TASK-017 implementation Slice D test count | 72 tests in `test_preliminary_checker_slice_d.py` (PASS / BLOCKED_PRELIMINARY / BLOCKED_FOR_DETAILED_DESIGN / input-guard / frozen-dataclass / determinism / §5.3 orchestrator aggregation / Slice C parity tests); all passing under Python 3.12 |
+| TASK-017 implementation Slice D scope | Design §9.2 minimum-wall check + Design §9.3 straight-pipe-span check + Design §5.3 ``MechanicalCheckReport`` orchestrator (``run_mechanical_check_report``). Slice C's ``preliminary_check`` (§9.1) reused unchanged inside the orchestrator. Slice C code section (above the Slice D header line in ``preliminary_checker.py``) preserved unchanged. |
+| TASK-017 Slice D CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A + Slice B + Slice C entries kept, Slice D entry inserted immediately after; no other shards / files modified, no structural mutation) |
 | TASK-015A historical | CLOSED / MERGED (unchanged; no TASK-015A asset mutated by any TASK-015 follow-up slice) |
 | TASK-016+ | PLANNED / NOT STARTED |
 

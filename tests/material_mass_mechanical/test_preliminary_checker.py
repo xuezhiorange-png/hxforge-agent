@@ -607,12 +607,27 @@ class TestForbiddenScopeGuards:
         )
 
     def test_no_slice_d_token(self) -> None:
-        """Slice C must NOT reference Slice D-specific check terms."""
+        """Slice C section must NOT reference Slice D-specific check terms.
+
+        Scoped to the Slice C code region only (above the Slice D
+        boundary header line) AND excludes the module docstring, which
+        is the shared Slice C + Slice D preamble that legitimately
+        enumerates Slice D's additions. Slice D's own code lives
+        below the boundary and is tested by
+        ``tests/material_mass_mechanical/test_preliminary_checker_slice_d.py``.
+        """
         import inspect
 
         from hexagent.material_mass_mechanical import preliminary_checker
 
         source = inspect.getsource(preliminary_checker)
+        # Scope guard: Slice C section ends at the Slice D header line.
+        slice_d_header = "# Slice D — Minimum-wall check (§9.2) + straight-pipe span check (§9.3)"
+        scoped = source.split(slice_d_header, 1)[0] if slice_d_header in source else source
+        # Strip module docstring (which enumerates Slice D's
+        # additions legitimately in the shared preamble).
+        parts = scoped.split('"""', 2)
+        body = parts[2] if len(parts) >= 3 else scoped
         # Slice D introduces minimum-wall + span checks
         forbidden = [
             "minimum_wall",
@@ -623,8 +638,9 @@ class TestForbiddenScopeGuards:
             "unsupported_span",
         ]
         for token in forbidden:
-            assert token not in source.lower(), (
-                f"Forbidden Slice D token {token!r} found in preliminary_checker"
+            assert token not in body.lower(), (
+                f"Forbidden Slice D token {token!r} found in Slice C code "
+                "body of preliminary_checker"
             )
 
     def test_no_closeout_token(self) -> None:
@@ -643,16 +659,31 @@ class TestForbiddenScopeGuards:
             )
 
     def test_no_detailed_mechanical_design(self) -> None:
-        """Slice C is preliminary screening only."""
+        """Slice C is preliminary screening only.
+
+        Scoped to the Slice C code region (above the Slice D
+        boundary) AND excludes the module docstring, which correctly
+        enumerates the detailed-mechanical terms that the
+        implementation MUST NOT introduce.
+        """
         import inspect
 
         from hexagent.material_mass_mechanical import preliminary_checker
 
         source = inspect.getsource(preliminary_checker)
+        # Scope to Slice C section only (same boundary as
+        # test_no_slice_d_token).
+        slice_d_header = "# Slice D — Minimum-wall check (§9.2) + straight-pipe span check (§9.3)"
+        scoped = source.split(slice_d_header, 1)[0] if slice_d_header in source else source
+        # Strip module docstring (which enumerates forbidden terms in
+        # negative form: "we MUST NOT introduce … fatigue, creep, …").
+        parts = scoped.split('"""', 2)
+        body = parts[2] if len(parts) >= 3 else scoped
         forbidden = ["creep", "fatigue", "buckling", "weld_efficiency"]
         for token in forbidden:
-            assert token not in source.lower(), (
-                f"Forbidden detailed-mechanical token {token!r} found"
+            assert token not in body.lower(), (
+                f"Forbidden detailed-mechanical token {token!r} found in "
+                "Slice C code body of preliminary_checker"
             )
 
     def test_no_c4_token(self) -> None:

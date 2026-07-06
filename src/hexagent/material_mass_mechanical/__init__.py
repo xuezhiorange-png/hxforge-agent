@@ -12,7 +12,10 @@ and the TASK-016 approved geometry catalog.
 Slice A: MaterialSelector only.
 Slice B: MassCalculator + MassBreakdown (consumes Slice A).
 Slice C: PreliminaryMechanicalChecker (allowable-stress check only; consumes Slice A).
-Slices D / Closeout are NOT YET IMPLEMENTED.
+Slice D: PreliminaryMechanicalChecker extended with minimum-wall (§9.2)
+        and straight-pipe-span (§9.3) preliminary screening checks;
+        plus a §5.3 ``MechanicalCheckReport`` orchestrator.
+Slice E (closeout) is NOT YET IMPLEMENTED.
 The TASK-017 application layer NEVER modifies TASK-013 records,
 NEVER introduces pressure-drop / C4 / cost / new-solver logic,
 and NEVER bypasses the TASK-013 closed-set enums.
@@ -56,10 +59,22 @@ from hexagent.material_mass_mechanical.material_selector import (
 from hexagent.material_mass_mechanical.preliminary_checker import (
     MECHANICAL_ROLES_FROZEN_ORDER,
     SUPPORTED_MECHANICAL_ROLES,
+    MechanicalCheckReport,
+    MechanicalCheckReportProvenance,
+    MechanicalCheckRequest,
+    MinimumWallCheckProvenance,
+    MinimumWallCheckRequest,
+    MinimumWallCheckResult,
     PreliminaryCheckProvenance,
     PreliminaryCheckRequest,
     PreliminaryCheckResult,
+    StraightPipeSpanCheckProvenance,
+    StraightPipeSpanCheckRequest,
+    StraightPipeSpanCheckResult,
+    check_minimum_wall,
+    check_straight_pipe_span,
     preliminary_check,
+    run_mechanical_check_report,
 )
 
 __all__ = [
@@ -86,18 +101,30 @@ __all__ = [
     "MaterialResolutionRequest",
     "MaterialResolutionResult",
     "MaterialSelectorError",
+    "MechanicalCheckReport",
+    "MechanicalCheckReportProvenance",
+    "MechanicalCheckRequest",
+    "MinimumWallCheckProvenance",
+    "MinimumWallCheckRequest",
+    "MinimumWallCheckResult",
     "PreliminaryCheckProvenance",
     "PreliminaryCheckRequest",
     "PreliminaryCheckResult",
     "PROPERTY_NAME_ALLOWABLE_STRESS",
     "PROPERTY_NAME_DENSITY",
     "PROPERTY_NAME_YOUNGS_MODULUS",
+    "StraightPipeSpanCheckProvenance",
+    "StraightPipeSpanCheckRequest",
+    "StraightPipeSpanCheckResult",
     "SUPPORTED_MECHANICAL_ROLES",
     "UNIT_ALLOWABLE_STRESS",
     "UNIT_DENSITY",
     "UNIT_YOUNGS_MODULUS",
     "calculate_mass_breakdown",
+    "check_minimum_wall",
+    "check_straight_pipe_span",
     "float_to_decimal_string",
     "preliminary_check",
     "resolve_material",
+    "run_mechanical_check_report",
 ]
