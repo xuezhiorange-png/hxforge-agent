@@ -290,18 +290,15 @@ def _require_positive_dimension(name: str, value: float) -> float:
         raise MaterialSelectorError(
             code=ERROR_INPUT_DIMENSIONAL_INCONSISTENT,
             message=(
-                f"{name} must be a finite number; "
-                f"observed non-finite value (NaN or ±Infinity)"
+                f"{name} must be a finite number; observed non-finite value (NaN or ±Infinity)"
             ),
-            context={"field": name, "observed": repr(value)}
+            context={"field": name, "observed": repr(value)},
         )
     if value < 0.0:
         raise MaterialSelectorError(
             code=ERROR_INPUT_DIMENSIONAL_INCONSISTENT,
-            message=(
-                f"{name} must be non-negative; observed negative value"
-            ),
-            context={"field": name, "observed": value}
+            message=(f"{name} must be non-negative; observed negative value"),
+            context={"field": name, "observed": value},
         )
     return value
 
@@ -323,7 +320,7 @@ def _check_geometry_approved(geometry_id: str, approval_state: str) -> None:
             context={
                 "geometry_record_id": geometry_id,
                 "observed_approval_state": approval_state,
-            }
+            },
         )
 
 
@@ -341,14 +338,13 @@ def _check_dimension_consistency(
         raise MaterialSelectorError(
             code=ERROR_GEOMETRY_CATALOG_INCONSISTENT,
             message=(
-                "geometry record has inconsistent dimensions: "
-                "outer_diameter_m < inner_diameter_m"
+                "geometry record has inconsistent dimensions: outer_diameter_m < inner_diameter_m"
             ),
             context={
                 "geometry_record_id": geometry_id,
                 "outer_diameter_m": outer_diameter_m,
                 "inner_diameter_m": inner_diameter_m,
-            }
+            },
         )
 
 
@@ -377,7 +373,7 @@ def _resolve_tube_record(
         context={
             "hairpin_geometry_id": hairpin_geometry_id,
             "tube_geometry_id": tube_geometry_id,
-        }
+        },
     )
 
 
@@ -441,13 +437,12 @@ def _hairpin_bend_kg(
         raise MaterialSelectorError(
             code=ERROR_HAIRPIN_BEND_INPUT_INCOMPLETE,
             message=(
-                "hairpin number_of_tubes must be a positive integer; "
-                f"observed {number_of_tubes!r}"
+                f"hairpin number_of_tubes must be a positive integer; observed {number_of_tubes!r}"
             ),
             context={
                 "field": "number_of_tubes",
                 "observed": number_of_tubes,
-            }
+            },
         )
     arc_length_m = math.pi * bend_radius_m
     if effective_length_m < arc_length_m:
@@ -462,7 +457,7 @@ def _hairpin_bend_kg(
                 "effective_length_m": effective_length_m,
                 "arc_length_m": arc_length_m,
                 "bend_radius_m": bend_radius_m,
-            }
+            },
         )
     cross_section_area_m2 = math.pi * (
         (tube_outer_diameter_m / 2.0) ** 2 - (tube_inner_diameter_m / 2.0) ** 2
@@ -502,7 +497,7 @@ def _fittings_kg(
                 "fittings role material resolution has no density_kg_m3; "
                 "cannot apply density-normalized fittings mass formula"
             ),
-            context={"component_role": "fittings"}
+            context={"component_role": "fittings"},
         )
     total_override_kg = 0.0
     for idx, override in enumerate(fitting_overrides_kg):
@@ -516,19 +511,18 @@ def _fittings_kg(
                 context={
                     "field": f"fitting_overrides_kg[{idx}]",
                     "observed": repr(override),
-                }
+                },
             )
         if override < 0.0:
             raise MaterialSelectorError(
                 code=ERROR_INPUT_DIMENSIONAL_INCONSISTENT,
                 message=(
-                    f"fitting_overrides_kg[{idx}] must be non-negative; "
-                    "observed negative value"
+                    f"fitting_overrides_kg[{idx}] must be non-negative; observed negative value"
                 ),
                 context={
                     "field": f"fitting_overrides_kg[{idx}]",
                     "observed": override,
-                }
+                },
             )
         total_override_kg += override
     if density_normalization:
@@ -581,9 +575,7 @@ def calculate_mass_breakdown(
     # tube / pipe records (which MUST be resolvable via the supplied
     # catalog when one is present; otherwise the calculator can only
     # honor the hairpin formula path).
-    hairpin_record = (
-        geometry_record if isinstance(geometry_record, HairpinGeometryRecord) else None
-    )
+    hairpin_record = geometry_record if isinstance(geometry_record, HairpinGeometryRecord) else None
     # Narrow straight_carrier_outer / _inner to float in both branches.
     straight_carrier_outer_m: float
     straight_carrier_inner_m: float
@@ -618,9 +610,7 @@ def calculate_mass_breakdown(
         straight_carrier_outer_m = straight_carrier.outer_diameter_m
         straight_carrier_inner_m = straight_carrier.inner_diameter_m
         straight_carrier_geometry_id = straight_carrier.geometry_id
-        _check_geometry_approved(
-            straight_carrier.geometry_id, straight_carrier.approval_state
-        )
+        _check_geometry_approved(straight_carrier.geometry_id, straight_carrier.approval_state)
     else:
         # narrow: non-hairpin means TubeGeometryRecord or PipeGeometryRecord
         assert isinstance(geometry_record, (TubeGeometryRecord, PipeGeometryRecord))
@@ -650,13 +640,11 @@ def calculate_mass_breakdown(
             context={
                 "missing_roles": missing_roles,
                 "expected_roles": list(COMPONENT_ROLES_FROZEN_ORDER),
-            }
+            },
         )
     # Also reject any extra keys that are not in the frozen four-role set
     # (design §5.2.1: closed set; extra roles are not allowed).
-    extra_roles: list[str] = [
-        role for role in resolutions if role not in COMPONENT_ROLE_CLOSED_SET
-    ]
+    extra_roles: list[str] = [role for role in resolutions if role not in COMPONENT_ROLE_CLOSED_SET]
     if extra_roles:
         raise MaterialSelectorError(
             code=ERROR_MATERIAL_RESOLUTION_MISSING_ROLE,
@@ -667,7 +655,7 @@ def calculate_mass_breakdown(
             context={
                 "extra_roles": sorted(extra_roles),
                 "expected_roles": sorted(COMPONENT_ROLE_CLOSED_SET),
-            }
+            },
         )
 
     # Step 3 — Material approval gate (design §7: MATERIAL_GOVERNANCE_UNAPPROVED).
@@ -690,7 +678,7 @@ def calculate_mass_breakdown(
                     "component_role": role,
                     "result_material_record_id": result.material_record_id,
                     "provenance_material_record_id": result.provenance.material_record_id,
-                }
+                },
             )
 
     # Step 4 — Per-component mass computation (design §6).
@@ -703,11 +691,8 @@ def calculate_mass_breakdown(
     if inner_tube_resolution.density_kg_m3 is None:
         raise MaterialSelectorError(
             code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
-            message=(
-                "inner_tube material resolution has no density_kg_m3; "
-                "cannot compute mass"
-            ),
-            context={"component_role": "inner_tube"}
+            message=("inner_tube material resolution has no density_kg_m3; cannot compute mass"),
+            context={"component_role": "inner_tube"},
         )
     # Straight-pipe inner / outer tube mass uses the request-level
     # effective_length_m (the TASK-016 Tube / Pipe records do not
@@ -737,11 +722,8 @@ def calculate_mass_breakdown(
     if outer_pipe_resolution.density_kg_m3 is None:
         raise MaterialSelectorError(
             code=ERROR_MATERIAL_GOVERNANCE_INCOMPLETE,
-            message=(
-                "outer_pipe material resolution has no density_kg_m3; "
-                "cannot compute mass"
-            ),
-            context={"component_role": "outer_pipe"}
+            message=("outer_pipe material resolution has no density_kg_m3; cannot compute mass"),
+            context={"component_role": "outer_pipe"},
         )
     outer_pipe_kg_raw = _straight_pipe_section_kg(
         density_kg_m3=outer_pipe_resolution.density_kg_m3,
@@ -763,7 +745,7 @@ def calculate_mass_breakdown(
                     "hairpin_bend material resolution has no density_kg_m3; "
                     "cannot compute hairpin mass"
                 ),
-                context={"component_role": "hairpin_bend"}
+                context={"component_role": "hairpin_bend"},
             )
         if catalog is None:
             raise MaterialSelectorError(
@@ -776,7 +758,7 @@ def calculate_mass_breakdown(
                 context={
                     "hairpin_geometry_id": hairpin_record.geometry_id,
                     "tube_geometry_id": hairpin_record.tube_geometry_id,
-                }
+                },
             )
         # Check the referenced tube record is also approved (design §7
         # geometry approval gate applied to references, mirroring
@@ -786,9 +768,7 @@ def calculate_mass_breakdown(
             tube_geometry_id=hairpin_record.tube_geometry_id,
             hairpin_geometry_id=hairpin_record.geometry_id,
         )
-        _check_geometry_approved(
-            tube_record.geometry_id, tube_record.approval_state
-        )
+        _check_geometry_approved(tube_record.geometry_id, tube_record.approval_state)
         hairpin_bend_kg_raw = _hairpin_bend_kg(
             density_kg_m3=hairpin_bend_resolution.density_kg_m3,
             tube_outer_diameter_m=tube_record.outer_diameter_m,
@@ -819,9 +799,7 @@ def calculate_mass_breakdown(
     outer_pipe_kg = _quantize_kg(outer_pipe_kg_raw)
     hairpin_bend_kg = _quantize_kg(hairpin_bend_kg_raw)
     fittings_kg = _quantize_kg(fittings_kg_raw)
-    total_kg = _quantize_kg(
-        inner_tube_kg + outer_pipe_kg + hairpin_bend_kg + fittings_kg
-    )
+    total_kg = _quantize_kg(inner_tube_kg + outer_pipe_kg + hairpin_bend_kg + fittings_kg)
 
     # Step 6 — Deterministic calculation_hash (§10.4 SHA-256 over
     # canonical JSON of the breakdown's *numerical* content; provenance
@@ -849,16 +827,10 @@ def calculate_mass_breakdown(
     # the convention of recording one material record id per
     # breakdown.
     provenance_payload: dict[str, Any] = {
-        "applicable_standard_id": (
-            inner_tube_resolution.provenance.applicable_standard_id
-        ),
+        "applicable_standard_id": (inner_tube_resolution.provenance.applicable_standard_id),
         "correlation_ids": [],
-        "design_pressure_mpa": (
-            inner_tube_resolution.provenance.design_pressure_mpa
-        ),
-        "design_temperature_c": (
-            inner_tube_resolution.provenance.design_temperature_c
-        ),
+        "design_pressure_mpa": (inner_tube_resolution.provenance.design_pressure_mpa),
+        "design_temperature_c": (inner_tube_resolution.provenance.design_temperature_c),
         "geometry_record_id": geometry_id,
         "git_commit": FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA,
         "material_record_id": inner_tube_resolution.material_record_id,
@@ -883,15 +855,9 @@ def calculate_mass_breakdown(
     provenance = MassProvenance(
         geometry_record_id=geometry_id,
         material_record_id=inner_tube_resolution.material_record_id,
-        applicable_standard_id=(
-            inner_tube_resolution.provenance.applicable_standard_id
-        ),
-        design_pressure_mpa=(
-            inner_tube_resolution.provenance.design_pressure_mpa
-        ),
-        design_temperature_c=(
-            inner_tube_resolution.provenance.design_temperature_c
-        ),
+        applicable_standard_id=(inner_tube_resolution.provenance.applicable_standard_id),
+        design_pressure_mpa=(inner_tube_resolution.provenance.design_pressure_mpa),
+        design_temperature_c=(inner_tube_resolution.provenance.design_temperature_c),
         correlation_ids=(),
         software_version="0.1.0",
         git_commit=FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA,
@@ -907,5 +873,3 @@ def calculate_mass_breakdown(
         calculation_hash=calculation_hash,
         provenance=provenance,
     )
-
-

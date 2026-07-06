@@ -102,9 +102,7 @@ def _base_material_record(
     via ``resolve_material`` (consumed by Slice B as the per-role
     MaterialResolutionResult source)."""
     if allowable_table_json is None:
-        allowable_table_json = (
-            '{"20": "137.895", "200": "103.421", "400": "68.947"}'
-        )
+        allowable_table_json = '{"20": "137.895", "200": "103.421", "400": "68.947"}'
     record: dict[str, Any] = {
         "material_record_id": record_id,
         "material_record_version": "1.0.0",
@@ -171,14 +169,10 @@ def _make_tube_record(
     """Construct a TubeGeometryRecord fixture."""
     if wall_thickness_m is None:
         wall_thickness_m = (outer_diameter_m - inner_diameter_m) / 2.0
-    cross_section_area = math.pi * (
-        (outer_diameter_m / 2.0) ** 2 - (inner_diameter_m / 2.0) ** 2
-    )
+    cross_section_area = math.pi * ((outer_diameter_m / 2.0) ** 2 - (inner_diameter_m / 2.0) ** 2)
     inner_radius = inner_diameter_m / 2.0
-    flow_area = math.pi * inner_radius ** 2
-    hydraulic_diameter = (
-        4.0 * flow_area / cross_section_area if cross_section_area > 0 else 0.0
-    )
+    flow_area = math.pi * inner_radius**2
+    hydraulic_diameter = 4.0 * flow_area / cross_section_area if cross_section_area > 0 else 0.0
     return TubeGeometryRecord(
         geometry_id=geometry_id,
         approval_state=approval_state,
@@ -206,14 +200,10 @@ def _make_pipe_record(
     """Construct a PipeGeometryRecord fixture."""
     if wall_thickness_m is None:
         wall_thickness_m = (outer_diameter_m - inner_diameter_m) / 2.0
-    cross_section_area = math.pi * (
-        (outer_diameter_m / 2.0) ** 2 - (inner_diameter_m / 2.0) ** 2
-    )
+    cross_section_area = math.pi * ((outer_diameter_m / 2.0) ** 2 - (inner_diameter_m / 2.0) ** 2)
     inner_radius = inner_diameter_m / 2.0
-    flow_area = math.pi * inner_radius ** 2
-    hydraulic_diameter = (
-        4.0 * flow_area / cross_section_area if cross_section_area > 0 else 0.0
-    )
+    flow_area = math.pi * inner_radius**2
+    hydraulic_diameter = 4.0 * flow_area / cross_section_area if cross_section_area > 0 else 0.0
     return PipeGeometryRecord(
         geometry_id=geometry_id,
         approval_state=approval_state,
@@ -290,9 +280,7 @@ def _resolve_material(
     )
     if not include_density:
         record["property_values"] = [
-            pv
-            for pv in record["property_values"]
-            if pv["property_name"] != PROPERTY_NAME_DENSITY
+            pv for pv in record["property_values"] if pv["property_name"] != PROPERTY_NAME_DENSITY
         ]
     request = MaterialResolutionRequest(
         component_role=component_role,
@@ -332,6 +320,7 @@ def _four_role_resolutions(
             MaterialProvenance,
             MaterialResolutionResult,
         )
+
         provenance = MaterialProvenance(
             geometry_record_id="geom:test",
             material_record_id=record_id,
@@ -426,10 +415,7 @@ def test_inner_tube_mass_formula_matches_design_section_6_1() -> None:
     expected_inner_tube_kg = (
         expected_density_kg_m3
         * math.pi
-        * (
-            (expected_outer_m / 2.0) ** 2
-            - (expected_inner_m / 2.0) ** 2
-        )
+        * ((expected_outer_m / 2.0) ** 2 - (expected_inner_m / 2.0) ** 2)
         * expected_length_m
     )
     expected_inner_tube_kg_q = float(
@@ -442,9 +428,7 @@ def test_inner_tube_mass_formula_matches_design_section_6_1() -> None:
         material_resolutions_by_component_role=resolutions,
     )
     breakdown = calculate_mass_breakdown(request)
-    assert breakdown.inner_tube_kg == pytest.approx(
-        expected_inner_tube_kg_q, rel=1e-6
-    )
+    assert breakdown.inner_tube_kg == pytest.approx(expected_inner_tube_kg_q, rel=1e-6)
     assert breakdown.inner_tube_kg > 0.0
 
 
@@ -461,10 +445,7 @@ def test_outer_pipe_mass_formula_matches_design_section_6_2() -> None:
     expected_outer_pipe_kg = (
         expected_density_kg_m3
         * math.pi
-        * (
-            (expected_outer_m / 2.0) ** 2
-            - (expected_inner_m / 2.0) ** 2
-        )
+        * ((expected_outer_m / 2.0) ** 2 - (expected_inner_m / 2.0) ** 2)
         * expected_length_m
     )
     expected_outer_pipe_kg_q = float(
@@ -477,9 +458,7 @@ def test_outer_pipe_mass_formula_matches_design_section_6_2() -> None:
         material_resolutions_by_component_role=resolutions,
     )
     breakdown = calculate_mass_breakdown(request)
-    assert breakdown.outer_pipe_kg == pytest.approx(
-        expected_outer_pipe_kg_q, rel=1e-6
-    )
+    assert breakdown.outer_pipe_kg == pytest.approx(expected_outer_pipe_kg_q, rel=1e-6)
 
 
 def test_straight_pipe_zero_length_produces_zero_mass() -> None:
@@ -587,15 +566,12 @@ def test_hairpin_bend_mass_formula_matches_design_section_6_3() -> None:
     )
     breakdown = calculate_mass_breakdown(request, catalog=catalog)
     expected_area = math.pi * (
-        (tube_record.outer_diameter_m / 2.0) ** 2
-        - (tube_record.inner_diameter_m / 2.0) ** 2
+        (tube_record.outer_diameter_m / 2.0) ** 2 - (tube_record.inner_diameter_m / 2.0) ** 2
     )
     expected_arc = math.pi * bend_radius_m
     expected_volume = expected_area * expected_arc * number_of_tubes
     expected_kg = 7850.0 * expected_volume
-    expected_kg_q = float(
-        Decimal(str(expected_kg)).quantize(Decimal("0.000001"))
-    )
+    expected_kg_q = float(Decimal(str(expected_kg)).quantize(Decimal("0.000001")))
     assert breakdown.hairpin_bend_kg == pytest.approx(expected_kg_q, rel=1e-6)
     assert breakdown.hairpin_bend_kg > 0.0
 
@@ -704,9 +680,7 @@ def test_fittings_mass_density_normalization_default() -> None:
     )
     breakdown = calculate_mass_breakdown(request)
     expected = (1.0 + 2.0 + 3.5) * (7850.0 / 7850.0)
-    expected_q = float(
-        Decimal(str(expected)).quantize(Decimal("0.000001"))
-    )
+    expected_q = float(Decimal(str(expected)).quantize(Decimal("0.000001")))
     assert breakdown.fittings_kg == pytest.approx(expected_q, rel=1e-6)
 
 
@@ -888,9 +862,7 @@ def test_provenance_carries_all_eight_required_fields_plus_result_hash() -> None
         "result_hash",
     }
     assert set(provenance_dict.keys()) == expected_fields
-    assert (
-        breakdown.provenance.git_commit == FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA
-    )
+    assert breakdown.provenance.git_commit == FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA
     assert breakdown.provenance.geometry_record_id == tube_record.geometry_id
 
 
@@ -930,9 +902,7 @@ def test_module_does_not_import_pressure_drop_correlations() -> None:
         "reynolds",
     ]
     for token in forbidden_tokens:
-        assert token not in source, (
-            f"forbidden pressure-drop token {token!r} found"
-        )
+        assert token not in source, f"forbidden pressure-drop token {token!r} found"
 
 
 def test_module_does_not_import_cost_or_currency_code() -> None:
@@ -950,9 +920,7 @@ def test_module_does_not_import_cost_or_currency_code() -> None:
         "lifecycle",
     ]
     for token in forbidden_tokens:
-        assert token not in source, (
-            f"forbidden cost token {token!r} found"
-        )
+        assert token not in source, f"forbidden cost token {token!r} found"
 
 
 def test_module_does_not_emit_slice_c_d_or_closeout_behavior() -> None:
@@ -971,9 +939,7 @@ def test_module_does_not_emit_slice_c_d_or_closeout_behavior() -> None:
         "MECHANICAL_CHECK_UNSUPPORTED_ROLE",
     ]
     for token in forbidden_tokens:
-        assert token not in source, (
-            f"forbidden Slice C/D token {token!r} found"
-        )
+        assert token not in source, f"forbidden Slice C/D token {token!r} found"
 
 
 def test_module_does_not_mutate_geometry_catalog_or_material_records() -> None:
@@ -990,9 +956,7 @@ def test_module_does_not_mutate_geometry_catalog_or_material_records() -> None:
         "property_values.remove",
     ]
     for token in forbidden_mutations:
-        assert token not in source, (
-            f"forbidden mutation token {token!r} found"
-        )
+        assert token not in source, f"forbidden mutation token {token!r} found"
 
 
 def test_module_does_not_depend_on_github_actions_or_ci() -> None:
@@ -1006,9 +970,7 @@ def test_module_does_not_depend_on_github_actions_or_ci() -> None:
         ".github",
     ]
     for token in forbidden_tokens:
-        assert token not in source, (
-            f"forbidden CI token {token!r} found"
-        )
+        assert token not in source, f"forbidden CI token {token!r} found"
 
 
 # ----------------- Tests: dataclass shape -----------------
@@ -1140,10 +1102,7 @@ def test_result_hash_changes_when_input_changes() -> None:
     )
     breakdown_a = calculate_mass_breakdown(request_a)
     breakdown_b = calculate_mass_breakdown(request_b)
-    assert (
-        breakdown_a.provenance.result_hash
-        != breakdown_b.provenance.result_hash
-    )
+    assert breakdown_a.provenance.result_hash != breakdown_b.provenance.result_hash
 
 
 # ----------------- Tests: total_kg consistency -----------------
