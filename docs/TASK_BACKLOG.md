@@ -51,7 +51,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
 | TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **TASK-017 IMPLEMENTATION CLOSEOUT READY FOR REVIEW** (MaterialSelector + MassCalculator + PreliminaryMechanicalChecker §9.1 + §9.2 + §9.3 + §5.3 orchestrator + tests; PR #75 remains DRAFT; Ready / merge / Issue #74 close: NOT AUTHORIZED — pending separate Charles authorization) | TASK-017 design |
-| TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | PLANNED | TASK-009, TASK-013, TASK-017 |
+| TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
 ## M3 — Shell-and-tube single phase
@@ -385,6 +385,24 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 design PR CI | `28748836440` — completed / success / head_sha `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` exact match |
 | TASK-017 design frozen contract file | `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md` |
 | TASK-017 design status | **DESIGN FROZEN** / Implementation Issue: #74 OPEN |
+| TASK-018 design Issue | #76 — OPEN (close deferred to Issue #76 closeout-authorization round after this closeout docs PR merges to main) |
+| TASK-018 design branch | `docs/task-018-c0-c1-cost-life-cycle-energy-design` (merged via PR #77; PR-head CI `28858333023` completed/success, branch is now fully subsumed into main at `05e4990f1…`) |
+| TASK-018 design base | `5f96cf761d470b82faa1a5d164eefd42360c7df9` (main @ PR #75 merge) |
+| TASK-018 design reviewed Head (pre-freeze) | `19200bf1a3c5d86b6b6129a3fc78c820ff9d3fa8` |
+| TASK-018 Frozen Contract Authority Commit SHA | `19200bf1a3c5d86b6b6129a3fc78c820ff9d3fa8` |
+| TASK-018 Frozen Contract Authority Base SHA | `5f96cf761d470b82faa1a5d164eefd42360c7df9` |
+| TASK-018 design PR | #77 — MERGED (merge commit `05e4990f1fb00c10ac94812721b6630d0d61db8a`, merged_at `2026-07-07T11:07:50Z`) |
+| TASK-018 design PR-head CI | `28858333023` — completed / success / head_sha `19200bf1a3c5d86b6b6129a3fc78c820ff9d3fa8` exact match |
+| TASK-018 design post-merge main CI | `28861564333` — completed / success / head_sha `05e4990f1fb00c10ac94812721b6630d0d61db8a` exact match (= merge commit). 30 jobs total = 19 success + 11 push-policy-skipped + 0 failed + 0 cancelled (lint / parse-manifest / verify-manifest / collect-global-main py3.11+3.12 / 13 × shard-main py3.11+3.12 all green) |
+| TASK-018 design freeze comment | `4903276112` (sha256 `8601b2dee2dd98f3dd5df78a9bc7949889a62db2bbf6dd2c044526f39c074c7b`, 3430 bytes; posted 2026-07-07T11:29:52Z) |
+| TASK-018 design review verdict (Round-1) | `ACCEPTED_FOR_READY_AUTHORIZATION` (0 P0 / 0 P1 / 2 non-blocking P2 wording nits — P2-1 status-narrative staleness in §1; P2-2 incomplete 5-input enumeration in §3.2 — **deferred** to a future design-amendment PR per TASK-018 §19.3 anti-rewrite rule + TASK-017 design-amendment precedent PR #46) |
+| TASK-018 design frozen contract file | `docs/tasks/TASK-018-c0-c1-cost-and-life-cycle-energy.md` (636 lines; blob `e4a4d74a2d7acd224326dde42eaeab3da83b499e` on main @ `05e4990f1…`) |
+| TASK-018 design status | **DESIGN FROZEN** / Implementation Issue: NOT YET CREATED |
+| TASK-018 implementation Issue | NOT YET CREATED (implementation requires a separate Charles authorization round; TASK-018 implementation Issue may be created after this closeout docs PR merges to main and Issue #76 is closed) |
+| TASK-018 implementation branch | NOT YET CREATED |
+| TASK-018 implementation base | (n/a; will be `05e4990f1…` = main @ PR #77 merge when implementation round is authorized) |
+| TASK-018 implementation status | **NOT AUTHORIZED / NOT STARTED** |
+| TASK-019+ status (relative to TASK-018) | **PLANNED / NOT STARTED / NOT AUTHORIZED** |
 | TASK-017 implementation Issue | #74 — OPEN |
 | TASK-017 implementation branch | `codex/task-017-materials-mass-mechanical-implementation` |
 | TASK-017 implementation base | `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge) |
