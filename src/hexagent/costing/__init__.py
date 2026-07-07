@@ -21,19 +21,45 @@ Slice B scope (TASK-018 implementation round 2):
       minor units, deterministic UUID v5 ``calculator_run_id``,
       closed-set blocker / warning propagation.
 
-Slice B does NOT include:
-    - ``LifeCycleEnergyEstimator`` (TASK-018 §5.3) — Slice C,
-      separate authorization.
+Slice C scope (TASK-018 implementation round 3):
+    - ``life_cycle_energy_estimator`` — deterministic life-cycle energy /
+      OPEX envelope application layer (TASK-018 §5.3).  Consumes the Slice B
+      ``CostBreakdown`` envelope plus the TASK-008 / TASK-017 thermal
+      summary and the §5.3.1 caller-supplied inputs and produces the
+      §5.3.2 ``LifeCycleEnergyBreakdown`` with deterministic UUID v5
+      ``life_cycle_run_id``, integer minor units on monetary fields,
+      deterministic IEEE-754 round-trip on ``*_kwh`` floats, closed-set
+      blocker / warning propagation.
+    - Discount formula handling: per §5.3.2 Rule 2 the frozen contract
+      does NOT prescribe the discount formula.  Slice C implements under
+      **Option A**: emit ``discounted_total_minor_units: null`` plus an
+      ``unspecified_blocker`` with
+      ``details.reason = "discount_formula_pending_design_amendment"``,
+      following the §9 safety-net pattern.  A future TASK-018 §5.3
+      design-amendment PR is required before a real discounted total can
+      be computed; that amendment is NOT in this round.
+
+Slice C does NOT include:
+    - ``docs/TASK_BACKLOG.md`` mutation (governance-sync deferred to a
+      separate Charles-authorized round; the Slice A + Slice B rows in
+      the implementation sub-table are stale).
+    - A discount formula (reserved for a future TASK-018 §5.3
+      design-amendment PR).
+    - Slice D / closeout.
+    - TASK-019+ work.
+    - TASK-018 design file mutation.
+    - Frozen TASK-011..TASK-017 contracts mutation.
     - Currency conversion (TASK-018 §6.1: never converted).
     - C2 historical-project regression; C3 vendor quotation.
     - Pressure-drop / C4 logic.
-    - A new entry on the closed-set blocker / warning enums: out-of-envelope
-      ``c0_heuristic_overrides`` surface as ``unspecified_blocker`` with a
-      structured ``details.reason = "c0_heuristic_out_of_envelope"`` field,
-      which is the §9 safety-net pattern for a runtime fault not present
-      in the frozen closed set.  Adding a dedicated
-      ``c0_heuristic_out_of_envelope_blocker`` requires a separate §9
-      design-amendment PR.
+    - A new entry on the closed-set blocker / warning enums:
+      out-of-envelope ``fouling_energy_penalty_factor`` surfaces as
+      ``unspecified_blocker`` with a structured
+      ``details.reason = "fouling_energy_penalty_factor_out_of_envelope"``
+      field, which is the §9 safety-net pattern for a runtime fault not
+      present in the frozen closed set.  Adding a dedicated
+      ``fouling_energy_penalty_factor_out_of_envelope_blocker`` requires a
+      separate §9 design-amendment PR.
 
 All public entry points are read-only with respect to the TASK-013 cost
 records they consume; no caller-supplied record mutation is performed
@@ -64,6 +90,16 @@ from .errors import (
     CostSelectorWarning,
     WarningCode,
 )
+from .life_cycle_energy_estimator import (
+    FOULING_ENERGY_PENALTY_MAX,
+    FOULING_ENERGY_PENALTY_MIN,
+    LIFECYCLE_SCHEMA_VERSION,
+    LifeCycleEnergyBreakdown,
+    LifeCycleEnergyEstimatorInput,
+    SparesCostPerYear,
+    ThermalServiceSummary,
+    calculate_life_cycle_breakdown,
+)
 
 __all__ = [
     "BLOCKER_CODES",
@@ -77,11 +113,19 @@ __all__ = [
     "CostSelectorError",
     "CostSelectorWarning",
     "CostSubtotalBlock",
+    "FOULING_ENERGY_PENALTY_MAX",
+    "FOULING_ENERGY_PENALTY_MIN",
+    "LIFECYCLE_SCHEMA_VERSION",
+    "LifeCycleEnergyBreakdown",
+    "LifeCycleEnergyEstimatorInput",
     "SCHEMA_VERSION",
     "SOURCE_CURRENCY_SENTINEL",
+    "SparesCostPerYear",
     "SelectionFilters",
+    "ThermalServiceSummary",
     "WARNING_CODES",
     "WarningCode",
     "calculate_cost_breakdown",
+    "calculate_life_cycle_breakdown",
     "select_cost_records",
 ]  # noqa: F822
