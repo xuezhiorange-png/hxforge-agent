@@ -31,6 +31,8 @@ shards:
       - tests/material_costs/test_selection.py
       - tests/material_costs/test_validation.py
       - tests/material_costs/test_frozen_contract_unchanged.py
+      - tests/costing/test_cost_model_selector.py
+      - tests/costing/test_frozen_contract_unchanged.py
       - tests/material_mass_mechanical/test_material_selector.py
       - tests/material_mass_mechanical/test_mass_calculator.py
       - tests/material_mass_mechanical/test_preliminary_checker.py
