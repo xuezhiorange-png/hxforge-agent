@@ -397,7 +397,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-018 design freeze comment | `4903276112` (sha256 `8601b2dee2dd98f3dd5df78a9bc7949889a62db2bbf6dd2c044526f39c074c7b`, 3430 bytes; posted 2026-07-07T11:29:52Z) |
 | TASK-018 design review verdict (Round-1) | `ACCEPTED_FOR_READY_AUTHORIZATION` (0 P0 / 0 P1 / 2 non-blocking P2 wording nits — P2-1 status-narrative staleness in §1; P2-2 incomplete 5-input enumeration in §3.2 — **deferred** to a future design-amendment PR per TASK-018 §19.3 anti-rewrite rule + TASK-017 design-amendment precedent PR #46) |
 | TASK-018 design frozen contract file | `docs/tasks/TASK-018-c0-c1-cost-and-life-cycle-energy.md` (636 lines; blob `e4a4d74a2d7acd224326dde42eaeab3da83b499e` on main @ `05e4990f1…`) |
-| TASK-018 design status | **DESIGN FROZEN** / Implementation Issue: #83 (Slice C Issue) OPEN |
+| TASK-018 design status | **DESIGN FROZEN** / Slice A/B/C implementation Issues #79/#81/#83 CLOSED; closeout governance-sync Issue #85 OPEN |
 | TASK-018 implementation Issues | Slice A #79 / Slice B #81 / Slice C #83 — all CLOSED (state_reason=completed) |
 | TASK-018 implementation Issue (closeout governance-sync) | #85 — OPEN (documentation-only governance-sync round opened in this branch) |
 | TASK-018 implementation branches | Slice A: `codex/task-018-impl-slice-a-cost-model-selector` / Slice B: `codex/task-018-impl-slice-b-cost-calculator` / Slice C: `codex/task-018-impl-slice-c-life-cycle-energy-estimator` (all merged into main); Closeout docs branch: `docs/task-018-implementation-closeout-governance-sync` (this round) |
