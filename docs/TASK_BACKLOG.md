@@ -51,7 +51,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-016 | Add approved tube, pipe and hairpin geometry catalog | PLANNED | TASK-001 |
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
 | TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **TASK-017 IMPLEMENTATION CLOSEOUT READY FOR REVIEW** (MaterialSelector + MassCalculator + PreliminaryMechanicalChecker §9.1 + §9.2 + §9.3 + §5.3 orchestrator + tests; PR #75 remains DRAFT; Ready / merge / Issue #74 close: NOT AUTHORIZED — pending separate Charles authorization) | TASK-017 design |
-| TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-009, TASK-013, TASK-017 |
+| TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | **IMPLEMENTATION SLICES A/B/C MERGED / CLOSED OUT**; closeout governance-sync docs PR opened as documentation-only (Issue #85) | TASK-009, TASK-013, TASK-017 |
 | TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
 
 ## M3 — Shell-and-tube single phase
@@ -385,7 +385,7 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-017 design PR CI | `28748836440` — completed / success / head_sha `6ed5b7dc7d8df163796eacb838afcf5702a4c53a` exact match |
 | TASK-017 design frozen contract file | `docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md` |
 | TASK-017 design status | **DESIGN FROZEN** / Implementation Issue: #74 OPEN |
-| TASK-018 design Issue | #76 — OPEN (close deferred to Issue #76 closeout-authorization round after this closeout docs PR merges to main) |
+| TASK-018 design Issue | #76 — CLOSED (state_reason=completed, closed_at=`2026-07-07T11:59:55Z`) |
 | TASK-018 design branch | `docs/task-018-c0-c1-cost-life-cycle-energy-design` (merged via PR #77; PR-head CI `28858333023` completed/success, branch is now fully subsumed into main at `05e4990f1…`) |
 | TASK-018 design base | `5f96cf761d470b82faa1a5d164eefd42360c7df9` (main @ PR #75 merge) |
 | TASK-018 design reviewed Head (pre-freeze) | `19200bf1a3c5d86b6b6129a3fc78c820ff9d3fa8` |
@@ -397,12 +397,61 @@ TASK-140 through TASK-159 cover organizations, roles, review/approval workflow, 
 | TASK-018 design freeze comment | `4903276112` (sha256 `8601b2dee2dd98f3dd5df78a9bc7949889a62db2bbf6dd2c044526f39c074c7b`, 3430 bytes; posted 2026-07-07T11:29:52Z) |
 | TASK-018 design review verdict (Round-1) | `ACCEPTED_FOR_READY_AUTHORIZATION` (0 P0 / 0 P1 / 2 non-blocking P2 wording nits — P2-1 status-narrative staleness in §1; P2-2 incomplete 5-input enumeration in §3.2 — **deferred** to a future design-amendment PR per TASK-018 §19.3 anti-rewrite rule + TASK-017 design-amendment precedent PR #46) |
 | TASK-018 design frozen contract file | `docs/tasks/TASK-018-c0-c1-cost-and-life-cycle-energy.md` (636 lines; blob `e4a4d74a2d7acd224326dde42eaeab3da83b499e` on main @ `05e4990f1…`) |
-| TASK-018 design status | **DESIGN FROZEN** / Implementation Issue: NOT YET CREATED |
-| TASK-018 implementation Issue | NOT YET CREATED (implementation requires a separate Charles authorization round; TASK-018 implementation Issue may be created after this closeout docs PR merges to main and Issue #76 is closed) |
-| TASK-018 implementation branch | NOT YET CREATED |
-| TASK-018 implementation base | (n/a; will be `05e4990f1…` = main @ PR #77 merge when implementation round is authorized) |
-| TASK-018 implementation status | **NOT AUTHORIZED / NOT STARTED** |
-| TASK-019+ status (relative to TASK-018) | **PLANNED / NOT STARTED / NOT AUTHORIZED** |
+| TASK-018 design status | **DESIGN FROZEN** / Slice A/B/C implementation Issues #79/#81/#83 CLOSED; closeout governance-sync Issue #85 OPEN |
+| TASK-018 implementation Issues | Slice A #79 / Slice B #81 / Slice C #83 — all CLOSED (state_reason=completed) |
+| TASK-018 implementation Issue (closeout governance-sync) | #85 — OPEN (documentation-only governance-sync round opened in this branch) |
+| TASK-018 implementation branches | Slice A: `codex/task-018-impl-slice-a-cost-model-selector` / Slice B: `codex/task-018-impl-slice-b-cost-calculator` / Slice C: `codex/task-018-impl-slice-c-life-cycle-energy-estimator` (all merged into main); Closeout docs branch: `docs/task-018-implementation-closeout-governance-sync` (this round) |
+| TASK-018 implementation bases | Slice A: `19200bf1a3c5d86b6b6129a3fc78c820ff9d3fa8` (design frozen commit; design PR-head CI `28858333023` completed/success per `TASK-018 design PR-head CI` row above) → merged to main at `1a9c8121…` via PR #80; Slice B: `a78fac1068c150b80e2bb7f717f1b182e515a38d` (main @ PR #78 / design closeout merge) → merged to main at `8c6487da…` via PR #82; Slice C: `8c6487da5808430571d14424e92e5a478fc6e7e2` (main @ PR #82 / Slice B merge) → merged to main at `ef7ee33f…` via PR #84; Closeout docs base: `ef7ee33f238128219b4ddf0a198afbe1457582b2` (this round) |
+| TASK-018 implementation status | Slice A: DONE / MERGED / MAIN-CI-VERIFIED / CLOSED (PR #80 / Issue #79); Slice B: DONE / MERGED / MAIN-CI-VERIFIED / CLOSED (PR #82 / Issue #81); Slice C: DONE / MERGED / MAIN-CI-VERIFIED / CLOSED (PR #84 / Issue #83); Closeout governance-sync docs PR: PENDING (DRAFT — this round) |
+| TASK-018+ status (relative to TASK-018) | TASK-019+ PLANNED / NOT STARTED / NOT AUTHORIZED |
+| TASK-018 implementation Slice A Issue | #79 — CLOSED (state_reason=completed, closed_at=`2026-07-07T14:06:10Z`, comments=1) |
+| TASK-018 implementation Slice A closeout comment | `4904687239` |
+| TASK-018 implementation Slice A PR | #80 — MERGED (merge commit `1a9c8121514c4c09ad4d310b503a8138afc5bbf9`, merged_at `2026-07-07T14:00:11Z`) |
+| TASK-018 implementation Slice A branch | `codex/task-018-impl-slice-a-cost-model-selector` |
+| TASK-018 implementation Slice A reviewed Head | `329105ab7856a65f740c69557f819b838957b62c` (Slice A commit on PR #80 branch; PR-head CI `28870830231` completed/success) |
+| TASK-018 implementation Slice A merge SHA | `1a9c8121514c4c09ad4d310b503a8138afc5bbf9` |
+| TASK-018 implementation Slice A merged_at | `2026-07-07T14:00:11Z` |
+| TASK-018 implementation Slice A PR-head CI | `28870830231` — completed / success / head_sha `329105ab7856a65f740c69557f819b838957b62c` exact match |
+| TASK-018 implementation Slice A Main Post-Merge CI | `28872056843` — completed / success / head_sha `1a9c8121514c4c09ad4d310b503a8138afc5bbf9` exact match (= merge commit) |
+| TASK-018 implementation Slice A Issue closed_at | `2026-07-07T14:06:10Z` |
+| TASK-018 implementation Slice A frozen contract file | `docs/tasks/TASK-018-c0-c1-cost-and-life-cycle-energy.md` (unchanged) |
+| TASK-018 implementation Slice A files added | `src/hexagent/costing/{__init__.py,cost_model_selector.py,errors.py}` + `tests/costing/{__init__.py,test_cost_model_selector.py,test_frozen_contract_unchanged.py}` |
+| TASK-018 implementation Slice A test count | 32 selector tests + 5 frozen-contract tests (pytest `tests/costing/`) — 32 passed (frozen-contract tests skipped in CI sparse-checkout per preflight round); all green under Python 3.12 |
+| TASK-018 Slice A CI manifest registration | 1 line added to existing `ci` shard (per design §13.2) |
+| TASK-018 implementation Slice A verdict (audit chain) | `TASK018_SLICE_A_MERGED_CLOSED_OUT` (head `329105a…`; PR #80 merge `1a9c8121…`; main post-merge CI `28872056843` success) |
+| TASK-018 implementation Slice B Issue | #81 — CLOSED (state_reason=completed, closed_at=`2026-07-07T16:29:36Z`, comments=1) |
+| TASK-018 implementation Slice B closeout comment | `4906045271` |
+| TASK-018 implementation Slice B PR | #82 — MERGED (merge commit `8c6487da5808430571d14424e92e5a478fc6e7e2`, merged_at `2026-07-07T16:24:17Z`) |
+| TASK-018 implementation Slice B branch | `codex/task-018-impl-slice-b-cost-calculator` |
+| TASK-018 implementation Slice B reviewed Head | `364db3406e1fa2802cf564e592518a7e07bbecf0` (Slice B commit on PR #82 branch; PR-head CI `28879718436` completed/success) |
+| TASK-018 implementation Slice B merge SHA | `8c6487da5808430571d14424e92e5a478fc6e7e2` |
+| TASK-018 implementation Slice B merged_at | `2026-07-07T16:24:17Z` |
+| TASK-018 implementation Slice B PR-head CI | `28879718436` — completed / success / head_sha `364db3406e1fa2802cf564e592518a7e07bbecf0` exact match |
+| TASK-018 implementation Slice B Main Post-Merge CI | `28881835876` — completed / success / head_sha `8c6487da5808430571d14424e92e5a478fc6e7e2` exact match (= merge commit) |
+| TASK-018 implementation Slice B Issue closed_at | `2026-07-07T16:29:36Z` |
+| TASK-018 implementation Slice B frozen contract file | `docs/tasks/TASK-018-c0-c1-cost-and-life-cycle-energy.md` (unchanged) |
+| TASK-018 implementation Slice B files added | `src/hexagent/costing/{__init__.py,cost_calculator.py}` + `tests/costing/test_cost_calculator.py` |
+| TASK-018 implementation Slice B test count | 30 calculator tests (pytest `tests/costing/`); all passing under Python 3.12 |
+| TASK-018 Slice B CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A test entry kept, Slice B entry inserted immediately after) |
+| TASK-018 implementation Slice B verdict (audit chain) | `TASK018_SLICE_B_MERGED_CLOSED_OUT` (head `364db34…`; PR #82 merge `8c6487da…`; main post-merge CI `28881835876` success) |
+| TASK-018 implementation Slice C Issue | #83 — CLOSED (state_reason=completed, closed_at=`2026-07-07T17:58:05Z`, comments=1) |
+| TASK-018 implementation Slice C closeout comment | `4906939341` |
+| TASK-018 implementation Slice C PR | #84 — MERGED (merge commit `ef7ee33f238128219b4ddf0a198afbe1457582b2`, merged_at `2026-07-07T17:52:43Z`) |
+| TASK-018 implementation Slice C branch | `codex/task-018-impl-slice-c-life-cycle-energy-estimator` |
+| TASK-018 implementation Slice C reviewed Head | `20f4f8b8aec28dac437fe4673f8ead16aa9dda1e` (Slice C commit on PR #84 branch; PR-head CI `28885096585` completed/success) |
+| TASK-018 implementation Slice C merge SHA | `ef7ee33f238128219b4ddf0a198afbe1457582b2` |
+| TASK-018 implementation Slice C merged_at | `2026-07-07T17:52:43Z` |
+| TASK-018 implementation Slice C PR-head CI | `28885096585` — completed / success |
+| TASK-018 implementation Slice C Main Post-Merge CI | `28887201364` — completed / success / head_sha `ef7ee33f238128219b4ddf0a198afbe1457582b2` exact match (= merge commit) |
+| TASK-018 implementation Slice C Issue closed_at | `2026-07-07T17:58:05Z` |
+| TASK-018 implementation Slice C frozen contract file | `docs/tasks/TASK-018-c0-c1-cost-and-life-cycle-energy.md` (unchanged) |
+| TASK-018 implementation Slice C files added | `src/hexagent/costing/{__init__.py,life_cycle_energy_estimator.py}` + `tests/costing/test_life_cycle_energy_estimator.py` |
+| TASK-018 implementation Slice C test count | 44 estimator tests (pytest `tests/costing/`); all passing under Python 3.12 |
+| TASK-018 Slice C CI manifest registration | 1 line added to existing `ci` shard (per design §13.2; Slice A + Slice B entries kept, Slice C entry inserted immediately after) |
+| TASK-018 implementation Slice C verdict (audit chain) | `TASK018_SLICE_C_MERGED_CLOSED_OUT` (head `20f4f8b…`; PR #84 merge `ef7ee33f…`; main post-merge CI `28887201364` success) |
+| TASK-018 deferred §5.3 discount formula design-amendment | DEFERRED / NOT AUTHORIZED — per TASK-018 §5.3.2 Rule 2, the frozen contract does not prescribe the discount formula; Slice A / B / C implementations all follow **Option A** (`discounted_total_minor_units = null` + `unspecified_blocker` with `details.reason = "discount_formula_pending_design_amendment"`). A future TASK-018 §5.3 design-amendment PR is required before any real `discounted_total_minor_units` can be computed. NOT in this closeout round. |
+| TASK-018 deferred §5.3.2 salvage formula design-amendment | DEFERRED / NOT AUTHORIZED — per TASK-018 §5.3.2 schema, `salvage_minor_units: <int>` is contractually required but no formula is prescribed. Slice A / B / C implementations hard-code `salvage_minor_units = 0` as a contract-compliant `<int>` placeholder (P2 governance nit per Slice C closeout). A future TASK-018 §5.3.2 design-amendment PR is required to prescribe the salvage formula. NOT in this closeout round. |
+| TASK-018+ forbidden scopes (explicit not-started) | TASK-019+ — PLANNED / NOT STARTED / NOT AUTHORIZED; Issue #23 — NOT TOUCHED (administratively open, comments=80); Feishu outbound — NOT SENT in any TASK-018 round (Slice A / B / C / closeout all zero Feishu); no TASK-018 Slice D implementation (TASK-018 has no §9.2 / §9.3 implementation counterpart to TASK-017 Slice D — closeout here is documentation-only). |
 | TASK-017 implementation Issue | #74 — OPEN |
 | TASK-017 implementation branch | `codex/task-017-materials-mass-mechanical-implementation` |
 | TASK-017 implementation base | `757e748dcef825b13397473977b181913c0cbfa8` (= main @ PR #73 merge) |
