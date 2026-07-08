@@ -1,6 +1,6 @@
 # TASK-019 — Golden Cases and Double-Pipe Validation Report Design Contract
 
-**Status:** DESIGN FROZEN / MERGED / GOVERNANCE-SYNCED
+**Status:** DESIGN FROZEN / MERGED / GOVERNANCE-SYNCED / AMENDMENT-002-A-IN-PROGRESS / MERGE-NOT-AUTHORIZED
 **Milestone:** M2 (Double-pipe vertical slice)
 **Priority:** P1
 **Depends on:** TASK-006, TASK-007, TASK-008, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015A, TASK-017, TASK-018
@@ -113,6 +113,7 @@ Per roadmap wording "Add 3 golden cases and validation report", TASK-019 defines
 
 **Inputs** (frozen):
 - Geometry: inner tube OD, inner tube ID, inner tube length, outer shell ID, outer shell OD, material assignment (per TASK-017 design)
+- **Geometry material properties (frozen, Amendment 002-A):** `wall_thermal_conductivity_w_m_k`, `inner_surface_roughness_m`, `annulus_surface_roughness_m` — see §4.5
 - Hot-side fluid: composition, mass flow rate, inlet temperature, inlet pressure
 - Cold-side fluid: composition, mass flow rate, inlet temperature, inlet pressure
 - Fouling factors: hot-side, cold-side (per TASK-014 design)
@@ -197,6 +198,84 @@ Per roadmap wording "Add 3 golden cases and validation report", TASK-019 defines
 - No new correlation registry entries.
 - No new property provider entries.
 - No default-source for `discount_rate` (must be `case_input` per TASK-018 §5.3.1 L314).
+
+### 4.5 Amendment 002-A — case_01 geometry material-property bridge (binding)
+
+**Amendment id**: `TASK-019-DESIGN-AMENDMENT-002-A`
+**Effective scope**: case_01 only (TASK-019-GOLDEN-01)
+**Status**: DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED
+
+#### 4.5.1 Purpose (binding)
+
+The Slice 3A adapter (`src/hexagent/validation_report/chain_adapter.py`) requires three geometry material properties to construct a TASK-008 `GeometryMaterial` for the rating call:
+
+- `wall_thermal_conductivity_w_m_k` (float, must be > 0 per `src/hexagent/exchangers/double_pipe/geometry.py:80`)
+- `inner_surface_roughness_m` (float, must be >= 0 per `src/hexagent/exchangers/double_pipe/geometry.py:82`)
+- `annulus_surface_roughness_m` (float, must be >= 0 per `src/hexagent/exchangers/double_pipe/geometry.py:84`)
+
+Amendment 001 froze these values' downstream expected_output vectors (heat_duty_W, h_tube_W_m2_K, h_annulus_W_m2_K, outlet_T_cold_K, outlet_T_hot_K) per the Kern 1950 Case 4.2 water-water 1"/2" tube-in-shell engineering-literature reference. The literature values for SS304 stainless steel at the operating envelope (293-343 K) are the canonical benchmark values:
+
+- `wall_thermal_conductivity_w_m_k` = `16.2` (SS304 documented thermal conductivity at 300 K, ± 0.5 W/(m·K) per INCO/ASTM A240 documented 5-10% tolerance band over the operating envelope)
+- `inner_surface_roughness_m` = `4.5e-5` (commercial steel tube 45 μm, per typical ASME B36.10M / ASTM A312 commercial-seamless-tubing surface finish documentation)
+- `annulus_surface_roughness_m` = `4.5e-5` (commercial steel pipe 45 μm, per same basis as tube side)
+
+These values are **frozen benchmark input**, NOT implementation fallback. The adapter MUST NOT hardcode them; it MUST read them from the case_01 `input.geometry.*` keys enumerated below. The Slice 3A PR #102 P1-1 fix specifically removed hardcoded `16.2` and `4.5e-5` from the adapter code path; this amendment re-introduces them as **case-bound authorized test-vector data** (fixture-level, not code-level).
+
+#### 4.5.2 Frozen field paths (binding, case_01 only)
+
+The case_01 frozen-input subtree gains three new keys under `input.geometry`:
+
+- `input.geometry.wall_thermal_conductivity_w_m_k: float` (must be > 0)
+- `input.geometry.inner_surface_roughness_m: float` (must be >= 0)
+- `input.geometry.annulus_surface_roughness_m: float` (must be >= 0)
+
+These keys are **flat under `input.geometry`** (no nested object), matching the exact read path the Slice 3A adapter already implements (`chain_adapter.py:334-336`). No duplicate locations are introduced.
+
+#### 4.5.3 Provenance contract (binding)
+
+Each new field path carries a provenance entry in `tests/golden/double_pipe_rating/_provenance_metadata.json` with:
+
+- `field_path` — the JSON-pointer-style path
+- `source_category` — `engineering_literature_reference` (Kern 1950 + INCO/ASTM A240 documentation)
+- `source_basis_text` — explicit citation
+- `unit` — `W/(m·K)` for thermal_conductivity, `m` for roughness
+- `rationale` — why this value is the canonical benchmark for SS304 at the operating envelope
+- `amendment_id` — `TASK-019-DESIGN-AMENDMENT-002-A`
+- `effective_scope` — `TASK-019-GOLDEN-01` only
+- `frozen_benchmark_input` — `true` (explicit statement that this is case-bound test-vector data, NOT implementation fallback)
+
+#### 4.5.4 Expected output: UNCHANGED (binding)
+
+The frozen `expected_output` vectors in `case_01_heat_balance_rating.json` (heat_duty_W, h_annulus, h_tube, outlet_T_cold, outlet_T_hot, LMTD_counterflow_K) **are NOT mutated by this amendment.** The Kern 1950 literature reference used to derive these vectors already employed the SS304 thermal conductivity and commercial-steel surface roughness documented in §4.5.1; the new explicit frozen-input values are the same values the literature reference implicitly used. Therefore re-running the deterministic calculation chain with the new explicit inputs MUST reproduce the frozen expected_output within the existing tolerances (see §4.5.5).
+
+If a future implementation round discovers that the new explicit bridge values differ from the implicit calibration basis and the expected_output vectors must change, this amendment MUST be revoked and replaced with a new amendment that re-derives the expected_output vectors and re-bases the tolerances. **No silent expected_output update is permitted.**
+
+#### 4.5.5 Tolerances: UNCHANGED (binding)
+
+The numeric tolerance values in `tests/golden/double_pipe_rating/_tolerance_metadata.json` are **NOT widened by this amendment.** The per-field tolerances for case_01 (heat_duty_W, h_annulus, h_tube, outlet_T_cold, outlet_T_hot, LMTD_counterflow_K) are derived from the deterministic numerical behavior of the TASK-006/007/008 frozen contracts and the CoolProp provider's documented numerical accuracy at the operating envelope; the addition of three new explicit input keys does not change those derivations.
+
+No `per_field_basis` entry is added for these three input fields because they are frozen input vectors, not output comparison fields. Amendment 002-A documents the no-tolerance-change status via top-level `amendment_002a_tolerance_status`, while field-level source/basis provenance lives in `_provenance_metadata.json`.
+
+#### 4.5.6 Non-authorizations (binding)
+
+Amendment 002-A **does NOT authorize** any of the following, in either this amendment round or in any future TASK-019 implementation round without an explicit separate design-amendment authorization:
+
+- **No case_02 MaterialRecord synthesis.** The case_02 `material_selection.tube_material_id` / `shell_material_id` strings remain descriptive; no `MaterialRecord` is synthesized from them. case_02 bridge is deferred to a future Amendment 002-B.
+- **No case_03 SelectionFilters or cost_records synthesis.** The case_03 `cost_model_selection` block remains as-is; no `SelectionFilters` are fabricated, no `cost_records` are added. case_03 bridge is deferred to a future Amendment 002-C.
+- **No comparison PASS/FAIL implementation.** The validation report's `comparison.overall_status` remains `NOT_COMPUTABLE` for all three cases until a future Slice 3B / Slice 4 implementation round separately authorized.
+- **No pressure-drop / TASK-020+ content.** Pressure drop remains `NOT_COMPUTABLE` per §6; no pressure-drop expected values are introduced.
+- **No discount / salvage formula invention.** Per §5.1 / §5.2; TASK-018 §5.3 / §5.3.2 remain DEFERRED / NOT AUTHORIZED.
+- **No new correlation registry entries.** Per §6; no new TASK-007 correlation IDs.
+- **No new property provider entries.** Per §6; no new TASK-015A provider IDs.
+- **No new blocker / warning code.** The TASK-019 case_01 already surfaces the `slice3a_blocked_field_paths` audit trail; no new blocker / warning codes are introduced by this amendment.
+- **No TASK-006 / TASK-007 / TASK-008 / TASK-011 / TASK-012 / TASK-013 / TASK-014 / TASK-015A / TASK-017 / TASK-018 frozen contract mutation.** The upstream_contract_references entries in `_provenance_metadata.json` for all ten upstream tasks are unchanged.
+- **No Issue #23 / #93 / #94 / #95 mutation.** Per ongoing governance; this amendment does not touch any Issue.
+
+#### 4.5.7 Slice 3B implementation status (binding)
+
+As of Amendment 002-A authoring, the Slice 3A PR #102 (`codex/task-019-slice3a-chain-adapter`, merge commit `94b08abf8286a2e6c63bbcb455dc5477eab66189`) is MERGED and post-merge main CI is GREEN. The Slice 3A adapter currently fails-closed for all three cases with `status=WIRED_VIA_CHAIN_PARTIAL` and `produced_fields=[]` because the case_01 fixture did not carry the three geometry material property keys; the case_02 and case_03 cases continue to fail-closed for the upstream-contract-gap reasons documented in TASK-019 Slice 3B discovery (`TASK019_SLICE3B_DISCOVERY_SCOPE_PROPOSAL_ACCEPTED_DESIGN_AMENDMENT_REQUIRED_IMPLEMENTATION_NOT_AUTHORIZED`).
+
+Amendment 002-A authorizes the case_01 bridge contract; case_02 and case_03 bridge contracts require separate future amendments. **Implementation of Slice 3B (case_01 actual_output production-chain execution using the new bridge keys) is NOT authorized by this amendment** and requires a separate Charles authorization in a future round.
 
 ## 5. TASK-018 deferred amendment handling (binding)
 
