@@ -1,6 +1,6 @@
 # TASK-019 — Golden Cases and Double-Pipe Validation Report Design Contract
 
-**Status:** DESIGN FROZEN / MERGED / GOVERNANCE-SYNCED / AMENDMENT-002-A-IN-PROGRESS / MERGE-NOT-AUTHORIZED
+**Status:** DESIGN FROZEN / MERGED / GOVERNANCE-SYNCED / AMENDMENT-002-A-IN-PROGRESS / AMENDMENT-002-D-IN-PROGRESS / MERGE-NOT-AUTHORIZED
 **Milestone:** M2 (Double-pipe vertical slice)
 **Priority:** P1
 **Depends on:** TASK-006, TASK-007, TASK-008, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015A, TASK-017, TASK-018
@@ -276,6 +276,108 @@ Amendment 002-A **does NOT authorize** any of the following, in either this amen
 As of Amendment 002-A authoring, the Slice 3A PR #102 (`codex/task-019-slice3a-chain-adapter`, merge commit `94b08abf8286a2e6c63bbcb455dc5477eab66189`) is MERGED and post-merge main CI is GREEN. The Slice 3A adapter currently fails-closed for all three cases with `status=WIRED_VIA_CHAIN_PARTIAL` and `produced_fields=[]` because the case_01 fixture did not carry the three geometry material property keys; the case_02 and case_03 cases continue to fail-closed for the upstream-contract-gap reasons documented in TASK-019 Slice 3B discovery (`TASK019_SLICE3B_DISCOVERY_SCOPE_PROPOSAL_ACCEPTED_DESIGN_AMENDMENT_REQUIRED_IMPLEMENTATION_NOT_AUTHORIZED`).
 
 Amendment 002-A authorizes the case_01 bridge contract; case_02 and case_03 bridge contracts require separate future amendments. **Implementation of Slice 3B (case_01 actual_output production-chain execution using the new bridge keys) is NOT authorized by this amendment** and requires a separate Charles authorization in a future round.
+
+### 4.6 Amendment 002-D — case_01 provider-canonical fluid identifiers (binding)
+
+**Amendment id**: `TASK-019-DESIGN-AMENDMENT-002-D`
+**Effective scope**: case_01 only (TASK-019-GOLDEN-01)
+**Status**: DESIGN-FROZEN-PENDING-MERGE
+
+#### 4.6.1 Purpose (binding)
+
+The Slice 3A adapter (`src/hexagent/validation_report/chain_adapter.py:341-348`) constructs `FluidIdentifier(name=str(side["fluid_composition"]), equation_of_state_backend="HEOS")` from the frozen `fluid_composition` field. The existing `fluid_composition` value is the **human-readable engineering description** `"water (H2O, single-phase liquid, pure)"` — which is NOT a provider-canonical CoolProp/HEOS fluid name. CoolProp does not resolve this descriptive string; the chain therefore fails closed at the upstream property evaluation with `property_evaluation_failed` (documented in `TASK019_SLICE3B_A_BLOCKED_UPSTREAM_CHAIN_CANNOT_EXECUTE_FROM_FROZEN_INPUTS_FLUID_NAME_NOT_COOLPROP_RESOLVABLE`).
+
+Amendment 002-D resolves this by freezing **explicit provider-canonical fluid identifiers** beside the existing `fluid_composition` field. The existing `fluid_composition` field is **preserved verbatim** as the human-readable engineering description; the new `fluid_identifier` fields are the only authorized source for future adapter construction of `FluidIdentifier(name=..., equation_of_state_backend=...)`.
+
+#### 4.6.2 Frozen field paths (binding, case_01 only)
+
+The case_01 frozen-input subtree gains four new keys (two per side):
+
+| Field path | Value | Type |
+|---|---|---|
+| `input.cold_side.fluid_identifier.name` | `"Water"` | string |
+| `input.cold_side.fluid_identifier.equation_of_state_backend` | `"HEOS"` | string |
+| `input.hot_side.fluid_identifier.name` | `"Water"` | string |
+| `input.hot_side.fluid_identifier.equation_of_state_backend` | `"HEOS"` | string |
+
+These are **flat under `input.cold_side.fluid_identifier` / `input.hot_side.fluid_identifier`** (a nested object per side), and are the canonical CoolProp-resolvable form of the existing human-readable `fluid_composition` strings.
+
+#### 4.6.3 Design contract (binding)
+
+- **`fluid_composition`** = human-readable engineering description (preserved verbatim, unchanged by this amendment)
+- **`fluid_identifier.name`** = provider-canonical fluid name passed to `FluidIdentifier.name`
+- **`fluid_identifier.equation_of_state_backend`** = provider backend passed to `FluidIdentifier.equation_of_state_backend`
+
+The future Slice 3B-A adapter MUST construct:
+
+```python
+FluidIdentifier(
+    name=str(side["fluid_identifier"]["name"]),
+    equation_of_state_backend=str(side["fluid_identifier"]["equation_of_state_backend"]),
+)
+```
+
+#### 4.6.4 Adapter constraints (binding, 3 negative authorizations)
+
+The future Slice 3B-A adapter MUST NOT do any of:
+
+1. **MUST NOT normalize `fluid_composition`.** The `fluid_composition` string is a human-readable description; the adapter must not transform it, split it, regex-match it, or strip parenthesized content from it.
+2. **MUST NOT infer `"Water"` from the descriptive string.** The provider-canonical name `"Water"` is read ONLY from the new `fluid_identifier.name` field. The adapter must not pattern-match the descriptive `fluid_composition` to derive a CoolProp name.
+3. **MUST NOT hardcode `"Water"` or `"HEOS"` in adapter logic.** The provider-canonical name and backend are read ONLY from the new `fluid_identifier.*` fields. No adapter-side fallback constants (this is the same no-hardcoded-fallback rule as Amendment 002-A §4.5.1).
+
+#### 4.6.5 Provenance contract (binding)
+
+Each new field path carries a provenance entry in `tests/golden/double_pipe_rating/_provenance_metadata.json` with:
+
+- `amendment_id` = `TASK-019-DESIGN-AMENDMENT-002-D`
+- `effective_scope` = `TASK-019-GOLDEN-01`
+- `frozen_benchmark_input` = `true`
+- `source_category` = `provider_api_contract`
+- `provider` = `CoolProp`
+- `backend` = `HEOS`
+- `rationale` = separate human-readable `fluid_composition` from provider-canonical `FluidIdentifier` fields
+
+The provenance must make clear that `"Water"` is the provider-canonical fluid identifier for CoolProp/HEOS (TASK-015A frozen registry entry), and that `"water (H2O, single-phase liquid, pure)"` remains the human-readable engineering description.
+
+#### 4.6.6 Expected output: UNCHANGED (binding)
+
+The frozen `expected_output` vectors in `case_01_heat_balance_rating.json` are **NOT mutated by this amendment.** Amendment 002-D adds new input fields (under `input.cold_side.fluid_identifier` / `input.hot_side.fluid_identifier`) without touching `expected_output` or any tolerance value. If a future implementation round discovers that the new explicit identifier values differ from the implicit calibration basis and the expected_output vectors must change, this amendment MUST be revoked and replaced with a new amendment that re-derives the expected_output vectors and re-bases the tolerances. **No silent expected_output update is permitted.**
+
+#### 4.6.7 Tolerances: UNCHANGED (binding)
+
+The numeric tolerance values in `tests/golden/double_pipe_rating/_tolerance_metadata.json` are **NOT widened or introduced by this amendment.** Only the following top-level metadata is added:
+
+- `amendment_002d_id`: `TASK-019-DESIGN-AMENDMENT-002-D`
+- `amendment_002d_effective_scope`: `TASK-019-GOLDEN-01`
+- `amendment_002d_tolerance_status`: `NO_NUMERIC_TOLERANCE_CHANGE_INPUT_IDENTIFIER_FIELDS_ONLY`
+
+No entry in `tolerance_profiles.TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001.per_field_basis` is added, removed, or modified. No entry in `tolerance_profiles.TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001.per_field_tolerances` is added, removed, or modified. The four new `fluid_identifier` fields are case-bound frozen input vectors, not output comparison fields, and are therefore not subject to numeric tolerance comparison in the validation report.
+
+#### 4.6.8 Non-authorizations (binding)
+
+Amendment 002-D **does NOT authorize** any of the following, in either this amendment round or in any future TASK-019 implementation round without an explicit separate design-amendment authorization:
+
+- **No case_02 / case_03 fluid identifier amendment.** Only case_01's two sides receive `fluid_identifier`; case_02 and case_03 bridge contracts require separate future amendments.
+- **No implementation code in this round.** This amendment is design-only; the adapter will be updated in a future Slice 3B-A round that is separately authorized.
+- **No adapter normalizer.** The future adapter must NOT normalize `fluid_composition` (see §4.6.4).
+- **No fixture expected_output changes.** All frozen expected_output vectors are preserved verbatim.
+- **No numeric tolerance widening.** All per-field tolerances are preserved verbatim.
+- **No comparison PASS/FAIL implementation.** `comparison.overall_status` remains `NOT_COMPUTABLE`.
+- **No pressure-drop / TASK-020+ content.** Pressure drop remains `NOT_COMPUTABLE` per §6.
+- **No discount / salvage formula invention.** Per §5.1 / §5.2; TASK-018 §5.3 / §5.3.2 remain DEFERRED.
+- **No MaterialRecord synthesis.** The case_02 `material_selection.tube_material_id` / `shell_material_id` strings remain descriptive; no `MaterialRecord` is synthesized from them.
+- **No SelectionFilters or cost_records synthesis.** The case_03 `cost_model_selection` block remains as-is.
+- **No new correlation registry entries.** Per §6.
+- **No new property provider entries.** Per §6.
+- **No new blocker / warning code.** Per §4.5.6 amendment 002-A's analogous binding.
+- **No TASK-006 / TASK-007 / TASK-008 / TASK-011 / TASK-012 / TASK-013 / TASK-014 / TASK-015A / TASK-017 / TASK-018 frozen contract mutation.** The upstream_contract_references entries in `_provenance_metadata.json` for all ten upstream tasks are unchanged.
+- **No Issue #23 / #93 / #94 / #95 mutation.** Per ongoing governance; this amendment does not touch any Issue.
+
+#### 4.6.9 Slice 3B-A implementation status (binding)
+
+As of Amendment 002-D authoring, the Slice 3A PR #102 is MERGED and post-merge main CI is GREEN. The Slice 3A adapter currently fails-closed for all three cases with `status=WIRED_VIA_CHAIN_PARTIAL` and `produced_fields=[]`. The Slice 3B-A attempt was BLOCKED at the case_01 fluid name resolution layer (`TASK019_SLICE3B_A_BLOCKED_UPSTREAM_CHAIN_CANNOT_EXECUTE_FROM_FROZEN_INPUTS_FLUID_NAME_NOT_COOLPROP_RESOLVABLE`).
+
+Amendment 002-D authorizes the case_01 fluid identifier bridge contract. The case_02 / case_03 bridge contracts and the Slice 3B-A implementation (case_01 adapter wiring) require a separate Charles authorization in a future round. **Implementation of Slice 3B-A is NOT authorized by this amendment.**
 
 ## 5. TASK-018 deferred amendment handling (binding)
 

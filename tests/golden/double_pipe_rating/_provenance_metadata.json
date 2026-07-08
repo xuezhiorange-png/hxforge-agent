@@ -24,6 +24,67 @@
   "amendment_id": "TASK-019-AMEND-001-FREEZE-VECTORS",
   "amendment_002a_id": "TASK-019-DESIGN-AMENDMENT-002-A",
   "amendment_002a_effective_scope": "TASK-019-GOLDEN-01",
+  "amendment_002d_id": "TASK-019-DESIGN-AMENDMENT-002-D",
+  "amendment_002d_effective_scope": "TASK-019-GOLDEN-01",
+  "amendment_002d_frozen_field_paths": {
+    "case_01_provider_fluid_identifiers": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-D",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_paths": [
+        "input.cold_side.fluid_identifier.name",
+        "input.cold_side.fluid_identifier.equation_of_state_backend",
+        "input.hot_side.fluid_identifier.name",
+        "input.hot_side.fluid_identifier.equation_of_state_backend"
+      ],
+      "frozen_benchmark_input": true
+    }
+  },
+  "amendment_002d_provenance_entries": {
+    "input.cold_side.fluid_identifier.name": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-D",
+      "backend": "HEOS",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.cold_side.fluid_identifier.name",
+      "frozen_benchmark_input": true,
+      "provider": "CoolProp",
+      "rationale": "Separate human-readable fluid_composition from provider-canonical FluidIdentifier fields. \"Water\" is the provider-canonical fluid identifier for CoolProp/HEOS (TASK-015A frozen); the existing fluid_composition string \"water (H2O, single-phase liquid, pure)\" remains the human-readable engineering description and is unchanged by this amendment. The future Slice 3B-A adapter will construct FluidIdentifier(name=\"Water\", equation_of_state_backend=\"HEOS\") from this frozen field. No adapter-side normalization of fluid_composition is authorized by this amendment; the adapter must not infer, normalize, or hardcode provider fluid names from fluid_composition.",
+      "source_category": "provider_api_contract",
+      "value": "Water"
+    },
+    "input.cold_side.fluid_identifier.equation_of_state_backend": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-D",
+      "backend": "HEOS",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.cold_side.fluid_identifier.equation_of_state_backend",
+      "frozen_benchmark_input": true,
+      "provider": "CoolProp",
+      "rationale": "Provider backend passed to FluidIdentifier.equation_of_state_backend. HEOS is the CoolProp Helmholtz-equation-of-state backend (TASK-015A frozen registry entry for CoolProp). The existing fluid_composition string remains the human-readable engineering description. The future Slice 3B-A adapter will pass this value directly to FluidIdentifier() without any adapter-side normalization or hardcoding.",
+      "source_category": "provider_api_contract",
+      "value": "HEOS"
+    },
+    "input.hot_side.fluid_identifier.name": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-D",
+      "backend": "HEOS",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.hot_side.fluid_identifier.name",
+      "frozen_benchmark_input": true,
+      "provider": "CoolProp",
+      "rationale": "Separate human-readable fluid_composition from provider-canonical FluidIdentifier fields. \"Water\" is the provider-canonical fluid identifier for CoolProp/HEOS (TASK-015A frozen); the existing fluid_composition string \"water (H2O, single-phase liquid, pure)\" remains the human-readable engineering description and is unchanged by this amendment. The future Slice 3B-A adapter will construct FluidIdentifier(name=\"Water\", equation_of_state_backend=\"HEOS\") from this frozen field. No adapter-side normalization of fluid_composition is authorized by this amendment; the adapter must not infer, normalize, or hardcode provider fluid names from fluid_composition.",
+      "source_category": "provider_api_contract",
+      "value": "Water"
+    },
+    "input.hot_side.fluid_identifier.equation_of_state_backend": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-D",
+      "backend": "HEOS",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.hot_side.fluid_identifier.equation_of_state_backend",
+      "frozen_benchmark_input": true,
+      "provider": "CoolProp",
+      "rationale": "Provider backend passed to FluidIdentifier.equation_of_state_backend. HEOS is the CoolProp Helmholtz-equation-of-state backend (TASK-015A frozen registry entry for CoolProp). The existing fluid_composition string remains the human-readable engineering description. The future Slice 3B-A adapter will pass this value directly to FluidIdentifier() without any adapter-side normalization or hardcoding.",
+      "source_category": "provider_api_contract",
+      "value": "HEOS"
+    }
+  },
   "amendment_002a_frozen_field_paths": {
     "case_01_input_geometry_bridge": {
       "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-A",

@@ -17,6 +17,9 @@
   "amendment_002a_id": "TASK-019-DESIGN-AMENDMENT-002-A",
   "amendment_002a_effective_scope": "TASK-019-GOLDEN-01",
   "amendment_002a_tolerance_status": "NO_NUMERIC_TOLERANCE_CHANGE: Amendment 002-A does NOT widen or introduce any numeric tolerance. The three new geometry material property fields (wall_thermal_conductivity_w_m_k, inner_surface_roughness_m, annulus_surface_roughness_m) are case-bound frozen input vectors, not output comparison values, and therefore are not subject to numeric tolerance comparison in the validation report. The existing per-field tolerances for case_01 expected_output (heat_duty_W, h_annulus, h_tube, outlet_T_cold, outlet_T_hot, LMTD_counterflow_K) are derived from the deterministic numerical behavior of the TASK-006/007/008 frozen contracts and the CoolProp provider's documented numerical accuracy; the addition of three new explicit input keys does not change those derivations.",
+  "amendment_002d_id": "TASK-019-DESIGN-AMENDMENT-002-D",
+  "amendment_002d_effective_scope": "TASK-019-GOLDEN-01",
+  "amendment_002d_tolerance_status": "NO_NUMERIC_TOLERANCE_CHANGE_INPUT_IDENTIFIER_FIELDS_ONLY",
   "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
   "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001",
   "tolerance_profiles": {
