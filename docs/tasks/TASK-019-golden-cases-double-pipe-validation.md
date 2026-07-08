@@ -254,7 +254,7 @@ If a future implementation round discovers that the new explicit bridge values d
 
 The numeric tolerance values in `tests/golden/double_pipe_rating/_tolerance_metadata.json` are **NOT widened by this amendment.** The per-field tolerances for case_01 (heat_duty_W, h_annulus, h_tube, outlet_T_cold, outlet_T_hot, LMTD_counterflow_K) are derived from the deterministic numerical behavior of the TASK-006/007/008 frozen contracts and the CoolProp provider's documented numerical accuracy at the operating envelope; the addition of three new explicit input keys does not change those derivations.
 
-A new `case_01.geometry_material_property_bridge_basis` entry is added to the per_field_basis dict to document the engineering-literature reference basis for the new input values, but this is **documentation only** — no new numeric tolerance is added and no existing tolerance is widened.
+No `per_field_basis` entry is added for these three input fields because they are frozen input vectors, not output comparison fields. Amendment 002-A documents the no-tolerance-change status via top-level `amendment_002a_tolerance_status`, while field-level source/basis provenance lives in `_provenance_metadata.json`.
 
 #### 4.5.6 Non-authorizations (binding)
 
