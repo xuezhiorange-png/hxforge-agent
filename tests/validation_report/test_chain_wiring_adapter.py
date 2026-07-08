@@ -687,32 +687,302 @@ def test_p1_produced_fields_have_no_none_values() -> None:
             )
 
 
-# P1-4 (extended): in the current Slice 3A fixture set, the chain
-# fails closed for all 3 cases (case_01: no material properties;
-# case_02: no full MaterialRecord; case_03: no cost records list).
-# Therefore produced_fields is empty for all 3 cases.
-def test_p1_all_cases_fail_closed_produced_fields_empty() -> None:
+# P1-4 (extended): after Slice 3B-A authorization, the per-case
+# production-chain contract is:
+#   - case_01: WIRED_VIA_CHAIN with the 6 authorized TASK-006/007/008
+#     produced fields (post Design Amendment 002-E mass_flow
+#     0.75/0.75 kg/s, both Re outside the TASK-007 transitional
+#     regime).
+#   - case_02: WIRED_VIA_CHAIN_PARTIAL — the frozen case_02 input
+#     still lacks a full TASK-013 catalog-resolved MaterialRecord;
+#     no synthetic MaterialRecord is built (P1-2 guard preserved).
+#   - case_03: WIRED_VIA_CHAIN_PARTIAL — the frozen case_03 input
+#     still lacks a TASK-018 catalog-resolved cost records list;
+#     no cost_records / SelectionFilters fabrication (P1-3 guard
+#     preserved).
+# This test replaces the prior Slice 3A "all 3 fail-closed" guard.
+# It preserves the P1 spirit: case_02 and case_03 still fail closed
+# with empty produced_fields (no fabrication), and case_01 is wired
+# only because the production chain genuinely produces the 6
+# authorized fields end-to-end (the chain runs the real
+# CoolPropProvider + the frozen fluid_identifier + the frozen
+# mass_flow + the frozen geometry material properties).
+def test_slice3b_a_case_01_wired_case_02_03_partial() -> None:
     from hexagent.validation_report import chain_adapter
 
-    for case_id in (
-        "TASK-019-GOLDEN-01",
-        "TASK-019-GOLDEN-02",
-        "TASK-019-GOLDEN-03",
-    ):
-        fixture = _load_fixture(case_id)
-        artifact = chain_adapter.compute_actual_output_via_chain(fixture)
-        # The current fixtures lack TASK-013 / TASK-018 catalog-resolved
-        # data, so every case must fail closed with an empty
-        # produced_fields list. (This test will be relaxed when a
-        # TASK-013 / TASK-018 catalog lookup helper is added.)
-        assert artifact.get("produced_fields", []) == [], (
-            f"case {case_id} must fail closed with empty produced_fields "
-            f"in current Slice 3A; got {artifact.get('produced_fields', [])!r}"
+    # case_01: WIRED_VIA_CHAIN, exactly 6 authorized fields.
+    fixture_01 = _load_fixture("TASK-019-GOLDEN-01")
+    artifact_01 = chain_adapter.compute_actual_output_via_chain(fixture_01)
+    assert artifact_01["status"] == "WIRED_VIA_CHAIN", (
+        f"case_01 must be WIRED_VIA_CHAIN after Slice 3B-A; got {artifact_01['status']!r}"
+    )
+    expected_fields = {
+        "heat_duty_W",
+        "LMTD_derived_values.LMTD_counterflow_K",
+        "heat_transfer_coefficients.annulus_side_W_m2_K",
+        "heat_transfer_coefficients.tube_side_W_m2_K",
+        "outlet_temperatures_K.cold_side",
+        "outlet_temperatures_K.hot_side",
+    }
+    assert set(artifact_01["produced_fields"]) == expected_fields, (
+        f"case_01 produced_fields must be exactly the 6 authorized "
+        f"fields; got {sorted(artifact_01['produced_fields'])}"
+    )
+    assert artifact_01["blocked_fields"] == []
+    assert artifact_01["comparison_overall_status"] == "NOT_COMPUTABLE"
+
+    # case_02: still partial (no MaterialRecord fabrication).
+    fixture_02 = _load_fixture("TASK-019-GOLDEN-02")
+    artifact_02 = chain_adapter.compute_actual_output_via_chain(fixture_02)
+    assert artifact_02["status"] == "WIRED_VIA_CHAIN_PARTIAL"
+    assert artifact_02["produced_fields"] == [], (
+        "case_02 must remain fail-closed partial; produced_fields must "
+        "be empty (no MaterialRecord synthesis, P1-2 guard preserved)"
+    )
+
+    # case_03: still partial (no cost_records / SelectionFilters fabrication).
+    fixture_03 = _load_fixture("TASK-019-GOLDEN-03")
+    artifact_03 = chain_adapter.compute_actual_output_via_chain(fixture_03)
+    assert artifact_03["status"] == "WIRED_VIA_CHAIN_PARTIAL"
+    assert artifact_03["produced_fields"] == [], (
+        "case_03 must remain fail-closed partial; produced_fields must "
+        "be empty (no cost_records / SelectionFilters fabrication, "
+        "P1-3 guard preserved)"
+    )
+    # Discount / salvage remain deferred.
+    assert artifact_03["discount_salvage_status"]["discounted_total_minor_units"] == (
+        "DEFERRED_PER_TASK_018_5_3"
+    )
+    assert artifact_03["discount_salvage_status"]["salvage_minor_units"] == (
+        "DEFERRED_PER_TASK_018_5_3_2"
+    )
+
+
+# Slice 3B-A §6.1: case_01 reads fluid_identifier, not fluid_composition.
+def test_slice3b_a_case_01_uses_fluid_identifier_not_composition() -> None:
+    """Mutating the fluid_composition description string must not
+    affect the case_01 chain; the chain must read the provider
+    identifier from the fluid_identifier sub-block."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-01")
+    # Mutate fluid_composition to a non-water string; the chain must
+    # still succeed (because the provider identifier is read from
+    # fluid_identifier, not fluid_composition).
+    fixture_mutated = json.loads(json.dumps(fixture))
+    fixture_mutated["input"]["hot_side"]["fluid_composition"] = (
+        "AIR / NON-WATER DESCRIPTION (audit-only)"
+    )
+    fixture_mutated["input"]["cold_side"]["fluid_composition"] = (
+        "AIR / NON-WATER DESCRIPTION (audit-only)"
+    )
+    artifact_mutated = chain_adapter.compute_actual_output_via_chain(fixture_mutated)
+    assert artifact_mutated["status"] == "WIRED_VIA_CHAIN", (
+        "case_01 must remain WIRED_VIA_CHAIN when fluid_composition "
+        "is mutated; the chain must read fluid_identifier, not "
+        "fluid_composition"
+    )
+    # The mutated case must produce the same 6 values as the
+    # unmutated case (proves the chain ignores fluid_composition).
+    artifact_baseline = chain_adapter.compute_actual_output_via_chain(fixture)
+    assert (
+        artifact_mutated["canonical_actual_output_sha256"]
+        == artifact_baseline["canonical_actual_output_sha256"]
+    ), "case_01 chain must be invariant to fluid_composition mutation"
+
+
+# Slice 3B-A §6.3: removing fluid_identifier makes case_01 fail closed.
+def test_slice3b_a_case_01_fail_closed_when_fluid_identifier_absent() -> None:
+    """If the frozen fluid_identifier sub-block is removed from the
+    case input, the case_01 chain must fail closed (not fabricate a
+    provider identifier)."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-01")
+    fixture_broken = json.loads(json.dumps(fixture))
+    del fixture_broken["input"]["hot_side"]["fluid_identifier"]
+    del fixture_broken["input"]["cold_side"]["fluid_identifier"]
+    artifact = chain_adapter.compute_actual_output_via_chain(fixture_broken)
+    # Must NOT be WIRED_VIA_CHAIN (no fabrication of a default
+    # Water/HEOS provider).
+    assert artifact["status"] != "WIRED_VIA_CHAIN", (
+        "case_01 must not fabricate a provider identifier when "
+        "fluid_identifier is absent; status was "
+        f"{artifact['status']!r}"
+    )
+    assert artifact["produced_fields"] == [], (
+        "case_01 must not produce fields when fluid_identifier is "
+        "absent; produced_fields must be empty"
+    )
+
+
+# Slice 3B-A §6.4: no hardcoded "Water" / "HEOS" fallback in adapter.
+def test_slice3b_a_no_hardcoded_water_heos_fallback_in_adapter() -> None:
+    """The chain_adapter source must not contain a hardcoded
+    ``"Water"`` / ``"HEOS"`` fallback string used as a default
+    provider identifier. The only acceptable uses of those strings
+    are in the test contract assertions, the module docstring, and
+    the `__all__` export surface (none of which substitute a
+    default at runtime)."""
+    import inspect
+
+    from hexagent.validation_report import chain_adapter
+
+    src = inspect.getsource(chain_adapter)
+    # The forbidden patterns are a hardcoded ``name="Water"`` or
+    # ``equation_of_state_backend="HEOS"`` assignment that
+    # substitutes a default. The adapter must read both from the
+    # frozen fixture's fluid_identifier sub-block.
+    forbidden_patterns = (
+        'name="Water"',
+        "name='Water'",
+        'equation_of_state_backend="HEOS"',
+        "equation_of_state_backend='HEOS'",
+    )
+    for pattern in forbidden_patterns:
+        assert pattern not in src, (
+            f"chain_adapter contains hardcoded {pattern!r} fallback; "
+            "the adapter must read the provider identifier from the "
+            "frozen fluid_identifier sub-block only"
         )
-        # And the status must be PARTIAL (not full WIRED_VIA_CHAIN).
-        assert artifact["status"] == "WIRED_VIA_CHAIN_PARTIAL", (
-            f"case {case_id} status must be WIRED_VIA_CHAIN_PARTIAL when "
-            f"the chain fails closed; got {artifact['status']!r}"
+
+
+# Slice 3B-A §6.5: no hardcoded 002-E numeric values in adapter.
+def test_slice3b_a_no_hardcoded_002e_numeric_values_in_adapter() -> None:
+    """The chain_adapter source must not contain the 6 frozen
+    Amendment 002-E expected_output numeric central values. The
+    chain must compute them from the production chain, not from
+    hardcoded constants."""
+    import inspect
+
+    from hexagent.validation_report import chain_adapter
+
+    src = inspect.getsource(chain_adapter)
+    # The 6 frozen Amendment 002-E central values:
+    #   heat_duty_W = 6598.77255277395
+    #   LMTD_counterflow_K = 37.85817982113553
+    #   annulus_side_W_m2_K = 2783.7013942048334
+    #   tube_side_W_m2_K = 7899.20947325792
+    #   cold_outlet_T = 295.25317863269566
+    #   hot_outlet_T = 331.0473945550949
+    forbidden_values = (
+        "6598.77255277395",
+        "37.85817982113553",
+        "2783.7013942048334",
+        "7899.20947325792",
+        "295.25317863269566",
+        "331.0473945550949",
+    )
+    for value in forbidden_values:
+        assert value not in src, (
+            f"chain_adapter source contains hardcoded Amendment 002-E "
+            f"central value {value!r}; the chain must compute the value, "
+            "not hardcode it"
+        )
+
+
+# Slice 3B-A §6.8: case_01 produced values are all finite and non-None.
+def test_slice3b_a_case_01_produced_values_finite_non_none() -> None:
+    """All 6 case_01 produced values must be finite (not inf/nan) and
+    non-None. The chain must produce real upstream values, not
+    None sentinels or non-finite placeholders."""
+    import math
+
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-01")
+    artifact = chain_adapter.compute_actual_output_via_chain(fixture)
+    values = artifact["values"]
+    flat_values = [
+        values["heat_duty_W"],
+        values["LMTD_derived_values"]["LMTD_counterflow_K"],
+        values["heat_transfer_coefficients"]["annulus_side_W_m2_K"],
+        values["heat_transfer_coefficients"]["tube_side_W_m2_K"],
+        values["outlet_temperatures_K"]["cold_side"],
+        values["outlet_temperatures_K"]["hot_side"],
+    ]
+    for v in flat_values:
+        assert v is not None, "case_01 produced value must not be None"
+        assert isinstance(v, float)
+        assert math.isfinite(v), f"case_01 produced value {v!r} must be finite"
+
+
+# Slice 3B-A §6.10: case_01 pressure-drop remains excluded / not produced.
+def test_slice3b_a_case_01_pressure_drop_excluded() -> None:
+    """case_01 actual_output must not include any pressure-drop
+    field. The chain must not produce, and the values must not
+    contain, any pressure-drop key (pressure_drop_pa, dp_*, etc.).
+    Pressure drop remains NOT_COMPUTABLE / TASK-020+ excluded."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-01")
+    artifact = chain_adapter.compute_actual_output_via_chain(fixture)
+    values = artifact["values"]
+    values_str = json.dumps(values, sort_keys=True)
+    forbidden_substrings = (
+        "pressure_drop_pa",
+        "dp_pa",
+        "delta_p",
+        "pressure_drop",
+    )
+    for sub in forbidden_substrings:
+        assert sub not in values_str, (
+            f"case_01 values must not contain {sub!r} key "
+            f"(pressure drop is NOT_COMPUTABLE / TASK-020+ excluded); "
+            f"values: {values_str}"
+        )
+
+
+# Slice 3B-A §6.14: canonical_actual_output_sha256 is stable and
+# lowercase 64-char.
+def test_slice3b_a_canonical_actual_output_sha256_stable_and_lowercase() -> None:
+    """The canonical_actual_output_sha256 field must be a stable
+    lowercase 64-char SHA-256 hex string, identical across repeated
+    adapter runs of the same fixture."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-01")
+    artifact_1 = chain_adapter.compute_actual_output_via_chain(fixture)
+    artifact_2 = chain_adapter.compute_actual_output_via_chain(fixture)
+    sha_1 = artifact_1["canonical_actual_output_sha256"]
+    sha_2 = artifact_2["canonical_actual_output_sha256"]
+    assert isinstance(sha_1, str)
+    assert len(sha_1) == 64
+    assert sha_1 == sha_1.lower(), "sha256 must be lowercase"
+    int(sha_1, 16)  # raises if not valid hex
+    assert sha_1 == sha_2, (
+        f"canonical_actual_output_sha256 must be stable across runs; got {sha_1!r} and {sha_2!r}"
+    )
+
+
+# Slice 3B-A §6.15: repeated adapter runs are deterministic.
+def test_slice3b_a_repeated_adapter_runs_are_deterministic() -> None:
+    """Two consecutive adapter runs on the same fixture must produce
+    byte-identical artifacts (status, produced_fields, values,
+    canonical_actual_output_sha256, upstream_calculation_run_ids,
+    upstream_provenance_digests)."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-01")
+    artifact_1 = chain_adapter.compute_actual_output_via_chain(fixture)
+    artifact_2 = chain_adapter.compute_actual_output_via_chain(fixture)
+    # The full dict minus fields that are explicitly allowed to vary
+    # across runs (none in this Slice 3B-A contract).
+    for key in (
+        "case_id",
+        "status",
+        "produced_fields",
+        "values",
+        "blocked_fields",
+        "upstream_calculation_run_ids",
+        "upstream_provenance_digests",
+        "canonical_actual_output_sha256",
+        "discount_salvage_status",
+        "comparison_overall_status",
+    ):
+        assert artifact_1[key] == artifact_2[key], (
+            f"artifact[{key!r}] must be deterministic across runs; "
+            f"got {artifact_1[key]!r} and {artifact_2[key]!r}"
         )
 
 
