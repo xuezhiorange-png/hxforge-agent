@@ -1,0 +1,55 @@
+{
+  "case_id": "TASK-019-GOLDEN-01",
+  "case_scope": "Slice 1 skeleton. Frozen-design scope: canonical concentric-tube double-pipe heat exchanger with both fluids in co-current arrangement, single-phase liquid on both sides (no phase change), fixed geometry (no iterative sizing), heat balance closure at design point. Upstream paths exercised: TASK-007 (tube + annulus single-phase correlations) + TASK-006 (heat balance solver) + TASK-008 (fixed-geometry double-pipe rating). Pressure drop is explicitly NOT_COMPUTABLE (TASK-020+ scope; excluded from TASK-019 by frozen design §6).",
+  "case_title": "Double-pipe heat balance + fixed-geometry rating",
+  "expected_output": {
+    "LMTD_derived_values": "TBD-by-Slice-2",
+    "heat_duty_W": "TBD-by-Slice-2",
+    "heat_transfer_coefficients": {
+      "annulus_side_W_m2_K": "TBD-by-Slice-2",
+      "tube_side_W_m2_K": "TBD-by-Slice-2"
+    },
+    "outlet_temperatures_K": {
+      "cold_side": "TBD-by-Slice-2",
+      "hot_side": "TBD-by-Slice-2"
+    }
+  },
+  "input": {
+    "cold_side": {
+      "fluid_composition": "TBD-by-Slice-2",
+      "inlet_pressure_Pa": "TBD-by-Slice-2",
+      "inlet_temperature_K": "TBD-by-Slice-2",
+      "mass_flow_kg_s": "TBD-by-Slice-2"
+    },
+    "fouling_factors": {
+      "cold_side_m2_K_W": "TBD-by-Slice-2",
+      "hot_side_m2_K_W": "TBD-by-Slice-2"
+    },
+    "geometry": {
+      "shell_id_m": "TBD-by-Slice-2",
+      "shell_material_id": "TBD-by-Slice-2",
+      "shell_od_m": "TBD-by-Slice-2",
+      "tube_id_m": "TBD-by-Slice-2",
+      "tube_length_m": "TBD-by-Slice-2",
+      "tube_material_id": "TBD-by-Slice-2",
+      "tube_od_m": "TBD-by-Slice-2"
+    },
+    "hot_side": {
+      "fluid_composition": "TBD-by-Slice-2",
+      "inlet_pressure_Pa": "TBD-by-Slice-2",
+      "inlet_temperature_K": "TBD-by-Slice-2",
+      "mass_flow_kg_s": "TBD-by-Slice-2"
+    },
+    "property_provider_id": "CoolProp (TASK-015A frozen)"
+  },
+  "license_boundary_attestation": {
+    "any_restricted_source_inputs": false,
+    "any_restricted_source_outputs": false,
+    "restricted_source_pointer_only_observed": true
+  },
+  "pressure_drop_excluded_from_taska_019": "NOT_COMPUTABLE",
+  "provenance_profile_id": "TASK-019-GOLDEN-PROVENANCE-V1-SLICE-1",
+  "schema_version": "TASK-019-GOLDEN-CASE-V1-SLICE-1-SKELETON",
+  "slice1_skeleton_note": "Slice 1 fixture-shape reproducibility only. All TBD-by-Slice-2 fields are deliberately placeholder strings; final expected vectors will be computed in Slice 2 after the full upstream calculation chain is wired up.",
+  "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1"
+}

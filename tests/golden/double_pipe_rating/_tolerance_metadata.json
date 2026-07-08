@@ -1,0 +1,30 @@
+{
+  "case_ids": [
+    "TASK-019-GOLDEN-01",
+    "TASK-019-GOLDEN-02",
+    "TASK-019-GOLDEN-03"
+  ],
+  "deterministic_schema_version": "TASK-019-GOLDEN-TOLERANCE-V1",
+  "license_boundary_attestation": {
+    "any_restricted_source_inputs": false,
+    "any_restricted_source_outputs": false,
+    "restricted_source_pointer_only_observed": true
+  },
+  "slice1_skeleton_note": "Slice 1 placeholder. Final tolerance values will be set in Slice 2 after the upstream calculation chain is wired up.",
+  "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1",
+  "tolerance_profiles": {
+    "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1": {
+      "abs_tolerance_default": "TBD-by-Slice-2",
+      "case_ids": [
+        "TASK-019-GOLDEN-01",
+        "TASK-019-GOLDEN-02",
+        "TASK-019-GOLDEN-03"
+      ],
+      "comparison_method_default": "TBD-by-Slice-2",
+      "currency_minor_units": "integer ONLY (no float for money per frozen design §3.3)",
+      "description": "Slice 1 placeholder tolerance profile. Final tolerances will be set in Slice 2.",
+      "rel_tolerance_default": "TBD-by-Slice-2"
+    }
+  },
+  "tolerance_schema_version": "TASK-019-GOLDEN-TOLERANCE-V1"
+}

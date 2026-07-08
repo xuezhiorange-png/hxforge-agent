@@ -51,6 +51,10 @@ shards:
       - tests/case_revisions/test_remediation_p01_to_p1.py
       - tests/case_revisions/test_restricted_content.py
       - tests/case_revisions/test_validation.py
+      - tests/validation_report/test_double_pipe_validation_report.py
+      - tests/validation_report/test_golden_case_reproducibility.py
+      - tests/validation_report/test_no_upstream_mutation.py
+      - tests/validation_report/test_excluded_scopes_negative.py
     timeout: 300
 
   - name: ci-acceptance

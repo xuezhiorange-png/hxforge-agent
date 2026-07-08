@@ -1,0 +1,80 @@
+{
+  "case_ids": [
+    "TASK-019-GOLDEN-01",
+    "TASK-019-GOLDEN-02",
+    "TASK-019-GOLDEN-03"
+  ],
+  "correlation_id_references": {
+    "annulus_single_phase": "TASK-007 frozen registry entry (TBD-by-Slice-2)",
+    "tube_single_phase": "TASK-007 frozen registry entry (TBD-by-Slice-2)"
+  },
+  "license_boundary_attestation": {
+    "any_restricted_source_inputs": false,
+    "any_restricted_source_outputs": false,
+    "restricted_source_pointer_only_observed": true
+  },
+  "provenance_profile_id": "TASK-019-GOLDEN-PROVENANCE-V1-SLICE-1",
+  "provenance_schema_version": "TASK-019-GOLDEN-PROVENANCE-V1",
+  "provider_id_references": {
+    "CoolProp": "TASK-015A frozen registry entry (TBD-by-Slice-2)"
+  },
+  "slice1_skeleton_note": "Slice 1 records frozen-contract references for downstream Slice 2 wiring. TBD-by-Slice-2 base SHAs are placeholders that Slice 2 will fill in from the actual frozen contract base SHAs at implementation time.",
+  "upstream_contract_references": {
+    "TASK-006": {
+      "frozen_contract_base_SHA": "5f96cf761d470b82faa1a5d164eefd42360c7df9 (TASK-017 impl PR #75 merge)",
+      "frozen_contract_path": "docs/tasks/TASK-006-heat-balance.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-007": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-007-tube-annulus-correlations.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-008": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-008-double-pipe-rating.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-011": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-011-benchmark-case-governance.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-012": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-012-standards-rule-pack-license-boundary.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-013": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-013-material-cost-data-governance.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-014": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-014-immutable-case-revisions-persistence.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-015A": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-015A-deterministic-test-environment-and-ci-sharding.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-017": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-017-materials-mass-preliminary-mechanical.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-018": {
+      "frozen_contract_base_SHA": "TBD-by-Slice-2-implementation",
+      "frozen_contract_path": "docs/tasks/TASK-018-c0-c1-cost-and-life-cycle-energy.md",
+      "slice1_status": "consumed-by-design-not-implemented-in-Slice-1"
+    },
+    "TASK-019": {
+      "frozen_contract_base_SHA": "5f96cf761d470b82faa1a5d164eefd42360c7df9 (TASK-018 closeout main HEAD before TASK-019 closeout chain; matches Frozen Contract Authority Base SHA)",
+      "frozen_contract_path": "docs/tasks/TASK-019-golden-cases-double-pipe-validation.md",
+      "frozen_contract_status": "DESIGN FROZEN / MERGED / GOVERNANCE-SYNCED",
+      "slice1_status": "implementation-authorized-Slice-1-only"
+    }
+  }
+}
