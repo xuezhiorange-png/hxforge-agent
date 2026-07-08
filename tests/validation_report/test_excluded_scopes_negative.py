@@ -27,9 +27,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-_GOLDEN_FIXTURE_DIR = (
-    Path(__file__).resolve().parent.parent / "golden" / "double_pipe_rating"
-)
+_GOLDEN_FIXTURE_DIR = Path(__file__).resolve().parent.parent / "golden" / "double_pipe_rating"
 
 
 # --- Forbidden key prefixes in fixture JSONs (per frozen design §6) ---
@@ -112,8 +110,7 @@ def test_fixtures_have_no_forbidden_key_prefixes() -> None:
             forbidden = _is_forbidden_key(k, FORBIDDEN_FIXTURE_KEY_PREFIXES)
             if forbidden:
                 raise AssertionError(
-                    f"fixture {fp.name} contains forbidden key {k!r} "
-                    f"matching prefix {forbidden!r}"
+                    f"fixture {fp.name} contains forbidden key {k!r} matching prefix {forbidden!r}"
                 )
 
 
@@ -240,8 +237,12 @@ def test_no_implementation_code_touches_issue_23() -> None:
     new non-governance doc performs or implies Issue #23 action. Governance-
     only references in frozen docs are allowed (and indeed the design
     contract must reference Issue #23 as a boundary)."""
+    _REPORT_SRC = (
+        _REPO_ROOT / "src" / "hexagent" / "validation_report" / "double_pipe_validation_report.py"
+    )
+
     # Scan src/ for Issue #23 references OUTSIDE of governance-exclusion context
-    src_path = _REPO_ROOT / "src" / "hexagent" / "validation_report" / "double_pipe_validation_report.py"
+    src_path = _REPORT_SRC
     if not src_path.exists():
         return
     text = src_path.read_text()
@@ -253,10 +254,10 @@ def test_no_implementation_code_touches_issue_23() -> None:
             # Allow only in explicit governance-boundary comments
             stripped = line.strip()
             if not (
-                stripped.startswith("#") or
-                "governance" in stripped.lower() or
-                "frozen design" in stripped.lower() or
-                "Issue #23 remains NOT TOUCHED" in stripped
+                stripped.startswith("#")
+                or "governance" in stripped.lower()
+                or "frozen design" in stripped.lower()
+                or "Issue #23 remains NOT TOUCHED" in stripped
             ):
                 raise AssertionError(
                     f"non-governance Issue #23 reference in "
@@ -267,7 +268,11 @@ def test_no_implementation_code_touches_issue_23() -> None:
 def test_no_feishu_outbound_in_implementation() -> None:
     """No Feishu outbound integration, webhook, client, token, URL, or send
     path in implementation code. Governance-only references are allowed."""
-    src_path = _REPO_ROOT / "src" / "hexagent" / "validation_report" / "double_pipe_validation_report.py"
+    _REPORT_SRC = (
+        _REPO_ROOT / "src" / "hexagent" / "validation_report" / "double_pipe_validation_report.py"
+    )
+
+    src_path = _REPORT_SRC
     if not src_path.exists():
         return
     text = src_path.read_text()
@@ -284,8 +289,7 @@ def test_no_feishu_outbound_in_implementation() -> None:
     for pat in forbidden_feishu_runtime_patterns:
         if re.search(pat, text):
             raise AssertionError(
-                f"Feishu runtime pattern found in "
-                f"double_pipe_validation_report.py: {pat!r}"
+                f"Feishu runtime pattern found in double_pipe_validation_report.py: {pat!r}"
             )
 
 
@@ -300,6 +304,4 @@ def test_fixtures_contain_no_feishu_or_issue_23_action_keys() -> None:
         with fp.open() as fh:
             text = fh.read()
         for sub in forbidden_key_substrings:
-            assert sub not in text, (
-                f"forbidden key substring {sub!r} found in {fp.name}"
-            )
+            assert sub not in text, f"forbidden key substring {sub!r} found in {fp.name}"

@@ -18,16 +18,13 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hexagent.validation_report import (
+from hexagent.validation_report import (  # noqa: E402
     TASK_019_GOLDEN_CASE_IDS,
     canonical_json_dumps,
     sha256_hex,
 )
 
-
-_GOLDEN_FIXTURE_DIR = (
-    Path(__file__).resolve().parent.parent / "golden" / "double_pipe_rating"
-)
+_GOLDEN_FIXTURE_DIR = Path(__file__).resolve().parent.parent / "golden" / "double_pipe_rating"
 
 
 def test_all_three_fixtures_load() -> None:
@@ -71,6 +68,7 @@ def test_canonical_json_dumps_uses_sorted_keys() -> None:
         # Easier check: the canonical form must equal what json.dumps produces
         # with sort_keys=True + the documented separators.
         import json as _json
+
         expected = _json.dumps(
             data,
             sort_keys=True,
@@ -111,9 +109,7 @@ def test_no_random_or_wall_clock_or_platform_fields_in_fixtures() -> None:
         with path.open() as fh:
             text = fh.read()
         for fs in forbidden_substrings:
-            assert fs not in text, (
-                f"forbidden non-deterministic field {fs!r} found in {path.name}"
-            )
+            assert fs not in text, f"forbidden non-deterministic field {fs!r} found in {path.name}"
 
 
 def test_slice1_placeholder_strings_present_in_fixtures() -> None:

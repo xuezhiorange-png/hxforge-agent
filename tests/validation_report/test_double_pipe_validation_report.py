@@ -8,7 +8,6 @@ blocks and a deterministic report_id.
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -18,7 +17,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hexagent.validation_report import (
+from hexagent.validation_report import (  # noqa: E402
     ALLOWED_OVERALL_STATUSES,
     TASK_019_GOLDEN_CASE_IDS,
     TASK_019_VALIDATION_REPORT_V1,
@@ -47,15 +46,13 @@ def test_golden_case_ids_constant_is_frozen() -> None:
 
 def test_allowed_overall_statuses_constant_is_frozen() -> None:
     """Allowed overall statuses per §7.3."""
-    assert ALLOWED_OVERALL_STATUSES == frozenset({"PASS", "FAIL", "NOT_COMPUTABLE"})
+    assert frozenset({"PASS", "FAIL", "NOT_COMPUTABLE"}) == ALLOWED_OVERALL_STATUSES
 
 
 # --- Report builder skeleton tests ---
 
 
-_GOLDEN_FIXTURE_DIR = (
-    Path(__file__).resolve().parent.parent / "golden" / "double_pipe_rating"
-)
+_GOLDEN_FIXTURE_DIR = Path(__file__).resolve().parent.parent / "golden" / "double_pipe_rating"
 
 
 def _stub_case_block(case_id: str, overall_status: str = "PASS") -> dict:
@@ -80,7 +77,9 @@ def _stub_case_block(case_id: str, overall_status: str = "PASS") -> dict:
             "correlation_ids": ["TASK-007-stub-correlation-id"],
             "provider_ids": ["TASK-015A-stub-provider-id"],
             "rule_pack_ids": [],
-            "design_contract_versions": {"TASK-019": "TASK-019-validation-report-impl-v0.1.0-slice1"},
+            "design_contract_versions": {
+                "TASK-019": "TASK-019-validation-report-impl-v0.1.0-slice1",
+            },
         },
     }
 
@@ -131,8 +130,7 @@ def test_each_case_has_required_section_7_1_fields() -> None:
     }
     for block in report["golden_cases"]:
         assert required <= set(block.keys()), (
-            f"case block {block.get('case_id')!r} missing keys: "
-            f"{required - set(block.keys())!r}"
+            f"case block {block.get('case_id')!r} missing keys: {required - set(block.keys())!r}"
         )
 
 
@@ -157,7 +155,8 @@ def test_aggregate_summary_counts_sum_to_three() -> None:
     report = build_double_pipe_validation_report(per_case_blocks=blocks)
     summary = report["aggregate_summary"]
     assert summary["total_cases"] == 3
-    assert summary["passed"] + summary["failed"] + summary["not_computable"] == summary["total_cases"]
+    total = summary["passed"] + summary["failed"] + summary["not_computable"]
+    assert total == summary["total_cases"]
     assert summary["passed"] == 1
     assert summary["failed"] == 1
     assert summary["not_computable"] == 1
@@ -170,7 +169,8 @@ def test_report_id_is_deterministic_across_repeated_calls() -> None:
     r2 = build_double_pipe_validation_report(per_case_blocks=blocks)
     assert r1["report_id"] == r2["report_id"]
     # UUID v5 string format
-    assert re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", r1["report_id"]), (
+    _UUID_V5_RE = r"^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    assert re.match(_UUID_V5_RE, r1["report_id"]), (
         f"report_id is not UUID v5 format: {r1['report_id']!r}"
     )
 
@@ -226,7 +226,13 @@ def test_report_rejects_invalid_overall_status() -> None:
 
     bad_block = _stub_case_block("TASK-019-GOLDEN-01", overall_status="BOGUS")
     with pytest.raises(ValueError):
-        build_double_pipe_validation_report(per_case_blocks=[bad_block, _stub_case_block("TASK-019-GOLDEN-02"), _stub_case_block("TASK-019-GOLDEN-03")])
+        build_double_pipe_validation_report(
+            per_case_blocks=[
+                bad_block,
+                _stub_case_block("TASK-019-GOLDEN-02"),
+                _stub_case_block("TASK-019-GOLDEN-03"),
+            ],
+        )
 
 
 def test_report_rejects_missing_required_keys() -> None:
@@ -235,7 +241,13 @@ def test_report_rejects_missing_required_keys() -> None:
 
     incomplete = {"case_id": "TASK-019-GOLDEN-01"}  # missing everything else
     with pytest.raises(ValueError):
-        build_double_pipe_validation_report(per_case_blocks=[incomplete, _stub_case_block("TASK-019-GOLDEN-02"), _stub_case_block("TASK-019-GOLDEN-03")])
+        build_double_pipe_validation_report(
+            per_case_blocks=[
+                incomplete,
+                _stub_case_block("TASK-019-GOLDEN-02"),
+                _stub_case_block("TASK-019-GOLDEN-03"),
+            ],
+        )
 
 
 # --- Fixture file presence (Slice 1 schema-shape reproducibility) ---
@@ -244,12 +256,25 @@ def test_report_rejects_missing_required_keys() -> None:
 def test_golden_fixtures_exist_and_are_loadable() -> None:
     """Slice 1 contract: all 3 golden fixtures exist, are valid JSON, and
     contain a ``case_id`` matching the expected TASK-019-GOLDEN-NN pattern."""
-    expected = {
-        "tests/golden/double_pipe_rating/case_01_heat_balance_rating.json": "TASK-019-GOLDEN-01",
-        "tests/golden/double_pipe_rating/case_02_materials_mass_mechanical.json": "TASK-019-GOLDEN-02",
-        "tests/golden/double_pipe_rating/case_03_cost_lifecycle_envelope.json": "TASK-019-GOLDEN-03",
-    }
-    for rel_path, expected_case_id in expected.items():
+    # Derive fixture-path -> case_id mapping from the frozen case-id list
+    # and the canonical Slice 1 fixture filename convention.  This keeps
+    # the test within 100-column ruff limits without hardcoding long
+    # path/case-id pairs that drift.
+    _expected_pairs = [
+        (
+            "tests/golden/double_pipe_rating/case_01_heat_balance_rating.json",
+            TASK_019_GOLDEN_CASE_IDS[0],
+        ),
+        (
+            "tests/golden/double_pipe_rating/case_02_materials_mass_mechanical.json",
+            TASK_019_GOLDEN_CASE_IDS[1],
+        ),
+        (
+            "tests/golden/double_pipe_rating/case_03_cost_lifecycle_envelope.json",
+            TASK_019_GOLDEN_CASE_IDS[2],
+        ),
+    ]
+    for rel_path, expected_case_id in _expected_pairs:
         p = _REPO_ROOT / rel_path
         assert p.exists(), f"missing fixture: {rel_path}"
         with p.open() as fh:

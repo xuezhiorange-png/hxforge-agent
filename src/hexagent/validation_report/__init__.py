@@ -6,16 +6,16 @@ No renderer. No external integration. No Feishu integration.
 """
 
 from hexagent.validation_report.double_pipe_validation_report import (
+    ALLOWED_OVERALL_STATUSES,
+    TASK_019_GOLDEN_CASE_IDS,
     # Schema constants
     TASK_019_VALIDATION_REPORT_V1,
-    TASK_019_GOLDEN_CASE_IDS,
-    ALLOWED_OVERALL_STATUSES,
-    # Deterministic helpers
-    canonical_json_dumps,
-    sha256_hex,
-    deterministic_report_id,
     # Report builder skeleton
     build_double_pipe_validation_report,
+    # Deterministic helpers
+    canonical_json_dumps,
+    deterministic_report_id,
+    sha256_hex,
 )
 
 __all__ = [

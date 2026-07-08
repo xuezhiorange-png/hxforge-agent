@@ -22,7 +22,8 @@ import datetime as _dt
 import hashlib as _hashlib
 import json as _json
 import uuid as _uuid
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 # --- Schema constants (per frozen design §7.1) ---
 
@@ -77,12 +78,14 @@ def sha256_hex(payload: str | bytes) -> str:
     return _hashlib.sha256(payload).hexdigest()
 
 
-def _stable_report_id_seed(*, schema_version: str, case_ids: Sequence[str], impl_version: str) -> str:
+def _stable_report_id_seed(
+    *,
+    schema_version: str,
+    case_ids: Sequence[str],
+    impl_version: str,
+) -> str:
     """Construct a stable seed string for UUID v5 derivation."""
-    return (
-        f"{schema_version}|{impl_version}|"
-        + "|".join(sorted(case_ids))
-    )
+    return f"{schema_version}|{impl_version}|" + "|".join(sorted(case_ids))
 
 
 def deterministic_report_id(
@@ -116,13 +119,13 @@ def _now_utc_iso8601() -> str:
     that want full determinism may pass a fixed ``generated_at`` value
     explicitly when invoking :func:`build_double_pipe_validation_report`.
     """
-    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # --- Slice 1 helper for environment metadata (deterministic) ---
 
 
-def _stable_run_environment_metadata() -> Dict[str, Any]:
+def _stable_run_environment_metadata() -> dict[str, Any]:
     """Return a deterministic, conservative run-environment metadata block.
 
     Per frozen design §7.1: ``run_environment`` is required but Slice 1
@@ -146,7 +149,7 @@ def _stable_run_environment_metadata() -> Dict[str, Any]:
 # --- Slice 1 upstream contract versions (frozen contract base SHAs) ---
 
 
-def _frozen_upstream_contract_versions() -> Dict[str, str]:
+def _frozen_upstream_contract_versions() -> dict[str, str]:
     """Record frozen contract base SHAs for the 10 upstream contracts.
 
     These are the contract base SHAs from TASK-018 closeout (PR #86 merge
@@ -185,7 +188,7 @@ def _ensure_allowed_overall_status(overall_status: str) -> str:
     return overall_status
 
 
-def _ensure_case_count(per_case_blocks: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+def _ensure_case_count(per_case_blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     if len(per_case_blocks) != len(TASK_019_GOLDEN_CASE_IDS):
         raise ValueError(
             f"validation report skeleton requires exactly "
@@ -201,11 +204,11 @@ def _ensure_case_count(per_case_blocks: Sequence[Mapping[str, Any]]) -> List[Dic
 def build_double_pipe_validation_report(
     *,
     per_case_blocks: Sequence[Mapping[str, Any]],
-    upstream_contract_versions: Optional[Mapping[str, str]] = None,
-    run_environment: Optional[Mapping[str, Any]] = None,
-    generated_at: Optional[str] = None,
-    license_boundary_attestation: Optional[Mapping[str, Any]] = None,
-) -> Dict[str, Any]:
+    upstream_contract_versions: Mapping[str, str] | None = None,
+    run_environment: Mapping[str, Any] | None = None,
+    generated_at: str | None = None,
+    license_boundary_attestation: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build a TASK-019 validation-report skeleton.
 
     Slice 1 scope: a deterministic report builder that accepts already-
@@ -263,9 +266,7 @@ def build_double_pipe_validation_report(
     for i, block in enumerate(blocks):
         missing = required_keys - set(block.keys())
         if missing:
-            raise ValueError(
-                f"per_case_blocks[{i}] missing required keys: {sorted(missing)!r}"
-            )
+            raise ValueError(f"per_case_blocks[{i}] missing required keys: {sorted(missing)!r}")
         comparison = block.get("comparison", {})
         overall = comparison.get("overall_status")
         if overall is not None:
@@ -302,7 +303,7 @@ def build_double_pipe_validation_report(
     case_ids = tuple(b["case_id"] for b in blocks)
     report_id = deterministic_report_id(case_ids=case_ids)
 
-    report: Dict[str, Any] = {
+    report: dict[str, Any] = {
         "report_schema_version": TASK_019_VALIDATION_REPORT_V1,
         "report_id": report_id,
         "generated_at": generated_at,
@@ -344,9 +345,7 @@ def _self_check() -> None:
 
     # sha256_hex shape
     h1 = sha256_hex("hello")
-    assert len(h1) == 64 and h1 == h1.lower(), (
-        f"sha256_hex returned non-canonical hash: {h1!r}"
-    )
+    assert len(h1) == 64 and h1 == h1.lower(), f"sha256_hex returned non-canonical hash: {h1!r}"
     h2 = sha256_hex("hello")
     assert h1 == h2, "sha256_hex is not deterministic"
 

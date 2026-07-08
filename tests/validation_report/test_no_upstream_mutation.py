@@ -8,7 +8,6 @@ Also asserts TASK-017 stale backlog rows are not edited by this branch.
 
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 import sys
@@ -53,18 +52,23 @@ def test_no_frozen_contract_modification_vs_origin_main() -> None:
     # Get list of changed files vs origin/main
     result = subprocess.run(
         ["git", "diff", "--name-only", "origin/main"],
-        capture_output=True, text=True, cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
     )
     if result.returncode != 0:
         # If origin/main is unreachable, fall back to HEAD
         result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
-            capture_output=True, text=True, cwd=str(_REPO_ROOT),
+            capture_output=True,
+            text=True,
+            cwd=str(_REPO_ROOT),
         )
     changed_files = set(line.strip() for line in result.stdout.splitlines() if line.strip())
 
     frozen_modified = sorted(
-        f for f in changed_files
+        f
+        for f in changed_files
         if any(f.startswith("docs/tasks/TASK-0") and f.endswith(".md") for _ in [0])
         and any(f.endswith(g.split("/")[-1]) for g in FROZEN_CONTRACT_GLOBS)
     )
@@ -111,7 +115,9 @@ def test_task_017_stale_backlog_rows_not_edited() -> None:
     """
     result = subprocess.run(
         ["git", "show", "origin/main:docs/TASK_BACKLOG.md"],
-        capture_output=True, text=True, cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
     )
     if result.returncode != 0:
         # origin/main not reachable, skip
@@ -129,7 +135,7 @@ def test_task_017_stale_backlog_rows_not_edited() -> None:
     ]
     for stale in stale_substrings:
         # Check the line exists in origin/main
-        matching = [l for l in origin_lines if stale in l]
+        matching = [line for line in origin_lines if stale in line]
         assert matching, f"stale row {stale!r} not found in origin/main"
 
     # Check current branch has not modified these rows
@@ -137,7 +143,9 @@ def test_task_017_stale_backlog_rows_not_edited() -> None:
     # so the rows should be byte-identical
     result_cur = subprocess.run(
         ["git", "show", "HEAD:docs/TASK_BACKLOG.md"],
-        capture_output=True, text=True, cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
     )
     if result_cur.returncode != 0:
         return
