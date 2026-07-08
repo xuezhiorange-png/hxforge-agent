@@ -1,6 +1,6 @@
 # TASK-019 — Golden Cases and Double-Pipe Validation Report Design Contract
 
-**Status:** DESIGN FROZEN / MERGED / GOVERNANCE-SYNCED / AMENDMENT-002-A-IN-PROGRESS / AMENDMENT-002-D-IN-PROGRESS / MERGE-NOT-AUTHORIZED
+**Status:** DESIGN FROZEN / MERGED / GOVERNANCE-SYNCED / AMENDMENT-002-A-IN-PROGRESS / AMENDMENT-002-D-IN-PROGRESS / AMENDMENT-002-E-IN-PROGRESS / MERGE-NOT-AUTHORIZED
 **Milestone:** M2 (Double-pipe vertical slice)
 **Priority:** P1
 **Depends on:** TASK-006, TASK-007, TASK-008, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015A, TASK-017, TASK-018
@@ -378,6 +378,117 @@ Amendment 002-D **does NOT authorize** any of the following, in either this amen
 As of Amendment 002-D authoring, the Slice 3A PR #102 is MERGED and post-merge main CI is GREEN. The Slice 3A adapter currently fails-closed for all three cases with `status=WIRED_VIA_CHAIN_PARTIAL` and `produced_fields=[]`. The Slice 3B-A attempt was BLOCKED at the case_01 fluid name resolution layer (`TASK019_SLICE3B_A_BLOCKED_UPSTREAM_CHAIN_CANNOT_EXECUTE_FROM_FROZEN_INPUTS_FLUID_NAME_NOT_COOLPROP_RESOLVABLE`).
 
 Amendment 002-D authorizes the case_01 fluid identifier bridge contract. The case_02 / case_03 bridge contracts and the Slice 3B-A implementation (case_01 adapter wiring) require a separate Charles authorization in a future round. **Implementation of Slice 3B-A is NOT authorized by this amendment.**
+
+### 4.7 Amendment 002-E — case_01 non-transitional operating point and expected_output re-freeze (binding)
+
+**Amendment id**: `TASK-019-DESIGN-AMENDMENT-002-E`
+**Effective scope**: case_01 only (TASK-019-GOLDEN-01)
+**Status**: DESIGN-FROZEN-PENDING-MERGE
+
+#### 4.7.1 Purpose (binding)
+
+The prior Slice 3B-A implementation attempt (`TASK019_SLICE3B_A_BLOCKED_CASE01_CHAIN_CANNOT_PRODUCE_ACTUAL_OUTPUT_WITH_AMENDMENT_002D_FLUID_IDENTIFIER_NO_FABRICATION_PERFORMED`) revealed that Amendment 002-D's fluid identifier bridge works correctly (CoolProp resolves `Water`/`HEOS` successfully), but the frozen case_01 operating point (mass_flow = 0.5/0.5 kg/s) lands in the **TASK-007 frozen correlation registry's transitional flow regime** (Re = 7399.4, 2300 ≤ Re ≤ 10000) which is unsupported. The upstream correlation registry returns `RatingStatus.BLOCKED` with blocker `CORRELATION_FLOW_REGIME_INCOMPATIBLE`.
+
+Amendment 002-E re-freezes case_01 into a **non-transitional turbulent operating point** by varying only the case_01 mass flow rates (per auth §2 "Preferred input change" and "Do not change geometry, inlet temperatures, inlet pressures, fouling factors, provider identifiers, material identifiers, or pressure-drop status unless Charles gives a separate authorization").
+
+#### 4.7.2 Candidate selection evidence (binding)
+
+Per auth §6 candidate selection rule, equal-flow candidates were probed in order: 0.75 → 0.80 → 0.90 → 1.00 kg/s on both sides. All four candidates pass the acceptance criteria. The **first** (smallest) candidate is selected:
+
+| Candidate | tube_Re | annulus_Re | min(Re) | status |
+|---|---|---|---|---|
+| **0.75 / 0.75 kg/s** ✓ selected | 75810.66 | 11386.37 | **11386.37** | succeeded (min > 11000 recommended margin) |
+| 0.80 / 0.80 kg/s (not needed) | 80913.45 | 12133.91 | 12133.91 | succeeded |
+| 0.90 / 0.90 kg/s (not needed) | 91125.55 | 13627.46 | 13627.46 | succeeded |
+| 1.00 / 1.00 kg/s (not needed) | 101344.92 | 15119.32 | 15119.32 | succeeded |
+
+Both tube-side and annulus-side Re are > 10000 (transitional regime avoided) and > 11000 (recommended margin). Selected correlations: `tube_turbulent_gnielinski` (applicable) and `annulus_turbulent_gnielinski_dh` (applicable).
+
+#### 4.7.3 Frozen field paths and values (binding, case_01 only)
+
+##### Changed input fields (mass_flow re-freeze)
+
+| Field path | Previous value (Amendment 001/002-D) | New value (Amendment 002-E) |
+|---|---|---|
+| `input.cold_side.mass_flow_kg_s` | `0.5` | `0.75` |
+| `input.hot_side.mass_flow_kg_s` | `0.5` | `0.75` |
+
+##### Re-frozen expected_output fields (production-chain-derived)
+
+| Field path | Previous value (Amendment 001) | New value (Amendment 002-E) |
+|---|---|---|
+| `expected_output.heat_duty_W` | `8368.0` | `6598.77255277395` |
+| `expected_output.LMTD_derived_values.LMTD_counterflow_K` | `29.86` | `37.85817982113553` |
+| `expected_output.heat_transfer_coefficients.annulus_side_W_m2_K` | `1520.0` | `2783.7013942048334` |
+| `expected_output.heat_transfer_coefficients.tube_side_W_m2_K` | `1850.0` | `7899.20947325792` |
+| `expected_output.outlet_temperatures_K.cold_side` | `312.8` | `295.25317863269566` |
+| `expected_output.outlet_temperatures_K.hot_side` | `316.4` | `331.0473945550949` |
+
+The previous Amendment 001 values were engineering-literature-referenced canonical baselines (Kern 1950); the Amendment 002-E values are **production-chain-derived** from the existing TASK-006/007/008 + TASK-015A CoolProp chain at the new non-transitional operating point. Both fluids remain single-phase liquid (no phase change). All six values are finite and positive.
+
+##### Preserved fields (binding, per auth §7 "Preserve these fields exactly unless separately authorized")
+
+- `input.cold_side.fluid_composition` = `"water (H2O, single-phase liquid, pure)"`
+- `input.hot_side.fluid_composition` = `"water (H2O, single-phase liquid, pure)"`
+- `input.cold_side.fluid_identifier` = `{"name": "Water", "equation_of_state_backend": "HEOS"}` (Amendment 002-D frozen)
+- `input.hot_side.fluid_identifier` = `{"name": "Water", "equation_of_state_backend": "HEOS"}` (Amendment 002-D frozen)
+- `input.cold_side.inlet_pressure_Pa` = `101325.0`
+- `input.hot_side.inlet_pressure_Pa` = `101325.0`
+- `input.cold_side.inlet_temperature_K` = `293.15`
+- `input.hot_side.inlet_temperature_K` = `333.15`
+- `input.geometry.*` — all 10 keys unchanged (including the 3 Amendment 002-A geometry material properties: `wall_thermal_conductivity_w_m_k=16.2`, `inner_surface_roughness_m=4.5e-5`, `annulus_surface_roughness_m=4.5e-5`)
+- `input.fouling_factors.*` — both keys unchanged
+- `input.property_provider_id` = `"CoolProp (TASK-015A frozen)"`
+- `pressure_drop_excluded_from_taska_019` = `"NOT_COMPUTABLE"`
+- `license_boundary_attestation.*` — unchanged
+
+#### 4.7.4 Production-chain evidence (binding)
+
+The six re-frozen expected_output values are derived from the production chain via `rate_double_pipe(geometry, hot_fluid=FluidIdentifier("Water", "HEOS"), cold_fluid=FluidIdentifier("Water", "HEOS"), hot_mass_flow_kg_s=0.75, cold_mass_flow_kg_s=0.75, ...)`:
+
+- Upstream tasks: TASK-006 (heat balance solver) + TASK-007 (single-phase correlations) + TASK-008 (double-pipe rating) + TASK-015A (CoolProp provider)
+- Provider: CoolProp 8.0.0
+- Provider identifier: `Water` / HEOS (per Amendment 002-D)
+- Tube correlation: `tube_turbulent_gnielinski` (applicable, tube_Re = 75810.66)
+- Annulus correlation: `annulus_turbulent_gnielinski_dh` (applicable, annulus_Re = 11386.37)
+- `provenance_digest` = `sha256:80a85f8001abcf739b805b2b33d7a2654145fd91ea13cd09c1dfc71758245c2a`
+- `result_hash` = `sha256:4e48e3d0e2e154d13caf765e2b6619950adadf953ca223e18fd8cea7c1ff7c1c`
+- No adapter execution used as source of expected_output
+- No hand-calculated expected_output
+- No transitional-flow correlation implementation
+- No correlation registry mutation
+
+#### 4.7.5 Tolerances: NUMERIC VALUES UNCHANGED (binding)
+
+The numeric tolerance values for the six case_01 expected_output fields (heat_duty_W abs=100.0 rel=0.01; LMTD_counterflow_K abs=0.5 rel=0.02; annulus_side_W_m2_K abs=100.0 rel=0.05; tube_side_W_m2_K abs=100.0 rel=0.05; outlet_temperatures_K abs=0.5 rel=0.002) are **preserved verbatim** from Amendment 001. Amendment 002-E re-freezes the expected_output central values but does not widen, narrow, or re-derive the numeric tolerances. The per-field basis strings are updated to reference Amendment 002-E and the new non-transitional operating point.
+
+#### 4.7.6 Non-authorizations (binding)
+
+Amendment 002-E **does NOT authorize** any of the following, in either this amendment round or in any future TASK-019 implementation round without an explicit separate design-amendment authorization:
+
+- **No implementation code in this round.** This amendment is design-only; the adapter will be updated in a future Slice 3B-A round that is separately authorized.
+- **No case_02 amendment.** case_02 numeric expected_output values and tolerance entries are preserved byte-for-byte.
+- **No case_03 amendment.** case_03 numeric expected_output values and tolerance entries are preserved byte-for-byte.
+- **No geometry mutation.** `input.geometry.*` is unchanged.
+- **No inlet temperature mutation.** Both `inlet_temperature_K` values are unchanged.
+- **No inlet pressure mutation.** Both `inlet_pressure_Pa` values are unchanged.
+- **No fouling-factor mutation.** Both `fouling_factors.*` values are unchanged.
+- **No provider identifier mutation.** Both `fluid_identifier.*` values are unchanged (Amendment 002-D frozen).
+- **No material identifier mutation.** The case_02 `material_selection.tube_material_id` / `shell_material_id` strings remain descriptive.
+- **No comparison PASS/FAIL implementation.** `comparison.overall_status` remains `NOT_COMPUTABLE`.
+- **No pressure-drop / TASK-020+ content.** Pressure drop remains `NOT_COMPUTABLE` per §6.
+- **No discount / salvage formula invention.** Per §5.1 / §5.2; TASK-018 §5.3 / §5.3.2 remain DEFERRED.
+- **No new correlation registry entries.** The `tube_turbulent_gnielinski` and `annulus_turbulent_gnielinski_dh` correlations are pre-existing in the TASK-007 frozen registry; no new entries were added.
+- **No transitional-flow correlation implementation.** Amendment 002-E avoids the transitional regime; it does not implement a transitional correlation.
+- **No StubPropertyProvider hardcoding.** The production chain uses the real `CoolPropProvider` (TASK-015A frozen).
+- **No source-code change to correlation registry.**
+- **No PropertyProvider change to `src/hexagent/properties/**`.**
+- **No new blocker / warning code.**
+- **No Issue #23 / #93 / #94 / #95 mutation.** Per ongoing governance; this amendment does not touch any Issue.
+
+#### 4.7.7 Slice 3B-A implementation status (binding)
+
+As of Amendment 002-E authoring, the Slice 3A PR #102 is MERGED, the Amendment 002-D PR #104 is MERGED, and post-merge main CI is GREEN. The case_01 fixture now carries the non-transitional operating point (0.75/0.75 kg/s) and production-chain-derived expected_output values. The Slice 3B-A implementation (case_01 adapter wiring using Amendment 002-D fluid_identifier fields at the new non-transitional operating point) requires a separate Charles authorization in a future round. **Implementation of Slice 3B-A is NOT authorized by this amendment.**
 
 ## 5. TASK-018 deferred amendment handling (binding)
 
