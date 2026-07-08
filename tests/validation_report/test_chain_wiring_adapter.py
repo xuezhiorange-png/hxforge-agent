@@ -17,6 +17,7 @@ comparison PASS / FAIL logic.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -128,7 +129,12 @@ def test_adapter_uses_production_chain_apis_only() -> None:
 
 
 # 5. case_01 actual_output is no longer placeholder-only / empty where
-# authorized production output is available.
+# authorized production output is available. Slice 3A P1 fix: a field
+# is counted as produced only when a real upstream execution returned
+# a non-None value. The current Slice 3A fixtures lack the
+# wall_thermal_conductivity / surface_roughness material properties
+# the upstream DoublePipeGeometry constructor requires, so the chain
+# must fail closed and produced_fields is empty.
 def test_case_01_actual_output_has_production_values() -> None:
     from hexagent.validation_report import chain_adapter
 
@@ -136,30 +142,61 @@ def test_case_01_actual_output_has_production_values() -> None:
     artifact = chain_adapter.compute_actual_output_via_chain(fixture)
     assert artifact["status"] in {"WIRED_VIA_CHAIN", "WIRED_VIA_CHAIN_PARTIAL"}
     produced = artifact.get("produced_fields", [])
-    # At minimum, the adapter must produce the heat_duty field.
-    assert "heat_duty_W" in produced
+    values = artifact.get("values", {})
+    # Slice 3A P1: produced_fields ⊆ fields where values[field] is non-None.
+    # A field name appearing in produced_fields without a corresponding
+    # non-None value is a P1 violation.
+    for field in produced:
+        cur: object = values
+        for part in field.split("."):
+            if not isinstance(cur, dict) or part not in cur:
+                raise AssertionError(f"produced field {field!r} not present in values for case_01")
+            cur = cur[part]  # type: ignore[assignment]
+        assert cur is not None, (
+            f"produced field {field!r} has None value in case_01; "
+            f"a None-valued field must not be in produced_fields"
+        )
 
 
 # 6. case_02 actual_output is no longer placeholder-only / empty where
-# authorized production output is available.
+# authorized production output is available. Slice 3A P1 fix: the
+# adapter surfaces the case-bound material IDs in values (required by
+# the §7.1 case-block surface), but produced_fields is empty because
+# the case_02 chain cannot run without a TASK-013 catalog-resolved
+# MaterialRecord.
 def test_case_02_actual_output_has_production_values() -> None:
     from hexagent.validation_report import chain_adapter
 
     fixture = _load_fixture("TASK-019-GOLDEN-02")
     artifact = chain_adapter.compute_actual_output_via_chain(fixture)
     assert artifact["status"] in {"WIRED_VIA_CHAIN", "WIRED_VIA_CHAIN_PARTIAL"}
-    # Adapter must surface the case-bound material_record_id strings
-    # (the production's selected_material_ids.shell_material_id and
-    # .tube_material_id are produced from the frozen fixture's
-    # material_selection block).
+    # Case-bound material IDs are surfaced in values for the §7.1
+    # materialization surface (the case-block validation report needs
+    # them to be non-None to render the case identity).
     values = artifact.get("values", {})
     assert "selected_material_ids" in values
     assert values["selected_material_ids"]["shell_material_id"] is not None
     assert values["selected_material_ids"]["tube_material_id"] is not None
+    # Slice 3A P1: produced_fields ⊆ fields where values[field] is non-None.
+    produced = artifact.get("produced_fields", [])
+    for field in produced:
+        cur: object = values
+        for part in field.split("."):
+            if not isinstance(cur, dict) or part not in cur:
+                raise AssertionError(f"produced field {field!r} not present in values for case_02")
+            cur = cur[part]  # type: ignore[assignment]
+        assert cur is not None, (
+            f"produced field {field!r} has None value in case_02; "
+            f"a None-valued field must not be in produced_fields"
+        )
 
 
 # 7. case_03 actual_output is no longer placeholder-only / empty where
-# authorized production output is available.
+# authorized production output is available. Slice 3A P1 fix: the
+# case_03 chain cannot run without a TASK-018 catalog-resolved cost
+# records list, so produced_fields is empty and all cost /
+# life-cycle actual_output values are fail-closed None. Discount /
+# salvage remain deferred (no formula invented).
 def test_case_03_actual_output_has_production_values() -> None:
     from hexagent.validation_report import chain_adapter
 
@@ -176,6 +213,19 @@ def test_case_03_actual_output_has_production_values() -> None:
         artifact.get("discount_salvage_status", {}).get("salvage_minor_units")
         == "DEFERRED_PER_TASK_018_5_3_2"
     )
+    # Slice 3A P1: produced_fields ⊆ fields where values[field] is non-None.
+    produced = artifact.get("produced_fields", [])
+    values = artifact.get("values", {})
+    for field in produced:
+        cur: object = values
+        for part in field.split("."):
+            if not isinstance(cur, dict) or part not in cur:
+                raise AssertionError(f"produced field {field!r} not present in values for case_03")
+            cur = cur[part]  # type: ignore[assignment]
+        assert cur is not None, (
+            f"produced field {field!r} has None value in case_03; "
+            f"a None-valued field must not be in produced_fields"
+        )
 
 
 # 8. expected_output remains unchanged.
@@ -467,3 +517,206 @@ def test_chain_wired_actual_output_sha_differs_from_not_computable() -> None:
         "chain-wired actual_output_sha256 must differ from the NOT_COMPUTABLE "
         "placeholder's actual_output_sha256; otherwise the chain wiring is a no-op"
     )
+
+
+# ---------------------------------------------------------------------------
+# Slice 3A P1 fix verification tests.
+#
+# These tests assert that the P1 findings from the prior engineering review
+# are fully remediated:
+#   - P1-1: no hardcoded wall_thermal_conductivity / surface_roughness
+#     fallback in case_01.
+#   - P1-2: no synthetic MaterialRecord construction in case_02.
+#   - P1-3: no hardcoded SelectionFilters / empty-record pseudo cost
+#     behavior in case_03.
+#   - P1-4: produced_fields is derived from real upstream-produced values
+#     (non-None), not from field-name presence alone.
+# ---------------------------------------------------------------------------
+
+
+# P1-1: chain_adapter source must NOT contain the hardcoded
+# wall_thermal_conductivity / roughness fallback values that were
+# removed in the P1 fix.
+def test_p1_no_hardcoded_geometry_material_properties() -> None:
+    import inspect
+
+    from hexagent.validation_report import chain_adapter
+
+    src = inspect.getsource(chain_adapter)
+    forbidden_literals = (
+        "16.2",  # the old hardcoded SS304 thermal conductivity
+        "4.5e-5",  # the old hardcoded surface roughness (inner + annulus)
+    )
+    for lit in forbidden_literals:
+        assert lit not in src, (
+            f"chain_adapter source still contains hardcoded literal {lit!r}; "
+            f"this is the P1-1 fallback the engineering review flagged"
+        )
+
+
+# P1-2: chain_adapter must NOT synthesize a MaterialRecord with
+# hardcoded metadata. The previous P1-2 implementation
+# (_build_material_record_from_case_02_input) has been removed.
+def test_p1_no_synthetic_material_record_construction() -> None:
+    import inspect
+
+    from hexagent.validation_report import chain_adapter
+
+    src = inspect.getsource(chain_adapter)
+    # The slice3a-frozen-fixture-v1 placeholder is a P1-2 marker.
+    assert "slice3a-frozen-fixture-v1" not in src, (
+        "chain_adapter source still contains the slice3a-frozen-fixture-v1 "
+        "placeholder; this is a P1-2 marker the engineering review flagged"
+    )
+    # The removed helper function must be gone (definitions only;
+    # comments are allowed since they document the removal).
+
+    # Match a def statement: ^def _build_material_record_from_case_02_input(
+    assert not re.search(
+        r"^def\s+_build_material_record_from_case_02_input\(", src, re.MULTILINE
+    ), (
+        "chain_adapter source still defines the removed "
+        "_build_material_record_from_case_02_input helper"
+    )
+    # No MaterialRecord-shaped dict literal with hardcoded values: the
+    # adapter must not return a dict containing the MaterialRecord
+    # fields with hardcoded values. (We check for the pattern of
+    # multiple hardcoded MaterialRecord field assignments in close
+    # proximity — the old implementation had
+    # "material_record_version": "slice3a-frozen-fixture-v1", ...)
+    # which is already caught above. We additionally check that
+    # no "US" or "approved" hardcoded string appears as a
+    # MaterialRecord field assignment.
+    forbidden_hardcoded_values = (
+        '"US"',  # old MaterialRecord "region"
+        '"approved"',  # old MaterialRecord "approval_state"
+    )
+    for val in forbidden_hardcoded_values:
+        assert val not in src, (
+            f"chain_adapter source still contains hardcoded MaterialRecord "
+            f"value {val!r}; this is a P1-2 marker the engineering review flagged"
+        )
+
+
+# P1-3: chain_adapter must NOT hardcode SelectionFilters (material_family,
+# cost_category_filter, quantity_basis_filter, license_class_filter) and
+# must NOT call select_cost_records with an empty records list as if it
+# were production-derived output.
+def test_p1_no_synthetic_cost_selection_filters() -> None:
+    import inspect
+
+    from hexagent.validation_report import chain_adapter
+
+    src = inspect.getsource(chain_adapter)
+    # The old P1-3 hardcode was a SelectionFilters(...) call with
+    # material_family="stainless_steel" and several frozenset filters
+    # for cost_category / quantity_basis / license_class. We check
+    # for the specific patterns that indicate a hardcoded
+    # SelectionFilters construction.
+    forbidden_filter_patterns = (
+        'material_family="stainless_steel"',  # old hardcoded material_family
+        "cost_category_filter=frozenset",  # any filter construction
+        "quantity_basis_filter=frozenset",  # any filter construction
+        "license_class_filter=frozenset",  # any filter construction
+    )
+    for pat in forbidden_filter_patterns:
+        assert pat not in src, (
+            f"chain_adapter source still contains hardcoded SelectionFilters "
+            f"pattern {pat!r}; this is the P1-3 finding the engineering review flagged"
+        )
+    # The removed helper function must be gone (definitions only;
+    # comments are allowed since they document the removal).
+    assert not re.search(
+        r"^def\s+_build_case_03_filters\(", src, re.MULTILINE
+    ), (
+        "chain_adapter source still defines the removed "
+        "_build_case_03_filters helper"
+    )
+    # No empty-records pseudo cost computation: select_cost_records
+    # must not be called with a literal empty tuple.
+    assert "select_cost_records(()," not in src, (
+        "chain_adapter source still calls select_cost_records with an empty "
+        "records tuple; this is the P1-3 empty-record pseudo cost behavior"
+    )
+
+
+# P1-4: produced_fields is derived from non-None values only.
+def test_p1_produced_fields_have_no_none_values() -> None:
+    from hexagent.validation_report import chain_adapter
+
+    def _dig(root: object, dotted: str) -> object:
+        cur: object = root
+        for part in dotted.split("."):
+            if not isinstance(cur, dict) or part not in cur:
+                return None
+            cur = cur[part]  # type: ignore[assignment]
+        return cur
+
+    for case_id in (
+        "TASK-019-GOLDEN-01",
+        "TASK-019-GOLDEN-02",
+        "TASK-019-GOLDEN-03",
+    ):
+        fixture = _load_fixture(case_id)
+        artifact = chain_adapter.compute_actual_output_via_chain(fixture)
+        values = artifact.get("values", {})
+        for field in artifact.get("produced_fields", []):
+            val = _dig(values, field)
+            assert val is not None, (
+                f"case {case_id} P1-4 violation: produced field {field!r} "
+                f"has None value; a None-valued field must not appear in "
+                f"produced_fields"
+            )
+
+
+# P1-4 (extended): in the current Slice 3A fixture set, the chain
+# fails closed for all 3 cases (case_01: no material properties;
+# case_02: no full MaterialRecord; case_03: no cost records list).
+# Therefore produced_fields is empty for all 3 cases.
+def test_p1_all_cases_fail_closed_produced_fields_empty() -> None:
+    from hexagent.validation_report import chain_adapter
+
+    for case_id in (
+        "TASK-019-GOLDEN-01",
+        "TASK-019-GOLDEN-02",
+        "TASK-019-GOLDEN-03",
+    ):
+        fixture = _load_fixture(case_id)
+        artifact = chain_adapter.compute_actual_output_via_chain(fixture)
+        # The current fixtures lack TASK-013 / TASK-018 catalog-resolved
+        # data, so every case must fail closed with an empty
+        # produced_fields list. (This test will be relaxed when a
+        # TASK-013 / TASK-018 catalog lookup helper is added.)
+        assert artifact.get("produced_fields", []) == [], (
+            f"case {case_id} must fail closed with empty produced_fields "
+            f"in current Slice 3A; got {artifact.get('produced_fields', [])!r}"
+        )
+        # And the status must be PARTIAL (not full WIRED_VIA_CHAIN).
+        assert artifact["status"] == "WIRED_VIA_CHAIN_PARTIAL", (
+            f"case {case_id} status must be WIRED_VIA_CHAIN_PARTIAL when "
+            f"the chain fails closed; got {artifact['status']!r}"
+        )
+
+
+# P1-4 (extended): the chain adapter must NOT silently substitute
+# constants to keep the chain wired. A guard test confirms that the
+# hardcoded 16.2 / 4.5e-5 fallback values, the slice3a-frozen-fixture-v1
+# MaterialRecord placeholder, and the empty-records pseudo cost path
+# are all gone from the adapter source.
+def test_p1_guard_test_no_silent_constant_substitution() -> None:
+    import inspect
+
+    from hexagent.validation_report import chain_adapter
+
+    src = inspect.getsource(chain_adapter)
+    forbidden_markers = (
+        "16.2",  # P1-1 hardcoded SS304 thermal conductivity
+        "4.5e-5",  # P1-1 hardcoded surface roughness
+        "slice3a-frozen-fixture-v1",  # P1-2 MaterialRecord placeholder
+        "select_cost_records((),",  # P1-3 empty-records pseudo cost
+    )
+    for marker in forbidden_markers:
+        assert marker not in src, (
+            f"chain_adapter source contains P1 guard-test marker {marker!r}; "
+            f"this is a silent-constant-substitution violation"
+        )

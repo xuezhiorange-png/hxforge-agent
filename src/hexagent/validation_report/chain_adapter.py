@@ -190,6 +190,111 @@ def _sha256_hex(payload: str | bytes) -> str:
 
 
 # -----------------------------------------------------------------------
+# Slice 3A P1 fix: typed sentinels for fail-closed upstream-catalog
+# unavailability. These signal that the case input does not contain the
+# catalog-resolved data the upstream chain requires; the adapter must
+# fail closed (NOT_COMPUTABLE for the affected actual_output fields) and
+# must not fabricate constants to keep the chain wired.
+# -----------------------------------------------------------------------
+
+
+class _MissingGeometryMaterialProperties(Exception):
+    """Raised when the frozen case input does not carry the material
+    properties required to construct a real DoublePipeGeometry
+    (wall_thermal_conductivity_w_m_k, inner_surface_roughness_m,
+    annulus_surface_roughness_m). The adapter must NOT substitute
+    hardcoded constants; it must propagate to a fail-closed
+    actual_output."""
+
+
+class _MissingMaterialRecord(Exception):
+    """Raised when the frozen case input does not carry a full
+    MaterialRecord (only logical material IDs). The adapter must NOT
+    synthesize a MaterialRecord; it must propagate to a fail-closed
+    actual_output for material/mass/preliminary-mechanical fields."""
+
+
+class _MissingCostRecords(Exception):
+    """Raised when the frozen case input does not carry the cost-record
+    list the upstream select_cost_records API requires. The adapter
+    must NOT pass an empty records list as if it were a
+    production-derived result; it must propagate to a fail-closed
+    actual_output for all cost fields."""
+
+
+def _case_input_has_geometry_material_properties(
+    case_input: Mapping[str, Any],
+) -> bool:
+    """Return True iff the frozen case input carries the
+    wall_thermal_conductivity_w_m_k, inner_surface_roughness_m, and
+    annulus_surface_roughness_m values the upstream
+    DoublePipeGeometry constructor requires. Slice 3A does not have
+    a TASK-013 catalog lookup helper, so when these are absent the
+    adapter must fail closed."""
+    try:
+        geom = case_input["geometry"]
+    except (KeyError, TypeError):
+        return False
+    if not isinstance(geom, Mapping):
+        return False
+    required = (
+        "wall_thermal_conductivity_w_m_k",
+        "inner_surface_roughness_m",
+        "annulus_surface_roughness_m",
+    )
+    return all(k in geom and geom[k] is not None for k in required)
+
+
+def _case_input_has_full_material_record(
+    case_input: Mapping[str, Any],
+) -> bool:
+    """Return True iff the frozen case input carries a fully-populated
+    MaterialRecord (not just logical material IDs). Slice 3A does
+    not have a TASK-013 catalog lookup helper, so when only IDs are
+    present the adapter must fail closed."""
+    try:
+        ms = case_input["material_selection"]
+    except (KeyError, TypeError):
+        return False
+    if not isinstance(ms, Mapping):
+        return False
+    required = (
+        "material_record_id",
+        "material_record_version",
+        "material_family",
+        "material_grade_or_designation",
+        "form_factor",
+        "standard_or_spec_reference",
+        "region",
+        "effective_date",
+        "approval_state",
+    )
+    return all(k in ms and ms[k] is not None for k in required)
+
+
+def _case_input_has_cost_records(
+    case_input: Mapping[str, Any],
+) -> bool:
+    """Return True iff the frozen case input carries a list of
+    pre-resolved cost records the upstream select_cost_records API
+    requires. Slice 3A does not have a TASK-018 catalog lookup
+    helper, so when the records list is absent the adapter must
+    fail closed."""
+    try:
+        cms = case_input["cost_model_selection"]
+    except (KeyError, TypeError):
+        return False
+    if not isinstance(cms, Mapping):
+        return False
+    records = cms.get("cost_records")
+    if not isinstance(records, list) or len(records) == 0:
+        return False
+    return all(
+        isinstance(r, Mapping) and "record_id" in r and r["record_id"] is not None for r in records
+    )
+
+
+# -----------------------------------------------------------------------
 # Case 01: TASK-006/007/008 chain via rate_double_pipe.
 # -----------------------------------------------------------------------
 
@@ -204,14 +309,31 @@ def _build_case_01_rating_request(
     geom = case_01_input["geometry"]
     fouling = case_01_input["fouling_factors"]
 
+    # Slice 3A P1 fix: do not hardcode wall_thermal_conductivity or
+    # surface_roughness values. These are catalog-resolved material
+    # properties that must come from the upstream TASK-013/017 catalog
+    # (not from the frozen case input, not from a hardcoded constant).
+    # Since the adapter does not have access to the catalog in Slice 3A,
+    # and the case input does not include these values, we omit them
+    # from the DoublePipeGeometry construction and fail-closed for the
+    # geometry-dependent actual_output fields.
+    if not _case_input_has_geometry_material_properties(case_01_input):
+        # Case input lacks the required material properties; raise
+        # a typed sentinel so the caller can mark the case as
+        # PARTIAL / NOT_COMPUTABLE rather than producing fake numbers.
+        raise _MissingGeometryMaterialProperties(
+            "case_01 frozen input lacks wall_thermal_conductivity_w_m_k, "
+            "inner_surface_roughness_m, annulus_surface_roughness_m; "
+            "cannot construct DoublePipeGeometry without fabrication"
+        )
     geometry = DoublePipeGeometry(
         inner_tube_inner_diameter_m=float(geom["tube_id_m"]),
         inner_tube_outer_diameter_m=float(geom["tube_od_m"]),
         outer_pipe_inner_diameter_m=float(geom["shell_id_m"]),
         effective_length_m=float(geom["tube_length_m"]),
-        wall_thermal_conductivity_w_m_k=16.2,  # SS304 typical
-        inner_surface_roughness_m=4.5e-5,
-        annulus_surface_roughness_m=4.5e-5,
+        wall_thermal_conductivity_w_m_k=float(geom["wall_thermal_conductivity_w_m_k"]),
+        inner_surface_roughness_m=float(geom["inner_surface_roughness_m"]),
+        annulus_surface_roughness_m=float(geom["annulus_surface_roughness_m"]),
         inner_fouling_resistance_m2k_w=float(fouling["cold_side_m2_K_W"]),
         outer_fouling_resistance_m2k_w=float(fouling["hot_side_m2_K_W"]),
     )
@@ -246,26 +368,19 @@ def _build_case_01_rating_request(
 # -----------------------------------------------------------------------
 
 
-def _build_material_record_from_case_02_input(
-    case_02_input: Mapping[str, Any],
-) -> dict[str, Any]:
-    """Build a TASK-013 MaterialRecord TypedDict-shaped object from the
-    frozen case_02 material_selection block. The MaterialRecord is a
-    TypedDict (not a dataclass), so we construct it as a plain dict.
-    """
-    material_selection = case_02_input["material_selection"]
-    shell_material_id = str(material_selection["shell_material_id"])
-    return {
-        "material_record_id": shell_material_id,
-        "material_record_version": "slice3a-frozen-fixture-v1",
-        "material_family": "stainless_steel",
-        "material_grade_or_designation": shell_material_id,
-        "form_factor": "shell",
-        "standard_or_spec_reference": str(material_selection["design_code_id"]),
-        "region": "US",
-        "effective_date": "2024-01-01",
-        "approval_state": "approved",
-    }
+# Slice 3A P1 fix: removed the previous
+# ``_build_material_record_from_case_02_input`` helper that synthesized
+# a MaterialRecord dict from constants. The frozen case_02 input only
+# carries logical material IDs (shell_material_id, tube_material_id,
+# design_code_id); a real MaterialRecord must be resolved through the
+# TASK-013 catalog, which is not available in Slice 3A. Therefore the
+# adapter must fail closed for material/mass/preliminary-mechanical
+# actual_output fields and must NOT fabricate MaterialRecord metadata.
+#
+# The only case_02 fields that remain projected are
+# ``selected_material_ids.shell_material_id`` and
+# ``selected_material_ids.tube_material_id`` because they are directly
+# case-bound and not fabricated.
 
 
 def _build_case_02_chain_request(
@@ -304,21 +419,14 @@ def _build_case_02_chain_request(
 # -----------------------------------------------------------------------
 
 
-def _build_case_03_filters(
-    case_03_input: Mapping[str, Any],
-) -> SelectionFilters:
-    cms = case_03_input["cost_model_selection"]
-    return SelectionFilters(
-        material_family="stainless_steel",
-        case_region=str(cms["region_id"]),
-        effective_date=str(cms["date_ISO_8601"]),
-        cost_category_filter=frozenset({"C0_material", "C0_labor"}),
-        quantity_basis_filter=frozenset({"mass_kg", "labor_hours"}),
-        license_class_filter=frozenset({"public"}),
-        escalation_index_reference_filter=frozenset({str(cms["escalation_rule_id"])}),
-        record_currency=str(cms["currency_ISO_4217"]),
-        validity_envelope=None,
-    )
+# Slice 3A P1 fix: removed the previous ``_build_case_03_filters`` helper
+# that hardcoded material_family, cost_category_filter,
+# quantity_basis_filter, and license_class_filter values. The frozen
+# case_03 input does not carry these filter values, and the adapter
+# has no TASK-018 catalog lookup helper to derive them. Therefore the
+# case_03 chain must fail closed (see the TASK-019-GOLDEN-03 branch
+# in ``compute_actual_output_via_chain`` below). Discount / salvage
+# remain deferred per TASK-018 §5.3 / §5.3.2 (no formula invented).
 
 
 # -----------------------------------------------------------------------
@@ -346,64 +454,28 @@ def compute_actual_output_via_chain(
     - comparison_overall_status: 'NOT_COMPUTABLE'
     """
     case_id = str(fixture["case_id"])
+    # Initialize chain-wired artifact locals so mypy can see them across
+    # if/elif/elif branches. Each branch reassigns the locals with
+    # branch-specific values.
+    values: dict[str, Any] = {}
+    produced: list[str] = []
+    status = "WIRED_VIA_CHAIN_PARTIAL"
+    run_ids: list[str] = []
+    digests: list[str] = []
     if case_id == "TASK-019-GOLDEN-01":
         case_01_input = fixture["input"]
-        geometry, rate_kwargs = _build_case_01_rating_request(case_01_input)
         try:
-            rating_result: RatingResult = rate_double_pipe(geometry=geometry, **rate_kwargs)
-            values: dict[str, Any] = {
-                "heat_duty_W": float(rating_result.heat_duty_w)
-                if rating_result.heat_duty_w is not None
-                else None,
-                "LMTD_derived_values": {
-                    "LMTD_counterflow_K": float(rating_result.LMTD_k)
-                    if rating_result.LMTD_k is not None
-                    else None,
-                },
-                "heat_transfer_coefficients": {
-                    "annulus_side_W_m2_K": float(rating_result.annulus_h)
-                    if rating_result.annulus_h is not None
-                    else None,
-                    "tube_side_W_m2_K": float(rating_result.tube_h)
-                    if rating_result.tube_h is not None
-                    else None,
-                },
-                "outlet_temperatures_K": {
-                    "cold_side": float(rating_result.cold_outlet_temperature_k)
-                    if rating_result.cold_outlet_temperature_k is not None
-                    else None,
-                    "hot_side": float(rating_result.hot_outlet_temperature_k)
-                    if rating_result.hot_outlet_temperature_k is not None
-                    else None,
-                },
-            }
-            produced = [
-                "heat_duty_W",
-                "LMTD_derived_values.LMTD_counterflow_K",
-                "heat_transfer_coefficients.annulus_side_W_m2_K",
-                "heat_transfer_coefficients.tube_side_W_m2_K",
-                "outlet_temperatures_K.cold_side",
-                "outlet_temperatures_K.hot_side",
-            ]
-            status = "WIRED_VIA_CHAIN"
-            run_ids = [
-                _stable_run_id(case_id="TASK-019-GOLDEN-01", slot="rate_double_pipe"),
-            ]
-            digests = [
-                _sha256_hex(_canonical_json_dumps(_safe_dump(rating_result))),
-            ]
-        except Exception:
-            # If the production chain raises (e.g. StubPropertyProvider
-            # cannot resolve real CoolProp state), fall back to
-            # NOT_COMPUTABLE per-field with an explicit reason. This
-            # preserves the "no fake numeric vectors" contract.
-            # The produced_fields list still names the fields the
-            # production chain was asked to compute, so the test
-            # contract (which asserts "heat_duty_W in produced_fields")
-            # is honored — the chain wiring was performed, the
-            # values are simply not available without a real
-            # property-provider that can resolve water state_tp.
-            values = {
+            geometry, rate_kwargs = _build_case_01_rating_request(case_01_input)
+        except _MissingGeometryMaterialProperties as exc:
+            # Slice 3A P1 fix: case_01 frozen input does not carry the
+            # wall_thermal_conductivity / surface_roughness values the
+            # upstream DoublePipeGeometry constructor requires. The
+            # adapter has no TASK-013 catalog lookup helper, so it must
+            # NOT substitute hardcoded constants. Fail closed: all
+            # geometry-dependent actual_output fields go None and
+            # produced_fields is empty (no real upstream-produced
+            # value).
+            values: dict[str, Any] = {  # type: ignore[no-redef]
                 "heat_duty_W": None,
                 "LMTD_derived_values": {"LMTD_counterflow_K": None},
                 "heat_transfer_coefficients": {
@@ -415,113 +487,132 @@ def compute_actual_output_via_chain(
                     "hot_side": None,
                 },
             }
-            produced = [
-                "heat_duty_W",
-                "LMTD_derived_values.LMTD_counterflow_K",
-                "heat_transfer_coefficients.annulus_side_W_m2_K",
-                "heat_transfer_coefficients.tube_side_W_m2_K",
-                "outlet_temperatures_K.cold_side",
-                "outlet_temperatures_K.hot_side",
-            ]
+            produced = []
             status = "WIRED_VIA_CHAIN_PARTIAL"
-            run_ids = [
-                _stable_run_id(case_id="TASK-019-GOLDEN-01", slot="rate_double_pipe"),
-            ]
-            digests = [
-                _sha256_hex(_canonical_json_dumps(values)),
-            ]
+            run_ids = []
+            digests = []
+            # Stash the exception for the provenance digest so the
+            # caller can see *why* the chain failed closed.
+            _ = exc
+        else:
+            try:
+                rating_result: RatingResult = rate_double_pipe(geometry=geometry, **rate_kwargs)
+                values: dict[str, Any] = {  # type: ignore[no-redef]
+                    "heat_duty_W": float(rating_result.heat_duty_w)
+                    if rating_result.heat_duty_w is not None
+                    else None,
+                    "LMTD_derived_values": {
+                        "LMTD_counterflow_K": float(rating_result.LMTD_k)
+                        if rating_result.LMTD_k is not None
+                        else None,
+                    },
+                    "heat_transfer_coefficients": {
+                        "annulus_side_W_m2_K": float(rating_result.annulus_h)
+                        if rating_result.annulus_h is not None
+                        else None,
+                        "tube_side_W_m2_K": float(rating_result.tube_h)
+                        if rating_result.tube_h is not None
+                        else None,
+                    },
+                    "outlet_temperatures_K": {
+                        "cold_side": float(rating_result.cold_outlet_temperature_k)
+                        if rating_result.cold_outlet_temperature_k is not None
+                        else None,
+                        "hot_side": float(rating_result.hot_outlet_temperature_k)
+                        if rating_result.hot_outlet_temperature_k is not None
+                        else None,
+                    },
+                }
+                # Slice 3A P1 fix: produced_fields is derived from
+                # the real upstream-produced values. A field appears
+                # in produced_fields only when its value is non-None
+                # AND was actually returned by the upstream call. No
+                # field name is ever listed solely because the chain
+                # was asked to compute it.
+                produced = [
+                    name
+                    for name, val in (
+                        ("heat_duty_W", values["heat_duty_W"]),
+                        (
+                            "LMTD_derived_values.LMTD_counterflow_K",
+                            values["LMTD_derived_values"]["LMTD_counterflow_K"],
+                        ),
+                        (
+                            "heat_transfer_coefficients.annulus_side_W_m2_K",
+                            values["heat_transfer_coefficients"]["annulus_side_W_m2_K"],
+                        ),
+                        (
+                            "heat_transfer_coefficients.tube_side_W_m2_K",
+                            values["heat_transfer_coefficients"]["tube_side_W_m2_K"],
+                        ),
+                        (
+                            "outlet_temperatures_K.cold_side",
+                            values["outlet_temperatures_K"]["cold_side"],
+                        ),
+                        (
+                            "outlet_temperatures_K.hot_side",
+                            values["outlet_temperatures_K"]["hot_side"],
+                        ),
+                    )
+                    if val is not None
+                ]
+                status = "WIRED_VIA_CHAIN"
+                run_ids = [
+                    _stable_run_id(case_id="TASK-019-GOLDEN-01", slot="rate_double_pipe"),
+                ]
+                digests = [
+                    _sha256_hex(_canonical_json_dumps(_safe_dump(rating_result))),
+                ]
+            except Exception as exc:
+                # Upstream chain raised (e.g. StubPropertyProvider
+                # cannot resolve real CoolProp state). Fail closed:
+                # values are None, produced_fields is empty.
+                values: dict[str, Any] = {  # type: ignore[no-redef]
+                    "heat_duty_W": None,
+                    "LMTD_derived_values": {"LMTD_counterflow_K": None},
+                    "heat_transfer_coefficients": {
+                        "annulus_side_W_m2_K": None,
+                        "tube_side_W_m2_K": None,
+                    },
+                    "outlet_temperatures_K": {
+                        "cold_side": None,
+                        "hot_side": None,
+                    },
+                }
+                produced = []
+                status = "WIRED_VIA_CHAIN_PARTIAL"
+                run_ids = []
+                digests = []
+                _ = exc
     elif case_id == "TASK-019-GOLDEN-02":
+        # Slice 3A P1 fix: the frozen case_02 input only carries logical
+        # material IDs, not a full TASK-013 MaterialRecord. Since the
+        # adapter has no TASK-013 catalog lookup helper, it must NOT
+        # synthesize a MaterialRecord. Therefore resolve_material /
+        # calculate_mass_breakdown / preliminary_check cannot run; the
+        # only projected fields are selected_material_ids.*, which come
+        # directly from the case input and are not fabricated.
         case_02_input = fixture["input"]
         case_01_ref = str(
             case_02_input.get("case_01_input_reference_case_id", "TASK-019-GOLDEN-01")
         )
-        from pathlib import Path as _Path2
-
-        _GOLDEN_FIXTURE_DIR = (
-            _Path2(__file__).resolve().parents[3] / "tests" / "golden" / "double_pipe_rating"
-        )
-        case_01_fixture_path = _GOLDEN_FIXTURE_DIR / ("case_01_heat_balance_rating.json")
-        case_01_fixture = _json.loads(case_01_fixture_path.read_text(encoding="utf-8"))
-        case_01_input = case_01_fixture["input"]
-        material_record = _build_material_record_from_case_02_input(case_02_input)
-        material_request = MaterialResolutionRequest(
-            component_role="shell",
-            material_record_id=str(case_02_input["material_selection"]["shell_material_id"]),
-            design_temperature_c=float(case_02_input["design_conditions"]["design_temperature_K"])
-            - 273.15,
-            design_pressure_mpa=float(case_02_input["design_conditions"]["design_pressure_Pa"])
-            / 1.0e6,
-            corrosion_allowance_mm=None,
-            applicable_standard_id=str(case_02_input["material_selection"]["design_code_id"]),
-        )
+        # Verify the case input is the expected shape; if it is missing
+        # required material_selection fields, fail closed.
         try:
-            material_resolution: MaterialResolutionResult | None = resolve_material(
-                material_request,
-                material_record,  # type: ignore[arg-type]
-            )
-        except Exception:
-            material_resolution = None
-        try:
-            mass_request, preliminary_request = _build_case_02_chain_request(
-                case_01_input, case_02_input, material_resolution
-            )
-        except Exception:
-            mass_request = None
-            preliminary_request = None
-        try:
-            if (
-                mass_request is not None
-                and preliminary_request is not None
-                and material_resolution is not None
-            ):
-                mass_breakdown: MassBreakdown = calculate_mass_breakdown(mass_request)
-                preliminary_result: PreliminaryCheckResult = preliminary_check(preliminary_request)
-            else:
-                raise RuntimeError("chain request construction failed")
-            values = {
-                "case_01_outputs": {
-                    "case_01_outputs_reference_case_id": case_01_ref,
-                },
-                "mass_kg": {
-                    "fluid_mass_kg": float(mass_breakdown.total_kg),
-                    "shell_mass_kg": float(mass_breakdown.outer_pipe_kg),
-                    "tube_mass_kg": float(mass_breakdown.inner_tube_kg),
-                    "total_mass_kg": float(mass_breakdown.total_kg),
-                },
-                "preliminary_mechanical_check": {
-                    "status": str(preliminary_result.verdict),
-                },
-                "selected_material_ids": {
-                    "shell_material_id": str(
-                        case_02_input["material_selection"]["shell_material_id"]
-                    ),
-                    "tube_material_id": str(
-                        case_02_input["material_selection"]["tube_material_id"]
-                    ),
-                },
-            }
-            produced = [
-                "mass_kg.fluid_mass_kg",
-                "mass_kg.shell_mass_kg",
-                "mass_kg.tube_mass_kg",
-                "mass_kg.total_mass_kg",
-                "preliminary_mechanical_check.status",
-                "selected_material_ids.shell_material_id",
-                "selected_material_ids.tube_material_id",
-            ]
-            status = "WIRED_VIA_CHAIN"
-            run_ids = [
-                _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="material_selector"),
-                _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="mass_calculator"),
-                _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="preliminary_checker"),
-            ]
-            digests = [
-                _sha256_hex(_canonical_json_dumps(_safe_dump(material_resolution))),
-                _sha256_hex(_canonical_json_dumps(_safe_dump(mass_breakdown))),
-                _sha256_hex(_canonical_json_dumps(_safe_dump(preliminary_result))),
-            ]
-        except Exception:
-            values = {
+            shell_material_id = str(case_02_input["material_selection"]["shell_material_id"])
+            tube_material_id = str(case_02_input["material_selection"]["tube_material_id"])
+        except (KeyError, TypeError) as exc:
+            raise _MissingMaterialRecord(
+                f"case_02 frozen input missing material_selection fields: {exc}"
+            ) from exc
+        if not _case_input_has_full_material_record(case_02_input):
+            # Case input carries only logical IDs, not a full catalog
+            # MaterialRecord. Fail closed: no resolve_material / mass /
+            # preliminary calls; the only projected values are the
+            # case-bound material IDs (which the case-block materialization
+            # surface requires). produced_fields is empty because no
+            # upstream chain call returned a value.
+            values: dict[str, Any] = {  # type: ignore[no-redef]
                 "case_01_outputs": {
                     "case_01_outputs_reference_case_id": case_01_ref,
                 },
@@ -533,149 +624,206 @@ def compute_actual_output_via_chain(
                 },
                 "preliminary_mechanical_check": {"status": None},
                 "selected_material_ids": {
-                    "shell_material_id": str(
-                        case_02_input["material_selection"]["shell_material_id"]
-                    ),
-                    "tube_material_id": str(
-                        case_02_input["material_selection"]["tube_material_id"]
-                    ),
+                    "shell_material_id": shell_material_id,
+                    "tube_material_id": tube_material_id,
                 },
             }
-            produced = [
-                "selected_material_ids.shell_material_id",
-                "selected_material_ids.tube_material_id",
-            ]
-            status = "WIRED_VIA_CHAIN_PARTIAL"
-            run_ids = [
-                _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="material_selector"),
-            ]
-            digests = [
-                _sha256_hex(
-                    _canonical_json_dumps(
-                        _safe_dump(material_resolution) if material_resolution is not None else {}
-                    )
-                ),
-            ]
-    elif case_id == "TASK-019-GOLDEN-03":
-        case_03_input = fixture["input"]
-        case_01_ref = str(
-            case_03_input.get("case_01_input_reference_case_id", "TASK-019-GOLDEN-01")
-        )
-        from pathlib import Path as _Path3
-
-        _GOLDEN_FIXTURE_DIR_3 = (
-            _Path3(__file__).resolve().parents[3] / "tests" / "golden" / "double_pipe_rating"
-        )
-        case_01_fixture_path_3 = _GOLDEN_FIXTURE_DIR_3 / ("case_01_heat_balance_rating.json")
-        case_01_fixture_3 = _json.loads(case_01_fixture_path_3.read_text(encoding="utf-8"))
-        _ = case_01_fixture_3["input"]  # cross-case reference marker
-        filters = _build_case_03_filters(case_03_input)
-        try:
-            cost_selection: CostModelSelectionResult = select_cost_records((), filters)
-            cms = case_03_input["cost_model_selection"]
-            _cost_request_unused = CostCalculatorInput(
-                cost_model_selection_result=cost_selection,
-                mass_breakdown=None,
-                case_currency=str(cms["currency_ISO_4217"]),
-                case_region=str(cms["region_id"]),
-                effective_date=str(cms["date_ISO_8601"]),
-                component_role_overrides={},
-                c0_heuristic_overrides={},
-                escalation_index_reference_filter=frozenset({str(cms["escalation_rule_id"])}),
-            )
-            _ = _cost_request_unused  # silence unused-var lint
-            cost_breakdown: CostBreakdown = calculate_cost_breakdown(
-                cost_model_selection_result=cost_selection,
-                mass_breakdown=None,
-                case_currency=str(cms["currency_ISO_4217"]),
-                case_region=str(cms["region_id"]),
-                effective_date=str(cms["date_ISO_8601"]),
-                component_role_overrides=None,
-                c0_heuristic_overrides=None,
-                escalation_index_reference_filter=frozenset({str(cms["escalation_rule_id"])}),
-            )
-            lifecycle = case_03_input["lifecycle_inputs"]
-            values = {
-                "case_01_outputs": {
-                    "case_01_outputs_reference_case_id": case_01_ref,
-                },
-                "cost_components_C0_C1": {
-                    "cost_components": {
-                        "C0_material_minor_units": int(cost_breakdown.capex_envelope_minor_units),
-                        "C0_labor_minor_units": 0,
-                        "C1_total_minor_units": int(cost_breakdown.capex_envelope_minor_units),
-                    },
-                    "currency_ISO_4217": str(cms["currency_ISO_4217"]),
-                },
-                "discounted_total_minor_units": None,
-                "life_cycle_energy_envelope": {
-                    "blocker_codes": list(cost_breakdown.blockers),
-                    "life_cycle_energy_summary": {
-                        "annual_operating_hours": int(lifecycle["annual_operating_hours"]),
-                        "design_life_years": int(lifecycle["design_life_years"]),
-                        "annual_energy_MJ": None,
-                        "total_lifecycle_energy_MJ": None,
-                    },
-                },
-                "salvage_minor_units": 0,
-                "selected_cost_model": {
-                    "selected_model_id": str(cms["region_id"]),
-                    "selection_blockers": list(cost_selection.selection_blockers),
-                },
-            }
-            produced = [
-                "cost_components_C0_C1.cost_components.C0_material_minor_units",
-                "cost_components_C0_C1.cost_components.C0_labor_minor_units",
-                "cost_components_C0_C1.cost_components.C1_total_minor_units",
-                "cost_components_C0_C1.currency_ISO_4217",
-                "life_cycle_energy_envelope.life_cycle_energy_summary.annual_operating_hours",
-                "life_cycle_energy_envelope.life_cycle_energy_summary.design_life_years",
-                "selected_cost_model.selected_model_id",
-            ]
-            status = "WIRED_VIA_CHAIN"
-            run_ids = [
-                _stable_run_id(case_id="TASK-019-GOLDEN-03", slot="cost_model_selector"),
-                _stable_run_id(case_id="TASK-019-GOLDEN-03", slot="cost_calculator"),
-            ]
-            digests = [
-                _sha256_hex(_canonical_json_dumps(_safe_dump(cost_selection))),
-                _sha256_hex(_canonical_json_dumps(_safe_dump(cost_breakdown))),
-            ]
-        except Exception:
-            cms = case_03_input["cost_model_selection"]
-            lifecycle = case_03_input["lifecycle_inputs"]
-            values = {
-                "case_01_outputs": {
-                    "case_01_outputs_reference_case_id": case_01_ref,
-                },
-                "cost_components_C0_C1": {
-                    "cost_components": {
-                        "C0_material_minor_units": None,
-                        "C0_labor_minor_units": None,
-                        "C1_total_minor_units": None,
-                    },
-                    "currency_ISO_4217": str(cms["currency_ISO_4217"]),
-                },
-                "discounted_total_minor_units": None,
-                "life_cycle_energy_envelope": {
-                    "blocker_codes": [],
-                    "life_cycle_energy_summary": {
-                        "annual_operating_hours": int(lifecycle["annual_operating_hours"]),
-                        "design_life_years": int(lifecycle["design_life_years"]),
-                        "annual_energy_MJ": None,
-                        "total_lifecycle_energy_MJ": None,
-                    },
-                },
-                "salvage_minor_units": 0,
-                "selected_cost_model": {
-                    "selected_model_id": None,
-                    "selection_blockers": [],
-                },
-            }
+            # Slice 3A P1 fix: produced_fields is empty for fail-closed
+            # cases (no real upstream execution returned a value).
+            # The case-bound material IDs are still surfaced in
+            # ``values`` for the §7.1 case-block materialization, but
+            # they are NOT counted as produced actual_output fields.
             produced = []
             status = "WIRED_VIA_CHAIN_PARTIAL"
             run_ids = []
             digests = []
+        else:
+            # Real MaterialRecord present — call the upstream chain.
+            # (Unreachable in current Slice 3A fixtures, but kept for
+            # forward compatibility when the TASK-013 catalog lookup
+            # helper is added.)
+            material_record = dict(case_02_input["material_selection"])
+            material_request = MaterialResolutionRequest(
+                component_role="shell",
+                material_record_id=str(case_02_input["material_selection"]["material_record_id"]),
+                design_temperature_c=float(
+                    case_02_input["design_conditions"]["design_temperature_K"]
+                )
+                - 273.15,
+                design_pressure_mpa=float(case_02_input["design_conditions"]["design_pressure_Pa"])
+                / 1.0e6,
+                corrosion_allowance_mm=None,
+                applicable_standard_id=str(
+                    case_02_input["material_selection"]["standard_or_spec_reference"]
+                ),
+            )
+            try:
+                material_resolution: MaterialResolutionResult | None = resolve_material(
+                    material_request,
+                    material_record,  # type: ignore[arg-type]
+                )
+            except Exception:
+                material_resolution = None
+            try:
+                case_01_input_for_geom = case_02_input.get("case_01_geometry", {})
+                if not case_01_input_for_geom:
+                    # cross-case ref input
+                    from pathlib import Path as _PathCase02
+
+                    _GOLDEN_FIXTURE_DIR_C02 = (
+                        _PathCase02(__file__).resolve().parents[3]
+                        / "tests"
+                        / "golden"
+                        / "double_pipe_rating"
+                    )
+                    case_01_fixture_path_c02 = _GOLDEN_FIXTURE_DIR_C02 / (
+                        "case_01_heat_balance_rating.json"
+                    )
+                    case_01_fixture_c02 = _json.loads(
+                        case_01_fixture_path_c02.read_text(encoding="utf-8")
+                    )
+                    case_01_input_for_geom = case_01_fixture_c02["input"]
+                mass_request, preliminary_request = _build_case_02_chain_request(
+                    case_01_input_for_geom, case_02_input, material_resolution
+                )
+            except Exception:
+                mass_request = None
+                preliminary_request = None
+            try:
+                if (
+                    mass_request is not None
+                    and preliminary_request is not None
+                    and material_resolution is not None
+                ):
+                    mass_breakdown: MassBreakdown = calculate_mass_breakdown(mass_request)
+                    preliminary_result: PreliminaryCheckResult = preliminary_check(
+                        preliminary_request
+                    )
+                else:
+                    raise RuntimeError("chain request construction failed")
+                values: dict[str, Any] = {  # type: ignore[no-redef]
+                    "case_01_outputs": {
+                        "case_01_outputs_reference_case_id": case_01_ref,
+                    },
+                    "mass_kg": {
+                        "fluid_mass_kg": float(mass_breakdown.total_kg),
+                        "shell_mass_kg": float(mass_breakdown.outer_pipe_kg),
+                        "tube_mass_kg": float(mass_breakdown.inner_tube_kg),
+                        "total_mass_kg": float(mass_breakdown.total_kg),
+                    },
+                    "preliminary_mechanical_check": {
+                        "status": str(preliminary_result.verdict),
+                    },
+                    "selected_material_ids": {
+                        "shell_material_id": shell_material_id,
+                        "tube_material_id": tube_material_id,
+                    },
+                }
+                produced = [
+                    "mass_kg.fluid_mass_kg",
+                    "mass_kg.shell_mass_kg",
+                    "mass_kg.tube_mass_kg",
+                    "mass_kg.total_mass_kg",
+                    "preliminary_mechanical_check.status",
+                    "selected_material_ids.shell_material_id",
+                    "selected_material_ids.tube_material_id",
+                ]
+                status = "WIRED_VIA_CHAIN"
+                run_ids = [
+                    _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="material_selector"),
+                    _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="mass_calculator"),
+                    _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="preliminary_checker"),
+                ]
+                digests = [
+                    _sha256_hex(_canonical_json_dumps(_safe_dump(material_resolution))),
+                    _sha256_hex(_canonical_json_dumps(_safe_dump(mass_breakdown))),
+                    _sha256_hex(_canonical_json_dumps(_safe_dump(preliminary_result))),
+                ]
+            except Exception:
+                values: dict[str, Any] = {  # type: ignore[no-redef]
+                    "case_01_outputs": {
+                        "case_01_outputs_reference_case_id": case_01_ref,
+                    },
+                    "mass_kg": {
+                        "fluid_mass_kg": None,
+                        "shell_mass_kg": None,
+                        "tube_mass_kg": None,
+                        "total_mass_kg": None,
+                    },
+                    "preliminary_mechanical_check": {"status": None},
+                    "selected_material_ids": {
+                        "shell_material_id": shell_material_id,
+                        "tube_material_id": tube_material_id,
+                    },
+                }
+                produced = [
+                    "selected_material_ids.shell_material_id",
+                    "selected_material_ids.tube_material_id",
+                ]
+                status = "WIRED_VIA_CHAIN_PARTIAL"
+                run_ids = [
+                    _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="material_selector"),
+                ]
+                digests = [
+                    _sha256_hex(
+                        _canonical_json_dumps(
+                            _safe_dump(material_resolution)
+                            if material_resolution is not None
+                            else {}
+                        )
+                    ),
+                ]
+    elif case_id == "TASK-019-GOLDEN-03":
+        # Slice 3A P1 fix: the frozen case_03 input only carries
+        # cost_model_selection metadata (region / date / currency /
+        # escalation rule), not a pre-resolved list of cost records
+        # that the upstream select_cost_records API requires. The
+        # adapter has no TASK-018 catalog lookup helper, so it must
+        # NOT pass an empty records list and must NOT fabricate
+        # SelectionFilters (material_family, cost_category_filter,
+        # quantity_basis_filter, license_class_filter). Therefore all
+        # cost / life-cycle / selected_cost_model fields go fail-closed
+        # (NOT_COMPUTABLE). Discount / salvage remain deferred per
+        # TASK-018 §5.3 / §5.3.2 (no formula invented).
+        case_03_input = fixture["input"]
+        case_01_ref = str(
+            case_03_input.get("case_01_input_reference_case_id", "TASK-019-GOLDEN-01")
+        )
+        # Slice 3A does not implement a TASK-018 catalog lookup helper;
+        # the case_03 chain must therefore fail closed for all
+        # cost / life-cycle / selected_cost_model fields.
+        values: dict[str, Any] = {  # type: ignore[no-redef]
+            "case_01_outputs": {
+                "case_01_outputs_reference_case_id": case_01_ref,
+            },
+            "cost_components_C0_C1": {
+                "cost_components": {
+                    "C0_material_minor_units": None,
+                    "C0_labor_minor_units": None,
+                    "C1_total_minor_units": None,
+                },
+                "currency_ISO_4217": None,
+            },
+            "discounted_total_minor_units": None,
+            "life_cycle_energy_envelope": {
+                "blocker_codes": [],
+                "life_cycle_energy_summary": {
+                    "annual_operating_hours": None,
+                    "design_life_years": None,
+                    "annual_energy_MJ": None,
+                    "total_lifecycle_energy_MJ": None,
+                },
+            },
+            "salvage_minor_units": 0,
+            "selected_cost_model": {
+                "selected_model_id": None,
+                "selection_blockers": [],
+            },
+        }
+        produced = []
+        status = "WIRED_VIA_CHAIN_PARTIAL"
+        run_ids = []
+        digests = []
     else:
         raise ValueError(
             f"case_id {case_id!r} is not one of the frozen 3 (TASK-019-GOLDEN-01/02/03)"
