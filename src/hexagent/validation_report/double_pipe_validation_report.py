@@ -30,14 +30,14 @@ from typing import Any
 TASK_019_VALIDATION_REPORT_V1: str = "TASK-019-VALIDATION-REPORT-V1"
 
 # Exactly 3 golden case IDs (per frozen design §4)
-TASK_019_GOLDEN_CASE_IDS: tuple = (
+TASK_019_GOLDEN_CASE_IDS: tuple[str, ...] = (
     "TASK-019-GOLDEN-01",
     "TASK-019-GOLDEN-02",
     "TASK-019-GOLDEN-03",
 )
 
 # Allowed overall statuses (per frozen design §7.3)
-ALLOWED_OVERALL_STATUSES: frozenset = frozenset({"PASS", "FAIL", "NOT_COMPUTABLE"})
+ALLOWED_OVERALL_STATUSES: frozenset[str] = frozenset({"PASS", "FAIL", "NOT_COMPUTABLE"})
 
 # Stable schema-version + implementation-version seeds for deterministic report_id.
 # Implementation version is bumped only on schema-affecting changes; for Slice 1
