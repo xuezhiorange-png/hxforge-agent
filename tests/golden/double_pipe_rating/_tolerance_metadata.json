@@ -4,7 +4,7 @@
     "TASK-019-GOLDEN-02",
     "TASK-019-GOLDEN-03"
   ],
-  "deterministic_schema_version": "TASK-019-GOLDEN-TOLERANCE-V1",
+  "deterministic_schema_version": "TASK-019-GOLDEN-TOLERANCE-V2",
   "license_boundary_attestation": {
     "any_restricted_source_inputs": false,
     "any_restricted_source_outputs": false,
@@ -12,8 +12,10 @@
   },
   "slice1_skeleton_note": "Slice 1 placeholder. Final tolerance values will be set in Slice 2 after the upstream calculation chain is wired up.",
   "slice2_schema_version": "TASK-019-GOLDEN-TOLERANCE-V2",
-  "slice2_status": "Slice 2 contract: tolerance drift forbidden without explicit design-amendment (per frozen design §7.4). Numeric abs_tolerance_default / rel_tolerance_default remain TBD-by-Slice-N because the upstream calculation chain is not yet wired up; Slice 2 never silently substitutes a default value. The Slice 2 materialization contract surfaces TBD-by-* tolerance entries as NOT_COMPUTABLE per-field comparisons.",
-  "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1",
+  "slice2_status": "Slice 2 contract: tolerance drift forbidden without explicit design-amendment (per frozen design §7.4). Amendment-001 (TASK-019-AMEND-001-FREEZE-VECTORS) freezes the per-field tolerance values listed in tolerance_profiles (TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001). Tolerances are derived from the deterministic numerical behavior of the frozen TASK-006/007/008/017/018 contracts and the CoolProp property provider's documented numerical accuracy at the operating envelope; per-field basis notes are in tolerance_profiles.TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001.per_field_basis. No new blocker / warning codes were introduced; no schema was widened.",
+  "amendment_id": "TASK-019-AMEND-001-FREEZE-VECTORS",
+  "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
+  "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001",
   "tolerance_profiles": {
     "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1": {
       "abs_tolerance_default": "TBD-by-Slice-2",
@@ -24,9 +26,161 @@
       ],
       "comparison_method_default": "TBD-by-Slice-2",
       "currency_minor_units": "integer ONLY (no float for money per frozen design §3.3)",
-      "description": "Slice 1 placeholder tolerance profile. Final tolerances will be set in Slice 2.",
+      "description": "Slice 1 placeholder tolerance profile. Preserved for backward compatibility with the Slice 1 fixture-schema-validation tests that reference this profile by name. Final tolerances for the frozen vectors live in TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001 below.",
       "rel_tolerance_default": "TBD-by-Slice-2"
+    },
+    "TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001": {
+      "case_ids": [
+        "TASK-019-GOLDEN-01",
+        "TASK-019-GOLDEN-02",
+        "TASK-019-GOLDEN-03"
+      ],
+      "comparison_method_default": "abs-or-rel whichever is tighter (per frozen design §7.4 + MASTER_DEVELOPMENT_SPEC §15.5)",
+      "currency_minor_units": "integer ONLY (no float for money per frozen design §3.3)",
+      "description": "TASK-019 amendment-001 frozen tolerance profile. Per-field abs / rel values are derived from the deterministic numerical behavior of the TASK-006/007/008/017/018 frozen upstream contracts and the CoolProp property provider's documented numerical accuracy at the operating envelope. Each per_field entry carries an explicit basis string so the tolerance value is auditable.",
+      "per_field_basis": {
+        "case_01.heat_duty_W": "Engineering-literature water-water reference (Kern 1950) ± 1% to account for property-provider numerical accuracy (CoolProp documented < 0.5% at 273-373 K) and single-phase correlation uncertainty bands (Gnielinski-tube / Kern-annulus documented 5-10% but propagating through heat-balance closure is well-bounded at 1% for the canonical case).",
+        "case_01.LMTD_counterflow_K": "Closed-form LMTD ± 0.5 K to account for temperature-input tolerance and CoolProp density-derivative numerical accuracy at the operating envelope.",
+        "case_01.heat_transfer_coefficients.annulus_side_W_m2_K": "Engineering-literature reference ± 5% to account for documented annulus-side correlation uncertainty bands (Kern 1950) over the operating envelope.",
+        "case_01.heat_transfer_coefficients.tube_side_W_m2_K": "Engineering-literature reference ± 5% to account for documented tube-side correlation uncertainty bands (Gnielinski) over the operating envelope.",
+        "case_01.outlet_temperatures_K": "Closed-form heat-balance closure ± 0.5 K to account for temperature-input tolerance and CoolProp cp-derivative numerical accuracy.",
+        "case_02.mass_kg.fluid_mass_kg": "Density × volume closed-form ± 1% to account for CoolProp density numerical accuracy and the canonical geometry's cylindrical-volume closure.",
+        "case_02.mass_kg.shell_mass_kg": "Density × volume closed-form ± 1% to account for SS304 documented density tolerance (per TASK-017 approved material catalog).",
+        "case_02.mass_kg.tube_mass_kg": "Density × volume closed-form ± 1% to account for SS304 documented density tolerance (per TASK-017 approved material catalog).",
+        "case_02.mass_kg.total_mass_kg": "Closed-form sum of component masses ± 1% (propagated from component tolerances).",
+        "case_02.preliminary_mechanical_check.status": "Categorical (PASS / BLOCKED_PRELIMINARY / BLOCKED_FOR_DETAILED_DESIGN); not numeric; no abs/rel tolerance. Per-field equality is required for PASS.",
+        "case_02.selected_material_ids.shell_material_id": "Categorical; string equality required for PASS.",
+        "case_02.selected_material_ids.tube_material_id": "Categorical; string equality required for PASS.",
+        "case_03.cost_components_C0_C1.cost_components.C0_material_minor_units": "Engineering-literature cost reference (RSMeans-like 2024 stainless-steel tubing) ± 2% to account for documented regional / temporal cost-source uncertainty bands. Integer minor units per frozen design §3.3.",
+        "case_03.cost_components_C0_C1.cost_components.C0_labor_minor_units": "Engineering-literature cost reference (RSMeans-like 2024 ASME labor) ± 2% to account for documented labor-rate regional / temporal uncertainty. Integer minor units per frozen design §3.3.",
+        "case_03.cost_components_C0_C1.cost_components.C1_total_minor_units": "Closed-form sum ± 1% (propagated from C0 component tolerances). Integer minor units per frozen design §3.3.",
+        "case_03.cost_components_C0_C1.currency_ISO_4217": "Categorical; string equality required for PASS.",
+        "case_03.discounted_total_minor_units": "DEFERRED per TASK-018 §5.3 Option A. No formula is invented in TASK-019 amendment-001. Tolerance is not applicable.",
+        "case_03.salvage_minor_units": "DEFERRED per TASK-018 §5.3.2. No formula is invented in TASK-019 amendment-001. The 0 placeholder is preserved verbatim; equality on the 0 placeholder is required for PASS.",
+        "case_03.life_cycle_energy_envelope.life_cycle_energy_summary.annual_energy_MJ": "Closed-form annual_energy_MJ = heat_duty × annual_operating_hours × fouling_energy_penalty_factor ± 2% (propagated from heat_duty ± 1% and fouling_energy_penalty_factor ± 1%).",
+        "case_03.life_cycle_energy_envelope.life_cycle_energy_summary.total_lifecycle_energy_MJ": "Closed-form total = annual × design_life_years ± 2% (propagated from annual tolerance).",
+        "case_03.life_cycle_energy_envelope.life_cycle_energy_summary.annual_operating_hours": "Categorical; integer equality required for PASS.",
+        "case_03.life_cycle_energy_envelope.life_cycle_energy_summary.design_life_years": "Categorical; integer equality required for PASS.",
+        "case_03.life_cycle_energy_envelope.blocker_codes": "Categorical; list equality required for PASS.",
+        "case_03.selected_cost_model.selected_model_id": "Categorical; string equality required for PASS.",
+        "case_03.selected_cost_model.selection_blockers": "Categorical; list equality required for PASS."
+      },
+      "per_field_tolerances": {
+        "case_01.heat_duty_W": {
+          "abs": 100.0,
+          "rel": 0.01
+        },
+        "case_01.LMTD_counterflow_K": {
+          "abs": 0.5,
+          "rel": 0.02
+        },
+        "case_01.heat_transfer_coefficients.annulus_side_W_m2_K": {
+          "abs": 100.0,
+          "rel": 0.05
+        },
+        "case_01.heat_transfer_coefficients.tube_side_W_m2_K": {
+          "abs": 100.0,
+          "rel": 0.05
+        },
+        "case_01.outlet_temperatures_K": {
+          "abs": 0.5,
+          "rel": 0.002
+        },
+        "case_02.mass_kg.fluid_mass_kg": {
+          "abs": 0.05,
+          "rel": 0.01
+        },
+        "case_02.mass_kg.shell_mass_kg": {
+          "abs": 0.05,
+          "rel": 0.01
+        },
+        "case_02.mass_kg.tube_mass_kg": {
+          "abs": 0.05,
+          "rel": 0.01
+        },
+        "case_02.mass_kg.total_mass_kg": {
+          "abs": 0.1,
+          "rel": 0.01
+        },
+        "case_02.preliminary_mechanical_check.status": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        },
+        "case_02.selected_material_ids.shell_material_id": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        },
+        "case_02.selected_material_ids.tube_material_id": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        },
+        "case_03.cost_components_C0_C1.cost_components.C0_material_minor_units": {
+          "abs": 10000,
+          "rel": 0.02
+        },
+        "case_03.cost_components_C0_C1.cost_components.C0_labor_minor_units": {
+          "abs": 10000,
+          "rel": 0.02
+        },
+        "case_03.cost_components_C0_C1.cost_components.C1_total_minor_units": {
+          "abs": 10000,
+          "rel": 0.01
+        },
+        "case_03.cost_components_C0_C1.currency_ISO_4217": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        },
+        "case_03.discounted_total_minor_units": {
+          "abs": null,
+          "categorical": true,
+          "categorical_value": null,
+          "rel": null
+        },
+        "case_03.salvage_minor_units": {
+          "abs": null,
+          "categorical": true,
+          "categorical_value": 0,
+          "rel": null
+        },
+        "case_03.life_cycle_energy_envelope.life_cycle_energy_summary.annual_energy_MJ": {
+          "abs": 5000.0,
+          "rel": 0.02
+        },
+        "case_03.life_cycle_energy_envelope.life_cycle_energy_summary.total_lifecycle_energy_MJ": {
+          "abs": 100000.0,
+          "rel": 0.02
+        },
+        "case_03.life_cycle_energy_envelope.life_cycle_energy_summary.annual_operating_hours": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        },
+        "case_03.life_cycle_energy_envelope.life_cycle_energy_summary.design_life_years": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        },
+        "case_03.life_cycle_energy_envelope.blocker_codes": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        },
+        "case_03.selected_cost_model.selected_model_id": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        },
+        "case_03.selected_cost_model.selection_blockers": {
+          "abs": null,
+          "categorical": true,
+          "rel": null
+        }
+      }
     }
   },
-  "tolerance_schema_version": "TASK-019-GOLDEN-TOLERANCE-V1"
+  "tolerance_schema_version": "TASK-019-GOLDEN-TOLERANCE-V2"
 }

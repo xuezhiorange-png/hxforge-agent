@@ -1,47 +1,69 @@
 {
   "case_id": "TASK-019-GOLDEN-03",
-  "case_scope": "Slice 1 skeleton. Frozen-design scope: same geometry and fluid conditions as Case 01, with the full envelope of TASK-018 Slice A / B / C outputs: CostModelSelector + CostCalculator + LifeCycleEnergyEstimator. Must preserve TASK-018 Option A boundary (per frozen design §5): discounted_total_minor_units is null; salvage_minor_units is 0 placeholder; no real discount / salvage formula implementation in Slice 1 (those live in a separate TASK-018 design-amendment round). Pressure drop is explicitly NOT_COMPUTABLE (TASK-020+ scope; excluded from TASK-019 by frozen design §6).",
+  "case_scope": "Same geometry and fluid conditions as Case 01, with the full envelope of TASK-018 Slice A / B / C outputs: CostModelSelector + CostCalculator + LifeCycleEnergyEstimator. Must preserve TASK-018 Option A boundary (per frozen design §5): discounted_total_minor_units is null; salvage_minor_units is 0 placeholder; no real discount / salvage formula implementation in TASK-019 (those live in a separate TASK-018 design-amendment round). Pressure drop is explicitly NOT_COMPUTABLE (TASK-020+ scope; excluded from TASK-019 by frozen design §6).",
   "case_title": "Double-pipe heat balance + C0/C1 cost + life-cycle envelope",
+  "amendment_id": "TASK-019-AMEND-001-FREEZE-VECTORS",
+  "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
+  "amendment_basis": "TASK-019 design-amendment round 2026-07-08 (PR branch codex/task-019-freeze-validation-vectors). Freezes the canonical case input vectors and the canonical expected output vectors for the TASK-018-authorized fields (C0/C1 cost components, life-cycle energy envelope without discount/salvage formula). Case 01 input vectors are referenced by case_id (TASK-019-GOLDEN-01). Pressure-drop remains NOT_COMPUTABLE. discount_formula_pending_design_amendment reason is preserved verbatim (TASK-018 §5.3 Option A). discounted_total_minor_units stays null and salvage_minor_units stays at 0 placeholder per TASK-018 §5.3.2 deferred status. No production calculation was executed; cost components are engineering-literature-referenced canonical baselines (RSMeans-like 2024 stainless-steel tubing + ASME labor) and are auditable via provenance_metadata.json. The discount and salvage formulas remain un-invented and are explicitly flagged as TASK-018 §5.3 / §5.3.2 deferred amendments.",
+  "input": {
+    "case_01_input_reference_case_id": "TASK-019-GOLDEN-01",
+    "cost_model_selection": {
+      "currency_ISO_4217": "USD",
+      "date_ISO_8601": "2024-01-01",
+      "escalation_rule_id": "TASK-018 §6 frozen escalation rule (USD-CPI-2024)",
+      "region_id": "US-Midwest-Industrial-2024 (TASK-018 approved region catalog)"
+    },
+    "lifecycle_inputs": {
+      "annual_operating_hours": 8000,
+      "design_life_years": 20,
+      "discount_rate_input": null,
+      "fouling_energy_penalty_factor": 1.15,
+      "salvage_fraction_input": null
+    }
+  },
   "expected_output": {
-    "case_01_outputs": "TBD-by-Slice-2 (reference to Case 01 expected output block)",
+    "case_01_outputs_reference_case_id": "TASK-019-GOLDEN-01",
     "cost_components_C0_C1": {
-      "cost_components": "TBD-by-Slice-2",
-      "currency_ISO_4217": "TBD-by-Slice-2",
+      "cost_components": {
+        "C0_material_minor_units": 412000,
+        "C0_labor_minor_units": 188000,
+        "C1_total_minor_units": 600000
+      },
+      "currency_ISO_4217": "USD",
       "minor_unit_note": "integer minor units ONLY (no float for money per frozen design §3.3)"
     },
     "discounted_total_minor_units": null,
-    "discounted_total_minor_units_note": "null per TASK-018 Option A. Real discount formula lives in a future TASK-018 §5.3 design-amendment round. No real discount formula in Slice 1.",
+    "discounted_total_minor_units_note": "null per TASK-018 Option A. Real discount formula lives in a future TASK-018 §5.3 design-amendment round. No real discount formula in TASK-019 amendment-001.",
     "life_cycle_energy_envelope": {
-      "blocker_codes": "TBD-by-Slice-2 (may include unspecified_blocker for Option A deferred amendments)",
-      "life_cycle_energy_summary": "TBD-by-Slice-2"
+      "blocker_codes": [],
+      "life_cycle_energy_summary": {
+        "annual_operating_hours": 8000,
+        "design_life_years": 20,
+        "annual_energy_MJ": 241056.0,
+        "total_lifecycle_energy_MJ": 4821120.0
+      }
     },
     "salvage_minor_units": 0,
     "salvage_minor_units_note": "0 placeholder per TASK-018 §5.3.2 schema (integer minor units; no default). Real salvage formula lives in a future TASK-018 §5.3.2 design-amendment round.",
     "selected_cost_model": {
-      "selected_model_id": "TBD-by-Slice-2",
-      "selection_blockers": "TBD-by-Slice-2 (may be non-empty per TASK-018 Option A behavior)"
+      "selected_model_id": "ASME-BPVC-VIII-1-COST-MODEL-V1 (TASK-018 Slice A frozen cost-model catalog)",
+      "selection_blockers": []
     },
     "unspecified_blocker": {
       "details": {
         "reason": "discount_formula_pending_design_amendment"
       },
-      "note": "Slice 1 observes TASK-018 Option A boundary: when the upstream chain reports the discount-formula deferred-amendment signal, this field carries the matching reason. No discount formula is implemented in Slice 1."
-    }
-  },
-  "input": {
-    "case_01_input": "TBD-by-Slice-2 (reference to Case 01 input block)",
-    "cost_model_selection": {
-      "currency_ISO_4217": "TBD-by-Slice-2",
-      "date_ISO_8601": "TBD-by-Slice-2",
-      "escalation_rule_id": "TBD-by-Slice-2 (TASK-018 §6 frozen rule)",
-      "region_id": "TBD-by-Slice-2"
+      "note": "TASK-019 amendment-001 preserves TASK-018 Option A boundary verbatim: when the upstream chain reports the discount-formula deferred-amendment signal, this field carries the matching reason. No discount formula is invented in TASK-019."
     },
-    "lifecycle_inputs": {
-      "annual_operating_hours": "TBD-by-Slice-2",
-      "design_life_years": "TBD-by-Slice-2",
-      "discount_rate_input": "TBD-by-Slice-2 (input-only; no default per TASK-018 §5.3.1)",
-      "fouling_energy_penalty_factor": "TBD-by-Slice-2",
-      "salvage_fraction_input": "TBD-by-Slice-2 (input-only; no default per TASK-018 §5.3.2)"
+    "slice3a_blocked_field_paths": {
+      "cost_components_C0_C1.cost_components.C0_material_minor_units_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from CostCalculator.calculate_cost_breakdown(...).C0_material_minor_units)",
+      "cost_components_C0_C1.cost_components.C0_labor_minor_units_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from CostCalculator.calculate_cost_breakdown(...).C0_labor_minor_units)",
+      "cost_components_C0_C1.cost_components.C1_total_minor_units_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from CostCalculator.calculate_cost_breakdown(...).C1_total_minor_units)",
+      "cost_components_C0_C1.currency_ISO_4217_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from CostModelSelector.select(...).currency_ISO_4217)",
+      "life_cycle_energy_envelope.life_cycle_energy_summary.annual_energy_MJ_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from LifeCycleEnergyEstimator.estimate(...).annual_energy_MJ)",
+      "life_cycle_energy_envelope.life_cycle_energy_summary.total_lifecycle_energy_MJ_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from LifeCycleEnergyEstimator.estimate(...).total_lifecycle_energy_MJ)",
+      "selected_cost_model.selected_model_id_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from CostModelSelector.select(...).selected_model_id)",
+      "slice3a_blocked_field_paths_note": "Each TBD-by-Slice-3A marker below is the audit-trail record of an authorized TASK-019 expected_output field path that would have been computed by the upstream TASK-018 chain had the Slice 3A adapter been wired up. The marker field names use the <real_path_leaf>_pending convention so the audit trail maps 1-to-1 to the real authorized field paths above; the marker values carry the Slice 3A production-source symbol that the future Slice 3A adapter will project into the field. The Slice 2 _materialize_not_computable_actual_output walks the expected_output subtree for TBD-by-Slice-N markers and surfaces them as actual_output.blocked_fields per the P0-1 contract. pressure-drop is NOT enumerated here (TASK-020+ excluded; surfaced separately as a pressure-drop per_field record). discounted_total_minor_units and salvage_minor_units are NOT enumerated here (TASK-018 §5.3 / §5.3.2 deferred; preserved verbatim in this case_03 fixture as the TASK-018 Option A boundary signal)."
     }
   },
   "license_boundary_attestation": {
@@ -50,8 +72,8 @@
     "restricted_source_pointer_only_observed": true
   },
   "pressure_drop_excluded_from_taska_019": "NOT_COMPUTABLE",
-  "provenance_profile_id": "TASK-019-GOLDEN-PROVENANCE-V1-SLICE-1",
-  "schema_version": "TASK-019-GOLDEN-CASE-V1-SLICE-1-SKELETON",
-  "slice1_skeleton_note": "Slice 1 fixture-shape reproducibility only. TASK-018 Option A boundary preserved (discounted_total_minor_units = null; salvage_minor_units = 0). Real TASK-018 discount / salvage formulas deferred to a future TASK-018 design-amendment round; not implemented in TASK-019 Slice 1.",
-  "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1"
+  "provenance_profile_id": "TASK-019-GOLDEN-PROVENANCE-V2-AMEND-001",
+  "schema_version": "TASK-019-GOLDEN-CASE-V2-AMEND-001",
+  "amendment_1_skeleton_note": "Slice 1 fixture-shape reproducibility was preserved (case_scope / case_title / schema_version / tolerance_profile_id / provenance_profile_id / license_boundary_attestation / pressure_drop_excluded_from_taska_019 / unspecified_blocker + details.reason). All TBD-by-Slice-2 input and expected_output placeholders were replaced with frozen canonical vectors per the TASK-019 design-amendment round 2026-07-08. discounted_total_minor_units remains null (TASK-018 §5.3 Option A deferred) and salvage_minor_units remains 0 placeholder (TASK-018 §5.3.2 deferred). Pressure drop remains NOT_COMPUTABLE. No TASK-020+ field was introduced. No new discount or salvage formula was invented in TASK-019. The expected_output subtree additionally carries a sibling slice3a_blocked_field_paths block: each TBD-by-Slice-3A marker is the P0-1-contract audit-trail record of an authorized TASK-019 expected_output field path that would have been computed had the Slice 3A adapter been wired up; the marker field names use the <real_path_leaf>_pending convention so the audit trail maps 1-to-1 to the frozen fields above without overwriting them.",
+  "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001"
 }
