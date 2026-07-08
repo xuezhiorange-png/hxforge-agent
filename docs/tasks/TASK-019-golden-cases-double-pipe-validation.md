@@ -23,13 +23,13 @@
 | Design base SHA | `76a8b5142c63fb09852146611e794355dea7f5b6` (= main @ PR #86 merge) |
 | Design file | `docs/tasks/TASK-019-golden-cases-double-pipe-validation.md` (this file) |
 | Base authority | main `76a8b5142c63fb09852146611e794355dea7f5b6` (PR #86 merge; TASK-018 closeout governance-sync merged on 2026-07-07) |
-| Design contract status | **DRAFT** (design Issue not yet created via API; manual creation by Charles required post-branch-push) |
+| Design contract status | **DRAFT** (design Issue #87 OPEN; design PR #88 OPEN / DRAFT / NOT READY / NOT MERGED; PR-head CI `28909027389` completed / success; head_sha `91fa03666e34ae89e92d36fdc6952f39ff843601` exact match) |
 | Frozen Contract Authority Commit SHA | TBD (set when design PR is reviewed PASS, frozen, and merged; self-reference guard per §11) |
 | Frozen Contract Authority Base SHA | `76a8b5142c63fb09852146611e794355dea7f5b6` |
 | Implementation status | **NOT AUTHORIZED** |
 | Implementation Issue | NOT YET CREATED |
-| PR (this design) | DRAFT / NOT READY / NOT MERGED (manual creation by Charles required post-branch-push) |
-| Issue (this design) | NOT YET CREATED via API (GitHub write auth unavailable in this round; manual creation by Charles required post-branch-push) |
+| PR (this design) | #88 — DRAFT / NOT READY / NOT MERGED / mergeable=true / mergeable_state=clean / head_sha `91fa03666e34ae89e92d36fdc6952f39ff843601` / base_sha `76a8b5142c63fb09852146611e794355dea7f5b6` (Issue #87 linked; design PR-head CI `28909027389` completed / success; Ready / merge / Issue #87 close: NOT AUTHORIZED — pending separate Charles authorization) |
+| Issue (this design) | #87 — OPEN (state_reason=None, closed_at=null, comments=0; Ready / merge / Issue #87 close: NOT AUTHORIZED — pending separate Charles authorization) |
 | CI `28906684134` (PR #86 post-merge main) | completed / success (from preflight round record) |
 | TASK-018 §5.3 discount formula amendment | DEFERRED / NOT AUTHORIZED (orthogonal to TASK-019; not required) |
 | TASK-018 §5.3.2 salvage formula amendment | DEFERRED / NOT AUTHORIZED (orthogonal to TASK-019; not required) |
@@ -486,8 +486,8 @@ The future TASK-019 implementation round MUST provide the following acceptance t
   - `test_no_discount_formula`: Golden case expected outputs contain `discounted_total_minor_units: null` (per §5.1) and no discount-formula computation.
   - `test_no_salvage_formula`: Golden case expected outputs contain `salvage_minor_units: 0` (per §5.2) and no salvage-formula computation.
   - `test_no_vendor_quote_or_c3`: Golden case provenance contains no `vendor_quote_*` / `c3_*` keys.
-  - `test_no_issue_23_action`: No code / test / doc references Issue #23.
-  - `test_no_feishu_outbound`: No code / test / doc references Feishu outbound API.
+  - `test_no_issue_23_action`: Assert no TASK-019 implementation code, golden case JSON fixtures, generated validation report, runtime path, or new non-governance docs perform or imply Issue #23 action. Governance-only references in TASK-019 design contract frozen docs (and in upstream frozen contracts' governance sections) are allowed and are not the target of this test.
+  - `test_no_feishu_outbound`: Assert no TASK-019 implementation code, tests, generated validation report, runtime path, or outbound integration performs Feishu outbound. Governance-only references in TASK-019 design contract frozen docs (and in upstream frozen contracts' governance sections) are allowed and are not the target of this test.
   - `test_no_task_017_stale_docs_remediation`: No code / test / doc modifies the TASK-017 stale rows in `docs/TASK_BACKLOG.md` (L379 / L455 / L459).
 
 ### 11.6 License-boundary tests
