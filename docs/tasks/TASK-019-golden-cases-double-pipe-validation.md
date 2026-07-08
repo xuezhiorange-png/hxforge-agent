@@ -1,6 +1,6 @@
 # TASK-019 — Golden Cases and Double-Pipe Validation Report Design Contract
 
-**Status:** DRAFT / NOT YET FROZEN
+**Status:** DESIGN FROZEN / MERGED / GOVERNANCE-SYNCED
 **Milestone:** M2 (Double-pipe vertical slice)
 **Priority:** P1
 **Depends on:** TASK-006, TASK-007, TASK-008, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015A, TASK-017, TASK-018
