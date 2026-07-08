@@ -56,6 +56,7 @@ shards:
       - tests/validation_report/test_no_upstream_mutation.py
       - tests/validation_report/test_excluded_scopes_negative.py
       - tests/validation_report/test_materialization_contract.py
+      - tests/validation_report/test_chain_wiring_adapter.py
     timeout: 300
 
   - name: ci-acceptance

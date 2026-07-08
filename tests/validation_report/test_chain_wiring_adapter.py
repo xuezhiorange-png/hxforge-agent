@@ -19,8 +19,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GOLDEN_FIXTURE_DIR = _REPO_ROOT / "tests" / "golden" / "double_pipe_rating"
 _CASES = {
@@ -129,7 +127,8 @@ def test_adapter_uses_production_chain_apis_only() -> None:
     )
 
 
-# 5. case_01 actual_output is no longer placeholder-only / empty where authorized production output is available.
+# 5. case_01 actual_output is no longer placeholder-only / empty where
+# authorized production output is available.
 def test_case_01_actual_output_has_production_values() -> None:
     from hexagent.validation_report import chain_adapter
 
@@ -141,7 +140,8 @@ def test_case_01_actual_output_has_production_values() -> None:
     assert "heat_duty_W" in produced
 
 
-# 6. case_02 actual_output is no longer placeholder-only / empty where authorized production output is available.
+# 6. case_02 actual_output is no longer placeholder-only / empty where
+# authorized production output is available.
 def test_case_02_actual_output_has_production_values() -> None:
     from hexagent.validation_report import chain_adapter
 
@@ -158,7 +158,8 @@ def test_case_02_actual_output_has_production_values() -> None:
     assert values["selected_material_ids"]["tube_material_id"] is not None
 
 
-# 7. case_03 actual_output is no longer placeholder-only / empty where authorized production output is available.
+# 7. case_03 actual_output is no longer placeholder-only / empty where
+# authorized production output is available.
 def test_case_03_actual_output_has_production_values() -> None:
     from hexagent.validation_report import chain_adapter
 
@@ -167,12 +168,14 @@ def test_case_03_actual_output_has_production_values() -> None:
     assert artifact["status"] in {"WIRED_VIA_CHAIN", "WIRED_VIA_CHAIN_PARTIAL"}
     # The discount_salvage_status signal must be set (deferred, not
     # invented).
-    assert artifact.get("discount_salvage_status", {}).get(
-        "discounted_total_minor_units"
-    ) == "DEFERRED_PER_TASK_018_5_3"
-    assert artifact.get("discount_salvage_status", {}).get(
-        "salvage_minor_units"
-    ) == "DEFERRED_PER_TASK_018_5_3_2"
+    assert (
+        artifact.get("discount_salvage_status", {}).get("discounted_total_minor_units")
+        == "DEFERRED_PER_TASK_018_5_3"
+    )
+    assert (
+        artifact.get("discount_salvage_status", {}).get("salvage_minor_units")
+        == "DEFERRED_PER_TASK_018_5_3_2"
+    )
 
 
 # 8. expected_output remains unchanged.
@@ -259,12 +262,9 @@ def test_pressure_drop_remains_not_computable() -> None:
         # The materialize_case_block_with_chain_output case block
         # must carry a per_field record for pressure-drop with status
         # NOT_COMPUTABLE.
-        case_block = materialize_case_block_with_chain_output(
-            _CASES[case_id], repo_root=_REPO_ROOT
-        )
+        case_block = materialize_case_block_with_chain_output(_CASES[case_id], repo_root=_REPO_ROOT)
         pressure_drop_records = [
-            r for r in case_block["comparison"]["per_field"]
-            if r["field"] == "pressure_drop"
+            r for r in case_block["comparison"]["per_field"] if r["field"] == "pressure_drop"
         ]
         assert pressure_drop_records, (
             f"case {case_id} must carry a per_field record for pressure-drop"
@@ -304,13 +304,11 @@ def test_no_new_blocker_or_warning_code() -> None:
             )
         # The case block's blockers list must contain only the
         # pre-existing TASK-018 §5.3 reason (when applicable).
-        case_block = materialize_case_block_with_chain_output(
-            _CASES[case_id], repo_root=_REPO_ROOT
-        )
+        case_block = materialize_case_block_with_chain_output(_CASES[case_id], repo_root=_REPO_ROOT)
         for blocker in case_block["comparison"]["blockers"]:
-            assert blocker in {
-                "discount_formula_pending_design_amendment"
-            }, f"unexpected blocker reason {blocker!r} in case {case_id}"
+            assert blocker in {"discount_formula_pending_design_amendment"}, (
+                f"unexpected blocker reason {blocker!r} in case {case_id}"
+            )
 
 
 # 14. canonical_actual_output_sha256 is deterministic if added.
@@ -320,7 +318,9 @@ def test_canonical_actual_output_sha256_is_deterministic() -> None:
     fixture = _load_fixture("TASK-019-GOLDEN-01")
     artifact_1 = chain_adapter.compute_actual_output_via_chain(fixture)
     artifact_2 = chain_adapter.compute_actual_output_via_chain(fixture)
-    assert artifact_1["canonical_actual_output_sha256"] == artifact_2["canonical_actual_output_sha256"]
+    assert (
+        artifact_1["canonical_actual_output_sha256"] == artifact_2["canonical_actual_output_sha256"]
+    )
 
 
 # 15. adapter output is deterministic across repeated runs.
@@ -378,26 +378,29 @@ def test_no_task_020_plus_field_introduced() -> None:
     for case_id in ("TASK-019-GOLDEN-01", "TASK-019-GOLDEN-02", "TASK-019-GOLDEN-03"):
         fixture = _load_fixture(case_id)
         artifact = chain_adapter.compute_actual_output_via_chain(fixture)
+
         # Walk the artifact's value subtree for forbidden-scope field
         # names.
-        def _walk(obj: object, path: str = "") -> None:
+        def _walk(obj: object, path: str = "", _cid: str = case_id) -> None:
             if isinstance(obj, dict):
                 for k, v in obj.items():
                     if isinstance(k, str) and any(
                         k.startswith(p) for p in _FORBIDDEN_SCOPE_FIELD_PREFIXES
                     ):
                         raise AssertionError(
-                            f"case {case_id} adapter introduced forbidden-scope field "
+                            f"case {_cid} adapter introduced forbidden-scope field "
                             f"{k!r} at path {path!r}"
                         )
                     _walk(v, f"{path}.{k}" if path else k)
             elif isinstance(obj, list):
                 for i, item in enumerate(obj):
                     _walk(item, f"{path}[{i}]")
+
         _walk(artifact["values"])
 
 
-# 18. no src/hexagent/exchangers/, correlations/, core/, material_mass_mechanical/, costing/** mutation is required or performed.
+# 18. no src/hexagent/exchangers/, correlations/, core/,
+# material_mass_mechanical/, costing/** mutation is required or performed.
 def test_no_upstream_mutation_required_or_performed() -> None:
     """The chain adapter must NOT mutate any production module
     outside validation_report/. We assert this by reading the
@@ -407,7 +410,6 @@ def test_no_upstream_mutation_required_or_performed() -> None:
     older than the adapter file mtime)."""
     import importlib
     import inspect
-    import time
 
     from hexagent.validation_report import chain_adapter
 
@@ -461,10 +463,7 @@ def test_chain_wired_actual_output_sha_differs_from_not_computable() -> None:
     cb_chain = materialize_case_block_with_chain_output(
         _CASES["TASK-019-GOLDEN-01"], repo_root=_REPO_ROOT
     )
-    assert (
-        cb_not_computable["actual_output_sha256"]
-        != cb_chain["actual_output_sha256"]
-    ), (
+    assert cb_not_computable["actual_output_sha256"] != cb_chain["actual_output_sha256"], (
         "chain-wired actual_output_sha256 must differ from the NOT_COMPUTABLE "
         "placeholder's actual_output_sha256; otherwise the chain wiring is a no-op"
     )
