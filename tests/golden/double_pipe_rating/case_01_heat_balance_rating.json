@@ -17,13 +17,16 @@
       "hot_side_m2_K_W": 0.0002
     },
     "geometry": {
+      "annulus_surface_roughness_m": 4.5e-05,
+      "inner_surface_roughness_m": 4.5e-05,
       "shell_id_m": 0.0525,
       "shell_material_id": "SS304 (stainless steel 304, per TASK-017 approved material catalog)",
       "shell_od_m": 0.0603,
       "tube_id_m": 0.0266,
       "tube_length_m": 2.0,
       "tube_material_id": "SS304 (stainless steel 304, per TASK-017 approved material catalog)",
-      "tube_od_m": 0.0334
+      "tube_od_m": 0.0334,
+      "wall_thermal_conductivity_w_m_k": 16.2
     },
     "hot_side": {
       "fluid_composition": "water (H2O, single-phase liquid, pure)",

@@ -22,6 +22,55 @@
   "slice2_schema_version": "TASK-019-GOLDEN-PROVENANCE-V2",
   "slice2_status": "slice2-materialized: true; frozen contract SHAs computed via SHA-256 over concatenated UTF-8 contract file blobs (per compute_frozen_upstream_contract_versions in src/hexagent/validation_report/double_pipe_validation_report.py). TASK-019 amendment-001 freezes the case input / expected_output / tolerance vectors; the frozen contract SHAs are unchanged from Slice 2 closeout (PR #100 merge) and are reproduced verbatim below for auditability.",
   "amendment_id": "TASK-019-AMEND-001-FREEZE-VECTORS",
+  "amendment_002a_id": "TASK-019-DESIGN-AMENDMENT-002-A",
+  "amendment_002a_effective_scope": "TASK-019-GOLDEN-01",
+  "amendment_002a_frozen_field_paths": {
+    "case_01_input_geometry_bridge": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-A",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_paths": [
+        "input.geometry.wall_thermal_conductivity_w_m_k",
+        "input.geometry.inner_surface_roughness_m",
+        "input.geometry.annulus_surface_roughness_m"
+      ],
+      "frozen_benchmark_input": true
+    }
+  },
+  "amendment_002a_provenance_entries": {
+    "input.geometry.wall_thermal_conductivity_w_m_k": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-A",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.geometry.wall_thermal_conductivity_w_m_k",
+      "frozen_benchmark_input": true,
+      "rationale": "SS304 documented thermal conductivity at 300 K. This is the canonical benchmark value for SS304 at the case_01 operating envelope (293-343 K) and is the same value implicitly used in the Kern 1950 Case 4.2 water-water 1\"/2\" tube-in-shell engineering-literature reference that the Amendment 001 expected_output vectors were derived from. The Slice 3A PR #102 P1-1 fix removed the hardcoded 16.2 from the adapter code path; this amendment re-introduces 16.2 as case-bound authorized test-vector data (fixture-level, not code-level).",
+      "source_basis_text": "INCO/ASTM A240 documented SS304 thermal conductivity at 300 K (16.2 W/(m·K), tolerance band ± 0.5 W/(m·K), per the documented 5-10% material-property variation over the 293-343 K operating envelope). Cross-referenced with Kern, Process Heat Transfer, 1950 Case 4.2 water-water 1\"/2\" tube-in-shell reference (the same source as the Amendment 001 case_01 expected_output vectors).",
+      "source_category": "engineering_literature_reference",
+      "unit": "W/(m·K)",
+      "value": 16.2
+    },
+    "input.geometry.inner_surface_roughness_m": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-A",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.geometry.inner_surface_roughness_m",
+      "frozen_benchmark_input": true,
+      "rationale": "Commercial steel tube 45 μm surface finish. This is the canonical benchmark value for the case_01 tube-side roughness and is the same value implicitly used in the Kern 1950 Case 4.2 water-water 1\"/2\" tube-in-shell engineering-literature reference. The Slice 3A PR #102 P1-1 fix removed the hardcoded 4.5e-5 from the adapter code path; this amendment re-introduces 4.5e-5 as case-bound authorized test-vector data (fixture-level, not code-level).",
+      "source_basis_text": "Typical ASME B36.10M / ASTM A312 commercial-seamless-tubing surface finish documentation (45 μm = 4.5e-5 m for commercial carbon / stainless steel seamless tubing). Cross-referenced with Kern, Process Heat Transfer, 1950 Case 4.2 water-water 1\"/2\" tube-in-shell reference.",
+      "source_category": "engineering_literature_reference",
+      "unit": "m",
+      "value": 4.5e-05
+    },
+    "input.geometry.annulus_surface_roughness_m": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-A",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.geometry.annulus_surface_roughness_m",
+      "frozen_benchmark_input": true,
+      "rationale": "Commercial steel pipe 45 μm surface finish (same basis as the tube-side roughness per typical commercial pipe documentation). This is the canonical benchmark value for the case_01 annulus-side roughness and is the same value implicitly used in the Kern 1950 Case 4.2 water-water 1\"/2\" tube-in-shell engineering-literature reference.",
+      "source_basis_text": "Typical ASME B36.10M / ASTM A312 commercial-seamless-pipe surface finish documentation (45 μm = 4.5e-5 m for commercial carbon / stainless steel seamless pipe). Cross-referenced with Kern, Process Heat Transfer, 1950 Case 4.2 water-water 1\"/2\" tube-in-shell reference.",
+      "source_category": "engineering_literature_reference",
+      "unit": "m",
+      "value": 4.5e-05
+    }
+  },
   "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
   "amendment_branch": "codex/task-019-freeze-validation-vectors",
   "amendment_basis": "TASK-019 amendment-001 freezes the case input vectors, the case expected output vectors for TASK-006/007/008/017/018-authorized fields, and the per-field tolerance values for all three TASK-019 Golden cases. No production calculation was executed; all numeric vectors are engineering-literature-referenced canonical baselines. The frozen contract SHAs below are unchanged from Slice 2 closeout and are reproduced for auditability; no upstream contract blob was mutated by this amendment.",
