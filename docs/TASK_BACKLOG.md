@@ -52,7 +52,7 @@ Status values: `DONE`, `IN_PROGRESS`, `READY_FOR_REVIEW`, `READY`, `BLOCKED`, `P
 | TASK-017 (design) | Add materials, mass and preliminary mechanical checks — design contract | **DESIGN FROZEN** / IMPLEMENTATION NOT AUTHORIZED | TASK-012 (impl), TASK-013, TASK-016 |
 | TASK-017 (impl) | Add materials, mass and preliminary mechanical checks — implementation | **TASK-017 IMPLEMENTATION CLOSEOUT READY FOR REVIEW** (MaterialSelector + MassCalculator + PreliminaryMechanicalChecker §9.1 + §9.2 + §9.3 + §5.3 orchestrator + tests; PR #75 remains DRAFT; Ready / merge / Issue #74 close: NOT AUTHORIZED — pending separate Charles authorization) | TASK-017 design |
 | TASK-018 | Add C0/C1 cost model and life-cycle energy estimate | **IMPLEMENTATION SLICES A/B/C MERGED / CLOSED OUT**; closeout governance-sync docs PR opened as documentation-only (Issue #85) | TASK-009, TASK-013, TASK-017 |
-| TASK-019 | Add Golden cases and double-pipe validation report | PLANNED | TASK-007–TASK-018 |
+| TASK-019 | Add Golden cases and double-pipe validation report | **TASK-019 DESIGN CONTRACT IN PROGRESS** (design branch `docs/task-019-golden-cases-double-pipe-validation-design`; design base SHA `76a8b5142c63fb09852146611e794355dea7f5b6` (= main @ PR #86 merge); BRANCH PUSHED via SSH; manual Issue + DRAFT PR creation by Charles required post-push because GitHub API write auth is unavailable in this round; design contract file `docs/tasks/TASK-019-golden-cases-double-pipe-validation.md`; design status: DRAFT / not Ready / not merged; no Issue number / no PR number invented) | TASK-007–TASK-018 |
 
 ## M3 — Shell-and-tube single phase
 
