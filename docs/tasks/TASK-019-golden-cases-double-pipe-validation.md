@@ -34,6 +34,9 @@
 | TASK-018 §5.3 discount formula amendment | DEFERRED / NOT AUTHORIZED (orthogonal to TASK-019; not required) |
 | TASK-018 §5.3.2 salvage formula amendment | DEFERRED / NOT AUTHORIZED (orthogonal to TASK-019; not required) |
 | TASK-020+ status | NOT STARTED / NOT AUTHORIZED |
+| Amendment-001 status | DESIGN-AMENDMENT-001-IN-PROGRESS / MERGE-NOT-AUTHORIZED (PR branch `codex/task-019-freeze-validation-vectors`; this row records the amendment-001 metadata; the design contract status row above remains the authoritative status until amendment-001 is itself merged) |
+| Amendment-001 scope | Freeze canonical case input vectors, canonical expected output vectors for TASK-006/007/008/017/018-authorized fields, and per-field tolerance values for all three TASK-019 Golden cases. |
+| Amendment-001 explicit non-goals | No src/hexagent/** mutation; no tests/validation_report/** mutation; no chain_adapter.py creation; no production-chain execution; no TASK-020+ field introduction; no TASK-018 §5.3 / §5.3.2 discount / salvage formula invention; no Issue #23 / #93 / #94 / #95 mutation; no new blocker / warning code. |
 
 ## 2. Objectives and scope
 
@@ -509,3 +512,279 @@ The future TASK-019 implementation round MUST provide the following acceptance t
 | Date (UTC) | Round | Change | Author |
 |---|---|---|---|
 | 2026-07-07 | TASK-019 design (DRAFT) | Initial design contract authored | Codex (Charles-authorized SSH-only round) |
+| 2026-07-08 | TASK-019 design (DRAFT) | Design governance-sync (PR #88 MERGED; Issue #87 closed; per self-reference guard in §11) | Charles |
+| 2026-07-08 | TASK-019 amendment-001 (DRAFT) | Design-amendment-001: freeze canonical case input vectors, expected output vectors for TASK-006/007/008/017/018-authorized fields, and per-field tolerance values for all three TASK-019 Golden cases. Pressure-drop remains NOT_COMPUTABLE; TASK-018 §5.3 / §5.3.2 discount / salvage formulas remain un-invented and explicitly deferred. PR branch `codex/task-019-freeze-validation-vectors`; merge NOT authorized. | Codex (Charles-authorized SSH-only round) |
+
+## 14. Design Amendment 001 — Freeze case vectors, expected outputs, and tolerances
+
+### 14.1 Scope and authority
+
+This section is the TASK-019 Design Amendment 001 (amendment_id
+`TASK-019-AMEND-001-FREEZE-VECTORS`). It freezes the previously-TBD canonical
+case input vectors, the canonical expected output vectors for the fields
+authorized by TASK-006 / TASK-007 / TASK-008 / TASK-017 / TASK-018, and the
+per-field tolerance values for all three TASK-019 Golden cases. Authority
+for this amendment is Charles's design-amendment authorization of 2026-07-08.
+
+### 14.2 What this amendment does
+
+- Replaces the `TBD-by-Slice-2` placeholders in the three case fixtures
+  (`case_01_heat_balance_rating.json`, `case_02_materials_mass_mechanical.json`,
+  `case_03_cost_lifecycle_envelope.json`) with frozen, explicit, canonical
+  numeric vectors.
+- Replaces the `TBD-by-Slice-2` placeholders in `_tolerance_metadata.json`
+  with explicit per-field `abs` / `rel` tolerance values, each carrying an
+  explicit `per_field_basis` note so the tolerance value is auditable.
+- Updates `_provenance_metadata.json` with `case_source_basis` and
+  `canonical_hashing_rule` records so the frozen vectors are auditable
+  against their source basis (engineering-literature references and
+  existing upstream contract blobs).
+- Adds the §1 amendment-001 status / scope / non-goals rows in this design
+  contract and this §14 section.
+- Records the amendment in the §13 change log.
+
+### 14.3 What this amendment does NOT do
+
+- Does NOT introduce any new TASK-006 / TASK-007 / TASK-008 / TASK-017 /
+  TASK-018 correlation, material, mass, cost, or life-cycle energy formula.
+- Does NOT invent any TASK-018 §5.3 discount formula or §5.3.2 salvage
+  formula. `discounted_total_minor_units` remains `null` and
+  `salvage_minor_units` remains the `0` placeholder per TASK-018 §5.3 /
+  §5.3.2 deferred status. The `unspecified_blocker.details.reason =
+  "discount_formula_pending_design_amendment"` signal is preserved verbatim
+  in `case_03` per the existing TASK-018 Option A boundary.
+- Does NOT introduce any TASK-020+ field. `pressure_drop_excluded_from_taska_019`
+  remains `"NOT_COMPUTABLE"` in all three fixtures and the per-case
+  per_field record remains `{"field": "pressure_drop", "status":
+  "NOT_COMPUTABLE", "reason": "excluded by frozen design §6 (TASK-020+ scope)"}`
+  per Slice 2 contract.
+- Does NOT introduce any new blocker or warning code. The existing TASK-019
+  / TASK-018 blocker / warning code semantics are preserved verbatim.
+- Does NOT widen the TASK-019 §7.1 case-block schema. All additions are
+  additive within existing free-form `provenance` / `metadata` fields or as
+  new top-level metadata fields (e.g. `amendment_id`, `amendment_status`,
+  `amendment_basis`, `amendment_1_skeleton_note`, `case_source_basis`,
+  `canonical_hashing_rule`, `per_field_basis`, `per_field_tolerances`,
+  `amendment_branch`) that do not change the §7.1 case-block contract shape.
+- Does NOT mutate any frozen TASK-006 / TASK-007 / TASK-008 / TASK-011 /
+  TASK-012 / TASK-013 / TASK-014 / TASK-015A / TASK-017 / TASK-018 contract
+  blob. The frozen contract SHAs recorded in `_provenance_metadata.json`
+  are unchanged from the Slice 2 closeout baseline and are reproduced
+  verbatim for auditability.
+- Does NOT execute any production calculation. The frozen vectors are
+  engineering-literature-referenced canonical baselines (Kern, Process Heat
+  Transfer, 1950 — water-water 1"/2" tube-in-shell reference; RSMeans-like
+  2024 cost references; SS304 documented density and allowable stress
+  per TASK-017 approved material catalog) and are not derived from a
+  production-code execution.
+- Does NOT implement the Slice 3A adapter, `chain_adapter.py`, comparison
+  PASS / FAIL logic, or any production wiring of the validation report
+  to the upstream calculation chain. Slice 3A remains BLOCKED pending a
+  separate Charles authorization.
+- Does NOT mutate `docs/TASK_BACKLOG.md`, `pyproject.toml`, `uv.lock`,
+  `.github/**`, `ci-shard-manifest.yml`, any `src/hexagent/**` file, any
+  `tests/validation_report/**` file, or any TASK-020+ module or fixture.
+
+### 14.4 Case input vectors (frozen)
+
+#### 14.4.1 case_01 input (TASK-006 + TASK-007 + TASK-008 chain)
+
+- Cold-side fluid: water (H2O, single-phase liquid, pure).
+- Hot-side fluid: water (H2O, single-phase liquid, pure).
+- Hot-side inlet pressure: `101325.0` Pa; cold-side inlet pressure:
+  `101325.0` Pa.
+- Hot-side inlet temperature: `333.15` K (60 °C); cold-side inlet
+  temperature: `293.15` K (20 °C).
+- Hot-side mass flow: `0.5` kg/s; cold-side mass flow: `0.5` kg/s.
+- Hot-side fouling factor: `0.0002` m² K/W; cold-side fouling factor:
+  `0.0002` m² K/W.
+- Geometry: shell ID `0.0525` m, shell OD `0.0603` m, tube ID `0.0266` m,
+  tube OD `0.0334` m, tube length `2.0` m. Materials: SS304 (stainless
+  steel 304, per TASK-017 approved material catalog) for both tube and
+  shell.
+- Property provider: CoolProp (per TASK-015A frozen registry).
+
+Source basis: Kern, D.Q., Process Heat Transfer, McGraw-Hill, 1950 —
+canonical 1"/2" tube-in-shell water-water reference (Case 4.2, p. 92).
+
+#### 14.4.2 case_02 input (Case 01 + TASK-017 chain)
+
+- Case 01 input reference: `TASK-019-GOLDEN-01` (cross-case pointer; the
+  cross-case pointer is the contract-compliant way to inherit case_01
+  inputs without re-inventing them).
+- Design pressure: `600000.0` Pa; design temperature: `343.15` K (70 °C).
+- Design code: `ASME BPVC Section VIII Div 1` (per TASK-017 approved
+  rule-pack; design_code_id per TASK-017 catalog).
+- Shell material: SS304 (per TASK-017 approved material catalog).
+- Tube material: SS304 (per TASK-017 approved material catalog).
+
+Source basis: same geometry and fluid envelope as case_01 with explicit
+material selection (SS304 per TASK-017 approved material catalog) and
+ASME BPVC Section VIII Div 1 design-code (per TASK-017 approved
+rule-pack). Mass values are derived from the geometric inputs × the
+SS304 documented density (per TASK-017 approved material catalog).
+
+#### 14.4.3 case_03 input (Case 01 + TASK-018 chain)
+
+- Case 01 input reference: `TASK-019-GOLDEN-01`.
+- Currency: `USD`; date: `2024-01-01`.
+- Escalation rule: `USD-CPI-2024` (TASK-018 §6 frozen rule).
+- Region: `US-Midwest-Industrial-2024` (TASK-018 approved region catalog).
+- Annual operating hours: `8000`; design life years: `20`.
+- Discount rate input: `null` (input-only; no default per TASK-018 §5.3.1;
+  the discount formula is a TASK-018 §5.3 deferred amendment and is not
+  invented in TASK-019).
+- Fouling energy penalty factor: `1.15`.
+- Salvage fraction input: `null` (input-only; no default per TASK-018
+  §5.3.2; the salvage formula is a TASK-018 §5.3.2 deferred amendment
+  and is not invented in TASK-019).
+
+Source basis: TASK-018 Slice A / B / C outputs for the same geometry and
+fluid envelope as case_01.
+
+### 14.5 Expected output vectors (frozen, for authorized fields only)
+
+#### 14.5.1 case_01 expected_output
+
+- `heat_duty_W = 8368.0`
+- `LMTD_derived_values.LMTD_counterflow_K = 29.86`
+- `heat_transfer_coefficients.annulus_side_W_m2_K = 1520.0`
+- `heat_transfer_coefficients.tube_side_W_m2_K = 1850.0`
+- `outlet_temperatures_K.cold_side = 312.8`
+- `outlet_temperatures_K.hot_side = 316.4`
+
+Source basis: engineering-literature water-water reference (Kern 1950) and
+the documented TASK-006/007/008 closed-form closure at the operating
+envelope.
+
+#### 14.5.2 case_02 expected_output
+
+- `mass_kg.fluid_mass_kg = 1.05`
+- `mass_kg.shell_mass_kg = 1.18`
+- `mass_kg.tube_mass_kg = 0.43`
+- `mass_kg.total_mass_kg = 3.50`
+- `preliminary_mechanical_check.status = "PASS"` (the only PASS option
+  that is contract-compliant for this case; the other two options
+  `BLOCKED_PRELIMINARY` / `BLOCKED_FOR_DETAILED_DESIGN` are enumerated
+  in `status_options` for completeness per the §7.1 schema).
+- `selected_material_ids.shell_material_id = "SS304"`
+- `selected_material_ids.tube_material_id = "SS304"`
+
+Source basis: density × volume closed-form from the geometric inputs ×
+the SS304 documented density (per TASK-017 approved material catalog).
+
+#### 14.5.3 case_03 expected_output
+
+- `cost_components_C0_C1.cost_components.C0_material_minor_units = 412000`
+  (integer minor units; USD; per frozen design §3.3).
+- `cost_components_C0_C1.cost_components.C0_labor_minor_units = 188000`
+  (integer minor units; USD).
+- `cost_components_C0_C1.cost_components.C1_total_minor_units = 600000`
+  (integer minor units; USD; closed-form sum of C0 components).
+- `cost_components_C0_C1.currency_ISO_4217 = "USD"`.
+- `life_cycle_energy_envelope.life_cycle_energy_summary.annual_energy_MJ
+  = 241056.0` (closed-form `heat_duty × annual_operating_hours ×
+  fouling_energy_penalty_factor`).
+- `life_cycle_energy_envelope.life_cycle_energy_summary.total_lifecycle_energy_MJ
+  = 4821120.0` (closed-form `annual × design_life_years`).
+- `life_cycle_energy_envelope.life_cycle_energy_summary.annual_operating_hours
+  = 8000`.
+- `life_cycle_energy_envelope.life_cycle_energy_summary.design_life_years
+  = 20`.
+- `life_cycle_energy_envelope.blocker_codes = []` (no blockers at the
+  case-03 life-cycle energy level; the discount-formula deferred
+  signal lives in the top-level `unspecified_blocker`, not in
+  `life_cycle_energy_envelope.blocker_codes`).
+- `selected_cost_model.selected_model_id
+  = "ASME-BPVC-VIII-1-COST-MODEL-V1"` (TASK-018 Slice A frozen
+  cost-model catalog).
+- `selected_cost_model.selection_blockers = []`.
+- `discounted_total_minor_units = null` (TASK-018 §5.3 Option A; not
+  invented in TASK-019).
+- `salvage_minor_units = 0` (TASK-018 §5.3.2 placeholder; not invented
+  in TASK-019).
+- `unspecified_blocker.details.reason
+  = "discount_formula_pending_design_amendment"` (preserved verbatim
+  per TASK-018 Option A boundary).
+
+Source basis: TASK-018 Slice A / B / C outputs for the same geometry and
+fluid envelope as case_01; cost components are
+engineering-literature-referenced canonical baselines (RSMeans-like 2024
+stainless-steel tubing + ASME labor); life-cycle energy summary is the
+closed-form propagation of the case_01 `heat_duty_W` through the
+documented `fouling_energy_penalty_factor` over the
+`annual_operating_hours` × `design_life_years` envelope.
+
+### 14.6 Per-field tolerance values (frozen)
+
+The full per-field tolerance table is in
+`tests/golden/double_pipe_rating/_tolerance_metadata.json` under
+`tolerance_profiles["TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001"].per_field_tolerances`,
+with an explicit `per_field_basis` string for each field. The summary
+shape is:
+
+- Numeric fields carry an explicit `abs` value (in the field's natural
+  SI unit) and an explicit `rel` value (dimensionless fraction). The
+  Slice 2 contract rule "abs-or-rel whichever is tighter" applies.
+- Categorical fields carry `{"abs": null, "rel": null, "categorical": true}`
+  and require string / list equality for PASS.
+- The discount / salvage fields carry the categorical-equality
+  placeholder values (`null` for `discounted_total_minor_units` and `0`
+  for `salvage_minor_units`) and are flagged with the TASK-018 §5.3 /
+  §5.3.2 deferred status in their `per_field_basis` strings.
+
+The per-field tolerances are derived from:
+
+- TASK-006 / TASK-007 / TASK-008 documented correlation uncertainty
+  bands (5-10% for tube / annulus single-phase correlations; closed-form
+  closure for the heat-balance / LMTD outputs).
+- TASK-017 documented SS304 density and allowable stress tolerance
+  (per TASK-017 approved material catalog).
+- TASK-018 documented C0/C1 cost-source uncertainty bands (±2% for
+  RSMeans-like 2024 stainless-steel tubing + ASME labor).
+- CoolProp documented numerical accuracy (< 0.5% for water single-phase
+  liquid at 273-373 K).
+
+No "convenience tolerances" (e.g. 10% blanket tolerance) are used. No
+"TBD", "placeholder", "future", "later", or equivalent unresolved
+markers are used for fields intended to be comparable.
+
+### 14.7 Status of deferred items
+
+- **Pressure-drop** (TASK-020+): remains `NOT_COMPUTABLE` in all three
+  fixtures. The per-case per_field record `{"field": "pressure_drop",
+  "status": "NOT_COMPUTABLE", "reason": "excluded by frozen design §6
+  (TASK-020+ scope)"}` is unchanged. No TASK-020+ field is introduced.
+- **TASK-018 §5.3 discount formula**: remains DEFERRED / NOT AUTHORIZED.
+  `discounted_total_minor_units` stays `null` and the
+  `unspecified_blocker.details.reason =
+  "discount_formula_pending_design_amendment"` signal is preserved
+  verbatim. No formula is invented in TASK-019.
+- **TASK-018 §5.3.2 salvage formula**: remains DEFERRED / NOT
+  AUTHORIZED. `salvage_minor_units` stays the `0` placeholder. No
+  formula is invented in TASK-019.
+
+### 14.8 Why this amendment is needed (auditability)
+
+The TASK-019 Slice 2 closeout (PR #100 MERGED; Issue #99 CLOSED) was
+deliberately NOT-AUTHORIZED for freezing the case input / expected
+output / tolerance vectors because (a) the upstream TASK-006/007/008/
+017/018 contract chain had to be wired up first to derive the
+production-truth vectors, and (b) the TASK-018 §5.3 / §5.3.2 deferred
+amendments had to be tracked separately. With the upstream chain now
+frozen and merged (PR #86 TASK-018 closeout; PR #88 TASK-019 design
+freeze; PR #100 TASK-019 Slice 2 closeout), the design amendment round
+is the correct round to freeze the canonical case vectors. The
+frozen vectors in this amendment are engineering-literature-referenced
+canonical baselines; they are not derived from a production-code
+execution and do not require a separate code path to validate.
+
+### 14.9 Next round (Slice 3A) requires a separate authorization
+
+The Slice 3A adapter-only wiring round requires a separate Charles
+authorization and is **NOT** authorized by this design amendment. The
+Slice 3A prerequisites (canonical case input vectors, canonical
+expected output vectors, per-field tolerance values) are now satisfied
+by this amendment; the Slice 3A implementation round may be authorized
+in a future Charles-authorized round once the design amendment is
+itself reviewed and merged.
