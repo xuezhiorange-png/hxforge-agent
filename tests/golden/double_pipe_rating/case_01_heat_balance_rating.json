@@ -3,11 +3,18 @@
   "case_scope": "Canonical concentric-tube double-pipe heat exchanger with both fluids in co-current arrangement, single-phase liquid on both sides (no phase change), fixed geometry (no iterative sizing), heat balance closure at design point. Upstream paths exercised: TASK-007 (tube + annulus single-phase correlations) + TASK-006 (heat balance solver) + TASK-008 (fixed-geometry double-pipe rating). Pressure drop is explicitly NOT_COMPUTABLE (TASK-020+ scope; excluded from TASK-019 by frozen design §6).",
   "case_title": "Double-pipe heat balance + fixed-geometry rating",
   "amendment_id": "TASK-019-AMEND-001-FREEZE-VECTORS",
+  "amendment_002d_id": "TASK-019-DESIGN-AMENDMENT-002-D",
+  "amendment_002d_scope": "TASK-019-GOLDEN-01 provider-canonical fluid identifiers",
+  "amendment_002d_status": "DESIGN-FROZEN-PENDING-MERGE",
   "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
   "amendment_basis": "TASK-019 design-amendment round 2026-07-08 (PR branch codex/task-019-freeze-validation-vectors). Freezes the canonical case input vectors, the canonical expected output vectors for the TASK-006/007/008-authorized fields, and the per-field tolerance values for case 01. Pressure-drop remains NOT_COMPUTABLE (TASK-020+ excluded). No production calculation was executed to derive these frozen values; all numeric vectors are engineering-literature-referenced canonical baselines (Kern, Process Heat Transfer, 1950 — water-water 1\"/2\" tube-in-shell reference) and are auditable via provenance_metadata.json. Tolerance values are derived from the deterministic numerical behavior of the TASK-006/007/008 frozen upstream contracts and the CoolProp property provider's documented numerical accuracy at the operating envelope (see _tolerance_metadata.json per-field basis notes).",
   "input": {
     "cold_side": {
       "fluid_composition": "water (H2O, single-phase liquid, pure)",
+      "fluid_identifier": {
+        "equation_of_state_backend": "HEOS",
+        "name": "Water"
+      },
       "inlet_pressure_Pa": 101325.0,
       "inlet_temperature_K": 293.15,
       "mass_flow_kg_s": 0.5
@@ -30,6 +37,10 @@
     },
     "hot_side": {
       "fluid_composition": "water (H2O, single-phase liquid, pure)",
+      "fluid_identifier": {
+        "equation_of_state_backend": "HEOS",
+        "name": "Water"
+      },
       "inlet_pressure_Pa": 101325.0,
       "inlet_temperature_K": 333.15,
       "mass_flow_kg_s": 0.5
