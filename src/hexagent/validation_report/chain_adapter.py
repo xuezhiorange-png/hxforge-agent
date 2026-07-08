@@ -1,4 +1,4 @@
-"""TASK-019 Slice 3A thin chain adapter.
+"""TASK-019 Slice 3A / 3B-A thin chain adapter.
 
 Slice 3A scope (per Charles authorization ``TASK019_SLICE3A_IMPL_*``):
 
@@ -12,17 +12,46 @@ Slice 3A scope (per Charles authorization ``TASK019_SLICE3A_IMPL_*``):
   Design Amendment 001, merge commit ``8c65965``) as the only
   case-bound input source. No fallback / default / synthetic inputs.
 * Preserve the existing TASK-019 case-block schema (do not widen).
-* Preserve ``expected_output`` exactly as frozen by Amendment 001.
-* Preserve per-case tolerances exactly as frozen by Amendment 001.
-* Keep ``comparison.overall_status`` as NOT_COMPUTABLE in Slice 3A.
-  No PASS/FAIL comparison logic is added.
+* Preserve ``expected_output`` exactly as frozen by Amendment 001
+  (re-frozen for case_01 by Design Amendment 002-E; production chain
+  outputs must match within tolerance but are not copied from
+  ``expected_output``).
+* Preserve per-case tolerances exactly as frozen by Amendment 001
+  (per-field basis notes updated by Amendment 002-E).
+* Keep ``comparison.overall_status`` as NOT_COMPUTABLE in Slice 3A
+  and 3B-A. No PASS/FAIL comparison logic is added.
 * Add only additive provenance fields derived from real adapter
   execution (``upstream_calculation_run_ids``,
   ``upstream_provenance_digests``, ``canonical_actual_output_sha256``).
 * Preserve pressure-drop NOT_COMPUTABLE / TASK-020+ excluded.
 * Preserve TASK-018 discount/salvage deferred status.
 
-NOT in Slice 3A:
+Slice 3B-A scope (per Charles authorization
+``TASK019_SLICE3B_A_IMPL_*``):
+
+* Enable case_01 ``actual_output`` to be produced by the existing
+  TASK-006/007/008 production chain using the frozen case_01 inputs
+  (post Design Amendment 002-E: mass_flow 0.75/0.75 kg/s, both Re
+  outside the TASK-007 transitional regime).
+* Read provider identifiers (name / equation_of_state_backend) from
+  ``fixture["input"][...]["fluid_identifier"]`` (not from
+  ``fluid_composition`` and not from a hardcoded "Water" / "HEOS"
+  fallback). ``fluid_composition`` remains an audit / description
+  field only.
+* Use the production ``CoolPropProvider`` (HEOS) as the
+  PropertyProvider for the TASK-006/007/008 chain. The previous
+  test-support StubPropertyProvider import path (which could not
+  resolve real CoolProp state and forced case_01 to fail-closed
+  partial) is retired in Slice 3B-A. No hardcoded water states are
+  configured on the property provider.
+* case_01 must return ``status == "WIRED_VIA_CHAIN"`` with
+  ``produced_fields`` equal to the six authorized TASK-006/007/008
+  fields and all values finite non-None.
+* case_02 and case_03 remain ``WIRED_VIA_CHAIN_PARTIAL`` (no
+  MaterialRecord synthesis, no SelectionFilters fabrication, no
+  cost_records fabrication, no discount/salvage formula).
+
+NOT in Slice 3A / 3B-A:
 
 * No comparison PASS/FAIL logic.
 * No new blocker or warning code.
@@ -44,11 +73,9 @@ from __future__ import annotations
 import dataclasses
 import hashlib as _hashlib
 import json as _json
-import sys as _sys
 import uuid as _uuid
 from collections.abc import Mapping
 from decimal import Decimal
-from pathlib import Path as _Path
 from typing import Any
 
 from hexagent.costing.cost_calculator import (
@@ -116,13 +143,17 @@ from hexagent.costing.life_cycle_energy_estimator import calculate_life_cycle_br
 # (with noqa-F401 markers) satisfy the contract verbatim.
 
 # PropertyProvider DI for the TASK-006/007/008 chain.
+# Slice 3B-A fix: the previous StubPropertyProvider import path went
+# through tests/support/ and could not resolve real CoolProp state.
+# Use the production CoolPropProvider instead so the case_01 chain
+# actually runs end-to-end. The import lives in this file only;
+# tests/support/ is not modified. If CoolProp is unavailable at
+# runtime, the chain falls back to fail-closed partial (no
+# fabrication).
 try:
-    _tests_root = str(_Path(__file__).resolve().parents[2] / "tests" / "support")
-    if _tests_root not in _sys.path:
-        _sys.path.insert(0, _tests_root)
-    import property_provider_doubles  # type: ignore[import-not-found]
+    from hexagent.properties.coolprop_provider import CoolPropProvider as _CoolPropProvider
 
-    _PROPERTY_PROVIDER = property_provider_doubles.StubPropertyProvider()
+    _PROPERTY_PROVIDER: object = _CoolPropProvider()
 except Exception:
     _PROPERTY_PROVIDER = None
 
@@ -337,15 +368,24 @@ def _build_case_01_rating_request(
         inner_fouling_resistance_m2k_w=float(fouling["cold_side_m2_K_W"]),
         outer_fouling_resistance_m2k_w=float(fouling["hot_side_m2_K_W"]),
     )
+
+    # Slice 3B-A fix: read provider identifiers from the frozen
+    # fluid_identifier sub-blocks (per Design Amendment 002-D and
+    # 002-E). The fluid_composition string remains an audit /
+    # description field and is not used for provider construction.
+    # This avoids any regex parsing or normalization of the
+    # fluid_composition string and keeps Water/HEOS as fully
+    # case-bound inputs (no hardcoded fallback).
+    def _provider_identifier(side: Mapping[str, Any]) -> FluidIdentifier:
+        fi = side["fluid_identifier"]
+        return FluidIdentifier(
+            name=str(fi["name"]),
+            equation_of_state_backend=str(fi["equation_of_state_backend"]),
+        )
+
     rate_kwargs: dict[str, Any] = {
-        "hot_fluid": FluidIdentifier(
-            name=str(hot["fluid_composition"]),
-            equation_of_state_backend="HEOS",
-        ),
-        "cold_fluid": FluidIdentifier(
-            name=str(cold["fluid_composition"]),
-            equation_of_state_backend="HEOS",
-        ),
+        "hot_fluid": _provider_identifier(hot),
+        "cold_fluid": _provider_identifier(cold),
         "hot_mass_flow_kg_s": float(hot["mass_flow_kg_s"]),
         "cold_mass_flow_kg_s": float(cold["mass_flow_kg_s"]),
         "hot_inlet_temperature_k": float(hot["inlet_temperature_K"]),
@@ -466,7 +506,11 @@ def compute_actual_output_via_chain(
         case_01_input = fixture["input"]
         try:
             geometry, rate_kwargs = _build_case_01_rating_request(case_01_input)
-        except _MissingGeometryMaterialProperties as exc:
+        except (
+            _MissingGeometryMaterialProperties,
+            KeyError,
+            TypeError,
+        ) as exc:
             # Slice 3A P1 fix: case_01 frozen input does not carry the
             # wall_thermal_conductivity / surface_roughness values the
             # upstream DoublePipeGeometry constructor requires. The
@@ -475,6 +519,12 @@ def compute_actual_output_via_chain(
             # geometry-dependent actual_output fields go None and
             # produced_fields is empty (no real upstream-produced
             # value).
+            # Slice 3B-A addition: also catch KeyError / TypeError
+            # raised when the frozen fluid_identifier sub-block is
+            # missing or malformed. The adapter must NOT fabricate a
+            # default Water/HEOS provider identifier; it must fail
+            # closed (WIRED_VIA_CHAIN_PARTIAL with empty
+            # produced_fields) so the §6.3 / §6.4 invariants hold.
             values: dict[str, Any] = {  # type: ignore[no-redef]
                 "heat_duty_W": None,
                 "LMTD_derived_values": {"LMTD_counterflow_K": None},
