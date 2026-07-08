@@ -26,6 +26,133 @@
   "amendment_002a_effective_scope": "TASK-019-GOLDEN-01",
   "amendment_002d_id": "TASK-019-DESIGN-AMENDMENT-002-D",
   "amendment_002d_effective_scope": "TASK-019-GOLDEN-01",
+  "amendment_002e_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+  "amendment_002e_effective_scope": "TASK-019-GOLDEN-01",
+  "amendment_002e_supersedes": "Amendment 001 case_01 numeric expected_output values for the six re-frozen fields (heat_duty_W, LMTD_counterflow_K, annulus_side_W_m2_K, tube_side_W_m2_K, outlet_T_cold, outlet_T_hot). Does NOT supersede case_02 or case_03.",
+  "amendment_002e_flow_regime_evidence": {
+    "selected_mass_flow_kg_s_cold": 0.75,
+    "selected_mass_flow_kg_s_hot": 0.75,
+    "tube_side_Re": 75810.66286235565,
+    "annulus_side_Re": 11386.373921030658,
+    "min_Re_tube_annulus": 11386.373921030658,
+    "min_Re_above_10000": true,
+    "min_Re_above_11000_recommended_margin": true,
+    "transitional_regime_avoided": true,
+    "transitional_range_definition": "2300 <= Re <= 10000 (TASK-007 frozen correlation registry)"
+  },
+  "amendment_002e_production_chain_evidence": {
+    "upstream_tasks": ["TASK-006", "TASK-007", "TASK-008", "TASK-015A"],
+    "provider": "CoolProp",
+    "provider_version": "8.0.0",
+    "provider_identifier_name": "Water",
+    "provider_identifier_equation_of_state_backend": "HEOS",
+    "tube_correlation_id": "tube_turbulent_gnielinski",
+    "annulus_correlation_id": "annulus_turbulent_gnielinski_dh",
+    "tube_applicability": "applicable",
+    "annulus_applicability": "applicable",
+    "provenance_digest": "sha256:80a85f8001abcf739b805b2b33d7a2654145fd91ea13cd09c1dfc71758245c2a",
+    "result_hash": "sha256:4e48e3d0e2e154d13caf765e2b6619950adadf953ca223e18fd8cea7c1ff7c1c",
+    "no_adapter_execution_used_as_source": true,
+    "no_hand_calculated_expected_output": true
+  },
+  "amendment_002e_frozen_field_paths": {
+    "case_01_mass_flow_re_freeze": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_paths": [
+        "input.cold_side.mass_flow_kg_s",
+        "input.hot_side.mass_flow_kg_s"
+      ],
+      "frozen_benchmark_input": true
+    },
+    "case_01_expected_output_re_freeze": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_paths": [
+        "expected_output.heat_duty_W",
+        "expected_output.LMTD_derived_values.LMTD_counterflow_K",
+        "expected_output.heat_transfer_coefficients.annulus_side_W_m2_K",
+        "expected_output.heat_transfer_coefficients.tube_side_W_m2_K",
+        "expected_output.outlet_temperatures_K.cold_side",
+        "expected_output.outlet_temperatures_K.hot_side"
+      ],
+      "frozen_expected_output": true
+    }
+  },
+  "amendment_002e_provenance_entries": {
+    "input.cold_side.mass_flow_kg_s": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.cold_side.mass_flow_kg_s",
+      "frozen_benchmark_input": true,
+      "rationale": "Re-freeze case_01 cold-side mass flow to 0.75 kg/s (previously 0.5 kg/s) to avoid the TASK-007 frozen correlation registry's transitional flow regime (2300 <= Re <= 10000). Selected as the smallest equal-flow candidate that satisfies the acceptance criteria (min(Re_tube, Re_annulus) >= 11000 recommended margin). Cold-side mass flow 0.75 kg/s yields annulus_Re = 11386.37 (turbulent, applicable). Geometry, inlet temperatures, inlet pressures, fouling factors, provider identifiers, material identifiers, and pressure-drop status are all unchanged per Amendment 002-E non-authorizations.",
+      "source_category": "production_chain_derived_golden_vector",
+      "value": 0.75
+    },
+    "input.hot_side.mass_flow_kg_s": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "input.hot_side.mass_flow_kg_s",
+      "frozen_benchmark_input": true,
+      "rationale": "Re-freeze case_01 hot-side mass flow to 0.75 kg/s (previously 0.5 kg/s) to avoid the TASK-007 frozen correlation registry's transitional flow regime (2300 <= Re <= 10000). Selected as the smallest equal-flow candidate that satisfies the acceptance criteria (min(Re_tube, Re_annulus) >= 11000 recommended margin). Hot-side mass flow 0.75 kg/s yields tube_Re = 75810.66 (turbulent, applicable). Geometry, inlet temperatures, inlet pressures, fouling factors, provider identifiers, material identifiers, and pressure-drop status are all unchanged per Amendment 002-E non-authorizations.",
+      "source_category": "production_chain_derived_golden_vector",
+      "value": 0.75
+    },
+    "expected_output.heat_duty_W": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "expected_output.heat_duty_W",
+      "frozen_expected_output": true,
+      "rationale": "Re-frozen from production chain (TASK-006 heat balance + TASK-007 single-phase correlations + TASK-008 double-pipe rating + TASK-015A CoolProp provider) at the new non-transitional operating point (mass_flow 0.75/0.75 kg/s, Water/HEOS). The previous Amendment 001 value (8368.0) was a Kern 1950 engineering-literature reference; the Amendment 002-E value (6598.77) is the production-chain-derived value at the new operating point. The previous value is superseded for case_01 only (not case_02 or case_03).",
+      "source_category": "production_chain_derived_golden_vector",
+      "value": 6598.77255277395
+    },
+    "expected_output.LMTD_derived_values.LMTD_counterflow_K": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "expected_output.LMTD_derived_values.LMTD_counterflow_K",
+      "frozen_expected_output": true,
+      "rationale": "Re-frozen from production chain at the new non-transitional operating point. The previous Amendment 001 value (29.86) is superseded for case_01 only.",
+      "source_category": "production_chain_derived_golden_vector",
+      "value": 37.85817982113553
+    },
+    "expected_output.heat_transfer_coefficients.annulus_side_W_m2_K": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "expected_output.heat_transfer_coefficients.annulus_side_W_m2_K",
+      "frozen_expected_output": true,
+      "rationale": "Re-frozen from production chain at the new non-transitional operating point, using the annulus_turbulent_gnielinski_dh correlation (applicable, annulus_Re = 11386.37). The previous Amendment 001 value (1520.0) is superseded for case_01 only.",
+      "source_category": "production_chain_derived_golden_vector",
+      "value": 2783.7013942048334
+    },
+    "expected_output.heat_transfer_coefficients.tube_side_W_m2_K": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "expected_output.heat_transfer_coefficients.tube_side_W_m2_K",
+      "frozen_expected_output": true,
+      "rationale": "Re-frozen from production chain at the new non-transitional operating point, using the tube_turbulent_gnielinski correlation (applicable, tube_Re = 75810.66). The previous Amendment 001 value (1850.0) is superseded for case_01 only.",
+      "source_category": "production_chain_derived_golden_vector",
+      "value": 7899.20947325792
+    },
+    "expected_output.outlet_temperatures_K.cold_side": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "expected_output.outlet_temperatures_K.cold_side",
+      "frozen_expected_output": true,
+      "rationale": "Re-frozen from production chain at the new non-transitional operating point. The previous Amendment 001 value (312.8) is superseded for case_01 only.",
+      "source_category": "production_chain_derived_golden_vector",
+      "value": 295.25317863269566
+    },
+    "expected_output.outlet_temperatures_K.hot_side": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+      "effective_scope": "TASK-019-GOLDEN-01",
+      "field_path": "expected_output.outlet_temperatures_K.hot_side",
+      "frozen_expected_output": true,
+      "rationale": "Re-frozen from production chain at the new non-transitional operating point. The previous Amendment 001 value (316.4) is superseded for case_01 only.",
+      "source_category": "production_chain_derived_golden_vector",
+      "value": 331.0473945550949
+    }
+  },
   "amendment_002d_frozen_field_paths": {
     "case_01_provider_fluid_identifiers": {
       "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-D",

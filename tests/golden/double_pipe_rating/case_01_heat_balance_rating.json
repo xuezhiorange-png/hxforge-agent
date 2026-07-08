@@ -6,6 +6,9 @@
   "amendment_002d_id": "TASK-019-DESIGN-AMENDMENT-002-D",
   "amendment_002d_scope": "TASK-019-GOLDEN-01 provider-canonical fluid identifiers",
   "amendment_002d_status": "DESIGN-FROZEN-PENDING-MERGE",
+  "amendment_002e_id": "TASK-019-DESIGN-AMENDMENT-002-E",
+  "amendment_002e_scope": "TASK-019-GOLDEN-01 non-transitional operating point and expected_output re-freeze",
+  "amendment_002e_status": "DESIGN-FROZEN-PENDING-MERGE",
   "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
   "amendment_basis": "TASK-019 design-amendment round 2026-07-08 (PR branch codex/task-019-freeze-validation-vectors). Freezes the canonical case input vectors, the canonical expected output vectors for the TASK-006/007/008-authorized fields, and the per-field tolerance values for case 01. Pressure-drop remains NOT_COMPUTABLE (TASK-020+ excluded). No production calculation was executed to derive these frozen values; all numeric vectors are engineering-literature-referenced canonical baselines (Kern, Process Heat Transfer, 1950 — water-water 1\"/2\" tube-in-shell reference) and are auditable via provenance_metadata.json. Tolerance values are derived from the deterministic numerical behavior of the TASK-006/007/008 frozen upstream contracts and the CoolProp property provider's documented numerical accuracy at the operating envelope (see _tolerance_metadata.json per-field basis notes).",
   "input": {
@@ -17,7 +20,7 @@
       },
       "inlet_pressure_Pa": 101325.0,
       "inlet_temperature_K": 293.15,
-      "mass_flow_kg_s": 0.5
+      "mass_flow_kg_s": 0.75
     },
     "fouling_factors": {
       "cold_side_m2_K_W": 0.0002,
@@ -43,22 +46,22 @@
       },
       "inlet_pressure_Pa": 101325.0,
       "inlet_temperature_K": 333.15,
-      "mass_flow_kg_s": 0.5
+      "mass_flow_kg_s": 0.75
     },
     "property_provider_id": "CoolProp (TASK-015A frozen)"
   },
   "expected_output": {
     "LMTD_derived_values": {
-      "LMTD_counterflow_K": 29.86
+      "LMTD_counterflow_K": 37.85817982113553
     },
-    "heat_duty_W": 8368.0,
+    "heat_duty_W": 6598.77255277395,
     "heat_transfer_coefficients": {
-      "annulus_side_W_m2_K": 1520.0,
-      "tube_side_W_m2_K": 1850.0
+      "annulus_side_W_m2_K": 2783.7013942048334,
+      "tube_side_W_m2_K": 7899.20947325792
     },
     "outlet_temperatures_K": {
-      "cold_side": 312.8,
-      "hot_side": 316.4
+      "cold_side": 295.25317863269566,
+      "hot_side": 331.0473945550949
     },
     "slice3a_blocked_field_paths": {
       "heat_duty_W_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from rate_double_pipe(HeatBalanceResult.heat_duty_W))",
