@@ -1,0 +1,48 @@
+{
+  "case_id": "TASK-019-GOLDEN-02",
+  "case_scope": "Slice 1 skeleton. Frozen-design scope: same geometry and fluid conditions as Case 01, with explicit material selection and mass calculation, plus §9.1 preliminary mechanical check on tube allowable stress (TASK-017 §9.1 — already implemented in preliminary_checker.py). Upstream paths exercised: Case 01 + TASK-017 MaterialSelector + MassCalculator + PreliminaryMechanicalChecker §9.1. Pressure drop is explicitly NOT_COMPUTABLE (TASK-020+ scope; excluded from TASK-019 by frozen design §6).",
+  "case_title": "Double-pipe heat balance + materials + mass + preliminary mechanical check",
+  "expected_output": {
+    "case_01_outputs": "TBD-by-Slice-2 (reference to Case 01 expected output block)",
+    "mass_kg": {
+      "fluid_mass_kg": "TBD-by-Slice-2",
+      "shell_mass_kg": "TBD-by-Slice-2",
+      "total_mass_kg": "TBD-by-Slice-2",
+      "tube_mass_kg": "TBD-by-Slice-2"
+    },
+    "preliminary_mechanical_check": {
+      "status": "TBD-by-Slice-2",
+      "status_options": [
+        "PASS",
+        "BLOCKED_PRELIMINARY",
+        "BLOCKED_FOR_DETAILED_DESIGN"
+      ]
+    },
+    "selected_material_ids": {
+      "shell_material_id": "TBD-by-Slice-2",
+      "tube_material_id": "TBD-by-Slice-2"
+    }
+  },
+  "input": {
+    "case_01_input": "TBD-by-Slice-2 (reference to Case 01 input block)",
+    "design_conditions": {
+      "design_pressure_Pa": "TBD-by-Slice-2",
+      "design_temperature_K": "TBD-by-Slice-2"
+    },
+    "material_selection": {
+      "design_code_id": "TBD-by-Slice-2 (selected from TASK-017 approved rule-packs)",
+      "shell_material_id": "TBD-by-Slice-2",
+      "tube_material_id": "TBD-by-Slice-2"
+    }
+  },
+  "license_boundary_attestation": {
+    "any_restricted_source_inputs": false,
+    "any_restricted_source_outputs": false,
+    "restricted_source_pointer_only_observed": true
+  },
+  "pressure_drop_excluded_from_taska_019": "NOT_COMPUTABLE",
+  "provenance_profile_id": "TASK-019-GOLDEN-PROVENANCE-V1-SLICE-1",
+  "schema_version": "TASK-019-GOLDEN-CASE-V1-SLICE-1-SKELETON",
+  "slice1_skeleton_note": "Slice 1 fixture-shape reproducibility only. TBD-by-Slice-2 placeholders will be wired to TASK-017 MaterialSelector / MassCalculator / PreliminaryMechanicalChecker outputs in Slice 2.",
+  "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1"
+}

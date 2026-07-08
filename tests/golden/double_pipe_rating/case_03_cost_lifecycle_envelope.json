@@ -1,0 +1,57 @@
+{
+  "case_id": "TASK-019-GOLDEN-03",
+  "case_scope": "Slice 1 skeleton. Frozen-design scope: same geometry and fluid conditions as Case 01, with the full envelope of TASK-018 Slice A / B / C outputs: CostModelSelector + CostCalculator + LifeCycleEnergyEstimator. Must preserve TASK-018 Option A boundary (per frozen design §5): discounted_total_minor_units is null; salvage_minor_units is 0 placeholder; no real discount / salvage formula implementation in Slice 1 (those live in a separate TASK-018 design-amendment round). Pressure drop is explicitly NOT_COMPUTABLE (TASK-020+ scope; excluded from TASK-019 by frozen design §6).",
+  "case_title": "Double-pipe heat balance + C0/C1 cost + life-cycle envelope",
+  "expected_output": {
+    "case_01_outputs": "TBD-by-Slice-2 (reference to Case 01 expected output block)",
+    "cost_components_C0_C1": {
+      "cost_components": "TBD-by-Slice-2",
+      "currency_ISO_4217": "TBD-by-Slice-2",
+      "minor_unit_note": "integer minor units ONLY (no float for money per frozen design §3.3)"
+    },
+    "discounted_total_minor_units": null,
+    "discounted_total_minor_units_note": "null per TASK-018 Option A. Real discount formula lives in a future TASK-018 §5.3 design-amendment round. No real discount formula in Slice 1.",
+    "life_cycle_energy_envelope": {
+      "blocker_codes": "TBD-by-Slice-2 (may include unspecified_blocker for Option A deferred amendments)",
+      "life_cycle_energy_summary": "TBD-by-Slice-2"
+    },
+    "salvage_minor_units": 0,
+    "salvage_minor_units_note": "0 placeholder per TASK-018 §5.3.2 schema (integer minor units; no default). Real salvage formula lives in a future TASK-018 §5.3.2 design-amendment round.",
+    "selected_cost_model": {
+      "selected_model_id": "TBD-by-Slice-2",
+      "selection_blockers": "TBD-by-Slice-2 (may be non-empty per TASK-018 Option A behavior)"
+    },
+    "unspecified_blocker": {
+      "details": {
+        "reason": "discount_formula_pending_design_amendment"
+      },
+      "note": "Slice 1 observes TASK-018 Option A boundary: when the upstream chain reports the discount-formula deferred-amendment signal, this field carries the matching reason. No discount formula is implemented in Slice 1."
+    }
+  },
+  "input": {
+    "case_01_input": "TBD-by-Slice-2 (reference to Case 01 input block)",
+    "cost_model_selection": {
+      "currency_ISO_4217": "TBD-by-Slice-2",
+      "date_ISO_8601": "TBD-by-Slice-2",
+      "escalation_rule_id": "TBD-by-Slice-2 (TASK-018 §6 frozen rule)",
+      "region_id": "TBD-by-Slice-2"
+    },
+    "lifecycle_inputs": {
+      "annual_operating_hours": "TBD-by-Slice-2",
+      "design_life_years": "TBD-by-Slice-2",
+      "discount_rate_input": "TBD-by-Slice-2 (input-only; no default per TASK-018 §5.3.1)",
+      "fouling_energy_penalty_factor": "TBD-by-Slice-2",
+      "salvage_fraction_input": "TBD-by-Slice-2 (input-only; no default per TASK-018 §5.3.2)"
+    }
+  },
+  "license_boundary_attestation": {
+    "any_restricted_source_inputs": false,
+    "any_restricted_source_outputs": false,
+    "restricted_source_pointer_only_observed": true
+  },
+  "pressure_drop_excluded_from_taska_019": "NOT_COMPUTABLE",
+  "provenance_profile_id": "TASK-019-GOLDEN-PROVENANCE-V1-SLICE-1",
+  "schema_version": "TASK-019-GOLDEN-CASE-V1-SLICE-1-SKELETON",
+  "slice1_skeleton_note": "Slice 1 fixture-shape reproducibility only. TASK-018 Option A boundary preserved (discounted_total_minor_units = null; salvage_minor_units = 0). Real TASK-018 discount / salvage formulas deferred to a future TASK-018 design-amendment round; not implemented in TASK-019 Slice 1.",
+  "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1"
+}
