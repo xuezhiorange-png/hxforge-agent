@@ -626,11 +626,8 @@ def test_p1_no_synthetic_cost_selection_filters() -> None:
         )
     # The removed helper function must be gone (definitions only;
     # comments are allowed since they document the removal).
-    assert not re.search(
-        r"^def\s+_build_case_03_filters\(", src, re.MULTILINE
-    ), (
-        "chain_adapter source still defines the removed "
-        "_build_case_03_filters helper"
+    assert not re.search(r"^def\s+_build_case_03_filters\(", src, re.MULTILINE), (
+        "chain_adapter source still defines the removed _build_case_03_filters helper"
     )
     # No empty-records pseudo cost computation: select_cost_records
     # must not be called with a literal empty tuple.
