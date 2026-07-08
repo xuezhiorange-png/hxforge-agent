@@ -1322,3 +1322,134 @@ _slice2_self_check()
 
 
 _self_check()
+
+
+# ---------------------------------------------------------------------------
+# Slice 3A: chain-wired materialization (additive; Slice 2 surface untouched).
+#
+# Slice 3A advances the Slice 2 materialization contract from "actual_output
+# is a structured NOT_COMPUTABLE record" to "actual_output is the real
+# projection of the upstream TASK-006 / TASK-007 / TASK-008 / TASK-017 /
+# TASK-018 production chain, computed by the chain_adapter module using
+# the frozen case input vectors".
+#
+# Slice 3A does NOT:
+# - Implement comparison PASS / FAIL logic. The comparison.overall_status
+#   remains NOT_COMPUTABLE in Slice 3A.
+# - Implement pressure-drop / C4 / TASK-020+. The pressure-drop
+#   per_field record remains NOT_COMPUTABLE.
+# - Invent TASK-018 §5.3 / §5.3.2 discount or salvage formulas.
+#   discounted_total_minor_units stays null and salvage_minor_units
+#   stays 0 per the frozen case_03 expected_output.
+# - Introduce any new blocker or warning code.
+# - Widen the TASK-019 §7.1 case-block schema. The chain-wired
+#   actual_output is integrated additively: the existing
+#   materialize_case_block_from_fixture signature is preserved; a new
+#   parameter ``actual_output_block`` lets callers substitute the
+#   chain-wired actual_output for the Slice 2 NOT_COMPUTABLE artifact.
+# ---------------------------------------------------------------------------
+
+
+def materialize_case_block_with_chain_output(
+    fixture_path: Path,
+    *,
+    repo_root: Path,
+    canonical_design_contract_versions: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Materialize a §7.1 case block with the chain-wired actual_output.
+
+    The chain-wired actual_output is computed by
+    ``chain_adapter.compute_actual_output_via_chain`` using the frozen
+    case input vectors. The comparison path is NOT touched:
+    ``comparison.overall_status`` remains NOT_COMPUTABLE in Slice 3A.
+
+    The pressure-drop per_field record is preserved as NOT_COMPUTABLE
+    (TASK-020+ excluded). The TASK-018 §5.3 / §5.3.2 deferred status
+    is preserved verbatim (discounted_total_minor_units = null;
+    salvage_minor_units = 0; blocker reason = discount_formula_pending_
+    design_amendment).
+    """
+    import json as _json_local
+
+    from hexagent.validation_report import chain_adapter as _chain_adapter
+
+    fixture_text = _read_text_file(fixture_path)
+    fixture = _json_local.loads(fixture_text.decode("utf-8"))
+
+    case_id = fixture["case_id"]
+    case_title = fixture["case_title"]
+    input_block = fixture.get("input", {})
+    expected_output_block = fixture.get("expected_output", {})
+
+    # Compute the chain-wired actual_output via the adapter.
+    chain_artifact = _chain_adapter.compute_actual_output_via_chain(fixture)
+    chain_values = chain_artifact.get("values", {})
+
+    # Build the chain-wired actual_output artifact. This is the
+    # Slice 2 NOT_COMPUTABLE artifact shape augmented with the
+    # chain-wired values. The blocked_fields list is empty for
+    # chain-wired (the production chain is wired; no fields are
+    # blocked). The fixture's slice3a_blocked_field_paths markers
+    # remain the P0-1-contract audit-trail record.
+    actual_output_block: dict[str, Any] = {
+        "status": chain_artifact.get("status", "WIRED_VIA_CHAIN_PARTIAL"),
+        "reason": "production_chain_wired_via_slice3a_adapter",
+        "produced_fields": list(chain_artifact.get("produced_fields", [])),
+        "blocked_fields": list(chain_artifact.get("blocked_fields", [])),
+        "values": chain_values,
+        "upstream_calculation_run_ids": list(
+            chain_artifact.get("upstream_calculation_run_ids", [])
+        ),
+        "upstream_provenance_digests": list(chain_artifact.get("upstream_provenance_digests", [])),
+        "canonical_actual_output_sha256": chain_artifact.get("canonical_actual_output_sha256", ""),
+        "discount_salvage_status": chain_artifact.get("discount_salvage_status", {}),
+    }
+
+    input_sha = sha256_hex(canonical_json_dumps(input_block))
+    expected_sha = sha256_hex(canonical_json_dumps(expected_output_block))
+    actual_sha = sha256_hex(canonical_json_dumps(actual_output_block))
+
+    has_deferred_blocker = _detect_deferred_amendment_blockers(fixture)
+    blockers = _collect_unspecified_blockers(fixture)
+    overall_status = _infer_overall_status(fixture, has_deferred_blocker)
+
+    per_field = _materialize_per_field_from_fixture(fixture)
+
+    provenance_metadata = _load_provenance_metadata(repo_root)
+    if canonical_design_contract_versions is None:
+        canonical_design_contract_versions = compute_frozen_upstream_contract_versions(
+            repo_root,
+            task_019_impl_version=_IMPLEMENTATION_VERSION_SLICE_2,
+        )
+    provenance_block = {
+        "correlation_ids": list(provenance_metadata.get("correlation_id_references", {}).keys()),
+        "provider_ids": list(provenance_metadata.get("provider_id_references", {}).keys()),
+        "rule_pack_ids": [],
+        "design_contract_versions": dict(canonical_design_contract_versions),
+        "upstream_calculation_run_ids": list(
+            chain_artifact.get("upstream_calculation_run_ids", [])
+        ),
+        "upstream_provenance_digests": list(chain_artifact.get("upstream_provenance_digests", [])),
+        "canonical_actual_output_sha256": chain_artifact.get("canonical_actual_output_sha256", ""),
+    }
+
+    case_block: dict[str, Any] = {
+        "case_id": case_id,
+        "case_title": case_title,
+        "input_sha256": input_sha,
+        "expected_output_sha256": expected_sha,
+        "actual_output_sha256": actual_sha,
+        "comparison": {
+            "overall_status": overall_status,
+            "per_field": per_field,
+            "blockers": blockers,
+            "warnings": [],
+        },
+        "provenance": provenance_block,
+    }
+
+    # Strict gate at the end: a forbidden-scope field or invalid case_id
+    # raises here so the caller can never accidentally publish a
+    # malformed report.
+    validate_case_block_strict(case_block)
+    return case_block
