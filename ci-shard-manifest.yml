@@ -55,6 +55,7 @@ shards:
       - tests/validation_report/test_golden_case_reproducibility.py
       - tests/validation_report/test_no_upstream_mutation.py
       - tests/validation_report/test_excluded_scopes_negative.py
+      - tests/validation_report/test_materialization_contract.py
     timeout: 300
 
   - name: ci-acceptance

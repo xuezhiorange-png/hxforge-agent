@@ -11,6 +11,8 @@
     "restricted_source_pointer_only_observed": true
   },
   "slice1_skeleton_note": "Slice 1 placeholder. Final tolerance values will be set in Slice 2 after the upstream calculation chain is wired up.",
+  "slice2_schema_version": "TASK-019-GOLDEN-TOLERANCE-V2",
+  "slice2_status": "Slice 2 contract: tolerance drift forbidden without explicit design-amendment (per frozen design §7.4). Numeric abs_tolerance_default / rel_tolerance_default remain TBD-by-Slice-N because the upstream calculation chain is not yet wired up; Slice 2 never silently substitutes a default value. The Slice 2 materialization contract surfaces TBD-by-* tolerance entries as NOT_COMPUTABLE per-field comparisons.",
   "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1",
   "tolerance_profiles": {
     "TASK-019-GOLDEN-TOLERANCE-V1-SLICE-1": {
