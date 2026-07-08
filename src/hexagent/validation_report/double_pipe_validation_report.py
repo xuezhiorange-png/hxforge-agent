@@ -761,6 +761,48 @@ def validate_per_case_blocks_strict(blocks: Sequence[Mapping[str, Any]]) -> None
 # --- Slice 2: case-block materialization from Slice 1 fixture ---
 
 
+def _materialize_not_computable_actual_output(
+    expected_output_block: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build the distinct NOT_COMPUTABLE actual-output artifact (P0-1 fix).
+
+    Per frozen design §7.1, the ``actual_output_sha256`` is the canonical
+    hash of the actual calculation output. Per the P0-1 review verdict on
+    PR #98, the actual-output artifact MUST NOT mirror the expected-output
+    block (which would make the two hashes equal byte-for-byte and
+    silently misrepresent the absence of an upstream-chain run).
+
+    Slice 2 does NOT execute the upstream TASK-006/007/008/017/018
+    calculation chain (per frozen design §6 + §11.5; those chains are
+    explicitly excluded from TASK-019 Slice 2 scope). Therefore the
+    actual-output artifact is a structured NOT_COMPUTABLE record that:
+
+    - names the reason for non-execution explicitly;
+    - declares ``produced_fields`` (always empty — Slice 2 produced
+      zero numeric fields);
+    - declares ``blocked_fields`` — the deterministically sorted list
+      of every expected-output field path that would have been computed
+      had the upstream chain been wired up. This is exactly the
+      ``_walk_for_tbd`` traversal result, sorted, so the artifact is
+      byte-stable across runs.
+
+    The artifact is deliberately minimal: no fake numeric vectors, no
+    derived metrics, no provider outputs. The deterministic
+    blocked_fields list serves as the audit trail of "what WOULD have
+    been computed, but wasn't", without ever substituting a default
+    value.
+    """
+    if not isinstance(expected_output_block, Mapping):
+        expected_output_block = {}
+    blocked_field_paths = sorted(r["field"] for r in _walk_for_tbd(expected_output_block))
+    return {
+        "status": "NOT_COMPUTABLE",
+        "reason": "upstream_calculation_chain_not_wired_in_task_019_slice2",
+        "produced_fields": [],
+        "blocked_fields": blocked_field_paths,
+    }
+
+
 def _materialize_per_field_from_fixture(
     fixture: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
@@ -838,6 +880,7 @@ def materialize_case_block_from_fixture(
     fixture_path: Path,
     *,
     repo_root: Path,
+    canonical_design_contract_versions: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Materialize a §7.1 case block from a Slice 1 frozen-design fixture.
 
@@ -876,13 +919,17 @@ def materialize_case_block_from_fixture(
     input_block = fixture.get("input", {})
     expected_output_block = fixture.get("expected_output", {})
 
-    # Slice 2 does NOT run the upstream chain. The actual_output block
-    # mirrors the expected_output block (placeholder-aware); the
-    # comparison then classifies every TBD-by-* field as NOT_COMPUTABLE.
-    # This preserves determinism (expected == actual byte-for-byte at
-    # the placeholder level) while never inventing a fake numeric
-    # actual_output.
-    actual_output_block = expected_output_block
+    # Slice 2 does NOT run the upstream chain (per frozen design §6 + §11.5;
+    # TASK-006/007/008/017/018 calculation chain is explicitly excluded
+    # from TASK-019 Slice 2). The actual_output artifact MUST therefore
+    # be a distinct, structured NOT_COMPUTABLE record — not a mirror of
+    # the expected_output block. Mirroring would make
+    # actual_output_sha256 == expected_output_sha256 byte-for-byte,
+    # which the frozen TASK-019 report contract forbids (per P0-1 review
+    # verdict on PR #98).
+    actual_output_block = _materialize_not_computable_actual_output(
+        expected_output_block,
+    )
 
     input_sha = sha256_hex(canonical_json_dumps(input_block))
     expected_sha = sha256_hex(canonical_json_dumps(expected_output_block))
@@ -895,14 +942,25 @@ def materialize_case_block_from_fixture(
     per_field = _materialize_per_field_from_fixture(fixture)
 
     provenance_metadata = _load_provenance_metadata(repo_root)
+    # P0-2 fix: case-level design_contract_versions MUST use the same
+    # canonical Slice-2 SHA map as the report-level upstream_contract_versions.
+    # If the caller (typically materialize_validation_report_from_fixtures)
+    # passes one in, use it verbatim. Otherwise fall back to computing it
+    # here so the function remains usable in isolation; in that fallback
+    # case the result is exactly compute_frozen_upstream_contract_versions(
+    # repo_root, task_019_impl_version=_IMPLEMENTATION_VERSION_SLICE_2)
+    # so the case-level SHA equals the report-level SHA when both are
+    # computed in the same Python process.
+    if canonical_design_contract_versions is None:
+        canonical_design_contract_versions = compute_frozen_upstream_contract_versions(
+            repo_root,
+            task_019_impl_version=_IMPLEMENTATION_VERSION_SLICE_2,
+        )
     provenance_block = {
         "correlation_ids": list(provenance_metadata.get("correlation_id_references", {}).keys()),
         "provider_ids": list(provenance_metadata.get("provider_id_references", {}).keys()),
         "rule_pack_ids": [],
-        "design_contract_versions": {
-            k: v.get("frozen_contract_base_SHA", "TBD")
-            for k, v in provenance_metadata.get("upstream_contract_references", {}).items()
-        },
+        "design_contract_versions": dict(canonical_design_contract_versions),
     }
 
     case_block: dict[str, Any] = {
@@ -1068,14 +1126,33 @@ def materialize_validation_report_from_fixtures(
         validate_fixture_provenance_round_trip(fx, provenance_metadata)
 
     per_case_blocks = [
-        materialize_case_block_from_fixture(p, repo_root=repo_root) for p in fixture_paths
+        materialize_case_block_from_fixture(
+            p,
+            repo_root=repo_root,
+            canonical_design_contract_versions=upstream_contract_versions,
+        )
+        for p in fixture_paths
     ]
     validate_per_case_blocks_strict(per_case_blocks)
 
     if upstream_contract_versions is None:
+        # Compute the canonical mapping BEFORE either top-level or
+        # case-level code path needs it (P0-2 fix: case-level and
+        # report-level MUST come from the same dict object).
         upstream_contract_versions = compute_frozen_upstream_contract_versions(
             repo_root, task_019_impl_version=task_019_impl_version
         )
+        # Re-materialize case blocks so they embed THIS exact dict
+        # object identity (not a value-equal copy).
+        per_case_blocks = [
+            materialize_case_block_from_fixture(
+                p,
+                repo_root=repo_root,
+                canonical_design_contract_versions=upstream_contract_versions,
+            )
+            for p in fixture_paths
+        ]
+        validate_per_case_blocks_strict(per_case_blocks)
     if run_environment is None:
         run_environment = materialize_run_environment()
 

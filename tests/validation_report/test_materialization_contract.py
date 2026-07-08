@@ -668,3 +668,250 @@ def test_slice1_surface_still_works() -> None:
     assert _IMPLEMENTATION_VERSION_SLICE_2.endswith("-slice2"), (
         "Slice 2 implementation version seed should be Slice 2-tagged"
     )
+
+
+# --- PR #98 P0 closure tests ---
+#
+# These tests pin the two P0 review findings for PR #98:
+#
+# P0-1: actual_output_sha256 must NOT equal expected_output_sha256. The
+#        actual_output artifact must be a distinct structured
+#        NOT_COMPUTABLE record explaining the upstream chain was not run.
+# P0-2: case-level provenance.design_contract_versions must equal the
+#        report-level upstream_contract_versions map. All 11 keys must
+#        be present and every value must be a 64-char lowercase hex SHA.
+
+
+class TestPR98P0Closure:
+    """Pin PR #98 review verdict:
+
+    ``TASK019_SLICE2_PR98_REVIEW_CHANGES_REQUIRED_P0_ACTUAL_OUTPUT_HASH_AND_PROVENANCE_CONTRACT``
+
+    P0-1: actual_output must not mirror expected_output.
+    P0-2: case-level provenance must use Slice 2 real frozen-contract SHAs.
+    """
+
+    # --- P0-1 acceptance tests ---
+
+    def test_p0_1_actual_output_sha_differs_from_expected_sha_case_01(self) -> None:
+        block = materialize_case_block_from_fixture(
+            _GOLDEN_FIXTURE_DIR / "case_01_heat_balance_rating.json",
+            repo_root=_REPO_ROOT,
+        )
+        assert block["actual_output_sha256"] != block["expected_output_sha256"], (
+            "P0-1: actual_output_sha256 must differ from expected_output_sha256; "
+            "the actual-output artifact must NOT mirror the expected-output block"
+        )
+
+    def test_p0_1_actual_output_sha_differs_from_expected_sha_case_02(self) -> None:
+        block = materialize_case_block_from_fixture(
+            _GOLDEN_FIXTURE_DIR / "case_02_materials_mass_mechanical.json",
+            repo_root=_REPO_ROOT,
+        )
+        assert block["actual_output_sha256"] != block["expected_output_sha256"]
+
+    def test_p0_1_actual_output_sha_differs_from_expected_sha_case_03(self) -> None:
+        block = materialize_case_block_from_fixture(
+            _GOLDEN_FIXTURE_DIR / "case_03_cost_lifecycle_envelope.json",
+            repo_root=_REPO_ROOT,
+        )
+        assert block["actual_output_sha256"] != block["expected_output_sha256"]
+
+    def test_p0_1_actual_sha_is_deterministic(self) -> None:
+        """Repeated materialization yields identical actual_output_sha256."""
+        p = _GOLDEN_FIXTURE_DIR / "case_01_heat_balance_rating.json"
+        b1 = materialize_case_block_from_fixture(p, repo_root=_REPO_ROOT)
+        b2 = materialize_case_block_from_fixture(p, repo_root=_REPO_ROOT)
+        assert b1["actual_output_sha256"] == b2["actual_output_sha256"]
+
+    def test_p0_1_actual_artifact_is_not_computable(self) -> None:
+        """The actual-output artifact is the structured NOT_COMPUTABLE record."""
+        from hexagent.validation_report.double_pipe_validation_report import (
+            _materialize_not_computable_actual_output,
+        )
+
+        fixture = json.loads(
+            (_GOLDEN_FIXTURE_DIR / "case_01_heat_balance_rating.json").read_text(encoding="utf-8")
+        )
+        artifact = _materialize_not_computable_actual_output(fixture.get("expected_output", {}))
+        assert artifact["status"] == "NOT_COMPUTABLE", (
+            f"actual-output artifact status must be NOT_COMPUTABLE, got {artifact['status']!r}"
+        )
+        assert artifact["reason"] == "upstream_calculation_chain_not_wired_in_task_019_slice2", (
+            f"actual-output artifact reason must explicitly cite "
+            f"upstream_calculation_chain_not_wired_in_task_019_slice2, got {artifact['reason']!r}"
+        )
+        assert artifact["produced_fields"] == [], (
+            f"Slice 2 produced no numeric fields; produced_fields must be "
+            f"empty list, got {artifact['produced_fields']!r}"
+        )
+        assert isinstance(artifact["blocked_fields"], list)
+        # blocked_fields is deterministically sorted (no duplicate, no
+        # unsorted order).
+        assert artifact["blocked_fields"] == sorted(artifact["blocked_fields"])
+        assert len(artifact["blocked_fields"]) > 0, (
+            "blocked_fields must enumerate the expected-output field paths "
+            "that would have been computed had the upstream chain been wired"
+        )
+
+    def test_p0_1_actual_artifact_contains_no_fake_numeric_vectors(self) -> None:
+        """The artifact must not carry any numeric values that look like outputs."""
+        from hexagent.validation_report.double_pipe_validation_report import (
+            _materialize_not_computable_actual_output,
+        )
+
+        fixture = json.loads(
+            (_GOLDEN_FIXTURE_DIR / "case_03_cost_lifecycle_envelope.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        artifact = _materialize_not_computable_actual_output(fixture.get("expected_output", {}))
+        s = canonical_json_dumps(artifact)
+        # None of the numeric-field-name tokens from the case-03 expected
+        # output subtree should appear inside the artifact as field names.
+        forbidden_field_names = [
+            "cost_components",
+            "currency_ISO_4217",
+            "life_cycle_energy_summary",
+            "selected_model_id",
+            "selection_blockers",
+            "blocker_codes",
+        ]
+        for fn in forbidden_field_names:
+            assert f'"{fn}"' not in s, (
+                f"actual-output artifact leaked the expected-output field name "
+                f"{fn!r}; this implies the artifact is mirroring the "
+                f"expected-output subtree"
+            )
+
+        # No floats, no ints except 0/1 indexing.
+        # Strip string values and assert no remaining int / float values
+        # in the artifact.
+        def _check_no_floats_or_ints_except_empty_lists(obj: object) -> None:
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    assert not isinstance(v, float), (
+                        f"actual-output artifact has float value at {k!r}: {v!r}"
+                    )
+                    assert not isinstance(v, int), (
+                        f"actual-output artifact has int value at {k!r}: {v!r}"
+                    )
+                    _check_no_floats_or_ints_except_empty_lists(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    _check_no_floats_or_ints_except_empty_lists(item)
+
+        _check_no_floats_or_ints_except_empty_lists(artifact)
+
+    def test_p0_1_no_case_silently_passes(self) -> None:
+        """No case has overall_status=PASS (no fake numeric vectors invented)."""
+        report = materialize_validation_report_from_fixtures(
+            _GOLDEN_FIXTURE_DIR,
+            repo_root=_REPO_ROOT,
+            generated_at="2026-07-08T00:00:00Z",
+        )
+        for case in report["golden_cases"]:
+            assert case["comparison"]["overall_status"] == "NOT_COMPUTABLE", (
+                f"case {case['case_id']} has unexpected status "
+                f"{case['comparison']['overall_status']!r} — Slice 2 must not "
+                f"silently pass a case whose expected_output subtree still "
+                f"contains TBD-by-Slice-N placeholders"
+            )
+
+    # --- P0-2 acceptance tests ---
+
+    def test_p0_2_case_level_provenance_has_eleven_frozen_keys(self) -> None:
+        """Each case provenance.design_contract_versions MUST have all 11 keys."""
+        report = materialize_validation_report_from_fixtures(
+            _GOLDEN_FIXTURE_DIR,
+            repo_root=_REPO_ROOT,
+            generated_at="2026-07-08T00:00:00Z",
+        )
+        expected_keys = {
+            "TASK-006",
+            "TASK-007",
+            "TASK-008",
+            "TASK-011",
+            "TASK-012",
+            "TASK-013",
+            "TASK-014",
+            "TASK-015A",
+            "TASK-017",
+            "TASK-018",
+            "TASK-019",
+        }
+        for case in report["golden_cases"]:
+            versions = case["provenance"]["design_contract_versions"]
+            assert set(versions.keys()) == expected_keys, (
+                f"case {case['case_id']} design_contract_versions keys "
+                f"{sorted(versions.keys())} != expected {sorted(expected_keys)}"
+            )
+
+    def test_p0_2_every_value_is_64_char_lowercase_hex(self) -> None:
+        report = materialize_validation_report_from_fixtures(
+            _GOLDEN_FIXTURE_DIR,
+            repo_root=_REPO_ROOT,
+            generated_at="2026-07-08T00:00:00Z",
+        )
+        for case in report["golden_cases"]:
+            versions = case["provenance"]["design_contract_versions"]
+            for key, value in versions.items():
+                assert isinstance(value, str), (
+                    f"case {case['case_id']} {key} is not a string: {type(value).__name__}"
+                )
+                assert len(value) == 64, f"case {case['case_id']} {key} length {len(value)} != 64"
+                assert value == value.lower(), (
+                    f"case {case['case_id']} {key} is not lowercase: {value!r}"
+                )
+                int(value, 16)  # raises if not hex
+
+    def test_p0_2_case_level_equals_top_level_upstream_contract_versions(self) -> None:
+        """For every case: case.provenance.design_contract_versions ==
+        report.upstream_contract_versions.
+        """
+        report = materialize_validation_report_from_fixtures(
+            _GOLDEN_FIXTURE_DIR,
+            repo_root=_REPO_ROOT,
+            generated_at="2026-07-08T00:00:00Z",
+        )
+        top_level = report["upstream_contract_versions"]
+        for case in report["golden_cases"]:
+            case_level = case["provenance"]["design_contract_versions"]
+            assert case_level == top_level, (
+                f"case {case['case_id']} design_contract_versions "
+                f"differs from top-level upstream_contract_versions:\n"
+                f"  case-level:    {case_level}\n"
+                f"  top-level:     {top_level}"
+            )
+
+    def test_p0_2_no_value_contains_annotation_text(self) -> None:
+        """No value contains annotation text such as 'TBD', '(', 'PR', 'merge',
+        spaces. Every value MUST be a clean 64-char lowercase hex SHA.
+        """
+        report = materialize_validation_report_from_fixtures(
+            _GOLDEN_FIXTURE_DIR,
+            repo_root=_REPO_ROOT,
+            generated_at="2026-07-08T00:00:00Z",
+        )
+        forbidden_annotations = ("TBD", "(", "PR", "merge", " ")
+        for case in report["golden_cases"]:
+            for key, value in case["provenance"]["design_contract_versions"].items():
+                for ann in forbidden_annotations:
+                    assert ann not in value, (
+                        f"case {case['case_id']} {key} contains forbidden "
+                        f"annotation {ann!r}: value={value!r}"
+                    )
+
+    def test_p0_2_top_level_upstream_contract_versions_is_11_keys(self) -> None:
+        """Sanity: the top-level block also has 11 64-char lowercase hex values."""
+        report = materialize_validation_report_from_fixtures(
+            _GOLDEN_FIXTURE_DIR,
+            repo_root=_REPO_ROOT,
+            generated_at="2026-07-08T00:00:00Z",
+        )
+        versions = report["upstream_contract_versions"]
+        assert len(versions) == 11
+        for _key, value in versions.items():
+            assert len(value) == 64
+            assert value == value.lower()
+            int(value, 16)
