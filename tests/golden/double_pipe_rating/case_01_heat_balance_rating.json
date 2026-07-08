@@ -45,6 +45,15 @@
     "outlet_temperatures_K": {
       "cold_side": 312.8,
       "hot_side": 316.4
+    },
+    "slice3a_blocked_field_paths": {
+      "heat_duty_W_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from rate_double_pipe(HeatBalanceResult.heat_duty_W))",
+      "LMTD_derived_values.LMTD_counterflow_K_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from rate_double_pipe(HeatBalanceResult.LMTD_K))",
+      "heat_transfer_coefficients.annulus_side_W_m2_K_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from rate_double_pipe(HeatBalanceResult.annulus_h))",
+      "heat_transfer_coefficients.tube_side_W_m2_K_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from rate_double_pipe(HeatBalanceResult.tube_h))",
+      "outlet_temperatures_K.cold_side_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from rate_double_pipe(HeatBalanceResult.outlet_T_cold))",
+      "outlet_temperatures_K.hot_side_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from rate_double_pipe(HeatBalanceResult.outlet_T_hot))",
+      "slice3a_blocked_field_paths_note": "Each TBD-by-Slice-3A marker below is the audit-trail record of an authorized TASK-019 expected_output field path that would have been computed by the upstream TASK-006/007/008 chain had the Slice 3A adapter been wired up. The marker field names use the <real_path_leaf>_pending convention so the audit trail maps 1-to-1 to the real authorized field paths above; the marker values carry the Slice 3A production-source symbol that the future Slice 3A adapter will project into the field. The Slice 2 _materialize_not_computable_actual_output walks the expected_output subtree for TBD-by-Slice-N markers and surfaces them as actual_output.blocked_fields per the P0-1 contract. pressure-drop is NOT enumerated here (TASK-020+ excluded; surfaced separately as a pressure-drop per_field record). discount/salvage are NOT enumerated here (TASK-018 §5.3 / §5.3.2 deferred; preserved verbatim in case_03)."
     }
   },
   "license_boundary_attestation": {
@@ -55,6 +64,6 @@
   "pressure_drop_excluded_from_taska_019": "NOT_COMPUTABLE",
   "provenance_profile_id": "TASK-019-GOLDEN-PROVENANCE-V2-AMEND-001",
   "schema_version": "TASK-019-GOLDEN-CASE-V2-AMEND-001",
-  "amendment_1_skeleton_note": "Slice 1 fixture-shape reproducibility was preserved (case_scope / case_title / schema_version / tolerance_profile_id / provenance_profile_id / license_boundary_attestation / pressure_drop_excluded_from_taska_019). All TBD-by-Slice-2 input and expected_output placeholders were replaced with frozen canonical numeric vectors per the TASK-019 design-amendment round 2026-07-08. Pressure drop remains NOT_COMPUTABLE. No TASK-020+ field was introduced.",
+  "amendment_1_skeleton_note": "Slice 1 fixture-shape reproducibility was preserved (case_scope / case_title / schema_version / tolerance_profile_id / provenance_profile_id / license_boundary_attestation / pressure_drop_excluded_from_taska_019). All TBD-by-Slice-2 input and expected_output placeholders were replaced with frozen canonical numeric vectors per the TASK-019 design-amendment round 2026-07-08. Pressure drop remains NOT_COMPUTABLE. No TASK-020+ field was introduced. The expected_output subtree additionally carries a sibling slice3a_blocked_field_paths block: each TBD-by-Slice-3A marker is the P0-1-contract audit-trail record of an authorized TASK-019 expected_output field path that would have been computed had the Slice 3A adapter been wired up; the marker field names use the <real_path_leaf>_pending convention so the audit trail maps 1-to-1 to the frozen numeric fields above without overwriting them.",
   "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001"
 }
