@@ -23,12 +23,12 @@
 | Design base SHA | `76a8b5142c63fb09852146611e794355dea7f5b6` (= main @ PR #86 merge) |
 | Design file | `docs/tasks/TASK-019-golden-cases-double-pipe-validation.md` (this file) |
 | Base authority | main `76a8b5142c63fb09852146611e794355dea7f5b6` (PR #86 merge; TASK-018 closeout governance-sync merged on 2026-07-07) |
-| Design contract status | **DRAFT** (design Issue #87 OPEN; design PR #88 OPEN / DRAFT / NOT READY / NOT MERGED; PR-head CI `28909027389` completed / success; head_sha `91fa03666e34ae89e92d36fdc6952f39ff843601` exact match) |
+| Design contract status | **DRAFT** (design Issue #87 OPEN; design PR #88 OPEN / DRAFT / NOT READY / NOT MERGED; Issue #87 linked to PR #88; latest PR head SHA and latest PR-head CI are intentionally verified externally during review / Ready / merge authorization rounds and are NOT frozen in this mutable design contract draft) |
 | Frozen Contract Authority Commit SHA | TBD (set when design PR is reviewed PASS, frozen, and merged; self-reference guard per §11) |
 | Frozen Contract Authority Base SHA | `76a8b5142c63fb09852146611e794355dea7f5b6` |
 | Implementation status | **NOT AUTHORIZED** |
 | Implementation Issue | NOT YET CREATED |
-| PR (this design) | #88 — DRAFT / NOT READY / NOT MERGED / mergeable=true / mergeable_state=clean / head_sha `91fa03666e34ae89e92d36fdc6952f39ff843601` / base_sha `76a8b5142c63fb09852146611e794355dea7f5b6` (Issue #87 linked; design PR-head CI `28909027389` completed / success; Ready / merge / Issue #87 close: NOT AUTHORIZED — pending separate Charles authorization) |
+| PR (this design) | #88 — DRAFT / NOT READY / NOT MERGED (Issue #87 linked; latest PR head SHA and latest PR-head CI are intentionally verified externally during review / Ready / merge authorization rounds and are NOT frozen in this mutable design contract draft; Ready / merge / Issue #87 close: NOT AUTHORIZED — pending separate Charles authorization) |
 | Issue (this design) | #87 — OPEN (state_reason=None, closed_at=null, comments=0; Ready / merge / Issue #87 close: NOT AUTHORIZED — pending separate Charles authorization) |
 | CI `28906684134` (PR #86 post-merge main) | completed / success (from preflight round record) |
 | TASK-018 §5.3 discount formula amendment | DEFERRED / NOT AUTHORIZED (orthogonal to TASK-019; not required) |
