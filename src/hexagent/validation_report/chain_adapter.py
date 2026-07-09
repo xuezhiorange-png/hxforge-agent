@@ -76,7 +76,7 @@ import json as _json
 import uuid as _uuid
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Final
+from typing import Any, Final, cast
 
 from hexagent.costing.cost_calculator import (
     CostBreakdown,
@@ -117,6 +117,7 @@ from hexagent.exchangers.double_pipe.rating import (  # type: ignore[attr-define
 
 from hexagent.material_mass_mechanical.mass_calculator import (
     MassBreakdown,
+    MassProvenance,
     MassCalculationRequest,
 )
 from hexagent.material_mass_mechanical.material_selector import (  # type: ignore[attr-defined]
@@ -917,6 +918,7 @@ def _build_case_03_selector_audit_only_values(
     selection_blockers: list[Any],
     mass_chain_prerequisites_unavailable: bool,
     fixture_selected_model_id: Any,
+    blocker_reason: str = "",
 ) -> dict[str, Any]:
     """Build the case_03 ``values`` block when mass dependency is
     unavailable (P0-2 fail-closed path). All cost component fields
@@ -927,6 +929,15 @@ def _build_case_03_selector_audit_only_values(
     public compatibility key (``selector_provenance_chain_hash``)
     per Charles's instruction to test both if a pre-existing public
     key requires preservation.
+
+    P0-1 + P0-2: when the chain fails closed, the
+    ``blocker_reason`` (e.g. ``"cost_model_selection_missing_or_malformed"``
+    or ``"mass_breakdown_bridge_missing_or_malformed"``) is
+    surfaced via the new ``life_cycle_energy_envelope.blocker_reasons``
+    metadata field. The blocker ``code`` itself remains the
+    existing ``UNSPECIFIED_BLOCKER`` enum literal in
+    ``life_cycle_energy_envelope.blocker_codes`` (P0-3: no new
+    blocker code strings).
     """
     if mass_chain_prerequisites_unavailable:
         # The mass-prerequisite unavailability is reported via
@@ -937,6 +948,7 @@ def _build_case_03_selector_audit_only_values(
         blocker_list_for_lifecycle = ["UNSPECIFIED_BLOCKER"]
     else:
         blocker_list_for_lifecycle = ["UNSPECIFIED_BLOCKER"]
+    blocker_reasons_for_lifecycle = [blocker_reason] if blocker_reason else []
     first_code = _code_value(selection_blockers[0]) if selection_blockers else ""
     return {
         "case_01_outputs": {
@@ -953,6 +965,7 @@ def _build_case_03_selector_audit_only_values(
         "discounted_total_minor_units": None,
         "life_cycle_energy_envelope": {
             "blocker_codes": blocker_list_for_lifecycle,
+            "blocker_reasons": blocker_reasons_for_lifecycle,
             "life_cycle_energy_summary": {
                 "annual_operating_hours": None,
                 "design_life_years": None,
@@ -980,6 +993,178 @@ def _build_case_03_selector_audit_only_values(
     }
 
 
+def _try_build_case_03_mass_breakdown_from_bridge(
+    *,
+    mass_breakdown_bridge: Mapping[str, Any] | None,
+) -> MassBreakdown | None:
+    """Construct a production ``MassBreakdown`` object from the
+    002-I frozen ``input.mass_breakdown_bridge`` block.
+
+    Per the 002-I design contract §16.4, this is the SOLE
+    source of mass dependency for the case_03 cost
+    calculator. The function reads each field verbatim from
+    ``bridge.values.*`` and constructs the production
+    ``MassProvenance`` and ``MassBreakdown`` objects (no
+    runtime FS read of case_02 fixture, no raw geometry
+    re-derivation, no synthetic MaterialResolutionResult
+    reconstruction, no stub MassBreakdown, no runtime catalog
+    resolver).
+
+    Returns ``None`` when the bridge is missing or malformed
+    (per the bridge's ``failure_policy``). The caller is
+    responsible for fail-closed behavior in that case.
+    """
+    if not isinstance(mass_breakdown_bridge, Mapping):
+        return None
+    values = mass_breakdown_bridge.get("values")
+    if not isinstance(values, Mapping):
+        return None
+    # Required numeric fields.
+    required_numeric_fields = (
+        "inner_tube_kg",
+        "outer_pipe_kg",
+        "hairpin_bend_kg",
+        "fittings_kg",
+        "total_kg",
+    )
+    for field_name in required_numeric_fields:
+        if field_name not in values:
+            return None
+        if not isinstance(values[field_name], (int, float)):
+            return None
+    # Required string fields.
+    calculation_hash = values.get("calculation_hash")
+    if not isinstance(calculation_hash, str) or not calculation_hash:
+        return None
+    # Required provenance sub-object (9 fields per
+    # ``MassProvenance``).
+    provenance_mapping = values.get("provenance")
+    if not isinstance(provenance_mapping, Mapping):
+        return None
+    required_provenance_fields = (
+        "geometry_record_id",
+        "material_record_id",
+        "applicable_standard_id",
+        "design_pressure_mpa",
+        "design_temperature_c",
+        "correlation_ids",
+        "software_version",
+        "git_commit",
+        "result_hash",
+    )
+    for field_name in required_provenance_fields:
+        if field_name not in provenance_mapping:
+            return None
+    if not isinstance(provenance_mapping["design_pressure_mpa"], (int, float)):
+        return None
+    if not isinstance(provenance_mapping["design_temperature_c"], (int, float)):
+        return None
+    if not isinstance(provenance_mapping["correlation_ids"], (list, tuple)):
+        return None
+    # Construct the production MassProvenance verbatim from
+    # the bridge's provenance sub-object.
+    production_provenance = MassProvenance(
+        geometry_record_id=str(provenance_mapping["geometry_record_id"]),
+        material_record_id=str(provenance_mapping["material_record_id"]),
+        applicable_standard_id=str(provenance_mapping["applicable_standard_id"]),
+        design_pressure_mpa=float(provenance_mapping["design_pressure_mpa"]),
+        design_temperature_c=float(provenance_mapping["design_temperature_c"]),
+        correlation_ids=tuple(provenance_mapping["correlation_ids"]),
+        software_version=str(provenance_mapping["software_version"]),
+        git_commit=str(provenance_mapping["git_commit"]),
+        result_hash=str(provenance_mapping["result_hash"]),
+    )
+    # Construct the production MassBreakdown verbatim from
+    # the bridge's values + the constructed provenance.
+    production_mass_breakdown = MassBreakdown(
+        inner_tube_kg=float(values["inner_tube_kg"]),
+        outer_pipe_kg=float(values["outer_pipe_kg"]),
+        hairpin_bend_kg=float(values["hairpin_bend_kg"]),
+        fittings_kg=float(values["fittings_kg"]),
+        total_kg=float(values["total_kg"]),
+        calculation_hash=str(calculation_hash),
+        provenance=production_provenance,
+    )
+    return production_mass_breakdown
+
+
+def _try_extract_case_meta_from_cost_model_selection(
+    cost_model_selection: Mapping[str, Any],
+) -> tuple[str, str, str] | None:
+    """Extract the 3 case-meta parameters from the 002-H frozen
+    ``input.cost_model_selection`` for use as
+    ``calculate_cost_breakdown`` kwargs.
+
+    Returns ``(case_currency, case_region, effective_date)`` as
+    ``str`` if all 3 keys are present and well-typed. Returns
+    ``None`` if any required key is missing, is the wrong
+    type, or is an empty string.
+
+    P0-1 fix: no fallback defaults. Per Charles's authorization,
+    missing or malformed ``input.cost_model_selection`` must
+    fail closed (the caller surfaces
+    ``details.reason="cost_model_selection_missing_or_malformed"``
+    via the existing UNSPECIFIED_BLOCKER enum literal).
+    """
+    if not isinstance(cost_model_selection, Mapping):
+        return None
+    currency_raw = cost_model_selection.get("currency_ISO_4217")
+    region_raw = cost_model_selection.get("region_id")
+    date_raw = cost_model_selection.get("date_ISO_8601")
+    if not isinstance(currency_raw, str) or not currency_raw:
+        return None
+    if not isinstance(region_raw, str) or not region_raw:
+        return None
+    if not isinstance(date_raw, str) or not date_raw:
+        return None
+    return currency_raw, region_raw, date_raw
+
+
+def _case_03_fail_closed_with_selector_audit(
+    *,
+    case_01_ref: str,
+    selector_run_id: str,
+    selector_provenance_hash: str,
+    c0_record_count: int,
+    c1_record_count: int,
+    selector_blockers: list[dict[str, Any]],
+    fixture_selected_model_id: Any,
+    reason: str,
+) -> tuple[dict[str, Any], list[str], str, list[str], list[str]]:
+    """Build a case_03 fail-closed tuple with the 5 P0-4
+    selector audit fields in produced_fields and a
+    UNSPECIFIED_BLOCKER blocker carrying the human-readable
+    reason in details.reason (P0-3: no new blocker code).
+    """
+    values = _build_case_03_selector_audit_only_values(
+        case_01_ref=case_01_ref,
+        selector_run_id=selector_run_id,
+        selector_provenance_hash=selector_provenance_hash,
+        c0_record_count=c0_record_count,
+        c1_record_count=c1_record_count,
+        selection_blockers=(
+            selector_blockers
+            if selector_blockers
+            else [
+                {
+                    "code": "UNSPECIFIED_BLOCKER",
+                    "details": {"reason": reason},
+                }
+            ]
+        ),
+        mass_chain_prerequisites_unavailable=True,
+        fixture_selected_model_id=fixture_selected_model_id,
+        blocker_reason=reason,
+    )
+    return (
+        values,
+        list(_CASE_03_SELECTOR_AUDIT_PRODUCED_FIELDS),
+        "WIRED_VIA_CHAIN_PARTIAL",
+        [selector_run_id] if selector_run_id else [],
+        [selector_provenance_hash] if selector_provenance_hash else [],
+    )
+
+
 def _execute_case_03_cost_chain(
     *,
     fixture: Mapping[str, Any],
@@ -989,16 +1174,30 @@ def _execute_case_03_cost_chain(
     bridge_bindings: Mapping[str, Any],
 ) -> tuple[dict[str, Any], list[str], str, list[str], list[str]]:
     """Execute the case_03 cost chain and project the public report
-    shape per the P0-1/2/3/4 fixup.
+    shape per the 002-I design-amendment contract.
 
     The selector audit (CostModelSelector.select_cost_records on the
-    002-H frozen bridge) is always run when the bridge is present
-    in the fixture; it has no mass dependency. The cost breakdown
-    (CostCalculator.calculate_cost_breakdown) is ONLY run when the
-    case_03 fixture carries the prerequisites for a real
-    MassBreakdown from the already-wired case_02 chain. The 002-H
-    frozen case_03 fixture does NOT carry those prerequisites, so
-    the cost breakdown is skipped (P0-2 fail-closed path).
+    002-H frozen bridge) is always run when the cost-records bridge
+    is present in the fixture; it has no mass dependency.
+
+    The cost breakdown (CostCalculator.calculate_cost_breakdown) is
+    run ONLY when the case_03 fixture carries a well-formed
+    ``input.mass_breakdown_bridge`` (the 002-I frozen bridge
+    contract). The 002-I bridge is a case-bound frozen benchmark
+    input; the future implementation MUST construct the production
+    ``MassBreakdown`` object from ``bridge.values.*`` only
+    (no runtime FS read of case_02 fixture, no raw geometry
+    re-derivation, no synthetic MaterialResolutionResult
+    reconstruction, no stub MassBreakdown, no runtime catalog
+    resolver; per §16.4 of the 002-I design contract).
+
+    If the bridge is missing or malformed, the chain fails closed
+    per the bridge's ``failure_policy``: status =
+    ``WIRED_VIA_CHAIN_PARTIAL``, all ``cost_components.*`` fields
+    = ``None``, ``produced_fields`` contains ONLY the 5 P0-4
+    selector audit fields, blocker ``code =
+    "UNSPECIFIED_BLOCKER"`` (P0-3: no new blocker code),
+    ``details.reason = "mass_breakdown_bridge_missing_or_malformed"``.
     """
     from hexagent.costing.cost_model_selector import (
         SELECTOR_LICENSE_CLASSES,
@@ -1067,6 +1266,8 @@ def _execute_case_03_cost_chain(
     )
 
     if selector_blockers or selector_result is None:
+        # Selector-side failure. Surface only the 5 P0-4 selector
+        # audit fields; no cost outputs synthesized.
         values = _build_case_03_selector_audit_only_values(
             case_01_ref=case_01_ref,
             selector_run_id=selector_run_id,
@@ -1079,37 +1280,259 @@ def _execute_case_03_cost_chain(
         )
         return (
             values,
-            # P0-4: produced_fields contains ONLY the 5 selector
-            # audit fields (P0-2: no cost outputs synthesized).
             list(_CASE_03_SELECTOR_AUDIT_PRODUCED_FIELDS),
             "WIRED_VIA_CHAIN_PARTIAL",
             [selector_run_id] if selector_run_id else [],
             [selector_provenance_hash] if selector_provenance_hash else [],
         )
 
-    # P0-1: real production MassBreakdown via the already-wired
-    # case_02 path requires the case_03 fixture to carry the
-    # material_catalog_bridge + case_01_geometry prerequisites.
-    # The 002-H frozen case_03 fixture does NOT carry these
-    # prerequisites, so the cost breakdown is skipped. We surface
-    # only the selector audit fields.
-    mass_chain_prerequisites_unavailable = True
-    values = _build_case_03_selector_audit_only_values(
-        case_01_ref=case_01_ref,
-        selector_run_id=selector_run_id,
-        selector_provenance_hash=selector_provenance_hash,
-        c0_record_count=selector_c0_count,
-        c1_record_count=selector_c1_count,
-        selection_blockers=list(selector_blockers),
-        mass_chain_prerequisites_unavailable=mass_chain_prerequisites_unavailable,
-        fixture_selected_model_id=fixture_selected_model_id,
+    # 002-I: read the case-bound frozen ``input.mass_breakdown_bridge``
+    # and try to construct the production ``MassBreakdown`` from
+    # ``bridge.values.*`` only. Per §16.4 of the 002-I design
+    # contract, this is the SOLE source of mass dependency for
+    # case_03 cost calculator. The future implementation MUST NOT
+    # read the case_02 fixture at runtime, MUST NOT call
+    # calculate_mass_breakdown, MUST NOT call resolve_material,
+    # MUST NOT construct synthetic MaterialResolutionResult,
+    # MUST NOT use a stub / duck-type MassBreakdown, MUST NOT
+    # introduce a runtime catalog resolver.
+    mass_breakdown_bridge = fixture.get("input", {}).get("mass_breakdown_bridge")
+    mass_breakdown_construction = _try_build_case_03_mass_breakdown_from_bridge(
+        mass_breakdown_bridge=mass_breakdown_bridge
+        if isinstance(mass_breakdown_bridge, Mapping)
+        else None,
     )
+    if mass_breakdown_construction is None:
+        # Bridge is missing or malformed. Fail closed per the
+        # 002-I bridge.failure_policy.
+        return _case_03_fail_closed_with_selector_audit(
+            case_01_ref=case_01_ref,
+            selector_run_id=selector_run_id,
+            selector_provenance_hash=selector_provenance_hash,
+            c0_record_count=selector_c0_count,
+            c1_record_count=selector_c1_count,
+            selector_blockers=[],
+            fixture_selected_model_id=fixture_selected_model_id,
+            reason="mass_breakdown_bridge_missing_or_malformed",
+        )
+
+    # P0-1 fix: read the 3 case-meta parameters from the
+    # frozen ``input.cost_model_selection`` block. NO fallback
+    # defaults. If any of the 3 required keys is missing or
+    # malformed, fail closed per the authorization
+    # (details.reason="cost_model_selection_missing_or_malformed",
+    # existing UNSPECIFIED_BLOCKER enum literal, no new blocker
+    # code).
+    case_meta = _try_extract_case_meta_from_cost_model_selection(cost_model_selection)
+    if case_meta is None:
+        return _case_03_fail_closed_with_selector_audit(
+            case_01_ref=case_01_ref,
+            selector_run_id=selector_run_id,
+            selector_provenance_hash=selector_provenance_hash,
+            c0_record_count=selector_c0_count,
+            c1_record_count=selector_c1_count,
+            selector_blockers=[],
+            fixture_selected_model_id=fixture_selected_model_id,
+            reason="cost_model_selection_missing_or_malformed",
+        )
+    case_currency_str, case_region_str, effective_date_str = case_meta
+
+    # Bridge is well-formed. The constructed production
+    # ``MassBreakdown`` is the SOLE mass dependency for the cost
+    # calculator. Pass it verbatim to calculate_cost_breakdown
+    # along with the case-meta parameters extracted from
+    # ``input.cost_model_selection`` (P0-1: no hardcoded
+    # "USD" / "US-Midwest-Industrial-2024" / "2024-01-01"
+    # literals at the call site).
+    production_mass_breakdown = mass_breakdown_construction
+    cost_breakdown: CostBreakdown | None = None
+    try:
+        cost_breakdown = calculate_cost_breakdown(
+            cost_model_selection_result=selector_result,
+            mass_breakdown=production_mass_breakdown,
+            case_currency=case_currency_str,
+            case_region=case_region_str,
+            effective_date=effective_date_str,
+        )
+    except Exception:
+        # Cost calculator invocation raised. Fail closed per the
+        # 002-I fail-closed rule.
+        cost_breakdown = None
+
+    if cost_breakdown is None:
+        # Cost calculator invocation raised. Fail closed per the
+        # 002-I fail-closed rule (no cost outputs synthesized; the
+        # cost calculator is the only step that may have legitimately
+        # raised, so the reason is recorded in details.reason).
+        return _case_03_fail_closed_with_selector_audit(
+            case_01_ref=case_01_ref,
+            selector_run_id=selector_run_id,
+            selector_provenance_hash=selector_provenance_hash,
+            c0_record_count=selector_c0_count,
+            c1_record_count=selector_c1_count,
+            selector_blockers=[],
+            fixture_selected_model_id=fixture_selected_model_id,
+            reason="cost_calculator_invocation_exception",
+        )
+
+    # 002-I §16.4: by-record-id mapping (NOT post-filter on
+    # c0_subtotal.amount_minor_units). Map the production
+    # CostBreakdown output to the public report shape:
+    # - C0_material_minor_units = next(
+    #       e['amount_minor_units']
+    #       for e in CostBreakdown.cost_breakdown['c0_subtotal'].component_breakdown
+    #       if e['cost_record_id'] == cost_records_bridge_bindings.c0_material_record_id
+    #   )
+    # - C0_labor_minor_units = same with c0_labor_record_id
+    # - C1_total_minor_units = CostBreakdown.capex_envelope_minor_units
+    #   (the public report's C1_total = production capex_envelope)
+    # - currency_ISO_4217 = CostBreakdown.capex_envelope_currency
+    cost_breakdown_dict = cast(dict[str, Any], cost_breakdown.cost_breakdown)
+    c0_subtotal_block = cast(dict[str, Any], cost_breakdown_dict["c0_subtotal"])
+    c0_component_breakdown = list(
+        cast(list[dict[str, Any]], c0_subtotal_block["component_breakdown"])
+    )
+    c0_material_record_id = str(bridge_bindings.get("c0_material_record_id", ""))
+    c0_labor_record_id = str(bridge_bindings.get("c0_labor_record_id", ""))
+
+    c0_material_entries = [
+        e
+        for e in c0_component_breakdown
+        if str(e.get("cost_record_id", "")) == c0_material_record_id
+    ]
+    c0_labor_entries = [
+        e for e in c0_component_breakdown if str(e.get("cost_record_id", "")) == c0_labor_record_id
+    ]
+
+    duplicate_c0_material = len(c0_material_entries) > 1
+    duplicate_c0_labor = len(c0_labor_entries) > 1
+    missing_c0_material = bool(c0_material_record_id) and not c0_material_entries
+    missing_c0_labor = bool(c0_labor_record_id) and not c0_labor_entries
+
+    if duplicate_c0_material or duplicate_c0_labor or missing_c0_material or missing_c0_labor:
+        # Duplicate / missing bound record id. Per P0-3: use the
+        # existing UNSPECIFIED_BLOCKER enum literal; carry the
+        # human-readable reason in details.reason (NOT a new
+        # blocker code).
+        if duplicate_c0_material:
+            reason = "duplicate_c0_material_record_id"
+        elif duplicate_c0_labor:
+            reason = "duplicate_c0_labor_record_id"
+        elif missing_c0_material:
+            reason = "missing_c0_material_record_id"
+        else:
+            reason = "missing_c0_labor_record_id"
+        return _case_03_fail_closed_with_selector_audit(
+            case_01_ref=case_01_ref,
+            selector_run_id=selector_run_id,
+            selector_provenance_hash=selector_provenance_hash,
+            c0_record_count=selector_c0_count,
+            c1_record_count=selector_c1_count,
+            selector_blockers=[
+                {
+                    "code": "UNSPECIFIED_BLOCKER",
+                    "details": {"reason": reason},
+                }
+            ],
+            fixture_selected_model_id=fixture_selected_model_id,
+            reason=reason,
+        )
+
+    c0_material_minor_units = (
+        int(c0_material_entries[0]["amount_minor_units"]) if c0_material_entries else 0
+    )
+    c0_labor_minor_units = int(c0_labor_entries[0]["amount_minor_units"]) if c0_labor_entries else 0
+    c1_total_minor_units = int(cost_breakdown.capex_envelope_minor_units)
+    currency_ISO_4217 = str(cost_breakdown.capex_envelope_currency)
+
+    values = {
+        "case_01_outputs": {
+            "case_01_outputs_reference_case_id": case_01_ref,
+        },
+        "cost_components_C0_C1": {
+            "cost_components": {
+                "C0_material_minor_units": c0_material_minor_units,
+                "C0_labor_minor_units": c0_labor_minor_units,
+                "C1_total_minor_units": c1_total_minor_units,
+            },
+            "currency_ISO_4217": currency_ISO_4217,
+            "calculator_run_id": str(cost_breakdown.calculator_run_id),
+            "escalation_pointer_used": (
+                str(cost_breakdown.escalation_pointer_used)
+                if cost_breakdown.escalation_pointer_used
+                else None
+            ),
+            "license_class_summary": dict(cost_breakdown.license_class_summary),
+        },
+        "discounted_total_minor_units": None,
+        "life_cycle_energy_envelope": {
+            "blocker_codes": [],
+            "life_cycle_energy_summary": {
+                "annual_operating_hours": None,
+                "design_life_years": None,
+                "annual_energy_MJ": None,
+                "total_lifecycle_energy_MJ": None,
+            },
+        },
+        "salvage_minor_units": 0,
+        "selected_cost_model": {
+            # P0-4: selected_model_id is fixture-context echo only;
+            # it MUST NOT appear in produced_fields.
+            "selected_model_id": fixture_selected_model_id,
+            "selection_blockers": [],
+            # 002-H canonical key (P0-4):
+            "provenance_chain_hash": selector_provenance_hash,
+            # Pre-existing public compatibility key (preserved
+            # per Charles's "if compatibility key remains, test
+            # both" instruction):
+            "selector_provenance_chain_hash": selector_provenance_hash,
+            "selector_run_id": selector_run_id,
+            "c0_record_count": selector_c0_count,
+            "c1_record_count": selector_c1_count,
+        },
+        "mass_breakdown_for_case_03": {
+            "bridge_id": str(
+                (mass_breakdown_bridge or {}).get("bridge_id", "")
+                if isinstance(mass_breakdown_bridge, Mapping)
+                else ""
+            ),
+            "mass_breakdown_class": (
+                "hexagent.material_mass_mechanical.mass_calculator.MassBreakdown"
+            ),
+            "total_kg": float(production_mass_breakdown.total_kg),
+            "calculation_hash": str(production_mass_breakdown.calculation_hash),
+        },
+        "selector_provenance_digest": selector_provenance_hash,
+    }
+    produced_fields_collected: list[str] = []
+    # Selector audit fields (always present when the selector
+    # ran cleanly).
+    produced_fields_collected.extend(list(_CASE_03_SELECTOR_AUDIT_PRODUCED_FIELDS))
+    # Cost component fields (when by-record-id mapping succeeded).
+    produced_fields_collected.append(
+        "cost_components_C0_C1.cost_components.C0_material_minor_units"
+    )
+    produced_fields_collected.append("cost_components_C0_C1.cost_components.C0_labor_minor_units")
+    produced_fields_collected.append("cost_components_C0_C1.cost_components.C1_total_minor_units")
+    produced_fields_collected.append("cost_components_C0_C1.currency_ISO_4217")
+    produced_fields_collected.append("cost_components_C0_C1.calculator_run_id")
+    if cost_breakdown.escalation_pointer_used:
+        produced_fields_collected.append("cost_components_C0_C1.escalation_pointer_used")
+    produced_fields_collected.append("cost_components_C0_C1.license_class_summary")
+    # P0-4: selected_model_id is fixture-context echo only; it
+    # MUST NOT appear in produced_fields.
     return (
         values,
-        list(_CASE_03_SELECTOR_AUDIT_PRODUCED_FIELDS),
-        "WIRED_VIA_CHAIN_PARTIAL",
-        [selector_run_id] if selector_run_id else [],
-        [selector_provenance_hash] if selector_provenance_hash else [],
+        produced_fields_collected,
+        "WIRED_VIA_CHAIN",
+        [
+            str(cost_breakdown.calculator_run_id),
+            selector_run_id,
+        ],
+        [
+            str(cost_breakdown.provenance_chain_hash),
+            selector_provenance_hash,
+        ],
     )
 
 
@@ -1654,6 +2077,7 @@ def compute_actual_output_via_chain(
                     .get("selected_cost_model", {})
                     .get("selected_model_id")
                 ),
+                blocker_reason="cost_records_bridge_missing",
             )
             produced = list(_CASE_03_SELECTOR_AUDIT_PRODUCED_FIELDS)
             status = "WIRED_VIA_CHAIN_PARTIAL"
