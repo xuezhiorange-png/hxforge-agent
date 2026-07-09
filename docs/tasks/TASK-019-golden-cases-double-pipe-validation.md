@@ -490,6 +490,217 @@ Amendment 002-E **does NOT authorize** any of the following, in either this amen
 
 As of Amendment 002-E authoring, the Slice 3A PR #102 is MERGED, the Amendment 002-D PR #104 is MERGED, and post-merge main CI is GREEN. The case_01 fixture now carries the non-transitional operating point (0.75/0.75 kg/s) and production-chain-derived expected_output values. The Slice 3B-A implementation (case_01 adapter wiring using Amendment 002-D fluid_identifier fields at the new non-transitional operating point) requires a separate Charles authorization in a future round. **Implementation of Slice 3B-A is NOT authorized by this amendment.**
 
+## 4.8 Amendment 002-F — case_02 Material Catalog Bridge Contract (binding)
+
+### 4.8.1 Purpose
+
+Resolve the TASK-019 Slice 3B-B blocker (`TASK019_SLICE3B_B_BLOCKED_CASE02_CHAIN_REQUIRES_MATERIAL_RECORD_OR_CATALOG_BRIDGE_NO_FABRICATION_PERFORMED`). The blocker is structural: the case_02 frozen fixture carries only three logical material identifiers (`material_selection.shell_material_id`, `tube_material_id`, `design_code_id`) as descriptive strings, while the TASK-017 production chain (`resolve_material` → `calculate_mass_breakdown` → `preliminary_check`) requires a full `MaterialRecord` TypedDict (~22 fields) plus a `MaterialResolutionRequest` (6 fields), plus a `GeometryRecord` for the mass calculator, plus a `MaterialResolutionResult` for the preliminary mechanical checker. None of these can be derived from the three logical IDs without fabrication.
+
+Amendment 002-F freezes a **case-bound Material Catalog Bridge Contract** that future TASK-019 implementation rounds (separately authorized) can consume to wire case_02 to the production chain without synthesis. The bridge replaces the existing bare logical-ID inputs with a richer, catalog-traceable material input contract. The bridge is **case-bound frozen data** (not a runtime catalog lookup, not an adapter-generated value, not a resolver implementation).
+
+Amendment 002-F does **NOT**:
+- Implement any resolver, loader, catalog database, or material calculation logic.
+- Modify `expected_output` numeric values, `actual_output`, comparison status, or tolerances.
+- Modify case_01 or case_03 fixtures, expected_output, tolerances, or any other field.
+- Authorize Slice 3B-B (or any future) implementation round.
+- Authorize Ready / Merge / Issue close / Feishu.
+
+Amendment 002-F does:
+- Freeze the new `input.material_catalog_bridge` sub-block on `case_02_materials_mass_mechanical.json`.
+- Document the bridge schema and provenance in this design contract (this §4.8).
+- Add 002-F provenance entries to `_provenance_metadata.json`.
+- Optionally add a top-level `amendment_002f_tolerance_status` line to `_tolerance_metadata.json` declaring that no case_02 tolerance values are changed (only the basis text is updated where strictly necessary).
+
+### 4.8.2 Bridge schema (case_02 only)
+
+The bridge is a new sub-block of `case_02_materials_mass_mechanical.json["input"]`. It is the only case-bound frozen material input the future adapter is authorized to consume for case_02. The existing `input.material_selection` block (with the three descriptive logical IDs) is **preserved verbatim** as audit/description metadata; the new `input.material_catalog_bridge` block is the only authorized source for future MaterialRecord construction.
+
+```json
+"material_catalog_bridge": {
+  "shell": {
+    "component_role": "shell",
+    "identity": {
+      "material_record_id": "MAT-SS304-SHELL-001",
+      "material_family": "stainless_steel_austenitic",
+      "material_standard": "ASME SA-240",
+      "grade": "304",
+      "form_factor": "pipe",
+      "product_form": "welded_pipe",
+      "standard_or_spec_reference": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)"
+    },
+    "physical_properties": {
+      "density_kg_m3": 8000.0,
+      "thermal_conductivity_w_m_k": 16.2,
+      "specific_heat_j_kg_k": 500.0
+    },
+    "mechanical_properties": {
+      "allowable_stress_mpa_at_design_temperature": 137.0,
+      "yield_strength_mpa": 215.0,
+      "elastic_modulus_gpa": 193.0
+    },
+    "provenance": {
+      "source_category": "TASK_017_APPROVED_MATERIAL_CATALOG",
+      "source_reference": "TASK-017 approved material catalog, SS304 entry, design_envelope_revision (TASK-017 catalog revision 2026-07-08)",
+      "revision": "2026-07-08",
+      "effective_date": "2026-07-08",
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F"
+    }
+  },
+  "tube": {
+    "component_role": "tube",
+    "identity": {
+      "material_record_id": "MAT-SS304-TUBE-001",
+      "material_family": "stainless_steel_austenitic",
+      "material_standard": "ASME SA-249",
+      "grade": "304",
+      "form_factor": "tube",
+      "product_form": "seamless_tube",
+      "standard_or_spec_reference": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)"
+    },
+    "physical_properties": {
+      "density_kg_m3": 8000.0,
+      "thermal_conductivity_w_m_k": 16.2,
+      "specific_heat_j_kg_k": 500.0
+    },
+    "mechanical_properties": {
+      "allowable_stress_mpa_at_design_temperature": 137.0,
+      "yield_strength_mpa": 215.0,
+      "elastic_modulus_gpa": 193.0
+    },
+    "provenance": {
+      "source_category": "TASK_017_APPROVED_MATERIAL_CATALOG",
+      "source_reference": "TASK-017 approved material catalog, SS304 entry, design_envelope_revision (TASK-017 catalog revision 2026-07-08)",
+      "revision": "2026-07-08",
+      "effective_date": "2026-07-08",
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F"
+    }
+  }
+}
+```
+
+### 4.8.3 Required-field coverage (resolve_material + downstream chain)
+
+The bridge is designed to cover the inputs the future case_02 production chain (per Slice 3B-B discovery) requires without further fabrication:
+
+| Future chain call | Required input | Bridge source |
+|---|---|---|
+| `resolve_material(request, material_record, *, ...)` | `MaterialResolutionRequest.component_role` | `bridge.{shell,tube}.component_role` |
+| `resolve_material(request, material_record, *, ...)` | `MaterialResolutionRequest.material_record_id` | `bridge.{shell,tube}.identity.material_record_id` |
+| `resolve_material(request, material_record, *, ...)` | `MaterialResolutionRequest.design_temperature_c` | derived from `case_02.input.design_conditions.design_temperature_K` (K → °C) — case-bound, not fabricated |
+| `resolve_material(request, material_record, *, ...)` | `MaterialResolutionRequest.design_pressure_mpa` | derived from `case_02.input.design_conditions.design_pressure_Pa` (Pa → MPa) — case-bound, not fabricated |
+| `resolve_material(request, material_record, *, ...)` | `MaterialResolutionRequest.applicable_standard_id` | `bridge.{shell,tube}.identity.standard_or_spec_reference` |
+| `resolve_material(request, material_record, *, ...)` | `MaterialResolutionRequest.corrosion_allowance_mm` | **Not in bridge** — must remain `None` per the existing Slice 3A P1-2 fail-closed contract (no fabrication) |
+| `resolve_material(request, material_record, *, ...)` | `MaterialRecord` (TypedDict, ~22 fields) | `bridge.{shell,tube}.{identity, physical_properties, mechanical_properties, provenance}` cover all 22 fields; remaining metadata fields (e.g. `material_record_version`, `retirement_date`, `license_evidence`, `quality_flags`, etc.) are populated from the bridge's `provenance` block and catalog-default `None` (no fabrication of absent fields) |
+| `calculate_mass_breakdown(request, ...)` | `MassCalculationRequest.geometry_record` | **Not in bridge** — must be supplied from the cross-case `TASK-019-GOLDEN-01` geometry bridge (already in `case_01_heat_balance_rating.json["input"]["geometry"]`) via `case_02_input["case_01_input_reference_case_id"]` cross-reference |
+| `calculate_mass_breakdown(request, ...)` | `MassCalculationRequest.material_resolutions_by_component_role` | derived from `resolve_material` outputs constructed from the bridge (case-bound, not fabricated) |
+| `preliminary_check(request)` | `PreliminaryCheckRequest.material_resolution` | derived from `resolve_material` output (case-bound) |
+| `preliminary_check(request)` | `PreliminaryCheckRequest.design_pressure_mpa` / `design_temperature_c` | derived from `case_02.input.design_conditions` (case-bound) |
+| `preliminary_check(request)` | `PreliminaryCheckRequest.{outer,inner}_diameter_m` | derived from `case_01.geometry` cross-reference (case-bound) |
+
+**Two required inputs are explicitly OUT OF BRIDGE scope** (and remain unfabricated per the no-fabrication governance rule):
+
+1. **`corrosion_allowance_mm`** — the existing Slice 3A P1-2 contract requires this to be `None` (no fabricated default). The bridge does not include a `corrosion_allowance_mm` field; the future implementation must pass `None` to `MaterialResolutionRequest`. The future mechanical check at the design envelope must tolerate the absence (this is part of the no-fabrication contract).
+2. **`geometry_record`** — supplied from the existing case_01 geometry cross-reference, not from the bridge. The bridge is a material bridge, not a geometry bridge.
+
+**The bridge is sufficient to construct a real `MaterialRecord` and a real `MaterialResolutionRequest` for both `shell` and `tube` sides, modulo the two `None` items above.** A future implementation round can use the bridge to wire `resolve_material` for both sides, then derive `MassCalculationRequest` and `PreliminaryCheckRequest` from the existing case_01 geometry cross-reference and the bridge-driven `MaterialResolutionResult`.
+
+### 4.8.4 Bridge values source and auditability
+
+The 6 numeric values in the bridge (`density_kg_m3`, `thermal_conductivity_w_m_k`, `specific_heat_j_kg_k`, `allowable_stress_mpa_at_design_temperature`, `yield_strength_mpa`, `elastic_modulus_gpa`) are the **frozen TASK-017 catalog values for SS304 at the design envelope (343.15 K / 70 °C)**. Each value is traceable to the bridge's `provenance.source_reference` field (TASK-017 approved material catalog, SS304 entry, design_envelope_revision 2026-07-08). The values are **case-bound frozen data**, not runtime-synthesized values, not adapter-generated values, and not resolver-implementation values.
+
+The `thermal_conductivity_w_m_k = 16.2` value is consistent with the Amendment 002-A `wall_thermal_conductivity_w_m_k = 16.2` value frozen on `case_01_heat_balance_rating.json["input"]["geometry"]` (the same SS304 material at the same envelope). The `density_kg_m3 = 8000.0` value is consistent with the existing case_02 `expected_output.mass_kg` derivation (per the existing `amendment_basis` text: "mass values are derived from the geometric inputs of Case 01 + the documented densities of SS304 (per TASK-017 approved material catalog)"). The `allowable_stress_mpa_at_design_temperature = 137.0` value is consistent with the existing case_02 `expected_output.preliminary_mechanical_check.status = "PASS"` derivation (per the existing `amendment_basis` text: "Preliminary mechanical check status is derived from the documented SS304 allowable stress at the design envelope (TASK-017 §9.1)"). The 002-F bridge values are therefore the **explicit audit-traceable basis for the existing case_02 expected_output values** — they do not change the expected_output, they document the basis that was used to derive it.
+
+A future implementation round is expected to **re-derive** the existing case_02 expected_output values (mass_kg.fluid_mass_kg=1.05, mass_kg.shell_mass_kg=1.18, mass_kg.tube_mass_kg=0.43, mass_kg.total_mass_kg=3.50, preliminary_mechanical_check.status="PASS") from the bridge + the case_01 geometry cross-reference. If the future production-chain output matches the existing expected_output within the existing numeric tolerance (Amendment 001 frozen: mass_kg.fluid_mass_kg abs=0.05 rel=0.01; mass_kg.shell_mass_kg abs=0.05 rel=0.01; mass_kg.tube_mass_kg abs=0.05 rel=0.01; mass_kg.total_mass_kg abs=0.1 rel=0.01; preliminary_mechanical_check.status categorical), the bridge values are confirmed to be the correct audit basis. If the future production-chain output does **NOT** match within the existing tolerance, the bridge values or the expected_output values are inconsistent and the future round must report the mismatch (NOT silently update the expected_output — the expected_output is a separate design artifact that can only be changed by a new design amendment).
+
+### 4.8.5 Frozen benchmark input, not runtime fallback
+
+The bridge is **frozen benchmark input**: the values are fixed at design-freeze time and bound to the fixture, not looked up at runtime. The future adapter is **required** to read the bridge values verbatim — it must NOT perform any catalog lookup, must NOT apply any normalization, and must NOT substitute any default. The bridge's `provenance.amendment_id = "TASK-019-DESIGN-AMENDMENT-002-F"` field identifies the amendment that froze the values; any later catalog revision that would change the values requires a new design amendment (002-G or later), not a runtime swap.
+
+The bridge is **not** an adapter-side fallback: the future implementation must error / fail-closed if the bridge is missing or malformed, not synthesize a default. The `case_02.input.material_selection` block is preserved as descriptive audit metadata; the future implementation must NOT derive a MaterialRecord from the descriptive strings in `material_selection` (that is the synthesis path explicitly forbidden by Amendment 002-A §4.5.1 and Slice 3A P1-2).
+
+### 4.8.6 Provenance additions (binding)
+
+`_provenance_metadata.json` MUST add (in the same structural style as the existing `amendment_002a_*`, `amendment_002d_*`, `amendment_002e_*` top-level fields):
+
+- `amendment_002f_id`: `"TASK-019-DESIGN-AMENDMENT-002-F"`
+- `amendment_002f_effective_scope`: `"TASK-019-GOLDEN-02"`
+- `amendment_002f_bridge_schema_version`: `"1.0"` (initial bridge contract version)
+- `amendment_002f_supersedes`: `"Amendment 001 bare logical material IDs (input.material_selection.shell_material_id, input.material_selection.tube_material_id, input.material_selection.design_code_id) as the sole case_02 material input. Amendment 002-F freezes the explicit material_catalog_bridge sub-block as the authorized case-bound frozen material input. The existing input.material_selection block is preserved as audit/description metadata; it is no longer the sole case_02 material input."`
+- `amendment_002f_field_paths_added` (list of new field paths in `case_02_materials_mass_mechanical.json`):
+  - `input.material_catalog_bridge.shell.identity.*`
+  - `input.material_catalog_bridge.shell.physical_properties.*`
+  - `input.material_catalog_bridge.shell.mechanical_properties.*`
+  - `input.material_catalog_bridge.shell.provenance.*`
+  - `input.material_catalog_bridge.tube.identity.*` (mirror)
+  - `input.material_catalog_bridge.tube.physical_properties.*` (mirror)
+  - `input.material_catalog_bridge.tube.mechanical_properties.*` (mirror)
+  - `input.material_catalog_bridge.tube.provenance.*` (mirror)
+- `amendment_002f_field_paths_unchanged` (explicit non-modification list):
+  - `expected_output.mass_kg.*` (all four values)
+  - `expected_output.preliminary_mechanical_check.status`
+  - `expected_output.selected_material_ids.*`
+  - `input.design_conditions.*` (pressure / temperature)
+  - `input.case_01_input_reference_case_id`
+  - `pressure_drop_excluded_from_taska_019`
+  - `license_boundary_attestation.*`
+  - `tolerance_profile_id`
+  - `provenance_profile_id` (V2; Amendment 002-F is in-scope for the existing profile)
+  - `schema_version` (V2; Amendment 002-F does not bump schema)
+- `amendment_002f_chain_coverage`: an explicit table mapping each future production chain call to the bridge field(s) that supply the required input, per §4.8.3 above.
+
+### 4.8.7 Tolerance unchanged (binding)
+
+`_tolerance_metadata.json` MUST NOT have any case_02 numeric tolerance value changed, widened, or narrowed. Optionally, a top-level field MAY be added to declare the no-tolerance-change status for Amendment 002-F:
+
+- `amendment_002f_id`: `"TASK-019-DESIGN-AMENDMENT-002-F"`
+- `amendment_002f_effective_scope`: `"TASK-019-GOLDEN-02"`
+- `amendment_002f_tolerance_status`: `"NO_NUMERIC_TOLERANCE_CHANGE_BRIDGE_INPUT_FIELDS_ONLY"`
+
+Per-field basis strings MAY be updated to reference Amendment 002-F (mirroring the Amendment 002-E precedent), but only where strictly necessary to document the new bridge basis; numeric `abs` / `rel` values MUST be preserved verbatim from Amendment 001.
+
+### 4.8.8 Case boundaries (binding)
+
+- **case_01** — UNCHANGED. Geometry, fluid identifier, mass flow, expected_output, tolerance, and all other fields are preserved verbatim from Amendment 002-E. The 002-F bridge is case_02 only; no field on `case_01_heat_balance_rating.json` is touched.
+- **case_02** — `input.material_catalog_bridge` sub-block is ADDED. `input.material_selection` block is PRESERVED verbatim as audit/description. `expected_output`, `tolerance`, and all other fields are PRESERVED verbatim.
+- **case_03** — UNCHANGED. `cost_model_selection`, expected_output, cost records, SelectionFilters, discount/salvage deferred markers, and all other fields are preserved verbatim. The 002-F bridge is case_02 only; no field on `case_03_cost_lifecycle_envelope.json` is touched.
+
+### 4.8.9 Amendment 002-F does NOT authorize
+
+Amendment 002-F **does NOT authorize** any of the following, in either this amendment round or in any future TASK-019 implementation round without an explicit separate design-amendment or implementation authorization:
+
+- **No resolver implementation.** The bridge freezes data; it does not implement any lookup / resolution logic.
+- **No catalog database.** The bridge references a `provenance.source_reference` field but does not implement or load any catalog DB.
+- **No MaterialRecord runtime synthesis.** The bridge is a case-bound frozen input. A future implementation round that consumes the bridge to build a `MaterialRecord` is authorized separately (and only as a case-bound projection from frozen input, not as a runtime synthesis).
+- **No material calculation logic.** No `calculate_mass_breakdown` or `preliminary_check` call is authorized in this amendment.
+- **No production module modification.** No `src/**` file is modified in this amendment.
+- **No test modification.** No `tests/validation_report/**`, `tests/unit/**`, `tests/benchmark/**`, or `tests/support/**` file is modified in this amendment.
+- **No case_03 implementation.** The 002-F bridge is case_02 only.
+- **No case_01 weakening.** case_01 remains `WIRED_VIA_CHAIN` per Slice 3B-A.
+- **No pressure-drop / TASK-020+ work.** Pressure drop remains `NOT_COMPUTABLE` / TASK-020+ excluded.
+- **No discount / salvage formula.** TASK-018 §5.3 / §5.3.2 remain deferred.
+- **No `corrosion_allowance_mm` default.** The future implementation must pass `None` to `MaterialResolutionRequest.corrosion_allowance_mm`; no fabricated default is allowed.
+- **No `geometry_record` fabrication.** The future implementation must derive `geometry_record` from the case_01 cross-reference (`case_02_input["case_01_input_reference_case_id"]`), not from a fabricated default.
+- **No expected_output mutation.** The 6 frozen mass_kg values, `preliminary_mechanical_check.status = "PASS"`, and `selected_material_ids.*` values are preserved verbatim.
+- **No tolerance widening.** All case_02 numeric tolerance values are preserved verbatim.
+- **No Issue / Feishu / Ready / Merge / branch deletion.** Per ongoing governance.
+
+### 4.8.10 Slice 3B-B implementation status (binding, future)
+
+As of Amendment 002-F authoring, the case_02 frozen fixture now carries the explicit `input.material_catalog_bridge` sub-block. A future implementation round (separately authorized, not part of 002-F) may consume the bridge to wire case_02 to the TASK-017 production chain. The future implementation must:
+
+1. Read the bridge verbatim (no synthesis, no normalization, no catalog lookup at runtime).
+2. Build a real `MaterialRecord` TypedDict from the bridge (a case-bound projection, not a synthesis — the bridge is the data source).
+3. Build a real `MaterialResolutionRequest` from the bridge's `identity` + `input.design_conditions`.
+4. Call `resolve_material(request, material_record)` for each side; expect real `MaterialResolutionResult` outputs.
+5. Build a real `MassCalculationRequest` using the cross-case case_01 geometry + the `MaterialResolutionResult` map.
+6. Call `calculate_mass_breakdown(request)`; expect real `MassBreakdown`.
+7. Build a real `PreliminaryCheckRequest` using the case_01 geometry diameters + the `MaterialResolutionResult`.
+8. Call `preliminary_check(request)`; expect real `PreliminaryCheckResult`.
+9. Surface the real outputs in `case_02 actual_output` with `produced_fields` covering the real upstream-returned fields (not case-bound metadata).
+10. Verify that the resulting `actual_output.mass_kg.*` and `actual_output.preliminary_mechanical_check.status` match the existing `expected_output.mass_kg.*` and `expected_output.preliminary_mechanical_check.status` within the existing numeric tolerance (Amendment 001 frozen); a future implementation round that finds a mismatch must NOT silently update the expected_output — it must report the mismatch and request a new design amendment.
+
+**Implementation of the above is NOT authorized by Amendment 002-F** and requires a separate Charles authorization in a future round. Amendment 002-F is a design contract only.
+
 ## 5. TASK-018 deferred amendment handling (binding)
 
 ### 5.1 Discount formula (TASK-018 §5.3)
