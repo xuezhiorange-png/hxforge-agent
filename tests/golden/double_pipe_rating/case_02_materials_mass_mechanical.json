@@ -2,9 +2,9 @@
   "case_id": "TASK-019-GOLDEN-02",
   "case_scope": "Same geometry and fluid conditions as Case 01, with explicit material selection and mass calculation, plus §9.1 preliminary mechanical check on tube allowable stress (TASK-017 §9.1 — already implemented in preliminary_checker.py). Upstream paths exercised: Case 01 + TASK-017 MaterialSelector + MassCalculator + PreliminaryMechanicalChecker §9.1. Pressure drop is explicitly NOT_COMPUTABLE (TASK-020+ scope; excluded from TASK-019 by frozen design §6).",
   "case_title": "Double-pipe heat balance + materials + mass + preliminary mechanical check",
-  "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F",
+  "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-G",
   "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
-  "amendment_basis": "TASK-019 design-amendment round 2026-07-08 (PR branch codex/task-019-freeze-validation-vectors). Freezes the canonical case input vectors and the canonical expected output vectors for the TASK-017-authorized fields (material_selection, mass_kg, preliminary_mechanical_check status). Case 01 input vectors are referenced by case_id (TASK-019-GOLDEN-01) and inherit the frozen values from case_01_heat_balance_rating.json. Pressure-drop remains NOT_COMPUTABLE. No production calculation was executed to derive these frozen values; mass values are derived from the geometric inputs of Case 01 + the documented densities of SS304 (per TASK-017 approved material catalog). Preliminary mechanical check status is derived from the documented SS304 allowable stress at the design envelope (TASK-017 §9.1).",
+  "amendment_basis": "TASK-019 design-amendment round 2026-07-08 (PR branch codex/task-019-freeze-validation-vectors; this is the 002-G re-derivation that supersedes part of 002-F's case_02 mass expected_output basis). Amendment 002-G reconciles the case_02 mass-chain contract with the production TASK-017 MassCalculator 4-role closed set (outer_pipe / inner_tube / hairpin_bend / fittings) and re-derives the case_02 expected_output.mass_kg metal-mass central values from the case_01 geometry cross-reference (Kern 1950 1\"/2\" tube-in-shell: shell_od=0.0603m, shell_id=0.0525m, tube_od=0.0334m, tube_id=0.0266m, tube_length=2.0m) + the 002-F SS304 bridge density (8000 kg/m^3) via the closed-form MassCalculator formula. New expected_output: tube_mass_kg=5.127 (production inner_tube_kg, mapped to case_02 tube_mass_kg per 方案 B), shell_mass_kg=11.056 (production outer_pipe_kg, mapped to case_02 shell_mass_kg per 方案 B), total_mass_kg=16.183 (production total_kg = inner_tube_kg + outer_pipe_kg, with hairpin_bend_kg=0 via include_hairpin=False and fittings_kg=0 via fitting_overrides_kg=()). The previous Amendment 001/002-F case_02 metal-mass_kg values (1.18/0.43/3.50) are SUPERSEDED for case_02 only (not case_01 or case_03). fluid_mass_kg is PRESERVED in case_02 expected_output.mass_kg (value 1.05 from the 002-F baseline) as a deferred-amendment placeholder per the 002-G Question 3 second-option (DEFER to a future real production chain 002-H+); the field is NOT a produced_field for the TASK-019 Slice 3B-B production contract, and the future Slice 3B-B adapter MUST NOT synthesize / copy / lookup fluid_mass_kg. The 002-G design also documents the deferred-amendment placeholder rationale in the mass_kg_field_mapping_002g sub-block and the slice3a_blocked_field_paths.mass_kg.fluid_mass_kg_pending marker (both now reflect DEFERRED, not REMOVED). No production calculation was executed in this design round; the new metal-mass central values are closed-form derivable from the case_01 geometry + the 002-F SS304 bridge values via the documented production MassCalculator formula. A future implementation round (separately authorized) will verify the production chain execution matches the frozen central values within the existing numeric tolerance. The 002-G bridge is extended with 2 new case-bound roles (hairpin_bend + fittings) so the future adapter can call production MassCalculator with the 4-role closed set; the hairpin_bend / fittings bridge values are SS304 (same catalog basis as the 002-F shell / tube bridges) with provenance documenting that they are case-bound presence for the production 4-role closed set (case_02 is straight-tube-in-shell with no hairpin / no fittings by design; hairpin_bend mass = 0 via include_hairpin=False, fittings mass = 0 via fitting_overrides_kg=()). Pressure-drop remains NOT_COMPUTABLE (TASK-020+). Preliminary mechanical check status remains PASS (TASK-017 §9.1, design-code ASME BPVC VIII-1, 137.0 MPa SS304 allowable at 70 degC >> 2.95 MPa hoop stress from case_01 cross-reference).",
   "input": {
     "case_01_input_reference_case_id": "TASK-019-GOLDEN-01",
     "design_conditions": {
@@ -17,10 +17,11 @@
       "tube_material_id": "SS304 (stainless steel 304, per TASK-017 approved material catalog)"
     },
     "material_catalog_bridge": {
-      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F",
-      "amendment_002f_scope": "TASK-019-GOLDEN-02 case-bound Material Catalog Bridge Contract (frozen input; not a runtime catalog lookup; not an adapter-generated value)",
-      "amendment_002f_status": "DESIGN-FROZEN-PENDING-MERGE",
-      "amendment_002f_bridge_schema_version": "1.0",
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-G",
+      "amendment_002g_scope": "TASK-019-GOLDEN-02 case-bound Material Catalog Bridge Contract (frozen input; not a runtime catalog lookup; not an adapter-generated value). 002-G extends the 002-F bridge (which covered shell + tube) with 2 additional case-bound roles (hairpin_bend + fittings) so the future adapter can call the production TASK-017 MassCalculator with the 4-role closed set required by MassCalculator.calculate_mass_breakdown. The hairpin_bend / fittings bridge values use the same SS304 catalog basis as the 002-F shell / tube bridges, with provenance documenting that they are case-bound presence for the production 4-role closed set; case_02 is straight-tube-in-shell with no hairpin / no fittings by design, so hairpin_bend_kg = 0 (via include_hairpin=False) and fittings_kg = 0 (via fitting_overrides_kg=()) at the future MassCalculator call.",
+      "amendment_002g_status": "DESIGN-FROZEN-PENDING-MERGE",
+      "amendment_002g_bridge_schema_version": "2.0",
+      "amendment_002g_supersedes": "Amendment 002-F bridge (which covered only shell + tube). Amendment 002-G is a superset of the 002-F bridge contract: the 002-F shell / tube role definitions, identity / physical / mechanical / provenance sub-blocks, and revision / effective_date / amendment_id fields are preserved verbatim. 002-G adds hairpin_bend + fittings roles. 002-G also re-derives the case_02 expected_output.mass_kg central values (see expected_output.mass_kg and provenance amendment_002g_supersedes).",
       "shell": {
         "component_role": "shell",
         "identity": {
@@ -47,7 +48,7 @@
           "source_reference": "TASK-017 approved material catalog, SS304 entry, design_envelope_revision (TASK-017 catalog revision 2026-07-08)",
           "revision": "2026-07-08",
           "effective_date": "2026-07-08",
-          "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F"
+          "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-G"
         }
       },
       "tube": {
@@ -76,7 +77,67 @@
           "source_reference": "TASK-017 approved material catalog, SS304 entry, design_envelope_revision (TASK-017 catalog revision 2026-07-08)",
           "revision": "2026-07-08",
           "effective_date": "2026-07-08",
-          "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F"
+          "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-G"
+        }
+      },
+      "hairpin_bend": {
+        "component_role": "hairpin_bend",
+        "case_bound_role_note": "case_02 is a straight-tube-in-shell geometry (Kern 1950 1\"/2\" tube-in-shell water-water reference) with NO hairpin bend by design. This bridge block is present to satisfy the production MassCalculator 4-role closed set (outer_pipe / inner_tube / hairpin_bend / fittings). The future adapter MUST pass include_hairpin=False to MassCalculator.calculate_mass_breakdown, which forces hairpin_bend_kg = 0.0 per design §6.3. All material values are SS304 (same catalog basis as the 002-F shell / tube bridges); no separate catalog revision is required for this role.",
+        "identity": {
+          "material_record_id": "MAT-SS304-HAIRPIN-001",
+          "material_family": "stainless_steel_austenitic",
+          "material_standard": "ASME SA-249",
+          "grade": "304",
+          "form_factor": "tube",
+          "product_form": "seamless_tube",
+          "standard_or_spec_reference": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)"
+        },
+        "physical_properties": {
+          "density_kg_m3": 8000.0,
+          "thermal_conductivity_w_m_k": 16.2,
+          "specific_heat_j_kg_k": 500.0
+        },
+        "mechanical_properties": {
+          "allowable_stress_mpa_at_design_temperature": 137.0,
+          "yield_strength_mpa": 215.0,
+          "elastic_modulus_gpa": 193.0
+        },
+        "provenance": {
+          "source_category": "TASK_017_APPROVED_MATERIAL_CATALOG",
+          "source_reference": "TASK-017 approved material catalog, SS304 entry, design_envelope_revision (TASK-017 catalog revision 2026-07-08). Role is case-bound presence for the production MassCalculator 4-role closed set; case_02 geometry has no hairpin bend, and hairpin_bend_kg is forced to 0.0 by include_hairpin=False at the future MassCalculator call (per design §6.3).",
+          "revision": "2026-07-08",
+          "effective_date": "2026-07-08",
+          "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-G"
+        }
+      },
+      "fittings": {
+        "component_role": "fittings",
+        "case_bound_role_note": "case_02 is a straight-tube-in-shell geometry (Kern 1950 1\"/2\" tube-in-shell water-water reference) with NO end-fittings by design (no flanges, elbows, or tees in the canonical Kern reference). This bridge block is present to satisfy the production MassCalculator 4-role closed set (outer_pipe / inner_tube / hairpin_bend / fittings). The future adapter MUST pass fitting_overrides_kg=() to MassCalculator.calculate_mass_breakdown, which forces fittings_kg = 0.0 per design §6.4. All material values are SS304 (same catalog basis as the 002-F shell / tube bridges); no separate catalog revision is required for this role.",
+        "identity": {
+          "material_record_id": "MAT-SS304-FITTINGS-001",
+          "material_family": "stainless_steel_austenitic",
+          "material_standard": "ASME SA-403",
+          "grade": "304",
+          "form_factor": "fitting",
+          "product_form": "butt_weld_fitting",
+          "standard_or_spec_reference": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)"
+        },
+        "physical_properties": {
+          "density_kg_m3": 8000.0,
+          "thermal_conductivity_w_m_k": 16.2,
+          "specific_heat_j_kg_k": 500.0
+        },
+        "mechanical_properties": {
+          "allowable_stress_mpa_at_design_temperature": 137.0,
+          "yield_strength_mpa": 215.0,
+          "elastic_modulus_gpa": 193.0
+        },
+        "provenance": {
+          "source_category": "TASK_017_APPROVED_MATERIAL_CATALOG",
+          "source_reference": "TASK-017 approved material catalog, SS304 entry, design_envelope_revision (TASK-017 catalog revision 2026-07-08). Role is case-bound presence for the production MassCalculator 4-role closed set; case_02 geometry has no end-fittings, and fittings_kg is forced to 0.0 by fitting_overrides_kg=() at the future MassCalculator call (per design §6.4).",
+          "revision": "2026-07-08",
+          "effective_date": "2026-07-08",
+          "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-G"
         }
       }
     }
@@ -84,10 +145,10 @@
   "expected_output": {
     "case_01_outputs_reference_case_id": "TASK-019-GOLDEN-01",
     "mass_kg": {
-      "fluid_mass_kg": 1.05,
-      "shell_mass_kg": 1.18,
-      "total_mass_kg": 3.50,
-      "tube_mass_kg": 0.43
+      "shell_mass_kg": 11.056395521337773,
+      "total_mass_kg": 16.183474731996316,
+      "tube_mass_kg": 5.127079210658542,
+      "fluid_mass_kg": 1.05
     },
     "preliminary_mechanical_check": {
       "status": "PASS",
@@ -101,15 +162,21 @@
       "shell_material_id": "SS304",
       "tube_material_id": "SS304"
     },
+    "mass_kg_field_mapping_002g": {
+      "shell_mass_kg": "expected_output.mass_kg.shell_mass_kg <- production MassCalculator.calculate_mass_breakdown(...).outer_pipe_kg (方案 B explicit mapping; the case_02 002-F bridge.shell component_role maps to production outer_pipe role per the canonical 002-F §4.8.3 contract). 002-G re-derivation: production-chain-derivable golden vector at the case_01 cross-reference geometry × 002-G bridge SS304 density 8000 kg/m^3 via the production MassCalculator closed-form formula; the 002-F central value 1.18 is superseded by the 002-G central value 11.056395521337773.",
+      "tube_mass_kg": "expected_output.mass_kg.tube_mass_kg <- production MassCalculator.calculate_mass_breakdown(...).inner_tube_kg (方案 B explicit mapping; the case_02 002-F bridge.tube component_role maps to production inner_tube role per the canonical 002-F §4.8.3 contract). 002-G re-derivation: production-chain-derivable golden vector at the case_01 cross-reference geometry × 002-G bridge SS304 density 8000 kg/m^3 via the production MassCalculator closed-form formula; the 002-F central value 0.43 is superseded by the 002-G central value 5.127079210658542.",
+      "total_mass_kg": "expected_output.mass_kg.total_mass_kg <- production MassCalculator.calculate_mass_breakdown(...).total_kg (production total_kg = inner_tube_kg + outer_pipe_kg + hairpin_bend_kg + fittings_kg; for case_02 hairpin_bend_kg=0 via include_hairpin=False and fittings_kg=0 via fitting_overrides_kg=(), so total_kg = inner_tube_kg + outer_pipe_kg = tube_mass_kg + shell_mass_kg per 方案 B). 002-G re-derivation: total_kg = 5.127 + 11.056 = 16.183 (16.183474731996316); the 002-F central value 3.50 is superseded by the 002-G central value 16.183474731996316.",
+      "fluid_mass_kg": "DEFERRED to a future real production chain (002-H+) per Question 3 second-option (auth allows either REMOVE or DEFER; 002-G selects DEFER to preserve the existing test contract on tests/validation_report/test_chain_wiring_adapter.py::test_expected_output_unchanged_across_adapter_runs which hard-codes fluid_mass_kg == 1.05; the field is preserved in expected_output.mass_kg as a deferred-amendment placeholder (value 1.05 from the 002-F baseline) and is NOT a produced_field for the TASK-019 Slice 3B-B production contract. The Slice 3B-B adapter MUST NOT (a) synthesize fluid_mass_kg from any source, (b) copy fluid_mass_kg from expected_output to actual_output, or (c) use any catalog lookup to derive fluid_mass_kg. A future amendment 002-H+ may either (a) remove fluid_mass_kg from expected_output.mass_kg if no real chain is contract-frozen, or (b) re-derive fluid_mass_kg from a real fluid-volume × fluid-density chain once available, IF AND ONLY IF a real production chain for fluid volume × fluid density is contract-frozen and the new central value is re-derivable via closed-form arithmetic on the case-bound inputs (no fabrication, no LLM inference). 002-G does not pre-authorize this work.)"
+    },
     "slice3a_blocked_field_paths": {
-      "mass_kg.fluid_mass_kg_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from MassCalculator.calculate_mass_breakdown(...).fluid_mass_kg)",
-      "mass_kg.shell_mass_kg_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from MassCalculator.calculate_mass_breakdown(...).shell_mass_kg)",
-      "mass_kg.tube_mass_kg_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from MassCalculator.calculate_mass_breakdown(...).tube_mass_kg)",
-      "mass_kg.total_mass_kg_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from MassCalculator.calculate_mass_breakdown(...).total_mass_kg)",
-      "preliminary_mechanical_check.status_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from PreliminaryMechanicalChecker.run(...).status)",
-      "selected_material_ids.shell_material_id_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from MaterialSelector.resolve(...).shell_material_id)",
-      "selected_material_ids.tube_material_id_pending": "TBD-by-Slice-3A (will be computed by Slice 3A adapter from MaterialSelector.resolve(...).tube_material_id)",
-      "slice3a_blocked_field_paths_note": "Each TBD-by-Slice-3A marker below is the audit-trail record of an authorized TASK-019 expected_output field path that would have been computed by the upstream TASK-017 chain had the Slice 3A adapter been wired up. The marker field names use the <real_path_leaf>_pending convention so the audit trail maps 1-to-1 to the real authorized field paths above; the marker values carry the Slice 3A production-source symbol that the future Slice 3A adapter will project into the field. The Slice 2 _materialize_not_computable_actual_output walks the expected_output subtree for TBD-by-Slice-N markers and surfaces them as actual_output.blocked_fields per the P0-1 contract. pressure-drop is NOT enumerated here (TASK-020+ excluded; surfaced separately as a pressure-drop per_field record)."
+      "mass_kg.shell_mass_kg_pending": "TBD-by-Slice-3B-B (will be computed by Slice 3B-B adapter from MassCalculator.calculate_mass_breakdown(...).outer_pipe_kg, mapped to expected_output.mass_kg.shell_mass_kg per the 002-G 方案 B field mapping above)",
+      "mass_kg.tube_mass_kg_pending": "TBD-by-Slice-3B-B (will be computed by Slice 3B-B adapter from MassCalculator.calculate_mass_breakdown(...).inner_tube_kg, mapped to expected_output.mass_kg.tube_mass_kg per the 002-G 方案 B field mapping above)",
+      "mass_kg.total_mass_kg_pending": "TBD-by-Slice-3B-B (will be computed by Slice 3B-B adapter from MassCalculator.calculate_mass_breakdown(...).total_kg, mapped to expected_output.mass_kg.total_mass_kg per the 002-G 方案 B field mapping above; total_kg = inner_tube_kg + outer_pipe_kg + hairpin_bend_kg + fittings_kg; for case_02 hairpin_bend_kg=0 + fittings_kg=0)",
+      "preliminary_mechanical_check.status_pending": "TBD-by-Slice-3B-B (will be computed by Slice 3B-B adapter from PreliminaryMechanicalChecker.run(...).status, using the case_01 cross-reference geometry diameters + the 002-G bridge.tube resolution + case_02.input.design_conditions)",
+      "selected_material_ids.shell_material_id_pending": "TBD-by-Slice-3B-B (will be computed by Slice 3B-B adapter from MaterialSelector.resolve(bridge.shell).material_grade='304' per the 002-G bridge; case_02 expected_output.selected_material_ids.shell_material_id='SS304' is the string-projection of the production material_grade)",
+      "selected_material_ids.tube_material_id_pending": "TBD-by-Slice-3B-B (will be computed by Slice 3B-B adapter from MaterialSelector.resolve(bridge.tube).material_grade='304' per the 002-G bridge; case_02 expected_output.selected_material_ids.tube_material_id='SS304' is the string-projection of the production material_grade)",
+      "mass_kg.fluid_mass_kg_pending": "TBD-by-Slice-3B-B-or-002-H-plus (DEFERRED per Amendment 002-G Question 3 second-option: fluid_mass_kg is preserved in case_02 expected_output.mass_kg as a deferred-amendment placeholder (value 1.05 from the 002-F baseline) and is NOT a produced_field for the TASK-019 Slice 3B-B production contract. The Slice 3B-B adapter MUST NOT (a) synthesize fluid_mass_kg from any source, (b) copy fluid_mass_kg from expected_output to actual_output, or (c) use any catalog lookup to derive fluid_mass_kg. A future amendment 002-H+ may either remove fluid_mass_kg from expected_output.mass_kg if no real chain is contract-frozen, or re-derive fluid_mass_kg from a real fluid-volume × fluid-density chain once available, IF AND ONLY IF a real production chain for fluid volume × fluid density is contract-frozen and the new central value is re-derivable via closed-form arithmetic on the case-bound inputs (no fabrication, no LLM inference). 002-G does not pre-authorize this work.)",
+      "slice3a_blocked_field_paths_note": "Each TBD-by-Slice-3B-B marker below is the audit-trail record of an authorized TASK-019 expected_output field path that would have been computed by the upstream TASK-017 chain had the Slice 3B-B adapter been wired up. The marker field names use the <real_path_leaf>_pending convention so the audit trail maps 1-to-1 to the real authorized field paths above; the marker values carry the Slice 3B-B production-source symbol that the future Slice 3B-B adapter will project into the field. The Slice 2 _materialize_not_computable_actual_output walks the expected_output subtree for TBD-by-Slice-N markers and surfaces them as actual_output.blocked_fields per the P0-1 contract. pressure-drop is NOT enumerated here (TASK-020+ excluded; surfaced separately as a pressure-drop per_field record). Amendment 002-G renamed the slice3a_blocked_field_paths marker block from Slice-3A to Slice-3B-B (the production chain wiring round for case_02 is Slice 3B-B, not Slice 3A) and updated the three metal-mass_kg marker production-source symbols to the 002-G contract (outer_pipe_kg / inner_tube_kg / total_kg per 方案 B). The fluid_mass_kg_pending marker is preserved with a DEFERRED value (not removed; not a work item) per Amendment 002-G Question 3 second-option (DEFER to a future real production chain 002-H+)."
     }
   },
   "license_boundary_attestation": {
@@ -120,6 +187,6 @@
   "pressure_drop_excluded_from_taska_019": "NOT_COMPUTABLE",
   "provenance_profile_id": "TASK-019-GOLDEN-PROVENANCE-V2-AMEND-001",
   "schema_version": "TASK-019-GOLDEN-CASE-V2-AMEND-001",
-  "amendment_1_skeleton_note": "Slice 1 fixture-shape reproducibility was preserved (case_scope / case_title / schema_version / tolerance_profile_id / provenance_profile_id / license_boundary_attestation / pressure_drop_excluded_from_taska_019). All TBD-by-Slice-2 input and expected_output placeholders were replaced with frozen canonical vectors per the TASK-019 design-amendment round 2026-07-08. The previously-TBD 'case_01_input' and 'case_01_outputs' reference placeholders are now explicit case_id cross-references (TASK-019-GOLDEN-01) to keep the cross-case link auditable without re-inventing the geometry. Pressure drop remains NOT_COMPUTABLE. No TASK-020+ field was introduced. The expected_output subtree additionally carries a sibling slice3a_blocked_field_paths block: each TBD-by-Slice-3A marker is the P0-1-contract audit-trail record of an authorized TASK-019 expected_output field path that would have been computed had the Slice 3A adapter been wired up; the marker field names use the <real_path_leaf>_pending convention so the audit trail maps 1-to-1 to the frozen fields above without overwriting them.",
+  "amendment_1_skeleton_note": "Slice 1 fixture-shape reproducibility was preserved (case_scope / case_title / schema_version / tolerance_profile_id / provenance_profile_id / license_boundary_attestation / pressure_drop_excluded_from_taska_019). All TBD-by-Slice-2 input and expected_output placeholders were replaced with frozen canonical vectors per the TASK-019 design-amendment round 2026-07-08. The previously-TBD 'case_01_input' and 'case_01_outputs' reference placeholders are now explicit case_id cross-references (TASK-019-GOLDEN-01) to keep the cross-case link auditable without re-inventing the geometry. Pressure drop remains NOT_COMPUTABLE. No TASK-020+ field was introduced. The expected_output subtree additionally carries a sibling slice3a_blocked_field_paths block: each TBD-by-Slice-3B-B marker is the P0-1-contract audit-trail record of an authorized TASK-019 expected_output field path that would have been computed had the Slice 3B-B adapter been wired up; the marker field names use the <real_path_leaf>_pending convention so the audit trail maps 1-to-1 to the frozen fields above without overwriting them. Amendment 002-G renamed the marker block to Slice-3B-B (per the 002-G 方案 B field mapping and the canonical TASK-019 implementation round naming) and updated the three metal-mass_kg marker production-source symbols to the 002-G contract. Amendment 002-G also added the mass_kg_field_mapping_002g sub-block to make the case_02 public report shape (shell_mass_kg / tube_mass_kg / total_mass_kg) -> production MassCalculator shape (outer_pipe_kg / inner_tube_kg / total_kg) mapping explicit and contract-frozen. fluid_mass_kg was PRESERVED in expected_output.mass_kg (value 1.05 from the 002-F baseline) as a deferred-amendment placeholder per the 002-G Question 3 second-option (DEFER to a future real production chain 002-H+); the fluid_mass_kg_pending marker in slice3a_blocked_field_paths is updated to reflect the DEFERRED status (the field is not a produced_field for the TASK-019 Slice 3B-B production contract).",
   "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001"
 }
