@@ -76,7 +76,59 @@
       "c1_total_record_id": "TASK-019-AMEND-002H-C1-INSTALLATION-V1",
       "provenance_amendment_id": "TASK-019-DESIGN-AMENDMENT-002-H"
     },
-    "cost_records_bridge_design_note": "002-H freezes cost_records_bridge as case-bound frozen benchmark input (NOT a runtime catalog lookup). Each bridge entry carries the CostModelSelector input record shape (TASK-018 Slice A selector-input shape per src/hexagent/costing/cost_model_selector.py _validate_record_shape and _project_canonical: required fields cost_record_id / cost_record_version / cost_category (with c0_/c1_ prefix convention) / cost_basis / currency / quantity_basis / cost_value / license_class / source_class); the bridge is NOT a TASK-013 CostRecord verbatim (TASK-013 CostRecord adds record_hash / provenance_edges / approval_state / human_entered_evidence fields that CostModelSelector does NOT consume). The bridge cost_value minor-unit integers are engineered to reproduce the amendment-001 frozen expected_output central values (C0_material=412000, C0_labor=188000, C1_total=600000) at the production chain's cost_breakdown output (capex_envelope_minor_units = C0_subtotal + C1_subtotal = 600000 with this bridge, where C0_subtotal=412000+188000=600000, C1_subtotal=0). The cost_category strings use the c0_/c1_ prefix convention required by the production CostModelSelector._build_selection bucket logic (src/hexagent/costing/cost_model_selector.py); these prefix strings are NOT members of the TASK-013 CostCategory StrEnum (src/hexagent/material_costs/models.py line 134), but the production selector does NOT invoke validate_cost_record_schema, so the prefix strings are accepted by the selector without enum validation. A future 002-I+ amendment may update TASK-013 CostCategory enum to add the c0_/c1_ prefix members if needed; until then, the prefix convention is binding on the TASK-019 adapter. No runtime catalog resolver is authorized in 002-H (see §15.3.1 of docs/tasks/TASK-019-golden-cases-double-pipe-validation.md)."
+    "cost_records_bridge_design_note": "002-H freezes cost_records_bridge as case-bound frozen benchmark input (NOT a runtime catalog lookup). Each bridge entry carries the CostModelSelector input record shape (TASK-018 Slice A selector-input shape per src/hexagent/costing/cost_model_selector.py _validate_record_shape and _project_canonical: required fields cost_record_id / cost_record_version / cost_category (with c0_/c1_ prefix convention) / cost_basis / currency / quantity_basis / cost_value / license_class / source_class); the bridge is NOT a TASK-013 CostRecord verbatim (TASK-013 CostRecord adds record_hash / provenance_edges / approval_state / human_entered_evidence fields that CostModelSelector does NOT consume). The bridge cost_value minor-unit integers are engineered to reproduce the amendment-001 frozen expected_output central values (C0_material=412000, C0_labor=188000, C1_total=600000) at the production chain's cost_breakdown output (capex_envelope_minor_units = C0_subtotal + C1_subtotal = 600000 with this bridge, where C0_subtotal=412000+188000=600000, C1_subtotal=0). The cost_category strings use the c0_/c1_ prefix convention required by the production CostModelSelector._build_selection bucket logic (src/hexagent/costing/cost_model_selector.py); these prefix strings are NOT members of the TASK-013 CostCategory StrEnum (src/hexagent/material_costs/models.py line 134), but the production selector does NOT invoke validate_cost_record_schema, so the prefix strings are accepted by the selector without enum validation. A future 002-I+ amendment may update TASK-013 CostCategory enum to add the c0_/c1_ prefix members if needed; until then, the prefix convention is binding on the TASK-019 adapter. No runtime catalog resolver is authorized in 002-H (see §15.3.1 of docs/tasks/TASK-019-golden-cases-double-pipe-validation.md).",
+    "mass_breakdown_bridge": {
+      "bridge_id": "TASK-019-AMEND-002I-CASE03-MASS-BREAKDOWN-BRIDGE-V1",
+      "bridge_type": "case_bound_production_mass_breakdown",
+      "source_case_id": "TASK-019-GOLDEN-02",
+      "source_contract": "TASK-019 Design Amendment 002-G / PR #109 case_02 mass-chain contract",
+      "source_usage": "Frozen input bridge for TASK-019-GOLDEN-03 cost calculator only; not a runtime reference to case_02 fixture.",
+      "mass_breakdown_class": "hexagent.material_mass_mechanical.mass_calculator.MassBreakdown",
+      "field_mapping": {
+        "inner_tube_kg": "case_02 actual_output.mass_kg.tube_mass_kg",
+        "outer_pipe_kg": "case_02 actual_output.mass_kg.shell_mass_kg",
+        "hairpin_bend_kg": "case_02 production MassBreakdown.hairpin_bend_kg",
+        "fittings_kg": "case_02 production MassBreakdown.fittings_kg",
+        "total_kg": "case_02 actual_output.mass_kg.total_mass_kg",
+        "calculation_hash": "case_02 production MassBreakdown.calculation_hash (tube call; primary mass input for case_03)",
+        "provenance": "case_02 production MassBreakdown.provenance (tube call; primary mass input for case_03)"
+      },
+      "values": {
+        "inner_tube_kg": 5.127079210658542,
+        "outer_pipe_kg": 11.056395521337773,
+        "hairpin_bend_kg": 0.0,
+        "fittings_kg": 0.0,
+        "total_kg": 16.183474731996316,
+        "calculation_hash": "42b4fad3d9c7130073cd362e7fd7575b88c3c10bd1ef24bc2a835e1738315fc7",
+        "provenance": {
+          "geometry_record_id": "case_02_tube_geometry_002g",
+          "material_record_id": "MAT-SS304-TUBE-001",
+          "applicable_standard_id": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)",
+          "design_pressure_mpa": 0.6,
+          "design_temperature_c": 70.0,
+          "correlation_ids": [],
+          "software_version": "0.1.0",
+          "git_commit": "6ed5b7dc7d8df163796eacb838afcf5702a4c53a",
+          "result_hash": "b6d2b2bc76592364ea9cc937937dfcd480b4716efd6645c375f20904d015bf58"
+        }
+      },
+      "runtime_forbidden": [
+        "read_case_02_fixture",
+        "derive_raw_geometry",
+        "resolve_material",
+        "construct_synthetic_material_resolution",
+        "use_stub_mass_breakdown",
+        "catalog_lookup",
+        "db_lookup",
+        "network_lookup"
+      ],
+      "failure_policy": {
+        "missing_or_malformed_bridge": "fail_closed",
+        "cost_components": "null",
+        "blocker_code": "UNSPECIFIED_BLOCKER",
+        "details_reason": "mass_breakdown_bridge_missing_or_malformed"
+      }
+    }
   },
   "expected_output": {
     "case_01_outputs_reference_case_id": "TASK-019-GOLDEN-01",
