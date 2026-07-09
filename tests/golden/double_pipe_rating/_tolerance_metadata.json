@@ -42,6 +42,34 @@
   },
   "amendment_002g_case_01_case_03_tolerance_status": "NO_CHANGE: case_01 and case_03 per-field tolerance entries are preserved byte-for-byte. Amendment 002-G is case_02 only. case_01 is frozen by 002-E; case_03 is frozen by 001.",
   "amendment_002g_tolerance_no_fabrication_statement": "The 002-G metal-mass_kg central values for case_02 (shell_mass_kg 11.056, tube_mass_kg 5.127, total_mass_kg 16.183) are computed by closed-form arithmetic on the case_01 cross-reference geometry (002-F frozen) and the 002-G bridge SS304 density (002-F frozen). No adapter-generated values, no LLM-inferred material properties, no catalog lookup, no engineering judgment, no hand-tuning. The fluid_mass_kg central value (1.05) is preserved verbatim from 002-F baseline (not re-derived in 002-G; the field is DEFERRED to a future real production chain 002-H+). The numeric tolerance values for all 4 case_02 mass_kg fields are preserved verbatim from 001 / 002-F; only the per_field_basis text is re-derived to reference 002-G (for the 3 metal-mass_kg fields) or updated to DEFERRED status (for fluid_mass_kg). The future implementation round (separately authorized) will verify the production chain execution matches the frozen metal-mass_kg central values within the existing numeric tolerance; any mismatch will require a new amendment (002-H+) to reconcile.",
+  "amendment_002h_id": "TASK-019-DESIGN-AMENDMENT-002-H",
+  "amendment_002h_effective_scope": "TASK-019-GOLDEN-03",
+  "amendment_002h_tolerance_status": "PRESERVED_VERBATIM_FROM_AMEND_001: all amendment-001 numeric tolerance values for case_03 (cost_components_C0_C1.*, life_cycle_energy_envelope.*, selected_cost_model.*) are preserved byte-for-byte. 002-H adds FOUR new CATEGORICAL-EQUALITY tolerance entries for the case_03 cost_records_bridge_bindings.* provenance fields (case-bound frozen benchmark input contract). NO existing numeric tolerance is widened.",
+  "amendment_002h_tolerance_numeric_status": "PRESERVED: case_03.cost_components_C0_C1.cost_components.{C0_material_minor_units: abs=10000 / rel=0.02, C0_labor_minor_units: abs=10000 / rel=0.02, C1_total_minor_units: abs=10000 / rel=0.01} preserved byte-for-byte. case_03.life_cycle_energy_envelope.life_cycle_energy_summary.{annual_energy_MJ: abs=5000.0 / rel=0.02, total_lifecycle_energy_MJ: abs=100000.0 / rel=0.02} preserved byte-for-byte. NO tolerance widening.",
+  "amendment_002h_tolerance_categorical_additions": [
+    {
+      "field_path": "input.cost_records_bridge_bindings.c0_material_record_id",
+      "tolerance": {"abs": null, "rel": null, "categorical": true, "categorical_value": "TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1"},
+      "per_field_basis": "Case-bound frozen benchmark input; binding record-id. The future implementation round MUST verify the fixture's input.cost_records_bridge_bindings.c0_material_record_id == this frozen literal verbatim. NO runtime catalog resolver is authorized."
+    },
+    {
+      "field_path": "input.cost_records_bridge_bindings.c0_labor_record_id",
+      "tolerance": {"abs": null, "rel": null, "categorical": true, "categorical_value": "TASK-019-AMEND-002H-C0-LABOR-ASME-V1"},
+      "per_field_basis": "Case-bound frozen benchmark input; binding record-id. The future implementation round MUST verify the fixture's input.cost_records_bridge_bindings.c0_labor_record_id == this frozen literal verbatim. NO runtime catalog resolver is authorized."
+    },
+    {
+      "field_path": "input.cost_records_bridge_bindings.c1_total_record_id",
+      "tolerance": {"abs": null, "rel": null, "categorical": true, "categorical_value": "TASK-019-AMEND-002H-C1-INSTALLATION-V1"},
+      "per_field_basis": "Case-bound frozen benchmark input; binding record-id. The future implementation round MUST verify the fixture's input.cost_records_bridge_bindings.c1_total_record_id == this frozen literal verbatim. The C1 record carries cost_value=0 minor_units because C1_total_minor_units in the public report shape equals capex_envelope_minor_units (C0_subtotal + C1_subtotal) per §15.3.4 of the design contract; the C1_subtotal is intentionally 0 to make capex_envelope = 600000 match the amendment-001 frozen central value of C1_total_minor_units."
+    },
+    {
+      "field_path": "input.cost_records_bridge_bindings.provenance_amendment_id",
+      "tolerance": {"abs": null, "rel": null, "categorical": true, "categorical_value": "TASK-019-DESIGN-AMENDMENT-002-H"},
+      "per_field_basis": "Case-bound frozen benchmark input; provenance amendment-id pointer. The future implementation round MUST verify the fixture's input.cost_records_bridge_bindings.provenance_amendment_id == this frozen literal verbatim. This entry identifies the amendment that froze the bridge values; any later catalog revision that would change the values requires a new design amendment (002-I+), not a runtime swap."
+    }
+  ],
+  "amendment_002h_case_01_case_02_case_03_tolerance_status": "case_01 (002-E frozen) and case_02 (002-G frozen) tolerance entries are preserved byte-for-byte. case_03 numeric tolerance entries (cost_components_C0_C1.*, life_cycle_energy_envelope.*, selected_cost_model.*, discounted_total_minor_units DEFERRED marker, salvage_minor_units DEFERRED marker) are preserved byte-for-byte. 002-H is case_03 input-bridge-only; it adds FOUR new categorical-equality tolerance entries to the case_03 input.cost_records_bridge_bindings.* block. NO existing tolerance is widened, NO existing tolerance value is changed.",
+  "amendment_002h_no_runtime_resolver_statement": "002-H does NOT authorize a runtime catalog resolver. The case-bound cost_records_bridge is the sole source of cost-record inputs to CostModelSelector.select. The future implementation round MUST read the bridge verbatim from the fixture; MUST NOT call any file-system walk, MUST NOT call any DB query, MUST NOT call any network call, MUST NOT introduce any catalog loader helper. A future amendment (002-J+) may authorize a runtime resolver with explicit input-output boundary + fixture-vs-resolver ordering rule; until then the no-runtime-resolver rule is binding.",
   "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
   "tolerance_profile_id": "TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001",
   "tolerance_profiles": {

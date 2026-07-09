@@ -448,8 +448,89 @@
     }
   },
   "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
-  "amendment_branch": "codex/task-019-freeze-validation-vectors",
-  "amendment_basis": "TASK-019 amendment-001 freezes the case input vectors, the case expected output vectors for TASK-006/007/008/017/018-authorized fields, and the per-field tolerance values for all three TASK-019 Golden cases. No production calculation was executed; all numeric vectors are engineering-literature-referenced canonical baselines. The frozen contract SHAs below are unchanged from Slice 2 closeout and are reproduced for auditability; no upstream contract blob was mutated by this amendment.",
+  "amendment_branch": "docs/task-019-amendment-002h-case03-cost-lifecycle-contract",
+  "amendment_basis": "TASK-019 amendment-002-H freezes the case_03 cost / lifecycle / catalog bridge contract for the future Slice 3B-C implementation round. Adds a frozen cost_records_bridge block to case_03 input; preserves all amendment-001 frozen expected_output central values byte-for-byte; preserves all amendment-001 numeric tolerance values byte-for-byte; documents the production API reality (select_cost_records PLURAL from hexagent.costing, NOT select_cost_record SINGULAR from hexagent.material_costs); documents the c0_/c1_ cost_category prefix convention required by the production CostModelSelector bucket logic (not TASK-013 CostCategory enum members); preserves TASK-018 §5.3 / §5.3.2 discount / salvage deferred status verbatim; authorizes no implementation, no Ready, no Merge, no Issue mutation, no Feishu.",
+  "amendment_002h_id": "TASK-019-DESIGN-AMENDMENT-002-H",
+  "amendment_002h_effective_scope": "TASK-019-GOLDEN-03",
+  "amendment_002h_bridge_schema_version": "TASK-019-COST-RECORDS-BRIDGE-V1",
+  "amendment_002h_supersedes": "TASK-019-AMEND-001-FREEZE-VECTORS (case_03 input only; expected_output central values preserved verbatim; tolerance numeric values preserved verbatim)",
+  "amendment_002h_field_paths_added": [
+    "input.cost_records_bridge (3 records: c0_material, c0_labor, c1_installation)",
+    "input.cost_records_bridge_bindings.{c0_material_record_id, c0_labor_record_id, c1_total_record_id, provenance_amendment_id}",
+    "input.cost_records_bridge_design_note"
+  ],
+  "amendment_002h_field_paths_preserved_not_modified": [
+    "expected_output.cost_components_C0_C1.cost_components.{C0_material_minor_units=412000, C0_labor_minor_units=188000, C1_total_minor_units=600000}",
+    "expected_output.cost_components_C0_C1.currency_ISO_4217=USD",
+    "expected_output.life_cycle_energy_envelope.life_cycle_energy_summary.{annual_operating_hours=8000, design_life_years=20, annual_energy_MJ=241056.0, total_lifecycle_energy_MJ=4821120.0}",
+    "expected_output.life_cycle_energy_envelope.blocker_codes=[]",
+    "expected_output.selected_cost_model.{selected_model_id, selection_blockers=[]}",
+    "expected_output.discounted_total_minor_units=null (TASK-018 §5.3 Option A boundary preserved)",
+    "expected_output.salvage_minor_units=0 (TASK-018 §5.3.2 placeholder preserved)",
+    "expected_output.unspecified_blocker.details.reason=discount_formula_pending_design_amendment",
+    "expected_output.slice3a_blocked_field_paths.* (audit-trail block preserved)",
+    "input.cost_model_selection.* (amendment-001 frozen metadata block)",
+    "input.lifecycle_inputs.{annual_operating_hours=8000, design_life_years=20, discount_rate_input=null, fouling_energy_penalty_factor=1.15, salvage_fraction_input=null}",
+    "input.case_01_input_reference_case_id=TASK-019-GOLDEN-01",
+    "amendment_id=TASK-019-AMEND-001-FREEZE-VECTORS (top-level)",
+    "schema_version=TASK-019-GOLDEN-CASE-V2-AMEND-001",
+    "tolerance_profile_id=TASK-019-GOLDEN-TOLERANCE-V2-AMEND-001",
+    "provenance_profile_id=TASK-019-GOLDEN-PROVENANCE-V2-AMEND-001"
+  ],
+  "amendment_002h_field_paths_unchanged": [
+    "case_01.* (002-E frozen; case_01 fixture, _provenance_metadata.json case_01 entries, _tolerance_metadata.json case_01 entries NOT modified)",
+    "case_02.* (002-G frozen; case_02 fixture, _provenance_metadata.json case_02 entries, _tolerance_metadata.json case_02 entries NOT modified)",
+    "src/** (NOT modified; design amendment round is docs + fixtures only)",
+    "tests/validation_report/** (NOT modified)",
+    "tests/unit/** (NOT modified)",
+    "tests/benchmark/** (NOT modified)",
+    "tests/support/** (NOT modified)",
+    ".github/** (NOT modified)",
+    "pyproject.toml (NOT modified)",
+    "uv.lock (NOT modified)",
+    "ci-shard-manifest.yml (NOT modified)",
+    "docs/tasks/TASK-006*.md .. TASK-018*.md (NOT modified; frozen upstream contract blobs unchanged)",
+    "docs/tasks/TASK-020+ (NOT modified; TASK-020+ scope untouched)"
+  ],
+  "amendment_002h_re_derivation_method": [
+    "no_re_derivation: expected_output central values preserved verbatim from amendment-001 (engineering-literature-referenced canonical baselines; C0_material=412000 minor_units, C0_labor=188000 minor_units, C1_total_minor_units=600000 minor_units; life_cycle_energy_envelope.life_cycle_energy_summary.{annual_energy_MJ=241056.0, total_lifecycle_energy_MJ=4821120.0})",
+    "no_fabrication_statement: cost_records_bridge is fixture-level frozen benchmark input, not a runtime lookup. The bridge cost_value integers are engineered to reproduce the amendment-001 central values at the production chain output (capex_envelope_minor_units = C0_subtotal + C1_subtotal = 412000 + 188000 + 0 = 600000). Verified empirically via .venv/bin/python invocation of hexagent.costing.select_cost_records + hexagent.costing.calculate_cost_breakdown; c0_subtotal=600000, c1_subtotal=0, capex_envelope=600000. The 3-record bridge does NOT compute mass-multiplied costs (cost_value is the closed-form minor_units value, not a per-kg rate); the mass_breakdown dependency enters CostCalculator only via the C1 currency_per_kg path which this bridge does not exercise.",
+    "no_runtime_resolver_statement: the future adapter MUST NOT introduce a runtime catalog resolver. The frozen cost_records_bridge is the sole source of cost-record inputs to CostModelSelector.select. A future amendment (002-J+) may authorize a runtime resolver with explicit input-output boundary + fixture-vs-resolver ordering rule; until then, the no-runtime-resolver rule is binding."
+  ],
+  "amendment_002h_chain_coverage": [
+    "select_cost_records_input_cost_records_bridge",
+    "select_cost_records_input_filters_from_cost_model_selection_block (material_family=stainless_steel_304, case_region, effective_date, cost_category_filter, quantity_basis_filter, license_class_filter=production default, escalation_index_reference_filter, record_currency, validity_envelope=None)",
+    "select_cost_records_propagate_c0_records_and_c1_records_to_cost_calculator",
+    "calculate_cost_breakdown_input_cost_model_selection_result",
+    "calculate_cost_breakdown_input_mass_breakdown_from_case_02 (per 002-G re-derivation; mass_breakdown.total_kg=16.183)",
+    "calculate_cost_breakdown_output_capex_envelope_to_cost_components_C0_C1 (C1_total_minor_units in public report shape = capex_envelope_minor_units)",
+    "calculate_cost_breakdown_output_calculator_run_id_to_upstream_calculation_run_ids",
+    "lifecycle_estimator_input_cost_breakdown_from_cost_calculator (OPTIONAL per §15.3.5)",
+    "lifecycle_estimator_input_thermal_service_summary_from_case_01 (OPTIONAL; case_01 already WIRED_VIA_CHAIN)",
+    "lifecycle_estimator_output_to_upstream_provenance_digests_only (public report shape unchanged; lifecycle-energy-summary integers remain amendment-001 frozen canonical baselines)"
+  ],
+  "amendment_002h_production_api_reconciliation": {
+    "production_select_cost_records_api": "hexagent.costing.select_cost_records (PLURAL; functional entrypoint in src/hexagent/costing/__init__.py; implementation in src/hexagent/costing/cost_model_selector.py line 651)",
+    "production_select_cost_records_signature": "select_cost_records(records: Sequence[Mapping[str, object]], filters: SelectionFilters) -> CostModelSelectionResult",
+    "production_select_cost_record_api_NOT_USED": "hexagent.material_costs.select_cost_record (SINGULAR; in src/hexagent/material_costs/selection.py line 263) is a DIFFERENT API that accepts a single cost_record_id from a caller-supplied catalog; it is NOT the API used by the TASK-019 case_03 chain. The chain_adapter's blocker description cites the PLURAL API correctly.",
+    "future_adapter_required_call": "hexagent.costing.select_cost_records (PLURAL) with records=case_03.input.cost_records_bridge and filters=SelectionFilters constructed from case_03.input.cost_model_selection per §15.3.2",
+    "production_calculate_cost_breakdown_api": "hexagent.costing.calculate_cost_breakdown (*, cost_model_selection_result, mass_breakdown, case_currency, case_region, effective_date, component_role_overrides=None, c0_heuristic_overrides=None, escalation_index_reference_filter=None) -> CostBreakdown",
+    "production_life_cycle_energy_estimator_api_OPTIONAL": "hexagent.costing.LifeCycleEnergyEstimator().estimate(input: LifeCycleEnergyEstimatorInput) -> LifeCycleEnergyBreakdown"
+  },
+  "amendment_002h_design_traps_documented": [
+    "trap_1_cost_category_prefix_convention: cost_category strings use c0_/c1_ prefix (c0_material_unit_price, c0_fabrication_labor, c1_installation_labor) required by the production CostModelSelector._build_selection bucket logic (src/hexagent/costing/cost_model_selector.py line 411-425). These prefix strings are NOT members of the TASK-013 CostCategory StrEnum (src/hexagent/material_costs/models.py line 134-152 lists material_unit_price, material_total_cost, fabrication_labor, fabrication_overhead, installation_labor, engineering_hours, transportation, taxes_and_duties, operating_energy, operating_utility, maintenance, insurance, decommissioning, compliance_permit, cost_escalation_index, price_index, other — no c0_/c1_ prefix members). The production selector does NOT invoke validate_cost_record_schema (which would reject the prefix strings via _check_enum_value on CostCategory); the prefix strings are accepted by the selector without enum validation. Future 002-I+ may update TASK-013 CostCategory enum to add the c0_/c1_ prefix members; until then the prefix convention is binding on the TASK-019 adapter.",
+    "trap_2_cost_value_units: cost_value is interpreted as integer minor units (USD cents) by _cost_value_to_minor_units (src/hexagent/costing/cost_calculator.py line 936). The bridge cost_value integers (412000, 188000, 0) are direct minor-unit amounts; they are NOT per-kg or per-hour rates (which would require mass-multiplied or time-multiplied derivation). The bridge is therefore a flat-labor-amount engineering-literature canonical baseline, not a unit-rate derivation. CostCalculator's C1 currency_per_kg path is NOT exercised by this bridge (the C1 record uses currency_per_hour which is a scalar at the calculator layer).",
+    "trap_3_C1_subtotal_semantics: CostCalculator capex_envelope_minor_units = sum(CostSubtotalBlock.amount_minor_units for c0_subtotal + c1_subtotal). With this bridge, capex_envelope = 412000 + 188000 + 0 = 600000. The public report shape's cost_components.C1_total_minor_units = 600000 = capex_envelope (the public report shape's C1_total is the total-project-cost semantic, not the production CostCalculator c1_subtotal semantic). The mapping §15.3.4 records this as: cost_components.C1_total_minor_units <- CostBreakdown.capex_envelope_minor_units.",
+    "trap_4_no_runtime_resolver_binding: 002-H does NOT authorize a runtime catalog resolver. The future adapter MUST read cost_records_bridge verbatim from the fixture, MUST NOT call any file-system walk, MUST NOT call any DB query, MUST NOT call any network call. A future 002-J+ may authorize a runtime resolver with explicit input-output boundary + fixture-vs-resolver ordering rule; until then, the no-runtime-resolver rule is binding.",
+    "trap_5_expected_output_central_value_preservation: 002-H does NOT re-derive the amendment-001 frozen expected_output central values. The fixture's cost_components_C0_C1.cost_components.{C0_material_minor_units=412000, C0_labor_minor_units=188000, C1_total_minor_units=600000} and life_cycle_energy_envelope.life_cycle_energy_summary.{annual_operating_hours=8000, design_life_years=20, annual_energy_MJ=241056.0, total_lifecycle_energy_MJ=4821120.0} and selected_cost_model.selected_model_id=ASME-BPVC-VIII-1-COST-MODEL-V1 are preserved verbatim byte-for-byte. If the future Slice 3B-C implementation round observes a mismatch OUTSIDE the amendment-001 tolerance envelope, the future round MUST STOP and report (see §15.3.6); silent expected_output mutation is FORBIDDEN by §9 FROZEN contract discipline."
+  ],
+  "amendment_002h_frozen_benchmark_input_bindings": {
+    "cost_records_bridge_bindings.c0_material_record_id": "TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1",
+    "cost_records_bridge_bindings.c0_labor_record_id": "TASK-019-AMEND-002H-C0-LABOR-ASME-V1",
+    "cost_records_bridge_bindings.c1_total_record_id": "TASK-019-AMEND-002H-C1-INSTALLATION-V1",
+    "cost_records_bridge_bindings.provenance_amendment_id": "TASK-019-DESIGN-AMENDMENT-002-H",
+    "binding_contract_note": "These 4 bindings are categorical-equality provenance entries. The future implementation round MUST verify the fixture's input.cost_records_bridge_bindings matches these 4 bindings byte-for-byte. Tolerance rule: {abs: null, rel: null, categorical: true, value: <frozen_string_literal>} for PASS."
+  },
   "case_source_basis": {
     "TASK-019-GOLDEN-01": "Kern, D.Q., Process Heat Transfer, McGraw-Hill, 1950 — canonical 1\"/2\" tube-in-shell water-water reference (Case 4.2, p. 92). Geometry: tube OD 33.4 mm × tube ID 26.6 mm × tube length 2.0 m; shell ID 52.5 mm × shell OD 60.3 mm. Operating envelope: hot-side 333.15 K / cold-side 293.15 K, both 0.5 kg/s, both 101325 Pa inlet. Fouling 0.0002 m^2 K/W both sides. The frozen vectors in case_01_heat_balance_rating.json are derived from the documented heat-balance closure at this operating point.",
     "TASK-019-GOLDEN-02": "Same geometry and fluid envelope as TASK-019-GOLDEN-01 with explicit material selection (SS304 per TASK-017 approved material catalog) and ASME BPVC Section VIII Div 1 design-code (per TASK-017 approved rule-pack). Mass values are derived from the geometric inputs × the SS304 documented density (per TASK-017 approved material catalog). Preliminary mechanical check PASSES because the design pressure (600000 Pa) and design temperature (343.15 K) are well below the SS304 allowable stress envelope at this temperature (per TASK-017 §9.1).",
