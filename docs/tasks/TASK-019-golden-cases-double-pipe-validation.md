@@ -1537,26 +1537,55 @@ fixture.**
 
 - **Binding contract surface**: the case_03 fixture's
   `input.cost_records_bridge` is a JSON array of frozen
-  cost-record-shaped mappings, each entry carrying the TASK-013
-  `CostRecord` shape verbatim: `cost_record_id` /
-  `cost_record_version` / `cost_category` /
-  `quantity_basis` / `currency_ISO_4217` / `value_minor_units` /
-  `source_class` / `issuing_body` / `region_id` /
-  `effective_date_ISO_8601` / `escalation_index_reference` /
-  `license_class` / `license_pointer` (the full set is
-  TASK-013 §6 + §10; only fields required by the
-  `CostModelSelector` selection algorithm need be present, with
-  other TASK-013 fields optional and frozen as `null` / omitted).
-- **Cost-record count**: a small, deterministic, frozen set of
-  records that exercises BOTH the C0 (`cost_category_filter`
-  includes `material` / `material_handling`) and C1
-  (`cost_category_filter` includes `labor` / `installation`) paths
-  per the TASK-018 §5.1.1 `SelectionFilters` shape. The frozen
-  record set MUST include at least one C0 record and at least one
-  C1 record so that the future adapter's `c0_records` and
-  `c1_records` outputs are both non-empty (otherwise the
-  `CostCalculator` falls into the `NOT_COMPUTABLE` state with
-  `cost_records_pending_TBD` blocker per TASK-018 §9.3).
+  selector-input-record-shaped mappings. Each entry carries the
+  **CostModelSelector input record shape** (TASK-018 Slice A
+  selector-input shape per `src/hexagent/costing/cost_model_selector.py`
+  `_validate_record_shape` and `_project_canonical`): the required
+  fields are `cost_record_id` / `cost_record_version` /
+  `cost_category` (with the `c0_` / `c1_` prefix convention
+  required by `CostModelSelector._build_selection` bucket logic;
+  see trap_1 below) / `cost_basis` / `currency` /
+  `quantity_basis` / `cost_value` (TASK-013 §6.4 CostValue
+  shape: integer minor units, currency, quantity_value_si,
+  unit_basis, normalized_unit_price,
+  escalation_index_reference, source_pointer,
+  uncertainty_band) / `license_class` / `source_class`. The
+  `escalation_index_reference` (top-level) /
+  `region` / `effective_date` / `provenance_amendment_id`
+  fields are also frozen at the bridge level to document the
+  TASK-018 §6 escalation rule and the §6.1 region binding.
+  This is NOT a TASK-013 CostRecord verbatim — TASK-013 CostRecord
+  adds fields like `record_hash` / `provenance_edges` /
+  `approval_state` / `human_entered_evidence` that are NOT
+  consumed by `CostModelSelector.select`; the bridge surface is
+  the CostModelSelector input contract surface only. The
+  CostModelSelector._validate_record_shape strict-required-field
+  set is the authoritative contract — the bridge MUST satisfy it.
+- **Cost-record count and binding convention**: a small,
+  deterministic, frozen set of records that exercises BOTH the
+  C0 (records whose `cost_category` starts with `c0_`) and C1
+  (records whose `cost_category` starts with `c1_`) buckets
+  per the production `CostModelSelector._build_selection`
+  bucket logic (`src/hexagent/costing/cost_model_selector.py`
+  lines 411-425). The frozen record set MUST include at least
+  one C0 record and at least one C1 record so that the
+  production selector populates `c0_records` and `c1_records`
+  both non-empty (otherwise the `CostCalculator` falls into
+  the `NOT_COMPUTABLE` state with `cost_records_pending_TBD`
+  blocker per TASK-018 §9.3). The bridge records are bound by
+  the `cost_records_bridge_bindings` block to the public report
+  shape's `cost_components_C0_C1.cost_components` fields: the
+  C0 record carrying `cost_category = "c0_material_unit_price"`
+  is bound to `C0_material_minor_units`; the C0 record carrying
+  `cost_category = "c0_fabrication_labor"` is bound to
+  `C0_labor_minor_units`; the C1 record carrying
+  `cost_category = "c1_installation_labor"` is bound to the
+  capex_envelope summary that maps to
+  `C1_total_minor_units` (see §15.3.4 mapping). The binding is
+  recorded in `input.cost_records_bridge_bindings` as
+  categorical-equality provenance entries; the future
+  implementation round MUST NOT add new bound records without
+  a new design amendment (002-I+).
 - **Bridge values source and auditability**: every cost-record entry
   is bound to one of three canonical TASK-018-approved sources
   recorded as `source_basis` (string literal at fixture-level),
@@ -1628,14 +1657,40 @@ lines 651-660).
           SS304 selection).
         - `case_region = input.cost_model_selection.region_id` verbatim.
         - `effective_date = input.cost_model_selection.date_ISO_8601` verbatim.
-        - `cost_category_filter = frozenset({"material", "material_handling",
-          "labor", "installation"})` (covers both C0 and C1 per TASK-018
-          §5.1.1; the future adapter MUST NOT narrow this set without
-          a new design amendment).
+        - `cost_category_filter = frozenset({"c0_material_unit_price",
+          "c0_fabrication_labor", "c1_installation_labor"})` —
+          **must EXACTLY match the fixture's
+          `input.cost_records_bridge[*].cost_category` set**. The
+          production `CostModelSelector._build_selection` bucket
+          logic uses `cost_category.startswith("c0_")` /
+          `cost_category.startswith("c1_")` to dispatch into
+          `c0_bucket` / `c1_bucket`; any `cost_category` whose
+          prefix is not `c0_` / `c1_` is rejected with the closed-set
+          `cost_category_does_not_match_c0_or_c1` blocker
+          (TASK-018 §9.1). The fixture's 3-record bridge has
+          `cost_category ∈ {"c0_material_unit_price",
+          "c0_fabrication_labor", "c1_installation_labor"}`; the
+          filter set MUST be exactly this set so the
+          `cost_category_filter` membership check does not drop
+          any record. The future adapter MUST NOT widen or narrow
+          this set without a new design amendment (002-I+).
         - `quantity_basis_filter = frozenset({"per_unit_mass_kg",
-          "per_unit_length_m", "per_unit_labor_hours"})` (matches
-          TASK-013 §6.3 quantity-basis codes that the SS304 /
-          ASME-labor records carry).
+          "per_unit_labor_hours", "currency_per_hour"})` — **must
+          EXACTLY match the fixture's
+          `input.cost_records_bridge[*].quantity_basis` set**. The
+          production `CostModelSelector._build_selection` applies
+          the `quantity_basis_filter` membership check after the
+          C0 / C1 bucket dispatch; any `quantity_basis` not in the
+          filter is silently dropped (the production selector
+          does NOT emit a closed-set blocker for this drop, per
+          the cost_category_filter / quantity_basis_filter split
+          in TASK-018 §5.1.1). The fixture's 3-record bridge has
+          `quantity_basis ∈ {"per_unit_mass_kg",
+          "per_unit_labor_hours", "currency_per_hour"}`; the
+          filter set MUST be exactly this set so the
+          `quantity_basis_filter` membership check does not drop
+          any record. The future adapter MUST NOT widen or narrow
+          this set without a new design amendment (002-I+).
         - `license_class_filter = frozenset(SELECTOR_LICENSE_CLASSES)`
           (the production module's default; the adapter MUST NOT
           widen this set).
@@ -1731,18 +1786,45 @@ amendment-001 public report shape.**
   values directly; the public report shape is a 3-element
   summary, NOT the production `c0_subtotal` / `c1_subtotal` /
   `cost_breakdown` nested envelope. Mapping is recorded below.
-- **`produced_fields` (binding)**:
+- **`produced_fields` (binding, BY-RECORD-ID mapping — NOT by
+  c0_subtotal.amount_minor_units post-filtering)**:
     - `cost_components_C0_C1.cost_components.C0_material_minor_units`
-      (int; mapped from `CostBreakdown.cost_breakdown["c0_subtotal"].
-      amount_minor_units` filtered to `cost_category_filter ⊆
-      {"material", "material_handling"}`, or 0 if no C0 records
-      match).
+      (int; looked up from
+      `CostBreakdown.cost_breakdown["c0_subtotal"].
+      component_breakdown[*].cost_record_id
+      == cost_records_bridge_bindings.c0_material_record_id`
+      `.amount_minor_units` field; the matching entry is
+      guaranteed by the bridge bindings to be the
+      `TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1` record). The
+      future adapter MUST NOT compute this field by filtering
+      `c0_subtotal.amount_minor_units` by a
+      `cost_category_filter` predicate; the binding is
+      record-id-based, not category-based, and any record-id
+      collision (multiple records with the same `cost_record_id`
+      in the bridge) MUST surface as
+      `details.reason = "duplicate_c0_material_record_id"` and
+      STOP per §15.3.6.
     - `cost_components_C0_C1.cost_components.C0_labor_minor_units`
-      (int; mapped from `CostBreakdown.cost_breakdown["c0_subtotal"].
-      amount_minor_units` filtered to `cost_category_filter ⊆
-      {"labor", "installation"}`, or 0 if no C0 records match).
+      (int; looked up from
+      `CostBreakdown.cost_breakdown["c0_subtotal"].
+      component_breakdown[*].cost_record_id
+      == cost_records_bridge_bindings.c0_labor_record_id`
+      `.amount_minor_units` field; the matching entry is
+      guaranteed by the bridge bindings to be the
+      `TASK-019-AMEND-002H-C0-LABOR-ASME-V1` record). The same
+      no-post-filter rule applies: by-record-id lookup only.
+      Duplicate-binding collision MUST surface as
+      `details.reason = "duplicate_c0_labor_record_id"` and STOP.
     - `cost_components_C0_C1.cost_components.C1_total_minor_units`
-      (int; from `CostBreakdown.capex_envelope_minor_units`).
+      (int; = `CostBreakdown.capex_envelope_minor_units` — the
+      total project cost summary emitted by CostCalculator,
+      which equals `c0_subtotal.amount_minor_units +
+      c1_subtotal.amount_minor_units` = `600000` with this
+      bridge). The future adapter MUST NOT compute this field by
+      filtering `c0_subtotal.amount_minor_units` by a category
+      predicate; the public report shape's `C1_total_minor_units`
+      is the capex-envelope total-project-cost semantic, NOT the
+      production `c1_subtotal` semantic.
     - `cost_components_C0_C1.currency_ISO_4217` (str; from
       `CostBreakdown.capex_envelope_currency`).
     - `cost_components_C0_C1.calculator_run_id` (str; from
