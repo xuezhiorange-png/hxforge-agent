@@ -2,7 +2,7 @@
   "case_id": "TASK-019-GOLDEN-02",
   "case_scope": "Same geometry and fluid conditions as Case 01, with explicit material selection and mass calculation, plus §9.1 preliminary mechanical check on tube allowable stress (TASK-017 §9.1 — already implemented in preliminary_checker.py). Upstream paths exercised: Case 01 + TASK-017 MaterialSelector + MassCalculator + PreliminaryMechanicalChecker §9.1. Pressure drop is explicitly NOT_COMPUTABLE (TASK-020+ scope; excluded from TASK-019 by frozen design §6).",
   "case_title": "Double-pipe heat balance + materials + mass + preliminary mechanical check",
-  "amendment_id": "TASK-019-AMEND-001-FREEZE-VECTORS",
+  "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F",
   "amendment_status": "DESIGN-AMENDMENT / MERGE-NOT-AUTHORIZED",
   "amendment_basis": "TASK-019 design-amendment round 2026-07-08 (PR branch codex/task-019-freeze-validation-vectors). Freezes the canonical case input vectors and the canonical expected output vectors for the TASK-017-authorized fields (material_selection, mass_kg, preliminary_mechanical_check status). Case 01 input vectors are referenced by case_id (TASK-019-GOLDEN-01) and inherit the frozen values from case_01_heat_balance_rating.json. Pressure-drop remains NOT_COMPUTABLE. No production calculation was executed to derive these frozen values; mass values are derived from the geometric inputs of Case 01 + the documented densities of SS304 (per TASK-017 approved material catalog). Preliminary mechanical check status is derived from the documented SS304 allowable stress at the design envelope (TASK-017 §9.1).",
   "input": {
@@ -15,6 +15,70 @@
       "design_code_id": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)",
       "shell_material_id": "SS304 (stainless steel 304, per TASK-017 approved material catalog)",
       "tube_material_id": "SS304 (stainless steel 304, per TASK-017 approved material catalog)"
+    },
+    "material_catalog_bridge": {
+      "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F",
+      "amendment_002f_scope": "TASK-019-GOLDEN-02 case-bound Material Catalog Bridge Contract (frozen input; not a runtime catalog lookup; not an adapter-generated value)",
+      "amendment_002f_status": "DESIGN-FROZEN-PENDING-MERGE",
+      "amendment_002f_bridge_schema_version": "1.0",
+      "shell": {
+        "component_role": "shell",
+        "identity": {
+          "material_record_id": "MAT-SS304-SHELL-001",
+          "material_family": "stainless_steel_austenitic",
+          "material_standard": "ASME SA-240",
+          "grade": "304",
+          "form_factor": "pipe",
+          "product_form": "welded_pipe",
+          "standard_or_spec_reference": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)"
+        },
+        "physical_properties": {
+          "density_kg_m3": 8000.0,
+          "thermal_conductivity_w_m_k": 16.2,
+          "specific_heat_j_kg_k": 500.0
+        },
+        "mechanical_properties": {
+          "allowable_stress_mpa_at_design_temperature": 137.0,
+          "yield_strength_mpa": 215.0,
+          "elastic_modulus_gpa": 193.0
+        },
+        "provenance": {
+          "source_category": "TASK_017_APPROVED_MATERIAL_CATALOG",
+          "source_reference": "TASK-017 approved material catalog, SS304 entry, design_envelope_revision (TASK-017 catalog revision 2026-07-08)",
+          "revision": "2026-07-08",
+          "effective_date": "2026-07-08",
+          "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F"
+        }
+      },
+      "tube": {
+        "component_role": "tube",
+        "identity": {
+          "material_record_id": "MAT-SS304-TUBE-001",
+          "material_family": "stainless_steel_austenitic",
+          "material_standard": "ASME SA-249",
+          "grade": "304",
+          "form_factor": "tube",
+          "product_form": "seamless_tube",
+          "standard_or_spec_reference": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)"
+        },
+        "physical_properties": {
+          "density_kg_m3": 8000.0,
+          "thermal_conductivity_w_m_k": 16.2,
+          "specific_heat_j_kg_k": 500.0
+        },
+        "mechanical_properties": {
+          "allowable_stress_mpa_at_design_temperature": 137.0,
+          "yield_strength_mpa": 215.0,
+          "elastic_modulus_gpa": 193.0
+        },
+        "provenance": {
+          "source_category": "TASK_017_APPROVED_MATERIAL_CATALOG",
+          "source_reference": "TASK-017 approved material catalog, SS304 entry, design_envelope_revision (TASK-017 catalog revision 2026-07-08)",
+          "revision": "2026-07-08",
+          "effective_date": "2026-07-08",
+          "amendment_id": "TASK-019-DESIGN-AMENDMENT-002-F"
+        }
+      }
     }
   },
   "expected_output": {
