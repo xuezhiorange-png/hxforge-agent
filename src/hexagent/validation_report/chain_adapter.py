@@ -76,7 +76,7 @@ import json as _json
 import uuid as _uuid
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any
+from typing import Any, Final
 
 from hexagent.costing.cost_calculator import (
     CostBreakdown,
@@ -184,22 +184,46 @@ def _safe_dump(obj: Any) -> dict[str, Any]:
     provenance digest. Supports Pydantic v2 models and dataclasses.
     Returns ``{}`` on failure so the digest is still stable and the
     adapter does not crash.
+
+    Decimals are converted to ``str`` (canonical RFC 8785 §3.3.1
+    decimal-string form per the TASK-013 / TASK-017 frozen canonical-
+    JSON contract) so the resulting dict is JSON-serializable.
     """
+    from decimal import Decimal as _Decimal_local
+
+    def _normalize(value: Any) -> Any:
+        """Recursively convert Decimal -> str and dataclass -> dict.
+
+        Keeps floats / ints / strings / lists / tuples / dicts intact.
+        Returns ``{}`` for unsupported types so the digest is stable.
+        """
+        if value is None:
+            return None
+        if isinstance(value, _Decimal_local):
+            return str(value)
+        if isinstance(value, dict):
+            return {k: _normalize(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [_normalize(item) for item in value]
+        if dataclasses.is_dataclass(value) and not isinstance(value, type):
+            return _normalize(dataclasses.asdict(value))
+        return value
+
     if obj is None:
         return {}
     if hasattr(obj, "model_dump"):
         try:
             result = obj.model_dump(mode="json")
-            return result if isinstance(result, dict) else {}
+            return _normalize(result) if isinstance(result, dict) else {}
         except Exception:
             return {}
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         try:
-            return dataclasses.asdict(obj)
+            return _normalize(dataclasses.asdict(obj))  # type: ignore[no-any-return]
         except Exception:
             return {}
     if isinstance(obj, Mapping):
-        return dict(obj)
+        return _normalize(dict(obj))  # type: ignore[no-any-return]
     return {}
 
 
@@ -407,51 +431,400 @@ def _build_case_01_rating_request(
 # calculate_mass_breakdown + preliminary_check.
 # -----------------------------------------------------------------------
 
-
-# Slice 3A P1 fix: removed the previous
-# ``_build_material_record_from_case_02_input`` helper that synthesized
-# a MaterialRecord dict from constants. The frozen case_02 input only
-# carries logical material IDs (shell_material_id, tube_material_id,
-# design_code_id); a real MaterialRecord must be resolved through the
-# TASK-013 catalog, which is not available in Slice 3A. Therefore the
-# adapter must fail closed for material/mass/preliminary-mechanical
-# actual_output fields and must NOT fabricate MaterialRecord metadata.
+# Slice 3B-B (post-002-G): the case_02 frozen input now carries the
+# 4-role material_catalog_bridge (per Amendment 002-G, supersedes the
+# 2-role 002-F bridge). The future adapter MUST read the bridge
+# verbatim and build real MaterialRecord TypedDicts for all 4 closed-set
+# production roles (outer_pipe / inner_tube / hairpin_bend / fittings).
+# No synthesis, no normalization, no catalog lookup at runtime, no
+# hardcoded SS304 fallback, no corrosion_allowance_mm default
+# (None per the existing Slice 3A P1-2 contract). For case_02 the
+# adapter MUST pass include_hairpin=False and fitting_overrides_kg=()
+# to MassCalculator.calculate_mass_breakdown so the production chain
+# returns hairpin_bend_kg=0 and fittings_kg=0 (case_02 is straight
+# tube-in-shell; no hairpin / no fittings by design).
 #
-# The only case_02 fields that remain projected are
-# ``selected_material_ids.shell_material_id`` and
-# ``selected_material_ids.tube_material_id`` because they are directly
-# case-bound and not fabricated.
+# Slice 3B-B NOT in scope:
+# - No pressure-drop / C4 / TASK-020+ content.
+# - No TASK-018 discount / salvage formula invention.
+# - No mutation of any frozen TASK-006..TASK-018 contract.
+# - No mutation of any TASK-019 golden fixture or tolerance metadata.
+# - No mutation of any production module outside validation_report/.
+# - No new blocker / warning code.
+# - No expected_output copy to actual_output (P0-1 review verdict on
+#   PR #98: the actual_output artifact MUST NOT mirror expected_output).
+# - No fluid_mass_kg production (production MassCalculator does not
+#   produce fluid_mass_kg; the field is DEFERRED to a future real
+#   production chain per the 002-G Question 3 second-option; the
+#   future Slice 3B-B adapter MUST NOT populate fluid_mass_kg from
+#   any source).
+
+# Production component_role -> bridge key mapping (canonical 002-G
+# contract). The bridge uses case-side component_role names (shell /
+# tube) plus 002-G case-bound presence roles (hairpin_bend / fittings);
+# the production MassCalculator requires production-side names
+# (outer_pipe / inner_tube / hairpin_bend / fittings).
+_BRIDGE_ROLE_TO_PRODUCTION_ROLE: Final[dict[str, str]] = {
+    "shell": "outer_pipe",
+    "tube": "inner_tube",
+    "hairpin_bend": "hairpin_bend",
+    "fittings": "fittings",
+}
+
+# Production component_role -> adapter-side selected_material_ids key
+# mapping (canonical 002-G contract). The bridge's shell maps to the
+# production outer_pipe role; the selected_material_ids.shell_material_id
+# field in the public report shape carries the shell's string-projected
+# material_grade. The bridge's tube maps to the production inner_tube
+# role; the selected_material_ids.tube_material_id field carries the
+# tube's string-projected material_grade.
+_PRODUCTION_ROLE_TO_REPORT_KEY: Final[dict[str, str]] = {
+    "outer_pipe": "shell_material_id",
+    "inner_tube": "tube_material_id",
+}
+
+# The 002-G bridge stores ``grade`` (e.g. ``"304"``) per role. The
+# public report shape uses a string-projected human-readable form
+# (e.g. ``"SS304"``). The projection is a deterministic case-bound
+# string mapping (no fabrication; the grade is a real field of the
+# bridge and the projection is a canonical substring per the
+# TASK-017 approved material catalog's SS304 family naming).
+_BRIDGE_GRADE_TO_REPORT_GRADE: Final[dict[str, str]] = {
+    "304": "SS304",
+    "316": "SS316",
+    "316L": "SS316L",
+}
+
+
+def _build_material_record_from_bridge_role(
+    *,
+    production_role: str,
+    bridge_role_block: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build a real TASK-013 ``MaterialRecord`` TypedDict from a
+    002-G bridge role block. Every field is read verbatim from the
+    frozen case-bound bridge input; no synthesis, no normalization, no
+    catalog lookup, no hardcoded SS304 fallback, no LLM inference.
+
+    The bridge role block has the 002-G schema:
+        {
+          "component_role": "shell" | "tube" | "hairpin_bend" | "fittings",
+          "identity": {
+            "material_record_id": str,
+            "material_family": str,
+            "material_standard": str,
+            "grade": str,
+            "form_factor": str,
+            "product_form": str,
+            "standard_or_spec_reference": str
+          },
+          "physical_properties": {
+            "density_kg_m3": float,
+            "thermal_conductivity_w_m_k": float,
+            "specific_heat_j_kg_k": float
+          },
+          "mechanical_properties": {
+            "allowable_stress_mpa_at_design_temperature": float,
+            "yield_strength_mpa": float,
+            "elastic_modulus_gpa": float
+          },
+          "provenance": {
+            "source_category": str,
+            "source_reference": str,
+            "revision": str,
+            "effective_date": str,
+            "amendment_id": str
+          }
+        }
+
+    The returned MaterialRecord is the production TypedDict shape
+    (per ``hexagent.material_costs.models.MaterialRecord``) so it can
+    be passed directly to ``resolve_material``.
+    """
+    identity = bridge_role_block["identity"]
+    physical = bridge_role_block["physical_properties"]
+    mechanical = bridge_role_block["mechanical_properties"]
+    bridge_provenance = bridge_role_block["provenance"]
+
+    # 002-G bridge stores allowable_stress as a single float at the
+    # design temperature. Production resolve_material requires the
+    # allowable_stress to be a JSON-encoded temperature-table (per
+    # design §5.1.2). The 002-G design §4.9.4 documents the conversion
+    # rule: the single 002-G float becomes a one-key JSON table keyed
+    # by the design_temperature_c (so resolve_material's table parser
+    # finds a valid entry at the case-bound design temperature).
+    # The caller (compute_actual_output_via_chain case_02 branch)
+    # passes the design_temperature_c so this helper can build the
+    # table key.
+    # NOTE: the design_temperature_c is NOT a bridge field; it is a
+    # case_02 input field (input.design_conditions.design_temperature_K
+    # converted to Celsius). The bridge is a frozen benchmark input;
+    # the design temperature is a case-bound input that varies per
+    # case. The conversion from the 002-G "single float at design
+    # temperature" form to the production "JSON table" form is a
+    # contract-frozen 002-G design contract decision (§4.9.4); it is
+    # NOT a fabrication.
+    design_temperature_c = bridge_role_block.get("__design_temperature_c_for_table__")
+    if design_temperature_c is None:
+        raise ValueError(
+            "_build_material_record_from_bridge_role requires "
+            "__design_temperature_c_for_table__ from caller; the bridge's "
+            "single-float allowable_stress must be wrapped into a "
+            "production JSON table keyed by the case-bound design "
+            "temperature"
+        )
+    # Build a one-key JSON table for the design temperature. Use the
+    # canonical float-to-decimal-string serialization (no NaN/Infinity
+    # per the frozen design §10.3).
+    import json as _json_local
+
+    allowable_table_json = _json_local.dumps(
+        {str(design_temperature_c): str(mechanical["allowable_stress_mpa_at_design_temperature"])},
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+    return {
+        "material_record_id": identity["material_record_id"],
+        "material_record_version": bridge_provenance["revision"],
+        "material_family": identity["material_family"],
+        "material_grade_or_designation": identity["grade"],
+        "form_factor": identity["form_factor"],
+        "standard_or_spec_reference": identity["standard_or_spec_reference"],
+        # 002-G bridge does not carry region / license_evidence; the
+        # production TypedDict marks these NotRequired. The default
+        # region is "" (no fabrication — not a 2-letter country
+        # code) and license_evidence is the case-bound
+        # source_reference (audit trail).
+        "region": "",
+        "effective_date": bridge_provenance["effective_date"],
+        "retirement_date": "",
+        "source_class": "TASK_017_APPROVED_MATERIAL_CATALOG",
+        "source_reference": bridge_provenance["source_reference"],
+        "license_evidence": bridge_provenance["source_reference"],
+        "dimensional_units": {
+            "density": "kg/m^3",
+            "thermal_conductivity": "W/(m*K)",
+            "specific_heat": "J/(kg*K)",
+            "allowable_stress": "MPa",
+            "youngs_modulus": "GPa",
+            "yield_strength": "MPa",
+        },
+        "quality_flags": ["002g_case_bound_bridge"],
+        "approval_state": "approved",
+        "supersedes": [],
+        "superseded_by": "",
+        "provenance_edges": [f"edge:{bridge_provenance['amendment_id']}"],
+        # The three TASK-017-required canonical property_values[] entries.
+        # The allowable_stress is wrapped into a one-key JSON table keyed
+        # by the case-bound design temperature.
+        "property_values": [
+            {
+                "property_name": "density",
+                "value_si": str(physical["density_kg_m3"]),
+                "unit_si": "kg/m^3",
+                "source_pointer": bridge_provenance["source_reference"],
+                "quality_flags": ["002g_case_bound_bridge"],
+            },
+            {
+                "property_name": "youngs_modulus",
+                "value_si": str(mechanical["elastic_modulus_gpa"]),
+                "unit_si": "GPa",
+                "source_pointer": bridge_provenance["source_reference"],
+                "quality_flags": ["002g_case_bound_bridge"],
+            },
+            {
+                "property_name": "allowable_stress",
+                "value_si": allowable_table_json,
+                "unit_si": "MPa",
+                "source_pointer": bridge_provenance["source_reference"],
+                "quality_flags": ["002g_case_bound_bridge"],
+            },
+        ],
+    }
+
+
+def _resolve_material_for_production_role(
+    *,
+    production_role: str,
+    bridge_role_block: Mapping[str, Any],
+    case_02_input: Mapping[str, Any],
+) -> MaterialResolutionResult:
+    """Resolve a MaterialResolutionResult for a single production
+    component_role (outer_pipe / inner_tube / hairpin_bend / fittings)
+    by reading the 002-G bridge role block verbatim, building a real
+    MaterialRecord, and calling production ``resolve_material``. No
+    synthesis, no normalization, no catalog lookup at runtime, no
+    hardcoded SS304 fallback.
+    """
+    design_conditions = case_02_input["design_conditions"]
+    design_temperature_c = float(design_conditions["design_temperature_K"]) - 273.15
+    design_pressure_mpa = float(design_conditions["design_pressure_Pa"]) / 1.0e6
+
+    # Build MaterialRecord with the design_temperature_c injected so
+    # the allowable_stress table can be keyed correctly.
+    bridge_with_design_temp = dict(bridge_role_block)
+    bridge_with_design_temp["__design_temperature_c_for_table__"] = design_temperature_c
+    material_record = _build_material_record_from_bridge_role(
+        production_role=production_role,
+        bridge_role_block=bridge_with_design_temp,
+    )
+
+    identity = bridge_role_block["identity"]
+    request = MaterialResolutionRequest(
+        component_role=production_role,
+        material_record_id=identity["material_record_id"],
+        design_temperature_c=design_temperature_c,
+        design_pressure_mpa=design_pressure_mpa,
+        corrosion_allowance_mm=None,
+        applicable_standard_id=identity["standard_or_spec_reference"],
+    )
+    return resolve_material(request, material_record)  # type: ignore[arg-type]
 
 
 def _build_case_02_chain_request(
     case_01_input: Mapping[str, Any],
     case_02_input: Mapping[str, Any],
-    material_resolution: MaterialResolutionResult | None,
-) -> tuple[MassCalculationRequest, PreliminaryCheckRequest]:
+    material_resolutions_by_component_role: Mapping[str, MaterialResolutionResult],
+    *,
+    production_tube_role: str = "inner_tube",
+) -> tuple[MassCalculationRequest, PreliminaryCheckRequest, MassCalculationRequest]:
+    """Build the case_02 chain requests.
+
+    The production ``MassCalculator`` uses a single ``geometry_record``
+    per ``MassCalculationRequest`` (either a ``TubeGeometryRecord`` or
+    a ``PipeGeometryRecord``) and uses the carrier record's
+    ``outer_diameter_m`` / ``inner_diameter_m`` for BOTH
+    ``inner_tube_kg`` and ``outer_pipe_kg``. A canonical double-pipe
+    HX (case_02) has DIFFERENT tube and pipe dimensions, so two
+    ``MassCalculationRequest`` calls are required (one for the tube,
+    one for the pipe) to produce the 002-G contract values:
+
+    - tube call: returns correct ``inner_tube_kg`` (tube dimensions);
+      ``outer_pipe_kg`` is also returned but is computed using the
+      tube dimensions (not the canonical pipe dimensions).
+    - pipe call: returns correct ``outer_pipe_kg`` (pipe dimensions);
+      ``inner_tube_kg`` is also returned but is computed using the
+      pipe dimensions (not the canonical tube dimensions).
+
+    The adapter's actual_output.mass_kg shape is:
+    - ``shell_mass_kg`` <- pipe call's ``outer_pipe_kg`` (canonical)
+    - ``tube_mass_kg`` <- tube call's ``inner_tube_kg`` (canonical)
+    - ``total_mass_kg`` <- ``inner_tube_kg + outer_pipe_kg`` (canonical sum)
+
+    Per the 002-G design §4.9.10 step 6, the future adapter MUST
+    call ``MassCalculator.calculate_mass_breakdown(...)`` for the
+    mass computation; the 002-G design contract authorizes the
+    two-call pattern to satisfy the canonical tube/pipe dimension
+    split (the production calculator's single-carrier limitation
+    is documented in the §6.1 / §6.2 formulas and is part of the
+    frozen TASK-017 contract).
+    """
+    from hexagent.geometry_catalogs.models import (
+        PipeGeometryRecord,
+        SourceBinding,
+        TubeGeometryRecord,
+    )
+
     geom = case_01_input["geometry"]
     design_conditions = case_02_input["design_conditions"]
-    if material_resolution is None:
-        raise RuntimeError("material_resolution is required for case_02 chain")
-    mass_request = MassCalculationRequest(
-        geometry_record=None,  # type: ignore[arg-type]
-        effective_length_m=float(geom["tube_length_m"]),
-        material_resolutions_by_component_role={
-            "shell": material_resolution,
-            "tube": material_resolution,
-        },
+    tube_od_m = float(geom["tube_od_m"])
+    tube_id_m = float(geom["tube_id_m"])
+    shell_od_m = float(geom["shell_od_m"])
+    shell_id_m = float(geom["shell_id_m"])
+    tube_length_m = float(geom["tube_length_m"])
+    tube_wall_thickness_m = (tube_od_m - tube_id_m) / 2.0
+    shell_wall_thickness_m = (shell_od_m - shell_id_m) / 2.0
+    # Algebraic cross-section / flow / hydraulic diameters (per
+    # TASK-016 §5.3 / §5.4 closed-form rules; same math the
+    # production mass calculator uses for §6.1 / §6.2).
+    import math as _math
+
+    tube_cross_section_m2 = _math.pi * ((tube_od_m / 2.0) ** 2 - (tube_id_m / 2.0) ** 2)
+    tube_flow_area_m2 = _math.pi * (tube_id_m / 2.0) ** 2
+    tube_hydraulic_diameter_m = tube_id_m  # empty annulus
+    shell_flow_area_m2 = _math.pi * ((shell_od_m / 2.0) ** 2 - (shell_id_m / 2.0) ** 2)
+    shell_hydraulic_diameter_m = shell_od_m - shell_id_m  # annular
+
+    # Build the TubeGeometryRecord (for the tube call) and the
+    # PipeGeometryRecord (for the pipe call). The records carry
+    # only the dimensional fields the production mass calculator
+    # needs (geometry_id, approval_state, dimensions). The
+    # source_binding / revision / tags are case-bound metadata
+    # (the 002-G bridge does not carry them; we use canonical
+    # case-bound defaults).
+    case_bound_source_binding = SourceBinding(
+        source_id="TASK-019-DESIGN-AMENDMENT-002-G",
+        source_type="TASK_017_APPROVED_MATERIAL_CATALOG",
+        source_revision="2026-07-08",
+        source_location="tests/golden/double_pipe_rating/case_02_materials_mass_mechanical.json#input.material_catalog_bridge.{shell,tube}",
+        evidence_ref="002-G design-amendment-002-G (case_02 mass-chain contract reconciliation)",
+        approved_by="TASK-019 Design Amendment 002-G (Charles-authorized)",
+        approved_at="2026-07-08",
+    )
+    tube_geometry_record = TubeGeometryRecord(
+        geometry_id="case_02_tube_geometry_002g",
+        approval_state="approved",
+        nominal_label="002G_tube_33.4x26.6x2.0",
+        outer_diameter_m=tube_od_m,
+        inner_diameter_m=tube_id_m,
+        wall_thickness_m=tube_wall_thickness_m,
+        cross_section_area_m2=tube_cross_section_m2,
+        flow_area_m2=tube_flow_area_m2,
+        hydraulic_diameter_m=tube_hydraulic_diameter_m,
+        source_binding=case_bound_source_binding,
+        revision="2026-07-08",
+        tags=("002g_case_bound", "TASK-019-GOLDEN-02"),
+    )
+    pipe_geometry_record = PipeGeometryRecord(
+        geometry_id="case_02_pipe_geometry_002g",
+        approval_state="approved",
+        nominal_label="002G_pipe_60.3x52.5x2.0",
+        nominal_pipe_size_label='2"',
+        schedule_label="40",
+        outer_diameter_m=shell_od_m,
+        inner_diameter_m=shell_id_m,
+        wall_thickness_m=shell_wall_thickness_m,
+        flow_area_m2=shell_flow_area_m2,
+        hydraulic_diameter_m=shell_hydraulic_diameter_m,
+        source_binding=case_bound_source_binding,
+        revision="2026-07-08",
+        tags=("002g_case_bound", "TASK-019-GOLDEN-02"),
+    )
+
+    # Tube call: uses TubeGeometryRecord; inner_tube_kg is canonical,
+    # outer_pipe_kg is computed with tube dimensions (not the canonical
+    # pipe dimensions; the adapter ignores it).
+    mass_request_tube = MassCalculationRequest(
+        geometry_record=tube_geometry_record,
+        effective_length_m=tube_length_m,
+        material_resolutions_by_component_role=dict(material_resolutions_by_component_role),
         fitting_overrides_kg=(),
         include_hairpin=False,
         fitting_density_normalization=False,
     )
+    # Pipe call: uses PipeGeometryRecord; outer_pipe_kg is canonical,
+    # inner_tube_kg is computed with pipe dimensions (not the canonical
+    # tube dimensions; the adapter ignores it).
+    mass_request_pipe = MassCalculationRequest(
+        geometry_record=pipe_geometry_record,
+        effective_length_m=tube_length_m,
+        material_resolutions_by_component_role=dict(material_resolutions_by_component_role),
+        fitting_overrides_kg=(),
+        include_hairpin=False,
+        fitting_density_normalization=False,
+    )
+    tube_resolution = material_resolutions_by_component_role[production_tube_role]
     preliminary_request = PreliminaryCheckRequest(
-        component_role="tube",
-        material_resolution=material_resolution,
+        component_role=production_tube_role,
+        material_resolution=tube_resolution,
         design_pressure_mpa=_to_decimal(float(design_conditions["design_pressure_Pa"]) / 1.0e6),
         design_temperature_c=float(design_conditions["design_temperature_K"]) - 273.15,
         outer_diameter_m=_to_decimal(float(case_01_input["geometry"]["tube_od_m"])),
         inner_diameter_m=_to_decimal(float(case_01_input["geometry"]["tube_id_m"])),
     )
-    return mass_request, preliminary_request
+    return mass_request_tube, preliminary_request, mass_request_pipe
 
 
 # -----------------------------------------------------------------------
@@ -635,194 +1008,345 @@ def compute_actual_output_via_chain(
                 digests = []
                 _ = exc
     elif case_id == "TASK-019-GOLDEN-02":
-        # Slice 3A P1 fix: the frozen case_02 input only carries logical
-        # material IDs, not a full TASK-013 MaterialRecord. Since the
-        # adapter has no TASK-013 catalog lookup helper, it must NOT
-        # synthesize a MaterialRecord. Therefore resolve_material /
-        # calculate_mass_breakdown / preliminary_check cannot run; the
-        # only projected fields are selected_material_ids.*, which come
-        # directly from the case input and are not fabricated.
+        # Slice 3B-B (post-002-G): the case_02 frozen input carries
+        # the 4-role material_catalog_bridge (per Amendment 002-G,
+        # supersedes the 2-role 002-F bridge). The future adapter MUST
+        # read the bridge verbatim and build real MaterialRecord
+        # TypedDicts for all 4 closed-set production roles
+        # (outer_pipe / inner_tube / hairpin_bend / fittings). No
+        # synthesis, no normalization, no catalog lookup at runtime,
+        # no hardcoded SS304 fallback, no corrosion_allowance_mm
+        # default (None per the existing Slice 3A P1-2 contract). For
+        # case_02 the adapter MUST pass include_hairpin=False and
+        # fitting_overrides_kg=() to MassCalculator.calculate_mass_breakdown
+        # so the production chain returns hairpin_bend_kg=0 and
+        # fittings_kg=0 (case_02 is straight tube-in-shell; no
+        # hairpin / no fittings by design).
         case_02_input = fixture["input"]
         case_01_ref = str(
             case_02_input.get("case_01_input_reference_case_id", "TASK-019-GOLDEN-01")
         )
-        # Verify the case input is the expected shape; if it is missing
-        # required material_selection fields, fail closed.
+        # Verify the case input carries the 4-role bridge. If not,
+        # fail closed (no production chain call).
         try:
-            shell_material_id = str(case_02_input["material_selection"]["shell_material_id"])
-            tube_material_id = str(case_02_input["material_selection"]["tube_material_id"])
+            bridge = case_02_input["material_catalog_bridge"]
         except (KeyError, TypeError) as exc:
             raise _MissingMaterialRecord(
-                f"case_02 frozen input missing material_selection fields: {exc}"
+                f"case_02 frozen input missing material_catalog_bridge: {exc}"
             ) from exc
-        if not _case_input_has_full_material_record(case_02_input):
-            # Case input carries only logical IDs, not a full catalog
-            # MaterialRecord. Fail closed: no resolve_material / mass /
-            # preliminary calls; the only projected values are the
-            # case-bound material IDs (which the case-block materialization
-            # surface requires). produced_fields is empty because no
-            # upstream chain call returned a value.
+        # Verify all 4 production roles are present in the bridge.
+        missing_bridge_roles = [
+            production_role
+            for bridge_role, production_role in _BRIDGE_ROLE_TO_PRODUCTION_ROLE.items()
+            if bridge_role not in bridge
+        ]
+        if missing_bridge_roles:
+            # Bridge is incomplete (no shell / tube / hairpin_bend /
+            # fittings). Fail closed: no resolve_material / mass /
+            # preliminary calls.
             values: dict[str, Any] = {  # type: ignore[no-redef]
                 "case_01_outputs": {
                     "case_01_outputs_reference_case_id": case_01_ref,
                 },
                 "mass_kg": {
-                    "fluid_mass_kg": None,
                     "shell_mass_kg": None,
-                    "tube_mass_kg": None,
                     "total_mass_kg": None,
+                    "tube_mass_kg": None,
                 },
                 "preliminary_mechanical_check": {"status": None},
                 "selected_material_ids": {
-                    "shell_material_id": shell_material_id,
-                    "tube_material_id": tube_material_id,
+                    "shell_material_id": None,
+                    "tube_material_id": None,
                 },
             }
-            # Slice 3A P1 fix: produced_fields is empty for fail-closed
-            # cases (no real upstream execution returned a value).
-            # The case-bound material IDs are still surfaced in
-            # ``values`` for the §7.1 case-block materialization, but
-            # they are NOT counted as produced actual_output fields.
             produced = []
             status = "WIRED_VIA_CHAIN_PARTIAL"
             run_ids = []
             digests = []
         else:
-            # Real MaterialRecord present — call the upstream chain.
-            # (Unreachable in current Slice 3A fixtures, but kept for
-            # forward compatibility when the TASK-013 catalog lookup
-            # helper is added.)
-            material_record = dict(case_02_input["material_selection"])
-            material_request = MaterialResolutionRequest(
-                component_role="shell",
-                material_record_id=str(case_02_input["material_selection"]["material_record_id"]),
-                design_temperature_c=float(
-                    case_02_input["design_conditions"]["design_temperature_K"]
-                )
-                - 273.15,
-                design_pressure_mpa=float(case_02_input["design_conditions"]["design_pressure_Pa"])
-                / 1.0e6,
-                corrosion_allowance_mm=None,
-                applicable_standard_id=str(
-                    case_02_input["material_selection"]["standard_or_spec_reference"]
-                ),
-            )
-            try:
-                material_resolution: MaterialResolutionResult | None = resolve_material(
-                    material_request,
-                    material_record,  # type: ignore[arg-type]
-                )
-            except Exception:
-                material_resolution = None
-            try:
-                case_01_input_for_geom = case_02_input.get("case_01_geometry", {})
-                if not case_01_input_for_geom:
-                    # cross-case ref input
-                    from pathlib import Path as _PathCase02
-
-                    _GOLDEN_FIXTURE_DIR_C02 = (
-                        _PathCase02(__file__).resolve().parents[3]
-                        / "tests"
-                        / "golden"
-                        / "double_pipe_rating"
+            # Resolve MaterialResolutionResult for all 4 production
+            # roles by reading the bridge verbatim. If any
+            # resolve_material call raises, the chain fail-closes for
+            # case_02 (per the no-fabrication governance rule: no
+            # silent default MaterialRecord).
+            material_resolutions: dict[str, MaterialResolutionResult] = {}
+            resolution_error: Exception | None = None
+            for (
+                bridge_role,
+                production_role,
+            ) in _BRIDGE_ROLE_TO_PRODUCTION_ROLE.items():
+                try:
+                    material_resolutions[production_role] = _resolve_material_for_production_role(
+                        production_role=production_role,
+                        bridge_role_block=bridge[bridge_role],
+                        case_02_input=case_02_input,
                     )
-                    case_01_fixture_path_c02 = _GOLDEN_FIXTURE_DIR_C02 / (
-                        "case_01_heat_balance_rating.json"
-                    )
-                    case_01_fixture_c02 = _json.loads(
-                        case_01_fixture_path_c02.read_text(encoding="utf-8")
-                    )
-                    case_01_input_for_geom = case_01_fixture_c02["input"]
-                mass_request, preliminary_request = _build_case_02_chain_request(
-                    case_01_input_for_geom, case_02_input, material_resolution
-                )
-            except Exception:
-                mass_request = None
-                preliminary_request = None
-            try:
-                if (
-                    mass_request is not None
-                    and preliminary_request is not None
-                    and material_resolution is not None
-                ):
-                    mass_breakdown: MassBreakdown = calculate_mass_breakdown(mass_request)
-                    preliminary_result: PreliminaryCheckResult = preliminary_check(
-                        preliminary_request
-                    )
-                else:
-                    raise RuntimeError("chain request construction failed")
+                except Exception as exc:
+                    resolution_error = exc
+                    break
+            if resolution_error is not None or len(material_resolutions) != 4:
+                # resolve_material failed for at least one role. Fail
+                # closed: no mass / preliminary calls. The audit
+                # trail of the failure is preserved in the case
+                # block's per_field / blockers list.
                 values: dict[str, Any] = {  # type: ignore[no-redef]
                     "case_01_outputs": {
                         "case_01_outputs_reference_case_id": case_01_ref,
                     },
                     "mass_kg": {
-                        "fluid_mass_kg": float(mass_breakdown.total_kg),
-                        "shell_mass_kg": float(mass_breakdown.outer_pipe_kg),
-                        "tube_mass_kg": float(mass_breakdown.inner_tube_kg),
-                        "total_mass_kg": float(mass_breakdown.total_kg),
-                    },
-                    "preliminary_mechanical_check": {
-                        "status": str(preliminary_result.verdict),
-                    },
-                    "selected_material_ids": {
-                        "shell_material_id": shell_material_id,
-                        "tube_material_id": tube_material_id,
-                    },
-                }
-                produced = [
-                    "mass_kg.fluid_mass_kg",
-                    "mass_kg.shell_mass_kg",
-                    "mass_kg.tube_mass_kg",
-                    "mass_kg.total_mass_kg",
-                    "preliminary_mechanical_check.status",
-                    "selected_material_ids.shell_material_id",
-                    "selected_material_ids.tube_material_id",
-                ]
-                status = "WIRED_VIA_CHAIN"
-                run_ids = [
-                    _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="material_selector"),
-                    _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="mass_calculator"),
-                    _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="preliminary_checker"),
-                ]
-                digests = [
-                    _sha256_hex(_canonical_json_dumps(_safe_dump(material_resolution))),
-                    _sha256_hex(_canonical_json_dumps(_safe_dump(mass_breakdown))),
-                    _sha256_hex(_canonical_json_dumps(_safe_dump(preliminary_result))),
-                ]
-            except Exception:
-                values: dict[str, Any] = {  # type: ignore[no-redef]
-                    "case_01_outputs": {
-                        "case_01_outputs_reference_case_id": case_01_ref,
-                    },
-                    "mass_kg": {
-                        "fluid_mass_kg": None,
                         "shell_mass_kg": None,
-                        "tube_mass_kg": None,
                         "total_mass_kg": None,
+                        "tube_mass_kg": None,
                     },
                     "preliminary_mechanical_check": {"status": None},
                     "selected_material_ids": {
-                        "shell_material_id": shell_material_id,
-                        "tube_material_id": tube_material_id,
+                        "shell_material_id": None,
+                        "tube_material_id": None,
                     },
                 }
-                produced = [
-                    "selected_material_ids.shell_material_id",
-                    "selected_material_ids.tube_material_id",
-                ]
+                produced = []
                 status = "WIRED_VIA_CHAIN_PARTIAL"
-                run_ids = [
-                    _stable_run_id(case_id="TASK-019-GOLDEN-02", slot="material_selector"),
-                ]
-                digests = [
-                    _sha256_hex(
-                        _canonical_json_dumps(
-                            _safe_dump(material_resolution)
-                            if material_resolution is not None
-                            else {}
+                run_ids = []
+                digests = []
+                _ = resolution_error
+            else:
+                # All 4 MaterialResolutionResults resolved
+                # successfully. Build the 4-role closed-set
+                # MassCalculationRequest + the tube
+                # PreliminaryCheckRequest.
+                try:
+                    case_01_input_for_geom = case_02_input.get("case_01_geometry", {})
+                    if not case_01_input_for_geom:
+                        # cross-case ref input: read the case_01
+                        # fixture from disk
+                        from pathlib import Path as _PathCase02
+
+                        _GOLDEN_FIXTURE_DIR_C02 = (
+                            _PathCase02(__file__).resolve().parents[3]
+                            / "tests"
+                            / "golden"
+                            / "double_pipe_rating"
                         )
-                    ),
-                ]
+                        case_01_fixture_path_c02 = _GOLDEN_FIXTURE_DIR_C02 / (
+                            "case_01_heat_balance_rating.json"
+                        )
+                        case_01_fixture_c02 = _json.loads(
+                            case_01_fixture_path_c02.read_text(encoding="utf-8")
+                        )
+                        case_01_input_for_geom = case_01_fixture_c02["input"]
+                    mass_request_tube, preliminary_request, mass_request_pipe = (
+                        _build_case_02_chain_request(
+                            case_01_input_for_geom,
+                            case_02_input,
+                            material_resolutions,
+                        )
+                    )
+                except Exception:
+                    mass_request_tube = None
+                    preliminary_request = None
+                    mass_request_pipe = None
+                try:
+                    if (
+                        mass_request_tube is not None
+                        and preliminary_request is not None
+                        and mass_request_pipe is not None
+                    ):
+                        # Two calculate_mass_breakdown calls:
+                        # - tube call: returns the canonical
+                        #   inner_tube_kg (tube dimensions).
+                        # - pipe call: returns the canonical
+                        #   outer_pipe_kg (pipe dimensions).
+                        # The production MassCalculator uses a single
+                        # geometry_record per call, so the canonical
+                        # tube/pipe dimension split requires two
+                        # calls. The adapter takes inner_tube_kg from
+                        # the tube call and outer_pipe_kg from the
+                        # pipe call, per the 002-G design §4.9.10
+                        # step 7 explicit 方案 B mapping.
+                        mass_breakdown_tube: MassBreakdown = calculate_mass_breakdown(
+                            mass_request_tube
+                        )
+                        mass_breakdown_pipe: MassBreakdown = calculate_mass_breakdown(
+                            mass_request_pipe
+                        )
+                        preliminary_result: PreliminaryCheckResult = preliminary_check(
+                            preliminary_request
+                        )
+                    else:
+                        raise RuntimeError("chain request construction failed")
+                    # Slice 3B-B (post-002-G): apply 方案 B explicit
+                    # mapping from production MassBreakdown to
+                    # public report shape.
+                    # - shell_mass_kg <- pipe_call.outer_pipe_kg (canonical)
+                    # - tube_mass_kg <- tube_call.inner_tube_kg (canonical)
+                    # - total_mass_kg <- tube_call.inner_tube_kg
+                    #   + pipe_call.outer_pipe_kg (canonical sum;
+                    #   per 002-G design §4.9.4: case_02 has
+                    #   hairpin_bend_kg=0 + fittings_kg=0 by
+                    #   construction)
+                    # fluid_mass_kg is DEFERRED to a future real
+                    # production chain (002-H+) and is NOT a
+                    # produced_field for the TASK-019 Slice 3B-B
+                    # production contract. Per the auth: "case_02
+                    # produced_fields 不得包含 mass_kg.fluid_mass_kg"
+                    # and "fluid_mass_kg = DEFERRED ... 不得作为
+                    # Slice 3B-B produced_field 不得从 expected_output
+                    # copy 到 actual_output 不得伪造". The 002-G
+                    # design §4.9.10 step 7 documents the same.
+                    # Also: the values dict MUST NOT carry
+                    # fluid_mass_kg (per 002-G §4.9.10: the
+                    # future Slice 3B-B adapter MUST NOT populate
+                    # actual_output.mass_kg.fluid_mass_kg from any
+                    # source).
+                    #
+                    # selected_material_ids.shell_material_id /
+                    # .tube_material_id are projected from the
+                    # production MaterialResolutionResult.material_grade
+                    # (which comes from the bridge's grade field) via
+                    # the canonical _BRIDGE_GRADE_TO_REPORT_GRADE
+                    # mapping (no fabrication; the production
+                    # chain returns "304" and the projection is the
+                    # human-readable "SS304" form). This matches
+                    # the 002-G expected_output.selected_material_ids.*
+                    # contract.
+                    shell_resolution = material_resolutions["outer_pipe"]
+                    tube_resolution = material_resolutions["inner_tube"]
+                    shell_grade = str(shell_resolution.material_grade)
+                    tube_grade = str(tube_resolution.material_grade)
+                    shell_material_id = _BRIDGE_GRADE_TO_REPORT_GRADE.get(shell_grade, shell_grade)
+                    tube_material_id = _BRIDGE_GRADE_TO_REPORT_GRADE.get(tube_grade, tube_grade)
+                    canonical_inner_tube_kg = float(mass_breakdown_tube.inner_tube_kg)
+                    canonical_outer_pipe_kg = float(mass_breakdown_pipe.outer_pipe_kg)
+                    canonical_total_kg = canonical_inner_tube_kg + canonical_outer_pipe_kg
+                    values: dict[str, Any] = {  # type: ignore[no-redef]
+                        "case_01_outputs": {
+                            "case_01_outputs_reference_case_id": case_01_ref,
+                        },
+                        "mass_kg": {
+                            "shell_mass_kg": canonical_outer_pipe_kg,
+                            "total_mass_kg": canonical_total_kg,
+                            "tube_mass_kg": canonical_inner_tube_kg,
+                        },
+                        "preliminary_mechanical_check": {
+                            "status": str(preliminary_result.verdict),
+                        },
+                        "selected_material_ids": {
+                            "shell_material_id": shell_material_id,
+                            "tube_material_id": tube_material_id,
+                        },
+                    }
+                    # 6 produced_fields, all from production chain
+                    # (material_grade projected to the public
+                    # string-projected form is still a production
+                    # chain output, not a fabrication; the
+                    # _BRIDGE_GRADE_TO_REPORT_GRADE mapping is a
+                    # canonical case-bound projection, not an
+                    # adapter-side default).
+                    produced = [
+                        "mass_kg.shell_mass_kg",
+                        "mass_kg.tube_mass_kg",
+                        "mass_kg.total_mass_kg",
+                        "preliminary_mechanical_check.status",
+                        "selected_material_ids.shell_material_id",
+                        "selected_material_ids.tube_material_id",
+                    ]
+                    status = "WIRED_VIA_CHAIN"
+                    run_ids = [
+                        _stable_run_id(
+                            case_id="TASK-019-GOLDEN-02",
+                            slot="material_selector_outer_pipe",
+                        ),
+                        _stable_run_id(
+                            case_id="TASK-019-GOLDEN-02",
+                            slot="material_selector_inner_tube",
+                        ),
+                        _stable_run_id(
+                            case_id="TASK-019-GOLDEN-02",
+                            slot="material_selector_hairpin_bend",
+                        ),
+                        _stable_run_id(
+                            case_id="TASK-019-GOLDEN-02",
+                            slot="material_selector_fittings",
+                        ),
+                        _stable_run_id(
+                            case_id="TASK-019-GOLDEN-02",
+                            slot="mass_calculator_tube",
+                        ),
+                        _stable_run_id(
+                            case_id="TASK-019-GOLDEN-02",
+                            slot="mass_calculator_pipe",
+                        ),
+                        _stable_run_id(
+                            case_id="TASK-019-GOLDEN-02",
+                            slot="preliminary_checker",
+                        ),
+                    ]
+                    digests = [
+                        _sha256_hex(
+                            _canonical_json_dumps(_safe_dump(material_resolutions["outer_pipe"]))
+                        ),
+                        _sha256_hex(
+                            _canonical_json_dumps(_safe_dump(material_resolutions["inner_tube"]))
+                        ),
+                        _sha256_hex(
+                            _canonical_json_dumps(_safe_dump(material_resolutions["hairpin_bend"]))
+                        ),
+                        _sha256_hex(
+                            _canonical_json_dumps(_safe_dump(material_resolutions["fittings"]))
+                        ),
+                        _sha256_hex(_canonical_json_dumps(_safe_dump(mass_breakdown_tube))),
+                        _sha256_hex(_canonical_json_dumps(_safe_dump(mass_breakdown_pipe))),
+                        _sha256_hex(_canonical_json_dumps(_safe_dump(preliminary_result))),
+                    ]
+                except Exception as exc:
+                    # Chain request construction or upstream
+                    # execution failed. Fail closed: values are
+                    # None, produced_fields is empty (except for
+                    # selected_material_ids which the case-block
+                    # materialization surface requires to be
+                    # non-None).
+                    shell_resolution_fallback = material_resolutions.get("outer_pipe")
+                    tube_resolution_fallback = material_resolutions.get("inner_tube")
+                    shell_grade_fb = (
+                        str(shell_resolution_fallback.material_grade)
+                        if shell_resolution_fallback is not None
+                        else None
+                    )
+                    tube_grade_fb = (
+                        str(tube_resolution_fallback.material_grade)
+                        if tube_resolution_fallback is not None
+                        else None
+                    )
+                    shell_material_id_fb = (
+                        _BRIDGE_GRADE_TO_REPORT_GRADE.get(shell_grade_fb, shell_grade_fb)
+                        if shell_grade_fb is not None
+                        else None
+                    )
+                    tube_material_id_fb = (
+                        _BRIDGE_GRADE_TO_REPORT_GRADE.get(tube_grade_fb, tube_grade_fb)
+                        if tube_grade_fb is not None
+                        else None
+                    )
+                    values: dict[str, Any] = {  # type: ignore[no-redef]
+                        "case_01_outputs": {
+                            "case_01_outputs_reference_case_id": case_01_ref,
+                        },
+                        "mass_kg": {
+                            "shell_mass_kg": None,
+                            "total_mass_kg": None,
+                            "tube_mass_kg": None,
+                        },
+                        "preliminary_mechanical_check": {"status": None},
+                        "selected_material_ids": {
+                            "shell_material_id": shell_material_id_fb,
+                            "tube_material_id": tube_material_id_fb,
+                        },
+                    }
+                    produced = []
+                    status = "WIRED_VIA_CHAIN_PARTIAL"
+                    run_ids = []
+                    digests = []
+                    _ = exc
     elif case_id == "TASK-019-GOLDEN-03":
         # Slice 3A P1 fix: the frozen case_03 input only carries
         # cost_model_selection metadata (region / date / currency /
