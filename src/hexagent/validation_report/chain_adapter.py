@@ -918,6 +918,7 @@ def _build_case_03_selector_audit_only_values(
     selection_blockers: list[Any],
     mass_chain_prerequisites_unavailable: bool,
     fixture_selected_model_id: Any,
+    blocker_reason: str = "",
 ) -> dict[str, Any]:
     """Build the case_03 ``values`` block when mass dependency is
     unavailable (P0-2 fail-closed path). All cost component fields
@@ -928,6 +929,15 @@ def _build_case_03_selector_audit_only_values(
     public compatibility key (``selector_provenance_chain_hash``)
     per Charles's instruction to test both if a pre-existing public
     key requires preservation.
+
+    P0-1 + P0-2: when the chain fails closed, the
+    ``blocker_reason`` (e.g. ``"cost_model_selection_missing_or_malformed"``
+    or ``"mass_breakdown_bridge_missing_or_malformed"``) is
+    surfaced via the new ``life_cycle_energy_envelope.blocker_reasons``
+    metadata field. The blocker ``code`` itself remains the
+    existing ``UNSPECIFIED_BLOCKER`` enum literal in
+    ``life_cycle_energy_envelope.blocker_codes`` (P0-3: no new
+    blocker code strings).
     """
     if mass_chain_prerequisites_unavailable:
         # The mass-prerequisite unavailability is reported via
@@ -938,6 +948,7 @@ def _build_case_03_selector_audit_only_values(
         blocker_list_for_lifecycle = ["UNSPECIFIED_BLOCKER"]
     else:
         blocker_list_for_lifecycle = ["UNSPECIFIED_BLOCKER"]
+    blocker_reasons_for_lifecycle = [blocker_reason] if blocker_reason else []
     first_code = _code_value(selection_blockers[0]) if selection_blockers else ""
     return {
         "case_01_outputs": {
@@ -954,6 +965,7 @@ def _build_case_03_selector_audit_only_values(
         "discounted_total_minor_units": None,
         "life_cycle_energy_envelope": {
             "blocker_codes": blocker_list_for_lifecycle,
+            "blocker_reasons": blocker_reasons_for_lifecycle,
             "life_cycle_energy_summary": {
                 "annual_operating_hours": None,
                 "design_life_years": None,
@@ -1076,6 +1088,38 @@ def _try_build_case_03_mass_breakdown_from_bridge(
     return production_mass_breakdown
 
 
+def _try_extract_case_meta_from_cost_model_selection(
+    cost_model_selection: Mapping[str, Any],
+) -> tuple[str, str, str] | None:
+    """Extract the 3 case-meta parameters from the 002-H frozen
+    ``input.cost_model_selection`` for use as
+    ``calculate_cost_breakdown`` kwargs.
+
+    Returns ``(case_currency, case_region, effective_date)`` as
+    ``str`` if all 3 keys are present and well-typed. Returns
+    ``None`` if any required key is missing, is the wrong
+    type, or is an empty string.
+
+    P0-1 fix: no fallback defaults. Per Charles's authorization,
+    missing or malformed ``input.cost_model_selection`` must
+    fail closed (the caller surfaces
+    ``details.reason="cost_model_selection_missing_or_malformed"``
+    via the existing UNSPECIFIED_BLOCKER enum literal).
+    """
+    if not isinstance(cost_model_selection, Mapping):
+        return None
+    currency_raw = cost_model_selection.get("currency_ISO_4217")
+    region_raw = cost_model_selection.get("region_id")
+    date_raw = cost_model_selection.get("date_ISO_8601")
+    if not isinstance(currency_raw, str) or not currency_raw:
+        return None
+    if not isinstance(region_raw, str) or not region_raw:
+        return None
+    if not isinstance(date_raw, str) or not date_raw:
+        return None
+    return currency_raw, region_raw, date_raw
+
+
 def _case_03_fail_closed_with_selector_audit(
     *,
     case_01_ref: str,
@@ -1110,6 +1154,7 @@ def _case_03_fail_closed_with_selector_audit(
         ),
         mass_chain_prerequisites_unavailable=True,
         fixture_selected_model_id=fixture_selected_model_id,
+        blocker_reason=reason,
     )
     return (
         values,
@@ -1271,18 +1316,43 @@ def _execute_case_03_cost_chain(
             reason="mass_breakdown_bridge_missing_or_malformed",
         )
 
+    # P0-1 fix: read the 3 case-meta parameters from the
+    # frozen ``input.cost_model_selection`` block. NO fallback
+    # defaults. If any of the 3 required keys is missing or
+    # malformed, fail closed per the authorization
+    # (details.reason="cost_model_selection_missing_or_malformed",
+    # existing UNSPECIFIED_BLOCKER enum literal, no new blocker
+    # code).
+    case_meta = _try_extract_case_meta_from_cost_model_selection(cost_model_selection)
+    if case_meta is None:
+        return _case_03_fail_closed_with_selector_audit(
+            case_01_ref=case_01_ref,
+            selector_run_id=selector_run_id,
+            selector_provenance_hash=selector_provenance_hash,
+            c0_record_count=selector_c0_count,
+            c1_record_count=selector_c1_count,
+            selector_blockers=[],
+            fixture_selected_model_id=fixture_selected_model_id,
+            reason="cost_model_selection_missing_or_malformed",
+        )
+    case_currency_str, case_region_str, effective_date_str = case_meta
+
     # Bridge is well-formed. The constructed production
     # ``MassBreakdown`` is the SOLE mass dependency for the cost
-    # calculator. Pass it verbatim to calculate_cost_breakdown.
+    # calculator. Pass it verbatim to calculate_cost_breakdown
+    # along with the case-meta parameters extracted from
+    # ``input.cost_model_selection`` (P0-1: no hardcoded
+    # "USD" / "US-Midwest-Industrial-2024" / "2024-01-01"
+    # literals at the call site).
     production_mass_breakdown = mass_breakdown_construction
     cost_breakdown: CostBreakdown | None = None
     try:
         cost_breakdown = calculate_cost_breakdown(
             cost_model_selection_result=selector_result,
             mass_breakdown=production_mass_breakdown,
-            case_currency="USD",
-            case_region="US-Midwest-Industrial-2024",
-            effective_date="2024-01-01",
+            case_currency=case_currency_str,
+            case_region=case_region_str,
+            effective_date=effective_date_str,
         )
     except Exception:
         # Cost calculator invocation raised. Fail closed per the
@@ -2007,6 +2077,7 @@ def compute_actual_output_via_chain(
                     .get("selected_cost_model", {})
                     .get("selected_model_id")
                 ),
+                blocker_reason="cost_records_bridge_missing",
             )
             produced = list(_CASE_03_SELECTOR_AUDIT_PRODUCED_FIELDS)
             status = "WIRED_VIA_CHAIN_PARTIAL"
