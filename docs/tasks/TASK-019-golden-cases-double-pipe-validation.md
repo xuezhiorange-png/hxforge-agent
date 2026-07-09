@@ -1498,3 +1498,654 @@ expected output vectors, per-field tolerance values) are now satisfied
 by this amendment; the Slice 3A implementation round may be authorized
 in a future Charles-authorized round once the design amendment is
 itself reviewed and merged.
+
+## 15. Design Amendment 002-H — case_03 cost / lifecycle / catalog bridge contract
+
+### 15.1 Scope and authority
+
+This section is the TASK-019 Design Amendment 002-H
+(amendment_id `TASK-019-DESIGN-AMENDMENT-002-H`). It freezes the case_03
+cost / lifecycle / catalog bridge contract required by the future
+TASK-019 Slice 3B-C implementation round, so that the future
+`chain_adapter.compute_actual_output_via_chain` call path for
+`TASK-019-GOLDEN-03` can transition from `WIRED_VIA_CHAIN_PARTIAL`
+(produced_fields=[]) to `WIRED_VIA_CHAIN` for the
+TASK-006/007/008/017/018-authorized fields. Authority for this
+amendment is Charles's design-amendment authorization of 2026-07-09.
+
+### 15.2 Purpose
+
+case_03 currently surfaces `WIRED_VIA_CHAIN_PARTIAL` with
+`produced_fields=[]` because the frozen case_03 `input.cost_model_selection`
+block carries only `currency_ISO_4217` / `date_ISO_8601` /
+`escalation_rule_id` / `region_id` — four metadata fields — and does NOT
+carry a pre-resolved list of cost records that the upstream
+`CostModelSelector.select(records, filters)` API requires. The TASK-019
+adapter has no TASK-018 catalog lookup helper, and per frozen design §6
+"no runtime catalog lookup" is the rule. Therefore all cost /
+life-cycle / `selected_cost_model` fields go fail-closed
+(`NOT_COMPUTABLE`). This amendment closes that gap by freezing a
+case-bound `cost_records_bridge` block in the case_03 fixture, so the
+future adapter can call the production chain WITHOUT runtime lookup.
+
+### 15.3 Required design answers (binding, contract-frozen)
+
+#### 15.3.1 Q1 — case_03 cost catalog bridge contract
+
+**Decision: YES, freeze a `cost_records_bridge` block in the case_03
+fixture.**
+
+- **Binding contract surface**: the case_03 fixture's
+  `input.cost_records_bridge` is a JSON array of frozen
+  selector-input-record-shaped mappings. Each entry carries the
+  **CostModelSelector input record shape** (TASK-018 Slice A
+  selector-input shape per `src/hexagent/costing/cost_model_selector.py`
+  `_validate_record_shape` and `_project_canonical`): the required
+  fields are `cost_record_id` / `cost_record_version` /
+  `cost_category` (with the `c0_` / `c1_` prefix convention
+  required by `CostModelSelector._build_selection` bucket logic;
+  see trap_1 below) / `cost_basis` / `currency` /
+  `quantity_basis` / `cost_value` (TASK-013 §6.4 CostValue
+  shape: integer minor units, currency, quantity_value_si,
+  unit_basis, normalized_unit_price,
+  escalation_index_reference, source_pointer,
+  uncertainty_band) / `license_class` / `source_class`. The
+  `escalation_index_reference` (top-level) /
+  `region` / `effective_date` / `provenance_amendment_id`
+  fields are also frozen at the bridge level to document the
+  TASK-018 §6 escalation rule and the §6.1 region binding.
+  This is NOT a TASK-013 CostRecord verbatim — TASK-013 CostRecord
+  adds fields like `record_hash` / `provenance_edges` /
+  `approval_state` / `human_entered_evidence` that are NOT
+  consumed by `CostModelSelector.select`; the bridge surface is
+  the CostModelSelector input contract surface only. The
+  CostModelSelector._validate_record_shape strict-required-field
+  set is the authoritative contract — the bridge MUST satisfy it.
+- **Cost-record count and binding convention**: a small,
+  deterministic, frozen set of records that exercises BOTH the
+  C0 (records whose `cost_category` starts with `c0_`) and C1
+  (records whose `cost_category` starts with `c1_`) buckets
+  per the production `CostModelSelector._build_selection`
+  bucket logic (`src/hexagent/costing/cost_model_selector.py`
+  lines 411-425). The frozen record set MUST include at least
+  one C0 record and at least one C1 record so that the
+  production selector populates `c0_records` and `c1_records`
+  both non-empty (otherwise the `CostCalculator` falls into
+  the `NOT_COMPUTABLE` state with `cost_records_pending_TBD`
+  blocker per TASK-018 §9.3). The bridge records are bound by
+  the `cost_records_bridge_bindings` block to the public report
+  shape's `cost_components_C0_C1.cost_components` fields: the
+  C0 record carrying `cost_category = "c0_material_unit_price"`
+  is bound to `C0_material_minor_units`; the C0 record carrying
+  `cost_category = "c0_fabrication_labor"` is bound to
+  `C0_labor_minor_units`; the C1 record carrying
+  `cost_category = "c1_installation_labor"` is bound to the
+  capex_envelope summary that maps to
+  `C1_total_minor_units` (see §15.3.4 mapping). The binding is
+  recorded in `input.cost_records_bridge_bindings` as
+  categorical-equality provenance entries; the future
+  implementation round MUST NOT add new bound records without
+  a new design amendment (002-I+).
+- **Bridge values source and auditability**: every cost-record entry
+  is bound to one of three canonical TASK-018-approved sources
+  recorded as `source_basis` (string literal at fixture-level),
+  with the bridge values engineered to reproduce the
+  amendment-001 frozen expected_output `cost_components_C0_C1`
+  central values (C0_material=412000 / C0_labor=188000 /
+  C1_total=600000) at the documented TASK-018 Slice A / B
+  formulas WITHIN the per-field tolerance values recorded in
+  `_tolerance_metadata.json` (see §15.3.5). If the bridge values
+  reproduce the central values within tolerance, the design
+  contract is satisfied; if a future implementation round observes
+  a mismatch OUTSIDE the tolerance, the future round MUST
+  STOP, report the mismatch explicitly, and request a new design
+  amendment (002-I+) — silent `expected_output` mutation is
+  FORBIDDEN by §9 FROZEN contract discipline.
+- **Bridge frozen benchmark input, not runtime fallback**: the
+  bridge values are fixed at design-freeze time and bound to the
+  fixture, not looked up at runtime. The future adapter is
+  REQUIRED to read the bridge values verbatim — it must NOT
+  perform any catalog lookup (no TASK-018 catalog loader, no
+  TASK-013 catalog loader, no file-system walk, no DB query, no
+  network call), must NOT apply any normalization, and must NOT
+  substitute any default. The bridge's
+  `provenance.amendment_id = "TASK-019-DESIGN-AMENDMENT-002-H"`
+  field identifies the amendment that froze the values; any later
+  catalog revision that would change the values requires a new
+  design amendment (002-I or later), not a runtime swap.
+- **No runtime catalog resolver**: the future adapter MUST NOT
+  introduce a runtime catalog resolver. The frozen
+  `cost_records_bridge` is the sole source of cost-record inputs
+  to `CostModelSelector.select`. Any future amendment that
+  authorizes a runtime resolver (002-J+) MUST explicitly state
+  the input-output boundary of the resolver and the
+  fixture-vs-resolver ordering rule; until then, the no-runtime-
+  resolver rule is binding.
+
+#### 15.3.2 Q2 — production API reality reconciliation
+
+**Decision: production API to call is `CostModelSelector.select`
+(via functional entrypoint `select_cost_records`).** The TASK-019
+adapter MUST call `hexagent.costing.select_cost_records(records,
+filters)` (exported from `src/hexagent/costing/__init__.py`,
+implemented in `src/hexagent/costing/cost_model_selector.py`
+lines 651-660).
+
+- **API name reality check**: the production module
+  `hexagent.costing.cost_model_selector` exports `select_cost_records`
+  (PLURAL) as a functional entrypoint that wraps
+  `CostModelSelector().select(records, filters)`. The TASK-019
+  Slice 3A adapter (`src/hexagent/validation_report/chain_adapter.py`
+  lines 1350-1398) cites this API as `select_cost_records` (plural)
+  — the chain_adapter's blocker description is therefore
+  accurate on the API name. The `select_cost_record` (SINGULAR)
+  API in `src/hexagent/material_costs/selection.py` line 263 is a
+  different API: it accepts a single `cost_record_id` from a
+  caller-supplied `catalog: list[dict]` and is NOT the API used
+  by `CostModelSelector` / `CostCalculator`. The future adapter
+  MUST use `select_cost_records` (PLURAL) from `hexagent.costing`,
+  NOT `select_cost_record` (SINGULAR) from
+  `hexagent.material_costs`.
+- **Inputs to the production API**:
+    - `records: Sequence[Mapping[str, object]]` — the case-bound
+      frozen `cost_records_bridge` array from the case_03 fixture,
+      passed verbatim with no mutation.
+    - `filters: SelectionFilters` — constructed from the frozen
+      case_03 `input.cost_model_selection` block:
+        - `material_family = "stainless_steel_304"` (TASK-013 §5
+          frozen material_family code, matches case_02 002-F / 002-G
+          SS304 selection).
+        - `case_region = input.cost_model_selection.region_id` verbatim.
+        - `effective_date = input.cost_model_selection.date_ISO_8601` verbatim.
+        - `cost_category_filter = frozenset({"c0_material_unit_price",
+          "c0_fabrication_labor", "c1_installation_labor"})` —
+          **must EXACTLY match the fixture's
+          `input.cost_records_bridge[*].cost_category` set**. The
+          production `CostModelSelector._build_selection` bucket
+          logic uses `cost_category.startswith("c0_")` /
+          `cost_category.startswith("c1_")` to dispatch into
+          `c0_bucket` / `c1_bucket`; any `cost_category` whose
+          prefix is not `c0_` / `c1_` is rejected with the closed-set
+          `cost_category_does_not_match_c0_or_c1` blocker
+          (TASK-018 §9.1). The fixture's 3-record bridge has
+          `cost_category ∈ {"c0_material_unit_price",
+          "c0_fabrication_labor", "c1_installation_labor"}`; the
+          filter set MUST be exactly this set so the
+          `cost_category_filter` membership check does not drop
+          any record. The future adapter MUST NOT widen or narrow
+          this set without a new design amendment (002-I+).
+        - `quantity_basis_filter = frozenset({"per_unit_mass_kg",
+          "per_unit_labor_hours", "currency_per_hour"})` — **must
+          EXACTLY match the fixture's
+          `input.cost_records_bridge[*].quantity_basis` set**. The
+          production `CostModelSelector._build_selection` applies
+          the `quantity_basis_filter` membership check after the
+          C0 / C1 bucket dispatch; any `quantity_basis` not in the
+          filter is silently dropped (the production selector
+          does NOT emit a closed-set blocker for this drop, per
+          the cost_category_filter / quantity_basis_filter split
+          in TASK-018 §5.1.1). The fixture's 3-record bridge has
+          `quantity_basis ∈ {"per_unit_mass_kg",
+          "per_unit_labor_hours", "currency_per_hour"}`; the
+          filter set MUST be exactly this set so the
+          `quantity_basis_filter` membership check does not drop
+          any record. The future adapter MUST NOT widen or narrow
+          this set without a new design amendment (002-I+).
+        - `license_class_filter = frozenset(SELECTOR_LICENSE_CLASSES)`
+          (the production module's default; the adapter MUST NOT
+          widen this set).
+        - `escalation_index_reference_filter = frozenset({input.cost_model_
+          selection.escalation_rule_id})` verbatim (TASK-018 §6
+          frozen escalation rule).
+        - `record_currency = input.cost_model_selection.currency_ISO_4217`
+          verbatim (TASK-018 §6.1 "currency is never converted"; the
+          adapter MUST NOT re-convert).
+        - `validity_envelope = None` (the TASK-019 adapter does NOT
+          prescribe a runtime validity envelope; the bridge values
+          are themselves the contract-frozen validity envelope).
+- **Outputs of the production API**:
+  `CostModelSelectionResult` carries
+  `schema_version` / `selector_run_id` / `c0_records` /
+  `c1_records` / `selection_warnings` /
+  `selection_blockers` / `license_class_summary` /
+  `provenance_chain_hash`. The future adapter MUST propagate
+  the entire envelope into `values.upstream_provenance_digests` /
+  `values.upstream_calculation_run_ids` as the audit chain.
+
+#### 15.3.3 Q3 — selected_cost_model contract
+
+**Decision: production-driven projection, no fabricated model-id.**
+
+- **Public expected_output shape (PRESERVED VERBATIM from
+  amendment-001)**: `expected_output.selected_cost_model.selected_model_id`
+  remains the amendment-001 frozen string literal
+  `"ASME-BPVC-VIII-1-COST-MODEL-V1 (TASK-018 Slice A frozen
+  cost-model catalog)"`. This is NOT a production output; it is
+  a fixture-level pointer that documents which TASK-018 cost-
+  model catalog the bridge values are bound to. The adapter MUST
+  NOT replace this string with the `selector_run_id` or any other
+  production output.
+- **`produced_fields` (binding)**: the future adapter's
+  `produced_fields` for case_03 include exactly the following:
+    - `selected_cost_model.selector_run_id` (string; from
+      `CostModelSelectionResult.selector_run_id`).
+    - `selected_cost_model.provenance_chain_hash` (string;
+      from `CostModelSelectionResult.provenance_chain_hash`).
+    - `selected_cost_model.selection_blockers` (list; verbatim
+      copy of `CostModelSelectionResult.selection_blockers`).
+    - `selected_cost_model.c0_record_count` (int; from
+      `len(CostModelSelectionResult.c0_records)`).
+    - `selected_cost_model.c1_record_count` (int; from
+      `len(CostModelSelectionResult.c1_records)`).
+- **`selected_model_id` is NOT a produced_field**: the production
+  API does NOT emit a `selected_model_id` string. The adapter MUST
+  NOT fabricate one; the amendment-001 string literal remains a
+  fixture-level pointer that the report context can echo back to
+  the user without claiming production provenance.
+- **DEFER / NOT_COMPUTABLE rules**: if
+  `len(CostModelSelectionResult.selection_blockers) > 0`, the
+  adapter surfaces `selected_cost_model.selection_blockers`
+  verbatim AND appends a new `blocked_fields` entry with
+  `details.reason = "selected_cost_model_blocker"` per the TASK-019
+  §9 closed-set blocker-code enumeration (this blocker code is
+  ADDITIVE to the existing closed set; it does NOT widen the
+  enumeration, it instantiates the existing
+  `cost_records_pending_TBD` semantic for the cost-model-selection
+  domain specifically — see §15.3.6 tolerance impact).
+
+#### 15.3.4 Q4 — cost_components_C0_C1 contract
+
+**Decision: production-driven projection from
+`CostBreakdown.to_dict()` shape, with explicit mapping to the
+amendment-001 public report shape.**
+
+- **Production call**: after `CostModelSelector.select` returns a
+  non-empty `CostModelSelectionResult`, the future adapter calls
+  `hexagent.costing.calculate_cost_breakdown(*, cost_model_selection_
+  result=selection_result, mass_breakdown=case_02_mass_breakdown
+  (per 002-G re-derivation, see §15.3.4 note below), case_currency=
+  "USD", case_region="US-Midwest-Industrial-2024", effective_date=
+  "2024-01-01")` and propagates the resulting `CostBreakdown` into
+  `values.upstream_provenance_digests`.
+- **Mass breakdown dependency (binding, future)**: case_03's
+  cost chain depends on the case_02 mass breakdown (the SS304
+  total_kg from §15 of the design contract = 16.183 kg). The
+  future adapter MUST use the production TASK-017
+  `MassBreakdown` shape from the case_02 chain (which is already
+  `WIRED_VIA_CHAIN` after PR #109) and MUST NOT re-derive
+  mass values from raw geometry. The cross-case reference is
+  `case_03.input.case_01_input_reference_case_id =
+  "TASK-019-GOLDEN-01"` (already frozen); the case_02 chain
+  is reachable via `case_02 = compute_actual_output_via_chain(fx_02)`.
+- **Public expected_output shape (PRESERVED VERBATIM from
+  amendment-001)**: `expected_output.cost_components_C0_C1.cost_
+  components.{C0_material_minor_units, C0_labor_minor_units,
+  C1_total_minor_units}` remain the amendment-001 frozen central
+  values (412000 / 188000 / 600000). The adapter MUST NOT replace
+  these integers with the production `cost_breakdown` minor-unit
+  values directly; the public report shape is a 3-element
+  summary, NOT the production `c0_subtotal` / `c1_subtotal` /
+  `cost_breakdown` nested envelope. Mapping is recorded below.
+- **`produced_fields` (binding, BY-RECORD-ID mapping — NOT by
+  c0_subtotal.amount_minor_units post-filtering)**:
+    - `cost_components_C0_C1.cost_components.C0_material_minor_units`
+      (int; looked up from
+      `CostBreakdown.cost_breakdown["c0_subtotal"].
+      component_breakdown[*].cost_record_id
+      == cost_records_bridge_bindings.c0_material_record_id`
+      `.amount_minor_units` field; the matching entry is
+      guaranteed by the bridge bindings to be the
+      `TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1` record). The
+      future adapter MUST NOT compute this field by filtering
+      `c0_subtotal.amount_minor_units` by a
+      `cost_category_filter` predicate; the binding is
+      record-id-based, not category-based, and any record-id
+      collision (multiple records with the same `cost_record_id`
+      in the bridge) MUST surface as
+      `details.reason = "duplicate_c0_material_record_id"` and
+      STOP per §15.3.6.
+    - `cost_components_C0_C1.cost_components.C0_labor_minor_units`
+      (int; looked up from
+      `CostBreakdown.cost_breakdown["c0_subtotal"].
+      component_breakdown[*].cost_record_id
+      == cost_records_bridge_bindings.c0_labor_record_id`
+      `.amount_minor_units` field; the matching entry is
+      guaranteed by the bridge bindings to be the
+      `TASK-019-AMEND-002H-C0-LABOR-ASME-V1` record). The same
+      no-post-filter rule applies: by-record-id lookup only.
+      Duplicate-binding collision MUST surface as
+      `details.reason = "duplicate_c0_labor_record_id"` and STOP.
+    - `cost_components_C0_C1.cost_components.C1_total_minor_units`
+      (int; = `CostBreakdown.capex_envelope_minor_units` — the
+      total project cost summary emitted by CostCalculator,
+      which equals `c0_subtotal.amount_minor_units +
+      c1_subtotal.amount_minor_units` = `600000` with this
+      bridge). The future adapter MUST NOT compute this field by
+      filtering `c0_subtotal.amount_minor_units` by a category
+      predicate; the public report shape's `C1_total_minor_units`
+      is the capex-envelope total-project-cost semantic, NOT the
+      production `c1_subtotal` semantic.
+    - `cost_components_C0_C1.currency_ISO_4217` (str; from
+      `CostBreakdown.capex_envelope_currency`).
+    - `cost_components_C0_C1.calculator_run_id` (str; from
+      `CostBreakdown.calculator_run_id`).
+    - `cost_components_C0_C1.escalation_pointer_used` (str;
+      from `CostBreakdown.escalation_pointer_used`).
+    - `cost_components_C0_C1.license_class_summary` (dict; from
+      `CostBreakdown.license_class_summary`).
+- **Subtotal / total fields**: the production API uses
+  `CostBreakdown.cost_breakdown` (a dict of `c0_subtotal` /
+  `c1_subtotal` blocks per TASK-018 §5.2.2), NOT a flat
+  `cost_components` array. The adapter projects the production
+  shape into the public amendment-001 `cost_components` summary
+  via the documented mapping above; the full
+  `CostBreakdown.to_dict()` shape is preserved verbatim in
+  `values.upstream_provenance_digests.cost_breakdown_payload`.
+- **DEFER / NOT_COMPUTABLE rules**: if the production
+  `CostBreakdown.state` is `NOT_COMPUTABLE` (any blocker
+  present), the adapter propagates the `blockers` list to
+  `blocked_fields` with `details.reason = "cost_components_C0_
+  C1_blocker"` (instantiates the existing
+  `cost_records_pending_TBD` semantic). All four
+  `cost_components` summary fields remain `None` (preserved
+  from amendment-001).
+
+#### 15.3.5 Q5 — lifecycle fields contract
+
+**Decision: TASK-018 §5.3 / §5.3.2 deferred status preserved
+verbatim; production projection is OPTIONAL and requires
+explicit authorization.**
+
+- **`discounted_total_minor_units` (DEFERRED PER TASK-018 §5.3)**:
+  remains `null` (preserved from amendment-001). The production
+  `LifeCycleEnergyEstimator` always emits
+  `discounted_total_minor_units = None` per TASK-018 §5.3.2
+  Rule 3 (no formula invented). The adapter MUST NOT add a
+  `discount_formula_*` value; the field stays `null`. The
+  top-level `unspecified_blocker.details.reason =
+  "discount_formula_pending_design_amendment"` is preserved
+  verbatim (TASK-018 Option A boundary).
+- **`salvage_minor_units` (DEFERRED PER TASK-018 §5.3.2)**:
+  remains `0` (preserved from amendment-001). The production
+  `LifeCycleEnergyEstimator` always emits
+  `salvage_minor_units = 0` per TASK-018 §5.3.2 (Slice C does
+  not prescribe a salvage formula). The adapter MUST NOT
+  compute a salvage value; the field stays `0`.
+- **`discount_rate_input` (NEW field, frozen by 002-H)**: the
+  case_03 fixture's `input.lifecycle_inputs.discount_rate_input`
+  is preserved as `null` (amendment-001 froze it as `null`).
+  The future adapter MUST NOT populate this field from any
+  source (no `discount_rate_input` even exists in the
+  production `LifeCycleEnergyEstimatorInput.discount_rate` —
+  the production field is `discount_rate: float`, but the
+  TASK-019 contract preserves `discount_rate_input = null` to
+  flag the contract-frozen gap).
+- **`salvage_fraction_input` (NEW field, frozen by 002-H)**: the
+  case_03 fixture's `input.lifecycle_inputs.salvage_fraction_input`
+  is preserved as `null` (amendment-001 froze it as `null`).
+  Same rule as `discount_rate_input`: adapter MUST NOT populate.
+- **Lifecycle energy summary (PRESERVED VERBATIM from
+  amendment-001)**: `expected_output.life_cycle_energy_envelope.
+  life_cycle_energy_summary.{annual_operating_hours,
+  design_life_years, annual_energy_MJ, total_lifecycle_energy_MJ}`
+  central values remain the amendment-001 frozen integers
+  (8000 / 20 / 241056.0 / 4821120.0). These are
+  engineering-literature-referenced canonical baselines
+  (RSMeans-like 2024 stainless-steel tubing + ASME labor), NOT
+  derived from a production-chain execution. The production
+  `LifeCycleEnergyEstimator` emits
+  `annual_pump_or_fan_energy_kwh` (pump/fan energy only, not
+  heat-duty energy), so the production outputs do NOT have a
+  direct field-by-field mapping to the public report shape;
+  the adapter MUST NOT replace the public-shape integers with
+  production outputs. The public-shape integers remain
+  fixture-level canonical baselines; the production
+  `LifeCycleEnergyBreakdown.to_dict()` shape is preserved
+  verbatim in `values.upstream_provenance_digests.
+  life_cycle_payload`.
+- **`produced_fields` for lifecycle (binding, minimal)**:
+    - `life_cycle_energy_envelope.life_cycle_run_id` (str; from
+      `LifeCycleEnergyBreakdown.life_cycle_run_id`).
+    - `life_cycle_energy_envelope.state` (str; from
+      `LifeCycleEnergyBreakdown.state` ∈
+      {COMPUTABLE, COMPUTABLE_WITH_WARNINGS, NOT_COMPUTABLE}).
+    - `life_cycle_energy_envelope.warnings` (list; from
+      `LifeCycleEnergyBreakdown.warnings`).
+    - `life_cycle_energy_envelope.blockers` (list; from
+      `LifeCycleEnergyBreakdown.blockers`).
+    - `life_cycle_energy_envelope.provenance_chain_hash`
+      (str; from `LifeCycleEnergyBreakdown.provenance_chain_hash`).
+  The 4 lifecycle-energy-summary integers (`annual_energy_MJ` etc.)
+  are NOT produced_fields; they are amendment-001 frozen
+  canonical baselines preserved verbatim in the report context.
+
+#### 15.3.6 Q6 — expected_output re-derivation policy
+
+**Decision: NO re-derivation in 002-H. Expected_output central
+values preserved verbatim from amendment-001.**
+
+- **No silent `expected_output` mutation in implementation
+  rounds**: 002-H preserves every amendment-001 central value
+  byte-for-byte. The fixture's `cost_components_C0_C1.cost_components`,
+  `life_cycle_energy_envelope.life_cycle_energy_summary`, and
+  `selected_cost_model.selected_model_id` are NOT re-derived.
+  The rationale: the amendment-001 central values are
+  engineering-literature-referenced canonical baselines
+  (RSMeans-like 2024 stainless-steel tubing + ASME labor for
+  cost; closed-form heat-duty × annual-hours × fouling-factor
+  for lifecycle-energy); they are not derived from the
+  TASK-018 production chain, so the production chain cannot
+  reliably reproduce them at unit precision. Silent
+  re-derivation would either (a) invent production values
+  that do not exist (forbidden by §6 "no fabrication"), or
+  (b) silently replace the canonical baselines with
+  production-derived values that disagree at >1% precision
+  (forbidden by §9 FROZEN contract discipline).
+- **Future implementation round mismatch handling (binding)**:
+  if the future Slice 3B-C implementation round observes a
+  mismatch between (production) `CostBreakdown.cost_breakdown`
+  output and (amendment-001 fixture) `expected_output.
+  cost_components_C0_C1.cost_components` that is OUTSIDE the
+  tolerance values recorded in `_tolerance_metadata.json`
+  (C0_material ±2%, C0_labor ±2%, C1_total ±1% absolute-or-
+  relative), the future round MUST:
+    1. STOP, do not mutate `expected_output` silently.
+    2. Surface the mismatch as an explicit
+       `blocked_fields` entry with
+       `details.reason = "expected_output_mismatch_pending_
+       design_amendment_002_i"`.
+    3. Report the mismatch to Charles and request a new
+       design amendment (002-I+). 002-H does NOT authorize
+       the implementation round to mutate `expected_output`
+       to match production; the new amendment is the
+       authorized mechanism.
+- **The frozen `cost_components_C0_C1.cost_components` /
+  `life_cycle_energy_envelope.*` values remain the contract
+  surface**; the production-chain output is the audit
+  artifact (in `values.upstream_provenance_digests`), not
+  the public report shape.
+
+#### 15.3.7 Q7 — tolerance / provenance impact
+
+**Decision: tolerance numeric values PRESERVED VERBATIM from
+amendment-001. Provenance ADDITIVE: 002-H appends new
+frozen-benchmark-input entries for the 4 `cost_records_bridge`
+fields.**
+
+- **Numeric tolerance (PRESERVED)**:
+    - `case_03.cost_components_C0_C1.cost_components.C0_material_minor_units`:
+      ±2% (preserved verbatim from amendment-001;
+      engineering-literature cost reference, RSMeans-like 2024
+      stainless-steel tubing).
+    - `case_03.cost_components_C0_C1.cost_components.C0_labor_minor_units`:
+      ±2% (preserved verbatim from amendment-001; engineering-
+      literature labor reference, ASME labor).
+    - `case_03.cost_components_C0_C1.cost_components.C1_total_minor_units`:
+      ±1% absolute-or-relative (preserved verbatim; closed-form
+      sum, propagated from C0 component tolerances).
+    - `case_03.life_cycle_energy_envelope.life_cycle_energy_summary.
+      annual_energy_MJ`: ±2% (preserved verbatim; closed-form
+      annual-energy = heat_duty × annual_hours × fouling_factor).
+    - `case_03.life_cycle_energy_envelope.life_cycle_energy_summary.
+      total_lifecycle_energy_MJ`: ±2% (preserved verbatim;
+      closed-form total = annual × design_life_years).
+- **Categorical tolerance (PRESERVED)**: `currency_ISO_4217`,
+  `selected_cost_model.selected_model_id`,
+  `selected_cost_model.selection_blockers`,
+  `life_cycle_energy_envelope.life_cycle_energy_summary.
+  {annual_operating_hours, design_life_years, blocker_codes}`
+  all preserved verbatim from amendment-001.
+- **DEFERRED markers (PRESERVED)**: `discounted_total_minor_units`
+  and `salvage_minor_units` retain their amendment-001
+  categorical-equality-on-null-or-zero markers with the
+  TASK-018 §5.3 / §5.3.2 deferred-status per_field_basis
+  strings preserved verbatim.
+- **NO tolerance widening**: 002-H does NOT widen any
+  tolerance, does NOT introduce any "convenience tolerance",
+  and does NOT change any per_field_basis text for existing
+  case_03 fields. The numeric values stay at the
+  amendment-001 frozen precision (abs=0.05 / rel=0.01
+  for cost-component min-units; abs=4821.12 / rel=0.02 for
+  lifecycle-energy fields).
+- **Provenance ADDITIVE entries**: 002-H adds four
+  `cost_records_bridge_bindings.*` entries to
+  `_provenance_metadata.json` under the
+  `case_source_basis` block:
+    - `cost_records_bridge_bindings.c0_material_record_id`
+      (string, frozen-benchmark input; references the bridge
+      record that supplies the C0 material cost basis).
+    - `cost_records_bridge_bindings.c0_labor_record_id`
+      (string, frozen-benchmark input; references the bridge
+      record that supplies the C0 labor cost basis).
+    - `cost_records_bridge_bindings.c1_total_record_id`
+      (string, frozen-benchmark input; references the bridge
+      record(s) that supply the C1 total cost basis).
+    - `cost_records_bridge_bindings.provenance_amendment_id`
+      (string, frozen-benchmark input; the value
+      `"TASK-019-DESIGN-AMENDMENT-002-H"`).
+  These four entries are CATALOG-style categorical
+  provenance records; they require categorical-equality
+  tolerance (`{"abs": null, "rel": null, "categorical":
+  true, "value": <frozen_string_literal>}`) for PASS in
+  the future implementation round.
+
+### 15.4 Production source (binding, contract-frozen)
+
+The case_03 chain's production source is the
+`hexagent.costing` module (TASK-018 Slice A / B / C
+implementation). The future Slice 3B-C adapter MUST call:
+
+1. `hexagent.costing.select_cost_records(records, filters)`
+   — Task-018 Slice A — `CostModelSelector.select(records,
+   filters)` functional entrypoint.
+2. `hexagent.costing.calculate_cost_breakdown(*,
+   cost_model_selection_result=…, mass_breakdown=…,
+   case_currency=…, case_region=…, effective_date=…)`
+   — TASK-018 Slice B — `CostCalculator.calculate_cost_breakdown`.
+
+If the future Slice 3B-C implementation round elects to wire
+the lifecycle envelope (which is OPTIONAL per §15.3.5), it MAY
+additionally call:
+
+3. `hexagent.costing.LifeCycleEnergyEstimator().estimate(…)`
+   — TASK-018 Slice C — `LifeCycleEnergyEstimator.estimate`.
+
+But lifecycle wiring is OPTIONAL in 002-H: the
+amendment-001 frozen lifecycle-energy-summary integers
+remain the public report shape, and the production
+`LifeCycleEnergyBreakdown.to_dict()` output (if wired)
+lives in `values.upstream_provenance_digests.life_cycle_payload`.
+
+### 15.5 Provenance additions (binding, contract-frozen)
+
+The `_provenance_metadata.json` 002-H block adds the
+following top-level keys (the same shape as the 002-A / 002-D /
+002-E / 002-F / 002-G entries):
+
+- `amendment_002h_id = "TASK-019-DESIGN-AMENDMENT-002-H"`
+- `amendment_002h_effective_scope = "TASK-019-GOLDEN-03"`
+- `amendment_002h_bridge_schema_version = "TASK-019-COST-RECORDS-BRIDGE-V1"`
+- `amendment_002h_supersedes = "TASK-019-AMEND-001-FREEZE-VECTORS (case_03 input only; expected_output central values preserved verbatim; tolerance numeric values preserved verbatim)"`
+- `amendment_002h_field_paths_added = ["input.cost_records_bridge", "input.lifecycle_inputs.discount_rate_input (already null in 001)", "input.lifecycle_inputs.salvage_fraction_input (already null in 001)"]`
+- `amendment_002h_field_paths_preserved_not_modified = ["expected_output.cost_components_C0_C1.*", "expected_output.life_cycle_energy_envelope.*", "expected_output.selected_cost_model.*", "expected_output.discounted_total_minor_units (still null)", "expected_output.salvage_minor_units (still 0)", "expected_output.unspecified_blocker.details.reason"]`
+- `amendment_002h_field_paths_unchanged = ["case_01.*", "case_02.*", "src/**", "tests/validation_report/**", "tests/unit/**", "tests/benchmark/**", "tests/support/**", ".github/**", "pyproject.toml", "uv.lock", "ci-shard-manifest.yml", "docs/tasks/TASK-006..TASK-018*.md (frozen)"]`
+- `amendment_002h_re_derivation_method = ["no_re_derivation: expected_output central values preserved verbatim from amendment-001 (engineering-literature-referenced canonical baselines)", "no_fabrication_statement: cost_records_bridge is fixture-level frozen benchmark input, not a runtime lookup", "no_runtime_resolver_statement: the future adapter MUST NOT introduce a runtime catalog resolver"]`
+- `amendment_002h_chain_coverage = ["select_cost_records_input_cost_records_bridge", "select_cost_records_input_filters_from_cost_model_selection_block", "select_cost_records_propagate_c0_records_and_c1_records_to_cost_calculator", "calculate_cost_breakdown_input_cost_model_selection_result", "calculate_cost_breakdown_input_mass_breakdown_from_case_02", "calculate_cost_breakdown_output_capex_envelope_to_cost_components_C0_C1", "calculate_cost_breakdown_output_calculator_run_id_to_upstream_calculation_run_ids", "lifecycle_estimator_input_cost_breakdown_from_cost_calculator", "lifecycle_estimator_input_thermal_service_summary_from_case_01", "lifecycle_estimator_output_to_upstream_provenance_digests_only (public report shape unchanged)"]`
+- `amendment_002h_production_api_reconciliation = ["production_select_cost_records_api = hexagent.costing.select_cost_records (PLURAL, in src/hexagent/costing/cost_model_selector.py line 651)", "production_select_cost_record_api = hexagent.material_costs.select_cost_record (SINGULAR, in src/hexagent/material_costs/selection.py line 263) — NOT the API used by the TASK-019 case_03 chain", "future_adapter_required_call = hexagent.costing.select_cost_records (PLURAL)"]`
+
+### 15.6 Tolerance unchanged for existing fields (binding, contract-frozen)
+
+All numeric tolerance values for the existing amendment-001
+case_03 fields are preserved verbatim. The 4 new
+`cost_records_bridge_bindings.*` provenance entries are
+categorical (string-literal equality for PASS). NO existing
+tolerance is widened.
+
+### 15.7 Case boundaries (binding)
+
+002-H applies ONLY to case_03. case_01 (002-E frozen) and
+case_02 (002-G frozen) are NOT touched. Specifically:
+
+- case_01: 002-E is binding; case_01 fixture,
+  `_provenance_metadata.json` case_01 entries, and
+  `_tolerance_metadata.json` case_01 entries are NOT modified
+  by 002-H.
+- case_02: 002-G is binding; case_02 fixture,
+  `_provenance_metadata.json` case_02 entries, and
+  `_tolerance_metadata.json` case_02 entries are NOT modified
+  by 002-H.
+- TASK-018 frozen design contract (`docs/tasks/TASK-018-*.md`)
+  is NOT modified by 002-H.
+
+### 15.8 Amendment 002-H does NOT authorize
+
+- Implement the future Slice 3B-C chain_adapter case_03 wiring.
+  002-H freezes the contract surface; the implementation
+  round requires a separate Charles authorization.
+- Mark a PR Ready. 002-H is a DRAFT PR; the Ready and Merge
+  steps are NOT authorized.
+- Mutate any Issue (close / comment / label / lock). 002-H is
+  docs-only; no Issue mutation is authorized.
+- Mutate `src/**`, `tests/validation_report/**`,
+  `tests/unit/**`, `tests/support/**`, `tests/benchmark/**`,
+  `.github/**`, `ci-shard-manifest.yml`, `pyproject.toml`, or
+  `uv.lock`. 002-H is docs + fixtures only.
+- Mutate any TASK-006..TASK-018 frozen contract blob. 002-H
+  freezes the TASK-019 surface; it does not change the
+  upstream contract chain.
+- Re-derive the amendment-001 frozen `expected_output`
+  central values. 002-H preserves them verbatim (see
+  §15.3.6).
+- Introduce any TASK-020+ content (pressure drop / C4 / TEMA /
+  Kern / Bell-Delaware / vendor quote / runtime catalog
+  resolver). 002-H remains within the frozen TASK-019 scope.
+- Invent any TASK-018 §5.3 discount formula or §5.3.2 salvage
+  formula. 002-H preserves the deferred status verbatim
+  (see §15.3.5).
+- Send Feishu. 002-H is a docs-only round; the final report
+  is delivered inline + via this file path, not via Feishu
+  outbound.
+
+### 15.9 Future Slice 3B-C implementation round prerequisites
+
+The future TASK-019 Slice 3B-C implementation round (NOT
+authorized by 002-H) MAY be authorized in a separate Charles-
+authorized round once 002-H is reviewed and merged. Slice 3B-C
+MUST:
+
+- Call `hexagent.costing.select_cost_records(records, filters)`
+  with `records = case_03.input.cost_records_bridge` and
+  `filters` constructed from `case_03.input.cost_model_selection`
+  per §15.3.2.
+- Call `hexagent.costing.calculate_cost_breakdown(...)` with
+  the resulting `CostModelSelectionResult` plus the case_02
+  `MassBreakdown` per §15.3.4.
+- Surface the production `CostBreakdown.to_dict()` shape
+  verbatim into `values.upstream_provenance_digests.
+  cost_breakdown_payload`.
+- Project the production output into the public
+  `produced_fields` per §15.3.3 / §15.3.4 / §15.3.5.
+- STOP and report mismatch (NOT silent mutation) if the
+  production output is OUTSIDE the amendment-001
+  tolerance envelope per §15.3.6.
+- Mutate ONLY the allowed files per §15.8 forbidden list.
