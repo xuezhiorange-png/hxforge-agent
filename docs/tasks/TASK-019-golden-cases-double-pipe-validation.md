@@ -2149,3 +2149,373 @@ MUST:
   production output is OUTSIDE the amendment-001
   tolerance envelope per §15.3.6.
 - Mutate ONLY the allowed files per §15.8 forbidden list.
+
+
+
+## 16. Design Amendment 002-I — case_03 MassBreakdown bridge contract (binding)
+
+This section is the TASK-019 Design Amendment 002-I
+(Charles-authorized design amendment round, NOT an
+implementation round). It freezes the missing
+`input.mass_breakdown_bridge` for TASK-019-GOLDEN-03 that
+the 002-H amendment intentionally left unspecified.
+
+### 16.1 Background and motivation (binding, contract-frozen)
+
+The 002-H amendment (PR #110 merged into main as
+`7e0a0bd9`) froze the TASK-019-GOLDEN-03
+`input.cost_records_bridge` (3 selector-input records) +
+`input.cost_records_bridge_bindings` (4 by-record-id
+bindings). The 002-H amendment DID NOT freeze a legal
+`MassBreakdown` bridge for case_03. The 002-H §15.3.4
+reference to a "case_02 `MassBreakdown`" was a contract
+placeholder, not a fixture-level frozen bridge.
+
+The PR #111 implementation round correctly left case_03 as
+`WIRED_VIA_CHAIN_PARTIAL` (with only the 5 P0-4 selector
+audit fields in `produced_fields` and all `cost_components.*`
+fields as `None`) because the 002-H frozen case_03 fixture
+did NOT carry a legal `MassBreakdown` bridge: the case_03
+fixture has no `material_catalog_bridge` (the case_02
+prerequisite) and no `case_01_geometry` (the case_02
+cross-case ref), so the case_02 chain cannot be invoked
+from case_03 without violating the P0 anti-fabrication rules
+(PR #111 P0 review).
+
+The 002-I amendment freezes the legal
+`input.mass_breakdown_bridge` as case-bound frozen
+benchmark input. The future implementation round (not
+authorized by 002-I) MAY then call
+`hexagent.costing.calculate_cost_breakdown(...)` with a
+production `MassBreakdown` object built **verbatim** from
+this bridge, satisfying the PR #111 P0 invariants
+(P0-1: no runtime FS read of case_02 fixture; P0-2: no
+stub MassBreakdown; P0-3: no new blocker code; P0-4:
+selected_model_id not in produced_fields).
+
+### 16.2 002-I frozen contract surface (binding, contract-frozen)
+
+The 002-I amendment adds ONE new frozen field to
+`tests/golden/double_pipe_rating/case_03_cost_lifecycle_envelope.json`:
+
+- `input.mass_breakdown_bridge` (case-bound frozen
+  benchmark input; NOT a runtime catalog lookup)
+
+Shape (binding; the future implementation MUST consume
+this exact shape):
+
+```json
+{
+  "bridge_id": "TASK-019-AMEND-002I-CASE03-MASS-BREAKDOWN-BRIDGE-V1",
+  "bridge_type": "case_bound_production_mass_breakdown",
+  "source_case_id": "TASK-019-GOLDEN-02",
+  "source_contract": "TASK-019 Design Amendment 002-G / PR #109 case_02 mass-chain contract",
+  "source_usage": "Frozen input bridge for TASK-019-GOLDEN-03 cost calculator only; not a runtime reference to case_02 fixture.",
+  "mass_breakdown_class": "hexagent.material_mass_mechanical.mass_calculator.MassBreakdown",
+  "field_mapping": {
+    "inner_tube_kg": "case_02 actual_output.mass_kg.tube_mass_kg",
+    "outer_pipe_kg": "case_02 actual_output.mass_kg.shell_mass_kg",
+    "hairpin_bend_kg": "case_02 production MassBreakdown.hairpin_bend_kg",
+    "fittings_kg": "case_02 production MassBreakdown.fittings_kg",
+    "total_kg": "case_02 actual_output.mass_kg.total_mass_kg",
+    "calculation_hash": "case_02 production MassBreakdown.calculation_hash (tube call; primary mass input for case_03)",
+    "provenance": "case_02 production MassBreakdown.provenance (tube call; primary mass input for case_03)"
+  },
+  "values": {
+    "inner_tube_kg": 5.127079210658542,
+    "outer_pipe_kg": 11.056395521337773,
+    "hairpin_bend_kg": 0.0,
+    "fittings_kg": 0.0,
+    "total_kg": 16.183474731996316,
+    "calculation_hash": "42b4fad3d9c7130073cd362e7fd7575b88c3c10bd1ef24bc2a835e1738315fc7",
+    "provenance": {
+      "geometry_record_id": "case_02_tube_geometry_002g",
+      "material_record_id": "MAT-SS304-TUBE-001",
+      "applicable_standard_id": "ASME BPVC Section VIII Div 1 (TASK-017 approved rule-pack; design_code_id per TASK-017 catalog)",
+      "design_pressure_mpa": 0.6,
+      "design_temperature_c": 70.0,
+      "correlation_ids": [],
+      "software_version": "0.1.0",
+      "git_commit": "6ed5b7dc7d8df163796eacb838afcf5702a4c53a",
+      "result_hash": "b6d2b2bc76592364ea9cc937937dfcd480b4716efd6645c375f20904d015bf58"
+    }
+  },
+  "runtime_forbidden": [
+    "read_case_02_fixture",
+    "derive_raw_geometry",
+    "resolve_material",
+    "construct_synthetic_material_resolution",
+    "use_stub_mass_breakdown",
+    "catalog_lookup",
+    "db_lookup",
+    "network_lookup"
+  ],
+  "failure_policy": {
+    "missing_or_malformed_bridge": "fail_closed",
+    "cost_components": "null",
+    "blocker_code": "UNSPECIFIED_BLOCKER",
+    "details_reason": "mass_breakdown_bridge_missing_or_malformed"
+  }
+}
+```
+
+### 16.3 Field value provenance (binding, contract-frozen)
+
+The `values` block in §16.2 is NOT invented. Each value is
+derived from the case_02 production chain (TASK-019 Design
+Amendment 002-G / PR #109) executed against the 002-G frozen
+case_02 fixture:
+
+- `inner_tube_kg = 5.127079210658542` = production
+  `MassBreakdown.inner_tube_kg` from the 002-G case_02
+  tube call (`calculate_mass_breakdown(tube_request)`).
+- `outer_pipe_kg = 11.056395521337773` = production
+  `MassBreakdown.outer_pipe_kg` from the 002-G case_02
+  pipe call (`calculate_mass_breakdown(pipe_request)`).
+  Per 002-G §4.9.10 step 7 "方案 B" mapping, the
+  public report shape's `mass_kg.shell_mass_kg` is the
+  production `outer_pipe_kg` (canonical).
+- `hairpin_bend_kg = 0.0` = production
+  `MassBreakdown.hairpin_bend_kg`. Per 002-G
+  `include_hairpin=False` and the case_02 fixture's
+  `fitting_overrides_kg=()`, this field is canonically
+  0.0 (case_02 is straight tube-in-shell; no hairpin by
+  design).
+- `fittings_kg = 0.0` = production
+  `MassBreakdown.fittings_kg`. Per 002-G
+  `fitting_overrides_kg=()` and
+  `fitting_density_normalization=False`, this field is
+  canonically 0.0 (case_02 has no fittings by design).
+- `total_kg = 16.183474731996316` = production
+  `MassBreakdown.total_kg` derived as
+  `tube_call.inner_tube_kg + pipe_call.outer_pipe_kg`
+  (per 002-G §4.9.10 step 7 "方案 B" mapping; the
+  canonical sum of the two production call results; this
+  matches the case_02 expected_output.mass_kg.total_mass_kg
+  = 16.183474731996316 byte-for-byte).
+- `calculation_hash = 42b4fad3d9c7130073cd362e7fd7575b88c3c10bd1ef24bc2a835e1738315fc7`
+  = production `MassBreakdown.calculation_hash` from the
+  002-G case_02 TUBE call (the primary mass input for
+  case_03; the TUBE call drives the `inner_tube_kg` value
+  that enters the case_03 `MassBreakdown`). The
+  PIPE call's `calculation_hash` is the separate
+  `MassBreakdown` object that drives
+  `outer_pipe_kg`; it is documented in the source
+  chain audit trail but the case_03 single-MassBreakdown
+  object carries the TUBE call's hash as the canonical
+  audit field. (The choice of TUBE-call hash is documented
+  in the field_mapping block: "calculation_hash:
+  case_02 production MassBreakdown.calculation_hash
+  (tube call; primary mass input for case_03)".)
+- `provenance` = production `MassProvenance` object
+  from the 002-G case_02 TUBE call. Each provenance
+  field is a verbatim copy of the production output:
+  `geometry_record_id = "case_02_tube_geometry_002g"`,
+  `material_record_id = "MAT-SS304-TUBE-001"`,
+  `applicable_standard_id = "ASME BPVC Section VIII Div 1
+  (TASK-017 approved rule-pack; design_code_id per
+  TASK-017 catalog)"`, `design_pressure_mpa = 0.6`,
+  `design_temperature_c = 70.0`,
+  `correlation_ids = []` (TUBE call has no
+  correlation_ids field populated for the mass path;
+  the correlation_ids field is empty in the case_02
+  TUBE-call MassBreakdown.provenance),
+  `software_version = "0.1.0"`,
+  `git_commit = "6ed5b7dc7d8df163796eacb838afcf5702a4c53a"`,
+  `result_hash = "b6d2b2bc76592364ea9cc937937dfcd480b4716efd6645c375f20904d015bf58"`
+  (TUBE-call's result_hash).
+
+The 002-G chain produces TWO `MassBreakdown` objects
+(tube call + pipe call). The 002-I case_03 single-
+`MassBreakdown` object canonicalizes the TUBE call's
+`calculation_hash` + `provenance` for the audit fields
+(per the field_mapping rationale). The TUBE call is the
+primary mass input for case_03 because it carries
+`inner_tube_kg` (the c0_material mass driver); the PIPE
+call's audit fields are documented in the source
+chain audit trail but the case_03 frozen bridge
+canonicalizes the TUBE call as the single
+`MassBreakdown` audit source.
+
+### 16.4 Future implementation contract (binding for the next round)
+
+The future implementation round (NOT authorized by 002-I;
+authorized in a separate Charles-authorized round) MUST
+read `input.mass_breakdown_bridge` verbatim from the
+case_03 fixture and construct a production
+`MassBreakdown` object from it. Specifically:
+
+- Construct
+  `MassBreakdown(inner_tube_kg=bridge.values.inner_tube_kg, outer_pipe_kg=bridge.values.outer_pipe_kg, hairpin_bend_kg=bridge.values.hairpin_bend_kg, fittings_kg=bridge.values.fittings_kg, total_kg=bridge.values.total_kg, calculation_hash=bridge.values.calculation_hash, provenance=MassProvenance(**bridge.values.provenance))`
+  by reading each field verbatim from
+  `case_03.input.mass_breakdown_bridge.values.<field>`.
+- Pass this `MassBreakdown` object to
+  `hexagent.costing.calculate_cost_breakdown(cost_model_selection_result=..., mass_breakdown=..., ...)` exactly as the
+  production API expects.
+- DO NOT call `calculate_mass_breakdown` from the
+  case_03 path (P0-1 ban: no raw geometry re-derivation
+  in case_03).
+- DO NOT call `resolve_material` from the case_03 path
+  (P0-1 ban: no synthetic MaterialResolutionResult
+  reconstruction in case_03).
+- DO NOT call any function on `tests/golden/double_pipe_rating/case_02_*.json`
+  (P0-1 ban: no runtime FS read of the case_02 fixture
+  from case_03).
+- DO NOT introduce any synthetic `MassBreakdown`
+  fallback (P0-2 ban: no `StubMassBreakdown` /
+  duck-type).
+- DO NOT introduce any runtime catalog resolver
+  (002-H §15.3.1 + 002-I §16.4 binding rule).
+- DO NOT call any DB / filesystem / network lookup
+  design for runtime.
+- If `input.mass_breakdown_bridge` is missing or
+  malformed, the implementation MUST fail closed
+  per `bridge.failure_policy`: status =
+  `WIRED_VIA_CHAIN_PARTIAL`, all `cost_components.*`
+  fields = `None`, `produced_fields` contains ONLY the
+  5 P0-4 selector audit fields, blocker
+  `code = "UNSPECIFIED_BLOCKER"`, `details.reason =
+  "mass_breakdown_bridge_missing_or_malformed"`. No new
+  blocker code strings are introduced (P0-3 binding
+  rule).
+
+### 16.5 Field values preserved verbatim (binding, contract-frozen)
+
+The 002-I amendment DOES NOT change the amendment-001
+frozen expected_output central values:
+
+- `expected_output.cost_components_C0_C1.cost_components.C0_material_minor_units = 412000`
+- `expected_output.cost_components_C0_C1.cost_components.C0_labor_minor_units = 188000`
+- `expected_output.cost_components_C0_C1.cost_components.C1_total_minor_units = 600000`
+- `expected_output.cost_components_C0_C1.currency_ISO_4217 = USD`
+- `expected_output.life_cycle_energy_envelope.life_cycle_energy_summary.annual_operating_hours = 8000`
+- `expected_output.life_cycle_energy_envelope.life_cycle_energy_summary.design_life_years = 20`
+- `expected_output.life_cycle_energy_envelope.life_cycle_energy_summary.annual_energy_MJ = 241056.0`
+- `expected_output.life_cycle_energy_envelope.life_cycle_energy_summary.total_lifecycle_energy_MJ = 4821120.0`
+- `expected_output.selected_cost_model.selected_model_id = "ASME-BPVC-VIII-1-COST-MODEL-V1 (TASK-018 Slice A frozen cost-model catalog)"`
+- `expected_output.discounted_total_minor_units = null`
+- `expected_output.salvage_minor_units = 0`
+- `expected_output.unspecified_blocker.details.reason = "discount_formula_pending_design_amendment"`
+
+If the future implementation round observes a cost
+breakdown output OUTSIDE the amendment-001 tolerance
+envelope, the future round MUST STOP and report (per §9
+FROZEN contract discipline + §16.4 fail-closed rule);
+silent expected_output mutation is FORBIDDEN.
+
+### 16.6 Tolerance unchanged (binding, contract-frozen)
+
+The 002-I amendment adds ONE frozen input bridge to the
+case_03 fixture. The existing amendment-001 numeric
+tolerance values are preserved verbatim. The new
+`mass_breakdown_bridge.values.{inner_tube_kg,
+outer_pipe_kg, hairpin_bend_kg, fittings_kg, total_kg,
+calculation_hash, provenance.*}` are categorical (string-
+literal equality + exact float equality with rel_tol = 0)
+for the `mass_breakdown_bridge` itself. NO existing
+tolerance is widened. The `_tolerance_metadata.json` is
+NOT modified by 002-I.
+
+### 16.7 Case boundaries (binding, contract-frozen)
+
+002-I applies ONLY to case_03 (input only). case_01
+(002-E frozen) and case_02 (002-G frozen) are NOT
+touched. Specifically:
+
+- case_01: 002-E is binding; case_01 fixture,
+  `_provenance_metadata.json` case_01 entries, and
+  `_tolerance_metadata.json` case_01 entries are NOT
+  modified by 002-I.
+- case_02: 002-G is binding; case_02 fixture,
+  `_provenance_metadata.json` case_02 entries, and
+  `_tolerance_metadata.json` case_02 entries are NOT
+  modified by 002-I.
+- TASK-018 frozen design contract
+  (`docs/tasks/TASK-018-*.md`) is NOT modified by 002-I.
+
+### 16.8 Amendment 002-I does NOT authorize
+
+- Implement the future case_03 cost breakdown wiring
+  using this bridge. 002-I freezes the contract surface;
+  the implementation round requires a separate Charles
+  authorization.
+- Mark a PR Ready. 002-I is a DRAFT PR; the Ready and
+  Merge steps are NOT authorized.
+- Mutate any Issue (close / comment / label / lock).
+  002-I is docs + fixtures only; no Issue mutation is
+  authorized.
+- Mutate `src/**`, `tests/validation_report/**`,
+  `tests/unit/**`, `tests/support/**`,
+  `tests/benchmark/**`, `.github/**`,
+  `ci-shard-manifest.yml`, `pyproject.toml`, or
+  `uv.lock`. 002-I is docs + case_03 fixture +
+  provenance metadata only.
+- Mutate any TASK-006..TASK-018 frozen contract blob.
+  002-I freezes the TASK-019 surface; it does not
+  change the upstream contract chain.
+- Re-derive the amendment-001 frozen `expected_output`
+  central values. 002-I preserves them verbatim (see
+  §16.5).
+- Introduce any TASK-020+ content (pressure drop / C4
+  / TEMA / Kern / Bell-Delaware / vendor quote /
+  runtime catalog resolver). 002-I remains within the
+  frozen TASK-019 scope.
+- Invent any TASK-018 §5.3 discount formula or §5.3.2
+  salvage formula. 002-I preserves the deferred
+  status verbatim (see §16.5).
+- Read the case_02 fixture at runtime. 002-I freezes
+  the case_03 MassBreakdown bridge as a case-bound
+  fixture input; the future implementation MUST read
+  the bridge from the case_03 fixture, NOT from the
+  case_02 fixture.
+- Send Feishu. 002-I is a docs-only round; the final
+  report is delivered inline + via this file path, not
+  via Feishu outbound.
+
+### 16.9 002-I provenance additions (binding, contract-frozen)
+
+The `_provenance_metadata.json` 002-I block adds the
+following top-level keys:
+
+- `amendment_002i_id = "TASK-019-DESIGN-AMENDMENT-002-I"`
+- `amendment_002i_effective_scope = "TASK-019-GOLDEN-03"`
+- `amendment_002i_bridge_schema_version = "TASK-019-MASS-BREAKDOWN-BRIDGE-V1"`
+- `amendment_002i_supersedes = "TASK-019-DESIGN-AMENDMENT-002-H (case_03 input.mass_breakdown_bridge only; expected_output central values preserved verbatim; tolerance numeric values preserved verbatim)"`
+- `amendment_002i_field_paths_added = ["input.mass_breakdown_bridge (7 numeric/string fields + provenance sub-object; production-case_02 mass-chain derived)"]`
+- `amendment_002i_field_paths_preserved_not_modified = ["expected_output.cost_components_C0_C1.* (all 4 values preserved verbatim from amendment-001)", "expected_output.life_cycle_energy_envelope.* (preserved verbatim)", "expected_output.selected_cost_model.* (preserved verbatim)", "expected_output.discounted_total_minor_units (still null)", "expected_output.salvage_minor_units (still 0)", "expected_output.unspecified_blocker.details.reason", "input.cost_records_bridge (3 records preserved verbatim from 002-H)", "input.cost_records_bridge_bindings (4 bindings preserved verbatim from 002-H)", "input.cost_model_selection.* (preserved verbatim)", "input.lifecycle_inputs.* (preserved verbatim)", "input.case_01_input_reference_case_id=TASK-019-GOLDEN-01"]`
+- `amendment_002i_field_paths_unchanged = ["case_01.* (002-E frozen)", "case_02.* (002-G frozen; case_02 input NOT modified; case_02 fixture, _provenance_metadata.json case_02 entries, _tolerance_metadata.json case_02 entries NOT modified)", "src/** (NOT modified)", "tests/validation_report/** (NOT modified)", "tests/unit/** (NOT modified)", "tests/benchmark/** (NOT modified)", "tests/support/** (NOT modified)", ".github/** (NOT modified)", "pyproject.toml (NOT modified)", "uv.lock (NOT modified)", "ci-shard-manifest.yml (NOT modified)", "docs/tasks/TASK-006..TASK-018*.md (frozen)"]`
+- `amendment_002i_re_derivation_method = ["no_re_derivation: mass_breakdown_bridge.values.* are derived from the case_02 production-chain output (tube call + pipe call per 002-G §4.9.10 step 7 方案 B); expected_output central values preserved verbatim from amendment-001", "no_fabrication_statement: mass_breakdown_bridge is case-bound frozen benchmark input; the values are production case_02 chain output, not invented", "no_runtime_resolver_statement: the future adapter MUST NOT introduce a runtime catalog resolver; the frozen mass_breakdown_bridge is the sole source of mass dependency for case_03 cost calculator", "no_case_02_runtime_read_statement: the future adapter MUST NOT read the case_02 fixture at runtime; mass_breakdown_bridge is the case-bound frozen input bridge, NOT a runtime reference to case_02", "no_raw_geometry_statement: the future adapter MUST NOT derive raw geometry from case_03; mass_breakdown_bridge carries the case_02 production-chain derived mass values directly", "no_synthetic_material_statement: the future adapter MUST NOT construct synthetic MaterialResolutionResult; the case_02 chain has already executed and the case_03 bridge carries the production-derived audit fields (calculation_hash + provenance)", "no_stub_mass_breakdown_statement: the future adapter MUST NOT use a stub / duck-type MassBreakdown; the case_03 bridge carries the real production MassBreakdown values"]`
+- `amendment_002i_chain_coverage = ["calculate_cost_breakdown_input_cost_model_selection_result (from select_cost_records output per 002-H §15.3.3)", "calculate_cost_breakdown_input_mass_breakdown_from_case_03_mass_breakdown_bridge (new in 002-I; bridge source = case_02 production chain)", "calculate_cost_breakdown_output_capex_envelope_to_cost_components_C0_C1 (unchanged from 002-H §15.3.4)", "calculate_cost_breakdown_output_calculator_run_id_to_upstream_calculation_run_ids (unchanged from 002-H)"]`
+- `amendment_002i_production_api_reconciliation = ["production_calculate_cost_breakdown_api = hexagent.costing.calculate_cost_breakdown (unchanged from 002-H §15.5)", "production_mass_breakdown_construction = future implementation MUST construct a hexagent.material_mass_mechanical.mass_calculator.MassBreakdown by reading case_03.input.mass_breakdown_bridge.values.* verbatim; the bridge is the SOLE source of mass dependency for case_03 cost calculator"]`
+- `amendment_002i_no_production_code_changed = true`
+- `amendment_002i_fixture_input_only = true`
+
+### 16.10 Future implementation round prerequisites (binding for next round)
+
+The future TASK-019 implementation round (NOT authorized
+by 002-I) MAY be authorized in a separate Charles-
+authorized round once 002-I is reviewed and merged. The
+future round MUST:
+
+- Read `case_03.input.mass_breakdown_bridge` verbatim
+  from the fixture.
+- Construct a production `MassBreakdown` object from
+  `bridge.values.*` per §16.4.
+- Call
+  `hexagent.costing.calculate_cost_breakdown(cost_model_selection_result=select_cost_records_output, mass_breakdown=constructed_MassBreakdown, ...)`
+  per the production API contract.
+- Surface the production `CostBreakdown.to_dict()` shape
+  verbatim into `values.upstream_provenance_digests.cost_breakdown_payload`.
+- Project the production output into the public
+  `produced_fields` per the P0-4 selector audit fields
+  (5 fields) + the cost component fields per the 002-H
+  §15.3.4 by-record-id mapping. The
+  `selected_model_id` MUST NOT appear in
+  `produced_fields` (P0-4 binding).
+- STOP and report mismatch (NOT silent mutation) if the
+  production output is OUTSIDE the amendment-001
+  tolerance envelope per §16.6.
+- Fail closed per §16.4 if the bridge is missing or
+  malformed.
+- Mutate ONLY the allowed files per §16.8 forbidden
+  list.
