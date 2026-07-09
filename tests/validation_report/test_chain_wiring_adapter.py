@@ -647,15 +647,14 @@ def test_p1_no_synthetic_cost_selection_filters() -> None:
 
     src = inspect.getsource(chain_adapter)
     # The old P1-3 hardcode was a SelectionFilters(...) call with
-    # material_family="stainless_steel" and several frozenset filters
-    # for cost_category / quantity_basis / license_class. We check
+    # material_family="stainless_steel" (without the 002-H
+    # "_304" suffix) and several frozenset filters for
+    # cost_category / quantity_basis / license_class. We check
     # for the specific patterns that indicate a hardcoded
-    # SelectionFilters construction.
+    # SelectionFilters construction that contradicts the 002-H
+    # contract surface.
     forbidden_filter_patterns = (
-        'material_family="stainless_steel"',  # old hardcoded material_family
-        "cost_category_filter=frozenset",  # any filter construction
-        "quantity_basis_filter=frozenset",  # any filter construction
-        "license_class_filter=frozenset",  # any filter construction
+        'material_family="stainless_steel"',  # old hardcoded material_family (no _304 suffix)
     )
     for pat in forbidden_filter_patterns:
         assert pat not in src, (
@@ -833,14 +832,57 @@ def test_slice3b_a_case_01_wired_case_02_03_partial() -> None:
     assert artifact_02["values"]["selected_material_ids"]["shell_material_id"] == "SS304"
     assert artifact_02["values"]["selected_material_ids"]["tube_material_id"] == "SS304"
 
-    # case_03: still partial (no cost_records / SelectionFilters fabrication).
+    # case_03: Slice 3B-C (post-002-H) wires case_03 to the production
+    # TASK-018 chain via the 002-H frozen cost_records_bridge +
+    # cost_records_bridge_bindings + SelectionFilters (constructed
+    # exactly per the 002-H §15.3.2 contract surface). The chain
+    # runs select_cost_records (c0=2, c1=1, blockers=[]) +
+    # calculate_cost_breakdown with the real production
+    # MassBreakdown from the case_02 chain (per 002-G / PR #109).
+    # The public report shape is projected by RECORD-ID lookup
+    # (C0_material <- c0_material_record_id, C0_labor <-
+    # c0_labor_record_id, C1_total <- capex_envelope_minor_units).
     fixture_03 = _load_fixture("TASK-019-GOLDEN-03")
     artifact_03 = chain_adapter.compute_actual_output_via_chain(fixture_03)
-    assert artifact_03["status"] == "WIRED_VIA_CHAIN_PARTIAL"
-    assert artifact_03["produced_fields"] == [], (
-        "case_03 must remain fail-closed partial; produced_fields must "
-        "be empty (no cost_records / SelectionFilters fabrication, "
-        "P1-3 guard preserved)"
+    assert artifact_03["status"] == "WIRED_VIA_CHAIN", (
+        f"case_03 must be WIRED_VIA_CHAIN after Slice 3B-C (post-002-H); "
+        f"got {artifact_03['status']!r}"
+    )
+    expected_03_fields = {
+        "cost_components_C0_C1.cost_components.C0_material_minor_units",
+        "cost_components_C0_C1.cost_components.C0_labor_minor_units",
+        "cost_components_C0_C1.cost_components.C1_total_minor_units",
+        "cost_components_C0_C1.currency_ISO_4217",
+        "cost_components_C0_C1.calculator_run_id",
+        "cost_components_C0_C1.license_class_summary",
+        "selected_cost_model.selected_model_id",
+        "selected_cost_model.selection_blockers",
+    }
+    assert set(artifact_03["produced_fields"]) == expected_03_fields, (
+        f"case_03 produced_fields must be exactly the 002-H contract fields; "
+        f"got {sorted(artifact_03['produced_fields'])}"
+    )
+    # BY-RECORD-ID mapped production values (NOT c0_subtotal
+    # post-filter) per 002-H §15.3.4.
+    assert (
+        artifact_03["values"]["cost_components_C0_C1"]["cost_components"]["C0_material_minor_units"]
+        == 412000
+    )
+    assert (
+        artifact_03["values"]["cost_components_C0_C1"]["cost_components"]["C0_labor_minor_units"]
+        == 188000
+    )
+    assert (
+        artifact_03["values"]["cost_components_C0_C1"]["cost_components"]["C1_total_minor_units"]
+        == 600000
+    )
+    assert artifact_03["values"]["cost_components_C0_C1"]["currency_ISO_4217"] == "USD"
+    # selected_model_id MUST be the amendment-001 frozen string
+    # literal — NOT replaced with selector_run_id or any production
+    # output (per 002-H §15.3.3).
+    assert (
+        artifact_03["values"]["selected_cost_model"]["selected_model_id"]
+        == "ASME-BPVC-VIII-1-COST-MODEL-V1 (TASK-018 Slice A frozen cost-model catalog)"
     )
     # Discount / salvage remain deferred.
     assert artifact_03["discount_salvage_status"]["discounted_total_minor_units"] == (
@@ -1101,3 +1143,168 @@ def test_p1_guard_test_no_silent_constant_substitution() -> None:
             f"chain_adapter source contains P1 guard-test marker {marker!r}; "
             f"this is a silent-constant-substitution violation"
         )
+
+
+# ----------------------------------------------------------------------------
+# Slice 3B-C (post-002-H) case_03 contract tests.
+# ----------------------------------------------------------------------------
+
+
+def test_slice3b_c_case_03_selector_bridge_smoke() -> None:
+    """The 002-H frozen cost_records_bridge + SelectionFilters produce
+    c0=2 / c1=1 / blockers=[] / warnings=[] at the production
+    CostModelSelector (per 002-H §15.3.2)."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-03")
+    artifact = chain_adapter.compute_actual_output_via_chain(fixture)
+    assert artifact["status"] == "WIRED_VIA_CHAIN"
+    # selected_cost_model carries the selector_run_id +
+    # provenance_chain_hash + c0_record_count + c1_record_count
+    # per 002-H §15.3.3.
+    scm = artifact["values"]["selected_cost_model"]
+    assert scm["selection_blockers"] == []
+    assert scm["selector_run_id"] != ""
+    assert scm["selector_provenance_chain_hash"] != ""
+    assert scm["c0_record_count"] == 2
+    assert scm["c1_record_count"] == 1
+
+
+def test_slice3b_c_case_03_by_record_id_mapping() -> None:
+    """The 002-H §15.3.4 public mapping is by-record-id lookup on
+    c0_subtotal.component_breakdown — NOT post-filter on
+    c0_subtotal.amount_minor_units. Verify the produced values
+    match the bridge's bound record ids and the amendment-001
+    central values exactly (412000 / 188000 / 600000)."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-03")
+    artifact = chain_adapter.compute_actual_output_via_chain(fixture)
+    cc = artifact["values"]["cost_components_C0_C1"]["cost_components"]
+    assert cc["C0_material_minor_units"] == 412000
+    assert cc["C0_labor_minor_units"] == 188000
+    assert cc["C1_total_minor_units"] == 600000
+    assert artifact["values"]["cost_components_C0_C1"]["currency_ISO_4217"] == "USD"
+
+
+def test_slice3b_c_case_03_no_runtime_resolver() -> None:
+    """The chain_adapter source must not introduce a runtime catalog
+    resolver (no filesystem / DB / network catalog lookup for cost
+    records). The 002-H §15.3.1 rule binding is: cost_records_bridge
+    is read from the fixture only; no TASK-018 / TASK-013 runtime
+    catalog helper is introduced."""
+    import inspect
+
+    from hexagent.validation_report import chain_adapter
+
+    src = inspect.getsource(chain_adapter)
+    forbidden_resolver_markers = (
+        "TASK_018_catalog_loader",
+        "TASK_013_catalog_loader",
+        "catalog_resolver",
+        "runtime_resolver",
+        "open_catalog",
+    )
+    for marker in forbidden_resolver_markers:
+        assert marker not in src, (
+            f"chain_adapter source contains forbidden runtime catalog "
+            f"resolver marker {marker!r}; 002-H §15.3.1 forbids a "
+            f"runtime catalog resolver"
+        )
+
+
+def test_slice3b_c_case_03_no_forbidden_scope() -> None:
+    """The chain_adapter source must not introduce any forbidden-scope
+    content (TASK-020+ pressure drop / C4 / TEMA / Kern /
+    Bell-Delaware / vendor quote / discount formula / salvage
+    formula)."""
+    import inspect
+
+    from hexagent.validation_report import chain_adapter
+
+    src = inspect.getsource(chain_adapter)
+    forbidden_scope_markers = (
+        "pressure_drop_calculator",
+        "TEMA",
+        "Kern_method",
+        "Bell_Delaware",
+        "Bell-Delaware",
+        "discount_formula",
+        "salvage_formula",
+        "vendor_quote",
+    )
+    for marker in forbidden_scope_markers:
+        # "TEMA" is allowed as a standards-source enum literal
+        # (frozen allowed-standards list); the chain_adapter source
+        # should not contain an algorithm implementation.
+        if marker == "TEMA":
+            # OK if it's only in a string-literal comment or
+            # standards allow-list reference. The Slice 3B-C contract
+            # forbids a TEMA algorithm implementation; we accept
+            # either no TEMA reference or a comment-only reference.
+            # To keep the assertion strict we skip TEMA here and
+            # verify it via the broader forbidden-scope negative
+            # tests in tests/validation_report/test_excluded_scopes_negative.py
+            continue
+        assert marker not in src, (
+            f"chain_adapter source contains forbidden-scope marker "
+            f"{marker!r}; Slice 3B-C is TASK-019 scope only"
+        )
+
+
+def test_slice3b_c_case_03_regression_case_01_case_02_unchanged() -> None:
+    """case_01 and case_02 produced_fields and status must remain
+    unchanged after Slice 3B-C wiring (regression guard)."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture_01 = _load_fixture("TASK-019-GOLDEN-01")
+    artifact_01 = chain_adapter.compute_actual_output_via_chain(fixture_01)
+    assert artifact_01["status"] == "WIRED_VIA_CHAIN"
+    assert set(artifact_01["produced_fields"]) == {
+        "heat_duty_W",
+        "LMTD_derived_values.LMTD_counterflow_K",
+        "heat_transfer_coefficients.annulus_side_W_m2_K",
+        "heat_transfer_coefficients.tube_side_W_m2_K",
+        "outlet_temperatures_K.cold_side",
+        "outlet_temperatures_K.hot_side",
+    }
+
+    fixture_02 = _load_fixture("TASK-019-GOLDEN-02")
+    artifact_02 = chain_adapter.compute_actual_output_via_chain(fixture_02)
+    assert artifact_02["status"] == "WIRED_VIA_CHAIN"
+    assert set(artifact_02["produced_fields"]) == {
+        "mass_kg.shell_mass_kg",
+        "mass_kg.tube_mass_kg",
+        "mass_kg.total_mass_kg",
+        "preliminary_mechanical_check.status",
+        "selected_material_ids.shell_material_id",
+        "selected_material_ids.tube_material_id",
+    }
+
+
+def test_slice3b_c_case_03_expected_output_unchanged() -> None:
+    """The fixture's expected_output block must remain byte-identical
+    to the 002-H frozen version after Slice 3B-C wiring (no
+    expected_output mutation by the adapter)."""
+    from hexagent.validation_report import chain_adapter
+
+    fixture = _load_fixture("TASK-019-GOLDEN-03")
+    expected_before = json.loads(json.dumps(fixture["expected_output"]))
+    # Run the adapter; this MUST NOT mutate the fixture.
+    chain_adapter.compute_actual_output_via_chain(fixture)
+    expected_after = json.loads(json.dumps(fixture["expected_output"]))
+    assert expected_before == expected_after, (
+        "chain_adapter.compute_actual_output_via_chain MUST NOT mutate "
+        "the fixture's expected_output block (no expected_output mutation rule)"
+    )
+    # Spot-check key amendment-001 frozen central values.
+    eo = expected_after
+    assert eo["cost_components_C0_C1"]["cost_components"]["C0_material_minor_units"] == 412000
+    assert eo["cost_components_C0_C1"]["cost_components"]["C0_labor_minor_units"] == 188000
+    assert eo["cost_components_C0_C1"]["cost_components"]["C1_total_minor_units"] == 600000
+    assert (
+        eo["selected_cost_model"]["selected_model_id"]
+        == "ASME-BPVC-VIII-1-COST-MODEL-V1 (TASK-018 Slice A frozen cost-model catalog)"
+    )
+    assert eo["discounted_total_minor_units"] is None
+    assert eo["salvage_minor_units"] == 0

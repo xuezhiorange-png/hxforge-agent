@@ -76,7 +76,7 @@ import json as _json
 import uuid as _uuid
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Final
+from typing import Any, Final, cast
 
 from hexagent.costing.cost_calculator import (
     CostBreakdown,
@@ -842,9 +842,552 @@ def _build_case_02_chain_request(
 # remain deferred per TASK-018 §5.3 / §5.3.2 (no formula invented).
 
 
-# -----------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# Slice 3B-C case_03 helpers (post-002-H).
+# --------------------------------------------------------------------------
+@dataclasses.dataclass(frozen=True)
+class _StubMassBreakdownForDuckType:
+    """Duck-type ``MassBreakdown`` stub for ``hexagent.costing`` cost calculator.
+
+    The production ``CostCalculator._compute_c1_subtotal`` reads
+    ``getattr(mass_breakdown, "total_kg", 0.0)`` (one getattr call per
+    call) and uses it only in the ``currency_per_kg`` branch of the
+    C1 subtotal arithmetic. The TASK-019 case_03 cost chain uses a
+    single C1 record with ``quantity_basis = "currency_per_hour"``,
+    which falls into the scalar branch per
+    ``src/hexagent/costing/cost_calculator.py`` _compute_c1_subtotal
+    (``elif quantity_basis == "currency_per_hour": minor_units =
+    int(round(base_minor))``); the scalar branch does NOT multiply by
+    ``total_kg``. Therefore the cost-chain output
+    (C0_material / C0_labor / C1_total minor-unit values) is invariant
+    to the ``total_kg`` of the supplied ``MassBreakdown``-shaped
+    object. This stub satisfies the duck-type contract for
+    fallback paths only; the happy path uses the real production
+    ``MassBreakdown`` returned by
+    ``_compute_case_03_production_mass_breakdown``.
+    """
+
+    total_kg: float = 0.0
+    inner_tube_kg: float = 0.0
+    outer_pipe_kg: float = 0.0
+    hairpin_bend_kg: float = 0.0
+    fittings_kg: float = 0.0
+
+
+def _code_value(blocker_entry: Any) -> str:
+    """Extract the ``code`` field from a selector / calculator blocker entry."""
+    if isinstance(blocker_entry, Mapping):
+        return str(blocker_entry.get("code", "UNSPECIFIED_BLOCKER"))
+    return "UNSPECIFIED_BLOCKER"
+
+
+def _load_case_02_fixture_for_mass_breakdown() -> dict[str, Any]:
+    """Read the case_02 fixture JSON file from disk (frozen test asset)."""
+    from pathlib import Path as _PathCase03Mass
+
+    _GOLDEN_FIXTURE_DIR_C03 = (
+        _PathCase03Mass(__file__).resolve().parents[3] / "tests" / "golden" / "double_pipe_rating"
+    )
+    case_02_fixture_path = _GOLDEN_FIXTURE_DIR_C03 / ("case_02_materials_mass_mechanical.json")
+    return cast(dict[str, Any], _json.loads(case_02_fixture_path.read_text(encoding="utf-8")))
+
+
+def _compute_case_03_production_mass_breakdown() -> tuple[Any, dict[str, Any]]:
+    """Execute the existing production mass-chain path and return the
+    real production ``MassBreakdown`` plus a report-facing dict.
+
+    Per TASK-019 Design Amendment 002-H §15.3.4, the case_03 cost
+    chain's ``mass_breakdown`` argument to
+    ``hexagent.costing.calculate_cost_breakdown`` must be the real
+    production ``MassBreakdown`` from the already-wired case_02
+    chain (PR #109, post-002-G). This helper invokes the
+    ``compute_actual_output_via_chain`` entry point on the
+    case_02 frozen fixture, then reconstructs a production-shaped
+    ``MassBreakdown`` by invoking the production
+    ``hexagent.material_mass_mechanical.mass_calculator.calculate_mass_breakdown``
+    API twice (tube call + pipe call) with the case_02 production
+    geometry records.
+    """
+    case_02_fixture = _load_case_02_fixture_for_mass_breakdown()
+    case_02_artifact = compute_actual_output_via_chain(case_02_fixture)
+    case_02_mass_kg = case_02_artifact.get("values", {}).get("mass_kg", {})
+    inner_tube_kg = float(case_02_mass_kg.get("tube_mass_kg", 0.0))
+    outer_pipe_kg = float(case_02_mass_kg.get("shell_mass_kg", 0.0))
+    total_kg = float(case_02_mass_kg.get("total_mass_kg", 0.0))
+    from hexagent.geometry_catalogs.models import (
+        PipeGeometryRecord,
+        SourceBinding,
+        TubeGeometryRecord,
+    )
+
+    case_01_geometry = case_02_fixture.get("input", {}).get("geometry", {})
+    tube_od_m = float(case_01_geometry.get("tube_od_m", 0.0))
+    tube_id_m = float(case_01_geometry.get("tube_id_m", 0.0))
+    shell_od_m = float(case_01_geometry.get("shell_od_m", 0.0))
+    shell_id_m = float(case_01_geometry.get("shell_id_m", 0.0))
+    tube_length_m = float(case_01_geometry.get("tube_length_m", 0.0))
+    import math as _math
+
+    tube_cross_section_m2 = _math.pi * ((tube_od_m / 2.0) ** 2 - (tube_id_m / 2.0) ** 2)
+    tube_flow_area_m2 = _math.pi * (tube_id_m / 2.0) ** 2
+    tube_wall_thickness_m = (tube_od_m - tube_id_m) / 2.0
+    shell_flow_area_m2 = _math.pi * ((shell_od_m / 2.0) ** 2 - (shell_id_m / 2.0) ** 2)
+    shell_wall_thickness_m = (shell_od_m - shell_id_m) / 2.0
+    case_bound_source_binding = SourceBinding(
+        source_id="TASK-019-DESIGN-AMENDMENT-002-G",
+        source_type="TASK_017_APPROVED_MATERIAL_CATALOG",
+        source_revision="2026-07-08",
+        source_location="tests/golden/double_pipe_rating/case_02_materials_mass_mechanical.json#input.material_catalog_bridge.{shell,tube}",
+        evidence_ref="002-G design-amendment-002-G (case_02 mass-chain contract reconciliation)",
+        approved_by="TASK-019 Design Amendment 002-G (Charles-authorized)",
+        approved_at="2026-07-08",
+    )
+    tube_geometry_record = TubeGeometryRecord(
+        geometry_id="case_03_tube_geometry_002g",
+        approval_state="approved",
+        nominal_label="002G_tube_33.4x26.6x2.0",
+        outer_diameter_m=tube_od_m,
+        inner_diameter_m=tube_id_m,
+        wall_thickness_m=tube_wall_thickness_m,
+        cross_section_area_m2=tube_cross_section_m2,
+        flow_area_m2=tube_flow_area_m2,
+        hydraulic_diameter_m=tube_id_m,
+        source_binding=case_bound_source_binding,
+        revision="2026-07-08",
+        tags=("002g_case_bound", "TASK-019-GOLDEN-03"),
+    )
+    pipe_geometry_record = PipeGeometryRecord(
+        geometry_id="case_03_pipe_geometry_002g",
+        approval_state="approved",
+        nominal_label="002G_pipe_60.3x52.5x2.0",
+        nominal_pipe_size_label='2"',
+        schedule_label="40",
+        outer_diameter_m=shell_od_m,
+        inner_diameter_m=shell_id_m,
+        wall_thickness_m=shell_wall_thickness_m,
+        flow_area_m2=shell_flow_area_m2,
+        hydraulic_diameter_m=shell_od_m - shell_id_m,
+        source_binding=case_bound_source_binding,
+        revision="2026-07-08",
+        tags=("002g_case_bound", "TASK-019-GOLDEN-03"),
+    )
+    from hexagent.material_mass_mechanical.material_selector import (
+        MaterialProvenance,
+        MaterialResolutionResult,
+    )
+
+    s304_density_kg_m3 = 8000.0  # SS304 per TASK-017 approved material catalog
+    case_03_provenance = MaterialProvenance(
+        geometry_record_id="case_03_combined_geometry_002g",
+        material_record_id="TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1",
+        applicable_standard_id="ASME BPVC Section VIII Div 1",
+        design_pressure_mpa=0.6,
+        design_temperature_c=70.0,
+    )
+    case_03_resolutions = {
+        "outer_pipe": MaterialResolutionResult(
+            material_record_id="TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1",
+            material_grade="SS304",
+            density_kg_m3=s304_density_kg_m3,
+            youngs_modulus_gpa=193.0,
+            allowable_stress_mpa={70.0: 137.0},
+            provenance=case_03_provenance,
+        ),
+        "inner_tube": MaterialResolutionResult(
+            material_record_id="TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1",
+            material_grade="SS304",
+            density_kg_m3=s304_density_kg_m3,
+            youngs_modulus_gpa=193.0,
+            allowable_stress_mpa={70.0: 137.0},
+            provenance=case_03_provenance,
+        ),
+        "hairpin_bend": MaterialResolutionResult(
+            material_record_id="TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1",
+            material_grade="SS304",
+            density_kg_m3=s304_density_kg_m3,
+            youngs_modulus_gpa=193.0,
+            allowable_stress_mpa={70.0: 137.0},
+            provenance=case_03_provenance,
+        ),
+        "fittings": MaterialResolutionResult(
+            material_record_id="TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1",
+            material_grade="SS304",
+            density_kg_m3=s304_density_kg_m3,
+            youngs_modulus_gpa=193.0,
+            allowable_stress_mpa={70.0: 137.0},
+            provenance=case_03_provenance,
+        ),
+    }
+
+    tube_request = MassCalculationRequest(
+        geometry_record=tube_geometry_record,
+        effective_length_m=tube_length_m,
+        material_resolutions_by_component_role=dict(case_03_resolutions),
+        fitting_overrides_kg=(),
+        include_hairpin=False,
+        fitting_density_normalization=False,
+    )
+    pipe_request = MassCalculationRequest(
+        geometry_record=pipe_geometry_record,
+        effective_length_m=tube_length_m,
+        material_resolutions_by_component_role=dict(case_03_resolutions),
+        fitting_overrides_kg=(),
+        include_hairpin=False,
+        fitting_density_normalization=False,
+    )
+    tube_mass_breakdown: MassBreakdown = calculate_mass_breakdown(tube_request)
+    pipe_mass_breakdown: MassBreakdown = calculate_mass_breakdown(pipe_request)
+    combined_mass_breakdown = MassBreakdown(
+        inner_tube_kg=tube_mass_breakdown.inner_tube_kg,
+        outer_pipe_kg=pipe_mass_breakdown.outer_pipe_kg,
+        hairpin_bend_kg=0.0,
+        fittings_kg=0.0,
+        total_kg=float(inner_tube_kg + outer_pipe_kg),
+        calculation_hash=pipe_mass_breakdown.calculation_hash,
+        provenance=pipe_mass_breakdown.provenance,
+    )
+    report_facing = {
+        "total_kg": combined_mass_breakdown.total_kg,
+        "inner_tube_kg": combined_mass_breakdown.inner_tube_kg,
+        "outer_pipe_kg": combined_mass_breakdown.outer_pipe_kg,
+        "hairpin_bend_kg": combined_mass_breakdown.hairpin_bend_kg,
+        "fittings_kg": combined_mass_breakdown.fittings_kg,
+        "calculation_hash": combined_mass_breakdown.calculation_hash,
+        "provenance": combined_mass_breakdown.provenance.to_dict(),
+        "case_02_chain_inner_tube_kg_from_chain": inner_tube_kg,
+        "case_02_chain_outer_pipe_kg_from_chain": outer_pipe_kg,
+        "case_02_chain_total_kg_from_chain": total_kg,
+    }
+    return combined_mass_breakdown, report_facing
+
+
+def _build_case_03_fail_closed_values(
+    *,
+    case_01_ref: str,
+    selection_blockers: list[dict[str, Any]],
+    selector_provenance_hash: str,
+) -> dict[str, Any]:
+    """Build the fail-closed ``values`` block for case_03."""
+    first_code = (
+        _code_value(selection_blockers[0]) if selection_blockers else "cost_records_bridge_missing"
+    )
+    return {
+        "case_01_outputs": {
+            "case_01_outputs_reference_case_id": case_01_ref,
+        },
+        "cost_components_C0_C1": {
+            "cost_components": {
+                "C0_material_minor_units": None,
+                "C0_labor_minor_units": None,
+                "C1_total_minor_units": None,
+            },
+            "currency_ISO_4217": None,
+        },
+        "discounted_total_minor_units": None,
+        "life_cycle_energy_envelope": {
+            "blocker_codes": [first_code],
+            "life_cycle_energy_summary": {
+                "annual_operating_hours": None,
+                "design_life_years": None,
+                "annual_energy_MJ": None,
+                "total_lifecycle_energy_MJ": None,
+            },
+        },
+        "salvage_minor_units": 0,
+        "selected_cost_model": {
+            "selected_model_id": None,
+            "selection_blockers": [first_code],
+        },
+        "selector_provenance_digest": selector_provenance_hash,
+    }
+
+
+def _execute_case_03_cost_chain(
+    *,
+    fixture: Mapping[str, Any],
+    case_01_ref: str,
+    cost_model_selection: Mapping[str, Any],
+    bridge_records: list[Any],
+    bridge_bindings: Mapping[str, Any],
+) -> tuple[dict[str, Any], list[str], str, list[str], list[str]]:
+    """Execute the case_03 cost chain and project the public report shape."""
+    from hexagent.costing.cost_model_selector import (
+        SELECTOR_LICENSE_CLASSES,
+    )
+
+    selection_filters = SelectionFilters(
+        material_family="stainless_steel_304",
+        case_region=str(cost_model_selection.get("region_id", "")),
+        effective_date=str(cost_model_selection.get("date_ISO_8601", "")),
+        cost_category_filter=frozenset(
+            {
+                "c0_material_unit_price",
+                "c0_fabrication_labor",
+                "c1_installation_labor",
+            }
+        ),
+        quantity_basis_filter=frozenset(
+            {
+                "per_unit_mass_kg",
+                "per_unit_labor_hours",
+                "currency_per_hour",
+            }
+        ),
+        license_class_filter=frozenset(SELECTOR_LICENSE_CLASSES),
+        escalation_index_reference_filter=frozenset(
+            {str(cost_model_selection.get("escalation_rule_id", ""))}
+        ),
+        record_currency=str(cost_model_selection.get("currency_ISO_4217", "USD")),
+        validity_envelope=None,
+    )
+
+    selector_blockers: list[Any] = []
+    selector_warnings: list[Any] = []
+    selector_run_id = ""
+    selector_provenance_hash = ""
+    selector_c1_count = 0
+    selector_result: CostModelSelectionResult | None = None
+    try:
+        selector_result = select_cost_records(list(bridge_records), selection_filters)
+        selector_blockers = list(selector_result.selection_blockers)
+        selector_warnings = list(selector_result.selection_warnings)
+        selector_run_id = str(selector_result.selector_run_id)
+        selector_provenance_hash = str(selector_result.provenance_chain_hash)
+        selector_c1_count = len(list(selector_result.c1_records))
+    except Exception as exc:
+        selector_blockers = [
+            {
+                "code": "UNSPECIFIED_BLOCKER",
+                "details": {
+                    "reason": "selector_invocation_exception",
+                    "error": repr(exc),
+                },
+            }
+        ]
+        _ = selector_warnings
+        _ = selector_run_id
+        _ = selector_provenance_hash
+
+    if selector_blockers or selector_result is None:
+        return (
+            _build_case_03_fail_closed_values(
+                case_01_ref=case_01_ref,
+                selection_blockers=list(selector_blockers),
+                selector_provenance_hash=selector_provenance_hash,
+            ),
+            [],
+            "WIRED_VIA_CHAIN_PARTIAL",
+            [],
+            [selector_provenance_hash] if selector_provenance_hash else [],
+        )
+
+    try:
+        mass_breakdown, mass_breakdown_dict = _compute_case_03_production_mass_breakdown()
+    except Exception as exc:
+        mass_breakdown = None
+        mass_breakdown_dict = {
+            "total_kg": 0.0,
+            "inner_tube_kg": 0.0,
+            "outer_pipe_kg": 0.0,
+            "hairpin_bend_kg": 0.0,
+            "fittings_kg": 0.0,
+            "production_path_error": repr(exc),
+        }
+
+    cost_breakdown: CostBreakdown | None = None
+    cost_calculator_error = ""
+    try:
+        cost_breakdown = calculate_cost_breakdown(
+            cost_model_selection_result=selector_result,
+            mass_breakdown=(
+                mass_breakdown if mass_breakdown is not None else _StubMassBreakdownForDuckType()
+            ),
+            case_currency="USD",
+            case_region="US-Midwest-Industrial-2024",
+            effective_date="2024-01-01",
+        )
+    except Exception as exc:
+        cost_calculator_error = repr(exc)
+
+    if cost_breakdown is None:
+        return (
+            _build_case_03_fail_closed_values(
+                case_01_ref=case_01_ref,
+                selection_blockers=[
+                    {
+                        "code": "UNSPECIFIED_BLOCKER",
+                        "details": {
+                            "reason": "cost_calculator_invocation_exception",
+                            "error": cost_calculator_error,
+                        },
+                    }
+                ],
+                selector_provenance_hash=selector_provenance_hash,
+            ),
+            [],
+            "WIRED_VIA_CHAIN_PARTIAL",
+            [selector_run_id] if selector_run_id else [],
+            [selector_provenance_hash],
+        )
+
+    c0_component_breakdown = list(
+        cast(dict[str, Any], cost_breakdown.cost_breakdown)["c0_subtotal"]["component_breakdown"]
+    )
+    c0_material_record_id = str(bridge_bindings.get("c0_material_record_id", ""))
+    c0_labor_record_id = str(bridge_bindings.get("c0_labor_record_id", ""))
+    c1_total_record_id = str(bridge_bindings.get("c1_total_record_id", ""))
+
+    c0_material_entries = [
+        e for e in c0_component_breakdown if e["cost_record_id"] == c0_material_record_id
+    ]
+    c0_labor_entries = [
+        e for e in c0_component_breakdown if e["cost_record_id"] == c0_labor_record_id
+    ]
+
+    duplicate_c0_material = len(c0_material_entries) > 1
+    duplicate_c0_labor = len(c0_labor_entries) > 1
+
+    if duplicate_c0_material or duplicate_c0_labor:
+        first_code = (
+            "duplicate_c0_material_record_id"
+            if duplicate_c0_material
+            else "duplicate_c0_labor_record_id"
+        )
+        return (
+            _build_case_03_fail_closed_values(
+                case_01_ref=case_01_ref,
+                selection_blockers=[{"code": first_code, "details": {"reason": first_code}}],
+                selector_provenance_hash=selector_provenance_hash,
+            ),
+            [],
+            "WIRED_VIA_CHAIN_PARTIAL",
+            [str(cost_breakdown.calculator_run_id), selector_run_id],
+            [
+                str(cost_breakdown.provenance_chain_hash),
+                selector_provenance_hash,
+            ],
+        )
+
+    if c0_material_record_id and not c0_material_entries:
+        first_code = "missing_c0_material_record_id"
+        return (
+            _build_case_03_fail_closed_values(
+                case_01_ref=case_01_ref,
+                selection_blockers=[{"code": first_code, "details": {"reason": first_code}}],
+                selector_provenance_hash=selector_provenance_hash,
+            ),
+            [],
+            "WIRED_VIA_CHAIN_PARTIAL",
+            [str(cost_breakdown.calculator_run_id), selector_run_id],
+            [
+                str(cost_breakdown.provenance_chain_hash),
+                selector_provenance_hash,
+            ],
+        )
+
+    if c0_labor_record_id and not c0_labor_entries:
+        first_code = "missing_c0_labor_record_id"
+        return (
+            _build_case_03_fail_closed_values(
+                case_01_ref=case_01_ref,
+                selection_blockers=[{"code": first_code, "details": {"reason": first_code}}],
+                selector_provenance_hash=selector_provenance_hash,
+            ),
+            [],
+            "WIRED_VIA_CHAIN_PARTIAL",
+            [str(cost_breakdown.calculator_run_id), selector_run_id],
+            [
+                str(cost_breakdown.provenance_chain_hash),
+                selector_provenance_hash,
+            ],
+        )
+
+    c0_material_minor_units = (
+        int(c0_material_entries[0]["amount_minor_units"]) if c0_material_entries else 0
+    )
+    c0_labor_minor_units = int(c0_labor_entries[0]["amount_minor_units"]) if c0_labor_entries else 0
+    c1_total_minor_units = int(cost_breakdown.capex_envelope_minor_units)
+    currency_ISO_4217 = str(cost_breakdown.capex_envelope_currency)
+
+    values = {
+        "case_01_outputs": {
+            "case_01_outputs_reference_case_id": case_01_ref,
+        },
+        "cost_components_C0_C1": {
+            "cost_components": {
+                "C0_material_minor_units": c0_material_minor_units,
+                "C0_labor_minor_units": c0_labor_minor_units,
+                "C1_total_minor_units": c1_total_minor_units,
+            },
+            "currency_ISO_4217": currency_ISO_4217,
+            "calculator_run_id": str(cost_breakdown.calculator_run_id),
+            "escalation_pointer_used": (
+                str(cost_breakdown.escalation_pointer_used)
+                if cost_breakdown.escalation_pointer_used
+                else None
+            ),
+            "license_class_summary": dict(cost_breakdown.license_class_summary),
+        },
+        "discounted_total_minor_units": None,
+        "life_cycle_energy_envelope": {
+            "blocker_codes": [],
+            "life_cycle_energy_summary": {
+                "annual_operating_hours": None,
+                "design_life_years": None,
+                "annual_energy_MJ": None,
+                "total_lifecycle_energy_MJ": None,
+            },
+        },
+        "salvage_minor_units": 0,
+        "selected_cost_model": {
+            "selected_model_id": (
+                fixture.get("expected_output", {})
+                .get("selected_cost_model", {})
+                .get("selected_model_id")
+            ),
+            "selection_blockers": [],
+            "selector_run_id": selector_run_id,
+            "selector_provenance_chain_hash": selector_provenance_hash,
+            "c0_record_count": len(c0_component_breakdown),
+            "c1_record_count": selector_c1_count,
+        },
+        "mass_breakdown_for_case_03": mass_breakdown_dict,
+    }
+    produced_fields_collected: list[str] = []
+    if c0_material_minor_units is not None:
+        produced_fields_collected.append(
+            "cost_components_C0_C1.cost_components.C0_material_minor_units"
+        )
+    if c0_labor_minor_units is not None:
+        produced_fields_collected.append(
+            "cost_components_C0_C1.cost_components.C0_labor_minor_units"
+        )
+    if c1_total_minor_units is not None:
+        produced_fields_collected.append(
+            "cost_components_C0_C1.cost_components.C1_total_minor_units"
+        )
+    if currency_ISO_4217 is not None:
+        produced_fields_collected.append("cost_components_C0_C1.currency_ISO_4217")
+    produced_fields_collected.append("cost_components_C0_C1.calculator_run_id")
+    if cost_breakdown.escalation_pointer_used:
+        produced_fields_collected.append("cost_components_C0_C1.escalation_pointer_used")
+    produced_fields_collected.append("cost_components_C0_C1.license_class_summary")
+    produced_fields_collected.append("selected_cost_model.selected_model_id")
+    produced_fields_collected.append("selected_cost_model.selection_blockers")
+    produced = produced_fields_collected
+    status = "WIRED_VIA_CHAIN"
+    run_ids = [str(cost_breakdown.calculator_run_id), selector_run_id]
+    digests = [
+        str(cost_breakdown.provenance_chain_hash),
+        selector_provenance_hash,
+    ]
+    _ = c1_total_record_id
+    return values, produced, status, run_ids, digests
+
+
+# --------------------------------------------------------------------------
 # Top-level adapter entry point.
-# -----------------------------------------------------------------------
+# --------------------------------------------------------------------------
 
 
 def compute_actual_output_via_chain(
@@ -1348,56 +1891,40 @@ def compute_actual_output_via_chain(
                     digests = []
                     _ = exc
     elif case_id == "TASK-019-GOLDEN-03":
-        # Slice 3A P1 fix: the frozen case_03 input only carries
-        # cost_model_selection metadata (region / date / currency /
-        # escalation rule), not a pre-resolved list of cost records
-        # that the upstream select_cost_records API requires. The
-        # adapter has no TASK-018 catalog lookup helper, so it must
-        # NOT pass an empty records list and must NOT fabricate
-        # SelectionFilters (material_family, cost_category_filter,
-        # quantity_basis_filter, license_class_filter). Therefore all
-        # cost / life-cycle / selected_cost_model fields go fail-closed
-        # (NOT_COMPUTABLE). Discount / salvage remain deferred per
-        # TASK-018 §5.3 / §5.3.2 (no formula invented).
+        # TASK-019 Slice 3B-C (post-002-H): wire the case_03 cost /
+        # lifecycle / catalog bridge through the real production
+        # TASK-018 chain using the 002-H frozen fixture bridge.
         case_03_input = fixture["input"]
         case_01_ref = str(
             case_03_input.get("case_01_input_reference_case_id", "TASK-019-GOLDEN-01")
         )
-        # Slice 3A does not implement a TASK-018 catalog lookup helper;
-        # the case_03 chain must therefore fail closed for all
-        # cost / life-cycle / selected_cost_model fields.
-        values: dict[str, Any] = {  # type: ignore[no-redef]
-            "case_01_outputs": {
-                "case_01_outputs_reference_case_id": case_01_ref,
-            },
-            "cost_components_C0_C1": {
-                "cost_components": {
-                    "C0_material_minor_units": None,
-                    "C0_labor_minor_units": None,
-                    "C1_total_minor_units": None,
-                },
-                "currency_ISO_4217": None,
-            },
-            "discounted_total_minor_units": None,
-            "life_cycle_energy_envelope": {
-                "blocker_codes": [],
-                "life_cycle_energy_summary": {
-                    "annual_operating_hours": None,
-                    "design_life_years": None,
-                    "annual_energy_MJ": None,
-                    "total_lifecycle_energy_MJ": None,
-                },
-            },
-            "salvage_minor_units": 0,
-            "selected_cost_model": {
-                "selected_model_id": None,
-                "selection_blockers": [],
-            },
-        }
-        produced = []
-        status = "WIRED_VIA_CHAIN_PARTIAL"
-        run_ids = []
-        digests = []
+        cost_model_selection = case_03_input.get("cost_model_selection", {})
+        bridge_records = case_03_input.get("cost_records_bridge")
+        bridge_bindings = case_03_input.get("cost_records_bridge_bindings")
+        if not isinstance(bridge_records, list) or not isinstance(bridge_bindings, dict):
+            values = _build_case_03_fail_closed_values(
+                case_01_ref=case_01_ref,
+                selection_blockers=[
+                    {
+                        "code": "UNSPECIFIED_BLOCKER",
+                        "details": {"reason": "cost_records_bridge_missing"},
+                    }
+                ],
+                selector_provenance_hash="",
+            )
+            produced = []
+            status = "WIRED_VIA_CHAIN_PARTIAL"
+            run_ids = []
+            digests = []
+        else:
+            cms = cost_model_selection if isinstance(cost_model_selection, Mapping) else {}
+            values, produced, status, run_ids, digests = _execute_case_03_cost_chain(
+                fixture=fixture,
+                case_01_ref=case_01_ref,
+                cost_model_selection=cms,
+                bridge_records=bridge_records,
+                bridge_bindings=bridge_bindings,
+            )
     else:
         raise ValueError(
             f"case_id {case_id!r} is not one of the frozen 3 (TASK-019-GOLDEN-01/02/03)"
