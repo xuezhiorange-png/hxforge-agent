@@ -281,24 +281,53 @@ TASK-012 type, and the TASK-020 contract does not require TASK-012 to
 expose anything beyond its existing `load_rule_pack(root)` interface.
 
 `LoadedRulePackView` has the following frozen fields, each populated by
-a direct key lookup against the TASK-012 `load_rule_pack(root)` result:
+a direct key lookup against the TASK-012 `load_rule_pack(root)` result.
+The view shape is the TASK-020-owned wrapper over the TASK-012 loader
+result; the underlying TASK-012 interface is unchanged.
 
 - `manifest: object` — the TASK-012 loader `manifest` value, copied by
   reference. The TASK-020 contract reads only the three identity fields
   `rule_pack_id`, `rule_pack_version` and `canonical_hash` (the last as
   `rule_pack_canonical_hash`).
-- `rules: list[object]` — the TASK-012 loader `rules` list, copied by
-  reference. Each element is a TASK-012 rule artifact whose direct
-  fields `rule_id`, `rule_version`, `canonical_hash`, `source_class`,
-  `license_evidence` and `approval_status` are read directly from the
-  rule body.
+- `rules: dict[str, object]` — the TASK-012 loader `rules` re-keyed as
+  a `dict` whose **key** is the rule's direct `rule_id` string and whose
+  **value** is the complete TASK-012 rule artifact. The dict is built
+  on view construction by keying each loader rule by its `rule_id`; the
+  underlying TASK-012 rule artifact fields (`rule_id`, `rule_version`,
+  `canonical_hash`, `source_class`, `license_evidence`,
+  `approval_status`) are read directly from the value, never from the
+  dict key. The dict exists to freeze lookup, selection, duplicate
+  detection and canonical identity on the `rule_id` key.
 - `provenance_edges: list[object]` — the TASK-012 loader
   `provenance_edges` list, copied by reference. TASK-020 reads
   provenance by edge ID only; it does not re-verify or relocate any
   direct rule field into provenance.
-- `permission_evidence: list[object]` — the TASK-012 loader
-  `permission_evidence` list, copied by reference. TASK-020 does not
-  collapse or re-encode permission evidence.
+- `permission_evidence: dict[str, object]` — the TASK-012 loader
+  `permission_evidence` re-keyed as a `dict` whose **key** is the
+  permission's direct `permission_id` string and whose **value** is the
+  complete TASK-012 permission evidence object. The dict is built on
+  view construction by keying each loader entry by its `permission_id`;
+  the underlying TASK-012 permission evidence fields are read directly
+  from the value, never from the dict key.
+
+**Frozen dict iteration discipline (P1-1, binding)**: the
+`LoadedRulePackView.rules` and `LoadedRulePackView.permission_evidence`
+dicts are the only iteration surface the TASK-020 adapter uses.
+Deterministic iteration MUST be the dict's natural iteration in
+**ascending Unicode code-point order on the key** (`rule_id` for rules,
+`permission_id` for permission evidence); the adapter MUST NOT rely
+on the TASK-012 loader's filesystem order, manifest-array order,
+dict-insertion order or any other input-order surrogate. `rule_count`
+is the number of dictionary entries in `LoadedRulePackView.rules`; it
+is NOT `len(rules_list)` of any list, and it MUST be computed by
+`len(loaded_rule_pack.rules)`. The `LoadedRulePackView` and the
+`RulePackValidationReport` MUST agree on three identities before
+evaluation: `rule_count` (entry count in the rules dict vs.
+`RulePackValidationReport.rule_count`), `manifest` identity
+(`manifest.rule_pack_id` / `manifest.rule_pack_version` /
+`manifest.canonical_hash` equal in both views), and `canonical_hash`
+of the loaded pack. Any disagreement emits
+`STC_RULE_PACK_VALIDATION_REPORT_MISMATCH` per §6.3.3.
 
 #### 6.3.2 TASK-020-owned typed view: `RulePackValidationReport`
 
@@ -370,7 +399,7 @@ fields such as `selected_rule_ids` and `selected_rule_hashes`) is
 removed from the request and is not a TASK-020 request field. For
 `INTERNAL_GENERIC` mode, `requested_rule_pack_identity` is `null`.
 
-#### 6.3.5 Output authority: `EvaluatedRulePackAuthority`
+#### 6.3.5 Output authority: `EvaluatedRulePackAuthority` and `SelectedRuleAuthority`
 
 The TASK-020 adapter produces an `EvaluatedRulePackAuthority` value
 object only after a successful evaluation. This object exists in three
@@ -390,16 +419,80 @@ contract. The frozen fields are:
   `RequestedRulePackIdentity`, lowercase 64-char SHA-256 hex.
 - `validation_status: enum` — required exact value `"ok"`, copied from
   `RulePackValidationReport.status`.
-- `selected_rule_ids: list[str]` — the rule IDs the adapter has
-  actually evaluated, in the §12.4 order.
-- `selected_rule_artifact_hashes: list[str]` — the lowercase 64-char
-  SHA-256 hex `canonical_hash` of each corresponding complete
-  TASK-012 rule artifact, in the same order as `selected_rule_ids`,
-  index-by-index. Each value is the TASK-012 rule artifact
-  `canonical_hash` direct field, not a separately computed rule-body
-  hash. The TASK-020 contract does not introduce a new
-  rule-body hash concept; if a future round requires a different hash
-  granularity, it must come from a separate design amendment.
+- `selected_rule_authorities: list[SelectedRuleAuthority]` — the
+  per-selected-rule authorities, each a complete
+  `SelectedRuleAuthority` value object (P1-3, binding), in the §12.4
+  order. The list is the **only** source of selected rule identity
+  in the evaluated authority. The previous
+  `selected_rule_ids: list[str]` and
+  `selected_rule_artifact_hashes: list[str]` parallel lists are
+  **deleted** from the contract: every per-rule identity field lives
+  inside the `SelectedRuleAuthority` value object, never as a
+  parallel list. The `selected_rule_ids` and
+  `selected_rule_artifact_hashes` projections, when needed for
+  compatibility with external consumers, are derived from
+  `[ra.rule_id for ra in selected_rule_authorities]` and
+  `[ra.rule_artifact_canonical_hash for ra in selected_rule_authorities]`
+  respectively; the canonical form is the
+  `selected_rule_authorities` list itself.
+
+##### 6.3.5.1 `SelectedRuleAuthority` (P1-3, binding, versioned)
+
+`SelectedRuleAuthority` is a TASK-020-owned, versioned value object
+that freezes the per-rule authority as a single typed object. The
+schema is exact; any field outside this shape MUST emit
+`STC_UNKNOWN_FIELD`. The frozen fields are:
+
+- `rule_id: str` — non-empty string. Sourced **directly** from the
+  TASK-012 rule artifact's `rule_id` direct field.
+- `rule_version: str` — non-empty string. Sourced **directly** from
+  the TASK-012 rule artifact's `rule_version` direct field.
+- `rule_artifact_canonical_hash: str` — lowercase 64-char SHA-256 hex
+  string. Sourced **directly** from the TASK-012 rule artifact's
+  `canonical_hash` direct field. This is the TASK-012 rule artifact
+  `canonical_hash`, not a separately computed rule-body hash.
+- `source_class: str` — non-empty string. Sourced **directly** from
+  the TASK-012 rule artifact's `source_class` direct field. This is
+  a direct rule-artifact field; the TASK-020 contract MUST NOT
+  relocate `source_class` into provenance or anywhere else.
+- `license_evidence: object` — copied by reference from the TASK-012
+  rule artifact's `license_evidence` direct field. This is a direct
+  rule-artifact field; the TASK-020 contract MUST NOT collapse
+  `license_evidence` into a provenance record.
+- `approval_status: str` — required exact value `"approved"`. Sourced
+  **directly** from the TASK-012 rule artifact's `approval_status`
+  direct field. This is a direct rule-artifact field; the TASK-020
+  contract MUST NOT relocate `approval_status` into a provenance
+  record.
+- `provenance_edge_ids: list[str]` — the TASK-012 `provenance_edges`
+  edge IDs the adapter consulted for this rule. The list is
+  **sorted in ascending Unicode code-point order at canonicalization
+  time** and **deduplicated** at construction time. Edge IDs are
+  references into the loaded `LoadedRulePackView.provenance_edges`
+  list; the contract MUST NOT store the full edge content here.
+- `evidence_refs: list[str]` — the rule's `evidence_refs` from the
+  TASK-012 rule artifact. The list is **sorted in ascending Unicode
+  code-point order at canonicalization time** and **deduplicated** at
+  construction time. The list MAY be empty.
+
+**Provenance discipline (P1-3, binding)**: `provenance_edge_ids` and
+`evidence_refs` are the only fields in `SelectedRuleAuthority` that
+carry provenance-like information. The direct fields `source_class`,
+`license_evidence` and `approval_status` are NOT stored inside
+provenance; they are stored directly on the
+`SelectedRuleAuthority` value object. The TASK-020 contract MUST NOT
+claim that the six direct fields above are "implicitly contained" in
+`EvaluatedRulePackAuthority` or in any provenance record; the
+`SelectedRuleAuthority` value object is the typed storage location,
+and every direct field is present in the value object by name.
+
+`EvaluatedRulePackAuthority` is therefore a complete schema-versioned
+object whose `selected_rule_authorities` is the typed, ordered,
+deduplicated list of `SelectedRuleAuthority` value objects. No
+parallel list of rule IDs or rule artifact hashes is part of the
+canonical `EvaluatedRulePackAuthority`; those values are
+projections of the `selected_rule_authorities` list, never the
+authoritative source.
 
 #### 6.3.6 TASK-012 direct rule fields vs. provenance references
 
@@ -525,7 +618,12 @@ The authority binding records:
   `EvaluatedRulePackAuthority` value object (§6.3.5), copied by
   reference. For `INTERNAL_GENERIC` mode, the rule-pack slot is
   `null`. The input-side `RequestedRulePackIdentity` is **not** a
-  binding field; only the evaluated authority is.
+  binding field; only the evaluated authority is. The evaluated
+  authority carries the typed `selected_rule_authorities` list
+  (§6.3.5.1) of `SelectedRuleAuthority` value objects, NOT a
+  parallel `selected_rule_ids` / `selected_rule_artifact_hashes`
+  pair; per-rule identity lives in the `SelectedRuleAuthority`
+  value object.
 - case authority citation/evidence pointers drawn from the consumed
   TASK-014 `CaseRevision` evidence record;
 - per-selected-rule direct authority fields and provenance edge IDs as
@@ -600,18 +698,45 @@ Exact allowed tokens and combinations are rule-pack concerns.
 
 ### 8.3 Authority-mode consistency
 
-For `INTERNAL_GENERIC`:
+For `INTERNAL_GENERIC` (P1-2, binding):
 
-- `standard_system_id`, `rule_pack_id`, `rule_pack_version`,
-  `rule_pack_canonical_hash` and `rule_pack_authority` must be null;
+- the only rule-pack field the request carries is
+  `requested_rule_pack_identity`, and its value MUST be exactly
+  `null` (binding: `requested_rule_pack_identity = null`). The
+  legacy `INTERNAL_GENERIC`-null requirements on
+  `rule_pack_id`, `rule_pack_version`, `rule_pack_canonical_hash`,
+  `rule_pack_authority` and `evaluated_rule_pack_authority` are
+  **deleted** from the contract: those names are not request fields in
+  this contract revision and a request MUST NOT carry any of them
+  under any authority mode;
 - component tokens may be null;
-- no standard compliance claim may be emitted.
+- no standard compliance claim may be emitted;
+- the `RequestedRulePackIdentity` is a request-side object that exists
+  **only** in the `APPROVED_RULE_PACK` mode; in `INTERNAL_GENERIC` mode
+  the request's `requested_rule_pack_identity` slot is `null` and the
+  adapter MUST NOT treat any other name as the rule-pack slot on the
+  request;
+- any field whose name is `rule_pack_id`, `rule_pack_version`,
+  `rule_pack_canonical_hash`, `rule_pack_authority` or
+  `evaluated_rule_pack_authority` on a request is a §8.1
+  `STC_UNKNOWN_FIELD` violation, regardless of the value, regardless
+  of the authority mode. The contract uses the single name
+  `requested_rule_pack_identity` on the request side and
+  `EvaluatedRulePackAuthority` on the output side; the legacy names
+  above are reserved for no usage in this contract and MUST NOT be
+  re-introduced;
+- the evaluated rule-pack authority is **output-only**. The request
+  MUST NOT carry any evaluated result (e.g. selected rule IDs, rule
+  artifact hashes, validation status); any such field on the request
+  is a `STC_UNKNOWN_FIELD` violation per §8.1.
 
 For `APPROVED_RULE_PACK`:
 
-- all rule-pack identity fields are required;
-- all three component tokens are required unless the approved rule pack
-  explicitly declares a different structural requirement;
+- the request MUST carry a non-null `requested_rule_pack_identity`
+  with the three frozen fields `rule_pack_id`, `rule_pack_version`
+  and `rule_pack_canonical_hash`;
+- all three component tokens are required unless the approved rule
+  pack explicitly declares a different structural requirement;
 - the referenced rule pack must load and validate under TASK-012.
 
 ### 8.4 No unit-bearing geometry inputs
@@ -637,7 +762,7 @@ not a silently ignored extension.
 | `shell_pass_count` | integer | normalized request value |
 | `tube_pass_count` | integer | normalized request value |
 | `component_tokens` | object | normalized front/shell/rear tokens or null values |
-| `authority_binding` | object | normalized §7.5 authority data; for `APPROVED_RULE_PACK` this object carries the complete `EvaluatedRulePackAuthority` value object (§6.3.5), which itself carries the post-evaluation `selected_rule_ids` and `selected_rule_artifact_hashes`; for `INTERNAL_GENERIC` the rule-pack slot is `null` |
+| `authority_binding` | object | normalized §7.5 authority data; for `APPROVED_RULE_PACK` this object carries the complete `EvaluatedRulePackAuthority` value object (§6.3.5), which itself carries the typed `selected_rule_authorities: list[SelectedRuleAuthority]` (§6.3.5.1) in the §12.4 order — per-rule identity (`rule_id`, `rule_version`, `rule_artifact_canonical_hash`, `source_class`, `license_evidence`, `approval_status`, `provenance_edge_ids`, `evidence_refs`) lives inside each `SelectedRuleAuthority` value object, never as a parallel list; for `INTERNAL_GENERIC` the rule-pack slot is `null` |
 | `case_authority` | object | the complete `CaseRevisionAuthority` value object (§7.3), copied by reference; carries `revision_id`, `payload_hash`, `domain_snapshot_hash`, `revision_status` |
 | `warnings` | array of §10.4 warning objects | stable ordered warning objects; each entry is the complete §10.4 five-field shape (`code`, `field_path`, `message_key`, sorted `evidence_refs`, canonical `details`) and is included in the canonical hash per §11.2 |
 | `blockers` | array of §10.4 blocker objects | empty for a valid configuration; when non-empty, the array is the §11.2.1 `validation_result` identity source |
@@ -730,8 +855,6 @@ Partial normalized outputs must not be exposed as valid configurations.
   not verify under TASK-012.
 - `STC_RULE_PROVENANCE_BLOCKED` — a selected rule's provenance records
   do not verify under TASK-012.
-- `STC_RULE_PROFILE_UNRECOGNIZED` — a rule body's `profile_id` is not
-  exactly `"task020.configuration-rule.v1"`.
 - `STC_RULE_TYPE_UNRECOGNIZED` — a rule body's `rule_type` is outside
   the closed TASK-020 type set per §12.3 / §12.8. The TASK-020
   profile is uniquely identified by
@@ -740,9 +863,6 @@ Partial normalized outputs must not be exposed as valid configurations.
 - `STC_RULE_DUPLICATE_IDENTITY` — two selected rules share the same
   `(profile_id, rule_type, constraint_id)` triple; resolution is
   fail-closed per §12.5.
-- `STC_RULE_PRIORITY_CONFLICT` — two selected rules of conflicting
-  `effect` share the same priority for the same `constraint_id` per
-  §12.5.
 - `STC_RULE_APPLICABILITY_UNRESOLVED` — applicability matching could
   not determine whether a rule applies.
 - `STC_RULE_CONSTRAINT_MISSING` — a constraint class required by
@@ -833,18 +953,23 @@ only if one of these canonical fields changes.
   `revision_status`) and the `payload_hash` and
   `domain_snapshot_hash` rendered as lowercase 64-char hex;
 - the complete evaluated rule-pack authority: the full
-  `EvaluatedRulePackAuthority` value object as defined in §6.3.5, with
-  all six fields (`rule_pack_id`, `rule_pack_version`,
-  `rule_pack_canonical_hash`, `validation_status`,
-  `selected_rule_ids`, `selected_rule_artifact_hashes`). The
-  `selected_rule_artifact_hashes` are the complete TASK-012 rule
-  artifact `canonical_hash` values, one per selected rule, in the
-  §12.4 order. The input-side `RequestedRulePackIdentity` is **not**
-  in the configuration hash; only the evaluated authority is.
-- the `selected_rule_ids` and `selected_rule_artifact_hashes` are
-  carried inside the `EvaluatedRulePackAuthority` (above); no separate
-  configuration-payload field is added beyond the evaluated authority
-  itself.
+  `EvaluatedRulePackAuthority` value object as defined in §6.3.5,
+  carrying the four pack-level fields (`rule_pack_id`,
+  `rule_pack_version`, `rule_pack_canonical_hash`,
+  `validation_status`) and the typed
+  `selected_rule_authorities: list[SelectedRuleAuthority]` list
+  (§6.3.5.1) in the §12.4 order. Per-rule identity
+  (`rule_id`, `rule_version`, `rule_artifact_canonical_hash`,
+  `source_class`, `license_evidence`, `approval_status`,
+  `provenance_edge_ids`, `evidence_refs`) lives inside each
+  `SelectedRuleAuthority` value object. The TASK-020 contract
+  does NOT carry parallel `selected_rule_ids` /
+  `selected_rule_artifact_hashes` lists in the canonical payload;
+  the canonical form is the `selected_rule_authorities` list, and
+  any external projection of rule IDs or rule artifact hashes is
+  derived from that list. The input-side `RequestedRulePackIdentity`
+  is **not** in the configuration hash; only the evaluated
+  authority is.
 - the **complete canonical warning objects** (per §10.4), each rendered
   with its full five-field shape and ordered by the §11.4 composite key;
 - the **complete canonical blocker objects** (per §10.4), in the same
@@ -877,28 +1002,53 @@ primitives/arrays/objects only).
 A `ConfigurationValidationResult(status = BLOCKED)` does not produce a
 `ShellAndTubeConfiguration`, but it does produce a deterministic identity
 of its own. The blocked-result identity is the SHA-256 hex of the
-canonical serialization of the following context tuple, in the §11.4
-ordered form:
+canonical serialization of the following **complete authority** context
+tuple (P1-4, binding), in the §11.4 ordered form:
 
-- the request's `RequestedRulePackIdentity` triple, when present
-  (i.e. when the request was in `APPROVED_RULE_PACK` mode and supplied
-  a non-null identity);
-- the set of `applicable_selected_rule_id` entries that the adapter
-  had actually selected before the blocker was emitted, in the
-  §12.4 full deterministic sort order;
-- the ordered, complete §10.4 blocker list.
+- the **complete** `CaseRevisionAuthority` value object (§7.3), with
+  all four fields (`revision_id`, `payload_hash`,
+  `domain_snapshot_hash`, `revision_status`). The complete case
+  authority is part of the identity and MUST NOT be omitted; a
+  different case revision MUST produce a different blocked identity
+  even if every other element of the context tuple is identical;
+- the request's `RequestedRulePackIdentity` triple, **when present**
+  (i.e. when the request was in `APPROVED_RULE_PACK` mode and
+  supplied a non-null identity). The triple is the full input-side
+  identity; it MUST NOT be summarized or omitted when present;
+- the **complete** `selected_rule_authorities` list (§6.3.5.1) — the
+  full list of `SelectedRuleAuthority` value objects, in the §12.4
+  sort order. The blocked-result identity MUST include every
+  `SelectedRuleAuthority` field by name (`rule_id`,
+  `rule_version`, `rule_artifact_canonical_hash`, `source_class`,
+  `license_evidence`, `approval_status`, `provenance_edge_ids`,
+  `evidence_refs`); a different rule artifact hash, a different
+  source class, a different license evidence, or any other per-rule
+  field change MUST produce a different blocked identity;
+- the **complete** canonical blockers (§10.4) — every blocker object
+  with its full five-field shape, in the §11.4 ordered form. The
+  blocker subset is NOT sufficient; the identity MUST include every
+  field of every blocker (`code`, `field_path`, `message_key`,
+  `evidence_refs`, `details`);
+- the TASK-020 schema version (`task020.configuration.v1`) and the
+  output `schema_version` value, both rendered in their canonical
+  string form.
 
-The request's case authority, the loaded pack's manifest identity, and
-the consumed `RulePackValidationReport.status` are excluded from this
-identity to keep it from encoding the same input twice; if a future
-round requires a fuller identity, it must come from a separate design
-amendment. The blocked-result identity is recorded in the surrounding
-run provenance, not in the configuration hash, and is used only to
-distinguish one blocked outcome from another in audit and CI artifacts.
-Without the requested pack identity and the applicable selected rule
-set, two different blocked outcomes that share the same blocker list
-would collapse to the same audit identity, which is why the frozen
-context tuple above is required.
+The blocked-result identity MUST NOT be derived from any of the
+following, on their own: a list of selected rule IDs only; a list of
+selected rule artifact hashes only; the blocker code subset only; or
+any other non-complete projection of the context tuple. Two
+configurations that differ in case revision, in any
+`SelectedRuleAuthority` field, or in any blocker field MUST produce
+different blocked identities; collapsing those differences into a
+shorter projection is a §11.2.1 violation.
+
+The blocked-result identity is recorded in the surrounding run
+provenance, not in the configuration hash, and is used only to
+distinguish one blocked outcome from another in audit and CI
+artifacts. The full authority-bound identity above guarantees that
+different case revisions, different rule artifact hashes, and
+different evidence records cannot collapse to the same audit
+identity.
 
 ### 11.3 Hash and ID algorithm
 
@@ -933,10 +1083,16 @@ orderings used in the SHA-256 canonical serialization of §11.2:
   `(code, field_path or "", message_key, canonical_details_hash)` in
   ascending order, applied to the §10.4 blocker objects;
 - `deferred_capabilities`: the order in §9.3;
-- `selected_rule_ids` and `selected_rule_artifact_hashes` inside the
-  `EvaluatedRulePackAuthority`: the order produced by the §12.4
-  full deterministic sort key, with `selected_rule_artifact_hashes`
-  matching `selected_rule_ids` index-by-index.
+- `selected_rule_authorities` inside the `EvaluatedRulePackAuthority`:
+  the list order is produced by the §12.4 full deterministic sort
+  key on the complete `SelectedRuleAuthority` value object. The
+  `provenance_edge_ids` and `evidence_refs` inside each
+  `SelectedRuleAuthority` are sorted in ascending Unicode
+  code-point order at canonicalization time and deduplicated at
+  construction time. The TASK-020 contract does NOT maintain
+  parallel `selected_rule_ids` and `selected_rule_artifact_hashes`
+  lists at canonicalization time; the canonical form is the
+  `selected_rule_authorities` list itself.
 
 Input object-key, input evidence-reference order, or input warning /
 blocker order MUST NOT alter the hash.
@@ -951,16 +1107,23 @@ and TASK-012 contracts:
   `revision_status`;
 - the complete `EvaluatedRulePackAuthority` value object (§6.3.5),
   carrying `rule_pack_id`, `rule_pack_version`,
-  `rule_pack_canonical_hash`, `validation_status = "ok"`,
-  `selected_rule_ids` and `selected_rule_artifact_hashes`;
+  `rule_pack_canonical_hash`, `validation_status = "ok"` and the
+  typed `selected_rule_authorities: list[SelectedRuleAuthority]`
+  (§6.3.5.1) in the §12.4 order. The per-rule fields
+  (`rule_id`, `rule_version`, `rule_artifact_canonical_hash`,
+  `source_class`, `license_evidence`, `approval_status`,
+  `provenance_edge_ids`, `evidence_refs`) live inside each
+  `SelectedRuleAuthority` value object;
 - for each selected rule, the rule's direct rule-artifact fields
   (`rule_id`, `rule_version`, `canonical_hash`, `source_class`,
   `license_evidence`, `approval_status`) and the list of TASK-012
   provenance edge IDs that the adapter consulted. The direct fields
-  live on the TASK-012 rule artifact; the edge IDs are references into
-  the loaded `provenance_edges` list. The TASK-020 contract MUST NOT
-  collapse the direct fields into the provenance edge contents;
-- citation/evidence pointers drawn from the rule body's
+  live on the TASK-012 rule artifact; the edge IDs are references
+  into the loaded `provenance_edges` list. The TASK-020 contract
+  MUST NOT collapse the direct fields into the provenance edge
+  contents; the per-rule identity is the §6.3.5.1
+  `SelectedRuleAuthority` value object, not a per-rule section
+  of the §11.5 record;
   `evidence_refs`;
 - the TASK-020 schema version;
 - the implementation package version and the surrounding Git commit in
@@ -1105,11 +1268,50 @@ sorted rule set. The general precedence rule from an earlier draft
 below are exhaustive and the §12.4 sort key is the only precedence
 mechanism.
 
-1. **Duplicate rule identity**: two surviving rules sharing the same
-   `(profile_id, rule_type, constraint_id)` triple MUST emit
-   `STC_RULE_DUPLICATE_IDENTITY` and stop. Two surviving rules
-   sharing the same full §12.4 sort key MUST also emit
-   `STC_RULE_DUPLICATE_IDENTITY` and stop.
+1. **Duplicate rule identity (P1-5, binding)**: two surviving rules
+   sharing the same `(profile_id, rule_type, constraint_id)` triple
+   MUST emit `STC_RULE_DUPLICATE_IDENTITY` and stop. Two surviving
+   rules sharing the same full §12.4 sort key MUST also emit
+   `STC_RULE_DUPLICATE_IDENTITY` and stop. The full §12.4 sort key
+   `(priority, rule_type, constraint_id, rule_id, rule_version,
+   rule_artifact_canonical_hash)` is the **complete comparison key**
+   for exact duplicate detection. The TASK-020 adapter compares the
+   complete key, not a partial key, when deciding whether two rules
+   are exact duplicates:
+   - if the complete keys are equal, the two rules are exact
+     duplicates; the adapter MUST deduplicate silently (keep one
+     instance) and MUST NOT emit any blocker, because the complete
+     comparison key fully identifies them as the same logical rule
+     with the same authority;
+   - if the complete keys differ in any field (including
+     `rule_artifact_canonical_hash`, `rule_version`, `priority`,
+     `rule_type` or `constraint_id`), the two rules are distinct
+     by authority. The TASK-020 adapter MUST NOT treat them as
+     duplicates; the §12.4 sort key with all six fields is the only
+     tie-break, and any two rules whose complete keys differ are
+     semantically distinct and MUST be preserved as separate
+     selected rules;
+   - if two rules share the same `(profile_id, rule_type,
+     constraint_id)` triple but differ in any other field of the
+     full key, they are not exact duplicates but they are
+     **same-logical-identity with different authority** and the
+     adapter MUST emit `STC_RULE_DUPLICATE_IDENTITY` and stop. The
+     dedup-by-complete-key policy above is a strict equality
+     policy: equal complete keys deduplicate, different complete
+     keys never deduplicate. The TASK-020 contract MUST NOT
+     introduce a partial-key dedup that conflates different
+     authority with the same logical identity.
+   - The deterministic sort key MUST cover every authority field
+     above and is the **only** tie-break used for selection. The
+     adapter MUST NOT use filesystem order, manifest-array order,
+     dict-iteration order, dict-insertion order, input rule-list
+     order or any other input-order surrogate as a tie-break. If
+     the complete key above still cannot distinguish two rules
+     (a future-proofing note for arbitrary future rule fields), the
+     adapter MUST fail closed: emit `STC_RULE_DUPLICATE_IDENTITY`
+     and stop. The complete key in this contract revision is
+     sufficient for the closed §12.3 rule_type set; the fail-closed
+     fallback is a §12.5 binding rule for any future addition.
 2. **Normalisation conflict**: if two
    `CONSTRUCTION_FAMILY_NORMALIZATION` rules apply to the same input
    value and produce different `normalized_value` results, the
@@ -1121,8 +1323,8 @@ mechanism.
    If the intersection is empty on either axis, the adapter MUST
    emit `STC_RULE_RANGE_INTERSECTION_EMPTY` and stop.
 4. **Orientation intersection**: when more than one
-   `ORIENTATION_ALLOWLIST` rule applies, the adapter MUST compute
-   the intersection of their `allowed_orientations` lists. If the
+   `ORIENTATION_ALLOWLIST` rule applies, the adapter MUST compute the
+   intersection of their `allowed_orientations` lists. If the
    intersection is empty, the adapter MUST emit
    `STC_RULE_ORIENTATION_INTERSECTION_EMPTY` and stop.
 5. **Token intersection**: when more than one
@@ -1156,6 +1358,36 @@ mechanism.
    `STC_RULE_TYPE_UNRECOGNIZED` and stop. There is no
    "skip unknown profile" behavior; the only "skip" applies to rules
    with a different `profile_id`, and that skip emits no blocker.
+
+**Obsolete blocker codes (P1-5, historical, removed)**: the
+following codes were present in earlier contract revisions and are
+**removed** from the closed §10.2 blocker set in this contract
+revision. They are recorded here only as historical reference; the
+contract MUST NOT re-introduce them:
+
+- `STC_RULE_PROFILE_UNRECOGNIZED` — removed because the TASK-020
+  contract treats a non-TASK-020 `profile_id` as a silent skip
+  (per §12.2) and the contract MUST NOT simultaneously skip a
+  rule and emit a profile-unrecognized blocker. The
+  profile-mismatch path is a no-op skip, not a blocker. A rule
+  with the TASK-020 `profile_id` and a bad `rule_type` is the
+  only profile-related blocker, encoded as
+  `STC_RULE_TYPE_UNRECOGNIZED`. A future round may add a
+  profile-required blocker under separate authorization, but the
+  historical `STC_RULE_PROFILE_UNRECOGNIZED` code is reserved for
+  no usage and MUST NOT be re-introduced as a synonym for the
+  no-op skip.
+- `STC_RULE_PRIORITY_CONFLICT` — removed because the generic
+  `ALLOW` vs `BLOCK` priority-precedence rule that this code
+  enforced has been deleted (the §12.4 sort key is the only
+  selection precedence mechanism). With the generic priority
+  precedence removed, the conflict that this code resolved cannot
+  occur in this contract revision, and a priority-conflict
+  blocker has no remaining semantics. The `STC_RULE_DUPLICATE_IDENTITY`
+  code above is the fail-closed code for any authority-based
+  duplicate-detection condition. The historical
+  `STC_RULE_PRIORITY_CONFLICT` code is reserved for no usage and
+  MUST NOT be re-introduced.
 
 Fail-closed means: on any of the conditions above, the adapter does
 not produce a `ConfigurationRuleEvaluation`; the calling
@@ -1458,12 +1690,12 @@ profile and type mismatches:
 
 The TASK-020 contract MUST NOT specify both "skip unknown profile"
 and "block unknown profile" anywhere; the only skip-without-block
-behavior is the cross-profile case above, and the only profile-must-
-match blocker is the TASK-020-profile-but-unknown-type case. The
-`STC_RULE_PROFILE_UNRECOGNIZED` code is reserved for the case
-where a request explicitly required TASK-020 profile authority but
-the loaded pack contains no rule with the TASK-020 `profile_id`
-under any `rule_type`.
+behavior is the cross-profile case above, and the only
+profile-must-match blocker is the TASK-020-profile-but-unknown-type
+case. The historical `STC_RULE_PROFILE_UNRECOGNIZED` code (see
+§12.5) is reserved for no usage in this contract revision and
+MUST NOT be re-introduced; the profile-mismatch path is the
+silent-skip above, not a blocker.
 
 ## 13. Persistence, API, CLI and report boundaries
 
@@ -1596,9 +1828,11 @@ The future implementation must include:
    (`STC_RULE_PROVENANCE_BLOCKED`) tests using the corresponding
    `unapproved_rule_pack` and `license_blocked_rule_pack` fixtures;
 9. conflicting-rule fixture tests
-   (`STC_RULE_DUPLICATE_IDENTITY`,
-   `STC_RULE_PRIORITY_CONFLICT`) using the
-   `conflicting_configuration_pack` fixture set;
+   (`STC_RULE_DUPLICATE_IDENTITY` covering both the same
+   `(profile_id, rule_type, constraint_id)` triple and the
+   same full §12.4 sort key, with same-authority duplicate dedup
+   and different-authority same-logical-identity block per §12.5)
+   using the `conflicting_configuration_pack` fixture set;
 10. token normalization and malformed-token tests;
 11. unsupported-token and incompatible-combination blocker tests;
 12. canonical ordering tests for evidence, warnings and blockers
@@ -1804,12 +2038,81 @@ The design may be frozen only when review confirms all of the following:
 | Which TASK-014 fields are authoritative for `CaseRevisionAuthority`? | `revision_id`, `payload_hash`, `domain_snapshot_hash` and `status` are mapped 1-to-1 per §7.3. `revision_status` accepts only the TASK-020 subset `{committed, superseded, archived}`. |
 | What is the TASK-020 rule-pack hash field name? | The single TASK-020-facing name is `rule_pack_canonical_hash`, bound to the TASK-012 manifest `canonical_hash` per §6.3. |
 | Which adapter boundary does TASK-020 freeze? | `ConfigurationRulePackAdapter.validate(request, loaded_rule_pack: LoadedRulePackView, validation_report: RulePackValidationReport)` per §12.1; the two TASK-020-owned typed views wrap the existing TASK-012 `load_rule_pack(root)` and `validate_rule_pack(root)` interfaces. |
-| How does the contract split input identity from evaluated authority? | The request carries `RequestedRulePackIdentity` (§6.3.4); the adapter produces `EvaluatedRulePackAuthority` (§6.3.5) with `selected_rule_artifact_hashes` bound to TASK-012 rule artifact `canonical_hash`. Only the evaluated authority is in the configuration hash and the §11.5 provenance record. |
+| How does the contract split input identity from evaluated authority? | The request carries `RequestedRulePackIdentity` (§6.3.4); the adapter produces `EvaluatedRulePackAuthority` (§6.3.5) with the typed `selected_rule_authorities: list[SelectedRuleAuthority]` (§6.3.5.1). Each per-rule identity field — `rule_id`, `rule_version`, `rule_artifact_canonical_hash`, `source_class`, `license_evidence`, `approval_status`, `provenance_edge_ids`, `evidence_refs` — lives inside the `SelectedRuleAuthority` value object, never as a parallel list. Only the evaluated authority is in the configuration hash and the §11.5 provenance record. |
 | Which rule types are accepted and what are their predicates? | The closed set is `COMPONENT_TOKEN_ALLOWLIST`, `CONFIGURATION_COMBINATION_BLOCKLIST`, `CONSTRUCTION_FAMILY_NORMALIZATION`, `PASS_COUNT_ALLOWED_RANGE`, `ORIENTATION_ALLOWLIST` per §12.3 / §12.8.1–§12.8.5. |
 | What is the selection sort key? | The full §12.4 key `(priority ASC, rule_type ASC, constraint_id ASC, rule_id ASC, rule_version ASC, rule_artifact_canonical_hash ASC)`. |
 | Which fixture paths are exact? | The four `case_revision/*` files and the four `rule_packs/*` directories in §14.2, each listing its `manifest.json` and per-rule files. |
 
-### 18.3 Required closeout evidence
+### 18.3 Authority-resolution synchronization record (post-PR-#123 / post-PR-#125)
+
+This contract revision records the current post-merge governance state
+so that PR #118 review can disambiguate the historical TASK-020
+authority-collision concern from the current M3 / TASK-020 scope
+discipline. The record is informational; it does not retroactively
+authorize any TASK-020 implementation.
+
+- The TASK-020 identity collision with the cost-stack governance line
+  has been resolved by the **TASK-019 Amendment 002-K** governance
+  chain: **PR #123** merged the corrective re-home of the
+  cost-stack contract under TASK-019 Amendment 002-K, and **PR #125**
+  recorded the post-merge governance closeout. The TASK-020 design
+  contract no longer overlaps with the TASK-019 cost-stack scope.
+- TASK-019 Amendment 002-K is owned by TASK-019; the
+  case_02 cost-stack coverage, fixture-authority, derivation
+  protocol, business-source availability gate, R1–R25 status
+  distribution and §17A.x amendment-internal numbering are TASK-019
+  Amendment 002-K authority and are out of scope for TASK-020.
+- TASK-020 remains reserved for the M3 shell-and-tube configuration
+  schema foundation. The TASK-020 number is not frozen to any
+  specific M3 capability; TASK-020 capability allocation is a
+  separate Charles-authorized M3 sequencing round.
+- PR #118 is the TASK-020 specific capability allocation **Draft
+  proposal** for the shell-and-tube configuration schema
+  foundation. PR #118 is NOT the backlog's frozen allocation; the
+  Draft proposal is pending independent re-review, Ready
+  authorization, and merge authorization.
+- PR #125 merge commit: `80f042e51bd5eb3783b1461f4ff1cabe1948109f`
+  (= current `origin/main` at the authoring of this §18.3
+  record). PR #123 merge commit (the cost-stack re-home):
+  `905b46753c33603ebdc61148871e40ffb0481c4f`.
+- Issue #122 (`[TASK-019][Amendment 002-K][governance] Re-home
+  PR #119 cost-stack contract and restore TASK-020 authority`)
+  is **closed / completed** in the repository at the time of
+  authoring this §18.3 record. The closure removes the P0
+  authority-collision barrier on the TASK-020 review thread;
+  closing Issue #122 does not waive any of the P1 design findings
+  on PR #118 and does not, on its own, mark PR #118 as Ready,
+  approved, or merge-authorized.
+- TASK-021 through TASK-039 remain unallocated to any specific
+  M3 capability. They remain PLANNED / NOT STARTED unless a separate
+  Charles-authorized M3 sequencing amendment round is opened.
+- IMPLEMENTATION NOT AUTHORIZED in this design PR. The
+  TASK-020 implementation is gated on §16 (Slice A / Slice B) and
+  §12.9 (required-constraint matrix) and on a separate
+  Charles-authorized implementation Issue. No fixture, expected
+  output, cost formula, pressure-drop, thermal-rating, Kern,
+  Bell–Delaware, TEMA, mechanical, material, cost, optimization,
+  API, report, golden validation or other engineering output is
+  introduced by this design PR.
+- PR #118 remains Draft, with the previous reviewed head
+  `9a24b58c30dde7b008648f60be27a65a4eecc867` superseded by the new
+  head in this round after the current-main ancestry sync. PR #118
+  Ready, approval and merge each require separate Charles
+  authorization.
+
+**Anti-fabrication guard (binding)**: this §18.3 record is the only
+place in the TASK-020 contract that references the post-merge main
+state. The TASK-020 contract MUST NOT characterize Issue #122
+closure as PR #118 Ready, approved, design-frozen or otherwise
+authorized. The TASK-020 contract MUST NOT use the post-merge
+governance chain to waive P1 design findings, and the TASK-020
+contract MUST NOT allocate TASK-021–TASK-039 to specific M3
+capabilities. The TASK-020 contract MUST NOT introduce any
+engineering equation, coefficient, fixture, expected output, or
+restricted-standard text under any round, including any round
+that documents the post-merge governance state.
+
+### 18.4 Required closeout evidence
 
 After any future authorized merge, closeout must record:
 
