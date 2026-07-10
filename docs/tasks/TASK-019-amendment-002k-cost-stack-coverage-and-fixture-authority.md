@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Design-content provenance** | PRESERVED FROM PR #119 (PR #119 HEAD COMMIT `aa6692eb5a978b3ab3ebd052aed50bcd9b03a213`) AND THE PR #121 BUSINESS-SOURCE AVAILABILITY GOVERNANCE ADDITION (PR #121 MERGE COMMIT `bb5b8c46e37f37b089a48fdd22b917ed73336194`), BOTH ORIGINALLY RECORDED UNDER A SUPERSEDED TASK-020 LABEL (`docs/tasks/TASK-020-cost-stack-coverage-and-fixture-authority.md`, superseded by this corrective rename); PR #119 MERGE COMMIT `b1b6ea7f5b766d171f0454a29f3b9a6ba05907b1`; CONTENT RE-HOMED UNDER TASK-019 AMENDMENT 002-K WITH AUTHORIZED IDENTITY / NUMBERING / HEADER / CROSS-REFERENCE CORRECTIONS |
-| **Corrective identity status** | TASK-019 DESIGN AMENDMENT 002-K RE-HOME READY FOR REVIEW / NOT MERGED |
+| **Corrective identity status** | TASK-019 DESIGN AMENDMENT 002-K RE-HOME MERGED / DESIGN FROZEN / MAIN-CI-VERIFIED |
 | **Implementation status** | NOT AUTHORIZED |
 | **Source authority** | §17 (TASK-019 Design Amendment 002-J) merged into `main`; case_02 002-G mass-chain already merged; case_03 002-H / 002-I bridge patterns already merged; PR #119 design content; PR #121 business-source availability gate; §17A.x (this contract, TASK-019 Design Amendment 002-K) |
 | **Scope** | case_02 full cost-stack coverage contract + fixture-authority + derivation protocol + business-source availability gate; NOT implementation |
@@ -517,12 +517,13 @@ The following conditions are hard STOPS. Any TASK-019 Design Amendment 002-K lin
 | 2026-07-10 | **Business-Source Availability Gate governance addition**, originally merged through PR #121 under the superseded identity and now preserved under §17A.8.6 / §17A.9 / §17A.10. Recorded `TASK019_AMENDMENT_002K_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE`; R1–R25 status distribution remains 14 / 7 / 1 / 3 / 0; no implementation authorization. | Charles-authorized governance-only round |
 | 2026-07-10 | **Amendment 002-K corrective re-home.** Corrected task identity, file path, section numbering, normative terminology, blocker token, Issue references, and authority chain without reverting or rewriting PR #119 or PR #121 history. Corrective identity remains Draft / not merged. | Charles-authorized corrective governance round; Issue #122 / Draft PR #123 |
 | 2026-07-10 | **PR #123 Ready-state governance sync.** After final docs-only re-review and successful CI on head `c3f780876cb2fec99417f745636dbbec6fea34fe`, Charles separately authorized PR #123's Ready transition. PR #123 remains not merged; merge and implementation remain separately unauthorized. | Charles-authorized Ready-state sync round |
+| 2026-07-10 | **Amendment 002-K post-merge closeout.** PR #123 reviewed head `b409a3a6ef94f337a9734e25e4ba354f2c68701d` merged into `main` at commit `905b46753c33603ebdc61148871e40ffb0481c4f` (merged at 2026-07-10T12:16:40Z); main push CI run `29092046857` completed / success. R1–R25 status distribution (14 / 7 / 1 / 3 / 0), business-source gate, Slice A–D blocker, and implementation NOT AUTHORIZED are preserved unchanged; §17A.8.6 cyclic gate remains for a separate follow-up amendment and is intentionally NOT resolved in this closeout. PR #118 remains Draft; TASK-021–TASK-039 remain unallocated; Issue #122 is intentionally NOT closed in this round. | Charles-authorized post-merge closeout round; PR #123 / `docs/task-019-amendment-002k-closeout` |
 
 ---
 
 **Final declaration**:
 
-> **TASK-019 DESIGN AMENDMENT 002-K CORRECTIVE IDENTITY CONTRACT PREPARED; IMPLEMENTATION NOT AUTHORIZED; CORRECTIVE MERGE REQUIRES SEPARATE CHARLES AUTHORIZATION.**
+> **TASK-019 DESIGN AMENDMENT 002-K CORRECTIVE IDENTITY CONTRACT MERGED INTO MAIN / DESIGN FROZEN / MAIN-CI-VERIFIED; IMPLEMENTATION NOT AUTHORIZED; READY AND MERGE AUTHORIZATIONS COMPLETED PER THE PR #123 / 905b46753 LIFECYCLE.**
 > **This is a corrective re-home of design content originally merged via PR #119 and supplemented via PR #121 under a superseded TASK-020 label; those labels are historical and non-authoritative.**
 > **BUSINESS COST SOURCE UNAVAILABLE; AMENDMENT 002-K SLICES A–D BLOCKED.**
 > **FIXTURE MUTATION NOT AUTHORIZED.**
