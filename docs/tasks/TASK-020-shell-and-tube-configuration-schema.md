@@ -24,10 +24,12 @@
 | Backlog authority | `docs/TASK_BACKLOG.md`, M3 collective scope for TASK-020 through TASK-039 |
 | Standards/license authority | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` |
 | Product scope authority | `docs/MASTER_DEVELOPMENT_SPEC.md`, especially §§2, 7, 8.2 and 9 |
+| Design PR | #118 — DRAFT / NOT READY / NOT MERGED |
 | Design contract status | **DRAFT / NOT FROZEN** |
+| Frozen Contract Authority SHA | NOT ESTABLISHED |
 | Implementation status | **NOT AUTHORIZED** |
 | Implementation Issue | NOT CREATED |
-| Design PR status | DRAFT / NOT READY / NOT MERGED |
+| Issue #117 status | OPEN |
 
 The six ordinary commits between the PR #116 merge commit and this branch
 base created and removed three temporary no-op files. Their net tree diff is
@@ -110,22 +112,25 @@ or consume TASK-021 through TASK-039.
 | Contract | Dependency type | TASK-020 use |
 |---|---|---|
 | TASK-001 | direct terminology authority | equipment-family and project terminology |
-| TASK-002 | direct unit/quantity authority | confirms SI discipline; TASK-020 itself accepts counts and labels only |
-| TASK-004 | direct provenance/error authority | structured error and calculation-provenance conventions |
-| TASK-005 | direct registry/applicability authority | registry-compatible identity and applicability behavior; no new correlation |
+| TASK-004 | direct error/provenance authority | structured error and calculation-provenance conventions |
 | TASK-012 design and implementation | direct runtime/governance dependency | rule-pack source class, approval, license, evidence and canonical hash validation |
+| TASK-014 design and implementation | direct case-authority dependency | immutable case-revision identity and verified case content hash supplied to TASK-020 |
 | TASK-015A | direct implementation-governance dependency | deterministic test execution and CI shard registration |
 | TASK-019 §18 | direct governance predecessor | source-definition handoff, anti-fabrication and allocation boundaries |
 
 ### 4.2 Reference-only predecessors
 
-TASK-003, TASK-006 through TASK-011 and TASK-013 through TASK-018 are
-reference-only for TASK-020. They demonstrate existing project conventions
-but TASK-020 does not consume their thermal, geometry, material, cost,
-persistence, API or report outputs.
+TASK-002, TASK-003 and TASK-005 through TASK-013, except TASK-012, plus
+TASK-016 through TASK-018 are reference-only for TASK-020. They demonstrate
+existing project conventions but TASK-020 does not consume their thermal,
+geometry, material, cost, API or report outputs.
 
 In particular:
 
+- TASK-002 SI discipline remains binding project policy, but TASK-020 accepts
+  no unit-bearing engineering quantity.
+- TASK-005 registry and applicability conventions are reference patterns;
+  TASK-020 creates no engineering correlation.
 - TASK-016 is a double-pipe tube/pipe/hairpin geometry catalog and is not a
   shell-and-tube bundle or layout catalog.
 - TASK-017 and TASK-018 apply to the completed double-pipe vertical slice and
@@ -147,8 +152,8 @@ The following remain absent at TASK-020 launch and must not be simulated:
 
 ### 5.1 In scope for the future TASK-020 implementation
 
-1. Typed domain models for configuration request, authority binding,
-   normalized configuration and validation result.
+1. Typed domain models for case authority, configuration request, authority
+   binding, normalized configuration and validation result.
 2. Structural normalization for equipment family, construction family,
    authority mode, component-code tokens, pass counts and orientation.
 3. Validation against a TASK-012-approved configuration rule pack when the
@@ -157,9 +162,9 @@ The following remain absent at TASK-020 launch and must not be simulated:
 5. Deterministic ordering, canonical serialization, SHA-256 content hashing
    and UUIDv5 result identity.
 6. Stable warning and blocker codes.
-7. Provenance that binds the result to the input, rule-pack identity and
-   source case revision.
-8. Unit, schema, determinism, license-boundary and negative-path tests.
+7. Provenance that binds the result to the verified TASK-014 case authority,
+   input, rule-pack identity and evidence references.
+8. Schema, determinism, license-boundary and negative-path tests.
 
 ### 5.2 Explicit non-scope
 
@@ -177,7 +182,8 @@ TASK-020 does not authorize or define:
 - vibration, thermal expansion or detailed/preliminary mechanical design;
 - material selection, mass, CAPEX, OPEX or life-cycle cost;
 - optimization, ranking or Pareto behavior;
-- persistence, ORM, migration, public API, CLI command or report rendering;
+- persistence, ORM, migration, public API, user-facing CLI command or report
+  rendering;
 - numerical Golden vectors;
 - any copied standard text, table, figure, scanned page or formula image;
 - any mutation of frozen TASK-001 through TASK-019 contracts;
@@ -262,13 +268,24 @@ external-standard code list and do not by themselves establish compliance.
 `UNSPECIFIED` is a valid schema value but may be rejected by a future approved
 rule pack for a particular standard-coded configuration.
 
-### 7.3 ShellAndTubeConfigurationRequest
+### 7.3 CaseRevisionAuthority
+
+TASK-020 consumes an immutable TASK-014 authority value containing:
+
+- `case_revision_id`;
+- `case_revision_hash`;
+- `authority_status`, exact value `VERIFIED`.
+
+TASK-020 does not query persistence. The calling application must obtain and
+verify this value through the TASK-014 contract before invocation.
+
+### 7.4 ShellAndTubeConfigurationRequest
 
 The request is an immutable value object containing the fields frozen in §8.
 It represents an explicitly supplied configuration. It is not a selection or
 optimization request.
 
-### 7.4 ConfigurationAuthorityBinding
+### 7.5 ConfigurationAuthorityBinding
 
 The authority binding records:
 
@@ -278,13 +295,13 @@ The authority binding records:
 - citation/evidence pointers;
 - approval status observed by TASK-020.
 
-### 7.5 ShellAndTubeConfiguration
+### 7.6 ShellAndTubeConfiguration
 
 The normalized configuration is the stable output descriptor containing the
 fields frozen in §9. It is safe for later M3 consumers to reference by ID, but
 it carries no geometry or performance claim.
 
-### 7.6 ConfigurationValidationResult
+### 7.7 ConfigurationValidationResult
 
 The validation result contains:
 
@@ -300,8 +317,7 @@ The validation result contains:
 | Field | Type | Requirement |
 |---|---|---|
 | `schema_version` | string | required; exact initial value `task020.configuration-request.v1` |
-| `case_revision_id` | string | required; non-empty immutable upstream case reference |
-| `case_revision_hash` | lowercase 64-char hex string | required; source case content hash |
+| `case_authority` | `CaseRevisionAuthority` | required; §7.3 |
 | `equipment_family` | string | required; exact value `SHELL_AND_TUBE` |
 | `authority_mode` | enum | required; §6.1 closed set |
 | `construction_family` | enum | required; §7.1 closed set |
@@ -368,9 +384,8 @@ not a silently ignored extension.
 | `shell_pass_count` | integer | normalized request value |
 | `tube_pass_count` | integer | normalized request value |
 | `component_tokens` | object | normalized front/shell/rear tokens or null values |
-| `authority_binding` | object | normalized §7.4 authority data |
-| `case_revision_id` | string | copied from request |
-| `case_revision_hash` | string | verified request hash reference |
+| `authority_binding` | object | normalized §7.5 authority data |
+| `case_authority` | object | copied from verified TASK-014 input |
 | `warnings` | array | stable ordered warning objects |
 | `blockers` | array | empty for a valid configuration |
 | `deferred_capabilities` | array | stable closed entries from §9.3 |
@@ -416,6 +431,7 @@ Partial normalized outputs must not be exposed as valid configurations.
 - `STC_SCHEMA_VERSION_UNSUPPORTED`
 - `STC_UNKNOWN_FIELD`
 - `STC_CASE_AUTHORITY_MISSING`
+- `STC_CASE_AUTHORITY_UNVERIFIED`
 - `STC_CASE_HASH_INVALID`
 - `STC_EQUIPMENT_FAMILY_INVALID`
 - `STC_AUTHORITY_MODE_INVALID`
@@ -468,7 +484,7 @@ locale or unordered filesystem state.
 The configuration hash covers:
 
 - normalized request structural fields;
-- case revision ID and hash;
+- verified case authority;
 - normalized authority binding;
 - rule-pack ID, version and verified content hash when applicable;
 - sorted evidence references;
@@ -515,7 +531,7 @@ Input object-key or evidence-reference order must not alter the hash.
 
 The authority binding must retain:
 
-- case revision ID and hash;
+- verified case revision ID and hash;
 - rule-pack ID, version and content hash when applicable;
 - source class;
 - approval status;
@@ -588,13 +604,18 @@ A separately authorized implementation may modify only:
 - `src/hexagent/shell_and_tube/configuration.py`
 - `src/hexagent/shell_and_tube/errors.py`
 - `src/hexagent/shell_and_tube/models.py`
+- `src/hexagent/shell_and_tube/rule_pack_adapter.py`
 - `src/hexagent/shell_and_tube/schema.py`
 - `src/hexagent/shell_and_tube/validation.py`
 - `tests/shell_and_tube/test_task020_configuration_models.py`
 - `tests/shell_and_tube/test_task020_configuration_validation.py`
 - `tests/shell_and_tube/test_task020_configuration_identity.py`
 - `tests/shell_and_tube/test_task020_license_boundary.py`
-- `tests/fixtures/task020/configuration/*.json`
+- `tests/fixtures/task020/configuration/internal_generic_valid.json`
+- `tests/fixtures/task020/configuration/approved_rule_pack_valid.json`
+- `tests/fixtures/task020/configuration/rule_pack_unapproved.json`
+- `tests/fixtures/task020/configuration/rule_pack_license_blocked.json`
+- `tests/fixtures/task020/configuration/configuration_combination_blocked.json`
 - `ci-shard-manifest.yml`, only to register the exact new test files
 
 Any additional path requires a design amendment and separate Charles
@@ -609,21 +630,22 @@ The future implementation must include:
 
 1. schema-version acceptance and rejection tests;
 2. unknown-field rejection tests;
-3. construction-family, orientation and pass-count validation tests;
-4. internal-generic mode tests proving no standard claim is emitted;
-5. approved-rule-pack mode success tests using synthetic approved internal
+3. verified and unverified case-authority tests;
+4. construction-family, orientation and pass-count validation tests;
+5. internal-generic mode tests proving no standard claim is emitted;
+6. approved-rule-pack mode success tests using synthetic approved internal
    rule content;
-6. missing, unapproved, hash-mismatched and license-blocked rule-pack tests;
-7. token normalization and malformed-token tests;
-8. unsupported-token and incompatible-combination blocker tests;
-9. canonical ordering tests for evidence, warnings and blockers;
-10. hash stability under object-key and input evidence-order changes;
-11. hash mutation tests for every computation-authority field;
-12. exact UUIDv5 identity tests;
-13. tests proving no geometry, thermal, pressure-drop, mechanical, material,
+7. missing, unapproved, hash-mismatched and license-blocked rule-pack tests;
+8. token normalization and malformed-token tests;
+9. unsupported-token and incompatible-combination blocker tests;
+10. canonical ordering tests for evidence, warnings and blockers;
+11. hash stability under object-key and input evidence-order changes;
+12. hash mutation tests for every computation-authority field;
+13. exact UUIDv5 identity tests;
+14. tests proving no geometry, thermal, pressure-drop, mechanical, material,
     cost or report output is produced;
-14. restricted-content marker rejection tests inherited from TASK-012;
-15. a frozen-contract integrity test for this document after design freeze.
+15. restricted-content marker rejection tests inherited from TASK-012;
+16. a frozen-contract integrity test for this document after design freeze.
 
 CI requirements:
 
@@ -645,6 +667,7 @@ A future implementation should be divided into two reviewable slices.
 
 - domain models and enums;
 - strict schema validation;
+- verified case-authority binding;
 - normalization;
 - warning/blocker objects;
 - canonical serialization, hash and UUIDv5 identity;
@@ -659,7 +682,7 @@ Slice A must not load or evaluate a rule pack.
 - approved-rule-pack authority validation;
 - token and combination validation;
 - license/evidence fail-closed behavior;
-- synthetic rule-pack fixtures and tests.
+- exact synthetic rule-pack fixtures and tests from §14.2.
 
 Slice B depends on Slice A and must not add engineering calculations.
 
@@ -705,12 +728,14 @@ The design may be frozen only when review confirms all of the following:
 - [ ] Later M3 Task IDs remain explicitly unassigned rather than invented.
 - [ ] Direct and reference-only dependencies are distinguished.
 - [ ] TASK-012 license and restricted-content boundaries are preserved.
+- [ ] TASK-014 case authority is a direct dependency and no persistence lookup
+      is hidden inside TASK-020.
 - [ ] Input and output schemas are complete and versioned.
 - [ ] Computable and `NOT_COMPUTABLE` outputs are explicit.
 - [ ] Warning and blocker codes are closed sets.
 - [ ] Canonical hash and UUIDv5 rules are exact.
 - [ ] Persistence, API, CLI and report boundaries are explicit.
-- [ ] The future implementation allowlist is exact.
+- [ ] The future implementation allowlist contains exact paths only.
 - [ ] Tests and CI expectations are complete.
 - [ ] Implementation remains separately authorized.
 
