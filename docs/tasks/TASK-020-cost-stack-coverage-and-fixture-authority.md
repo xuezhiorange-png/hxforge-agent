@@ -357,6 +357,50 @@ The TASK-020 implementation is split into **four slices**, each with explicit **
 - Each Slice's commit message MUST name the Slice (e.g. `docs(task-020): slice A — fixture authority`).
 - The four Slices' commits MAY be in the same branch but MUST be separate commits with separate provenance entries.
 
+### §20.8.6 Business Cost Source Availability Gate (binding, contract-frozen)
+
+TASK-020 implementation requires traceable case_02 business cost Source before Slice A may begin. This subsection codifies the business-source availability gate as a hard precondition for any TASK-020 implementation slice.
+
+**Acceptable Source types** (case_02 business cost Source, in priority order):
+
+- approved cost catalog (TASK-013 governed; case_02-bound entries with stable `cost_record_id` and `cost_record_version`; documented `source_*` fields; `provenance_chain_hash` reproducible from canonical-JSON of `{source_record_ids, correlation_ids, case_input_field, license_class, schema_version}` per TASK-018 §7 / §10);
+- supplier quotation (with quote ID, effective date, currency, region, escalation rule, validity period, vendor contact);
+- contract or purchase record (with contract ID, line-item breakdown, effective date, party identification);
+- formally approved internal cost baseline (with approval ID, approver chain, effective date, scope statement);
+- another Charles-confirmed, traceable business Source (must be explicitly named by Charles in a separate authorization message).
+
+**Current state** (binding, governance-only):
+
+```
+TASK020_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE
+```
+
+While this state applies, the following are ALL **explicitly forbidden**:
+
+- Slice A is blocked.
+- Slice B is blocked.
+- Slice C is blocked.
+- Slice D is blocked.
+- fixture mutation is forbidden.
+- expected_output capture is forbidden.
+- production mutation is forbidden.
+- cost-related test mutation is forbidden.
+
+**Implementation authorization cannot be inferred** from:
+
+- Issue #120 (`TASK-020: case_02 cost-stack coverage and fixture authority`) as a tracking artifact;
+- the TASK-020 design contract itself (governance-only);
+- any prior Slice entry condition being individually met;
+- any §20.10 anti-fabrication check passing (passing anti-fabrication checks is necessary but NOT sufficient for business-source authorization).
+
+The state `TASK020_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE` is lifted only by a future Charles-authorized round that:
+1. identifies the specific case_02 business cost Source (per the 5 acceptable types above);
+2. documents the Source identity, version, effective date, and authority chain;
+3. explicitly states that the Source is sufficient for Slice A entry (and downstream slices);
+4. updates the §20.9 register status of the relevant R-items (R2 / R9 / R10 / R11 / R22 / R23) from `REPO_SOURCE_REQUIRED` to `RESOLVED` (or to a new state) with provenance recorded in `_provenance_metadata.json`.
+
+Until that round, **no TASK-020 implementation slice is authorized**, regardless of any other gate status.
+
 ---
 
 ## §20.9 Source-Missing Register (binding, contract-frozen)
@@ -393,6 +437,12 @@ The following table is the **formal register** of source-missing items. Each ite
 
 **Status transition rule (binding)**: a register item's status MAY transition from `SOURCE_MISSING` / `REPO_SOURCE_REQUIRED` / `CHARLES_SOURCE_REQUIRED` to `RESOLVED` ONLY in the round that actually produces the missing authority. The status transition MUST be recorded in `_provenance_metadata.json` and the §20.9 register (in a future round, not this round). A `RESOLVED` item in this round's register is a §20.10 anti-fabrication violation.
 
+**§20.9 register-level note (governance amendment, 2026-07-10)**: The R1–R25 item statuses remain unchanged in this amendment. The overall TASK-020 implementation state is blocked by unavailable business cost Source (per §20.8.6 `TASK020_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE`). Concretely:
+
+- R24 governance tracking (the TASK-020 GitHub Issue) is now represented by **Issue #120** (`TASK-020: case_02 cost-stack coverage and fixture authority`). The Issue is a tracking / authorization artifact only. **Creating the Issue does NOT resolve the business Source blockers** identified in this round.
+- No R-item becomes `RESOLVED` in this round. R1–R25 retain their existing statuses (`SOURCE_MISSING` × 14 / `REPO_SOURCE_REQUIRED` × 7 / `CHARLES_SOURCE_REQUIRED` × 1 / `DEFERRED` × 3 / `RESOLVED` × 0). The blocked state `TASK020_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE` does NOT transition any R-item to `RESOLVED`; a future Charles-authorized round with a real business cost Source is the only valid path to lift the blocked state and transition R-items (R2 / R9 / R10 / R11 / R22 / R23 in particular) to `RESOLVED`.
+- The blocked state applies to the implementation slices (Slice A / B / C / D), NOT to the §20 governance amendment itself. This amendment is governance-only and does not require a business cost Source to be authored.
+
 ---
 
 ## §20.10 Non-Actions and Anti-Fabrication Guard (binding, contract-frozen)
@@ -409,6 +459,23 @@ The following declarations are **explicitly non-actions** of §20. Each is a §2
 - **The existence of `total cost` is NOT a license to claim component breakdown is authorized.** If a future round writes `expected_output.cost_components_C0_C1.cost_components.C1_total_minor_units` it MUST also write `C0_material_minor_units` and `C0_labor_minor_units` (and the component breakdowns per §17.2 G1 / G2). A total without components is a §20.10 anti-fabrication violation.
 - **A documentation example is NOT `expected_output` authority.** Numbers appearing in §20 / §17 / §15 / §16 prose are examples, not authority. Authority is the production chain output captured in Slice C.
 - **A test convenience is NOT business authority.** A test asserting `assert expected_output.cost_components_C0_C1.cost_components.C1_total_minor_units == 12345` does NOT make 12345 the business authority for that field. The business authority is the production chain output.
+
+The following additional anti-fabrication rules apply to the `TASK020_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE` state (per §20.8.6) and are **explicitly forbidden** while that state is in effect:
+
+- **No synthetic cost records.** Creating artificial cost records (whether via a hand-written loop, a generated sequence, a test fixture, a mock, or any other method) to satisfy schema or test requirements is a §20.10 anti-fabrication violation. A `cost_records_bridge` list may remain empty; it MUST NOT be populated with invented records.
+- **No placeholder monetary values.** Writing `0` (or any non-real number) into `cost_value_minor_units` to satisfy schema or test requirements is a §20.10 anti-fabrication violation. The schema requires an integer; the integer MUST be the real value from a business Source. An empty list is the correct representation while the business Source is unavailable.
+- **No zero values used merely to satisfy schema or tests.** A `0` in `cost_value_minor_units` is interpreted as "this catalog entry states that the cost is zero minor units", which is a positive business claim. Zero is NEVER to be used as a placeholder.
+- **No random or example record IDs.** Inventing IDs such as `EXAMPLE-001`, `TEST-RECORD`, `PLACEHOLDER`, or any non-traceable identifier is a §20.10 anti-fabrication violation. Real `cost_record_id` values come from the catalog and follow a documented naming convention.
+- **No copying case_03 cost records into case_02.** Case_03's `cost_records_bridge` (TASK-019-AMEND-002H-C0-MATERIAL-SS304-TUBE-V1, TASK-019-AMEND-002H-C0-LABOR-ASME-V1, TASK-019-AMEND-002H-C1-INSTALLATION-V1) is case_03-specific and bound to its `provenance_amendment_id = TASK-019-DESIGN-AMENDMENT-002-H`. Copying these records or their `cost_value` fields into case_02 would mis-attribute the source. The two cases share the bridge PATTERN, not the bridge CONTENT.
+- **No copying case_03 monetary values into case_02.** Even if a case_02 record role is similar to a case_03 record role (e.g. both have a `C0_material` record), the `cost_value_minor_units` MUST come from a case_02-specific business Source. case_03's `cost_value_minor_units` (per `case_03_cost_lifecycle_envelope.json` — the actual integers are intentionally not restated here to avoid creating any appearance of an authorized case_02 Source template) MUST NOT be copied or adapted into case_02. The two cases share the bridge PATTERN, not the bridge CONTENT.
+- **No deriving component costs by reversing a target total.** Computing `C0_material` or `C0_labor` from a guessed `C1_total` (or vice versa) is a §20.10 anti-fabrication violation. The reverse derivation is a hidden source-fabrication technique that produces numbers without a corresponding business Source.
+- **No deriving costs from equipment mass without an authorized cost Source.** Multiplying `case_02.expected_output.mass_kg.shell_mass_kg` (1.18) by a guessed USD/kg is a §20.10 anti-fabrication violation. Equipment mass is a derived quantity, not a unit price.
+- **No filling required fields solely to make tests pass.** A test that asserts `cost_records_bridge` is non-empty MUST NOT be satisfied by inventing a record. The test itself is the wrong test if it requires invented data; the test MUST be updated to assert the empty state (per §20.10.2 #2 anti-fabrication check).
+- **No treating `null` / empty string / empty list as a completed business Source.** A `null` value in a required field is an explicit "not yet sourced" marker, not a value. An empty list (`[]`) is an explicit "no records yet" marker, not a completed `cost_records_bridge`. The blocked state `TASK020_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE` is the correct representation of these empty structures while the business Source is unavailable.
+
+**Schema existence is not business-value authority.** A field being required in the §20.5.2 contract (or in any subsequent §20.x contract update) does NOT authorize invention of its value. The contract declares the SHAPE of the field; the business Source provides the VALUE. The two are independent.
+
+**A field being required does not authorize invention of its value.** The required status is a contract declaration; the value is a separate Charles-supplied or production-chain-derived input. Until the value is supplied, the field's required status means "must be filled when a Source is available", NOT "must be filled now with any number".
 
 ### §20.10.2 Anti-fabrication checks (binding)
 
@@ -440,6 +507,7 @@ The following conditions are hard STOPS. Any TASK-020 lineage round that encount
 | Date | Change | Author |
 |---|---|---|
 | 2026-07-10 | Initial §20 design contract authored (this file). All 10 sections (§20.1 – §20.10) created from TASK-020 preparation report synthesis + TASK-019 frozen design cross-reference. Status: DESIGN FROZEN / MERGE-NOT-AUTHORIZED. | Charles-authorized design-only round |
+| 2026-07-10 | **Business-Source Availability Gate amendment.** Recorded `TASK020_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE`; added the §20.8.6 business-source availability gate and the §20.10.1 anti-fabrication boundary (no synthetic records / no placeholder monetary values / no zero placeholders / no random IDs / no case_03 record copying / no reverse-derivation / no mass-based price guessing / no test-driven invention / no treating `null` / `[]` / `""` as completed Source); added the §20.9 register-level note (R1–R25 statuses unchanged; Issue #120 is tracking only; blocked state does not transition R-items to `RESOLVED`); no R-item status change; no implementation authorization. **Authority**: Charles confirmation that no traceable case_02 business cost data is currently available. **Scope**: governance-only. **Implementation**: NOT AUTHORIZED. | Charles-authorized governance-only round (this amendment) |
 
 ---
 
