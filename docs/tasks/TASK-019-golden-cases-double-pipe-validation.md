@@ -2785,3 +2785,55 @@ A future dedicated TASK-020 design round may start only after:
 - the round carries forward every unresolved allocation question in §18.4 and answers only those supported by repo evidence and Charles authorization.
 
 The future TASK-020 design round remains design-only unless Charles separately authorizes implementation after that design contract is reviewed and merged.
+
+
+## 18.8 TASK identity correction and Amendment 002-K re-home (binding, contract-frozen, governance-only)
+
+This subsection freezes a historical fact: PR #119 (`b1b6ea7f5b766d171f0454a29f3b9a6ba05907b1`, merged 2026-07-10T09:07:12Z by Charles via GitHub Web UI) carried a TASK-019 amendment asset under a superseded `TASK-020-cost-stack-coverage-and-fixture-authority.md` filename. Per the TASK-020 authority reconciliation, that file has been forward-correctively re-homed under the correct TASK-019 amendment letter 002-K, without rewriting any history.
+
+The following facts are binding and not subject to re-derivation:
+
+1. PR #119 merge commit `b1b6ea7f5b766d171f0454a29f3b9a6ba05907b1` is preserved as an unchangeable historical record on `main`. PR #119 is not reverted, not rebased, not force-pushed, not amended, and not rewritten. Its design content remains semantically identical under the new amendment identity.
+
+2. The original PR #119 file path `docs/tasks/TASK-020-cost-stack-coverage-and-fixture-authority.md` is a historical, superseded, non-authoritative label. The phrase "TASK-020" in that path and in the PR #119 commit subject (`docs(task-020): freeze cost-stack and fixture authority`) and in the original commit body ("add the TASK-020 cost-stack coverage and fixture-authority design contract") MUST NOT be cited as current task authority; the current task authority for this design content is the re-homed path below.
+
+3. The current correct contract identity is `TASK-019 Design Amendment 002-K` (case_02 cost-stack coverage and fixture-authority). The current correct file path is `docs/tasks/TASK-019-amendment-002k-cost-stack-coverage-and-fixture-authority.md`. The §18.8 subsection ID range and the internal `§17A.x` numbering are TASK-019 amendment-internal; the prior `§20.x` numbering used in PR #119 / merge `b1b6ea7` is renamed to `§17A.x` for consistency with the TASK-019 amendment-letter convention.
+
+4. TASK-020 is reserved for the M3 Shell-and-Tube single-phase family per `docs/TASK_BACKLOG.md` line 57–59 ("TASK-020 through TASK-039 cover TEMA configuration schemas, tube layout, shell diameter, tube-side rating, Kern screening, Bell–Delaware, pressure-drop decomposition, thermal expansion screening, preliminary mechanical boundaries, materials, costing, optimization, API, report and Golden validation"). TASK-020's specific scope within M3 is not frozen on `main` as of the authoring of this §18.8. The literal backlog line is historical, non-authoritative for any specific TASK-020 capability allocation; TASK-020 capability allocation is a separately authorized future M3 sequencing round.
+
+5. PR #118 (branch `docs/task-020-shell-and-tube-configuration-schema-design`, head `565082d8cbe4a0ea96a45ba97f8f36d92f7ed060` at the time of authoring this §18.8) is a Draft design proposal for the M3 Shell-and-Tube Configuration Schema Foundation capability. PR #118 is NOT modified by this §18.8 round. PR #118's P1/P2 review findings (review `4669760160`, `4669976126`, `4670171868`) and its draft status remain unchanged.
+
+6. TASK-019 Design Amendment 002-K scope is limited to:
+   - case_02 full cost-stack coverage contract;
+   - case_02 fixture authority;
+   - case_02 expected_output fixture derivation protocol;
+   - case_02 source-missing register (R1–R25, all designated by `TASK-019 Design Amendment 002-K` amendment letter, not TASK-020);
+   - Amendment 002-K Slice A through Slice D implementation gates (`Amendment 002-K Slice A`, `B`, `C`, `D`; each requires its own Charles-authorized implementation round; A does NOT auto-authorize B).
+
+7. TASK-019 Design Amendment 002-K does NOT authorize:
+   - any production code mutation;
+   - any test, fixture, expected_output, provenance metadata, or tolerance metadata mutation;
+   - any TASK-020 implementation Issue / branch / commit / PR;
+   - any catalog scan, resolver, lookup, or dynamic integration claim;
+   - any pressure-drop, thermal rating, Kern, Bell–Delaware, thermal expansion, mechanical, or TEMA implementation;
+   - any discount formula, salvage formula, or escalation-rule evaluation;
+   - any runtime catalog scan / resolver code path;
+   - any TASK-021 through TASK-039 allocation;
+   - any READY transition or merge of the corrective PR without separate Charles authorization.
+
+8. The TASK-020 / M3 family slot, the §18.4 unresolved allocation questions, the TASK-019 §17 amendment letter J (002-J) frozen contract, and the §17A / §18 frozen M2 golden-case and handoff contracts remain in effect per their pre-existing binding text. This §18.8 does not supersede any of them; it records the TASK-020 authority correction and the Amendment 002-K re-home in addition to them.
+
+9. The `main` @ `b1b6ea7` historical state is preserved. Future rounds that need to alter the TASK-019 design contract, the TASK-020 M3 family placement, or the Amendment 002-K content MUST go through separate Charles-authorized amendment rounds; this §18.8 is a corrective governance note and is NOT itself a re-authorization of any frozen content.
+
+10. Issue #117 (the M3 TASK-020 first shell-and-tube capability contract Issue, Charles-created 2026-07-10T07:36:12Z) remains OPEN. PR #118 remains DRAFT. This §18.8 does not close, merge, freeze, or in any way alter the state of Issue #117 or PR #118.
+
+11. **Post-merge closeout (2026-07-10)** — this sub-item is the minimal post-merge governance closeout note appended after PR #123 was merged into `main` by Charles via GitHub Web UI. It records the immutable historical facts and does NOT extend the binding content above.
+
+    - **PR #123 merged.** Actual merge commit `905b46753c33603ebdc61148871e40ffb0481c4f` (2-parent merge commit; authorized method was squash, actual method was merge commit; the merge-method deviation is preserved as an immutable historical fact; no revert / no history rewrite / no force-push / no rebase was performed or authorized). Merged at `2026-07-10T12:16:40Z`. Reviewed PR head `b409a3a6ef94f337a9734e25e4ba354f2c68701d`. Merge commit tree matched reviewed PR head tree byte-for-byte (`5710d9a5c1fa1bb2a2637b35fc9dac5f7b353e40`).
+    - **Corrected Amendment 002-K path is now authoritative on `main`**: `docs/tasks/TASK-019-amendment-002k-cost-stack-coverage-and-fixture-authority.md` (§17A.1 through §17A.11). The old TASK-020 cost-stack path `docs/tasks/TASK-020-cost-stack-coverage-and-fixture-authority.md` is absent from the current tree and preserved only in immutable Git history as historical, superseded, non-authoritative evidence.
+    - **Post-merge main CI run `29092046857` completed / success** (35 check-runs: 24 success + 11 main-track skipped + 0 failed + 0 cancelled; `final-gate` completed / success; main-track skipped jobs are expected for `event=push`).
+    - **Historical PR #119 / PR #121 lineage remains preserved**: PR #119 merge commit `b1b6ea7f5b766d171f0454a29f3b9a6ba05907b1` and PR #121 merge commit `bb5b8c46e37f37b089a48fdd22b917ed73336194` are unchanged in immutable Git history; the re-homed contract semantically preserves their design content under the TASK-019 Amendment 002-K identity.
+    - **TASK-020 is restored to the M3 family reservation** per `docs/TASK_BACKLOG.md` M3 section. TASK-020 specific M3 capability allocation is **still not frozen** merely because PR #123 merged; M3 sequencing remains a separate Charles-authorized round. TASK-021 through TASK-039 remain unallocated.
+    - **PR #118 remains Draft** (open + Draft + head `9a24b58c30dde7b008648f60be27a65a4eecc867`, unchanged by this closeout). PR #118 is not authorized, Ready-ed, approved, or otherwise mutated by this §18.8.11 closeout entry.
+    - **Issue #122 remains OPEN**. This closeout does not close, modify, or otherwise mutate Issue #122; Issue #122 close is a separate Charles-authorized round.
+    - **implementation remains NOT AUTHORIZED.** No fixture / expected_output / cost formula / production implementation is introduced. The `TASK019_AMENDMENT_002K_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE` state remains active. R1–R25 status distribution is unchanged. Amendment 002-K Slice A through Slice D remain blocked and are separately authorized only.
