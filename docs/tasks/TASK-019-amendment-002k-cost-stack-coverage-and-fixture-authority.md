@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Design-content provenance** | PRESERVED FROM PR #119 (PR #119 HEAD COMMIT `aa6692eb5a978b3ab3ebd052aed50bcd9b03a213`) AND THE PR #121 BUSINESS-SOURCE AVAILABILITY GOVERNANCE ADDITION (PR #121 MERGE COMMIT `bb5b8c46e37f37b089a48fdd22b917ed73336194`), BOTH ORIGINALLY RECORDED UNDER A SUPERSEDED TASK-020 LABEL (`docs/tasks/TASK-020-cost-stack-coverage-and-fixture-authority.md`, superseded by this corrective rename); PR #119 MERGE COMMIT `b1b6ea7f5b766d171f0454a29f3b9a6ba05907b1`; CONTENT RE-HOMED UNDER TASK-019 AMENDMENT 002-K WITH AUTHORIZED IDENTITY / NUMBERING / HEADER / CROSS-REFERENCE CORRECTIONS |
-| **Corrective identity status** | TASK-019 DESIGN AMENDMENT 002-K RE-HOME DRAFT / NOT MERGED |
+| **Corrective identity status** | TASK-019 DESIGN AMENDMENT 002-K RE-HOME READY FOR REVIEW / NOT MERGED |
 | **Implementation status** | NOT AUTHORIZED |
 | **Source authority** | §17 (TASK-019 Design Amendment 002-J) merged into `main`; case_02 002-G mass-chain already merged; case_03 002-H / 002-I bridge patterns already merged; PR #119 design content; PR #121 business-source availability gate; §17A.x (this contract, TASK-019 Design Amendment 002-K) |
 | **Scope** | case_02 full cost-stack coverage contract + fixture-authority + derivation protocol + business-source availability gate; NOT implementation |
@@ -392,7 +392,7 @@ While this state applies, the following are ALL **explicitly forbidden**:
 **Implementation authorization cannot be inferred** from:
 
 - Issue #120 (`TASK-020: case_02 cost-stack coverage and fixture authority`), which is preserved only as a historical source-availability tracking artifact under the superseded TASK-020 label;
-- Issue #122, which authorizes only the corrective 002-K identity re-home and Draft PR;
+- Issue #122, which authorized only the corrective 002-K identity re-home and creation of the Draft PR; the later Ready transition was separately authorized by Charles after final docs-only re-review and does not authorize merge or implementation;
 - this Amendment 002-K design contract itself (governance-only);
 - any prior Slice entry condition being individually met;
 - any §17A.10 anti-fabrication check passing (passing anti-fabrication checks is necessary but NOT sufficient for business-source authorization).
@@ -446,7 +446,7 @@ The following table is the **formal register** of source-missing items. Each ite
 
 - Issue #120 remains a historical source-availability tracking artifact under the superseded TASK-020 label. Issue #122 is the corrective 002-K governance Issue. **Neither Issue resolves the business Source blockers or authorizes an implementation slice.**
 - No R-item becomes `RESOLVED` in this round. R1–R25 retain their existing statuses (`SOURCE_MISSING` × 14 / `REPO_SOURCE_REQUIRED` × 7 / `CHARLES_SOURCE_REQUIRED` × 1 / `DEFERRED` × 3 / `RESOLVED` × 0). The blocked state does NOT transition any R-item to `RESOLVED`; a future Charles-authorized round with a real business cost Source is the only valid path to lift the state and transition R2 / R9 / R10 / R11 / R22 / R23 in particular.
-- The blocked state applies to Amendment 002-K implementation slices, NOT to this governance-only corrective re-home. The corrective Draft does not require a business cost Source to preserve and rename the contract.
+- The blocked state applies to Amendment 002-K implementation slices, NOT to this governance-only corrective re-home. The corrective governance-only re-home does not require a business cost Source to preserve and rename the contract.
 
 ---
 
@@ -516,6 +516,7 @@ The following conditions are hard STOPS. Any TASK-019 Design Amendment 002-K lin
 | 2026-07-10 | Initial cost-stack / fixture-authority design content authored and later merged through PR #119 under a superseded TASK-020 identity. Historical content preserved; implementation not authorized. | Charles-authorized design-only round |
 | 2026-07-10 | **Business-Source Availability Gate governance addition**, originally merged through PR #121 under the superseded identity and now preserved under §17A.8.6 / §17A.9 / §17A.10. Recorded `TASK019_AMENDMENT_002K_BLOCKED_BUSINESS_COST_DATA_UNAVAILABLE`; R1–R25 status distribution remains 14 / 7 / 1 / 3 / 0; no implementation authorization. | Charles-authorized governance-only round |
 | 2026-07-10 | **Amendment 002-K corrective re-home.** Corrected task identity, file path, section numbering, normative terminology, blocker token, Issue references, and authority chain without reverting or rewriting PR #119 or PR #121 history. Corrective identity remains Draft / not merged. | Charles-authorized corrective governance round; Issue #122 / Draft PR #123 |
+| 2026-07-10 | **PR #123 Ready-state governance sync.** After final docs-only re-review and successful CI on head `c3f780876cb2fec99417f745636dbbec6fea34fe`, Charles separately authorized PR #123's Ready transition. PR #123 remains not merged; merge and implementation remain separately unauthorized. | Charles-authorized Ready-state sync round |
 
 ---
 
