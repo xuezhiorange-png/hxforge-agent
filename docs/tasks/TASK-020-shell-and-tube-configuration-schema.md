@@ -1958,10 +1958,16 @@ The design may be frozen only when review confirms all of the following:
       `selected_rule_artifact_hashes`, `validation_status`) appears
       on the request.
 - [ ] The output carries exactly one rule-pack object, the
-      `EvaluatedRulePackAuthority` (§6.3.5), with
-      `selected_rule_artifact_hashes` bound to the TASK-012 rule
-      artifact `canonical_hash` (not a separately computed rule-body
-      hash).
+      `EvaluatedRulePackAuthority` (§6.3.5), containing
+      `selected_rule_authorities: list[SelectedRuleAuthority]`. Each
+      `SelectedRuleAuthority` carries the complete per-rule authority,
+      including `rule_id`, `rule_version`,
+      `rule_artifact_canonical_hash` (bound to the TASK-012 rule
+      artifact `canonical_hash`, not a separately computed rule-body
+      hash), `source_class`, `license_evidence`, `approval_status`,
+      `provenance_edge_ids` and `evidence_refs`. No parallel
+      `selected_rule_ids` or `selected_rule_artifact_hashes` list is
+      part of the authoritative or canonical schema.
 - [ ] The TASK-020 rule-pack authority uses the TASK-012 manifest
       `canonical_hash` under the single name
       `rule_pack_canonical_hash`; no `content_hash` or `rule_pack_hash`
@@ -2001,19 +2007,27 @@ The design may be frozen only when review confirms all of the following:
       sets; no glob or wildcard fixture discovery is permitted.
 - [ ] The canonical hash (§11.2) covers the complete §10.4 warning and
       blocker objects, the complete `CaseRevisionAuthority`, the
-      complete `EvaluatedRulePackAuthority` (with its
-      `selected_rule_ids` and `selected_rule_artifact_hashes` in the
-      §12.4 order), the `schema_version` and the frozen
-      `deferred_capabilities` list. The input-side
-      `RequestedRulePackIdentity` is **not** in the configuration
-      hash; only the evaluated authority is.
-- [ ] `BLOCKED` result identity (§11.2.1) covers the request's
-      `RequestedRulePackIdentity` triple (when present), the
-      applicable selected rule set in the §12.4 sort order, and the
-      ordered, complete §10.4 blocker list. Case authority, loaded
-      pack manifest identity and `RulePackValidationReport.status`
-      are excluded from the blocked-result identity to avoid
-      encoding the same input twice.
+      complete `EvaluatedRulePackAuthority` (including the complete
+      ordered `selected_rule_authorities: list[SelectedRuleAuthority]`
+      in the §12.4 order), the `schema_version` and the frozen
+      `deferred_capabilities` list. The canonical payload does not
+      contain parallel `selected_rule_ids` or
+      `selected_rule_artifact_hashes` lists; any such projections are
+      derived views only and are not computation authority. The
+      input-side `RequestedRulePackIdentity` is **not** in the
+      configuration hash; only the evaluated authority is.
+- [ ] `BLOCKED` result identity (§11.2.1) covers the complete authority
+      context tuple: the complete `CaseRevisionAuthority`; the
+      request's `RequestedRulePackIdentity` when present; the
+      complete `selected_rule_authorities: list[SelectedRuleAuthority]`
+      in the §12.4 sort order; the ordered, complete §10.4 blocker
+      list; the TASK-020 schema version and the output `schema_version`.
+      `CaseRevisionAuthority` MUST NOT be excluded. Different case
+      revisions, different `SelectedRuleAuthority` fields, or
+      different complete blocker objects MUST produce different
+      blocked-result identities. The identity MUST NOT be derived from
+      any partial projection (rule IDs only, rule artifact hashes
+      only, blocker code subset only).
 - [ ] Input and output schemas are complete and versioned.
 - [ ] Computable and `NOT_COMPUTABLE` outputs are explicit.
 - [ ] Warning and blocker codes are closed sets.
