@@ -7,10 +7,7 @@ shape.
 
 from __future__ import annotations
 
-import pytest
-
 import hexagent.exchangers.shell_tube as st
-
 
 SHA_PAYLOAD = "a" * 64
 SHA_DOMAIN = "b" * 64
@@ -70,15 +67,13 @@ class TestBlockerCodeClosure:
 
     def test_obsolete_profile_unrecognized_absent(self) -> None:
         from hexagent.exchangers.shell_tube.models import BlockerCode
-        assert not any(
-            c.value == "STC_RULE_PROFILE_UNRECOGNIZED" for c in BlockerCode
-        )
+
+        assert not any(c.value == "STC_RULE_PROFILE_UNRECOGNIZED" for c in BlockerCode)
 
     def test_obsolete_priority_conflict_absent(self) -> None:
         from hexagent.exchangers.shell_tube.models import BlockerCode
-        assert not any(
-            c.value == "STC_RULE_PRIORITY_CONFLICT" for c in BlockerCode
-        )
+
+        assert not any(c.value == "STC_RULE_PRIORITY_CONFLICT" for c in BlockerCode)
 
     def test_known_blocker_codes_emitted(self) -> None:
         # Each known blocker code in the §10.2 closed set must be

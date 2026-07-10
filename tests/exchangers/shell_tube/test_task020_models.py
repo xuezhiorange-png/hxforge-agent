@@ -6,10 +6,12 @@ exercise any engineering numerical behavior.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
-from hexagent.exchangers.shell_tube import models
 from hexagent.exchangers.shell_tube.models import (
+    DEFERRED_CAPABILITIES,
     AuthorityMode,
     BlockerCode,
     CaseRevisionAuthority,
@@ -18,12 +20,10 @@ from hexagent.exchangers.shell_tube.models import (
     ConfigurationAuthorityBinding,
     ConfigurationValidationResult,
     ConstructionFamily,
-    DEFERRED_CAPABILITIES,
     EquipmentFamily,
     ErrorEntry,
     EvaluatedRulePackAuthority,
     Orientation,
-    RequestedRulePackIdentity,
     SelectedRuleAuthority,
     ShellAndTubeConfiguration,
     ShellAndTubeConfigurationRequest,
@@ -31,7 +31,6 @@ from hexagent.exchangers.shell_tube.models import (
     ValidationStatus,
     WarningCode,
 )
-
 
 SHA_PAYLOAD = "a" * 64
 SHA_DOMAIN = "b" * 64
@@ -43,12 +42,8 @@ def _make_case_authority(**overrides: object) -> CaseRevisionAuthority:
     return CaseRevisionAuthority(
         revision_id=str(overrides.get("revision_id", "rev-001")),
         payload_hash=str(overrides.get("payload_hash", SHA_PAYLOAD)),
-        domain_snapshot_hash=str(
-            overrides.get("domain_snapshot_hash", SHA_DOMAIN)
-        ),
-        revision_status=CaseRevisionStatus(
-            str(overrides.get("revision_status", "committed"))
-        ),
+        domain_snapshot_hash=str(overrides.get("domain_snapshot_hash", SHA_DOMAIN)),
+        revision_status=CaseRevisionStatus(str(overrides.get("revision_status", "committed"))),
     )
 
 
@@ -62,7 +57,7 @@ class TestCaseRevisionAuthority:
 
     def test_authority_is_frozen(self) -> None:
         cra = _make_case_authority()
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             cra.revision_id = "rev-002"  # type: ignore[misc]
 
     def test_authority_rejects_non_string_revision_id(self) -> None:
@@ -94,14 +89,12 @@ class TestRequestModel:
             orientation=Orientation.HORIZONTAL,
             shell_pass_count=1,
             tube_pass_count=2,
-            component_tokens=ComponentTokens(
-                front_head="A", shell="B", rear_head="C"
-            ),
+            component_tokens=ComponentTokens(front_head="A", shell="B", rear_head="C"),
             standard_system_id=None,
             requested_rule_pack_identity=None,
             evidence_refs=(),
         )
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             request.shell_pass_count = 99  # type: ignore[misc]
 
     def test_request_evidence_refs_normalized_to_tuple(self) -> None:
@@ -114,9 +107,7 @@ class TestRequestModel:
             orientation=Orientation.HORIZONTAL,
             shell_pass_count=1,
             tube_pass_count=2,
-            component_tokens=ComponentTokens(
-                front_head=None, shell=None, rear_head=None
-            ),
+            component_tokens=ComponentTokens(front_head=None, shell=None, rear_head=None),
             standard_system_id=None,
             requested_rule_pack_identity=None,
             evidence_refs=("ref-c", "ref-a", "ref-b"),
@@ -139,9 +130,7 @@ class TestConfigurationModel:
             orientation=Orientation.HORIZONTAL,
             shell_pass_count=1,
             tube_pass_count=2,
-            component_tokens=ComponentTokens(
-                front_head=None, shell=None, rear_head=None
-            ),
+            component_tokens=ComponentTokens(front_head=None, shell=None, rear_head=None),
             standard_system_id=None,
             requested_rule_pack_identity=None,
             evidence_refs=(),
@@ -173,9 +162,7 @@ class TestConfigurationModel:
         # §9.3 closed initial deferred_capabilities set is bound
         # to the configuration by default.
         assert configuration.deferred_capabilities == DEFERRED_CAPABILITIES
-        assert (
-            "TUBE_LAYOUT_NOT_COMPUTABLE" in configuration.deferred_capabilities
-        )
+        assert "TUBE_LAYOUT_NOT_COMPUTABLE" in configuration.deferred_capabilities
         assert "PRESSURE_DROP_NOT_COMPUTABLE" in configuration.deferred_capabilities
 
 
@@ -188,13 +175,11 @@ class TestErrorEntry:
             evidence_refs=(),
             details=None,
         )
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             entry.code = "STC_OTHER"  # type: ignore[misc]
 
     def test_error_entry_default_evidence_refs_is_empty_tuple(self) -> None:
-        entry = ErrorEntry(
-            code="STC_X", field_path=None, message_key="STC_X"
-        )
+        entry = ErrorEntry(code="STC_X", field_path=None, message_key="STC_X")
         assert entry.evidence_refs == ()
 
 
@@ -270,7 +255,7 @@ class TestSelectedRuleAuthority:
             license_evidence=None,
             approval_status="approved",
         )
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             sra.rule_id = "r2"  # type: ignore[misc]
 
 
@@ -308,9 +293,7 @@ class TestFrozenShape:
             orientation=Orientation.HORIZONTAL,
             shell_pass_count=1,
             tube_pass_count=2,
-            component_tokens=ComponentTokens(
-                front_head=None, shell=None, rear_head=None
-            ),
+            component_tokens=ComponentTokens(front_head=None, shell=None, rear_head=None),
             authority_binding=binding,
             case_authority=cra,
             warnings=(),

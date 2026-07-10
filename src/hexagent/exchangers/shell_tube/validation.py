@@ -30,24 +30,22 @@ NOT in scope (Slice B, DEFERRED)
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 from hexagent.exchangers.shell_tube import canonical, errors, schema
 from hexagent.exchangers.shell_tube.authority import (
     bind_request_to_configuration_authority,
-    finalize_selected_rule_authority,
     from_case_revision_payload,
     from_requested_rule_pack_identity,
-    sorted_selected_rule_authorities,
 )
 from hexagent.exchangers.shell_tube.models import (
+    DEFERRED_CAPABILITIES,
     AuthorityMode,
     CaseRevisionAuthority,
     ComponentTokens,
-    ConfigurationAuthorityBinding,
     ConfigurationValidationResult,
     ConstructionFamily,
-    DEFERRED_CAPABILITIES,
     EquipmentFamily,
     ErrorEntry,
     EvaluatedRulePackAuthority,
@@ -61,17 +59,10 @@ from hexagent.exchangers.shell_tube.models import (
 from hexagent.exchangers.shell_tube.schema import (
     CONFIGURATION_SCHEMA_VERSION,
     REQUEST_ALLOWED_FIELDS,
-    REQUEST_FORBIDDEN_FIELD_NAMES,
     REQUEST_SCHEMA_VERSION,
-    check_authority_mode,
     check_authority_mode_consistency,
-    check_construction_family,
-    check_equipment_family,
-    check_orientation,
-    check_pass_count,
     normalize_token,
 )
-
 
 # ---------------------------------------------------------------------------
 # §8.1 — Internal payload → domain request conversion
@@ -81,9 +72,7 @@ from hexagent.exchangers.shell_tube.schema import (
 def _parse_case_authority(payload: Mapping[str, Any]) -> CaseRevisionAuthority:
     """Parse the ``case_authority`` sub-payload per §7.3 / §8.1."""
     if "case_authority" not in payload or payload["case_authority"] is None:
-        raise errors.BlockerError(
-            "STC_CASE_AUTHORITY_MISSING", "case_authority required"
-        )
+        raise errors.BlockerError("STC_CASE_AUTHORITY_MISSING", "case_authority required")
     raw = payload["case_authority"]
     if not isinstance(raw, Mapping):
         raise errors.BlockerError(
@@ -99,7 +88,7 @@ def _parse_case_authority(payload: Mapping[str, Any]) -> CaseRevisionAuthority:
 
 def _parse_requested_rule_pack_identity(
     payload: Mapping[str, Any],
-) -> Optional[RequestedRulePackIdentity]:
+) -> RequestedRulePackIdentity | None:
     if payload.get("requested_rule_pack_identity") is None:
         return None
     raw = payload["requested_rule_pack_identity"]
@@ -122,9 +111,7 @@ def _payload_to_request(
     # §8.1 — schema version
     schema_version = str(payload.get("schema_version", ""))
     if schema_version != REQUEST_SCHEMA_VERSION:
-        raise errors.BlockerError(
-            "STC_SCHEMA_VERSION_UNSUPPORTED", schema_version
-        )
+        raise errors.BlockerError("STC_SCHEMA_VERSION_UNSUPPORTED", schema_version)
 
     # §8.1 — case authority (§7.3)
     case_authority = _parse_case_authority(payload)
@@ -132,28 +119,26 @@ def _payload_to_request(
     # §8.1 — equipment / authority / construction / orientation
     equipment_family_raw = payload.get("equipment_family", "")
     if equipment_family_raw != EquipmentFamily.SHELL_AND_TUBE.value:
-        raise errors.BlockerError(
-            "STC_EQUIPMENT_FAMILY_INVALID", str(equipment_family_raw)
-        )
+        raise errors.BlockerError("STC_EQUIPMENT_FAMILY_INVALID", str(equipment_family_raw))
     equipment_family = EquipmentFamily.SHELL_AND_TUBE
 
     authority_mode_raw = payload.get("authority_mode", "")
     try:
         authority_mode = AuthorityMode(authority_mode_raw)
     except ValueError as exc:
-        raise errors.BlockerError("STC_AUTHORITY_MODE_INVALID", str(exc))
+        raise errors.BlockerError("STC_AUTHORITY_MODE_INVALID", str(exc)) from exc
 
     construction_family_raw = payload.get("construction_family", "")
     try:
         construction_family = ConstructionFamily(construction_family_raw)
     except ValueError as exc:
-        raise errors.BlockerError("STC_CONSTRUCTION_FAMILY_INVALID", str(exc))
+        raise errors.BlockerError("STC_CONSTRUCTION_FAMILY_INVALID", str(exc)) from exc
 
     orientation_raw = payload.get("orientation", "")
     try:
         orientation = Orientation(orientation_raw)
     except ValueError as exc:
-        raise errors.BlockerError("STC_ORIENTATION_INVALID", str(exc))
+        raise errors.BlockerError("STC_ORIENTATION_INVALID", str(exc)) from exc
 
     # §8.1 — pass counts
     shell_pass_count = payload.get("shell_pass_count", 0)
@@ -171,9 +156,7 @@ def _payload_to_request(
         or isinstance(tube_pass_count, bool)
         or tube_pass_count < 1
     ):
-        raise errors.BlockerError(
-            "STC_PASS_COUNT_INVALID", f"tube_pass_count={tube_pass_count!r}"
-        )
+        raise errors.BlockerError("STC_PASS_COUNT_INVALID", f"tube_pass_count={tube_pass_count!r}")
 
     # §8.2 — structural tokens
     front_head_token = normalize_token(payload.get("front_head_token"))
@@ -210,9 +193,7 @@ def _payload_to_request(
             "STC_AUTHORITY_FIELDS_INCONSISTENT",
             f"evidence_refs must be list, got {type(raw_evidence).__name__}",
         )
-    evidence_refs = canonical.sort_evidence_refs(
-        str(ref) for ref in raw_evidence
-    )
+    evidence_refs = canonical.sort_evidence_refs(str(ref) for ref in raw_evidence)
 
     return ShellAndTubeConfigurationRequest(
         schema_version=schema_version,
@@ -288,7 +269,7 @@ def _build_normalized_configuration(
 ) -> tuple[ShellAndTubeConfiguration, str, str]:
     """Build the §9.1 normalized configuration + (hash, id)."""
     # §9.1 — authority binding
-    evaluated_rpa: Optional[EvaluatedRulePackAuthority] = None
+    evaluated_rpa: EvaluatedRulePackAuthority | None = None
     if request.authority_mode == AuthorityMode.APPROVED_RULE_PACK:
         # Slice A does NOT load or evaluate rule packs (§16.1). The
         # binding carries a null rule-pack slot for the FAIL-CLOSED
@@ -334,16 +315,12 @@ def _build_normalized_configuration(
         "authority_mode": authority_binding.authority_mode.value,
         "standard_system_id": authority_binding.standard_system_id,
         "case_authority": case_authority_dict,
-        "case_authority_evidence_refs": list(
-            authority_binding.case_authority_evidence_refs
-        ),
+        "case_authority_evidence_refs": list(authority_binding.case_authority_evidence_refs),
         "evaluated_rule_pack_authority": (
             None
             if authority_binding.evaluated_rule_pack_authority is None
             else {
-                "rule_pack_id": (
-                    authority_binding.evaluated_rule_pack_authority.rule_pack_id
-                ),
+                "rule_pack_id": (authority_binding.evaluated_rule_pack_authority.rule_pack_id),
                 "rule_pack_version": (
                     authority_binding.evaluated_rule_pack_authority.rule_pack_version
                 ),
@@ -357,16 +334,16 @@ def _build_normalized_configuration(
                     {
                         "rule_id": sra.rule_id,
                         "rule_version": sra.rule_version,
-                        "rule_artifact_canonical_hash": (
-                            sra.rule_artifact_canonical_hash
-                        ),
+                        "rule_artifact_canonical_hash": (sra.rule_artifact_canonical_hash),
                         "source_class": sra.source_class,
                         "license_evidence": sra.license_evidence,
                         "approval_status": sra.approval_status,
                         "provenance_edge_ids": list(sra.provenance_edge_ids),
                         "evidence_refs": list(sra.evidence_refs),
                     }
-                    for sra in authority_binding.evaluated_rule_pack_authority.selected_rule_authorities
+                    for sra in (
+                        authority_binding.evaluated_rule_pack_authority.selected_rule_authorities
+                    )
                 ],
             }
         ),
@@ -375,9 +352,7 @@ def _build_normalized_configuration(
     payload = canonical.canonical_payload(
         configuration=configuration_dict,
         case_authority=case_authority_dict,
-        evaluated_rule_pack_authority=(
-            authority_binding_dict["evaluated_rule_pack_authority"]
-        ),
+        evaluated_rule_pack_authority=(authority_binding_dict["evaluated_rule_pack_authority"]),
         canonical_warnings=[_error_entry_to_dict(e) for e in warnings],
         canonical_blockers=[_error_entry_to_dict(e) for e in blockers],
         deferred_capabilities=DEFERRED_CAPABILITIES,

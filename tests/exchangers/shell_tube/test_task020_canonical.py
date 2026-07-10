@@ -6,11 +6,8 @@ contract.
 
 from __future__ import annotations
 
-import pytest
-
 import hexagent.exchangers.shell_tube as st
 from hexagent.exchangers.shell_tube import canonical
-
 
 SHA_PAYLOAD = "a" * 64
 SHA_DOMAIN = "b" * 64
@@ -51,20 +48,14 @@ class TestDeterminism:
         result2 = st.validate_request(_make_request())
         assert result1.configuration is not None
         assert result2.configuration is not None
-        assert (
-            result1.configuration.configuration_hash
-            == result2.configuration.configuration_hash
-        )
+        assert result1.configuration.configuration_hash == result2.configuration.configuration_hash
 
     def test_same_input_same_id(self) -> None:
         result1 = st.validate_request(_make_request())
         result2 = st.validate_request(_make_request())
         assert result1.configuration is not None
         assert result2.configuration is not None
-        assert (
-            result1.configuration.configuration_id
-            == result2.configuration.configuration_id
-        )
+        assert result1.configuration.configuration_id == result2.configuration.configuration_id
 
     def test_dict_key_order_independence(self) -> None:
         result1 = st.validate_request(_make_request())
@@ -82,34 +73,21 @@ class TestDeterminism:
         result2 = st.validate_request(reordered)
         assert result1.configuration is not None
         assert result2.configuration is not None
-        assert (
-            result1.configuration.configuration_hash
-            == result2.configuration.configuration_hash
-        )
+        assert result1.configuration.configuration_hash == result2.configuration.configuration_hash
 
     def test_status_change_changes_hash(self) -> None:
-        result1 = st.validate_request(
-            _make_request(orientation="HORIZONTAL")
-        )
-        result2 = st.validate_request(
-            _make_request(orientation="VERTICAL")
-        )
+        result1 = st.validate_request(_make_request(orientation="HORIZONTAL"))
+        result2 = st.validate_request(_make_request(orientation="VERTICAL"))
         assert result1.configuration is not None
         assert result2.configuration is not None
-        assert (
-            result1.configuration.configuration_hash
-            != result2.configuration.configuration_hash
-        )
+        assert result1.configuration.configuration_hash != result2.configuration.configuration_hash
 
     def test_pass_count_change_changes_hash(self) -> None:
         result1 = st.validate_request(_make_request(shell_pass_count=1))
         result2 = st.validate_request(_make_request(shell_pass_count=2))
         assert result1.configuration is not None
         assert result2.configuration is not None
-        assert (
-            result1.configuration.configuration_hash
-            != result2.configuration.configuration_hash
-        )
+        assert result1.configuration.configuration_hash != result2.configuration.configuration_hash
 
 
 class TestHashFormat:
@@ -152,13 +130,13 @@ class TestCanonicalization:
         # Sort is by Unicode code-point order; ``.`` (0x2E) sorts
         # before digits (0x30..0x39), so we use only digits and
         # letters to make the order trivially predictable.
-        result = st.validate_request(
-            _make_request(evidence_refs=["ref-c", "ref-a", "ref-b"])
-        )
+        result = st.validate_request(_make_request(evidence_refs=["ref-c", "ref-a", "ref-b"]))
         assert result.configuration is not None
-        assert list(
-            result.configuration.authority_binding.case_authority_evidence_refs
-        ) == ["ref-a", "ref-b", "ref-c"]
+        assert list(result.configuration.authority_binding.case_authority_evidence_refs) == [
+            "ref-a",
+            "ref-b",
+            "ref-c",
+        ]
 
     def test_canonicalization_drops_id_and_hash(self) -> None:
         """§11.2 exclusion list — configuration_id and configuration_hash
@@ -169,10 +147,6 @@ class TestCanonicalization:
         # payload should not — recomputing the hash with
         # configuration_id and configuration_hash in the payload
         # would change the hash.
-        from hexagent.exchangers.shell_tube.canonical import (
-            canonical_payload,
-            configuration_hash,
-        )
 
         # The validation pipeline exposes the canonical payload
         # indirectly via the configuration hash. We assert the
@@ -181,10 +155,7 @@ class TestCanonicalization:
         # canonicalizer).
         result2 = st.validate_request(_make_request())
         assert result2.configuration is not None
-        assert (
-            result.configuration.configuration_hash
-            == result2.configuration.configuration_hash
-        )
+        assert result.configuration.configuration_hash == result2.configuration.configuration_hash
 
     def test_token_lowercase_normalized_then_hash_stable(self) -> None:
         result1 = st.validate_request(_make_request(front_head_token="front"))
@@ -193,7 +164,4 @@ class TestCanonicalization:
         assert result2.configuration is not None
         # Both must produce the same hash because the canonicalizer
         # normalizes tokens to uppercase before hashing.
-        assert (
-            result1.configuration.configuration_hash
-            == result2.configuration.configuration_hash
-        )
+        assert result1.configuration.configuration_hash == result2.configuration.configuration_hash

@@ -31,8 +31,8 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from typing import Any, Iterable, Mapping, Optional
-
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 # §11.3 — Frozen UUIDv5 namespace seed
 UUID_NAMESPACE_URL = uuid.UUID("00000000-0000-0000-0000-000000000000")  # placeholder
@@ -104,7 +104,7 @@ def sort_evidence_refs(refs: Iterable[str]) -> tuple[str, ...]:
     return tuple(sorted(refs))
 
 
-def sort_details_keys(details: Optional[Mapping[str, Any]]) -> Optional[dict[str, Any]]:
+def sort_details_keys(details: Mapping[str, Any] | None) -> dict[str, Any] | None:
     """Return ``details`` with keys in lexicographic Unicode code-point order.
 
     ``None`` is returned for ``None`` input. Per §10.4 lines 921–923
@@ -159,7 +159,7 @@ def canonical_payload(
     configuration: Mapping[str, Any],
     *,
     case_authority: Mapping[str, Any],
-    evaluated_rule_pack_authority: Optional[Mapping[str, Any]],
+    evaluated_rule_pack_authority: Mapping[str, Any] | None,
     canonical_warnings: Iterable[Mapping[str, Any]],
     canonical_blockers: Iterable[Mapping[str, Any]],
     deferred_capabilities: Iterable[str],
@@ -228,7 +228,7 @@ def configuration_id(configuration_hash_hex: str) -> str:
 def blocked_result_identity(
     *,
     case_revision_authority: Mapping[str, Any],
-    requested_rule_pack_identity: Optional[Mapping[str, Any]],
+    requested_rule_pack_identity: Mapping[str, Any] | None,
     selected_rule_authorities: Iterable[Mapping[str, Any]],
     canonical_blockers: Iterable[Mapping[str, Any]],
     schema_version: str,
@@ -252,9 +252,7 @@ def blocked_result_identity(
         "selected_rule_authorities": [
             _canonical_value(dict(sra)) for sra in selected_rule_authorities
         ],
-        "canonical_blockers": [
-            _canonical_value(dict(b)) for b in canonical_blockers
-        ],
+        "canonical_blockers": [_canonical_value(dict(b)) for b in canonical_blockers],
         "schema_version": schema_version,
         "output_schema_version": output_schema_version,
     }

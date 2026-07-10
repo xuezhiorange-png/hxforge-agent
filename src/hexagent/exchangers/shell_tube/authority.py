@@ -35,10 +35,10 @@ Public surface
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping, Optional
 
 from hexagent.exchangers.shell_tube.errors import BlockerError
 from hexagent.exchangers.shell_tube.models import (
+    TASK_020_ACCEPTED_LIFECYCLE_VALUES,
     AuthorityMode,
     CaseRevisionAuthority,
     CaseRevisionStatus,
@@ -46,9 +46,7 @@ from hexagent.exchangers.shell_tube.models import (
     EvaluatedRulePackAuthority,
     RequestedRulePackIdentity,
     SelectedRuleAuthority,
-    TASK_020_ACCEPTED_LIFECYCLE_VALUES,
 )
-
 
 # ---------------------------------------------------------------------------
 # Hash / ID / evidence_refs format patterns (frozen at §7.3 / §8.2 / §11.3)
@@ -127,9 +125,7 @@ def from_case_revision_payload(
     if not is_valid_sha256_hex(payload_hash):
         raise BlockerError("STC_CASE_PAYLOAD_HASH_INVALID", str(payload_hash))
     if not is_valid_sha256_hex(domain_snapshot_hash):
-        raise BlockerError(
-            "STC_CASE_DOMAIN_SNAPSHOT_HASH_INVALID", str(domain_snapshot_hash)
-        )
+        raise BlockerError("STC_CASE_DOMAIN_SNAPSHOT_HASH_INVALID", str(domain_snapshot_hash))
     if status not in TASK_020_ACCEPTED_LIFECYCLE_VALUES:
         raise BlockerError("STC_CASE_REVISION_STATUS_BLOCKED", str(status))
     return CaseRevisionAuthority(
@@ -169,13 +165,9 @@ def from_requested_rule_pack_identity(
     if not isinstance(rule_pack_id, str) or not rule_pack_id:
         raise BlockerError("STC_RULE_PACK_NOT_FOUND", str(rule_pack_id))
     if not isinstance(rule_pack_version, str) or not rule_pack_version:
-        raise BlockerError(
-            "STC_REQUESTED_RULE_PACK_IDENTITY_MISSING", str(rule_pack_version)
-        )
+        raise BlockerError("STC_REQUESTED_RULE_PACK_IDENTITY_MISSING", str(rule_pack_version))
     if not is_valid_sha256_hex(rule_pack_canonical_hash):
-        raise BlockerError(
-            "STC_RULE_PACK_CANONICAL_HASH_MISMATCH", str(rule_pack_canonical_hash)
-        )
+        raise BlockerError("STC_RULE_PACK_CANONICAL_HASH_MISMATCH", str(rule_pack_canonical_hash))
     return RequestedRulePackIdentity(
         rule_pack_id=rule_pack_id,
         rule_pack_version=rule_pack_version,
@@ -191,8 +183,8 @@ def from_requested_rule_pack_identity(
 def bind_request_to_configuration_authority(
     request_authority_mode: AuthorityMode,
     case_authority: CaseRevisionAuthority,
-    standard_system_id: Optional[str],
-    evaluated_rule_pack_authority: Optional[EvaluatedRulePackAuthority],
+    standard_system_id: str | None,
+    evaluated_rule_pack_authority: EvaluatedRulePackAuthority | None,
     *,
     case_authority_evidence_refs: tuple[str, ...] = (),
 ) -> ConfigurationAuthorityBinding:
@@ -267,12 +259,8 @@ def finalize_selected_rule_authority(
         source_class=item.source_class,
         license_evidence=item.license_evidence,
         approval_status=item.approval_status,
-        provenance_edge_ids=tuple(
-            sorted({edge_id for edge_id in item.provenance_edge_ids})
-        ),
-        evidence_refs=tuple(
-            sorted({evidence_ref for evidence_ref in item.evidence_refs})
-        ),
+        provenance_edge_ids=tuple(sorted({edge_id for edge_id in item.provenance_edge_ids})),
+        evidence_refs=tuple(sorted({evidence_ref for evidence_ref in item.evidence_refs})),
     )
 
 

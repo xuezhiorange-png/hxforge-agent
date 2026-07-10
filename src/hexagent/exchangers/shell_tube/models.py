@@ -43,16 +43,16 @@ Forbiddens (P1-1, P1-2, P1-3)
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any, Mapping, Optional
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # §6.1 — Authority modes
 # ---------------------------------------------------------------------------
 
 
-class AuthorityMode(str, enum.Enum):
+class AuthorityMode(enum.StrEnum):
     """§6.1 — Closed set of authority modes."""
 
     INTERNAL_GENERIC = "INTERNAL_GENERIC"
@@ -64,7 +64,7 @@ class AuthorityMode(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 
-class ConstructionFamily(str, enum.Enum):
+class ConstructionFamily(enum.StrEnum):
     """§7.1 — Closed internal construction-family set."""
 
     FIXED_TUBESHEET = "FIXED_TUBESHEET"
@@ -77,7 +77,7 @@ class ConstructionFamily(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 
-class Orientation(str, enum.Enum):
+class Orientation(enum.StrEnum):
     """§7.2 — Closed orientation set."""
 
     HORIZONTAL = "HORIZONTAL"
@@ -90,7 +90,7 @@ class Orientation(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 
-class EquipmentFamily(str, enum.Enum):
+class EquipmentFamily(enum.StrEnum):
     """§9.1 — Single allowed value for TASK-020 is ``SHELL_AND_TUBE``."""
 
     SHELL_AND_TUBE = "SHELL_AND_TUBE"
@@ -101,7 +101,7 @@ class EquipmentFamily(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 
-class StandardClaimStatus(str, enum.Enum):
+class StandardClaimStatus(enum.StrEnum):
     """§9.1 — Standard claim status for the normalized configuration."""
 
     NO_STANDARD_CLAIM = "NO_STANDARD_CLAIM"
@@ -113,7 +113,7 @@ class StandardClaimStatus(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 
-class ValidationStatus(str, enum.Enum):
+class ValidationStatus(enum.StrEnum):
     """§7.7 — The status of a configuration validation result."""
 
     VALID = "VALID"
@@ -135,7 +135,7 @@ TASK_020_ACCEPTED_LIFECYCLE_VALUES: frozenset[str] = frozenset(
 )
 
 
-class CaseRevisionStatus(str, enum.Enum):
+class CaseRevisionStatus(enum.StrEnum):
     """Subset of TASK-014 lifecycle values that TASK-020 accepts."""
 
     COMMITTED = "committed"
@@ -251,9 +251,7 @@ class EvaluatedRulePackAuthority:
     rule_pack_version: str
     rule_pack_canonical_hash: str
     validation_status: str
-    selected_rule_authorities: tuple[SelectedRuleAuthority, ...] = field(
-        default_factory=tuple
-    )
+    selected_rule_authorities: tuple[SelectedRuleAuthority, ...] = field(default_factory=tuple)
 
 
 # ---------------------------------------------------------------------------
@@ -272,9 +270,9 @@ class ConfigurationAuthorityBinding:
     """
 
     authority_mode: AuthorityMode
-    standard_system_id: Optional[str]
+    standard_system_id: str | None
     case_authority: CaseRevisionAuthority
-    evaluated_rule_pack_authority: Optional[EvaluatedRulePackAuthority]
+    evaluated_rule_pack_authority: EvaluatedRulePackAuthority | None
     case_authority_evidence_refs: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -292,9 +290,9 @@ class ComponentTokens:
     to the core schema; semantic authority comes from the rule pack.
     """
 
-    front_head: Optional[str]
-    shell: Optional[str]
-    rear_head: Optional[str]
+    front_head: str | None
+    shell: str | None
+    rear_head: str | None
 
 
 # ---------------------------------------------------------------------------
@@ -319,8 +317,8 @@ class ShellAndTubeConfigurationRequest:
     shell_pass_count: int
     tube_pass_count: int
     component_tokens: ComponentTokens
-    standard_system_id: Optional[str]
-    requested_rule_pack_identity: Optional[RequestedRulePackIdentity]
+    standard_system_id: str | None
+    requested_rule_pack_identity: RequestedRulePackIdentity | None
     evidence_refs: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -368,11 +366,9 @@ class ShellAndTubeConfiguration:
     component_tokens: ComponentTokens
     authority_binding: ConfigurationAuthorityBinding
     case_authority: CaseRevisionAuthority
-    warnings: tuple["ErrorEntry", ...] = field(default_factory=tuple)
-    blockers: tuple["ErrorEntry", ...] = field(default_factory=tuple)
-    deferred_capabilities: tuple[str, ...] = field(
-        default_factory=lambda: DEFERRED_CAPABILITIES
-    )
+    warnings: tuple[ErrorEntry, ...] = field(default_factory=tuple)
+    blockers: tuple[ErrorEntry, ...] = field(default_factory=tuple)
+    deferred_capabilities: tuple[str, ...] = field(default_factory=lambda: DEFERRED_CAPABILITIES)
 
 
 # ---------------------------------------------------------------------------
@@ -390,10 +386,10 @@ class ErrorEntry:
     """
 
     code: str
-    field_path: Optional[str]
+    field_path: str | None
     message_key: str
     evidence_refs: tuple[str, ...] = field(default_factory=tuple)
-    details: Optional[Mapping[str, Any]] = None
+    details: Mapping[str, Any] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -410,12 +406,10 @@ class ConfigurationValidationResult:
     """
 
     status: ValidationStatus
-    configuration: Optional[ShellAndTubeConfiguration] = None
+    configuration: ShellAndTubeConfiguration | None = None
     warnings: tuple[ErrorEntry, ...] = field(default_factory=tuple)
     blockers: tuple[ErrorEntry, ...] = field(default_factory=tuple)
-    deferred_capabilities: tuple[str, ...] = field(
-        default_factory=lambda: DEFERRED_CAPABILITIES
-    )
+    deferred_capabilities: tuple[str, ...] = field(default_factory=lambda: DEFERRED_CAPABILITIES)
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +417,7 @@ class ConfigurationValidationResult:
 # ---------------------------------------------------------------------------
 
 
-class BlockerCode(str, enum.Enum):
+class BlockerCode(enum.StrEnum):
     """§10.2 — Closed set of TASK-020 blocker codes.
 
     Only codes that the validation pipeline is allowed to emit. Any
@@ -451,15 +445,9 @@ class BlockerCode(str, enum.Enum):
     STC_RULE_PACK_REQUIRED = "STC_RULE_PACK_REQUIRED"
     STC_RULE_PACK_NOT_FOUND = "STC_RULE_PACK_NOT_FOUND"
     STC_RULE_PACK_VALIDATION_FAILED = "STC_RULE_PACK_VALIDATION_FAILED"
-    STC_RULE_PACK_VALIDATION_REPORT_MISMATCH = (
-        "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
-    )
-    STC_REQUESTED_RULE_PACK_IDENTITY_MISSING = (
-        "STC_REQUESTED_RULE_PACK_IDENTITY_MISSING"
-    )
-    STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH = (
-        "STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH"
-    )
+    STC_RULE_PACK_VALIDATION_REPORT_MISMATCH = "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+    STC_REQUESTED_RULE_PACK_IDENTITY_MISSING = "STC_REQUESTED_RULE_PACK_IDENTITY_MISSING"
+    STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH = "STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH"
     STC_RULE_PACK_CANONICAL_HASH_MISMATCH = "STC_RULE_PACK_CANONICAL_HASH_MISMATCH"
     STC_REQUIRED_RULE_MISSING = "STC_REQUIRED_RULE_MISSING"
     STC_RULE_UNAPPROVED = "STC_RULE_UNAPPROVED"
@@ -472,9 +460,7 @@ class BlockerCode(str, enum.Enum):
     STC_RULE_CONSTRAINT_MISSING = "STC_RULE_CONSTRAINT_MISSING"
     STC_RULE_NORMALIZATION_CONFLICT = "STC_RULE_NORMALIZATION_CONFLICT"
     STC_RULE_RANGE_INTERSECTION_EMPTY = "STC_RULE_RANGE_INTERSECTION_EMPTY"
-    STC_RULE_ORIENTATION_INTERSECTION_EMPTY = (
-        "STC_RULE_ORIENTATION_INTERSECTION_EMPTY"
-    )
+    STC_RULE_ORIENTATION_INTERSECTION_EMPTY = "STC_RULE_ORIENTATION_INTERSECTION_EMPTY"
     STC_RULE_TOKEN_INTERSECTION_EMPTY = "STC_RULE_TOKEN_INTERSECTION_EMPTY"
     STC_RULE_SLOT_NULLABLE_MISSING = "STC_RULE_SLOT_NULLABLE_MISSING"
     STC_TOKEN_UNSUPPORTED_BY_RULE_PACK = "STC_TOKEN_UNSUPPORTED_BY_RULE_PACK"
@@ -483,15 +469,11 @@ class BlockerCode(str, enum.Enum):
     STC_CANONICALIZATION_FAILED = "STC_CANONICALIZATION_FAILED"
 
 
-class WarningCode(str, enum.Enum):
+class WarningCode(enum.StrEnum):
     """§10.3 — Closed set of TASK-020 warning codes."""
 
-    STC_GENERIC_CONFIGURATION_NO_STANDARD_CLAIM = (
-        "STC_GENERIC_CONFIGURATION_NO_STANDARD_CLAIM"
-    )
-    STC_RESTRICTED_STANDARD_METADATA_ONLY = (
-        "STC_RESTRICTED_STANDARD_METADATA_ONLY"
-    )
+    STC_GENERIC_CONFIGURATION_NO_STANDARD_CLAIM = "STC_GENERIC_CONFIGURATION_NO_STANDARD_CLAIM"
+    STC_RESTRICTED_STANDARD_METADATA_ONLY = "STC_RESTRICTED_STANDARD_METADATA_ONLY"
     STC_ORIENTATION_UNSPECIFIED = "STC_ORIENTATION_UNSPECIFIED"
 
 

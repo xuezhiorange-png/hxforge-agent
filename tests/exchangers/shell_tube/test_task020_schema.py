@@ -12,7 +12,6 @@ import pytest
 
 import hexagent.exchangers.shell_tube as st
 
-
 # ---------------------------------------------------------------------------
 # Test fixtures
 # ---------------------------------------------------------------------------
@@ -67,23 +66,17 @@ class TestSchemaVersion:
             _make_request(schema_version="task020.configuration-request.v2")
         )
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_SCHEMA_VERSION_UNSUPPORTED" for b in result.blockers
-        )
+        assert any(b.code == "STC_SCHEMA_VERSION_UNSUPPORTED" for b in result.blockers)
 
     def test_missing_schema_version_blocked(self) -> None:
         result = st.validate_request(_make_request(schema_version=""))
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_SCHEMA_VERSION_UNSUPPORTED" for b in result.blockers
-        )
+        assert any(b.code == "STC_SCHEMA_VERSION_UNSUPPORTED" for b in result.blockers)
 
 
 class TestUnknownField:
     def test_unknown_top_level_field_blocked(self) -> None:
-        result = st.validate_request(
-            _make_request(unexpected_field="boom")
-        )
+        result = st.validate_request(_make_request(unexpected_field="boom"))
         assert result.status.value == "BLOCKED"
         assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
 
@@ -103,23 +96,17 @@ class TestUnknownField:
         assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
 
     def test_legacy_evaluated_rule_pack_authority_blocked(self) -> None:
-        result = st.validate_request(
-            _make_request(evaluated_rule_pack_authority={"foo": "bar"})
-        )
+        result = st.validate_request(_make_request(evaluated_rule_pack_authority={"foo": "bar"}))
         assert result.status.value == "BLOCKED"
         assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
 
     def test_legacy_selected_rule_ids_blocked(self) -> None:
-        result = st.validate_request(
-            _make_request(selected_rule_ids=["rule-a"])
-        )
+        result = st.validate_request(_make_request(selected_rule_ids=["rule-a"]))
         assert result.status.value == "BLOCKED"
         assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
 
     def test_legacy_selected_rule_artifact_hashes_blocked(self) -> None:
-        result = st.validate_request(
-            _make_request(selected_rule_artifact_hashes=[SHA_RULE_PACK])
-        )
+        result = st.validate_request(_make_request(selected_rule_artifact_hashes=[SHA_RULE_PACK]))
         assert result.status.value == "BLOCKED"
         assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
 
@@ -148,9 +135,7 @@ class TestCaseAuthority:
         request["case_authority"]["revision_id"] = ""
         result = st.validate_request(request)
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_CASE_REVISION_ID_MISSING" for b in result.blockers
-        )
+        assert any(b.code == "STC_CASE_REVISION_ID_MISSING" for b in result.blockers)
 
     def test_case_authority_payload_hash_invalid_blocked(self) -> None:
         request = _make_request()
@@ -158,9 +143,7 @@ class TestCaseAuthority:
         request["case_authority"]["payload_hash"] = "not-hex"
         result = st.validate_request(request)
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_CASE_PAYLOAD_HASH_INVALID" for b in result.blockers
-        )
+        assert any(b.code == "STC_CASE_PAYLOAD_HASH_INVALID" for b in result.blockers)
 
     def test_case_authority_payload_hash_uppercase_blocked(self) -> None:
         request = _make_request()
@@ -168,9 +151,7 @@ class TestCaseAuthority:
         request["case_authority"]["payload_hash"] = SHA_PAYLOAD.upper()
         result = st.validate_request(request)
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_CASE_PAYLOAD_HASH_INVALID" for b in result.blockers
-        )
+        assert any(b.code == "STC_CASE_PAYLOAD_HASH_INVALID" for b in result.blockers)
 
     def test_case_authority_domain_snapshot_hash_invalid_blocked(self) -> None:
         request = _make_request()
@@ -178,10 +159,7 @@ class TestCaseAuthority:
         request["case_authority"]["domain_snapshot_hash"] = "x" * 63
         result = st.validate_request(request)
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_CASE_DOMAIN_SNAPSHOT_HASH_INVALID"
-            for b in result.blockers
-        )
+        assert any(b.code == "STC_CASE_DOMAIN_SNAPSHOT_HASH_INVALID" for b in result.blockers)
 
     @pytest.mark.parametrize(
         "status_value",
@@ -195,16 +173,10 @@ class TestCaseAuthority:
         request["case_authority"]["status"] = status_value
         result = st.validate_request(request)
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_CASE_REVISION_STATUS_BLOCKED" for b in result.blockers
-        )
+        assert any(b.code == "STC_CASE_REVISION_STATUS_BLOCKED" for b in result.blockers)
 
-    @pytest.mark.parametrize(
-        "status_value", ["committed", "superseded", "archived"]
-    )
-    def test_case_authority_status_accepted(
-        self, status_value: str
-    ) -> None:
+    @pytest.mark.parametrize("status_value", ["committed", "superseded", "archived"])
+    def test_case_authority_status_accepted(self, status_value: str) -> None:
         request = _make_request()
         request["case_authority"] = dict(VALID_CASE_AUTHORITY)
         request["case_authority"]["status"] = status_value
@@ -216,32 +188,22 @@ class TestEquipmentAndAuthority:
     def test_equipment_family_wrong_value_blocked(self) -> None:
         result = st.validate_request(_make_request(equipment_family="PLATE"))
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_EQUIPMENT_FAMILY_INVALID" for b in result.blockers
-        )
+        assert any(b.code == "STC_EQUIPMENT_FAMILY_INVALID" for b in result.blockers)
 
     def test_authority_mode_invalid_blocked(self) -> None:
         result = st.validate_request(_make_request(authority_mode="BOGUS"))
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_AUTHORITY_MODE_INVALID" for b in result.blockers
-        )
+        assert any(b.code == "STC_AUTHORITY_MODE_INVALID" for b in result.blockers)
 
     def test_construction_family_invalid_blocked(self) -> None:
-        result = st.validate_request(
-            _make_request(construction_family="UNKNOWN")
-        )
+        result = st.validate_request(_make_request(construction_family="UNKNOWN"))
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_CONSTRUCTION_FAMILY_INVALID" for b in result.blockers
-        )
+        assert any(b.code == "STC_CONSTRUCTION_FAMILY_INVALID" for b in result.blockers)
 
     def test_orientation_invalid_blocked(self) -> None:
         result = st.validate_request(_make_request(orientation="DIAGONAL"))
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_ORIENTATION_INVALID" for b in result.blockers
-        )
+        assert any(b.code == "STC_ORIENTATION_INVALID" for b in result.blockers)
 
     def test_orientation_unspecified_accepted(self) -> None:
         result = st.validate_request(_make_request(orientation="UNSPECIFIED"))
@@ -249,14 +211,10 @@ class TestEquipmentAndAuthority:
 
     @pytest.mark.parametrize("field", ["shell_pass_count", "tube_pass_count"])
     @pytest.mark.parametrize("bad_value", [0, -1])
-    def test_pass_count_invalid_blocked(
-        self, field: str, bad_value: int
-    ) -> None:
+    def test_pass_count_invalid_blocked(self, field: str, bad_value: int) -> None:
         result = st.validate_request(_make_request(**{field: bad_value}))
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_PASS_COUNT_INVALID" for b in result.blockers
-        )
+        assert any(b.code == "STC_PASS_COUNT_INVALID" for b in result.blockers)
 
     def test_approved_rule_pack_mode_emits_fail_closed_blocker(self) -> None:
         request = _make_request(
@@ -270,9 +228,7 @@ class TestEquipmentAndAuthority:
         )
         result = st.validate_request(request)
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_RULE_PACK_REQUIRED" for b in result.blockers
-        )
+        assert any(b.code == "STC_RULE_PACK_REQUIRED" for b in result.blockers)
         # Per §10.1: a blocked validation returns no configuration.
         assert result.configuration is None
 
@@ -293,9 +249,7 @@ class TestEquipmentAndAuthority:
 
 class TestStructuralTokens:
     def test_token_normalized_to_uppercase(self) -> None:
-        result = st.validate_request(
-            _make_request(front_head_token="front", shell_token="shell")
-        )
+        result = st.validate_request(_make_request(front_head_token="front", shell_token="shell"))
         assert result.status.value == "VALID"
         assert result.configuration is not None
         assert result.configuration.component_tokens.front_head == "FRONT"
@@ -336,9 +290,7 @@ class TestStructuralTokens:
             )
         )
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers
-        )
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
 
     def test_internal_generic_must_have_null_standard_system_id(self) -> None:
         result = st.validate_request(
@@ -348,21 +300,19 @@ class TestStructuralTokens:
             )
         )
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers
-        )
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
 
 
 class TestEvidenceRefs:
     def test_evidence_refs_sorted(self) -> None:
-        result = st.validate_request(
-            _make_request(evidence_refs=["ref-c", "ref-a", "ref-b"])
-        )
+        result = st.validate_request(_make_request(evidence_refs=["ref-c", "ref-a", "ref-b"]))
         assert result.status.value == "VALID"
         assert result.configuration is not None
-        assert list(
-            result.configuration.authority_binding.case_authority_evidence_refs
-        ) == ["ref-a", "ref-b", "ref-c"]
+        assert list(result.configuration.authority_binding.case_authority_evidence_refs) == [
+            "ref-a",
+            "ref-b",
+            "ref-c",
+        ]
 
     def test_evidence_refs_empty_accepted(self) -> None:
         result = st.validate_request(_make_request(evidence_refs=[]))
@@ -371,6 +321,4 @@ class TestEvidenceRefs:
     def test_evidence_refs_wrong_type_blocked(self) -> None:
         result = st.validate_request(_make_request(evidence_refs="not-a-list"))
         assert result.status.value == "BLOCKED"
-        assert any(
-            b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers
-        )
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)

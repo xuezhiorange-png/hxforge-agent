@@ -14,8 +14,6 @@ subclasses so that the validation layer can convert them into stable
 
 from __future__ import annotations
 
-import enum
-
 from hexagent.exchangers.shell_tube.models import (
     BlockerCode,
     WarningCode,

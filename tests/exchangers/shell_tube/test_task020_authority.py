@@ -6,9 +6,10 @@ any rule pack; rule-pack loading is Slice B.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
-import hexagent.exchangers.shell_tube as st
 from hexagent.exchangers.shell_tube.authority import (
     bind_request_to_configuration_authority,
     finalize_selected_rule_authority,
@@ -21,14 +22,9 @@ from hexagent.exchangers.shell_tube.authority import (
 from hexagent.exchangers.shell_tube.errors import BlockerError
 from hexagent.exchangers.shell_tube.models import (
     AuthorityMode,
-    CaseRevisionAuthority,
     CaseRevisionStatus,
-    ConfigurationAuthorityBinding,
-    EvaluatedRulePackAuthority,
-    RequestedRulePackIdentity,
     SelectedRuleAuthority,
 )
-
 
 SHA_PAYLOAD = "a" * 64
 SHA_DOMAIN = "b" * 64
@@ -126,12 +122,8 @@ class TestCaseRevisionAuthorityFactory:
             )
         assert exc_info.value.code == "STC_CASE_REVISION_STATUS_BLOCKED"
 
-    @pytest.mark.parametrize(
-        "status_value", ["committed", "superseded", "archived"]
-    )
-    def test_status_in_acceptance_subset_accepted(
-        self, status_value: str
-    ) -> None:
+    @pytest.mark.parametrize("status_value", ["committed", "superseded", "archived"])
+    def test_status_in_acceptance_subset_accepted(self, status_value: str) -> None:
         from_case_revision_payload(
             revision_id="rev-001",
             payload_hash=SHA_PAYLOAD,
@@ -201,7 +193,7 @@ class TestConfigurationAuthorityBinding:
             standard_system_id=None,
             evaluated_rule_pack_authority=None,
         )
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             binding.authority_mode = AuthorityMode.APPROVED_RULE_PACK  # type: ignore[misc]
 
 
@@ -305,7 +297,7 @@ class TestNoRulePackLoading:
         # import; this is a structural test, not a behavioral one.
         source_path = auth.__file__
         assert source_path is not None
-        with open(source_path, "r", encoding="utf-8") as fh:
+        with open(source_path, encoding="utf-8") as fh:
             source = fh.read()
         assert "hexagent.rule_packs" not in source
         assert "from hexagent.rule_packs" not in source

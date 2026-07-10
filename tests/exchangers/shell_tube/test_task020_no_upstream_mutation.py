@@ -4,14 +4,11 @@ Asserts that the TASK-020 Slice A implementation does not modify any
 frozen TASK-001..TASK-019 contract file. Pattern mirrors
 ``tests/validation_report/test_no_upstream_mutation.py``.
 
-This test is run as part of the local pytest suite only. CI registration
-is DEFERRED per the round's scope (per Charles's explicit "ci-shard-manifest.yml out of scope" instruction).
+CI registration: registered in the ``ci`` shard as part of the
+PR #127 CI corrective round.
 """
 
 from __future__ import annotations
-
-from pathlib import Path
-
 
 # 19 frozen contract files (per TASK-019 frozen design §9.1)
 FROZEN_CONTRACT_PATHS: list[str] = [
@@ -59,7 +56,7 @@ def test_no_frozen_task_doc_modified_by_this_module() -> None:
     for module in new_modules:
         source_path = module.__file__
         assert source_path is not None
-        with open(source_path, "r", encoding="utf-8") as fh:
+        with open(source_path, encoding="utf-8") as fh:
             source = fh.read()
         for frozen_path in FROZEN_CONTRACT_PATHS:
             # The TASK-020 implementation may mention frozen
@@ -103,12 +100,11 @@ def test_no_production_module_modification_outside_shell_tube() -> None:
     for module in new_modules:
         source_path = module.__file__
         assert source_path is not None
-        with open(source_path, "r", encoding="utf-8") as fh:
+        with open(source_path, encoding="utf-8") as fh:
             source = fh.read()
         for forbidden in forbidden_module_targets:
             assert (
-                f"from {forbidden} import" not in source
-                and f"import {forbidden}" not in source
+                f"from {forbidden} import" not in source and f"import {forbidden}" not in source
             ), f"module {module.__name__} imports {forbidden}"
 
 
@@ -143,7 +139,7 @@ def test_no_migrations_or_workflow_modification() -> None:
     for module in new_modules:
         source_path = module.__file__
         assert source_path is not None
-        with open(source_path, "r", encoding="utf-8") as fh:
+        with open(source_path, encoding="utf-8") as fh:
             source = fh.read()
         for forbidden in forbidden_file_targets:
             # Look for actual file write patterns, not bare mentions.

@@ -22,31 +22,22 @@ Slice B (rule-pack evaluation) is **not** implemented here. The
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 from hexagent.exchangers.shell_tube.authority import (
     is_valid_structural_token,
 )
-from hexagent.exchangers.shell_tube.errors import BlockerError, WarningSignal
+from hexagent.exchangers.shell_tube.errors import BlockerError
 from hexagent.exchangers.shell_tube.models import (
+    DEFERRED_CAPABILITIES,
     AuthorityMode,
     BlockerCode,
-    CaseRevisionAuthority,
-    ConfigurationAuthorityBinding,
-    ConfigurationValidationResult,
     ConstructionFamily,
-    DEFERRED_CAPABILITIES,
     EquipmentFamily,
-    ErrorEntry,
     Orientation,
     RequestedRulePackIdentity,
-    ShellAndTubeConfiguration,
-    ShellAndTubeConfigurationRequest,
-    StandardClaimStatus,
-    ValidationStatus,
-    WarningCode,
 )
-
 
 # ---------------------------------------------------------------------------
 # §8.1 — schema version + forbidden fields
@@ -70,7 +61,7 @@ def _check_unknown_fields(
     allowed_fields: frozenset[str],
 ) -> None:
     """Emit STC_UNKNOWN_FIELD for any payload key not in ``allowed_fields`` (§8.1)."""
-    for key in payload.keys():
+    for key in payload:
         if key not in allowed_fields:
             raise BlockerError(
                 BlockerCode.STC_UNKNOWN_FIELD.value,
@@ -130,7 +121,7 @@ def _check_request_forbidden_fields(payload: Mapping[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def normalize_token(raw: Optional[str]) -> Optional[str]:
+def normalize_token(raw: str | None) -> str | None:
     """Normalize a structural component token per §8.2.
 
     1. trimmed
@@ -161,8 +152,8 @@ def normalize_token(raw: Optional[str]) -> Optional[str]:
 
 def check_authority_mode_consistency(
     authority_mode: AuthorityMode,
-    requested_rule_pack_identity: Optional[RequestedRulePackIdentity],
-    standard_system_id: Optional[str],
+    requested_rule_pack_identity: RequestedRulePackIdentity | None,
+    standard_system_id: str | None,
 ) -> None:
     """Enforce §8.3 authority-mode consistency.
 
@@ -203,9 +194,7 @@ def check_authority_mode_consistency(
                 "APPROVED_RULE_PACK requires standard_system_id",
             )
     else:  # pragma: no cover - AuthorityMode is a closed enum
-        raise BlockerError(
-            BlockerCode.STC_AUTHORITY_MODE_INVALID.value, str(authority_mode)
-        )
+        raise BlockerError(BlockerCode.STC_AUTHORITY_MODE_INVALID.value, str(authority_mode))
 
 
 # ---------------------------------------------------------------------------
@@ -215,30 +204,22 @@ def check_authority_mode_consistency(
 
 def check_equipment_family(value: Any) -> None:
     if not isinstance(value, EquipmentFamily) or value != EquipmentFamily.SHELL_AND_TUBE:
-        raise BlockerError(
-            BlockerCode.STC_EQUIPMENT_FAMILY_INVALID.value, str(value)
-        )
+        raise BlockerError(BlockerCode.STC_EQUIPMENT_FAMILY_INVALID.value, str(value))
 
 
 def check_authority_mode(value: Any) -> None:
     if not isinstance(value, AuthorityMode):
-        raise BlockerError(
-            BlockerCode.STC_AUTHORITY_MODE_INVALID.value, str(value)
-        )
+        raise BlockerError(BlockerCode.STC_AUTHORITY_MODE_INVALID.value, str(value))
 
 
 def check_construction_family(value: Any) -> None:
     if not isinstance(value, ConstructionFamily):
-        raise BlockerError(
-            BlockerCode.STC_CONSTRUCTION_FAMILY_INVALID.value, str(value)
-        )
+        raise BlockerError(BlockerCode.STC_CONSTRUCTION_FAMILY_INVALID.value, str(value))
 
 
 def check_orientation(value: Any) -> None:
     if not isinstance(value, Orientation):
-        raise BlockerError(
-            BlockerCode.STC_ORIENTATION_INVALID.value, str(value)
-        )
+        raise BlockerError(BlockerCode.STC_ORIENTATION_INVALID.value, str(value))
 
 
 def check_pass_count(value: Any, *, field_name: str) -> None:
