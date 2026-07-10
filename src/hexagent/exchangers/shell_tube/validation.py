@@ -69,8 +69,58 @@ from hexagent.exchangers.shell_tube.schema import (
 # ---------------------------------------------------------------------------
 
 
+# §8.1 — Whitelist of allowed fields per nested object
+_CASE_AUTHORITY_ALLOWED_FIELDS: frozenset[str] = frozenset(
+    {
+        "revision_id",
+        "payload_hash",
+        "domain_snapshot_hash",
+        "status",
+    }
+)
+_REQUESTED_RULE_PACK_IDENTITY_ALLOWED_FIELDS: frozenset[str] = frozenset(
+    {
+        "rule_pack_id",
+        "rule_pack_version",
+        "rule_pack_canonical_hash",
+    }
+)
+
+
+def _require_str_field(
+    raw: Mapping[str, Any],
+    field_name: str,
+    *,
+    field_path: str,
+) -> str:
+    """Return ``raw[field_name]`` after strict ``str`` type check.
+
+    §8.1 — silent ``str()`` coercion is forbidden. The field MUST
+    be explicitly present in the mapping and MUST be a ``str``
+    instance. Otherwise raise ``STC_AUTHORITY_FIELDS_INCONSISTENT``
+    with a descriptive message.
+    """
+    if field_name not in raw:
+        raise errors.BlockerError(
+            "STC_AUTHORITY_FIELDS_INCONSISTENT",
+            f"{field_path}.{field_name}: missing",
+        )
+    value = raw[field_name]
+    if not isinstance(value, str):
+        raise errors.BlockerError(
+            "STC_AUTHORITY_FIELDS_INCONSISTENT",
+            f"{field_path}.{field_name}: expected str, got {type(value).__name__}",
+        )
+    return value
+
+
 def _parse_case_authority(payload: Mapping[str, Any]) -> CaseRevisionAuthority:
-    """Parse the ``case_authority`` sub-payload per §7.3 / §8.1."""
+    """Parse the ``case_authority`` sub-payload per §7.3 / §8.1.
+
+    Strict type checks: no silent ``str()`` coercion. Unknown
+    fields emit ``STC_UNKNOWN_FIELD``. Type mismatches emit
+    ``STC_AUTHORITY_FIELDS_INCONSISTENT``.
+    """
     if "case_authority" not in payload or payload["case_authority"] is None:
         raise errors.BlockerError("STC_CASE_AUTHORITY_MISSING", "case_authority required")
     raw = payload["case_authority"]
@@ -78,17 +128,37 @@ def _parse_case_authority(payload: Mapping[str, Any]) -> CaseRevisionAuthority:
         raise errors.BlockerError(
             "STC_AUTHORITY_FIELDS_INCONSISTENT", "case_authority must be mapping"
         )
+    # §8.1 — unknown fields (whitelist)
+    extra_fields = set(raw.keys()) - _CASE_AUTHORITY_ALLOWED_FIELDS
+    if extra_fields:
+        raise errors.BlockerError(
+            "STC_UNKNOWN_FIELD",
+            f"case_authority extra field(s): {sorted(extra_fields)}",
+        )
+    # §8.1 — strict type checks (no str() coercion)
+    revision_id = _require_str_field(raw, "revision_id", field_path="case_authority")
+    payload_hash = _require_str_field(raw, "payload_hash", field_path="case_authority")
+    domain_snapshot_hash = _require_str_field(
+        raw, "domain_snapshot_hash", field_path="case_authority"
+    )
+    status = _require_str_field(raw, "status", field_path="case_authority")
     return from_case_revision_payload(
-        revision_id=str(raw.get("revision_id", "")),
-        payload_hash=str(raw.get("payload_hash", "")),
-        domain_snapshot_hash=str(raw.get("domain_snapshot_hash", "")),
-        status=str(raw.get("status", "")),
+        revision_id=revision_id,
+        payload_hash=payload_hash,
+        domain_snapshot_hash=domain_snapshot_hash,
+        status=status,
     )
 
 
 def _parse_requested_rule_pack_identity(
     payload: Mapping[str, Any],
 ) -> RequestedRulePackIdentity | None:
+    """Parse the ``requested_rule_pack_identity`` sub-payload per §6.3.4 / §8.1.
+
+    Strict type checks: no silent ``str()`` coercion. Unknown
+    fields emit ``STC_UNKNOWN_FIELD``. Type mismatches emit
+    ``STC_AUTHORITY_FIELDS_INCONSISTENT``.
+    """
     if payload.get("requested_rule_pack_identity") is None:
         return None
     raw = payload["requested_rule_pack_identity"]
@@ -97,10 +167,27 @@ def _parse_requested_rule_pack_identity(
             "STC_REQUESTED_RULE_PACK_IDENTITY_MISSING",
             "requested_rule_pack_identity must be mapping",
         )
+    # §8.1 — unknown fields (whitelist)
+    extra_fields = set(raw.keys()) - _REQUESTED_RULE_PACK_IDENTITY_ALLOWED_FIELDS
+    if extra_fields:
+        raise errors.BlockerError(
+            "STC_UNKNOWN_FIELD",
+            f"requested_rule_pack_identity extra field(s): {sorted(extra_fields)}",
+        )
+    # §8.1 — strict type checks (no str() coercion)
+    rule_pack_id = _require_str_field(
+        raw, "rule_pack_id", field_path="requested_rule_pack_identity"
+    )
+    rule_pack_version = _require_str_field(
+        raw, "rule_pack_version", field_path="requested_rule_pack_identity"
+    )
+    rule_pack_canonical_hash = _require_str_field(
+        raw, "rule_pack_canonical_hash", field_path="requested_rule_pack_identity"
+    )
     return from_requested_rule_pack_identity(
-        rule_pack_id=str(raw.get("rule_pack_id", "")),
-        rule_pack_version=str(raw.get("rule_pack_version", "")),
-        rule_pack_canonical_hash=str(raw.get("rule_pack_canonical_hash", "")),
+        rule_pack_id=rule_pack_id,
+        rule_pack_version=rule_pack_version,
+        rule_pack_canonical_hash=rule_pack_canonical_hash,
     )
 
 
@@ -185,15 +272,29 @@ def _payload_to_request(
     )
 
     # §8.1 — evidence refs
-    raw_evidence = payload.get("evidence_refs", [])
-    if raw_evidence is None:
-        raw_evidence = []
+    # Per Fix 1: must be explicitly present in the request, must be
+    # a list, each element must be a str. No silent str() coercion
+    # on non-string elements, no defaulting to [] when missing.
+    if "evidence_refs" not in payload:
+        raise errors.BlockerError(
+            "STC_AUTHORITY_FIELDS_INCONSISTENT",
+            "evidence_refs: missing (must be explicitly present)",
+        )
+    raw_evidence = payload["evidence_refs"]
     if not isinstance(raw_evidence, list):
         raise errors.BlockerError(
             "STC_AUTHORITY_FIELDS_INCONSISTENT",
-            f"evidence_refs must be list, got {type(raw_evidence).__name__}",
+            f"evidence_refs: expected list, got {type(raw_evidence).__name__}",
         )
-    evidence_refs = canonical.sort_evidence_refs(str(ref) for ref in raw_evidence)
+    # Per-element strict str() check; no coercion of non-string
+    # elements.
+    for index, ref in enumerate(raw_evidence):
+        if not isinstance(ref, str):
+            raise errors.BlockerError(
+                "STC_AUTHORITY_FIELDS_INCONSISTENT",
+                f"evidence_refs[{index}]: expected str, got {type(ref).__name__}",
+            )
+    evidence_refs = canonical.sort_evidence_refs(raw_evidence)
 
     return ShellAndTubeConfigurationRequest(
         schema_version=schema_version,
@@ -230,31 +331,57 @@ def _error_entry_from_exception(exc: errors.ShellTubeError) -> ErrorEntry:
 def _canonicalize_error_entries(
     entries: list[ErrorEntry],
 ) -> tuple[ErrorEntry, ...]:
-    """Return ``entries`` sorted in §11.4 ascending order."""
-    sorted_dicts = canonical.sort_error_entries(
-        {
-            "code": e.code,
-            "field_path": e.field_path,
-            "message_key": e.message_key,
-            "evidence_refs": list(e.evidence_refs),
-            "details": e.details,
-        }
-        for e in entries
-    )
-    # Map back to ErrorEntry instances preserving the canonical order.
-    by_key = {
-        (
-            e.code,
-            e.field_path,
-            e.message_key,
-        ): e
-        for e in entries
-    }
-    out: list[ErrorEntry] = []
-    for d in sorted_dicts:
-        key = (d["code"], d["field_path"], d["message_key"])
-        out.append(by_key[key])
-    return tuple(out)
+    """Return ``entries`` sorted in §11.4 ascending order, complete.
+
+    Per Fix 3: every ``ErrorEntry`` is preserved as-is — entries
+    with the same ``(code, field_path, message_key)`` but different
+    ``details`` or ``evidence_refs`` MUST both be retained. Each
+    entry's ``evidence_refs`` is sorted in ascending Unicode
+    code-point order (§11.4). Each entry's ``details`` is
+    canonicalized (§11.2). The final tuple is sorted by the
+    composite 4-field key:
+
+    ``(code, field_path or "", message_key, canonical_details_hash)``
+    """
+    if not entries:
+        return ()
+
+    # Step 1 — per-entry canonicalization: build a new ErrorEntry
+    # with sorted evidence_refs and canonical details. This
+    # produces a stable, deterministic representation of each
+    # entry before sorting.
+    canonicalized: list[ErrorEntry] = []
+    for entry in entries:
+        sorted_evidence_refs = tuple(sorted(entry.evidence_refs))
+        if entry.details is None:
+            canonical_details: Mapping[str, Any] | None = None
+        else:
+            # Canonicalize the details mapping (sorts keys, recurses
+            # into nested values). The result is a dict with str keys
+            # and canonical values; the ErrorEntry dataclass accepts
+            # any Mapping[str, Any] | None.
+            canonical_details = canonical._canonical_value(dict(entry.details))
+        canonicalized.append(
+            ErrorEntry(
+                code=entry.code,
+                field_path=entry.field_path,
+                message_key=entry.message_key,
+                evidence_refs=sorted_evidence_refs,
+                details=canonical_details,
+            )
+        )
+
+    # Step 2 — sort by the frozen composite 4-field key. We do NOT
+    # merge entries that share the same 3-field key, because
+    # distinct ``details`` or ``evidence_refs`` produce distinct
+    # composite keys.
+    def sort_key(e: ErrorEntry) -> tuple[str, str, str, str]:
+        field_path = e.field_path if e.field_path is not None else ""
+        details = e.details if e.details is not None else {}
+        details_hash = canonical.configuration_hash(details)
+        return (e.code, field_path, e.message_key, details_hash)
+
+    return tuple(sorted(canonicalized, key=sort_key))
 
 
 # ---------------------------------------------------------------------------

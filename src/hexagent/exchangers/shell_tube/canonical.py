@@ -30,9 +30,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import uuid
 from collections.abc import Iterable, Mapping
 from typing import Any
+
+from hexagent.exchangers.shell_tube.errors import BlockerError
+from hexagent.exchangers.shell_tube.models import BlockerCode
 
 # §11.3 — Frozen UUIDv5 namespace seed
 UUID_NAMESPACE_URL = uuid.UUID("00000000-0000-0000-0000-000000000000")  # placeholder
@@ -50,14 +54,44 @@ URN_PREFIX = "urn:hxforge:task020:shell-and-tube-configuration:v1:"
 
 
 def _canonical_value(value: Any) -> Any:
-    """Coerce ``value`` into the §10.4 canonical form.
+    """Coerce ``value`` into the §10.4 canonical form, fail-closed (§11).
 
-    The ``details`` field of an ``ErrorEntry`` is restricted to JSON
-    primitives, arrays of values, or JSON objects whose keys are
-    sorted in lexicographic Unicode code-point order (§10.4 lines
-    916–923).
+    The allowed canonical value set is exactly:
+    - ``None``
+    - ``bool``
+    - ``int``
+    - finite ``float`` (NaN and ±Infinity are **rejected**)
+    - ``str``
+    - ``list`` / ``tuple`` of allowed values
+    - ``Mapping`` with ``str`` keys to allowed values
+
+    Any other value (``object()``, ``set``, ``bytes``, ``Decimal``,
+    ``datetime``, non-string mapping keys, etc.) raises
+    ``BlockerError(STC_CANONICALIZATION_FAILED)``.
+
+    The function MUST NOT mask unsupported values via
+    ``str(value)`` or ``repr(value)`` coercion. The single
+    exception is the §11.2 contract that finite floats are
+    serialized as their ``repr`` form for determinism; this is
+    the **only** ``repr``-based conversion in the canonicalizer.
     """
-    if value is None or isinstance(value, (bool, int, float, str)):
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if math.isnan(value):
+            raise BlockerError(
+                BlockerCode.STC_CANONICALIZATION_FAILED.value,
+                "NaN is not a valid canonical value",
+            )
+        if math.isinf(value):
+            raise BlockerError(
+                BlockerCode.STC_CANONICALIZATION_FAILED.value,
+                f"{'+' if value > 0 else '-'}Infinity is not a valid canonical value",
+            )
+        return repr(value)
+    if isinstance(value, str):
         return value
     if isinstance(value, (list, tuple)):
         return [_canonical_value(item) for item in value]
@@ -65,16 +99,19 @@ def _canonical_value(value: Any) -> Any:
         coerced: dict[str, Any] = {}
         for raw_key, raw_value in value.items():
             if not isinstance(raw_key, str):
-                # Only string keys are allowed by §10.4; non-string keys
-                # are encoded as a stable JSON-friendly form.
-                coerced[str(raw_key)] = _canonical_value(raw_value)
-            else:
-                coerced[raw_key] = _canonical_value(raw_value)
+                raise BlockerError(
+                    BlockerCode.STC_CANONICALIZATION_FAILED.value,
+                    f"non-string mapping key: {type(raw_key).__name__}",
+                )
+            coerced[raw_key] = _canonical_value(raw_value)
         # Sort by key (lexicographic Unicode code-point order).
         return {key: coerced[key] for key in sorted(coerced.keys())}
-    # Fallback: stringify via __repr__ to keep the canonical form
-    # deterministic across runs even for non-JSON-native objects.
-    return repr(value)
+    # Fail-closed: any other type (object, set, bytes, Decimal,
+    # datetime, custom classes, etc.) is NOT a valid canonical value.
+    raise BlockerError(
+        BlockerCode.STC_CANONICALIZATION_FAILED.value,
+        f"unsupported canonical value type: {type(value).__name__}",
+    )
 
 
 def _canonical_json(payload: Mapping[str, Any]) -> str:

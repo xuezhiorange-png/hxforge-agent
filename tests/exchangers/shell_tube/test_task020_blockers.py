@@ -8,6 +8,7 @@ shape.
 from __future__ import annotations
 
 import hexagent.exchangers.shell_tube as st
+from hexagent.exchangers.shell_tube.models import ErrorEntry
 
 SHA_PAYLOAD = "a" * 64
 SHA_DOMAIN = "b" * 64
@@ -193,3 +194,76 @@ class TestBlockersAreSorted:
         codes = [b.code for b in result.blockers]
         # Sorted ascending
         assert codes == sorted(codes)
+
+
+class TestErrorEntriesPreserved:
+    """Fix 3 — complete ``ErrorEntry`` objects are preserved.
+
+    Entries with the same ``(code, field_path, message_key)`` but
+    different ``details`` or ``evidence_refs`` MUST all be
+    retained. The final sort is stable by the composite 4-field
+    key ``(code, field_path or "", message_key, canonical_details_hash)``.
+    """
+
+    def _build_entries(self) -> list[ErrorEntry]:
+        return [
+            ErrorEntry(
+                code="STC_INVALID_REQUEST",
+                field_path="case_authorities[0].revision_id",
+                message_key="not_str",
+                evidence_refs=("ref-c", "ref-a", "ref-b"),  # unsorted input
+                details={"actual_type": "int"},
+            ),
+            ErrorEntry(
+                code="STC_INVALID_REQUEST",
+                field_path="case_authorities[0].revision_id",
+                message_key="not_str",
+                evidence_refs=("ref-c", "ref-a", "ref-b"),
+                details={"actual_type": "str"},  # DIFFERENT details
+            ),
+        ]
+
+    def test_distinct_details_preserved_for_same_signature(self) -> None:
+        from hexagent.exchangers.shell_tube.validation import _canonicalize_error_entries
+
+        entries = self._build_entries()
+        canonical = _canonicalize_error_entries(entries)
+        assert len(canonical) == 2
+        # Both entries preserved despite sharing the 3-field key.
+        details_set: set[tuple[tuple[str, str], ...]] = set()
+        for entry in canonical:
+            assert entry.details is not None
+            details_set.add(tuple(sorted(entry.details.items())))
+        assert details_set == {
+            (("actual_type", "int"),),
+            (("actual_type", "str"),),
+        }
+
+    def test_evidence_refs_sorted_unicode_codepoint(self) -> None:
+        from hexagent.exchangers.shell_tube.validation import _canonicalize_error_entries
+
+        entries = self._build_entries()
+        canonical = _canonicalize_error_entries(entries)
+        for entry in canonical:
+            assert entry.evidence_refs == ("ref-a", "ref-b", "ref-c")
+
+    def test_sort_stable_by_details_hash(self) -> None:
+        from hexagent.exchangers.shell_tube.validation import _canonicalize_error_entries
+
+        entries = self._build_entries()
+        canonical = _canonicalize_error_entries(entries)
+        # The two entries share (code, field_path, message_key), so
+        # their relative order is determined by canonical_details_hash.
+        # The "int" details hash and the "str" details hash differ;
+        # the order must be stable across repeated runs.
+        canonical_again = _canonicalize_error_entries(entries)
+        assert [e.details for e in canonical] == [e.details for e in canonical_again]
+        # Whichever details hash sorts first must be deterministic.
+        # We don't assert the specific order — just that the
+        # canonical sort produces a stable, deterministic ordering.
+        first, second = canonical
+        # Re-run the canonical sort and confirm identical order.
+        for _ in range(3):
+            again = _canonicalize_error_entries(entries)
+            assert again[0].details == first.details
+            assert again[1].details == second.details

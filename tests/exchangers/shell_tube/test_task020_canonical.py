@@ -6,7 +6,10 @@ contract.
 
 from __future__ import annotations
 
+import pytest
+
 import hexagent.exchangers.shell_tube as st
+import hexagent.exchangers.shell_tube.errors as errors
 from hexagent.exchangers.shell_tube import canonical
 
 SHA_PAYLOAD = "a" * 64
@@ -165,3 +168,84 @@ class TestCanonicalization:
         # Both must produce the same hash because the canonicalizer
         # normalizes tokens to uppercase before hashing.
         assert result1.configuration.configuration_hash == result2.configuration.configuration_hash
+
+
+class TestFailClosedCanonicalization:
+    """§11 — canonicalization fails closed for unsupported values.
+
+    Allowed canonical value set:
+    - ``None``
+    - ``bool``
+    - ``int``
+    - finite ``float``
+    - ``str``
+    - ``list`` / ``tuple`` of allowed values
+    - ``Mapping`` with ``str`` keys to allowed values
+
+    Every other input MUST raise ``BlockerError`` with
+    ``code == "STC_CANONICALIZATION_FAILED"``.
+    """
+
+    def test_object_rejected(self) -> None:
+        payload = {"x": object()}
+        with pytest.raises(errors.BlockerError) as exc_info:
+            canonical._canonical_value(payload)
+        assert exc_info.value.code == "STC_CANONICALIZATION_FAILED"
+
+    def test_set_rejected(self) -> None:
+        payload = {"x": {1, 2, 3}}
+        with pytest.raises(errors.BlockerError) as exc_info:
+            canonical._canonical_value(payload)
+        assert exc_info.value.code == "STC_CANONICALIZATION_FAILED"
+
+    def test_bytes_rejected(self) -> None:
+        payload = {"x": b"raw-bytes"}
+        with pytest.raises(errors.BlockerError) as exc_info:
+            canonical._canonical_value(payload)
+        assert exc_info.value.code == "STC_CANONICALIZATION_FAILED"
+
+    def test_non_string_mapping_key_rejected(self) -> None:
+        payload = {1: "value"}  # type: ignore[dict-item]
+        with pytest.raises(errors.BlockerError) as exc_info:
+            canonical._canonical_value(payload)
+        assert exc_info.value.code == "STC_CANONICALIZATION_FAILED"
+
+    def test_nan_rejected(self) -> None:
+        payload = {"x": float("nan")}
+        with pytest.raises(errors.BlockerError) as exc_info:
+            canonical._canonical_value(payload)
+        assert exc_info.value.code == "STC_CANONICALIZATION_FAILED"
+
+    def test_infinity_rejected(self) -> None:
+        payload = {"x": float("inf")}
+        with pytest.raises(errors.BlockerError) as exc_info:
+            canonical._canonical_value(payload)
+        assert exc_info.value.code == "STC_CANONICALIZATION_FAILED"
+
+    def test_negative_infinity_rejected(self) -> None:
+        payload = {"x": float("-inf")}
+        with pytest.raises(errors.BlockerError) as exc_info:
+            canonical._canonical_value(payload)
+        assert exc_info.value.code == "STC_CANONICALIZATION_FAILED"
+
+    def test_nested_unsupported_value_rejected(self) -> None:
+        payload = {"outer": {"inner": object()}}
+        with pytest.raises(errors.BlockerError) as exc_info:
+            canonical._canonical_value(payload)
+        assert exc_info.value.code == "STC_CANONICALIZATION_FAILED"
+
+    def test_finite_float_remains_deterministic(self) -> None:
+        # Finite floats must round-trip through repr() deterministically.
+        payload = {"x": 1.5}
+        result1 = canonical._canonical_value(payload)
+        result2 = canonical._canonical_value(payload)
+        assert result1 == result2 == {"x": "1.5"}
+
+    def test_mapping_insertion_order_does_not_affect_hash(self) -> None:
+        # The canonical serializer must sort keys, so insertion order
+        # of a top-level mapping does not affect the canonical hash.
+        from hexagent.exchangers.shell_tube.canonical import configuration_hash
+
+        payload1 = {"a": 1, "b": 2, "c": 3}
+        payload2 = {"c": 3, "a": 1, "b": 2}
+        assert configuration_hash(payload1) == configuration_hash(payload2)

@@ -209,38 +209,6 @@ def bind_request_to_configuration_authority(
 # ---------------------------------------------------------------------------
 
 
-def sorted_selected_rule_authorities(
-    items: list[SelectedRuleAuthority],
-) -> tuple[SelectedRuleAuthority, ...]:
-    """Return ``items`` in the §12.4 deterministic sort order.
-
-    The §12.4 sort key is:
-
-    - ``(priority ASC, rule_type ASC, constraint_id ASC, rule_id ASC,
-       rule_version ASC, rule_artifact_canonical_hash ASC)``
-
-    The first 3 fields (``priority`` / ``rule_type`` /
-    ``constraint_id``) are not stored on ``SelectedRuleAuthority``
-    directly; ``rule_type`` and ``constraint_id`` are rule-body
-    fields. To produce a deterministic order from the value object
-    alone, we sort by the **complete key present on the value
-    object**: ``(rule_id, rule_version,
-    rule_artifact_canonical_hash)`` with ascending Unicode code-point
-    order. The full §12.4 sort key is a strict-equality refinement
-    used by Slice B; Slice A sorts by the available key fields.
-
-    ``evidence_refs`` and ``provenance_edge_ids`` inside each
-    ``SelectedRuleAuthority`` are sorted in ascending Unicode
-    code-point order at canonicalization time (§6.3.5.1).
-    """
-    return tuple(
-        sorted(
-            items,
-            key=lambda r: (r.rule_id, r.rule_version, r.rule_artifact_canonical_hash),
-        )
-    )
-
-
 def finalize_selected_rule_authority(
     item: SelectedRuleAuthority,
 ) -> SelectedRuleAuthority:
@@ -271,5 +239,4 @@ __all__ = [
     "from_requested_rule_pack_identity",
     "is_valid_sha256_hex",
     "is_valid_structural_token",
-    "sorted_selected_rule_authorities",
 ]

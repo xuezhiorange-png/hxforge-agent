@@ -322,3 +322,94 @@ class TestEvidenceRefs:
         result = st.validate_request(_make_request(evidence_refs="not-a-list"))
         assert result.status.value == "BLOCKED"
         assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
+
+
+class TestStrictInputValidation:
+    """Fix 1 — silent ``str()`` coercion is forbidden.
+
+    Every typed field MUST be explicitly present and MUST be the
+    declared type. ``object`` / ``int`` / ``None`` / extra fields
+    / missing fields / wrong element types all fail closed with
+    a stable ``STC_*`` code.
+    """
+
+    def test_case_authority_revision_id_int_blocked(self) -> None:
+        request = _make_request()
+        request["case_authority"] = dict(VALID_CASE_AUTHORITY)
+        request["case_authority"]["revision_id"] = 123  # type: ignore[assignment]
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
+
+    def test_case_authority_payload_hash_int_blocked(self) -> None:
+        request = _make_request()
+        request["case_authority"] = dict(VALID_CASE_AUTHORITY)
+        request["case_authority"]["payload_hash"] = 456  # type: ignore[assignment]
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
+
+    def test_case_authority_status_int_blocked(self) -> None:
+        request = _make_request()
+        request["case_authority"] = dict(VALID_CASE_AUTHORITY)
+        request["case_authority"]["status"] = 1  # type: ignore[assignment]
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
+
+    def test_case_authority_extra_field_returns_unknown_field(self) -> None:
+        request = _make_request()
+        request["case_authority"] = dict(VALID_CASE_AUTHORITY)
+        request["case_authority"]["unexpected_extra"] = "boom"
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
+
+    def test_requested_rule_pack_identity_rule_pack_id_int_blocked(self) -> None:
+        request = _make_request(
+            authority_mode="APPROVED_RULE_PACK",
+            standard_system_id="TEMA",
+            requested_rule_pack_identity={
+                "rule_pack_id": 123,  # type: ignore[dict-item]
+                "rule_pack_version": "v1",
+                "rule_pack_canonical_hash": SHA_RULE_PACK,
+            },
+        )
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
+
+    def test_requested_rule_pack_identity_extra_field_returns_unknown_field(
+        self,
+    ) -> None:
+        request = _make_request(
+            authority_mode="APPROVED_RULE_PACK",
+            standard_system_id="TEMA",
+            requested_rule_pack_identity={
+                "rule_pack_id": "rp1",
+                "rule_pack_version": "v1",
+                "rule_pack_canonical_hash": SHA_RULE_PACK,
+                "extra_field": "boom",
+            },
+        )
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
+
+    def test_evidence_refs_missing_blocked(self) -> None:
+        request = _make_request()
+        # Pop evidence_refs entirely.
+        del request["evidence_refs"]
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
+
+    def test_evidence_refs_int_element_blocked(self) -> None:
+        result = st.validate_request(_make_request(evidence_refs=[123]))  # type: ignore[list-item]
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
+
+    def test_evidence_refs_none_element_blocked(self) -> None:
+        result = st.validate_request(_make_request(evidence_refs=["valid", None]))  # type: ignore[list-item]
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)

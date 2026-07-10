@@ -17,7 +17,6 @@ from hexagent.exchangers.shell_tube.authority import (
     from_requested_rule_pack_identity,
     is_valid_sha256_hex,
     is_valid_structural_token,
-    sorted_selected_rule_authorities,
 )
 from hexagent.exchangers.shell_tube.errors import BlockerError
 from hexagent.exchangers.shell_tube.models import (
@@ -236,53 +235,6 @@ class TestSelectedRuleAuthorityFinalize:
         )
         finalized = finalize_selected_rule_authority(sra)
         assert finalized.evidence_refs == ("ref-a", "ref-b")
-
-
-class TestSortSelectedRuleAuthorities:
-    def test_sort_by_full_key(self) -> None:
-        items = [
-            SelectedRuleAuthority(
-                rule_id="r2",
-                rule_version="v1",
-                rule_artifact_canonical_hash=SHA_RULE_PACK,
-                source_class="STANDARD",
-                license_evidence=None,
-                approval_status="approved",
-            ),
-            SelectedRuleAuthority(
-                rule_id="r1",
-                rule_version="v1",
-                rule_artifact_canonical_hash=SHA_RULE_PACK,
-                source_class="STANDARD",
-                license_evidence=None,
-                approval_status="approved",
-            ),
-        ]
-        sorted_items = sorted_selected_rule_authorities(items)
-        assert [s.rule_id for s in sorted_items] == ["r1", "r2"]
-
-    def test_sort_by_rule_artifact_canonical_hash_when_rule_id_same(self) -> None:
-        items = [
-            SelectedRuleAuthority(
-                rule_id="r1",
-                rule_version="v1",
-                rule_artifact_canonical_hash="f" * 64,
-                source_class="STANDARD",
-                license_evidence=None,
-                approval_status="approved",
-            ),
-            SelectedRuleAuthority(
-                rule_id="r1",
-                rule_version="v1",
-                rule_artifact_canonical_hash="a" * 64,
-                source_class="STANDARD",
-                license_evidence=None,
-                approval_status="approved",
-            ),
-        ]
-        sorted_items = sorted_selected_rule_authorities(items)
-        assert sorted_items[0].rule_artifact_canonical_hash == "a" * 64
-        assert sorted_items[1].rule_artifact_canonical_hash == "f" * 64
 
 
 class TestNoRulePackLoading:
