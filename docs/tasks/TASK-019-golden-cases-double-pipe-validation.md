@@ -2615,3 +2615,109 @@ This subsection codifies the evidence-reset rule that governs any future round (
 The §17.x references in this section are to the section numbers within this file. Mutable facts (latest main HEAD SHA, latest post-merge main CI run id, future §18 / 002-J amendment letter, future §18 PR number, future implementation allowed-file list) are intentionally **NOT** frozen in this section and MUST be re-derived at the time of any future round that needs them.
 
 The current main HEAD at the time of this §17 authoring round is `6d24889cb4091730248b5cc68f5e304445be1a88` (= PR #113 merge commit "TASK-019 Slice 3B-D: case03 cost breakdown via mass bridge"). This SHA is recorded here **only for round traceability**, not as a frozen binding reference. Any future round MUST re-derive the current main HEAD via `git rev-parse origin/main` at the time of that round.
+
+## 18. Design Amendment 002-J — TASK-020 source-definition handoff (binding after merge; design-only)
+
+This section is the TASK-019 Design Amendment 002-J source-definition handoff. It is a Charles-authorized **design-only authoring round** following the merge of §17 by PR #114. It does not implement TASK-020, does not create a pressure-drop or thermal-method contract, and does not claim that any TASK-020 runtime capability exists.
+
+The purpose of §18 is to convert the governance boundaries in §17 into an auditable handoff contract for a future dedicated TASK-020 design card, without assigning unverified formulas, algorithms, fixture values, or implementation files.
+
+### 18.1 Authority and verified baseline (binding after merge)
+
+The only repository authorities for this amendment are:
+
+- `docs/TASK_BACKLOG.md`, whose M3 wording states that TASK-020 through TASK-039 collectively cover shell-and-tube single-phase configuration, geometry, rating, screening, pressure-drop decomposition, thermal expansion, mechanical boundaries, materials, costing, optimization, API, report, and Golden validation;
+- this file through §17.1–§17.7 as merged into `main` by PR #114;
+- current committed repository code and tests, used only to establish what already exists and what remains absent.
+
+The verified authoring baseline is main commit `da6e06499d03431f5b942e9098c5896ecf9814cb` (= PR #114 squash merge). This SHA is recorded only as round traceability and must not be treated as a permanently frozen latest-main value.
+
+Conversation-only drafts, non-resolvable SHA strings, `/tmp` exports, and uncommitted branch content are not authority.
+
+### 18.2 Deferred-scope partition (binding after merge)
+
+The phrase `TASK-020+ / future work` in §17 is a deferral class, not an automatic assignment of every deferred item to TASK-020.
+
+The following TASK-019 double-pipe gaps remain separate follow-up concerns unless a future Charles-authorized design round explicitly assigns them:
+
+- case_02 full cost-stack coverage described by §17.2;
+- missing full-cost-stack `expected_output` vectors described by §17.3;
+- dynamic catalog integration and any runtime catalog resolver described by §17.4.
+
+These concerns must not be silently imported into TASK-020 merely because they are future work.
+
+Pressure-drop, TEMA configuration, Kern screening, Bell–Delaware, and related thermal-method concepts belong somewhere within the M3 TASK-020–TASK-039 family according to the backlog. The backlog does not currently freeze which concept belongs to TASK-020 specifically. §18 therefore does not allocate any formula, algorithm, standard method, or implementation slice to TASK-020.
+
+### 18.3 Dedicated TASK-020 design-card prerequisite (binding after merge)
+
+Before any TASK-020 implementation Issue, branch, commit, or PR may be created, a dedicated TASK-020 design card must be authored and reviewed as a separate Charles-authorized round.
+
+That future design card must freeze, at minimum:
+
+- exact TASK-020 title and objective;
+- exact dependency set;
+- in-scope and out-of-scope method families;
+- authoritative standards and licensing boundaries;
+- input and output schemas;
+- deterministic identity, serialization, hash, and provenance rules;
+- blocker and `NOT_COMPUTABLE` behavior;
+- allowed production and test files;
+- acceptance tests and CI expectations;
+- implementation slicing, if more than one implementation round is required.
+
+No implementation authorization may be inferred from the existence or merge of §18.
+
+### 18.4 Allocation questions that remain intentionally unresolved (binding after merge)
+
+The future TASK-020 design-card round must answer these questions from repository evidence and Charles authorization rather than assumption:
+
+1. Is TASK-020 the TEMA configuration/schema foundation, or another first M3 capability?
+2. Which later TASK IDs own tube layout, shell diameter, tube-side rating, Kern screening, Bell–Delaware, pressure-drop decomposition, and thermal expansion screening?
+3. Which existing TASK-002 through TASK-019 contracts are direct dependencies and which are only reference material?
+4. What standards content may be represented directly, what must remain rule-pack/pointer-only, and what licensing restrictions apply?
+5. Which outputs are computable in the first TASK-020 slice and which must remain explicitly blocked or `NOT_COMPUTABLE`?
+6. Does the first TASK-020 design require a new dedicated task file, and what is its exact path and naming convention?
+
+§18 must not pre-answer these questions.
+
+### 18.5 Evidence and anti-fabrication requirements (binding after merge)
+
+A future TASK-020 design card must:
+
+- re-derive current `main` at the start of its round;
+- cite only committed files, resolvable commits, merged PRs, and current repository code/tests;
+- distinguish backlog-family wording from an executable task contract;
+- distinguish existing runtime capability from proposed capability;
+- explicitly record every unresolved question rather than filling gaps with assumed engineering practice;
+- treat vendor, paid-standard, and restricted-source content according to the existing TASK-012 licensing boundary;
+- fail closed if a required authority source cannot be verified.
+
+No future TASK-020 artifact may cite the invalid SHA strings recorded in §17.6 as valid commits.
+
+### 18.6 002-J explicit non-actions (binding after merge)
+
+Amendment 002-J does not authorize:
+
+- any production-code mutation;
+- any test, fixture, Golden vector, provenance metadata, or tolerance metadata mutation;
+- any pressure-drop, TEMA, Kern, Bell–Delaware, thermal-expansion, mechanical, costing, optimization, API, report, database, or persistence implementation;
+- any expected-output number or tolerance value;
+- any runtime catalog scan, resolver, lookup, or dynamic integration claim;
+- any new blocker or warning code;
+- any mutation of frozen TASK-006 through TASK-018 contracts;
+- any TASK-019 implementation expansion;
+- any TASK-020 implementation Issue or PR;
+- Ready or merge for the 002-J PR without separate Charles authorization;
+- Feishu outbound.
+
+### 18.7 Future TASK-020 design-round prerequisites (binding after merge)
+
+A future dedicated TASK-020 design round may start only after:
+
+- §18 has been committed and merged into `main`;
+- the round re-verifies the current main SHA and confirms §18 is present on main;
+- Charles separately authorizes the dedicated TASK-020 design-card round;
+- the round names its exact allowed files before mutation;
+- the round carries forward every unresolved allocation question in §18.4 and answers only those supported by repo evidence and Charles authorization.
+
+The future TASK-020 design round remains design-only unless Charles separately authorizes implementation after that design contract is reviewed and merged.
