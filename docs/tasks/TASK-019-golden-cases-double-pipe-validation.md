@@ -2519,3 +2519,99 @@ future round MUST:
   malformed.
 - Mutate ONLY the allowed files per §16.8 forbidden
   list.
+
+
+## 17. TASK-020 section source definition (binding, contract-frozen, governance-only)
+
+This section is the TASK-020 **section source definition** (Charles-authorized source-definition / authoring round). It is **NOT** the TASK-020 implementation round. It is **NOT** 002-J. It does **NOT** introduce §18, does **NOT** reference any prior fabricated §17 / §18 draft, and does **NOT** claim any TASK-020 implementation exists.
+
+The purpose of §17 is to define the **source authority**, **boundaries**, and **anti-fabrication guardrails** for TASK-020+ rounds in a way that is recoverable from this file alone — i.e. without relying on any prior conversation context, prior invalid commit SHA, prior `/tmp` export, or any non-authoritative source.
+
+This section is **Charles-authorized**: the six subsection titles (`§17.1` through `§17.6`) and the body content boundaries were provided by Charles as the authoritative source for this authoring round. They are **NOT** reconstructed from any prior §18 draft, **NOT** reverse-engineered from any prior invalid §17.x numbering, and **NOT** derived from conversation-only material. Any §17.x that appears in a prior invalid draft is explicitly discarded per §17.6 below.
+
+### 17.1 TASK-020+ deferred scope authority (binding, contract-frozen)
+
+§17 is a **source-definition / boundary section** only. It defines what TASK-020+ items are **deferred**, not what they contain.
+
+§17:
+
+- MAY say that TASK-020+ items are deferred and are **not** part of current Task-019 implementation.
+- MAY cross-reference the existing per-amendment "Future implementation round prerequisites" blocks at §15.9 and §16.10.
+- MUST NOT claim that any TASK-020+ implementation exists.
+- MUST NOT claim that §18 (002-J or any later amendment letter) exists.
+- MUST NOT reference fabricated §17.x content from prior invalid drafts (see §17.6).
+- MUST NOT re-embed any prior invalid commit SHA (see §17.6).
+- MUST NOT escalate the deferred status into a binding implementation schedule.
+
+### 17.2 case_02 cost-stack coverage gap (binding, contract-frozen)
+
+The case_02 path in current Task-019 does **not** provide full cost-stack coverage. This subsection records that **gap** as a deferred coverage gap, scoped to the fields already enumerated in §15.3.4 / §15.3.5 as "deferred to a future real production chain".
+
+§17.2:
+
+- MAY describe the case_02 cost-stack as a **deferred coverage gap**.
+- MAY list the gap fields by reference to §15.3.4 / §15.3.5 (e.g. `c0_subtotal.component_breakdown[]`, `c1_subtotal.component_breakdown[]`, `life_cycle_energy_envelope.P_intake_kW` / `P_total_kW` / `P_cooling_kW` / `P_loop_kW`).
+- MAY note that the `cost_chain_selector.c0_record_count` / `c1_record_count` / `selection_blockers` subset is wired by 002-H / 002-I bridges and is **not** part of the gap.
+- MUST NOT invent a completed selection algorithm.
+- MUST NOT claim that catalog-driven full coverage is implemented unless repo tests / code already prove it (no such proof exists in current main `6d24889cb4091730248b5cc68f5e304445be1a88`).
+- MUST NOT add expected values or fixture outputs in this section.
+- MUST NOT pre-resolve the gap to any specific future amendment letter.
+
+### 17.3 expected_output fixture gap (binding, contract-frozen)
+
+The `expected_output` coverage for the full cost stack is **incomplete** in current Task-019 fixtures. This subsection records that **incompleteness** as a deferred fixture gap.
+
+§17.3:
+
+- MAY state that missing `expected_output` fields require future explicit fixture authoring, scoped to the same fields enumerated in §17.2.
+- MAY cross-reference the existing fixture contract on `tests/validation_report/test_chain_wiring_adapter.py::test_expected_output_unchanged_across_adapter_runs` (already bound by amendment 002-G).
+- MAY cross-reference `_provenance_metadata.json` and `_tolerance_metadata.json` as the metadata surfaces where future fixture authoring would be recorded.
+- MUST NOT invent numeric expected outputs in this section.
+- MUST NOT add schema fields unless they are already present in committed repo truth.
+- MUST NOT pretend that future fixture data already exists.
+
+### 17.4 dynamic catalog integration boundary (binding, contract-frozen)
+
+Dynamic catalog integration is **TASK-020+ / future work** unless explicitly committed elsewhere in current main.
+
+§17.4:
+
+- MAY state that current fixture behavior remains **static / curated** (as already declared by amendment 002-F §4.8.5 and amendment 002-G §4.9.4).
+- MAY note that `cost_records_bridge` is the sole source of cost-record inputs to `CostModelSelector.select` per §15.3.2 Q2.
+- MUST NOT claim that dynamic catalog integration exists in any form.
+- MUST NOT imply that any runtime catalog scan, runtime resolver, or runtime catalog lookup is implemented.
+- MUST NOT pre-authorize a runtime resolver. Any future amendment that authorizes a runtime resolver MUST be a separate Charles-authorized round (per §15.3.2 Q2 forward-reference wording).
+- MUST keep this subsection a **boundary declaration**, not an implementation design.
+
+### 17.5 pressure-drop / thermal-method exclusion boundary (binding, contract-frozen)
+
+Pressure-drop and thermal-method implementation are **explicitly excluded** from current Task-019 scope. This subsection restates that exclusion as a binding boundary.
+
+§17.5:
+
+- MAY mention that "pressure drop remains `NOT_COMPUTABLE`" if that wording already appears in the file (it appears in §6, §15, §16).
+- MAY cross-reference `pressure_drop_excluded_from_taska_019` as the existing expected_output marker for this exclusion.
+- MUST NOT introduce any C4 / TEMA / Kern / Bell-Delaware / equivalent pressure-drop formula.
+- MUST NOT add any thermal-method computation logic, thermal expansion screening logic, or thermal-method acceptance criteria.
+- MUST NOT widen the existing exclusion without a separate Charles-authorized round.
+- MUST make clear that this exclusion applies unless a future task is separately authorized (TASK-020+ or later).
+
+### 17.6 non-actions and anti-fabrication guard (binding, contract-frozen)
+
+This subsection codifies the evidence-reset rule that governs any future round (including but not limited to §18 / 002-J) that may cite §17.
+
+§17.6 declares the following facts as **permanently binding** for any future TASK-020+ round:
+
+- **No §18 exists yet.** §18 (whether 002-J or any later amendment letter) is **NOT** included in this file. Any prior conversation context that referenced §18 as if it existed is **non-authoritative** and **discarded**. §18 may only be added to this file by a future Charles-authorized round, after §17 has been merged into `main` and Charles has separately authorized §18 in that round.
+- **Previous §18 SHA claims are invalid.** The SHA strings `b8c7c2528a08a2c8e2a8d4a4c5e8e2a5b8d4a4c8` and `00d44def96a89c3c8c47e0a3a4a4a4c8f1b3a5c0` have been verified as **not resolvable** by `git cat-file -t` in the local repository (`fatal: could not get object info`) and are **not reachable** from any current ref (`git branch --contains` returns error, `git reflog --all` returns zero matches, `git fsck --no-reflogs --unreachable` returns zero matches). These SHA strings MUST NOT be referenced as valid commits, MUST NOT be embedded in any future PR body, and MUST NOT be cited as evidence of any prior §18 work.
+- **Conversation-derived-only §17.x content is not repo authority.** Any §17.x content that originated solely from prior conversation context (rather than from a committed file or from Charles-provided text in an authorization message) is **non-authoritative** and **discarded**. The six §17.x subsections in this file are sourced from Charles's authorization message for this round (`CHARLES_PROVIDED_TEXT`), not from any prior invalid draft.
+- **Future §18 may only cite §17 after §17 is committed and merged.** Any future §18 / 002-J round that wants to reference §17.x MUST verify that §17 is committed and merged into `main` (not just present on a Draft PR / unmerged branch) before citing any §17.x subsection. A future §18 may NOT cite a §17.x that exists only on a Draft branch.
+- **No future section may cite non-existent commits, `/tmp` exports, or unverified SHA claims.** Any future PR body, design contract, or governance report MUST verify each cited SHA via `git cat-file -t <sha>` returning `commit` (or the equivalent remote REST verification for un-fetched commits) before embedding it. Any `/tmp` export referenced as evidence MUST be regenerable from a real source on demand. Any SHA claim that cannot be so verified MUST be treated as fabrication and MUST NOT be embedded.
+
+§17.6 MUST NOT include implementation details beyond governance / evidence discipline. It is a **governance guardrail**, not a design or implementation contract.
+
+### 17.7 §17 self-reference discipline (binding, contract-frozen)
+
+The §17.x references in this section are to the section numbers within this file. Mutable facts (latest main HEAD SHA, latest post-merge main CI run id, future §18 / 002-J amendment letter, future §18 PR number, future implementation allowed-file list) are intentionally **NOT** frozen in this section and MUST be re-derived at the time of any future round that needs them.
+
+The current main HEAD at the time of this §17 authoring round is `6d24889cb4091730248b5cc68f5e304445be1a88` (= PR #113 merge commit "TASK-019 Slice 3B-D: case03 cost breakdown via mass bridge"). This SHA is recorded here **only for round traceability**, not as a frozen binding reference. Any future round MUST re-derive the current main HEAD via `git rev-parse origin/main` at the time of that round.
