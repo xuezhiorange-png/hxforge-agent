@@ -24,26 +24,29 @@
 | Backlog authority | `docs/TASK_BACKLOG.md`, M3 collective scope for TASK-020 through TASK-039 |
 | Standards/license authority | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` |
 | Product scope authority | `docs/MASTER_DEVELOPMENT_SPEC.md`, especially §§2, 7, 8.2 and 9 |
-| Design PR | #118 — DRAFT / NOT READY / NOT MERGED |
-| Design contract status | **DRAFT / NOT FROZEN** |
-| Frozen Contract Authority SHA | NOT ESTABLISHED |
-| Implementation status | **NOT AUTHORIZED** |
-| Implementation Issue | NOT CREATED |
-| Issue #117 status | OPEN |
-| Design Amendment 001 | **AUTHORED** (Issue #129, see §19) |
+| **Design PR (Issue #117 authoring)** | **#118 — MERGED** (squash merge SHA `6bdc9d9de1be2a5d56fcee40804902100f8140aa`; historical at original PR #118 authoring; pre-Amendment-001 baseline) |
+| **Design contract status** | **FROZEN ON MAIN THROUGH DESIGN AMENDMENT 001** (Design Amendment 001 merge SHA `d4ee40109c74061db89339e55899cabfe2fb80fe`, current `main`); DESIGN AMENDMENT 002 AUTHORED IN PR #132 / DRAFT / NOT MERGED (Amendment 002 authority is proposed only, NOT current-main authority) |
+| **Current main frozen design-document SHA-256 (through Amendment 001)** | `0b369c9552bbe69c71faef92e564a974d2a6fab3badfb7866eadd752caed2f73` (recomputed and pinned in the §1 authority table on the current-main branch; this is the current-main authority) |
+| **Proposed Amendment 002 final design-document SHA-256** | `<recomputed after all corrections; written by Commit E review-correction; not main authority until PR #132 merges>` |
+| **Implementation status** | **S1: MERGED** (PR #127 squash merge SHA `d00d5ced3c0da065f00096f0303c0709917fc380`); **S2: AUTHORIZED BUT SUSPENDED / BLOCKED** while Amendment 002 remains unmerged (Issue #128 OPEN); **S2 RECOVERY: NOT AUTHORIZED** |
+| **S1 implementation PR** | #127 |
+| **S1 merge SHA** | `d00d5ced3c0da065f00096f0303c0709917fc380` |
+| **S2 implementation Issue** | #128 — OPEN |
+| Issue #117 status | OPEN (preserved; not closed or marked completed by any TASK-020 amendment) |
+| Design Amendment 001 | **AUTHORED + MERGED** (Issue #129, see §19) |
 | Design Amendment 001 S1 merge SHA | `d00d5ced3c0da065f00096f0303c0709917fc380` |
-| Issue #129 status | OPEN |
+| Issue #129 status (pre-merge) | OPEN |
 | Design Amendment 001 merge PR | #130 — MERGED |
 | Design Amendment 001 merge SHA | `d4ee40109c74061db89339e55899cabfe2fb80fe` (current `main`) |
 | Issue #129 status (post-merge) | CLOSED / COMPLETED |
 | Post-merge CI run | `29144874902` — completed / success |
-| Design Amendment 002 | **AUTHORED** (Issue #131, see §20) |
+| Design Amendment 002 | **AUTHORED** (Issue #131, see §20); proposed Amendment 002 final SHA written in the row above |
 | Design Amendment 002 Issue | #131 — `[TASK-020][design amendment 002] Make the S2 rule-pack adapter contract executable` |
 | Design Amendment 002 authorization comment | Issue #131 comment `4943978594` |
 | Design Amendment 002 branch | `docs/task-020-amendment-002-s2-executable-contract` |
 | Design Amendment 002 starting HEAD | `d4ee40109c74061db89339e55899cabfe2fb80fe` (= current `main`) |
 | Design Amendment 002 authoring boundary | exactly two files (see §20.B): the design contract + the frozen-contract integrity guard |
-| Design Amendment 002 status | AUTHORING AUTHORIZED; AMENDMENT PR PENDING; MERGE NOT AUTHORIZED; READY NOT AUTHORIZED |
+| Design Amendment 002 status | AUTHORING AUTHORIZED; AMENDMENT PR #132 PENDING / DRAFT / NOT READY / NOT MERGED |
 | S2 implementation status | **AUTHORIZED BUT BLOCKED** (comment `4943742113`; suspended while Amendment 002 remains unmerged) |
 | S2 implementation recovery | requires (1) amendment PR review, (2) separate Ready authorization, (3) separate merge authorization, (4) green post-merge CI, (5) separate Charles S2 recovery authorization — no step implies the next |
 | TASK-021 through TASK-039 | UNALLOCATED |
@@ -907,9 +910,15 @@ Partial normalized outputs must not be exposed as valid configurations.
   profile is uniquely identified by
   `profile_id == "task020.configuration-rule.v1"`; a rule with that
   profile_id and an unknown `rule_type` MUST emit this blocker.
-- `STC_RULE_DUPLICATE_IDENTITY` — two selected rules share the same
-  `(profile_id, rule_type, constraint_id)` triple; resolution is
-  fail-closed per §12.5.
+- `STC_RULE_DUPLICATE_IDENTITY` — two surviving rules share the
+  same `(profile_id, rule_type, constraint_id)` logical-identity
+  triple but differ in at least one field of the complete §12.4
+  six-field comparison key `(priority, rule_type, constraint_id,
+  rule_id, rule_version, rule_artifact_canonical_hash)`. Exact
+  complete-key equality represents the same authority, is silently
+  deduplicated, and MUST NOT emit this blocker. Trigger condition:
+  same logical-identity triple AND different complete six-field
+  keys; see §12.4, §12.5, §15 item 9, §20.B.
 - `STC_RULE_APPLICABILITY_UNRESOLVED` — applicability matching could
   not determine whether a rule applies.
 - `STC_RULE_CONSTRAINT_MISSING` — a constraint class required by
@@ -1365,13 +1374,16 @@ mechanism.
      above and is the **only** tie-break used for selection. The
      adapter MUST NOT use filesystem order, manifest-array order,
      dict-iteration order, dict-insertion order, input rule-list
-     order or any other input-order surrogate as a tie-break. If
-     the complete key above still cannot distinguish two rules
-     (a future-proofing note for arbitrary future rule fields), the
-     adapter MUST fail closed: emit `STC_RULE_DUPLICATE_IDENTITY`
-     and stop. The complete key in this contract revision is
-     sufficient for the closed §12.3 rule_type set; the fail-closed
-     fallback is a §12.5 binding rule for any future addition.
+     order or any other input-order surrogate as a tie-break. The
+     complete six-field key `(priority, rule_type, constraint_id,
+     rule_id, rule_version, rule_artifact_canonical_hash)` is the
+     single, exhaustive authority-comparison key for the closed
+     §12.3 `rule_type` set; if a future revision adds new
+     authority fields, those fields MUST be incorporated into the
+     complete key via a separately authorized design amendment
+     (the current contract MUST NOT silently extend the key, MUST
+     NOT reintroduce a partial-key dedup, and MUST NOT reinterpret
+     equal complete keys as conflicting authority).
 2. **Normalisation conflict**: if two
    `CONSTRUCTION_FAMILY_NORMALIZATION` rules apply to the same input
    value and produce different `normalized_value` results, the
