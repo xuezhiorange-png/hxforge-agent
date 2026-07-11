@@ -150,9 +150,7 @@ def _check_nested_object_keys(
         for k in non_str_keys:
             t = type(k).__name__
             type_counts[t] = type_counts.get(t, 0) + 1
-        type_desc = ", ".join(
-            f"{tname}×{n}" for tname, n in sorted(type_counts.items())
-        )
+        type_desc = ", ".join(f"{tname}×{n}" for tname, n in sorted(type_counts.items()))
         raise errors.BlockerError(
             "STC_UNKNOWN_FIELD",
             f"{field_path}: non-string field name(s) ({type_desc})",
