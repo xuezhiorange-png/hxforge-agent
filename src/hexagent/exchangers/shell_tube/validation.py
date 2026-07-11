@@ -114,12 +114,64 @@ def _require_str_field(
     return value
 
 
+def _check_nested_object_keys(
+    raw: Mapping[Any, Any],
+    allowed_fields: frozenset[str],
+    *,
+    field_path: str,
+) -> None:
+    """Fail-closed whitelist check for nested object field names.
+
+    Per Fix 1 / P0-B — the nested mapping's keys MUST be
+    exclusively ``str`` instances. If any key is not a ``str``
+    (e.g. ``int``, ``None``, ``tuple``), raise
+    ``STC_UNKNOWN_FIELD`` with a stable, type-only description
+    of the offending keys. The description intentionally omits
+    object ``repr`` / memory addresses, so the same input
+    produces the same blocker message on every run.
+
+    After the all-``str`` check passes, raise
+    ``STC_UNKNOWN_FIELD`` for any string key not in
+    ``allowed_fields``.
+
+    No native ``TypeError`` or ``ValueError`` is allowed to leak
+    to the caller; the function either returns silently or
+    raises a single ``BlockerError`` with a stable code.
+    """
+    # Step 1 — every key MUST be a str. We never sort mixed
+    # types (which would raise ``TypeError``); we inspect them
+    # by type-name only.
+    non_str_keys = [k for k in raw if not isinstance(k, str)]
+    if non_str_keys:
+        # Aggregate by type name, sorted, to produce a stable,
+        # cross-run identical message that does NOT depend on
+        # object identity, repr, or memory address.
+        type_counts: dict[str, int] = {}
+        for k in non_str_keys:
+            t = type(k).__name__
+            type_counts[t] = type_counts.get(t, 0) + 1
+        type_desc = ", ".join(
+            f"{tname}×{n}" for tname, n in sorted(type_counts.items())
+        )
+        raise errors.BlockerError(
+            "STC_UNKNOWN_FIELD",
+            f"{field_path}: non-string field name(s) ({type_desc})",
+        )
+    # Step 2 — all keys are confirmed ``str``; now whitelist-check.
+    extra_fields = set(raw.keys()) - allowed_fields
+    if extra_fields:
+        raise errors.BlockerError(
+            "STC_UNKNOWN_FIELD",
+            f"{field_path} extra field(s): {sorted(extra_fields)}",
+        )
+
+
 def _parse_case_authority(payload: Mapping[str, Any]) -> CaseRevisionAuthority:
     """Parse the ``case_authority`` sub-payload per §7.3 / §8.1.
 
     Strict type checks: no silent ``str()`` coercion. Unknown
-    fields emit ``STC_UNKNOWN_FIELD``. Type mismatches emit
-    ``STC_AUTHORITY_FIELDS_INCONSISTENT``.
+    fields and non-string field names emit ``STC_UNKNOWN_FIELD``.
+    Type mismatches on values emit ``STC_AUTHORITY_FIELDS_INCONSISTENT``.
     """
     if "case_authority" not in payload or payload["case_authority"] is None:
         raise errors.BlockerError("STC_CASE_AUTHORITY_MISSING", "case_authority required")
@@ -128,14 +180,13 @@ def _parse_case_authority(payload: Mapping[str, Any]) -> CaseRevisionAuthority:
         raise errors.BlockerError(
             "STC_AUTHORITY_FIELDS_INCONSISTENT", "case_authority must be mapping"
         )
-    # §8.1 — unknown fields (whitelist)
-    extra_fields = set(raw.keys()) - _CASE_AUTHORITY_ALLOWED_FIELDS
-    if extra_fields:
-        raise errors.BlockerError(
-            "STC_UNKNOWN_FIELD",
-            f"case_authority extra field(s): {sorted(extra_fields)}",
-        )
-    # §8.1 — strict type checks (no str() coercion)
+    # §8.1 / P0-B — fail-closed field-name check.
+    _check_nested_object_keys(
+        raw,
+        _CASE_AUTHORITY_ALLOWED_FIELDS,
+        field_path="case_authority",
+    )
+    # §8.1 — strict type checks on values (no str() coercion)
     revision_id = _require_str_field(raw, "revision_id", field_path="case_authority")
     payload_hash = _require_str_field(raw, "payload_hash", field_path="case_authority")
     domain_snapshot_hash = _require_str_field(
@@ -156,8 +207,8 @@ def _parse_requested_rule_pack_identity(
     """Parse the ``requested_rule_pack_identity`` sub-payload per §6.3.4 / §8.1.
 
     Strict type checks: no silent ``str()`` coercion. Unknown
-    fields emit ``STC_UNKNOWN_FIELD``. Type mismatches emit
-    ``STC_AUTHORITY_FIELDS_INCONSISTENT``.
+    fields and non-string field names emit ``STC_UNKNOWN_FIELD``.
+    Type mismatches on values emit ``STC_AUTHORITY_FIELDS_INCONSISTENT``.
     """
     if payload.get("requested_rule_pack_identity") is None:
         return None
@@ -167,14 +218,13 @@ def _parse_requested_rule_pack_identity(
             "STC_REQUESTED_RULE_PACK_IDENTITY_MISSING",
             "requested_rule_pack_identity must be mapping",
         )
-    # §8.1 — unknown fields (whitelist)
-    extra_fields = set(raw.keys()) - _REQUESTED_RULE_PACK_IDENTITY_ALLOWED_FIELDS
-    if extra_fields:
-        raise errors.BlockerError(
-            "STC_UNKNOWN_FIELD",
-            f"requested_rule_pack_identity extra field(s): {sorted(extra_fields)}",
-        )
-    # §8.1 — strict type checks (no str() coercion)
+    # §8.1 / P0-B — fail-closed field-name check.
+    _check_nested_object_keys(
+        raw,
+        _REQUESTED_RULE_PACK_IDENTITY_ALLOWED_FIELDS,
+        field_path="requested_rule_pack_identity",
+    )
+    # §8.1 — strict type checks on values (no str() coercion)
     rule_pack_id = _require_str_field(
         raw, "rule_pack_id", field_path="requested_rule_pack_identity"
     )

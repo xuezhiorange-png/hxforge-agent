@@ -413,3 +413,144 @@ class TestStrictInputValidation:
         result = st.validate_request(_make_request(evidence_refs=["valid", None]))  # type: ignore[list-item]
         assert result.status.value == "BLOCKED"
         assert any(b.code == "STC_AUTHORITY_FIELDS_INCONSISTENT" for b in result.blockers)
+
+
+class TestNestedNonStringUnknownField:
+    """P0-B — nested mapping non-string field names fail closed.
+
+    Every key in a nested object (``case_authority``,
+    ``requested_rule_pack_identity``) MUST be a ``str`` instance.
+    A mapping that contains a non-string key (e.g. ``int``) must
+    fail closed with a stable ``STC_UNKNOWN_FIELD`` blocker
+    code. No native ``TypeError`` / ``ValueError`` is allowed to
+    leak to the caller, and the blocker message MUST be
+    identical across repeated executions of the same input.
+    """
+
+    def test_case_authority_single_int_key_blocked(self) -> None:
+        request = _make_request()
+        request["case_authority"] = {1: "int-key", **VALID_CASE_AUTHORITY}
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        # P0-B / 1 — case_authority with a single int key returns
+        # BLOCKED with STC_UNKNOWN_FIELD (NOT a leaked TypeError).
+        assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
+        # No native exception surfaced to the caller.
+        assert result.configuration is None
+
+    def test_case_authority_mixed_str_unknown_and_int_key_blocked(self) -> None:
+        request = _make_request()
+        request["case_authority"] = {
+            1: "int-key",
+            "unknown_str_key": "boom",
+            **VALID_CASE_AUTHORITY,
+        }
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        # P0-B / 2 — mixed string-unknown + int key returns
+        # BLOCKED with STC_UNKNOWN_FIELD (no TypeError leak from
+        # ``sorted(mixed_types)``).
+        assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
+        assert result.configuration is None
+
+    def test_requested_rule_pack_identity_single_int_key_blocked(self) -> None:
+        request = _make_request(
+            authority_mode="APPROVED_RULE_PACK",
+            standard_system_id="TEMA",
+            requested_rule_pack_identity={
+                1: "int-key",
+                "rule_pack_id": "rp1",
+                "rule_pack_version": "v1",
+                "rule_pack_canonical_hash": SHA_RULE_PACK,
+            },
+        )
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        # P0-B / 3 — single int key in requested_rule_pack_identity.
+        assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
+        assert result.configuration is None
+
+    def test_requested_rule_pack_identity_mixed_str_unknown_and_int_key_blocked(
+        self,
+    ) -> None:
+        request = _make_request(
+            authority_mode="APPROVED_RULE_PACK",
+            standard_system_id="TEMA",
+            requested_rule_pack_identity={
+                1: "int-key",
+                "unknown_str": "boom",
+                "rule_pack_id": "rp1",
+                "rule_pack_version": "v1",
+                "rule_pack_canonical_hash": SHA_RULE_PACK,
+            },
+        )
+        result = st.validate_request(request)
+        assert result.status.value == "BLOCKED"
+        # P0-B / 4 — mixed int + str unknown key.
+        assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
+        assert result.configuration is None
+
+    def test_no_native_typeerror_leaked_from_case_authority(self) -> None:
+        # P0-B / 7 — wrapped in ``validate_request``, the mixed
+        # int+str key input MUST NOT surface a native ``TypeError``
+        # to the caller. The validation pipeline catches it as
+        # ``STC_UNKNOWN_FIELD`` instead.
+        request = _make_request()
+        request["case_authority"] = {1: "int-key", "boom": "x", **VALID_CASE_AUTHORITY}
+        # The function returns a ConfigurationValidationResult
+        # object; it does NOT raise.
+        result = st.validate_request(request)
+        assert result is not None
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
+
+    def test_no_native_typeerror_leaked_from_requested_rule_pack_identity(self) -> None:
+        request = _make_request(
+            authority_mode="APPROVED_RULE_PACK",
+            standard_system_id="TEMA",
+            requested_rule_pack_identity={
+                1: "int-key",
+                "boom": "x",
+                "rule_pack_id": "rp1",
+                "rule_pack_version": "v1",
+                "rule_pack_canonical_hash": SHA_RULE_PACK,
+            },
+        )
+        result = st.validate_request(request)
+        assert result is not None
+        assert result.status.value == "BLOCKED"
+        assert any(b.code == "STC_UNKNOWN_FIELD" for b in result.blockers)
+
+    def test_repeated_runs_produce_identical_blocker_representation(self) -> None:
+        # P0-B / 8 — re-running the same input twice produces
+        # exactly the same blocker code AND message_key AND
+        # details. The blocker description must NOT depend on
+        # object memory address, repr, or any other unstable
+        # representation.
+        def build_request() -> dict[str, object]:
+            request = _make_request()
+            request["case_authority"] = {
+                1: "int-key",
+                2: "another-int-key",
+                "boom": "x",
+                **VALID_CASE_AUTHORITY,
+            }
+            return request
+
+        result1 = st.validate_request(build_request())
+        result2 = st.validate_request(build_request())
+        result3 = st.validate_request(build_request())
+
+        # All three runs must produce the same status.
+        assert result1.status == result2.status == result3.status
+        assert result1.status.value == "BLOCKED"
+        # The blocker codes must be identical.
+        codes1 = sorted(b.code for b in result1.blockers)
+        codes2 = sorted(b.code for b in result2.blockers)
+        codes3 = sorted(b.code for b in result3.blockers)
+        assert codes1 == codes2 == codes3
+        # The blocker message_keys must be identical.
+        msg_keys1 = sorted(b.message_key for b in result1.blockers)
+        msg_keys2 = sorted(b.message_key for b in result2.blockers)
+        msg_keys3 = sorted(b.message_key for b in result3.blockers)
+        assert msg_keys1 == msg_keys2 == msg_keys3
