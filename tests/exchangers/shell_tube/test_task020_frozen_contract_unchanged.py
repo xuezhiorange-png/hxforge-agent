@@ -41,8 +41,8 @@ _EXPECTED_DESIGN_HEADING = "## 1. Authority, status and authorization gate"
 #
 # Authority chain: S1 merge SHA d00d5ced3c0da065f00096f0303c0709917fc380
 #                  → Design Amendment 001 / Issue #129 final byte content
-#                  → SHA-256 f1cf59e7b986dd6a3ab14c5733e6e4c1151dfc40a698ed871de224bd580f2ed2
-_EXPECTED_FROZEN_SHA256 = "f1cf59e7b986dd6a3ab14c5733e6e4c1151dfc40a698ed871de224bd580f2ed2"
+#                  → SHA-256 0b369c9552bbe69c71faef92e564a974d2a6fab3badfb7866eadd752caed2f73
+_EXPECTED_FROZEN_SHA256 = "0b369c9552bbe69c71faef92e564a974d2a6fab3badfb7866eadd752caed2f73"
 
 
 def test_design_contract_present() -> None:

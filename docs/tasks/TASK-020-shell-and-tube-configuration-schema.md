@@ -2241,9 +2241,9 @@ unchanged.
 - Established S1 architecture (frozen at `d00d5ced`): production under `src/hexagent/exchangers/`, tests under `tests/exchangers/`, fixtures under `tests/fixtures/task020/`.
 - This amendment authorizes **design reconciliation only**:
   the design contract's §10.2, §14.2 and a new §19 record are
-  edited. No production code, no test, no fixture, no manifest,
-  no workflow, no TASK-001 through TASK-019 contract is modified
-  by this amendment.
+  edited. No production code, fixture, manifest, workflow, or TASK-001 through
+  TASK-019 contract is modified by this amendment. The only test mutation
+  is the frozen-contract integrity guard expressly authorized by Issue #129.
 - **S2 implementation remains separately authorized through Issue #128**. Issue #128 is unchanged by this amendment and remains OPEN.
 - **TASK-021 through TASK-039 remain unallocated** by this amendment and by TASK-020.
 
