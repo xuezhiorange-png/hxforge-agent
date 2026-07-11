@@ -57,6 +57,13 @@ shards:
       - tests/validation_report/test_excluded_scopes_negative.py
       - tests/validation_report/test_materialization_contract.py
       - tests/validation_report/test_chain_wiring_adapter.py
+      - tests/exchangers/shell_tube/test_task020_authority.py
+      - tests/exchangers/shell_tube/test_task020_blockers.py
+      - tests/exchangers/shell_tube/test_task020_canonical.py
+      - tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py
+      - tests/exchangers/shell_tube/test_task020_models.py
+      - tests/exchangers/shell_tube/test_task020_no_upstream_mutation.py
+      - tests/exchangers/shell_tube/test_task020_schema.py
     timeout: 300
 
   - name: ci-acceptance
