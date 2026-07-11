@@ -30,6 +30,9 @@
 | Implementation status | **NOT AUTHORIZED** |
 | Implementation Issue | NOT CREATED |
 | Issue #117 status | OPEN |
+| Design Amendment 001 | **AUTHORED** (Issue #129, see §19) |
+| Design Amendment 001 S1 merge SHA | `d00d5ced3c0da065f00096f0303c0709917fc380` |
+| Issue #129 status | OPEN |
 
 The six ordinary commits between the PR #116 merge commit and this branch
 base created and removed three temporary no-op files. Their net tree diff is
@@ -826,7 +829,25 @@ Partial normalized outputs must not be exposed as valid configurations.
 - `STC_PASS_COUNT_INVALID`
 - `STC_TOKEN_MALFORMED`
 - `STC_AUTHORITY_FIELDS_INCONSISTENT`
-- `STC_RULE_PACK_REQUIRED`
+- `STC_RULE_PACK_REQUIRED` (transitional Slice-A blocker; superseded
+  by the three codes below per Design Amendment 001 §19.G; S2
+  implementation MUST stop emitting it)
+- `STC_RULE_PACK_ADAPTER_INPUTS_MISSING` — `APPROVED_RULE_PACK`
+  mode request reached the TASK-020 adapter with **both**
+  `loaded_rule_pack` and `validation_report` absent. The adapter
+  cannot evaluate rule-pack authority against an empty input
+  pair and the adapter MUST emit this blocker (fail-closed).
+- `STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE` — `APPROVED_RULE_PACK`
+  mode request reached the TASK-020 adapter with **exactly one**
+  of `loaded_rule_pack` or `validation_report` absent. A
+  partial adapter input pair cannot satisfy the §6.3.3
+  cross-input consistency check and the adapter MUST emit this
+  blocker (fail-closed).
+- `STC_RULE_PACK_NOT_EXPECTED_IN_MODE` — request reached the
+  TASK-020 adapter in `INTERNAL_GENERIC` mode with **either**
+  `loaded_rule_pack` or `validation_report` present.
+  Rule-pack authority is forbidden in `INTERNAL_GENERIC` mode
+  and the adapter MUST emit this blocker.
 - `STC_RULE_PACK_NOT_FOUND`
 - `STC_RULE_PACK_VALIDATION_FAILED` — TASK-012 `validate_rule_pack(root)`
   did not return `status = "ok"`. The TASK-020 adapter does not
@@ -1728,81 +1749,144 @@ Exactly one file is allowed:
 No backlog, workflow, source, test, fixture or manifest mutation is allowed in
 this design PR.
 
-### 14.2 Future implementation allowlist
+### 14.2 Future implementation allowlist (Design Amendment 001 §19.C)
 
-A separately authorized implementation may modify only:
+Design Amendment 001 (Issue #129) supersedes the original
+§14.2 implementation allowlist. The future TASK-020 S2
+implementation may modify only the **exact 42 files** enumerated
+below. No third file is authorized. Any additional path
+requires a further design amendment and separate Charles
+authorization before mutation.
 
-- `src/hexagent/shell_and_tube/__init__.py`
-- `src/hexagent/shell_and_tube/configuration.py`
-- `src/hexagent/shell_and_tube/errors.py`
-- `src/hexagent/shell_and_tube/models.py`
-- `src/hexagent/shell_and_tube/rule_pack_adapter.py`
-- `src/hexagent/shell_and_tube/schema.py`
-- `src/hexagent/shell_and_tube/validation.py`
-- `tests/shell_and_tube/test_task020_configuration_models.py`
-- `tests/shell_and_tube/test_task020_configuration_validation.py`
-- `tests/shell_and_tube/test_task020_configuration_identity.py`
-- `tests/shell_and_tube/test_task020_license_boundary.py`
-- `tests/shell_and_tube/test_task020_rule_profile_adapter.py`
-- `tests/fixtures/task020/case_revision/case_revision_committed.json`
-- `tests/fixtures/task020/case_revision/case_revision_superseded.json`
-- `tests/fixtures/task020/case_revision/case_revision_archived.json`
-- `tests/fixtures/task020/case_revision/case_revision_draft_blocked.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/manifest.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/component_token_allowlist_front.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/component_token_allowlist_shell.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/component_token_allowlist_rear.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/construction_family_normalization.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/pass_count_allowed_range.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/orientation_allowlist.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/configuration_combination_blocklist.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/component_token_allowlist_front_edge.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/component_token_allowlist_shell_edge.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/component_token_allowlist_rear_edge.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/construction_family_normalization_edge.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/pass_count_allowed_range_edge.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/orientation_allowlist_edge.json`
-- `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/configuration_combination_blocklist_edge.json`
-- `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/manifest.json`
-- `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/rules/conflict_a.json`
-- `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/rules/conflict_b.json`
-- `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/provenance/conflict_a_edge.json`
-- `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/provenance/conflict_b_edge.json`
-- `tests/fixtures/task020/rule_packs/unapproved_rule_pack/manifest.json`
-- `tests/fixtures/task020/rule_packs/unapproved_rule_pack/rules/allowed_tokens.json`
-- `tests/fixtures/task020/rule_packs/unapproved_rule_pack/provenance/allowed_tokens_edge.json`
-- `tests/fixtures/task020/rule_packs/license_blocked_rule_pack/manifest.json`
-- `tests/fixtures/task020/rule_packs/license_blocked_rule_pack/rules/allowed_tokens.json`
-- `tests/fixtures/task020/rule_packs/license_blocked_rule_pack/provenance/allowed_tokens_edge.json`
-- `ci-shard-manifest.yml`, only to register the exact new test files
+**Established architecture (Design Amendment 001 §19.B — frozen):**
 
-The fixture paths above are exact file paths. The implementation MUST NOT
-use glob patterns, recursive wildcards, or any other form of bulk fixture
-discovery. Each fixture file is named, audited, and listed in this
-section by hand.
+- production: `src/hexagent/exchangers/shell_tube/`
+- tests: `tests/exchangers/shell_tube/`
+- fixtures: `tests/fixtures/task020/`
 
-All rule-pack fixtures are `INTERNAL_ENGINEERING_RULE` content authored
-under TASK-012 governance; they MUST NOT contain verbatim copies of TEMA
-or any other restricted standard text, table, figure or formula. Token
-identifiers in the fixtures are synthetic project-internal strings and
-carry no external-standard semantics.
+The following paths from the original §14.2 are explicitly
+**forbidden** and superseded for TASK-020 implementation:
 
-The fixture file names follow the closed TASK-020 `rule_type` set in
-§12.3; each per-rule fixture JSON file embeds a rule body whose
-`rule_type` matches the file name suffix (for example,
-`component_token_allowlist_front.json` carries a rule body with
-`rule_type == "COMPONENT_TOKEN_ALLOWLIST"` and
-`component_slot == "front_head"`). The exact TASK-014 `CaseRevision`
-fixture shape is defined by TASK-014; this contract only enumerates the
-four task020-specific fixture files covering the four TASK-020
-acceptance scenarios (committed, superseded, archived, blocked).
+- `src/hexagent/shell_and_tube/` (any subpath) — forbidden
+- `tests/shell_and_tube/` (any subpath) — forbidden
+- `src/hexagent/shell_and_tube/configuration.py` — forbidden
+- `src/hexagent/shell_and_tube/schema.py` — forbidden
+- `tests/shell_and_tube/test_task020_configuration_models.py` — forbidden
+- `tests/shell_and_tube/test_task020_configuration_validation.py` — forbidden
+- `tests/shell_and_tube/test_task020_configuration_identity.py` — forbidden
+- `tests/shell_and_tube/test_task020_license_boundary.py` — forbidden
+- `tests/shell_and_tube/test_task020_rule_profile_adapter.py` — replaced by
+  `tests/exchangers/shell_tube/test_task020_rule_profile_adapter.py` per §19.H
 
-The fixture allowlist above is the **complete** list of fixture paths
-the future TASK-020 implementation may add or modify. The
-implementation MUST NOT use glob, wildcard, recursive discovery, or
-any unlisted directory-level authorization. Any additional path
-requires a design amendment and separate Charles authorization before
-mutation.
+**Binding count: production 6 + tests 5 + fixtures 30 + manifest 1 = 42 files.**
+
+#### 14.2.1 Production — 6 files
+
+1. `src/hexagent/exchangers/shell_tube/__init__.py`
+2. `src/hexagent/exchangers/shell_tube/errors.py`
+3. `src/hexagent/exchangers/shell_tube/models.py`
+4. `src/hexagent/exchangers/shell_tube/rule_pack_adapter.py`
+5. `src/hexagent/exchangers/shell_tube/validation.py`
+6. `src/hexagent/exchangers/shell_tube/canonical.py`
+
+#### 14.2.2 Tests — 5 files (all accepted, none renamed)
+
+1. `tests/exchangers/shell_tube/test_task020_rule_profile_adapter.py`
+2. `tests/exchangers/shell_tube/test_task020_rule_pack_adapter.py`
+3. `tests/exchangers/shell_tube/test_task020_rule_pack_fixtures.py`
+4. `tests/exchangers/shell_tube/test_task020_rule_pack_hash_integration.py`
+5. `tests/exchangers/shell_tube/test_task020_rule_pack_canonical.py`
+
+Disposition:
+
+- all five filenames are **ACCEPTED**;
+- no test is renamed;
+- no proposed test is folded into an existing S1 test;
+- `test_task020_rule_profile_adapter.py` changes directory only from
+  the old frozen path (`tests/shell_and_tube/`) to
+  `tests/exchangers/shell_tube/`;
+- **no** TASK-020 contract defines
+  `test_task020_configuration_rule_pack_adapter.py` (this filename is
+  not part of any allowlist and must not be created).
+
+#### 14.2.3 Fixtures — 30 exact files
+
+The complete 30-file fixture enumeration below is preserved
+**exactly**. The fixture paths are file paths, not globs. The
+implementation MUST NOT use glob patterns, recursive wildcards,
+or any other form of bulk fixture discovery. Each fixture file
+is named, audited, and listed in this section by hand.
+
+All rule-pack fixtures are `INTERNAL_ENGINEERING_RULE` content
+authored under TASK-012 governance; they MUST NOT contain
+verbatim copies of TEMA or any other restricted standard text,
+table, figure or formula. Token identifiers in the fixtures are
+synthetic project-internal strings and carry no
+external-standard semantics.
+
+**Case revision — 4 files:**
+
+1. `tests/fixtures/task020/case_revision/case_revision_committed.json`
+2. `tests/fixtures/task020/case_revision/case_revision_superseded.json`
+3. `tests/fixtures/task020/case_revision/case_revision_archived.json`
+4. `tests/fixtures/task020/case_revision/case_revision_draft_blocked.json`
+
+**Valid configuration pack — 15 files:**
+
+1. `tests/fixtures/task020/rule_packs/valid_configuration_pack/manifest.json`
+2. `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/component_token_allowlist_front.json`
+3. `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/component_token_allowlist_shell.json`
+4. `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/component_token_allowlist_rear.json`
+5. `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/construction_family_normalization.json`
+6. `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/pass_count_allowed_range.json`
+7. `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/orientation_allowlist.json`
+8. `tests/fixtures/task020/rule_packs/valid_configuration_pack/rules/configuration_combination_blocklist.json`
+9. `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/component_token_allowlist_front_edge.json`
+10. `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/component_token_allowlist_shell_edge.json`
+11. `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/component_token_allowlist_rear_edge.json`
+12. `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/construction_family_normalization_edge.json`
+13. `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/pass_count_allowed_range_edge.json`
+14. `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/orientation_allowlist_edge.json`
+15. `tests/fixtures/task020/rule_packs/valid_configuration_pack/provenance/configuration_combination_blocklist_edge.json`
+
+**Conflicting configuration pack — 5 files:**
+
+1. `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/manifest.json`
+2. `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/rules/conflict_a.json`
+3. `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/rules/conflict_b.json`
+4. `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/provenance/conflict_a_edge.json`
+5. `tests/fixtures/task020/rule_packs/conflicting_configuration_pack/provenance/conflict_b_edge.json`
+
+**Unapproved pack — 3 files:**
+
+1. `tests/fixtures/task020/rule_packs/unapproved_rule_pack/manifest.json`
+2. `tests/fixtures/task020/rule_packs/unapproved_rule_pack/rules/allowed_tokens.json`
+3. `tests/fixtures/task020/rule_packs/unapproved_rule_pack/provenance/allowed_tokens_edge.json`
+
+**License-blocked pack — 3 files:**
+
+1. `tests/fixtures/task020/rule_packs/license_blocked_rule_pack/manifest.json`
+2. `tests/fixtures/task020/rule_packs/license_blocked_rule_pack/rules/allowed_tokens.json`
+3. `tests/fixtures/task020/rule_packs/license_blocked_rule_pack/provenance/allowed_tokens_edge.json`
+
+The fixture allowlist above is the **complete** list of
+fixture paths the future TASK-020 S2 implementation may add or
+modify. The implementation MUST NOT use glob, wildcard,
+recursive discovery, or any unlisted directory-level
+authorization. Any additional path requires a design amendment
+and separate Charles authorization before mutation.
+
+#### 14.2.4 CI manifest — 1 file
+
+1. `ci-shard-manifest.yml`
+
+Authorized only to register the five new S2 test files in
+`tests/exchangers/shell_tube/` (see §14.2.2) into the existing
+shard during the later S2 implementation round. The amendment's
+own frozen-contract integrity test
+(`tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`)
+is **not** part of this later 42-file S2 implementation
+boundary; it is part of the design-amendment authoring round.
 
 ## 15. Test and CI contract
 
@@ -2139,3 +2223,288 @@ After any future authorized merge, closeout must record:
 - confirmation that Issue #117 is closed only after Charles authorization;
 - confirmation that implementation remains not authorized unless separately
   granted.
+
+## 19. Design Amendment 001 — Issue #129 (S2 integration surface and paths)
+
+Design Amendment 001 (Issue #129) reconciles the original
+§14.2 implementation allowlist with the established S1
+architecture. It is **design-only** — it does not authorize any
+S2 implementation work. S2 implementation remains separately
+authorized through Issue #128, which this amendment leaves
+unchanged.
+
+### 19.A Amendment authority record
+
+- Authorizing Issue: **#129** — `[TASK-020][design amendment 001] Reconcile S2 integration surface and implementation paths`.
+- Branch base (S1 merge): `d00d5ced3c0da065f00096f0303c0709917fc380` (PR #127 merge).
+- Branch name (this amendment): `docs/task-020-amendment-001-s2-integration-surface-and-paths`.
+- Established S1 architecture (frozen at `d00d5ced`): production under `src/hexagent/exchangers/`, tests under `tests/exchangers/`, fixtures under `tests/fixtures/task020/`.
+- This amendment authorizes **design reconciliation only**:
+  the design contract's §10.2, §14.2 and a new §19 record are
+  edited. No production code, fixture, manifest, workflow, or TASK-001 through
+  TASK-019 contract is modified by this amendment. The only test mutation
+  is the frozen-contract integrity guard expressly authorized by Issue #129.
+- **S2 implementation remains separately authorized through Issue #128**. Issue #128 is unchanged by this amendment and remains OPEN.
+- **TASK-021 through TASK-039 remain unallocated** by this amendment and by TASK-020.
+
+### 19.B Established architecture (frozen)
+
+Design Amendment 001 freezes the following locations as the
+only places the future TASK-020 S2 implementation may write
+code or place tests:
+
+- production: `src/hexagent/exchangers/shell_tube/`
+- tests: `tests/exchangers/shell_tube/`
+- fixtures: `tests/fixtures/task020/`
+
+The amendment explicitly forbids creating or duplicating any
+path under:
+
+- `src/hexagent/shell_and_tube/` — superseded
+- `tests/shell_and_tube/` — superseded
+
+The original §14.2 paths under those two forbidden roots are
+**not** valid TASK-020 implementation paths. The amendment
+records that those paths are superseded for TASK-020
+implementation. Any continuation of work under the forbidden
+roots is a §17 anti-fabrication violation.
+
+### 19.C Exact S2 implementation allowlist (42 files)
+
+The future TASK-020 S2 implementation may modify only the
+**exact 42 files** enumerated in §14.2.1–§14.2.4, summarized:
+
+- production: **6 files** under `src/hexagent/exchangers/shell_tube/`
+- tests: **5 files** under `tests/exchangers/shell_tube/`
+- fixtures: **30 files** under `tests/fixtures/task020/`
+  - case revision: 4
+  - valid configuration pack: 15
+  - conflicting configuration pack: 5
+  - unapproved pack: 3
+  - license-blocked pack: 3
+- CI manifest: **1 file** (`ci-shard-manifest.yml`, S2 registration only)
+
+**Binding count: 6 + 5 + 30 + 1 = 42 files.** The amendment's
+own frozen-contract integrity test
+(`tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`)
+is **not** part of this later 42-file S2 implementation
+boundary; it is part of the design-amendment authoring round.
+
+All five test filenames are **ACCEPTED** without rename. No
+proposed test is folded into an existing S1 test. The path
+`test_task020_rule_profile_adapter.py` changes directory only
+from `tests/shell_and_tube/` to `tests/exchangers/shell_tube/`.
+**No** TASK-020 contract defines
+`test_task020_configuration_rule_pack_adapter.py`; that filename
+must not be created.
+
+Fixtures are exact file paths. No glob, no wildcard, no
+recursive discovery, no project-authored synthetic token list
+beyond the listed set, no copied TEMA or restricted-standard
+content.
+
+The CI manifest is authorized only to register the five new
+S2 test files in the existing shard during the later S2
+implementation round.
+
+### 19.D Frozen top-level S2 entry point
+
+The future TASK-020 S2 implementation MUST provide a top-level
+entry point with this exact frozen signature:
+
+```python
+def validate_request(
+    payload: Mapping[str, Any],
+    *,
+    loaded_rule_pack: LoadedRulePackView | None = None,
+    validation_report: RulePackValidationReport | None = None,
+) -> ConfigurationValidationResult:
+    ...
+```
+
+Explicit rules:
+
+- the existing `validate_request(payload)` call (no adapter
+  arguments) remains compatible and MUST NOT break;
+- `loaded_rule_pack` and `validation_report` are supplied by
+  the **caller** — never by `validate_request`;
+- `validate_request` MUST NOT construct them from a filesystem
+  path;
+- `validate_request` MUST NOT accept a filesystem path, an
+  environment variable, a clock, a locale, or an unordered
+  filesystem traversal as an implicit input;
+- `validate_request` MUST NOT call into TASK-012
+  verification routines to re-implement them;
+- no network lookup, no clock, no environment, no locale, no
+  unordered filesystem dependence is allowed in
+  `validate_request`.
+
+### 19.E Frozen adapter signature (unchanged)
+
+The TASK-020 adapter signature is preserved unchanged from §12.1:
+
+```python
+ConfigurationRulePackAdapter.validate(
+    request: ShellAndTubeConfigurationRequest,
+    loaded_rule_pack: LoadedRulePackView,
+    validation_report: RulePackValidationReport,
+) -> ConfigurationRuleEvaluation
+```
+
+### 19.F Frozen top-level input-presence semantics
+
+`validate_request` MUST apply the following exact rules.
+
+**`INTERNAL_GENERIC` mode**:
+
+- if **either** `loaded_rule_pack` is present **or**
+  `validation_report` is present, return `BLOCKED` with code
+  `STC_RULE_PACK_NOT_EXPECTED_IN_MODE`. Both arguments must
+  be absent in `INTERNAL_GENERIC` mode.
+
+**`APPROVED_RULE_PACK` mode — both adapter arguments absent**:
+
+- if **both** `loaded_rule_pack is None` and
+  `validation_report is None`, return `BLOCKED` with code
+  `STC_RULE_PACK_ADAPTER_INPUTS_MISSING`.
+
+**`APPROVED_RULE_PACK` mode — partial presence**:
+
+- if **exactly one** of `loaded_rule_pack` or
+  `validation_report` is absent, return `BLOCKED` with code
+  `STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE`.
+
+**`APPROVED_RULE_PACK` mode — both present**:
+
+- delegate to
+  `ConfigurationRulePackAdapter.validate(request, loaded_rule_pack, validation_report)`.
+
+The existing cross-input codes from §6.3.3 remain authoritative
+inside the adapter:
+
+- TASK-012 report status is not `"ok"` →
+  `STC_RULE_PACK_VALIDATION_FAILED`;
+- report, loaded pack and request do not describe the same
+  pack → `STC_RULE_PACK_VALIDATION_REPORT_MISMATCH`;
+- requested identity absent →
+  `STC_REQUESTED_RULE_PACK_IDENTITY_MISSING`;
+- requested identity field mismatch →
+  `STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH`;
+- canonical hash mismatch →
+  `STC_RULE_PACK_CANONICAL_HASH_MISMATCH`.
+
+### 19.G Disposition of `STC_RULE_PACK_REQUIRED`
+
+- `STC_RULE_PACK_REQUIRED` was the transitional Slice-A
+  blocker.
+- Design Amendment 001 supersedes it for S2.
+- The S2 implementation MUST stop emitting
+  `STC_RULE_PACK_REQUIRED`.
+- It is replaced by three codes (added to §10.2 above):
+  - `STC_RULE_PACK_ADAPTER_INPUTS_MISSING`
+  - `STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE`
+  - `STC_RULE_PACK_NOT_EXPECTED_IN_MODE`
+- The S2 implementation MUST NOT alias multiple new
+  conditions back to `STC_RULE_PACK_REQUIRED`.
+
+### 19.H Test-contract reconciliation
+
+The five accepted S2 tests supplement (not replace) the existing
+S1 tests under `tests/exchangers/shell_tube/`. Minimum coverage
+mapping:
+
+- `tests/exchangers/shell_tube/test_task020_rule_profile_adapter.py`
+  - closed profile ID;
+  - five frozen rule types (§12.3);
+  - deterministic selection (§12.4);
+  - duplicate/conflict/intersection behavior (§12.5).
+- `tests/exchangers/shell_tube/test_task020_rule_pack_adapter.py`
+  - top-level presence matrix (§19.F);
+  - TASK-012 report status (`STC_RULE_PACK_VALIDATION_FAILED`);
+  - cross-input consistency (§6.3.3);
+  - approved-pack success;
+  - `ConfigurationRuleEvaluation` shape.
+- `tests/exchangers/shell_tube/test_task020_rule_pack_fixtures.py`
+  - all four rule-pack fixture sets
+    (`valid_configuration_pack`, `conflicting_configuration_pack`,
+    `unapproved_rule_pack`, `license_blocked_rule_pack`);
+  - required-rule missing;
+  - unapproved/license/provenance blocked;
+  - conflict fixtures;
+  - unsupported token;
+  - incompatible combination;
+  - no restricted content (TASK-012 inherited marker).
+- `tests/exchangers/shell_tube/test_task020_rule_pack_hash_integration.py`
+  - full evaluated authority in canonical payload (§11.2);
+  - hash stability;
+  - mutation of every computation-authority field;
+  - UUIDv5 identity;
+  - blocked-result identity (§11.2.1).
+- `tests/exchangers/shell_tube/test_task020_rule_pack_canonical.py`
+  - selected-rule composite sort (§12.4);
+  - per-rule evidence/provenance ordering (§11.4);
+  - warning/blocker full-object ordering (§11.4);
+  - canonical JSON behavior (§11.2).
+
+The existing S1 tests continue to cover schema, case authority,
+generic mode and non-computable output boundaries and remain
+authoritative.
+
+### 19.I Preserved exclusions
+
+Design Amendment 001 does NOT authorize, and the S2
+implementation MUST NOT introduce:
+
+- geometry;
+- heat-transfer calculations;
+- pressure-drop calculations;
+- Kern;
+- Bell–Delaware;
+- TEMA calculations or copied content;
+- mechanical calculations;
+- materials;
+- mass;
+- cost;
+- optimization;
+- API;
+- CLI;
+- report rendering;
+- persistence;
+- TASK-021 through TASK-039 allocation.
+
+### 19.J Anti-fabrication guard
+
+This amendment itself is design-only. The amendment MUST NOT:
+
+- write production code under `src/hexagent/exchangers/shell_tube/`;
+- write or rename test files other than the single amendment's
+  frozen-contract integrity test
+  (`tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`);
+- create or modify any fixture file in
+  `tests/fixtures/task020/`;
+- modify `ci-shard-manifest.yml`;
+- modify any workflow file;
+- modify any TASK-001 through TASK-019 contract;
+- modify Issue #128;
+- create the S2 implementation branch
+  `codex/task-020-s2-rule-pack-adapter-impl`.
+
+This amendment's only allowed file mutations are:
+
+1. `docs/tasks/TASK-020-shell-and-tube-configuration-schema.md`;
+2. `tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`.
+
+No third file is authorized.
+
+### 19.K Amendment change log
+
+- **001** (this amendment, Issue #129) — Reconcile §14.2
+  implementation allowlist from `shell_and_tube/` roots to
+  `exchangers/shell_tube/` roots; freeze 42-file S2
+  implementation boundary; freeze `validate_request` top-level
+  signature with `loaded_rule_pack` / `validation_report`
+  keyword-only inputs; replace `STC_RULE_PACK_REQUIRED` with
+  three input-presence codes; record five accepted S2 test
+  filenames and minimum coverage mapping; preserve all
+  §19.I exclusions; preserve Issue #128 unchanged; preserve
+  TASK-021 through TASK-039 unallocated.
