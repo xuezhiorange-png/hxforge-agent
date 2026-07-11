@@ -3,21 +3,21 @@
 Asserts that the TASK-020 design contract file
 ``docs/tasks/TASK-020-shell-and-tube-configuration-schema.md`` is not
 modified by this round. The contract is **frozen** at the
-Design Amendment 001 / Issue #129 authority revision.
+Design Amendment 002 / Issue #131 authority revision.
 
 This test verifies three invariants:
 
 1. The TASK-020 design contract file is **present** on the
    implementation branch.
 2. The TASK-020 design contract file is **unchanged** from the
-   Design Amendment 001 / Issue #129 final byte content,
+   Design Amendment 002 / Issue #131 final byte content,
    verified by content hash (CI-independent: no git history or
    remote refs required).
 3. The TASK-020 design contract §1 heading is present (sanity
    check on the contract text).
 
 This test is the **only** test mutation authorized by Design
-Amendment 001 / Issue #129. It MUST NOT be weakened or bypassed.
+Amendment 002 / Issue #131. It MUST NOT be weakened or bypassed.
 """
 
 from __future__ import annotations
@@ -33,16 +33,16 @@ _DESIGN_CONTRACT_PATH = Path("docs/tasks/TASK-020-shell-and-tube-configuration-s
 _EXPECTED_DESIGN_HEADING = "## 1. Authority, status and authorization gate"
 
 # SHA-256 of docs/tasks/TASK-020-shell-and-tube-configuration-schema.md
-# at the frozen authority revision TASK-020 Design Amendment 001 /
-# Issue #129 final byte content (this branch HEAD).
+# at the frozen authority revision TASK-020 Design Amendment 002 /
+# Issue #131 final byte content (this branch HEAD).
 # Pre-computed via:
 #   python3 -c \
 #     "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('docs/tasks/TASK-020-shell-and-tube-configuration-schema.md').read_bytes()).hexdigest())"  # noqa: E501
 #
-# Authority chain: S1 merge SHA d00d5ced3c0da065f00096f0303c0709917fc380
-#                  → Design Amendment 001 / Issue #129 final byte content
-#                  → SHA-256 0b369c9552bbe69c71faef92e564a974d2a6fab3badfb7866eadd752caed2f73
-_EXPECTED_FROZEN_SHA256 = "0b369c9552bbe69c71faef92e564a974d2a6fab3badfb7866eadd752caed2f73"
+# Authority chain: Amendment 001 merge SHA d4ee40109c74061db89339e55899cabfe2fb80fe
+#                  → Design Amendment 002 / Issue #131 final byte content
+#                  → SHA-256 ec15dd0668f4497c981a432bde5aaeef50560060e4733872f367aa9c35426ddb
+_EXPECTED_FROZEN_SHA256 = "ec15dd0668f4497c981a432bde5aaeef50560060e4733872f367aa9c35426ddb"
 
 
 def test_design_contract_present() -> None:
@@ -51,7 +51,7 @@ def test_design_contract_present() -> None:
 
 def test_design_contract_unchanged_from_frozen_authority() -> None:
     """The TASK-020 design contract must not be modified by the
-    Design Amendment 001 / Issue #129 round except via this
+    Design Amendment 002 / Issue #131 round except via this
     test's own SHA-256 update.
 
     Verified by content hash (SHA-256) against the pre-computed
