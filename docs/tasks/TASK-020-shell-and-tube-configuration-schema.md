@@ -25,30 +25,45 @@
 | Standards/license authority | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` |
 | Product scope authority | `docs/MASTER_DEVELOPMENT_SPEC.md`, especially §§2, 7, 8.2 and 9 |
 | **Design PR (Issue #117 authoring)** | **#118 — MERGED** (squash merge SHA `6bdc9d9de1be2a5d56fcee40804902100f8140aa`; historical at original PR #118 authoring; pre-Amendment-001 baseline) |
-| **Design contract status** | **FROZEN ON MAIN THROUGH DESIGN AMENDMENT 001** (Design Amendment 001 merge SHA `d4ee40109c74061db89339e55899cabfe2fb80fe`, current `main`); DESIGN AMENDMENT 002 AUTHORED IN PR #132 / DRAFT / NOT MERGED (Amendment 002 authority is proposed only, NOT current-main authority) |
-| **Current main frozen design-document SHA-256 (through Amendment 001)** | `0b369c9552bbe69c71faef92e564a974d2a6fab3badfb7866eadd752caed2f73` (recomputed and pinned in the §1 authority table on the current-main branch; this is the current-main authority) |
-| **Proposed Amendment 002 final design-document SHA-256** | `<recomputed after all corrections; written by Commit E review-correction; not main authority until PR #132 merges>` |
-| **Implementation status** | **S1: MERGED** (PR #127 squash merge SHA `d00d5ced3c0da065f00096f0303c0709917fc380`); **S2: AUTHORIZED BUT SUSPENDED / BLOCKED** while Amendment 002 remains unmerged (Issue #128 OPEN); **S2 RECOVERY: NOT AUTHORIZED** |
+| **Design contract status** | **FROZEN ON MAIN THROUGH DESIGN AMENDMENT 002** (Design Amendment 001 merge SHA `d4ee40109c74061db89339e55899cabfe2fb80fe` — historical; Design Amendment 002 merge SHA `4a2296258cfffe497623ee20d9b29fcc97358aaa` — **main at Amendment 003 authoring time**); Design Amendment 003 is authored on its own branch and remains proposed until the Amendment 003 design PR is created and merged (see §21) |
+| **Pre-Amendment-003 design-document SHA-256 on `main` (Amendments 001+002 cumulative)** | `9d6ae05ca2f1656f9a7c63a35f6043cea9220f21a59fcb7e97f3d79819a5c4c2` (Amendment 002 final byte content on the pre-Amendment-003 `main` baseline). Not asserted as the current `main` authority — that authority is frozen exclusively by the integrity guard below. |
+| **Amendment 003 frozen-document integrity authority** | `tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py::_EXPECTED_FROZEN_SHA256`. The exact content SHA-256 is bound only by the integrity guard and is intentionally NOT duplicated inside the hashed document (the document content hash is the only source of the document content hash; writing it back into the document would form an unbounded `document bytes → document SHA → write SHA into document → document bytes change → SHA changes` loop, which cannot converge to a fixed point). |
+| **Implementation status (historical, factual)** | **S1: MERGED** (PR #127 squash merge SHA `d00d5ced3c0da065f00096f0303c0709917fc380`); **S2**: implementation remains authorized but Amendment 003 does not itself authorize S2 implementation recovery; S2 recovery requires the five-step authorization sequence recorded below (binding) |
 | **S1 implementation PR** | #127 |
 | **S1 merge SHA** | `d00d5ced3c0da065f00096f0303c0709917fc380` |
-| **S2 implementation Issue** | #128 — OPEN |
-| Issue #117 status | OPEN (preserved; not closed or marked completed by any TASK-020 amendment) |
+| **S2 implementation Issue number** | #128 (live state externally tracked) |
+| **S2 implementation authority comments** | Phase A authorization `4950222698`; Phase B authorization `4950298467` |
+| Issue #117 status | OPEN at the Amendment 003 authoring time on 2026-07-12; live state externally tracked. Not frozen as a permanent design-contract invariant. |
 | Design Amendment 001 | **AUTHORED + MERGED** (Issue #129, see §19) |
 | Design Amendment 001 S1 merge SHA | `d00d5ced3c0da065f00096f0303c0709917fc380` |
-| Issue #129 status (pre-merge) | OPEN |
+| Issue #129 state | OPEN at Amendment 001 authoring time; CLOSED / COMPLETED post-merge per Issue close governance flow. These are date-bounded historical facts; live state externally tracked. |
 | Design Amendment 001 merge PR | #130 — MERGED |
-| Design Amendment 001 merge SHA | `d4ee40109c74061db89339e55899cabfe2fb80fe` (current `main`) |
-| Issue #129 status (post-merge) | CLOSED / COMPLETED |
-| Post-merge CI run | `29144874902` — completed / success |
-| Design Amendment 002 | **AUTHORED** (Issue #131, see §20); proposed Amendment 002 final SHA written in the row above |
-| Design Amendment 002 Issue | #131 — `[TASK-020][design amendment 002] Make the S2 rule-pack adapter contract executable` |
+| Design Amendment 001 merge SHA | `d4ee40109c74061db89339e55899cabfe2fb80fe` (historical; pre-Amendment-002 baseline) |
+| Post-merge CI run (Amendment 001) | `29144874902` — completed / success |
+| Design Amendment 002 | **AUTHORED + MERGED** (Issue #131, see §20); merged as PR #132 |
+| Design Amendment 002 Issue number | #131 (live state externally tracked) |
 | Design Amendment 002 authorization comment | Issue #131 comment `4943978594` |
 | Design Amendment 002 branch | `docs/task-020-amendment-002-s2-executable-contract` |
-| Design Amendment 002 starting HEAD | `d4ee40109c74061db89339e55899cabfe2fb80fe` (= current `main`) |
+| Design Amendment 002 starting HEAD (historical, pre-merger baseline) | `d4ee40109c74061db89339e55899cabfe2fb80fe` |
 | Design Amendment 002 authoring boundary | exactly two files (see §20.B): the design contract + the frozen-contract integrity guard |
-| Design Amendment 002 status | AUTHORING AUTHORIZED; AMENDMENT PR #132 PENDING / DRAFT / NOT READY / NOT MERGED |
-| S2 implementation status | **AUTHORIZED BUT BLOCKED** (comment `4943742113`; suspended while Amendment 002 remains unmerged) |
-| S2 implementation recovery | requires (1) amendment PR review, (2) separate Ready authorization, (3) separate merge authorization, (4) green post-merge CI, (5) separate Charles S2 recovery authorization — no step implies the next |
+| Design Amendment 002 PR | **#132 — MERGED** at `2026-07-12T06:16:15Z` |
+| Design Amendment 002 PR head SHA | `60e5d15d9e1ccef9a952a9b7ba599ed12035ae87` |
+| Design Amendment 002 merge SHA | `4a2296258cfffe497623ee20d9b29fcc97358aaa` (= main at Amendment 003 authoring time; not asserted as the permanent current `main`) |
+| Design Amendment 002 post-merge CI run | `29182404791` — completed / success |
+| Design Amendment 002 Issue #131 historical review-time state (verbatim, dated) | "Issue #131 was OPEN at the Amendment 003 transfer review on 2026-07-12. Its live state is tracked on GitHub and is not frozen as a permanent design-contract invariant." (per binding review comment `4950607148`). PR #132 being MERGED and Issue #131 being OPEN are independent facts and are not conflated. |
+| Design Amendment 003 | Authored on its own branch (see §21). The remaining lifecycle metadata (live branch head, PR number, Ready / merge state, post-merge CI run) is tracked externally in Issue #133 and the Amendment 003 design PR — it is not duplicated as permanent current-state content in this hash-frozen document. |
+| Design Amendment 003 Issue number | #133 (Issue was OPEN when the Amendment 003 authority record was authored on 2026-07-12; live state is read from GitHub) |
+| Design Amendment 003 Issue URL | `https://github.com/xuezhiorange-png/hxforge-agent/issues/133` |
+| Design Amendment 003 first blocking review comment | Issue #133 comment `4950510717` |
+| Design Amendment 003 second blocking review comment | Issue #133 comment `4950559775` |
+| Design Amendment 003 third blocking review comment | Issue #133 comment `4950607148` |
+| Design Amendment 003 authority comment | Issue #128 comment `4950333856` |
+| Design Amendment 003 branch (authoring identity) | `docs/task-020-amendment-003-s1-test-expectation-carveout` |
+| Design Amendment 003 authoring base SHA | `4a2296258cfffe497623ee20d9b29fcc97358aaa` (= main at Amendment 003 authoring time; not asserted as the permanent current `main`; see §21.A "Live branch head" row for externalization) |
+| Design Amendment 003 authoring boundary | exactly two files (see §21.A): the design contract + the frozen-contract integrity guard |
+| **Live GitHub metadata policy (design-document wide)** | Live GitHub metadata — Issue state (Issue #117, #128, #129, #131, #133), branch refs (the live `main` ref + the live `docs/task-020-amendment-003-s1-test-expectation-carveout` ref), commit SHA, PR number + state (`open` / `closed` / `merged` / `draft` / `ready`), Ready transition, merge SHA, post-merge CI run id, and authentication availability — is **read from GitHub when needed** and is **not duplicated as permanent current-state fields** in this hash-frozen document. Authoritative GitHub-side anchor for the Amendment 003 live metadata is the Amendment 003 design PR; governance escalation anchors are recorded as immutable Issue + comment IDs. |
+| S2 implementation recovery sequence (binding, future-stable) | requires, in order, with each step separately authorized: (1) Amendment 003 personal review; (2) separate Ready authorization on the Amendment 003 design PR; (3) separate merge authorization on the Amendment 003 design PR; (4) successful post-merge main CI on the exact merge SHA; (5) separate Charles S2 recovery authorization (Phase A authority comment `4950222698`; Phase B authority comment `4950298467`). No step implies the next. **This sequence remains true regardless of which historical review or future Ready / merge event has occurred.** |
+| Ready / merge authorization rule (binding, future-stable) | This design amendment (Design Amendment 003) does not itself authorize Ready transition on the Amendment 003 design PR or merge of the Amendment 003 design PR. Each requires a separate explicit Charles authorization. **This rule remains true regardless of whether Ready / merge has happened in the future.** |
 | TASK-021 through TASK-039 | UNALLOCATED |
 | TASK-012 mutation | NOT AUTHORIZED by this amendment or any prior TASK-020 amendment |
 
@@ -1833,6 +1848,13 @@ The following paths from the original §14.2 are explicitly
 
 **Binding count: production 6 + tests 5 + fixtures 30 + manifest 1 = 42 files.**
 
+**CORE_S2_IMPLEMENTATION_ALLOWLIST_REMAINS_42_FILES** — Design Amendment
+003 does NOT modify, replace, re-enumerate, or relax this 42-file
+binding count. The 42 paths in §14.2.1 + §14.2.2 + §14.2.3 + §14.2.4
+remain frozen exactly as listed below. Amendment 003 only ADDS the
+two legacy S1 correction paths documented in §14.2.5; it does NOT
+modify the 42-file core boundary.
+
 #### 14.2.1 Production — 6 files
 
 1. `src/hexagent/exchangers/shell_tube/__init__.py`
@@ -1940,6 +1962,58 @@ own frozen-contract integrity test
 (`tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`)
 is **not** part of this later 42-file S2 implementation
 boundary; it is part of the design-amendment authoring round.
+
+#### 14.2.5 Amendment 003 legacy S1 test-correction carve-out
+
+Design Amendment 003 (see §21) carves out exactly **two** legacy
+S1 test paths from the §14.2 implementation allowlist. These
+two paths are the ONLY pre-existing S1 tests that the later S2
+implementation round is authorized to mutate, and even then
+only for the single targeted assertion substitution documented
+in §21.A (one literal `expected_code` substitution per file).
+The carve-out is **not** a general S1-test amendment; no other
+pre-existing S1 test may be modified.
+
+Exact two carved-out legacy S1 paths:
+
+1. `tests/exchangers/shell_tube/test_task020_blockers.py`
+2. `tests/exchangers/shell_tube/test_task020_schema.py`
+
+Per-path mutation discipline (binding):
+
+- Each file is authorized **only** for a single literal
+  `STC_RULE_PACK_REQUIRED → STC_RULE_PACK_ADAPTER_INPUTS_MISSING`
+  substitution at the existing assertion sites:
+  - `tests/exchangers/shell_tube/test_task020_blockers.py`
+    line 156 (parametrized case at lines 138-149).
+  - `tests/exchangers/shell_tube/test_task020_schema.py`
+    line 231 (`test_approved_rule_pack_mode_emits_fail_closed_blocker`,
+    lines 219-233).
+- The substitution MUST align with the §19.F +
+  §19.G `STC_RULE_PACK_REQUIRED` disposition matrix.
+- The substitution MUST NOT:
+  - refactor the test;
+  - delete, skip, or weaken any existing assertion;
+  - add new assertions or new parametrized cases in these files;
+  - reformat the file beyond the minimal diff required for the
+    literal string substitution;
+  - modify any other line in the file.
+- No other pre-existing S1 test file may be mutated.
+
+Final implementation PR maximum path count:
+
+- Core S2 implementation allowlist (this §14.2, frozen):
+  **42 paths**
+- Amendment 003 legacy S1 correction carve-out (this §14.2.5):
+  **2 paths**
+- Maximum final implementation PR path count:
+  **42 + 2 = 44 paths**
+
+This §14.2.5 is NOT a relaxation of the §14.2 core 42-file
+allowlist, NOT a glob/wildcard/recursive authorization, and NOT
+a transfer of any §19.I exclusion. The 42-file core boundary is
+preserved exactly as §14.2.1 + §14.2.2 + §14.2.3 + §14.2.4 =
+6 + 5 + 30 + 1.
 
 ## 15. Test and CI contract
 
@@ -2518,7 +2592,17 @@ mapping:
 
 The existing S1 tests continue to cover schema, case authority,
 generic mode and non-computable output boundaries and remain
-authoritative.
+authoritative, with the following Design Amendment 003 carve-out:
+the two existing S1 parametrized/assertion cases at
+`tests/exchangers/shell_tube/test_task020_blockers.py`
+(line 156) and
+`tests/exchangers/shell_tube/test_task020_schema.py`
+(line 231) are authorized for a single
+`STC_RULE_PACK_REQUIRED → STC_RULE_PACK_ADAPTER_INPUTS_MISSING`
+substitution each (see §14.2.5 below and §21 below). Amendment 003
+does **NOT** fold S2 tests into S1 tests; it only adjusts the two
+legacy expectations that reference the superseded `STC_RULE_PACK_REQUIRED`
+blocker code per §19.G above.
 
 ### 19.I Preserved exclusions
 
@@ -2616,6 +2700,60 @@ No third file is authorized.
   separate merge → green post-merge CI → separate Charles S2
   recovery authorization). No engineering calculation is
   authorized. TASK-021 through TASK-039 remain unallocated.
+- **003** (this amendment, see §21; authorizing Issue
+  **#133** — `[TASK-020][design amendment 003] Reconcile S1
+  test expectations with S2 input matrix` (was OPEN when
+  the Amendment 003 authority record was authored on
+  2026-07-12; live state is read from GitHub);
+  authority comment
+  `4950333856`; base SHA
+  `4a2296258cfffe497623ee20d9b29fcc97358aaa`) —
+  S1 test expectation carve-out. The S2 implementation
+  produces exactly two S1-test assertion mismatches:
+  - `tests/exchangers/shell_tube/test_task020_blockers.py::TestBlockerCodeClosure::test_known_blocker_codes_emitted`
+    (parametrized case at lines 138-149; assertion line 156)
+  - `tests/exchangers/shell_tube/test_task020_schema.py::TestEquipmentAndAuthority::test_approved_rule_pack_mode_emits_fail_closed_blocker`
+    (lines 219-233; assertion line 231)
+
+  Both tests assert `validate_request` emits the legacy
+  `STC_RULE_PACK_REQUIRED` blocker under the §19.F row-3
+  case (`APPROVED_RULE_PACK` mode + both adapter inputs
+  absent). The merged contract §19.F + §19.G explicitly
+  mandates that S2 **stop** emitting `STC_RULE_PACK_REQUIRED`
+  and replace it with `STC_RULE_PACK_ADAPTER_INPUTS_MISSING`
+  for that row. The §14.2 implementation allowlist (Design
+  Amendment 001 §19.C, frozen through Design Amendment 002
+  §20.B) does not authorize the two S1 test files. Amendment
+  003 therefore:
+
+  - Carves out exactly two legacy S1 correction paths from
+    the implementation allowlist (see new §14.2.5 below).
+    Each correction is a single targeted
+    `expected_code` substitution:
+    `STC_RULE_PACK_REQUIRED → STC_RULE_PACK_ADAPTER_INPUTS_MISSING`.
+    No test refactor, no assertion weakening, no coverage
+    removal, no scenario change, no third file.
+  - Updates §19.H below to clarify that the five new S2
+    tests supplement (not replace) the two carve-out-corrected
+    S1 tests. Amendment 003 does **NOT** fold S2 tests into
+    S1 tests; it only adjusts the two legacy expectations
+    that reference the superseded blocker code.
+  - Records §21 below (Design Amendment 003) with the full
+    amendment ledger (authorizing Issue **#133**, authority
+    comment, base SHA,
+    exact two failing node IDs, exact two test paths, old →
+    new blocker code, contract-mandated reason, 42-file core
+    boundary preserved, 44-path maximum implementation
+    boundary, implementation suspension requirements).
+  - Preserves the 001 and 002 entries above verbatim.
+
+  Authoring boundary: exactly two files (the design contract
+  + the frozen-contract integrity guard). No TASK-012 mutation.
+  No S2 implementation recovery authorization. No force-push.
+  S2 implementation remains suspended; implementation recovery
+  is not implied by the §003 amendment and requires Charles's
+  separate explicit S2 recovery authorization as in §20.G.
+  TASK-021 through TASK-039 remain unallocated.
 
 ## 20. Design Amendment 002 — Issue #131 (make the S2 rule-pack adapter contract executable)
 
@@ -2916,3 +3054,227 @@ files in §20.F.
   remains suspended until the five-step §20.G sequence is
   satisfied. No engineering calculation is authorized.
   TASK-021 through TASK-039 remain unallocated.
+
+## 21. Design Amendment 003 — S1 test expectation carve-out
+
+Design Amendment 003 reconciles the two pre-existing S1-test
+`STC_RULE_PACK_REQUIRED` expectations that the S2 implementation
+cannot satisfy without violating either the merged contract (§19.F +
+§19.G explicit `STC_RULE_PACK_REQUIRED` disposition matrix) or the
+§14.2 implementation allowlist (42-file frozen core). It is
+**design-only** — it does not authorize any S2 implementation
+recovery, any TASK-012 mutation, any TASK-020 repository file
+beyond the exact two-file authoring boundary, or any other TASK-001
+through TASK-019 contract.
+
+### 21.A Amendment authority record
+
+- Authorizing Issue: **#133** —
+  `[TASK-020][design amendment 003] Reconcile S1 test
+  expectations with S2 input matrix`
+  ([https://github.com/xuezhiorange-png/hxforge-agent/issues/133](https://github.com/xuezhiorange-png/hxforge-agent/issues/133);
+  was OPEN when the Amendment 003 authority record was
+  authored on 2026-07-12; live state is read from GitHub; scope:
+  Design Amendment 003).
+- Authorizing comment: Issue #128 comment `4950333856`
+  (`OPTION_A_SEMANTICS_FROZEN` — `STC_RULE_PACK_REQUIRED` expectations
+  in existing S1 tests are stale for S2; `OPTIONS_B_AND_C_REJECTED`).
+- Amendment 003 Issue number bound: **#133** (was OPEN when the
+  Amendment 003 authority record was authored on 2026-07-12; live
+  state is read from GitHub).
+- Amendment 003 Issue URL:
+  `https://github.com/xuezhiorange-png/hxforge-agent/issues/133`.
+- Amendment 003 first blocking review comment: Issue #133
+  comment `4950510717` (transfer review round):
+  §1 current-authority row correction, §21.A PR #132
+  merged-state correction, §21.F commit/push scope
+  clarification.
+- Amendment 003 second blocking review comment: Issue #133
+  comment `4950559775` (final metadata stabilization round):
+  Issue #131 historical OPEN review-time statement
+  enforcement, self-referential commit SHA removal,
+  transient transfer-state removal, live GitHub metadata
+  externalization, PR #132 immutable merged-fact retention,
+  integrity guard negative-assertion expansion.
+- Amendment 003 third blocking review comment: Issue #133
+  comment `4950607148` (final authority-table
+  stabilization round): live-state contradiction removal
+  (no undated `state: OPEN` / no `current \`main\`` rebind
+  claim); impossible self-hash field replacement; integrity
+  guard as sole hash authority; §1 frozen-rule
+  classification; PR #132 immutable facts retention; Issue
+  #131 dated historical OPEN preservation; Issue #133
+  authority-number-and-URL preservation; §14.2.5 + §21
+  headings preservation; two exact S1 paths preservation;
+  live-metadata externalization rule preservation; one
+  frozen commit ahead; complete transfer package generation
+  (patch + tar).
+- Amendment 001 merge SHA (prior step):
+  `d4ee40109c74061db89339e55899cabfe2fb80fe` (historical).
+- Amendment 002 PR #132: **MERGED** at
+  `2026-07-12T06:16:15Z`; head SHA
+  `60e5d15d9e1ccef9a952a9b7ba599ed12035ae87`; merge SHA
+  `4a2296258cfffe497623ee20d9b29fcc97358aaa`; post-merge
+  main CI `29182404791` — completed / success.
+- Amendment 002 Issue #131 historical review-time state
+  (verbatim, dated): "Issue #131 was OPEN at the Amendment 003
+  transfer review on 2026-07-12. Its live state is tracked on
+  GitHub and is not frozen as a permanent design-contract
+  invariant." (per binding review comment `4950607148`). PR #132
+  being MERGED and Issue #131 being OPEN are independent facts
+  and are not conflated.
+- Authoring base SHA (Amendment 003 starting HEAD):
+  `4a2296258cfffe497623ee20d9b29fcc97358aaa`.
+- Amendment branch:
+  `docs/task-020-amendment-003-s1-test-expectation-carveout`.
+- Live branch head / commit SHA: tracked externally in the
+  Amendment 003 design PR and Issue #133; not duplicated in
+  this hash-frozen document.
+- Authoring boundary: exactly two files:
+  1. `docs/tasks/TASK-020-shell-and-tube-configuration-schema.md` (this file).
+  2. `tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`
+     (the integrity guard updated to the post-Amendment-003 final SHA-256).
+
+### 21.B Exact failing S1 node IDs (binding carve-out)
+
+1. `tests/exchangers/shell_tube/test_task020_blockers.py::TestBlockerCodeClosure::test_known_blocker_codes_emitted`
+   - parametrized case entry at lines 138-149
+   - assertion line 156
+2. `tests/exchangers/shell_tube/test_task020_schema.py::TestEquipmentAndAuthority::test_approved_rule_pack_mode_emits_fail_closed_blocker`
+   - test body lines 219-233
+   - assertion line 231
+
+### 21.C Exact legacy S1 paths authorized for single-`expected_code` substitution
+
+| # | Path | Old expected blocker | New expected blocker | Mutation discipline |
+|---|---|---|---|---|
+| 1 | `tests/exchangers/shell_tube/test_task020_blockers.py` (line 156) | `STC_RULE_PACK_REQUIRED` | `STC_RULE_PACK_ADAPTER_INPUTS_MISSING` | literal string substitution only at line 156; no other mutation |
+| 2 | `tests/exchangers/shell_tube/test_task020_schema.py` (line 231) | `STC_RULE_PACK_REQUIRED` | `STC_RULE_PACK_ADAPTER_INPUTS_MISSING` | literal string substitution only at line 231; no other mutation |
+
+The substitution MUST align with §19.F + §19.G; the §19.F row-3
+matrix mandates the new code. Amendment 003 does **NOT** fold
+the new S2 tests into either of these two S1 files.
+
+### 21.D Reason the correction is contract-mandated
+
+- The merged Design Amendments 001 + 002 preserve the §19.F input-
+  presence matrix and the §19.G disposition of
+  `STC_RULE_PACK_REQUIRED`: S2 **must stop** emitting that code, and
+  the §19.F row-3 case (`APPROVED_RULE_PACK` + both adapter
+  inputs absent) must emit `STC_RULE_PACK_ADAPTER_INPUTS_MISSING`.
+- The pre-Amendment-001 S1 tests at `test_task020_blockers.py` line
+  156 and `test_task020_schema.py` line 231 assert the prior
+  Slice-A emission of `STC_RULE_PACK_REQUIRED` for the same input
+  matrix, which §19.G explicitly supersedes.
+- The §14.2 implementation allowlist (Amendments 001 + 002) does
+  not authorize either of these two S1 test files; the implementation
+  is therefore structurally unable to make these two assertions
+  green without violating the §14.2 boundary.
+- The minimal honest resolution is a contract revision that
+  carves out exactly the two `expected_code` substitution sites,
+  binds that substitution to the §19.F + §19.G matrix, and
+  preserves the §14.2 42-file core exactly.
+
+### 21.E Maximum implementation boundary
+
+- Core S2 implementation allowlist (frozen by §14.2 + Amendment 001
+  §19.C + Amendment 002 §20.B): **42 files** (6 production +
+  5 S2 tests + 30 fixtures + 1 CI manifest).
+- Amendment 003 legacy S1 correction carve-out (§14.2.5 above):
+  **2 files**.
+- Final maximum implementation PR path count:
+  **42 core + 2 carve-out = 44 paths**.
+- No third path is authorized. No glob, wildcard, recursive
+  discovery, or related-tests style authorization is granted.
+
+### 21.F Implementation suspension requirements
+
+Amendment 003 authoring round authorizes the following
+**Amendment 003 design-branch** mutations only (the freeze
+boundary of this amendment; see §21.A):
+
+- the single Amendment 003 design-branch commit (this commit);
+- non-force push of the Amendment 003 design branch
+  (`docs/task-020-amendment-003-s1-test-expectation-carveout`) by
+  Charles's separately-authorized authenticated GitHub transfer;
+- creation of **one** Draft Amendment 003 design PR (Draft, not
+  Ready).
+
+Amendment 003 authoring does NOT authorize any of the
+following (binding):
+
+- S2 implementation commit on branch
+  `codex/task-020-s2-rule-pack-adapter-impl` or any other
+  implementation branch;
+- S2 implementation-branch push;
+- implementation PR creation on the S2 implementation branch;
+- implementation PR Mark Ready;
+- implementation PR merge;
+- mutation of the two carve-out S1 test files in this amendment
+  round (`§21.D` substitution is deferred to a later
+  separately-authorized implementation round);
+- any force-push (including on the Amendment 003 design branch);
+- Mark Ready transition on the Amendment 003 Draft design PR;
+- merge of the Amendment 003 Draft design PR;
+- close of Issue #128;
+- close of Issue #133 (Amendment 003 Issue; governance closeout
+  is performed post-merge under a separate closeout round);
+- close of Issue #131 (Amendment 002 Issue; live state
+  externally tracked on `GET /repos/{owner}/{repo}/issues/131`;
+  PR #132 merge does not determine Issue #131 close state);
+- any TASK-012 mutation;
+- any TASK-001 through TASK-019 contract mutation;
+- any change to `tests/fixtures/task020/`,
+  `ci-shard-manifest.yml`, `.github/workflows/`,
+  `tests/ci/verify_manifest.py`, or the S2 implementation branch
+  ref `codex/task-020-s2-rule-pack-adapter-impl`.
+
+Implementation recovery requires the five-step sequence in §1
+(PR review → separate Ready → separate merge → green post-merge
+CI → separate Charles S2 recovery authorization). No step implies
+the next. Amendment 003 itself does NOT advance the S2
+implementation one step further into the five-step sequence.
+
+### 21.G Anti-fabrication guard (binding for this round)
+
+This amendment itself is design-only. This round MUST NOT:
+
+- write production code under `src/hexagent/exchangers/shell_tube/`;
+- write or rename any test file other than
+  `tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`
+  and the existing two carve-out S1 files are NOT mutated in this
+  round;
+- create or modify any fixture file in `tests/fixtures/task020/`;
+- modify `ci-shard-manifest.yml`;
+- modify any workflow file;
+- modify `tests/ci/verify_manifest.py`;
+- modify any TASK-012 file;
+- modify any TASK-001 through TASK-019 contract;
+- modify the S2 implementation branch
+  `codex/task-020-s2-rule-pack-adapter-impl`;
+- modify either of the two carve-out S1 test files
+  (`test_task020_blockers.py`,
+  `test_task020_schema.py`) — that mutation is deferred to the
+  later separately-authorized implementation round;
+- mark Ready;
+- merge;
+- close Issue #128, Issue #133, or Issue #131.
+
+The amendment's only allowed file mutations are the two files in
+§21.A.
+
+### 21.H Amendment 003 change log
+
+- **001** (Issue #129) — see §19.K.
+- **002** (Issue #131) — see §19.K and §20.
+- **003** (this amendment) — see §21.A above. Carves out the two
+  legacy S1 test paths at §21.B + §21.C for a single literal
+  `STC_RULE_PACK_REQUIRED → STC_RULE_PACK_ADAPTER_INPUTS_MISSING`
+  substitution each. Authoring boundary: exactly two files
+  (§21.A). No TASK-012 mutation. No TASK-020 repository file
+  beyond §21.A. No 3rd file. S2 implementation remains suspended
+  until the §1 five-step sequence is satisfied. No engineering
+  calculation is authorized. TASK-021 through TASK-039 remain
+  unallocated. The §14.2 42-file core boundary is preserved
+  exactly; §14.2.5 adds 2 carved-out S1 correction paths;
+  maximum final implementation PR path count is 44.
