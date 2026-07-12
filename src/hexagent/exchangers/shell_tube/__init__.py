@@ -36,6 +36,7 @@ from hexagent.exchangers.shell_tube import (
     canonical,
     errors,
     models,
+    rule_pack_adapter,
     schema,
     validation,
 )
@@ -47,52 +48,75 @@ __all__ = [
     "canonical",
     "errors",
     "models",
+    "rule_pack_adapter",
     "schema",
     "validation",
     # Schema-version constants (used by callers and tests).
     "REQUEST_SCHEMA_VERSION",
     "CONFIGURATION_SCHEMA_VERSION",
-    # Top-level entry point.
+    # Top-level entry points.
     "validate_request",
+    "ConfigurationRulePackAdapter",
     # Stable types re-exported for convenience.
     "AuthorityMode",
+    "CASE_REVISION_AUTHORITY_VALUES",
+    "CLOSED_RULE_TYPES",
     "CaseRevisionAuthority",
     "ComponentTokens",
     "ConfigurationAuthorityBinding",
+    "ConfigurationRuleEvaluation",
     "ConfigurationValidationResult",
     "ConstructionFamily",
     "EquipmentFamily",
     "EvaluatedRulePackAuthority",
+    "LoadedRulePackView",
     "Orientation",
+    "PROFILE_ID_TASK_020_CONFIGURATION_RULE_V1",
     "RequestRulePackIdentity",
     "RequestedRulePackIdentity",
+    "RulePackValidationReport",
     "SelectedRuleAuthority",
     "ShellAndTubeConfiguration",
     "ShellAndTubeConfigurationRequest",
     "StandardClaimStatus",
+    "TASK_020_VALIDATION_REPORT_OK",
     "ValidationStatus",
-]
+    "loaded_rule_pack_view_from_loader_dict",
+    "rule_pack_validation_report_from_validate_dict",
+]  # noqa: E501
 
 # Stable types re-exported for convenience. These are also re-exported
 # from ``models``; we import from ``models`` here to keep the
 # public-surface contract in a single location.
 from hexagent.exchangers.shell_tube.models import (
+    CASE_REVISION_AUTHORITY_VALUES,
+    CLOSED_RULE_TYPES,
+    PROFILE_ID_TASK_020_CONFIGURATION_RULE_V1,
+    TASK_020_VALIDATION_REPORT_OK,
     AuthorityMode,
     CaseRevisionAuthority,
     ComponentTokens,
     ConfigurationAuthorityBinding,
+    ConfigurationRuleEvaluation,
     ConfigurationValidationResult,
     ConstructionFamily,
     EquipmentFamily,
     EvaluatedRulePackAuthority,
+    LoadedRulePackView,
     Orientation,
     RequestedRulePackIdentity,
     RequestRulePackIdentity,
+    RulePackValidationReport,
     SelectedRuleAuthority,
     ShellAndTubeConfiguration,
     ShellAndTubeConfigurationRequest,
     StandardClaimStatus,
     ValidationStatus,
+)
+from hexagent.exchangers.shell_tube.rule_pack_adapter import (
+    ConfigurationRulePackAdapter,
+    loaded_rule_pack_view_from_loader_dict,
+    rule_pack_validation_report_from_validate_dict,
 )
 from hexagent.exchangers.shell_tube.validation import validate_request
 

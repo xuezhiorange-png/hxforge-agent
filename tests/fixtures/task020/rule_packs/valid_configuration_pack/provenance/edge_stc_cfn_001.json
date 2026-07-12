@@ -1,0 +1,7 @@
+{
+  "edge_id": "edge_stc_cfn_001",
+  "from_rule_id": "external:INTERNAL_ENGINEERING_RULE:stc-cfn-001-source",
+  "to_rule_id": "stc-cfn-001",
+  "relation": "paraphrases",
+  "evidence_ref": "internal://engineering-handbook/shell_tube/stc-cfn-001-source/v1"
+}

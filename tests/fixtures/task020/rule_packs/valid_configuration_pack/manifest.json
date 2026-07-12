@@ -1,0 +1,19 @@
+{
+  "rule_pack_id": "task020.configuration-rule-pack.shell_and_tube.v1",
+  "rule_pack_version": "1.0.0",
+  "rule_count": 7,
+  "rules": [
+    "stc-cta-front-001",
+    "stc-cta-shell-001",
+    "stc-cta-rear-001",
+    "stc-cfn-001",
+    "stc-pcar-001",
+    "stc-oal-001",
+    "stc-ccb-001"
+  ],
+  "target_jurisdiction": "INTL",
+  "target_standard_family": "INTERNAL",
+  "creation_timestamp_utc": "2026-07-09T08:00:00Z",
+  "review_id": "task020_s2_pack_review_001",
+  "canonical_hash": "b78062a37c2d0940c0c5e6820efbf7af002ab82b63b34be225878674ee9a86b6"
+}

@@ -1,0 +1,14 @@
+{
+  "rule_pack_id": "task020.configuration-rule-pack.shell_and_tube.conflict.v1",
+  "rule_pack_version": "1.0.0",
+  "rule_count": 2,
+  "rules": [
+    "conflict-a-pass-count",
+    "conflict-b-pass-count"
+  ],
+  "target_jurisdiction": "INTL",
+  "target_standard_family": "INTERNAL",
+  "creation_timestamp_utc": "2026-07-09T08:00:00Z",
+  "review_id": "task020_s2_conflict_review_001",
+  "canonical_hash": "d65d1f833f39a6ee9a99a304fb9b6cc3fc14f3c7041de6bf26ada81a2d81be69"
+}

@@ -1,0 +1,7 @@
+{
+  "edge_id": "edge_stc_oal_001",
+  "from_rule_id": "external:INTERNAL_ENGINEERING_RULE:stc-oal-001-source",
+  "to_rule_id": "stc-oal-001",
+  "relation": "paraphrases",
+  "evidence_ref": "internal://engineering-handbook/shell_tube/stc-oal-001-source/v1"
+}

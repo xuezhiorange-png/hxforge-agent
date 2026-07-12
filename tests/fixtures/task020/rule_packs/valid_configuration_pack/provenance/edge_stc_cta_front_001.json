@@ -1,0 +1,7 @@
+{
+  "edge_id": "edge_stc_cta_front_001",
+  "from_rule_id": "external:INTERNAL_ENGINEERING_RULE:stc-cta-front-001-source",
+  "to_rule_id": "stc-cta-front-001",
+  "relation": "paraphrases",
+  "evidence_ref": "internal://engineering-handbook/shell_tube/stc-cta-front-001-source/v1"
+}

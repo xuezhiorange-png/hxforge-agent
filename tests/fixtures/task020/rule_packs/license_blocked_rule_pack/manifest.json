@@ -1,0 +1,13 @@
+{
+  "rule_pack_id": "task020.configuration-rule-pack.shell_and_tube.license_blocked.v1",
+  "rule_pack_version": "0.1.0",
+  "rule_count": 1,
+  "rules": [
+    "license-blocked-pass-range"
+  ],
+  "target_jurisdiction": "INTL",
+  "target_standard_family": "INTERNAL",
+  "creation_timestamp_utc": "2026-07-09T08:00:00Z",
+  "review_id": "task020_s2_license_review_001",
+  "canonical_hash": "3e1c564e701bd65652383d54577307186750995b3bc4afe435aa8f42b357d6f3"
+}

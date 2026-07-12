@@ -44,17 +44,23 @@ from hexagent.exchangers.shell_tube.models import (
     AuthorityMode,
     CaseRevisionAuthority,
     ComponentTokens,
+    ConfigurationRuleEvaluation,
     ConfigurationValidationResult,
     ConstructionFamily,
     EquipmentFamily,
     ErrorEntry,
     EvaluatedRulePackAuthority,
+    LoadedRulePackView,
     Orientation,
     RequestedRulePackIdentity,
+    RulePackValidationReport,
     ShellAndTubeConfiguration,
     ShellAndTubeConfigurationRequest,
     StandardClaimStatus,
     ValidationStatus,
+)
+from hexagent.exchangers.shell_tube.rule_pack_adapter import (
+    ConfigurationRulePackAdapter,
 )
 from hexagent.exchangers.shell_tube.schema import (
     CONFIGURATION_SCHEMA_VERSION,
@@ -441,16 +447,34 @@ def _build_normalized_configuration(
     request: ShellAndTubeConfigurationRequest,
     warnings: tuple[ErrorEntry, ...],
     blockers: tuple[ErrorEntry, ...],
+    *,
+    evaluated_rpa_override: EvaluatedRulePackAuthority | None = None,
+    normalized_construction_family_override: ConstructionFamily | None = None,
 ) -> tuple[ShellAndTubeConfiguration, str, str]:
-    """Build the §9.1 normalized configuration + (hash, id)."""
+    """Build the §9.1 normalized configuration + (hash, id).
+
+    ``evaluated_rpa_override`` (Phase B): when provided, the configuration
+    carries this ``EvaluatedRulePackAuthority`` instead of ``None``. Used
+    by the S2 ``APPROVED_RULE_PACK`` success path after the adapter has
+    produced an evaluated authority.
+
+    ``normalized_construction_family_override`` (Phase B): when provided,
+    the configuration's ``construction_family`` field is taken from this
+    value (the adapter's normalized result) instead of the request's
+    input ``construction_family``. Used by the S2 success path so the
+    canonical payload reflects the rule-pack's normalization decision.
+    """
+
+    normalized_construction_family = (
+        normalized_construction_family_override
+        if normalized_construction_family_override is not None
+        else request.construction_family
+    )
+
     # §9.1 — authority binding
-    evaluated_rpa: EvaluatedRulePackAuthority | None = None
-    if request.authority_mode == AuthorityMode.APPROVED_RULE_PACK:
-        # Slice A does NOT load or evaluate rule packs (§16.1). The
-        # binding carries a null rule-pack slot for the FAIL-CLOSED
-        # BLOCKED path; the result is BLOCKED before the binding is
-        # serialized.
-        evaluated_rpa = None
+    evaluated_rpa: EvaluatedRulePackAuthority | None = (
+        evaluated_rpa_override if evaluated_rpa_override is not None else None
+    )
     authority_binding = bind_request_to_configuration_authority(
         request_authority_mode=request.authority_mode,
         case_authority=request.case_authority,
@@ -470,7 +494,7 @@ def _build_normalized_configuration(
         "equipment_family": request.equipment_family.value,
         "authority_mode": request.authority_mode.value,
         "standard_claim_status": standard_claim_status.value,
-        "construction_family": request.construction_family.value,
+        "construction_family": normalized_construction_family.value,
         "orientation": request.orientation.value,
         "shell_pass_count": request.shell_pass_count,
         "tube_pass_count": request.tube_pass_count,
@@ -544,7 +568,7 @@ def _build_normalized_configuration(
         equipment_family=request.equipment_family,
         authority_mode=request.authority_mode,
         standard_claim_status=standard_claim_status,
-        construction_family=request.construction_family,
+        construction_family=normalized_construction_family,
         orientation=request.orientation,
         shell_pass_count=request.shell_pass_count,
         tube_pass_count=request.tube_pass_count,
@@ -575,6 +599,9 @@ def _error_entry_to_dict(entry: ErrorEntry) -> dict[str, Any]:
 
 def validate_request(
     payload: Mapping[str, Any],
+    *,
+    loaded_rule_pack: LoadedRulePackView | None = None,
+    validation_report: RulePackValidationReport | None = None,
 ) -> ConfigurationValidationResult:
     """Validate a §8 request payload.
 
@@ -582,9 +609,27 @@ def validate_request(
     the result has ``status == BLOCKED`` and the normalized
     configuration is **not** produced (§10.1).
 
-    For ``APPROVED_RULE_PACK`` mode, the result is BLOCKED with
-    ``STC_RULE_PACK_REQUIRED`` (Slice A does NOT load or evaluate
-    rule packs).
+    §19.F — Frozen top-level input-presence semantics (Phase B)
+    ------------------------------------------------------
+    The two optional adapter inputs are **keyword-only** and default to
+    ``None``; this preserves backward compatibility with the S1
+    call site (``validate_request(payload)``). The four §19.F
+    combinations are:
+
+    - ``INTERNAL_GENERIC`` mode + both ``loaded_rule_pack`` and
+      ``validation_report`` are ``None``:
+      → existing S1 generic flow (§7.1 / §9.1).
+    - ``INTERNAL_GENERIC`` mode + either ``loaded_rule_pack`` or
+      ``validation_report`` is not ``None``:
+      → BLOCKED with
+      ``STC_RULE_PACK_NOT_EXPECTED_IN_MODE``.
+    - ``APPROVED_RULE_PACK`` mode + both inputs are ``None``:
+      → BLOCKED with ``STC_RULE_PACK_ADAPTER_INPUTS_MISSING``.
+    - ``APPROVED_RULE_PACK`` mode + exactly one input is not ``None``:
+      → BLOCKED with ``STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE``.
+    - ``APPROVED_RULE_PACK`` mode + both inputs are not ``None``:
+      → call ``ConfigurationRulePackAdapter.validate(...)`` and use
+      its ``ConfigurationRuleEvaluation`` outputs.
     """
     blockers: list[ErrorEntry] = []
     warnings: list[ErrorEntry] = []
@@ -605,27 +650,94 @@ def validate_request(
             blockers.append(_error_entry_from_exception(exc))
             return _finalize_blocked(blockers, warnings)
 
-        # §8.3 — authority-mode consistency already enforced in _payload_to_request
-
-        # §16.1 — Slice A: APPROVED_RULE_PACK mode emits fail-closed
-        # blocker (no rule-pack loading / evaluation).
-        if request.authority_mode == AuthorityMode.APPROVED_RULE_PACK:
+        # §19.F — Frozen input-presence semantics
+        #
+        # ``loaded_rule_pack`` + ``validation_report`` are the two
+        # adapter-side inputs. Each combination maps to a single
+        # ``STC_*`` blocker code per §19.F. The codes are non-reserved
+        # (they are emitter codes, not the five §20.C / §20.E reserved
+        # codes that S2 must never raise).
+        def _emit_presence_blocker(
+            code_str: str,
+            message: str,
+        ) -> ConfigurationValidationResult:
             blockers.append(
                 ErrorEntry(
-                    code="STC_RULE_PACK_REQUIRED",
+                    code=code_str,
                     field_path="authority_mode",
-                    message_key="STC_RULE_PACK_REQUIRED",
+                    message_key=code_str,
                     evidence_refs=(),
                     details=None,
                 )
             )
+            _ = message  # message kept for caller-side context only
             return _finalize_blocked(blockers, warnings)
 
-        # §9.1 — normalized configuration
+        if request.authority_mode == AuthorityMode.INTERNAL_GENERIC:
+            # §19.F — Forbidden presence of adapter inputs in
+            # INTERNAL_GENERIC.
+            if loaded_rule_pack is not None or validation_report is not None:
+                return _emit_presence_blocker(
+                    "STC_RULE_PACK_NOT_EXPECTED_IN_MODE",
+                    "INTERNAL_GENERIC forbids adapter inputs",
+                )
+            # else — generic S1 flow continues below
+            configuration, _, _ = _build_normalized_configuration(
+                request=request,
+                warnings=tuple(warnings),
+                blockers=tuple(blockers),
+            )
+            return ConfigurationValidationResult(
+                status=ValidationStatus.VALID,
+                configuration=configuration,
+                warnings=tuple(warnings),
+                blockers=(),
+                deferred_capabilities=DEFERRED_CAPABILITIES,
+            )
+
+        # request.authority_mode == APPROVED_RULE_PACK from here
+        # §19.F — APPROVED_RULE_PACK mode: both inputs required
+        if loaded_rule_pack is None and validation_report is None:
+            return _emit_presence_blocker(
+                "STC_RULE_PACK_ADAPTER_INPUTS_MISSING",
+                "APPROVED_RULE_PACK mode requires both adapter inputs",
+            )
+        if loaded_rule_pack is None or validation_report is None:
+            return _emit_presence_blocker(
+                "STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE",
+                "APPROVED_RULE_PACK mode requires both adapter inputs (one is absent)",
+            )
+
+        # §19.F — both inputs are present: call the Phase A adapter.
+        # On any BlockerError, the exception is converted into a
+        # single ErrorEntry whose code is the structured ``STC_*``
+        # code carried by the BlockerError (no message parsing).
+        try:
+            evaluation: ConfigurationRuleEvaluation = ConfigurationRulePackAdapter.validate(
+                request=request,
+                loaded_rule_pack=loaded_rule_pack,
+                validation_report=validation_report,
+            )
+        except errors.BlockerError as exc:
+            blockers.append(_error_entry_from_exception(exc))
+            return _finalize_blocked(blockers, warnings)
+
+        # §19.F — adapter success: consume the
+        # ConfigurationRuleEvaluation exactly as defined in §20.D —
+        # normalized_construction_family + evaluated_rule_pack_authority.
+        # No parallel lists, no partial authority.
+        normalized_evaluated_rpa: EvaluatedRulePackAuthority = (
+            evaluation.evaluated_rule_pack_authority
+        )
+        normalized_cf: ConstructionFamily = evaluation.normalized_construction_family
+
+        # §9.1 — normalized configuration using the adapter's outputs.
         configuration, _, _ = _build_normalized_configuration(
             request=request,
             warnings=tuple(warnings),
             blockers=tuple(blockers),
+            evaluated_rpa_override=normalized_evaluated_rpa,
+            normalized_construction_family_override=normalized_cf,
         )
         return ConfigurationValidationResult(
             status=ValidationStatus.VALID,

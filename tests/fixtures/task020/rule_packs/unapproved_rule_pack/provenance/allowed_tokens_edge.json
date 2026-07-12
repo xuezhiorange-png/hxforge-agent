@@ -1,0 +1,7 @@
+{
+  "edge_id": "allowed_tokens_edge",
+  "from_rule_id": "external:INTERNAL_ENGINEERING_RULE:unapproved-source",
+  "to_rule_id": "unapproved-pass-range",
+  "relation": "paraphrases",
+  "evidence_ref": "internal://engineering-handbook/shell_tube/unapproved/v1"
+}

@@ -441,14 +441,21 @@ class BlockerCode(enum.StrEnum):
     STC_AUTHORITY_FIELDS_INCONSISTENT = "STC_AUTHORITY_FIELDS_INCONSISTENT"
     # Rule-pack blockers (Slice A emits STC_RULE_PACK_REQUIRED only;
     # all other rule-pack codes are Slice B territory and are still
-    # defined here for the closed-set guarantee).
+    # Rule-pack blockers (Slice A emits STC_RULE_PACK_REQUIRED only;
+    # S2 Phase B emits the full slice):
     STC_RULE_PACK_REQUIRED = "STC_RULE_PACK_REQUIRED"
     STC_RULE_PACK_NOT_FOUND = "STC_RULE_PACK_NOT_FOUND"
     STC_RULE_PACK_VALIDATION_FAILED = "STC_RULE_PACK_VALIDATION_FAILED"
     STC_RULE_PACK_VALIDATION_REPORT_MISMATCH = "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+    # §19.F — input-presence blockers for the
+    # ``validate_request(payload, *, loaded_rule_pack, validation_report)``
+    # top-level entry point. Phase A deferred these to Phase B.
+    STC_RULE_PACK_NOT_EXPECTED_IN_MODE = "STC_RULE_PACK_NOT_EXPECTED_IN_MODE"
+    STC_RULE_PACK_ADAPTER_INPUTS_MISSING = "STC_RULE_PACK_ADAPTER_INPUTS_MISSING"
+    STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE = "STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE"
+    STC_RULE_PACK_CANONICAL_HASH_MISMATCH = "STC_RULE_PACK_CANONICAL_HASH_MISMATCH"
     STC_REQUESTED_RULE_PACK_IDENTITY_MISSING = "STC_REQUESTED_RULE_PACK_IDENTITY_MISSING"
     STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH = "STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH"
-    STC_RULE_PACK_CANONICAL_HASH_MISMATCH = "STC_RULE_PACK_CANONICAL_HASH_MISMATCH"
     STC_REQUIRED_RULE_MISSING = "STC_REQUIRED_RULE_MISSING"
     STC_RULE_UNAPPROVED = "STC_RULE_UNAPPROVED"
     STC_RULE_CANONICAL_HASH_MISMATCH = "STC_RULE_CANONICAL_HASH_MISMATCH"
@@ -480,25 +487,225 @@ class WarningCode(enum.StrEnum):
 __all__ = [
     "AuthorityMode",
     "BlockerCode",
+    "CASE_REVISION_AUTHORITY_VALUES",
     "CaseRevisionAuthority",
     "CaseRevisionStatus",
+    "CLOSED_RULE_TYPES",
     "ComponentTokens",
     "ConfigurationAuthorityBinding",
+    "ConfigurationRuleEvaluation",
     "ConfigurationValidationResult",
     "ConstructionFamily",
     "DEFERRED_CAPABILITIES",
     "EquipmentFamily",
     "ErrorEntry",
     "EvaluatedRulePackAuthority",
+    "LoadedRulePackView",
     "Orientation",
+    "PROFILE_ID_TASK_020_CONFIGURATION_RULE_V1",
     "RequestRulePackIdentity",
     "RequestedRulePackIdentity",
+    "RulePackValidationReport",
     "SelectedRuleAuthority",
     "ShellAndTubeConfiguration",
     "ShellAndTubeConfigurationRequest",
     "StandardClaimStatus",
     "TASK_020_ACCEPTED_LIFECYCLE_VALUES",
+    "TASK_020_VALIDATION_REPORT_OK",
     "ValidationStatus",
     "WarningCode",
     "replace",
-]
+]  # noqa: E501
+
+
+# ---------------------------------------------------------------------------
+# §6.3.1 — TASK-020-owned typed view: LoadedRulePackView (S2, frozen)
+# ---------------------------------------------------------------------------
+
+
+PROFILE_ID_TASK_020_CONFIGURATION_RULE_V1 = "task020.configuration-rule.v1"
+
+# §12.3 — closed rule_type set
+CLOSED_RULE_TYPES: tuple[str, ...] = (
+    "COMPONENT_TOKEN_ALLOWLIST",
+    "CONSTRUCTION_FAMILY_NORMALIZATION",
+    "PASS_COUNT_ALLOWED_RANGE",
+    "ORIENTATION_ALLOWLIST",
+    "CONFIGURATION_COMBINATION_BLOCKLIST",
+)
+
+TASK_020_VALIDATION_REPORT_OK = "ok"
+
+CASE_REVISION_AUTHORITY_VALUES: tuple[str, ...] = (
+    "committed",
+    "superseded",
+    "archived",
+    "draft_blocked",
+)
+
+
+@dataclass(frozen=True)
+class LoadedRulePackView:
+    """§6.3.1 — TASK-020-owned typed view over TASK-012 ``load_rule_pack``.
+
+    The view is a frozen wrapper around the plain ``dict`` returned by
+    ``hexagent.rule_packs.loader.load_rule_pack(root)``. It exposes the
+    three identity fields the TASK-020 adapter reads from the manifest
+    and the per-rule artifact dictionary keyed by ``rule_id``. The view
+    does **not** re-validate, re-verify, or re-canonicalize anything —
+    it just freezes the dict-by-key shape so that the adapter can rely
+    on deterministic iteration over the dict (ascending Unicode code-point
+    order on the ``rule_id`` key, per §6.3.1's frozen iteration
+    discipline).
+    """
+
+    manifest: Mapping[str, object]
+    rules: Mapping[str, Mapping[str, object]]
+    provenance_edges: tuple[Mapping[str, object], ...]
+    permission_evidence: Mapping[str, Mapping[str, object]]
+    rule_pack_id: str
+    rule_pack_version: str
+    rule_pack_canonical_hash: str
+    rule_count: int
+
+    def __post_init__(self) -> None:
+        # Local defensive checks only — these mirror what the adapter
+        # would otherwise re-check at runtime; the typed view construction
+        # is the boundary where the loader result becomes a TASK-020
+        # value object. STC_* errors are emitted by the adapter, not
+        # here.
+        for name in ("rule_pack_id", "rule_pack_version", "rule_pack_canonical_hash"):
+            v = getattr(self, name)
+            if not isinstance(v, str) or not v:
+                raise TypeError(
+                    f"LoadedRulePackView.{name} must be a non-empty str, got {type(v).__name__}"
+                )
+        if not isinstance(self.rule_count, int) or self.rule_count < 0:
+            raise TypeError(
+                "LoadedRulePackView.rule_count must be a non-negative int, "
+                f"got {type(self.rule_count).__name__}"
+            )
+        if len(self.rules) != self.rule_count:
+            raise ValueError(
+                "LoadedRulePackView.rule_count disagrees with len(rules) "
+                f"({self.rule_count} vs {len(self.rules)})"
+            )
+
+
+# ---------------------------------------------------------------------------
+# §6.3.2 — TASK-020-owned typed view: RulePackValidationReport (S2, frozen)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RulePackValidationReport:
+    """§6.3.2 — TASK-020-owned typed view over TASK-012 ``validate_rule_pack``.
+
+    Adapter reads only ``status`` (must equal ``"ok"``), the identity
+    triple from ``manifest`` (``rule_pack_id`` / ``rule_pack_version`` /
+    ``canonical_hash``), and ``rule_count``. The ``errors`` list is
+    carried so the adapter can confirm the report shape but it is
+    **never parsed** to extract per-rule blockers (per §6.3.2 + §6.3.3).
+
+    Final-cleanup-round semantics (binding):
+
+    - ``status`` is required non-empty ``str``.
+    - ``status == "ok"`` ⇒ ``manifest`` is a ``Mapping`` and
+      ``rule_count`` is a non-negative ``int`` (bool rejected as int).
+    - ``status != "ok"`` ⇒ ``manifest`` may be ``None`` and
+      ``rule_count`` may be ``None``. The minimal TASK-012 failure
+      shape ``{status, errors}`` is the canonical source of ``fail``
+      reports; this view must not fabricate ``{}`` / ``0`` to keep the
+      dataclass constructable. ``None`` is the truthful absence.
+    - When a caller supplies non-``None`` on the failure path the type
+      is still validated (do not let ``bool`` slip through as ``int``).
+    """
+
+    status: str
+    manifest: Mapping[str, object] | None
+    rule_count: int | None
+    errors: tuple[Mapping[str, object], ...] = field(default_factory=tuple)
+    rule_pack_id: str = ""
+    rule_pack_version: str = ""
+    rule_pack_canonical_hash: str = ""
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.status, str) or not self.status:
+            raise TypeError("RulePackValidationReport.status must be a non-empty str")
+        if self.status == TASK_020_VALIDATION_REPORT_OK:
+            # Success path: manifest + rule_count are REQUIRED.
+            if not isinstance(self.manifest, Mapping):
+                raise TypeError(
+                    "RulePackValidationReport.manifest must be a Mapping when status='ok'"
+                )
+            if (
+                not isinstance(self.rule_count, int)
+                or isinstance(self.rule_count, bool)
+                or self.rule_count < 0
+            ):
+                raise TypeError(
+                    "RulePackValidationReport.rule_count must be a non-negative "
+                    "int (bool rejected) when status='ok'"
+                )
+            return
+        # Failure path: both fields are optional. If a value is supplied,
+        # validate its type. ``None`` is allowed and is the truthful
+        # absence of a manifest / rule_count on the failure path.
+        if self.manifest is not None and not isinstance(self.manifest, Mapping):
+            raise TypeError(
+                "RulePackValidationReport.manifest must be a Mapping or None; "
+                f"got {type(self.manifest).__name__}"
+            )
+        if self.rule_count is not None and (
+            not isinstance(self.rule_count, int)
+            or isinstance(self.rule_count, bool)
+            or self.rule_count < 0
+        ):
+            raise TypeError(
+                "RulePackValidationReport.rule_count must be a non-negative int "
+                "or None; "
+                f"got {type(self.rule_count).__name__}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# §20.D — ConfigurationRuleEvaluation (S2 success-only value object)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ConfigurationRuleEvaluation:
+    """§20.D — Frozen success-only value object returned by the adapter.
+
+    Two fields exactly; no parallel lists, no optional fields, no
+    blocked-state representation. The ``validate(...)`` method raises
+    ``BlockerError`` on any non-success path (per §6.3); a partial
+    result is **not** permitted.
+    """
+
+    normalized_construction_family: ConstructionFamily
+    evaluated_rule_pack_authority: EvaluatedRulePackAuthority
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.normalized_construction_family, ConstructionFamily):
+            raise TypeError(
+                "ConfigurationRuleEvaluation.normalized_construction_family "
+                "must be ConstructionFamily, got "
+                f"{type(self.normalized_construction_family).__name__}"
+            )
+        if not isinstance(self.evaluated_rule_pack_authority, EvaluatedRulePackAuthority):
+            raise TypeError(
+                "ConfigurationRuleEvaluation.evaluated_rule_pack_authority "
+                "must be EvaluatedRulePackAuthority, got "
+                f"{type(self.evaluated_rule_pack_authority).__name__}"
+            )
+        # Cross-check: evaluated authority's identity triple must agree
+        # on its own fields. If it doesn't, construction fails (this
+        # enforces the §6.3.5 invariant that the adapter only builds an
+        # authority whose three identity fields are mutually consistent).
+        era = self.evaluated_rule_pack_authority
+        if not (era.rule_pack_id and era.rule_pack_version and era.rule_pack_canonical_hash):
+            raise ValueError(
+                "ConfigurationRuleEvaluation.evaluated_rule_pack_authority "
+                "must have non-empty identity triple"
+            )

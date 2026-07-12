@@ -1,0 +1,65 @@
+{
+  "rule_id": "stc-oal-001",
+  "rule_version": "1.0.0",
+  "rule_title": "Orientation allowlist",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "jurisdiction": "INTL",
+  "standard_family": "INTERNAL",
+  "bibliographic_reference": "internal://engineering-handbook/shell_tube/stc-oal-001/v1.0.0",
+  "license_evidence": "project_internal_authority",
+  "source_evidence": {
+    "source_class": "INTERNAL_ENGINEERING_RULE",
+    "source_reference": "internal://engineering-handbook/shell_tube/stc-oal-001/v1.0.0",
+    "source_title_or_identifier": "Orientation allowlist",
+    "source_locator_or_citation": "Section stc-oal-001",
+    "source_jurisdiction": "INTL",
+    "license_evidence": "project_internal_authority",
+    "source_access_date": "n/a",
+    "source_publisher": "internal",
+    "source_version_or_publication_date": "2026-01-15"
+  },
+  "rule_body": {
+    "allowed_orientations": [
+      "HORIZONTAL",
+      "VERTICAL"
+    ],
+    "evidence_refs": [
+      "internal://engineering-handbook/shell_tube/orientation/v1"
+    ],
+    "profile_id": "task020.configuration-rule.v1",
+    "rule_type": "ORIENTATION_ALLOWLIST",
+    "constraint_id": "valid-cfg-orientation",
+    "priority": 0,
+    "applies_to_authority_modes": [
+      "APPROVED_RULE_PACK"
+    ],
+    "applies_to_construction_families": [
+      "FIXED_TUBESHEET"
+    ]
+  },
+  "forbidden_content_marker_check": [],
+  "applicability_envelope": {
+    "scope": "TASK-020-S2 fixture",
+    "units": "n/a"
+  },
+  "uncertainty": {
+    "type": "structural",
+    "note": "exact"
+  },
+  "review_status": "accepted",
+  "approval_status": "approved",
+  "provenance_edges": [
+    "edge_stc_oal_001"
+  ],
+  "human_entered_evidence": {
+    "author_identity": "internal_engineer@example.invalid",
+    "author_role": "internal engineer",
+    "entry_timestamp_utc": "2026-07-04T09:00:00Z",
+    "review": {
+      "review_thread_reference": "task020_s2_pack_review_001",
+      "review_timestamp_utc": "2026-07-04T09:15:00Z",
+      "reviewer_identity": "internal_reviewer@example.invalid"
+    }
+  },
+  "canonical_hash": "fbfdce8a85383682417c0e1df1b344fb27eae8a3da53bac72d29b23ec18c75ba"
+}
