@@ -24,15 +24,33 @@
 | Backlog authority | `docs/TASK_BACKLOG.md`, M3 collective scope for TASK-020 through TASK-039 |
 | Standards/license authority | `docs/tasks/TASK-012-standards-rule-pack-license-boundary.md` |
 | Product scope authority | `docs/MASTER_DEVELOPMENT_SPEC.md`, especially §§2, 7, 8.2 and 9 |
-| Design PR | #118 — DRAFT / NOT READY / NOT MERGED |
-| Design contract status | **DRAFT / NOT FROZEN** |
-| Frozen Contract Authority SHA | NOT ESTABLISHED |
-| Implementation status | **NOT AUTHORIZED** |
-| Implementation Issue | NOT CREATED |
-| Issue #117 status | OPEN |
-| Design Amendment 001 | **AUTHORED** (Issue #129, see §19) |
+| **Design PR (Issue #117 authoring)** | **#118 — MERGED** (squash merge SHA `6bdc9d9de1be2a5d56fcee40804902100f8140aa`; historical at original PR #118 authoring; pre-Amendment-001 baseline) |
+| **Design contract status** | **FROZEN ON MAIN THROUGH DESIGN AMENDMENT 001** (Design Amendment 001 merge SHA `d4ee40109c74061db89339e55899cabfe2fb80fe`, current `main`); DESIGN AMENDMENT 002 AUTHORED IN PR #132 / DRAFT / NOT MERGED (Amendment 002 authority is proposed only, NOT current-main authority) |
+| **Current main frozen design-document SHA-256 (through Amendment 001)** | `0b369c9552bbe69c71faef92e564a974d2a6fab3badfb7866eadd752caed2f73` (recomputed and pinned in the §1 authority table on the current-main branch; this is the current-main authority) |
+| **Proposed Amendment 002 final design-document SHA-256** | `<recomputed after all corrections; written by Commit E review-correction; not main authority until PR #132 merges>` |
+| **Implementation status** | **S1: MERGED** (PR #127 squash merge SHA `d00d5ced3c0da065f00096f0303c0709917fc380`); **S2: AUTHORIZED BUT SUSPENDED / BLOCKED** while Amendment 002 remains unmerged (Issue #128 OPEN); **S2 RECOVERY: NOT AUTHORIZED** |
+| **S1 implementation PR** | #127 |
+| **S1 merge SHA** | `d00d5ced3c0da065f00096f0303c0709917fc380` |
+| **S2 implementation Issue** | #128 — OPEN |
+| Issue #117 status | OPEN (preserved; not closed or marked completed by any TASK-020 amendment) |
+| Design Amendment 001 | **AUTHORED + MERGED** (Issue #129, see §19) |
 | Design Amendment 001 S1 merge SHA | `d00d5ced3c0da065f00096f0303c0709917fc380` |
-| Issue #129 status | OPEN |
+| Issue #129 status (pre-merge) | OPEN |
+| Design Amendment 001 merge PR | #130 — MERGED |
+| Design Amendment 001 merge SHA | `d4ee40109c74061db89339e55899cabfe2fb80fe` (current `main`) |
+| Issue #129 status (post-merge) | CLOSED / COMPLETED |
+| Post-merge CI run | `29144874902` — completed / success |
+| Design Amendment 002 | **AUTHORED** (Issue #131, see §20); proposed Amendment 002 final SHA written in the row above |
+| Design Amendment 002 Issue | #131 — `[TASK-020][design amendment 002] Make the S2 rule-pack adapter contract executable` |
+| Design Amendment 002 authorization comment | Issue #131 comment `4943978594` |
+| Design Amendment 002 branch | `docs/task-020-amendment-002-s2-executable-contract` |
+| Design Amendment 002 starting HEAD | `d4ee40109c74061db89339e55899cabfe2fb80fe` (= current `main`) |
+| Design Amendment 002 authoring boundary | exactly two files (see §20.B): the design contract + the frozen-contract integrity guard |
+| Design Amendment 002 status | AUTHORING AUTHORIZED; AMENDMENT PR #132 PENDING / DRAFT / NOT READY / NOT MERGED |
+| S2 implementation status | **AUTHORIZED BUT BLOCKED** (comment `4943742113`; suspended while Amendment 002 remains unmerged) |
+| S2 implementation recovery | requires (1) amendment PR review, (2) separate Ready authorization, (3) separate merge authorization, (4) green post-merge CI, (5) separate Charles S2 recovery authorization — no step implies the next |
+| TASK-021 through TASK-039 | UNALLOCATED |
+| TASK-012 mutation | NOT AUTHORIZED by this amendment or any prior TASK-020 amendment |
 
 The six ordinary commits between the PR #116 merge commit and this branch
 base created and removed three temporary no-op files. Their net tree diff is
@@ -865,25 +883,42 @@ Partial normalized outputs must not be exposed as valid configurations.
   field of the loaded pack manifest.
 - `STC_RULE_PACK_CANONICAL_HASH_MISMATCH` — manifest canonical hash
   declared by the request does not match the loaded `RulePack`.
-- `STC_REQUIRED_RULE_MISSING` — a `task020.configuration-rule.v1` rule
-  required for the current `construction_family` /
-  `authority_mode` combination was not found in the selected set.
-- `STC_RULE_UNAPPROVED` — a selected rule's `approval_status` is not
-  exactly `approved`.
-- `STC_RULE_CANONICAL_HASH_MISMATCH` — a selected rule's `canonical_hash`
-  does not verify against its declared content.
-- `STC_RULE_LICENSE_BLOCKED` — a selected rule's license boundary does
-  not verify under TASK-012.
-- `STC_RULE_PROVENANCE_BLOCKED` — a selected rule's provenance records
-  do not verify under TASK-012.
+- `STC_REQUIRED_RULE_MISSING` — **reserved, not emitted by TASK-020-S2**
+  per Design Amendment 002 §20.E. When the §12.9 required-constraint
+  matrix lacks an applicable required rule class or required
+  component-slot rule, TASK-020 emits `STC_RULE_CONSTRAINT_MISSING`
+  (below). The two codes MUST NOT be aliased.
+- `STC_RULE_UNAPPROVED` — **reserved in TASK-020-S2, not emitted**
+  per Design Amendment 002 §20.C. TASK-012 `validate_rule_pack`
+  reports `status = "fail"` via `errors[*].message`; TASK-020 does
+  not parse free-form messages. TASK-020 emits
+  `STC_RULE_PACK_VALIDATION_FAILED` instead. May become executable
+  only after a separately authorized TASK-012 interface exposes
+  structured verdict codes.
+- `STC_RULE_CANONICAL_HASH_MISMATCH` — **reserved in TASK-020-S2,
+  not emitted** per Design Amendment 002 §20.C. Same rationale as
+  `STC_RULE_UNAPPROVED`. TASK-020 does not re-verify per-rule
+  canonical hashes and does not parse TASK-012 free-form messages.
+- `STC_RULE_LICENSE_BLOCKED` — **reserved in TASK-020-S2, not
+  emitted** per Design Amendment 002 §20.C. Same rationale.
+  TASK-020 does not re-verify per-rule license boundaries.
+- `STC_RULE_PROVENANCE_BLOCKED` — **reserved in TASK-020-S2, not
+  emitted** per Design Amendment 002 §20.C. Same rationale.
+  TASK-020 does not re-verify per-rule provenance records.
 - `STC_RULE_TYPE_UNRECOGNIZED` — a rule body's `rule_type` is outside
   the closed TASK-020 type set per §12.3 / §12.8. The TASK-020
   profile is uniquely identified by
   `profile_id == "task020.configuration-rule.v1"`; a rule with that
   profile_id and an unknown `rule_type` MUST emit this blocker.
-- `STC_RULE_DUPLICATE_IDENTITY` — two selected rules share the same
-  `(profile_id, rule_type, constraint_id)` triple; resolution is
-  fail-closed per §12.5.
+- `STC_RULE_DUPLICATE_IDENTITY` — two surviving rules share the
+  same `(profile_id, rule_type, constraint_id)` logical-identity
+  triple but differ in at least one field of the complete §12.4
+  six-field comparison key `(priority, rule_type, constraint_id,
+  rule_id, rule_version, rule_artifact_canonical_hash)`. Exact
+  complete-key equality represents the same authority, is silently
+  deduplicated, and MUST NOT emit this blocker. Trigger condition:
+  same logical-identity triple AND different complete six-field
+  keys; see §12.4, §12.5, §15 item 9, §20.B.
 - `STC_RULE_APPLICABILITY_UNRESOLVED` — applicability matching could
   not determine whether a rule applies.
 - `STC_RULE_CONSTRAINT_MISSING` — a constraint class required by
@@ -1274,12 +1309,24 @@ TASK-012 rule-artifact direct fields (read by reference from the
 NOT use the order of rules inside the loaded pack filesystem, the
 order of fields inside `manifest.json`, the iteration order of any
 unordered collection, or any other input-order surrogate as a
-tie-breaker. If two distinct rules still share the same full key, the
-adapter MUST emit `STC_RULE_DUPLICATE_IDENTITY` and stop.
+tie-breaker.
+
+The complete six-field key `(priority, rule_type, constraint_id,
+rule_id, rule_version, rule_artifact_canonical_hash)` is the
+**complete comparison key** for exact duplicate detection. Rules
+sharing the same complete six-field key represent the **same
+authority**; they are silently deduplicated and the adapter MUST
+NOT emit `STC_RULE_DUPLICATE_IDENTITY` for exact complete-key
+equality. Detailed equality semantics — and the conditions under
+which `STC_RULE_DUPLICATE_IDENTITY` is emitted for same-logical-
+identity / different-authority rules — are defined in §12.5.
 
 The sort key above replaces any earlier "input order" tie-break
 language; the contract does not use input-order tie-breaks anywhere
-in §12 and MUST NOT reintroduce them.
+in §12 and MUST NOT reintroduce them. The above equality behavior
+supersedes the prior "MUST emit `STC_RULE_DUPLICATE_IDENTITY` and
+stop" sentence for equal complete keys; that sentence is removed
+by Design Amendment 002 §20.B.
 
 ### 12.5 Conflict, intersection and missing-rule semantics (frozen, fail-closed)
 
@@ -1289,21 +1336,22 @@ sorted rule set. The general precedence rule from an earlier draft
 below are exhaustive and the §12.4 sort key is the only precedence
 mechanism.
 
-1. **Duplicate rule identity (P1-5, binding)**: two surviving rules
-   sharing the same `(profile_id, rule_type, constraint_id)` triple
-   MUST emit `STC_RULE_DUPLICATE_IDENTITY` and stop. Two surviving
-   rules sharing the same full §12.4 sort key MUST also emit
-   `STC_RULE_DUPLICATE_IDENTITY` and stop. The full §12.4 sort key
-   `(priority, rule_type, constraint_id, rule_id, rule_version,
-   rule_artifact_canonical_hash)` is the **complete comparison key**
-   for exact duplicate detection. The TASK-020 adapter compares the
-   complete key, not a partial key, when deciding whether two rules
-   are exact duplicates:
+1. **Duplicate rule identity (P1-5, binding)** (reconciled by
+   Design Amendment 002 §20.B): two surviving rules sharing the
+   same `(profile_id, rule_type, constraint_id)` triple but
+   differing in any field of the full §12.4 sort key MUST emit
+   `STC_RULE_DUPLICATE_IDENTITY` and stop. The full §12.4 sort
+   key `(priority, rule_type, constraint_id, rule_id,
+   rule_version, rule_artifact_canonical_hash)` is the
+   **complete comparison key** for exact duplicate detection.
+   The TASK-020 adapter compares the complete key, not a
+   partial key, when deciding whether two rules are exact
+   duplicates:
    - if the complete keys are equal, the two rules are exact
      duplicates; the adapter MUST deduplicate silently (keep one
-     instance) and MUST NOT emit any blocker, because the complete
-     comparison key fully identifies them as the same logical rule
-     with the same authority;
+     deterministic copy) and MUST NOT emit any blocker, because
+     the complete comparison key fully identifies them as the
+     same logical rule with the same authority;
    - if the complete keys differ in any field (including
      `rule_artifact_canonical_hash`, `rule_version`, `priority`,
      `rule_type` or `constraint_id`), the two rules are distinct
@@ -1313,7 +1361,7 @@ mechanism.
      semantically distinct and MUST be preserved as separate
      selected rules;
    - if two rules share the same `(profile_id, rule_type,
-     constraint_id)` triple but differ in any other field of the
+     constraint_id)` triple but differ in any field of the
      full key, they are not exact duplicates but they are
      **same-logical-identity with different authority** and the
      adapter MUST emit `STC_RULE_DUPLICATE_IDENTITY` and stop. The
@@ -1326,13 +1374,16 @@ mechanism.
      above and is the **only** tie-break used for selection. The
      adapter MUST NOT use filesystem order, manifest-array order,
      dict-iteration order, dict-insertion order, input rule-list
-     order or any other input-order surrogate as a tie-break. If
-     the complete key above still cannot distinguish two rules
-     (a future-proofing note for arbitrary future rule fields), the
-     adapter MUST fail closed: emit `STC_RULE_DUPLICATE_IDENTITY`
-     and stop. The complete key in this contract revision is
-     sufficient for the closed §12.3 rule_type set; the fail-closed
-     fallback is a §12.5 binding rule for any future addition.
+     order or any other input-order surrogate as a tie-break. The
+     complete six-field key `(priority, rule_type, constraint_id,
+     rule_id, rule_version, rule_artifact_canonical_hash)` is the
+     single, exhaustive authority-comparison key for the closed
+     §12.3 `rule_type` set; if a future revision adds new
+     authority fields, those fields MUST be incorporated into the
+     complete key via a separately authorized design amendment
+     (the current contract MUST NOT silently extend the key, MUST
+     NOT reintroduce a partial-key dedup, and MUST NOT reinterpret
+     equal complete keys as conflicting authority).
 2. **Normalisation conflict**: if two
    `CONSTRUCTION_FAMILY_NORMALIZATION` rules apply to the same input
    value and produce different `normalized_value` results, the
@@ -1419,7 +1470,9 @@ appropriate §10.2 blocker code.
 ### 12.6 Citation and evidence
 
 `evidence_refs` on each rule body is preserved by the adapter into
-the result's `ConfigurationRuleEvaluation` and is the basis for the
+the rule artifacts inside `evaluated_rule_pack_authority.selected_rule_authorities`
+on the successful `ConfigurationRuleEvaluation` value object
+(frozen shape per §20.D). `evidence_refs` is the basis for the
 `evidence_refs` field of any §10.4 warning or blocker the
 configuration later emits. The TASK-020 contract does not collapse
 `source_class`, `license_evidence` or `approval_status` into
@@ -1905,18 +1958,35 @@ The future implementation must include:
 7. approved-rule-pack mode success tests using the synthetic
    `valid_configuration_pack` fixture set in
    `tests/fixtures/task020/rule_packs/valid_configuration_pack/`;
-8. missing rule (`STC_REQUIRED_RULE_MISSING`), unapproved rule
-   (`STC_RULE_UNAPPROVED`), canonical-hash-mismatched rule
-   (`STC_RULE_CANONICAL_HASH_MISMATCH`), license-blocked rule
-   (`STC_RULE_LICENSE_BLOCKED`) and provenance-blocked rule
-   (`STC_RULE_PROVENANCE_BLOCKED`) tests using the corresponding
-   `unapproved_rule_pack` and `license_blocked_rule_pack` fixtures;
+8. missing rule, unapproved pack, canonical-hash-mismatched
+   pack, license-blocked pack and provenance-blocked pack
+   tests using the corresponding `unapproved_rule_pack` and
+   `license_blocked_rule_pack` fixtures. Per Design Amendment
+   002 §20.C and §20.E, these tests assert the following
+   adapter-side outcomes and are NOT permitted to parse
+   `validation_report.errors[*].message`:
+   - `unapproved_rule_pack`: TASK-012 `validate_rule_pack`
+     returns `status = "fail"`; TASK-020 returns
+     `STC_RULE_PACK_VALIDATION_FAILED`.
+   - `license_blocked_rule_pack`: TASK-012 `validate_rule_pack`
+     returns `status = "fail"`; TASK-020 returns
+     `STC_RULE_PACK_VALIDATION_FAILED`.
+   - missing-required-class or missing-required-slot tests:
+     TASK-020 returns `STC_RULE_CONSTRAINT_MISSING` (the sole
+     emitted blocker for §12.9 matrix gaps; see §20.E).
+     `STC_REQUIRED_RULE_MISSING` is reserved and is not emitted.
 9. conflicting-rule fixture tests
-   (`STC_RULE_DUPLICATE_IDENTITY` covering both the same
-   `(profile_id, rule_type, constraint_id)` triple and the
-   same full §12.4 sort key, with same-authority duplicate dedup
-   and different-authority same-logical-identity block per §12.5)
-   using the `conflicting_configuration_pack` fixture set;
+   (`STC_RULE_DUPLICATE_IDENTITY`) using the
+   `conflicting_configuration_pack` fixture set. Per Design
+   Amendment 002 §20.B, two surviving rules sharing the
+   **complete six-field key** `(priority, rule_type,
+   constraint_id, rule_id, rule_version,
+   rule_artifact_canonical_hash)` represent the same authority
+   and are silently deduplicated (no blocker). Two rules
+   sharing the `(profile_id, rule_type, constraint_id)`
+   triple but differing in any complete-key field represent
+   conflicting authority and emit `STC_RULE_DUPLICATE_IDENTITY`
+   per §12.5;
 10. token normalization and malformed-token tests;
 11. unsupported-token and incompatible-combination blocker tests;
 12. canonical ordering tests for evidence, warnings and blockers
@@ -2508,3 +2578,341 @@ No third file is authorized.
   filenames and minimum coverage mapping; preserve all
   §19.I exclusions; preserve Issue #128 unchanged; preserve
   TASK-021 through TASK-039 unallocated.
+- **002** (Issue #131, see §20) — Make the S2 rule-pack
+  adapter contract executable. Reconciles four frozen-contract
+  defects identified during the TASK-020-S2 source audit
+  (Issue #128 comment `4943798402` and blocking review
+  comment `4943817689`):
+  - Defect 1: §12.4 + §12.5 contradictory equal-complete-key
+    semantics → exact complete-key equality silently
+    deduplicates; same-logical-identity / different-authority
+    emits `STC_RULE_DUPLICATE_IDENTITY` (per §20.B).
+  - Defect 2: TASK-012 `validate_rule_pack` reports
+    `status = "fail"` via free-form `errors[*].message` and
+    exposes no structured verdict code → TASK-020 emits only
+    `STC_RULE_PACK_VALIDATION_FAILED` on non-`ok` TASK-012
+    reports; four rule-level codes (`STC_RULE_UNAPPROVED`,
+    `STC_RULE_CANONICAL_HASH_MISMATCH`,
+    `STC_RULE_LICENSE_BLOCKED`, `STC_RULE_PROVENANCE_BLOCKED`)
+    are reserved in TASK-020-S2 and not emitted (per §20.C).
+  - Defect 3: `ConfigurationRuleEvaluation` shape undefined →
+    success-only value object `@dataclass(frozen=True)
+    ConfigurationRuleEvaluation{ normalized_construction_family,
+    evaluated_rule_pack_authority }` is frozen; blocked paths
+    raise `BlockerError` and `validate_request` converts it to
+    `ConfigurationValidationResult(status = BLOCKED)`
+    (per §20.D).
+  - Defect 4: `STC_REQUIRED_RULE_MISSING` /
+    `STC_RULE_CONSTRAINT_MISSING` overlap → the sole emitted
+    blocker for §12.9 matrix gaps is
+    `STC_RULE_CONSTRAINT_MISSING`;
+    `STC_REQUIRED_RULE_MISSING` is reserved and not emitted
+    (per §20.E).
+  Authoring boundary: exactly two files (the design contract
+  + the frozen-contract integrity guard). No TASK-012 mutation.
+  S2 implementation remains suspended while Amendment 002
+  remains unmerged. Implementation recovery requires the
+  five-step sequence in §1 (PR review → separate Ready →
+  separate merge → green post-merge CI → separate Charles S2
+  recovery authorization). No engineering calculation is
+  authorized. TASK-021 through TASK-039 remain unallocated.
+
+## 20. Design Amendment 002 — Issue #131 (make the S2 rule-pack adapter contract executable)
+
+Design Amendment 002 (Issue #131) reconciles the four
+frozen-contract defects identified during the TASK-020-S2
+source audit (Issue #128 comment `4943798402` and blocking
+review comment `4943817689`). It is **design-only** — it does
+not authorize any S2 implementation recovery, any TASK-012
+mutation, or any TASK-020 repository file beyond the exact
+two-file authoring boundary.
+
+### 20.A Amendment authority record
+
+- Authorizing Issue: **#131** — `[TASK-020][design amendment 002] Make the S2 rule-pack adapter contract executable`.
+- Authorizing comment: Issue #131 comment `4943978594`.
+- Branch base (post-Amendment-001 `main`):
+  `d4ee40109c74061db89339e55899cabfe2fb80fe` (PR #130 squash
+  merge).
+- Branch name (this amendment):
+  `docs/task-020-amendment-002-s2-executable-contract`.
+- Starting HEAD: `d4ee40109c74061db89339e55899cabfe2fb80fe`.
+- Amendment 001 merge PR: #130 (superseded authority for
+  Amendment 001 is preserved; Amendment 001 rows in §1 are
+  retained, not rewritten).
+- This amendment authorizes **design reconciliation only**:
+  the design contract's §1 authority table, §10.2, §12.4,
+  §12.5, §15, §19.K change log and a new §20 record are
+  edited. No production code, no S2 test, no fixture, no
+  manifest, no workflow, no TASK-012 contract, no TASK-001
+  through TASK-019 contract is modified by this amendment.
+- **S2 implementation remains authorized but blocked.** The
+  S2 branch `codex/task-020-s2-rule-pack-adapter-impl` is
+  unchanged and remains identical to `main` at
+  `d4ee40109c74061db89339e55899cabfe2fb80fe` (zero diff).
+  Implementation is suspended while Amendment 002 remains
+  unmerged.
+- **Implementation recovery** requires the five-step
+  sequence recorded in §1 (PR review → separate Ready →
+  separate merge → green post-merge CI → separate Charles S2
+  recovery authorization). No step implies the next.
+- **TASK-021 through TASK-039 remain unallocated** by this
+  amendment and by TASK-020.
+- **TASK-012 mutation is NOT authorized** by this amendment.
+  The four reserved TASK-020 rule-level codes
+  (`STC_RULE_UNAPPROVED`, `STC_RULE_CANONICAL_HASH_MISMATCH`,
+  `STC_RULE_LICENSE_BLOCKED`, `STC_RULE_PROVENANCE_BLOCKED`)
+  may become executable only after a separately authorized
+  TASK-012 interface amendment exposes structured failure
+  verdict codes. Amendment 002 does not propose that
+  interface.
+- **Ready and merge are NOT authorized by this amendment.**
+  Both require separate Charles authorization after PR review.
+
+### 20.B Reconciliation — exact-duplicate semantics (Defect 1)
+
+The complete six-field key
+
+```python
+complete_key = (
+    priority,
+    rule_type,
+    constraint_id,
+    rule_id,
+    rule_version,
+    rule_artifact_canonical_hash,
+)
+```
+
+is the **complete comparison key** for exact duplicate
+detection in §12.4 / §12.5. The TASK-020 adapter applies
+the following rules (binding):
+
+- Two surviving rules with **exactly equal** complete six-
+  field keys represent the same authority. They are
+  **silently deduplicated** and exactly one deterministic
+  copy is kept. The adapter MUST NOT emit
+  `STC_RULE_DUPLICATE_IDENTITY` for exact complete-key
+  equality.
+- Two surviving rules sharing the same `(profile_id,
+  rule_type, constraint_id)` triple but differing in any
+  field of the complete six-field key represent **conflicting
+  authority**. The adapter MUST emit
+  `STC_RULE_DUPLICATE_IDENTITY` and stop.
+- §12.4 is corrected to remove the prior sentence requiring
+  a blocker solely on complete-key equality. §12.5 item 1
+  retains the same-logical-identity / different-authority
+  blocker semantics and is authoritative.
+- Filesystem order, manifest-array order, dict-insertion
+  order, unordered-iteration order, and any other input-
+  order surrogate remain **forbidden** as tie-breakers.
+- §15 item 9 is updated to assert silent deduplication for
+  equal complete keys and `STC_RULE_DUPLICATE_IDENTITY` for
+  same-logical-identity / different-authority.
+
+### 20.C Reconciliation — TASK-012 failed-report mapping (Defect 2)
+
+TASK-012 `validate_rule_pack(root)` returns
+`{status, errors: [{path, message}], manifest?, rule_count?}`
+(see `src/hexagent/rule_packs/validation.py`). TASK-012
+exposes **no stable structured per-rule verdict code**; all
+rule-level findings live inside free-form `errors[*].message`.
+
+Amendment 002 binds the following rules (binding):
+
+- TASK-020 MUST NOT parse
+  `validation_report.errors[*].message`.
+- TASK-020 MUST NOT derive stable verdicts from TASK-012
+  free-form error prose.
+- TASK-020 MUST NOT re-run TASK-012 approval, canonical-
+  hash, license, or provenance verification.
+- For every `validation_report.status != "ok"` condition,
+  TASK-020 emits **only** `STC_RULE_PACK_VALIDATION_FAILED`.
+- The following codes remain in the closed historical /
+  reserved namespace and are **not emitted by TASK-020-S2**:
+  - `STC_RULE_UNAPPROVED`
+  - `STC_RULE_CANONICAL_HASH_MISMATCH`
+  - `STC_RULE_LICENSE_BLOCKED`
+  - `STC_RULE_PROVENANCE_BLOCKED`
+- These four codes may become executable only after a
+  separately authorized TASK-012 interface amendment
+  exposes structured failure verdict codes. Amendment 002
+  does **not** propose that TASK-012 amendment.
+- §15 item 8 is updated so the `unapproved_rule_pack` and
+  `license_blocked_rule_pack` fixtures prove:
+  1. TASK-012 reports `status = "fail"`.
+  2. TASK-020 returns `STC_RULE_PACK_VALIDATION_FAILED`.
+- The `unapproved_rule_pack` and `license_blocked_rule_pack`
+  fixture sets remain authorized, but their TASK-020
+  integration assertion is the two-line outcome above. No
+  per-rule verdict mapping is asserted.
+
+### 20.D Frozen `ConfigurationRuleEvaluation` value object (Defect 3)
+
+The adapter return type is frozen as the success-only value
+object:
+
+```python
+@dataclass(frozen=True)
+class ConfigurationRuleEvaluation:
+    normalized_construction_family: ConstructionFamily
+    evaluated_rule_pack_authority: EvaluatedRulePackAuthority
+```
+
+Binding rules:
+
+- `normalized_construction_family` is the unique successful
+  result of the applicable `CONSTRUCTION_FAMILY_NORMALIZATION`
+  rules. After the §12.5 normalization-conflict resolution
+  passes, exactly one normalized value exists.
+- `evaluated_rule_pack_authority` contains the complete
+  ordered `selected_rule_authorities` (full §12.4 sort key
+  applied to the surviving rule set).
+- No parallel selected-rule ID lists or hash lists are
+  permitted. The value object holds the canonical authority
+  representation; downstream code reads
+  `evaluated_rule_pack_authority.selected_rule_authorities`.
+- The object is constructed **only** after every cross-input
+  (§6.3.3), selection (§12.4), duplicate (§12.5 P1-5),
+  intersection (§12.5 items 3–5), required-constraint
+  (§12.5 item 7), and predicate (§12.5 items 6, 8–10)
+  check passes.
+- A blocked adapter path does **not** produce a partial
+  `ConfigurationRuleEvaluation`. Blocked paths raise a
+  structured `BlockerError`. `validate_request` converts
+  that blocker into the final
+  `ConfigurationValidationResult(status = BLOCKED)`.
+- Adapter warnings are **not** added to this value object
+  because Amendment 002 defines no S2-specific warning-
+  producing rule predicate.
+- The adapter signature is preserved unchanged:
+  ```python
+  ConfigurationRulePackAdapter.validate(
+      request: ShellAndTubeConfigurationRequest,
+      loaded_rule_pack: LoadedRulePackView,
+      validation_report: RulePackValidationReport,
+  ) -> ConfigurationRuleEvaluation
+  ```
+
+### 20.E Reconciliation — missing-rule blocker boundary (Defect 4)
+
+`STC_RULE_CONSTRAINT_MISSING` is the **sole** emitted blocker
+when the §12.9 required-constraint matrix lacks an applicable
+required rule class or required component-slot rule. The
+emission conditions (binding):
+
+- missing `CONSTRUCTION_FAMILY_NORMALIZATION` rule for the
+  current `(authority_mode, construction_family)`;
+- missing `front_head` `COMPONENT_TOKEN_ALLOWLIST` rule;
+- missing `shell` `COMPONENT_TOKEN_ALLOWLIST` rule;
+- missing `rear_head` `COMPONENT_TOKEN_ALLOWLIST` rule;
+- missing `PASS_COUNT_ALLOWED_RANGE` rule;
+- missing `ORIENTATION_ALLOWLIST` rule.
+
+`STC_REQUIRED_RULE_MISSING` is **reserved** and is **not
+emitted by TASK-020-S2**. The two codes MUST NOT be aliased.
+
+§10.2 entries for both codes are updated to reflect this
+boundary; §12.5 item 7 and §12.8.x required-class clauses
+are authoritative for the trigger.
+
+### 20.F Amendment authoring boundary (binding)
+
+This Amendment 002 authorizes mutation of exactly two
+repository files:
+
+1. `docs/tasks/TASK-020-shell-and-tube-configuration-schema.md`
+   (the design contract amended by this round);
+2. `tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`
+   (the frozen-contract integrity guard, modified only to
+   update `_EXPECTED_FROZEN_SHA256` and the Amendment 002
+   authority wording in docstrings and comments).
+
+No third file is authorized. No production code, no S2 test
+file, no fixture, no manifest, no workflow, no
+`tests/ci/verify_manifest.py`, no TASK-012 file, no
+TASK-001 through TASK-019 contract, and no
+`codex/task-020-s2-rule-pack-adapter-impl` mutation is
+authorized.
+
+### 20.G S2 implementation status (binding)
+
+- The existing S2 implementation authorization (Issue #128
+  comment `4943742113`) is NOT revoked.
+- Implementation is **suspended** while Amendment 002 remains
+  unmerged.
+- The existing S2 branch
+  `codex/task-020-s2-rule-pack-adapter-impl` remains at
+  `d4ee40109c74061db89339e55899cabfe2fb80fe` (identical to
+  `main`, zero diff).
+- Implementation mutation may **not** resume until **all**
+  of the following have happened, in order, with each step
+  separately authorized:
+  1. The Amendment 002 PR is reviewed.
+  2. Ready is separately authorized.
+  3. Merge is separately authorized.
+  4. Post-merge CI succeeds.
+  5. Charles separately authorizes S2 implementation
+     recovery.
+
+No step implies the next. The S2 branch remains identical
+to `main` for the entire duration.
+
+### 20.H Preserved exclusions (binding)
+
+Amendment 002 does NOT authorize, and the S2 implementation
+MUST NOT introduce:
+
+- geometry;
+- heat-transfer calculations;
+- pressure-drop calculations;
+- Kern;
+- Bell–Delaware;
+- TEMA calculations or copied content;
+- mechanical calculations;
+- materials;
+- mass;
+- cost;
+- optimization;
+- API;
+- CLI;
+- report rendering;
+- persistence;
+- TASK-021 through TASK-039 allocation;
+- engineering calculation of any kind.
+
+### 20.I Anti-fabrication guard (binding)
+
+Amendment 002 itself is design-only. The amendment MUST NOT:
+
+- mutate production code under
+  `src/hexagent/exchangers/shell_tube/`;
+- mutate or rename any S2 test file other than the single
+  frozen-contract integrity guard
+  (`tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py`);
+- create or modify any fixture file in
+  `tests/fixtures/task020/`;
+- modify `ci-shard-manifest.yml`;
+- modify any workflow file;
+- modify `tests/ci/verify_manifest.py`;
+- modify any TASK-012 file;
+- modify any TASK-001 through TASK-019 contract;
+- modify the S2 implementation branch
+  `codex/task-020-s2-rule-pack-adapter-impl`;
+- mark Ready;
+- merge;
+- close Issue #128;
+- close Issue #131.
+
+The amendment's only allowed file mutations are the two
+files in §20.F.
+
+### 20.J Amendment 002 change log
+
+- **001** (Issue #129) — see §19.K.
+- **002** (this amendment, Issue #131) — see §19.K and the
+  four reconciliations above. Authoring boundary: exactly two
+  files (§20.F). No TASK-012 mutation. S2 implementation
+  remains suspended until the five-step §20.G sequence is
+  satisfied. No engineering calculation is authorized.
+  TASK-021 through TASK-039 remain unallocated.
