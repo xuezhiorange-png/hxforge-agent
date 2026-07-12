@@ -650,8 +650,249 @@ def test_no_directory_discovery_in_all_five_frozen_s2_test_modules() -> None:
 
 
 def test_exact_30_fixture_paths_preserved() -> None:
-    """§5 — confirm 30 fixture paths are still exactly the closed allowlist."""
-    assert len(ALL_FIXTURE_FILES) == 30
-    assert set(ALL_FIXTURE_FILES) == set(ALL_FIXTURE_FILES)
-    for p in ALL_FIXTURE_FILES:
-        assert p.exists(), f"missing fixture: {p}"
+    """§6 — confirm 30 fixture paths exactly equal the independently-frozen
+    relative-path tuple. The expected tuple is NOT derived from
+    ``ALL_FIXTURE_FILES``; it is a separate manifest the test module
+    binds by hand. Discovery idioms are forbidden.
+    """
+    actual = tuple(path.relative_to(FIXTURE_ROOT).as_posix() for path in ALL_FIXTURE_FILES)
+    assert len(EXPECTED_TASK020_FIXTURE_RELATIVE_PATHS) == 30
+    assert len(set(EXPECTED_TASK020_FIXTURE_RELATIVE_PATHS)) == 30
+    assert len(actual) == 30
+    assert len(set(actual)) == 30
+    assert set(actual) == set(EXPECTED_TASK020_FIXTURE_RELATIVE_PATHS)
+    for path in ALL_FIXTURE_FILES:
+        assert path.exists(), f"missing fixture: {path}"
+
+
+# §6 — independently-frozen relative-path tuple. NOT derived from
+# ``ALL_FIXTURE_FILES``. Each entry is a forward-slash POSIX-style path
+# relative to ``FIXTURE_ROOT``. The 30 entries enumerate the closed
+# frozen allowlist for the TASK-020-S2 round.
+EXPECTED_TASK020_FIXTURE_RELATIVE_PATHS: Final[tuple[str, ...]] = (
+    # 4 case_revision files
+    "case_revision/case_revision_committed.json",
+    "case_revision/case_revision_superseded.json",
+    "case_revision/case_revision_archived.json",
+    "case_revision/case_revision_draft_blocked.json",
+    # 15 valid_configuration_pack
+    "rule_packs/valid_configuration_pack/manifest.json",
+    "rule_packs/valid_configuration_pack/rules/stc-cta-front-001.json",
+    "rule_packs/valid_configuration_pack/rules/stc-cta-shell-001.json",
+    "rule_packs/valid_configuration_pack/rules/stc-cta-rear-001.json",
+    "rule_packs/valid_configuration_pack/rules/stc-cfn-001.json",
+    "rule_packs/valid_configuration_pack/rules/stc-pcar-001.json",
+    "rule_packs/valid_configuration_pack/rules/stc-oal-001.json",
+    "rule_packs/valid_configuration_pack/rules/stc-ccb-001.json",
+    "rule_packs/valid_configuration_pack/provenance/edge_stc_cta_front_001.json",
+    "rule_packs/valid_configuration_pack/provenance/edge_stc_cta_shell_001.json",
+    "rule_packs/valid_configuration_pack/provenance/edge_stc_cta_rear_001.json",
+    "rule_packs/valid_configuration_pack/provenance/edge_stc_cfn_001.json",
+    "rule_packs/valid_configuration_pack/provenance/edge_stc_pcar_001.json",
+    "rule_packs/valid_configuration_pack/provenance/edge_stc_oal_001.json",
+    "rule_packs/valid_configuration_pack/provenance/edge_stc_ccb_001.json",
+    # 5 conflicting_configuration_pack
+    "rule_packs/conflicting_configuration_pack/manifest.json",
+    "rule_packs/conflicting_configuration_pack/rules/conflict_a.json",
+    "rule_packs/conflicting_configuration_pack/rules/conflict_b.json",
+    "rule_packs/conflicting_configuration_pack/provenance/conflict_a_edge.json",
+    "rule_packs/conflicting_configuration_pack/provenance/conflict_b_edge.json",
+    # 3 unapproved_rule_pack
+    "rule_packs/unapproved_rule_pack/manifest.json",
+    "rule_packs/unapproved_rule_pack/rules/allowed_tokens.json",
+    "rule_packs/unapproved_rule_pack/provenance/allowed_tokens_edge.json",
+    # 3 license_blocked_rule_pack
+    "rule_packs/license_blocked_rule_pack/manifest.json",
+    "rule_packs/license_blocked_rule_pack/rules/allowed_tokens.json",
+    "rule_packs/license_blocked_rule_pack/provenance/allowed_tokens_edge.json",
+)
+
+
+# ---------------------------------------------------------------------------
+# Final-narrow-corrective-round §4 + §5 — failure-report explicit field
+# semantics + non-vacuous permission re-keying.
+# ---------------------------------------------------------------------------
+
+
+def _blocker_code(exc: object) -> str:
+    """Stable blocker-code assertion helper.
+
+    Works for both ``pytest.raises(...) as exc`` (exc is an
+    ``ExceptionInfo``; read ``exc.value.code``) and
+    ``try / except`` blocks (exc is the ``BlockerError`` itself;
+    read ``exc.code``).
+    """
+    value = getattr(exc, "value", exc)
+    return str(getattr(value, "code", exc))
+
+
+def test_fail_report_manifest_missing_yields_none_and_empty_identity() -> None:
+    """§3.2 / §4 — ``{status, errors}`` with no ``manifest`` key:
+    ``report.manifest is None`` and identity triple stays empty.
+    """
+    fail: Mapping[str, object] = {"status": "fail", "errors": []}
+    report = rule_pack_validation_report_from_validate_dict(fail)
+    assert report.manifest is None
+    assert report.rule_pack_id == ""
+    assert report.rule_pack_version == ""
+    assert report.rule_pack_canonical_hash == ""
+
+
+def test_fail_report_explicit_valid_manifest_is_preserved() -> None:
+    """§3.2 / §4 — explicit Mapping manifest on fail is preserved AND
+    identity triple is extracted from it.
+    """
+    fail: Mapping[str, object] = {
+        "status": "fail",
+        "errors": [],
+        "manifest": {
+            "rule_pack_id": "fail-pack-id",
+            "rule_pack_version": "1.0.0",
+            "canonical_hash": "h" * 64,
+        },
+    }
+    report = rule_pack_validation_report_from_validate_dict(fail)
+    assert report.manifest is not None
+    assert report.manifest["rule_pack_id"] == "fail-pack-id"
+    assert report.rule_pack_id == "fail-pack-id"
+    assert report.rule_pack_version == "1.0.0"
+    assert report.rule_pack_canonical_hash == "h" * 64
+
+
+@pytest.mark.parametrize(
+    "bad_manifest",
+    [
+        "this-is-a-string-not-a-mapping",
+        ["a", "list", "instead", "of", "mapping"],
+        42,
+        3.14,
+    ],
+)
+def test_fail_report_invalid_type_manifest_rejected(bad_manifest: object) -> None:
+    """§3.2 — explicit non-Mapping manifest on fail raises MISMATCH.
+    No silent coercion to None, no leaked ``TypeError``.
+    """
+    fail: Mapping[str, object] = {
+        "status": "fail",
+        "errors": [],
+        "manifest": bad_manifest,  # type: ignore[dict-item]
+    }
+    with pytest.raises(BlockerError) as exc:
+        rule_pack_validation_report_from_validate_dict(fail)
+    assert _blocker_code(exc) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_fail_report_rule_count_missing_yields_none() -> None:
+    """§3.2 / §4 — ``{status, errors}`` with no ``rule_count`` key:
+    ``report.rule_count is None``.
+    """
+    fail: Mapping[str, object] = {"status": "fail", "errors": []}
+    report = rule_pack_validation_report_from_validate_dict(fail)
+    assert report.rule_count is None
+
+
+def test_fail_report_explicit_zero_rule_count_preserved() -> None:
+    """§3.2 — explicit ``rule_count == 0`` on fail is preserved (NOT
+    coerced to None).
+    """
+    fail: Mapping[str, object] = {
+        "status": "fail",
+        "errors": [],
+        "rule_count": 0,
+    }
+    report = rule_pack_validation_report_from_validate_dict(fail)
+    assert report.rule_count == 0
+    assert report.rule_count is not None
+
+
+def test_fail_report_explicit_positive_rule_count_preserved() -> None:
+    """§3.2 — explicit positive ``rule_count`` on fail is preserved."""
+    fail: Mapping[str, object] = {
+        "status": "fail",
+        "errors": [],
+        "rule_count": 7,
+    }
+    report = rule_pack_validation_report_from_validate_dict(fail)
+    assert report.rule_count == 7
+
+
+@pytest.mark.parametrize(
+    "bad_rule_count",
+    [
+        True,  # bool rejected as int
+        -1,  # negative int rejected
+        "1",  # str rejected
+        3.14,  # float rejected
+        [0, 1, 2],  # list rejected
+        {"nested": "value"},  # mapping rejected
+        None,  # explicit None rejected as type
+    ],
+)
+def test_fail_report_invalid_type_rule_count_rejected(bad_rule_count: object) -> None:
+    """§3.2 — explicit illegal ``rule_count`` on fail raises MISMATCH.
+    No silent coercion to None, no leaked bare ``TypeError``.
+    """
+    fail: Mapping[str, object] = {
+        "status": "fail",
+        "errors": [],
+        "rule_count": bad_rule_count,  # type: ignore[dict-item]
+    }
+    with pytest.raises(BlockerError) as exc:
+        rule_pack_validation_report_from_validate_dict(fail)
+    assert _blocker_code(exc) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_fail_report_wrapper_does_not_leak_bare_typeerror() -> None:
+    """§3.2 — wrapper never lets a bare ``TypeError`` reach the caller.
+    All illegal types trigger a stable ``BlockerError``;
+    ``TypeError`` is caught and never re-raised from the wrapper.
+    """
+    fail: Mapping[str, object] = {
+        "status": "fail",
+        "errors": [],
+        "manifest": "NOT-A-MAPPING",
+        "rule_count": "NOT-AN-INT",
+    }
+    try:
+        rule_pack_validation_report_from_validate_dict(fail)
+    except BlockerError as exc:
+        assert _blocker_code(exc) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+    except TypeError as err:
+        # wrapper leakage of bare TypeError is a regression
+        raise AssertionError(
+            "wrapper leaked a bare TypeError instead of raising BlockerError"
+        ) from err
+    else:
+        raise AssertionError("wrapper accepted an illegal manifest+rule_count on a fail report")
+
+
+def test_permission_positive_rekey_uses_direct_permission_id() -> None:
+    """§5 — non-vacuous positive re-key test using synthetic input.
+
+    The fixture's own permission_evidence may be empty; this test
+    does NOT rely on it. Instead it constructs synthetic input with
+    a deliberately-mismatched input key and a known direct
+    ``permission_id``, then asserts the output is keyed by the direct
+    ``permission_id``, not the input key.
+
+    The synthetic object is in-memory only — never written to JSON
+    fixture storage.
+    """
+    pack = FIXTURE_ROOT / "rule_packs/valid_configuration_pack"
+    base_loader = load_rule_pack(pack)
+    synthetic_loader: Mapping[str, object] = {
+        **base_loader,
+        "permission_evidence": {
+            "WRONG_INPUT_KEY": {
+                "permission_id": "permission-direct-id",
+                "evidence": "synthetic-test-only",
+            },
+        },
+    }
+    loaded = loaded_rule_pack_view_from_loader_dict(synthetic_loader)
+    assert set(loaded.permission_evidence) == {"permission-direct-id"}
+    assert "WRONG_INPUT_KEY" not in loaded.permission_evidence
+    assert (
+        loaded.permission_evidence["permission-direct-id"]["permission_id"]
+        == "permission-direct-id"
+    )

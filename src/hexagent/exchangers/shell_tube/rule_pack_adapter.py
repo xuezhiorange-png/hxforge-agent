@@ -1345,30 +1345,50 @@ def rule_pack_validation_report_from_validate_dict(
 ) -> RulePackValidationReport:
     """Adapter helper — wrap a TASK-012 ``validate_rule_pack`` dict result.
 
-    Final-cleanup-round fail-shape discipline (binding):
+    Final-narrow-corrective-round fail-shape discipline (binding):
 
     The adapter reads ``status`` first. On ``status != "ok"`` the
     minimal TASK-012 failure shape ``{status, errors}`` is accepted
     and the resulting ``RulePackValidationReport`` carries:
 
-        * ``manifest: None``
-        * ``rule_count: None``
+        * ``manifest: None`` — when ``manifest`` key is missing;
+        * ``manifest: dict(raw_manifest)`` — when ``manifest`` key is
+          explicitly present and a valid mapping; the identity triple
+          is extracted from it (when present);
+        * ``rule_count: None`` — when ``rule_count`` key is missing;
+        * ``rule_count: raw_rule_count`` — when ``rule_count`` key is
+          explicitly present, isinstance int (not bool), non-negative.
 
-    The adapter NEVER fabricates ``{}`` / ``0`` to keep the dataclass
-    constructable. ``None`` is the truthful absence of those fields in
-    the validator's failure report.
+    The wrapper distinguishes **key missing** from **key present but
+    illegal value**:
+
+        * ``status != "ok"``, ``manifest`` key missing:
+          ``report.manifest is None`` (truthful absence).
+        * ``status != "ok"``, ``manifest`` key explicit Mapping:
+          ``report.manifest == dict(raw_manifest)`` (preserved).
+        * ``status != "ok"``, ``manifest`` key explicit non-Mapping
+          (str / list / int / etc.):
+          ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``. NO silent
+          conversion to ``None`` and NO leakage of bare ``TypeError``
+          from the dataclass.
+        * ``status != "ok"``, ``rule_count`` key missing:
+          ``report.rule_count is None``.
+        * ``status != "ok"``, ``rule_count`` key explicit non-negative
+          int (not bool):
+          ``report.rule_count == raw_rule_count`` (preserved, may be 0).
+        * ``status != "ok"``, ``rule_count`` key explicit illegal value
+          (bool / negative int / float / str / list / mapping / None):
+          ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``. NO silent
+          conversion to ``None`` and NO leakage of bare ``TypeError``.
 
     On ``status == "ok"`` both ``manifest`` (mapping) and ``rule_count``
     (``int``, non-negative, ``bool`` rejected) are required. The
     adapter never invents them either — they come from the real
     TASK-012 validator's report.
 
-    On fail, ``rule_pack_id`` / ``rule_pack_version`` /
-    ``rule_pack_canonical_hash`` are read from ``validate_result``'s
-    ``manifest`` mapping when present; otherwise they remain empty
-    strings (the dataclass default). The cross-input consistency check
-    is short-circuited by the §7.1 status-boundary check, so empty
-    identity cannot leak past the boundary.
+    The adapter NEVER parses ``errors[*].message`` and NEVER runs any
+    TASK-012 approval / hash / license / provenance verification
+    (per §6.3.2 + §6.3.3 + §20.C).
     """
     status = validate_result.get("status")
     if not isinstance(status, str) or not status:
@@ -1410,24 +1430,56 @@ def rule_pack_validation_report_from_validate_dict(
             rule_pack_canonical_hash=rhash,
         )
 
-    # Failure path — minimal shape accepted. The dataclass rejects
-    # fabricated ``manifest`` / ``rule_count`` placeholders; both must
-    # be ``None`` unless the validator explicitly supplied them. The
-    # adapter does NOT parse ``errors[*].message``.
-    raw_manifest_obj = validate_result.get("manifest")
-    raw_rule_count_obj = validate_result.get("rule_count")
+    # Failure path — precise key-presence semantics.
+    #
+    # ``manifest``:
+    #   key missing → manifest_value = None
+    #   key explicit Mapping → manifest_value = dict(raw_manifest),
+    #                            identity triple extracted
+    #   key explicit non-Mapping → BlockerError(MISMATCH); no
+    #                               silent coercion to None
+    #
+    # ``rule_count``:
+    #   key missing → rule_count_value = None
+    #   key explicit non-negative int (not bool) → preserved
+    #   key explicit any other type → BlockerError(MISMATCH); no
+    #                                    silent coercion to None and
+    #                                    no bare TypeError leakage.
+    manifest_value: Mapping[str, object] | None = None
+    rule_count_value: int | None = None
     rid = ""
     rver = ""
     rhash = ""
-    if isinstance(raw_manifest_obj, Mapping):
-        rid, rver, rhash = _manifest_identity(raw_manifest_obj)
-    failed_rule_count: int | None = None
-    if isinstance(raw_rule_count_obj, int) and not isinstance(raw_rule_count_obj, bool):
-        failed_rule_count = raw_rule_count_obj
+
+    if "manifest" in validate_result:
+        raw_manifest = validate_result["manifest"]
+        if not isinstance(raw_manifest, Mapping):
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_PACK_VALIDATION_REPORT_MISMATCH),
+                "validation_report.manifest must be a mapping when "
+                "explicitly supplied on a failure report",
+            )
+        manifest_value = dict(raw_manifest)
+        rid, rver, rhash = _manifest_identity(raw_manifest)
+
+    if "rule_count" in validate_result:
+        raw_rule_count = validate_result["rule_count"]
+        if (
+            not isinstance(raw_rule_count, int)
+            or isinstance(raw_rule_count, bool)
+            or raw_rule_count < 0
+        ):
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_PACK_VALIDATION_REPORT_MISMATCH),
+                "validation_report.rule_count must be a non-negative int "
+                "(bool rejected) when explicitly supplied on a failure report",
+            )
+        rule_count_value = raw_rule_count
+
     return RulePackValidationReport(
         status=status,
-        manifest=None,
-        rule_count=failed_rule_count,
+        manifest=manifest_value,
+        rule_count=rule_count_value,
         errors=errors_view,
         rule_pack_id=rid,
         rule_pack_version=rver,
