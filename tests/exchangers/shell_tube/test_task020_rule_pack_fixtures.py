@@ -513,6 +513,40 @@ def test_status_ok_with_bool_rule_count_rejected() -> None:
     assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
 
 
+def test_status_ok_with_negative_rule_count_rejected_without_typeerror_leak() -> None:
+    """§3.1 — success path requires ``rule_count`` to be a non-negative int.
+
+    Regression for blocker-review ``4680526861``: a ``status == "ok"`` report
+    carrying ``rule_count: -1`` must be rejected at the adapter wrapper with
+    ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH`` BEFORE the
+    ``RulePackValidationReport.__post_init__`` check runs, so that the
+    constraint violation surfaces as a stable TASK-020 blocker code
+    instead of leaking a bare ``TypeError`` from the dataclass layer.
+    """
+    bad_ok: Mapping[str, object] = {
+        "status": "ok",
+        "manifest": {
+            "rule_pack_id": "negative-count-pack",
+            "rule_pack_version": "1.0.0",
+            "canonical_hash": "h" * 64,
+        },
+        "rule_count": -1,
+        "errors": [],
+    }
+    try:
+        rule_pack_validation_report_from_validate_dict(bad_ok)
+    except BlockerError as exc:
+        assert str(exc.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH", (
+            f"unexpected blocker code: {exc.code!r}"
+        )
+    except TypeError as exc:  # pragma: no cover - guarded regression
+        raise AssertionError(
+            "success report wrapper leaked TypeError for negative rule_count"
+        ) from exc
+    else:
+        raise AssertionError("success report wrapper accepted negative rule_count")
+
+
 def test_status_ok_constructs_with_real_mapping_and_int() -> None:
     """§3.1 — success path constructable with a Mapping and non-negative int."""
     ok: Mapping[str, object] = {

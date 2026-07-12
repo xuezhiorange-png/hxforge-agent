@@ -1414,10 +1414,14 @@ def rule_pack_validation_report_from_validate_dict(
                 str(BlockerCode.STC_RULE_PACK_VALIDATION_REPORT_MISMATCH),
                 "validation_report.manifest is not a mapping on status=ok",
             )
-        if not isinstance(rule_count_obj, int) or isinstance(rule_count_obj, bool):
+        if (
+            not isinstance(rule_count_obj, int)
+            or isinstance(rule_count_obj, bool)
+            or rule_count_obj < 0
+        ):
             raise BlockerError(
                 str(BlockerCode.STC_RULE_PACK_VALIDATION_REPORT_MISMATCH),
-                "validation_report.rule_count is not an int on status=ok",
+                "validation_report.rule_count must be a non-negative int on status=ok",
             )
         rid, rver, rhash = _manifest_identity(manifest_obj)
         return RulePackValidationReport(
