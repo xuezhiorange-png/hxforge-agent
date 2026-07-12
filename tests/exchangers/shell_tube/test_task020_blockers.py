@@ -136,7 +136,7 @@ class TestBlockerCodeClosure:
             ("STC_PASS_COUNT_INVALID", {"shell_pass_count": 0}),
             ("STC_TOKEN_MALFORMED", {"shell_token": "X" * 20}),
             (
-                "STC_RULE_PACK_REQUIRED",
+                "STC_RULE_PACK_ADAPTER_INPUTS_MISSING",
                 {
                     "authority_mode": "APPROVED_RULE_PACK",
                     "standard_system_id": "TEMA",

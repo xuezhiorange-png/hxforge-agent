@@ -228,7 +228,7 @@ class TestEquipmentAndAuthority:
         )
         result = st.validate_request(request)
         assert result.status.value == "BLOCKED"
-        assert any(b.code == "STC_RULE_PACK_REQUIRED" for b in result.blockers)
+        assert any(b.code == "STC_RULE_PACK_ADAPTER_INPUTS_MISSING" for b in result.blockers)
         # Per §10.1: a blocked validation returns no configuration.
         assert result.configuration is None
 
@@ -237,7 +237,7 @@ class TestEquipmentAndAuthority:
     ) -> None:
         # Per §8.3, APPROVED_RULE_PACK requires a non-null
         # requested_rule_pack_identity; this is enforced before
-        # Slice A's STC_RULE_PACK_REQUIRED.
+        # Slice A's STC_RULE_PACK_ADAPTER_INPUTS_MISSING.
         request = _make_request(
             authority_mode="APPROVED_RULE_PACK",
             standard_system_id="TEMA",

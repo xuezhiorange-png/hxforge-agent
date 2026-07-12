@@ -10,6 +10,22 @@ hierarchy and the ``STCErrorCode`` base enumeration.
 All TASK-020 errors MUST be raised as ``ShellTubeError`` or one of its
 subclasses so that the validation layer can convert them into stable
 ``ConfigurationValidationResult.blockers`` entries.
+
+S2 (Amendment 002) reserved-codes audit
+----------------------------------------
+
+The following ``STC_*`` codes are declared in the §10.2 closed list for
+historical / forward-compatibility reasons but MUST NOT be raised by the
+TASK-020-S2 adapter (per §20.C + §20.E of the design contract). They are
+**reserved** — TASK-020 reads only ``validation_report.status`` (not the
+free-form ``errors[*].message``) and does not re-verify approval /
+canonical-hash / license / provenance. ``STC_REQUIRED_RULE_MISSING`` is
+likewise reserved because the §12.9 required-constraint matrix gap is
+emitted as ``STC_RULE_CONSTRAINT_MISSING`` and the two are not aliases.
+
+The frozen set is exposed here as ``RESERVED_S2_BLOCKER_CODES`` so the
+adapter can assert guard-level invariants in tests / adapters
+(``assert code not in RESERVED_S2_BLOCKER_CODES``).
 """
 
 from __future__ import annotations
@@ -55,10 +71,38 @@ ALL_BLOCKER_CODES: frozenset[str] = frozenset(c.value for c in BlockerCode)
 ALL_WARNING_CODES: frozenset[str] = frozenset(c.value for c in WarningCode)
 
 
+# S2 reserved codes — declared in the §10.2 closed list but NOT raised by
+# the TASK-020-S2 adapter. See module docstring for the §20.C / §20.E
+# rationale.
+RESERVED_S2_BLOCKER_CODES: frozenset[str] = frozenset(
+    {
+        "STC_RULE_UNAPPROVED",
+        "STC_RULE_CANONICAL_HASH_MISMATCH",
+        "STC_RULE_LICENSE_BLOCKED",
+        "STC_RULE_PROVENANCE_BLOCKED",
+        "STC_REQUIRED_RULE_MISSING",
+    }
+)
+
+# S2 intersection-empty family — three per-rule-type codes
+# (range / orientation / token). Round §5 / §6.7 references
+# ``STC_RULE_INTERSECTION_EMPTY`` generically; the closed list emits
+# one of the three type-specific codes instead.
+S2_INTERSECTION_EMPTY_FAMILY: frozenset[str] = frozenset(
+    {
+        "STC_RULE_RANGE_INTERSECTION_EMPTY",
+        "STC_RULE_ORIENTATION_INTERSECTION_EMPTY",
+        "STC_RULE_TOKEN_INTERSECTION_EMPTY",
+    }
+)
+
+
 __all__ = [
     "ALL_BLOCKER_CODES",
     "ALL_WARNING_CODES",
     "BlockerError",
+    "RESERVED_S2_BLOCKER_CODES",
+    "S2_INTERSECTION_EMPTY_FAMILY",
     "ShellTubeError",
     "WarningSignal",
 ]
