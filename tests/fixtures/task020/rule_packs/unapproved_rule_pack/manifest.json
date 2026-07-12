@@ -1,11 +1,13 @@
 {
-  "rule_pack_id": "task020-internal-engineering-unapproved-v1",
-  "rule_pack_version": "v1",
-  "canonical_hash": "333333333333333333333333333333333333333333333333333333333333cccc",
-  "source_class": "INTERNAL_ENGINEERING_RULE",
-  "license": {
-    "id": "internal-engineering-license-2026"
-  },
-  "approval_status": "draft_not_approved",
-  "task020_profile": "task020.configuration-rule.v1"
+  "rule_pack_id": "task020.configuration-rule-pack.shell_and_tube.unapproved.v1",
+  "rule_pack_version": "0.1.0",
+  "rule_count": 1,
+  "rules": [
+    "unapproved-pass-range"
+  ],
+  "target_jurisdiction": "INTL",
+  "target_standard_family": "INTERNAL",
+  "creation_timestamp_utc": "2026-07-09T08:00:00Z",
+  "review_id": "task020_s2_unapproved_review_001",
+  "canonical_hash": "4f07d33f1315af2236c3020443b23126ba9c487c6a78abe0daf834e4d21b5326"
 }

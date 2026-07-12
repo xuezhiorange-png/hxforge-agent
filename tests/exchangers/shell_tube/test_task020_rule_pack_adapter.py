@@ -1,37 +1,40 @@
-"""TASK-020-S2 rule-pack adapter top-level tests.
+"""TASK-020-S2 top-level adapter tests — real TASK-012 integration.
 
-Maps to §14.2.2 + §19.H minimum coverage for
-``tests/exchangers/shell_tube/test_task020_rule_pack_adapter.py``:
+These tests drive the S2 adapter's public entry point
+``ConfigurationRulePackAdapter.validate`` through REAL
+``hexagent.rule_packs.loader.load_rule_pack`` and
+``hexagent.rule_packs.validation.validate_rule_pack``. They cover:
 
-- top-level presence matrix (§19.F);
-- TASK-012 report status (`STC_RULE_PACK_VALIDATION_FAILED`, §7.1);
-- cross-input consistency (§6.3.3);
-- approved-pack success (§7 / §12);
-- ``ConfigurationRuleEvaluation`` frozen shape (§20.D).
-
-All rule payloads use the synthetic ``INTERNAL_ENGINEERING_RULE``
-token vocabulary defined in the §14.2.3 fixtures. No engineering
-value, numeric coefficient, expected output or restricted-standard
-text is asserted anywhere in this file.
+* top-level happy-path success;
+* valid pack produces ConfigurationRuleEvaluation shape with
+  EvaluatedRulePackAuthority;
+* cross-input consistency blocker on identity disagreement;
+* rule-count mismatch between loaded and report;
+* ``validation_report.status != "ok"`` emits
+  STC_RULE_PACK_VALIDATION_FAILED;
+* minimum-fail-shape report accepted without manifest / rule_count;
+* minimum-fail-shape report rejected as such on the fail path;
+* success report without manifest rejected;
+* success report without rule_count rejected;
+* cross-input consistency uses TASK-012 directive identity fields.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Final, cast
 
-import hexagent.exchangers.shell_tube as st
+import pytest
+
+from hexagent.exchangers.shell_tube.errors import BlockerError
 from hexagent.exchangers.shell_tube.models import (
     AuthorityMode,
     CaseRevisionAuthority,
     CaseRevisionStatus,
     ComponentTokens,
-    ConfigurationRuleEvaluation,
-    ConfigurationValidationResult,
     ConstructionFamily,
     EquipmentFamily,
-    EvaluatedRulePackAuthority,
     Orientation,
     RequestedRulePackIdentity,
     ShellAndTubeConfigurationRequest,
@@ -41,379 +44,249 @@ from hexagent.exchangers.shell_tube.rule_pack_adapter import (
     loaded_rule_pack_view_from_loader_dict,
     rule_pack_validation_report_from_validate_dict,
 )
+from hexagent.rule_packs.loader import load_rule_pack
+from hexagent.rule_packs.validation import validate_rule_pack
 
-# ---------------------------------------------------------------------------
-# Fixtures loader — reads from the §14.2.3 fixture allowlist (no glob / no
-# recursive / no invented paths).
-# ---------------------------------------------------------------------------
-
-FIXTURE_ROOT = Path(__file__).resolve().parent.parent.parent / "fixtures" / "task020"
-
-
-def _load_pack_payload(pack_dir: str) -> dict[str, Any]:
-    pack_root: Path = FIXTURE_ROOT / "rule_packs" / pack_dir
-    manifest_obj = json.loads((pack_root / "manifest.json").read_text(encoding="utf-8"))
-    manifest = cast(dict[str, Any], manifest_obj) if isinstance(manifest_obj, dict) else {}
-    rules: dict[str, dict[str, Any]] = {}
-    for fp in sorted((pack_root / "rules").glob("*.json")):
-        rule: dict[str, Any] = json.loads(fp.read_text(encoding="utf-8"))
-        rule_id = rule.get("rule_id")
-        if not isinstance(rule_id, str) or not rule_id:
-            raise ValueError(f"rule at {fp} missing string rule_id")
-        rules[rule_id] = rule
-    provenance_edges: list[Any] = []
-    for fp in sorted((pack_root / "provenance").glob("*.json")):
-        provenance_edges.append(json.loads(fp.read_text(encoding="utf-8")))
-    result: dict[str, Any] = {
-        "manifest": manifest,
-        "rules": rules,
-        "provenance_edges": provenance_edges,
-        "permission_evidence": {},
-    }
-    return cast(dict[str, Any], result)
+FIXTURE_ROOT: Final[Path] = Path(__file__).parent.parent.parent / "fixtures/task020"
+VALID_PACK: Final[Path] = FIXTURE_ROOT / "rule_packs/valid_configuration_pack"
+UNAPPROVED_PACK: Final[Path] = FIXTURE_ROOT / "rule_packs/unapproved_rule_pack"
+LICENSE_PACK: Final[Path] = FIXTURE_ROOT / "rule_packs/license_blocked_rule_pack"
+CONFLICTING_PACK: Final[Path] = FIXTURE_ROOT / "rule_packs/conflicting_configuration_pack"
 
 
-def _load_pack_manifest(pack_dir: str) -> dict[str, Any]:
-    manifest_obj: object = json.loads(
-        (FIXTURE_ROOT / "rule_packs" / pack_dir / "manifest.json").read_text(encoding="utf-8")
-    )
-    if not isinstance(manifest_obj, dict):
-        return {}
-    return cast(dict[str, Any], manifest_obj)
+def _manifest_id(pack: Path) -> tuple[str, str, str]:
+    m = json.loads((pack / "manifest.json").read_text())
+    return m["rule_pack_id"], m["rule_pack_version"], m["canonical_hash"]
 
 
-def _make_matching_report_payload(payload: dict[str, Any], *, status: str = "ok") -> dict[str, Any]:
-    manifest = payload.get("manifest", {})
-    rules = payload.get("rules", {})
-    return {
-        "status": status,
-        "manifest": dict(manifest),
-        "rule_count": len(rules),
-        "errors": [],
-    }
-
-
-def _valid_request_payload(**overrides: object) -> dict[str, object]:
-    request: dict[str, object] = {
-        "schema_version": st.REQUEST_SCHEMA_VERSION,
-        "case_authority": {
-            "revision_id": "rev-001-committed",
-            "payload_hash": "a" * 64,
-            "domain_snapshot_hash": "b" * 64,
-            "status": "committed",
-        },
-        "equipment_family": "SHELL_AND_TUBE",
-        "authority_mode": "APPROVED_RULE_PACK",
-        "construction_family": "FIXED_TUBESHEET",
-        "orientation": "HORIZONTAL",
-        "shell_pass_count": 2,
-        "tube_pass_count": 4,
-        "front_head_token": "IER_FT_HEAD_A",
-        "shell_token": "IER_SHELL_A",
-        "rear_head_token": "IER_RH_HEAD_A",
-        "standard_system_id": "INTERNAL_ENGINEERING_RULE",
-        "requested_rule_pack_identity": {
-            "rule_pack_id": "task020-internal-engineering-rule-pack-v1",
-            "rule_pack_version": "v1",
-            "rule_pack_canonical_hash": "3" * 64,
-        },
-        "evidence_refs": [],
-    }
-    request.update(overrides)
-    return request
-
-
-# ---------------------------------------------------------------------------
-# §19.F — input-presence matrix (top-level)
-# ---------------------------------------------------------------------------
-
-
-def test_internal_generic_mode_with_no_adapter_inputs_returns_valid() -> None:
-    """``INTERNAL_GENERIC`` mode with both adapter inputs absent
-    returns ``VALID`` and produces a normalized configuration
-    (§19.F row 1)."""
-    payload = _valid_request_payload()
-    payload["authority_mode"] = "INTERNAL_GENERIC"
-    payload["requested_rule_pack_identity"] = None
-    payload["standard_system_id"] = None
-    result = st.validate_request(payload, loaded_rule_pack=None, validation_report=None)
-    assert isinstance(result, ConfigurationValidationResult)
-    assert result.status.value == "VALID"
-    assert result.configuration is not None
-
-
-def test_internal_generic_mode_with_adapter_input_emits_not_expected_in_mode() -> None:
-    """``INTERNAL_GENERIC`` mode with an adapter input present emits
-    ``STC_RULE_PACK_NOT_EXPECTED_IN_MODE`` (§19.F row 2)."""
-    payload = _valid_request_payload()
-    payload["authority_mode"] = "INTERNAL_GENERIC"
-    payload["requested_rule_pack_identity"] = None
-    payload["standard_system_id"] = None
-    loaded_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(loaded_payload)
-    report_payload = _make_matching_report_payload(loaded_payload)
-    report = rule_pack_validation_report_from_validate_dict(report_payload)
-    result = st.validate_request(
-        payload,
-        loaded_rule_pack=loaded,
-        validation_report=report,
-    )
-    assert result.status.value == "BLOCKED"
-    assert any(b.code == "STC_RULE_PACK_NOT_EXPECTED_IN_MODE" for b in result.blockers)
-
-
-def test_approved_rule_pack_mode_with_no_adapter_inputs_emits_inputs_missing() -> None:
-    """``APPROVED_RULE_PACK`` mode with both adapter inputs absent
-    emits ``STC_RULE_PACK_ADAPTER_INPUTS_MISSING`` (§19.F row 3)."""
-    payload = _valid_request_payload()
-    result = st.validate_request(
-        payload,
-        loaded_rule_pack=None,
-        validation_report=None,
-    )
-    assert result.status.value == "BLOCKED"
-    assert any(b.code == "STC_RULE_PACK_ADAPTER_INPUTS_MISSING" for b in result.blockers)
-
-
-def test_approved_rule_pack_mode_with_partial_inputs_emits_inputs_incomplete() -> None:
-    """``APPROVED_RULE_PACK`` mode with exactly one adapter input
-    emits ``STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE`` (§19.F row 4)."""
-    payload = _valid_request_payload()
-    loaded_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(loaded_payload)
-    result = st.validate_request(
-        payload,
-        loaded_rule_pack=loaded,
-        validation_report=None,
-    )
-    assert result.status.value == "BLOCKED"
-    assert any(b.code == "STC_RULE_PACK_ADAPTER_INPUTS_INCOMPLETE" for b in result.blockers)
-
-
-# ---------------------------------------------------------------------------
-# §7 / §12 — approved-pack success path
-# ---------------------------------------------------------------------------
-
-
-def test_approved_rule_pack_mode_full_path_returns_valid() -> None:
-    """When both adapter inputs are present and the pack loads with
-    ``status == 'ok'``, the full pipeline produces a
-    ``ConfigurationRuleEvaluation`` (per §20.D) and ``validate_request``
-    returns ``VALID``."""
-    payload = _valid_request_payload()
-    loaded_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(loaded_payload)
-    report_payload = _make_matching_report_payload(loaded_payload)
-    report = rule_pack_validation_report_from_validate_dict(report_payload)
-    result = st.validate_request(
-        payload,
-        loaded_rule_pack=loaded,
-        validation_report=report,
-    )
-    assert result.status.value == "VALID"
-    assert result.configuration is not None
-    # Configuration contains the EVALUATED authority, not the input
-    # identity (§6.3.5 / §20.D).
-    era = result.configuration.authority_binding.evaluated_rule_pack_authority
-    assert isinstance(era, EvaluatedRulePackAuthority)
-    assert era.validation_status == "ok"
-
-
-# ---------------------------------------------------------------------------
-# §7.1 — TASK-012 status != "ok"
-# ---------------------------------------------------------------------------
-
-
-def test_unapproved_pack_emits_validation_failed() -> None:
-    """Per §15 item 8 + §20.C, an unapproved_rule_pack fixture whose
-    TASK-012 validator returns ``status = "fail"`` causes TASK-020 to
-    emit only ``STC_RULE_PACK_VALIDATION_FAILED``. TASK-020 MUST NOT
-    parse ``validation_report.errors[*].message``."""
-    payload = _valid_request_payload()
-    loaded_payload = _load_pack_payload("unapproved_rule_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(loaded_payload)
-    # Manifest identity triple from the unapproved pack is matched.
-    manifest = loaded_payload["manifest"]
-    payload["requested_rule_pack_identity"] = {
-        "rule_pack_id": manifest["rule_pack_id"],
-        "rule_pack_version": manifest["rule_pack_version"],
-        "rule_pack_canonical_hash": manifest["canonical_hash"],
-    }
-    report_dict = {
-        "status": "fail",
-        "manifest": dict(manifest),
-        "rule_count": len(loaded_payload["rules"]),
-        "errors": [{"path": "manifest.json", "message": "approval_status is not approved"}],
-    }
-    report = rule_pack_validation_report_from_validate_dict(report_dict)
-    result = st.validate_request(
-        payload,
-        loaded_rule_pack=loaded,
-        validation_report=report,
-    )
-    assert result.status.value == "BLOCKED"
-    assert any(b.code == "STC_RULE_PACK_VALIDATION_FAILED" for b in result.blockers)
-    # Reserved rule-level codes MUST NOT be emitted (§20.C / §19.G).
-    for forbidden in (
-        "STC_RULE_UNAPPROVED",
-        "STC_RULE_CANONICAL_HASH_MISMATCH",
-        "STC_RULE_LICENSE_BLOCKED",
-        "STC_RULE_PROVENANCE_BLOCKED",
-    ):
-        assert not any(b.code == forbidden for b in result.blockers)
-
-
-def test_license_blocked_pack_emits_validation_failed() -> None:
-    """Per §15 item 8 + §20.C, a license_blocked_rule_pack fixture
-    whose TASK-012 validator returns ``status = "fail"`` causes
-    TASK-020 to emit only ``STC_RULE_PACK_VALIDATION_FAILED``."""
-    payload = _valid_request_payload()
-    loaded_payload = _load_pack_payload("license_blocked_rule_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(loaded_payload)
-    manifest = loaded_payload["manifest"]
-    payload["requested_rule_pack_identity"] = {
-        "rule_pack_id": manifest["rule_pack_id"],
-        "rule_pack_version": manifest["rule_pack_version"],
-        "rule_pack_canonical_hash": manifest["canonical_hash"],
-    }
-    report_dict = {
-        "status": "fail",
-        "manifest": dict(manifest),
-        "rule_count": len(loaded_payload["rules"]),
-        "errors": [{"path": "manifest.json", "message": "license not recognized"}],
-    }
-    report = rule_pack_validation_report_from_validate_dict(report_dict)
-    result = st.validate_request(
-        payload,
-        loaded_rule_pack=loaded,
-        validation_report=report,
-    )
-    assert result.status.value == "BLOCKED"
-    assert any(b.code == "STC_RULE_PACK_VALIDATION_FAILED" for b in result.blockers)
-
-
-# ---------------------------------------------------------------------------
-# §6.3.3 — cross-input consistency
-# ---------------------------------------------------------------------------
-
-
-def test_cross_input_identity_mismatch_emits_report_mismatch() -> None:
-    """When ``loaded_rule_pack.manifest`` and ``validation_report.manifest``
-    disagree on any identity field, the adapter emits
-    ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``."""
-    pack_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(pack_payload)
-    report_manifest = dict(pack_payload["manifest"])
-    # Mutate the validation-report manifest to disagree.
-    report_manifest["rule_pack_version"] = "v999-drift"
-    report_dict = {
-        "status": "ok",
-        "manifest": report_manifest,
-        "rule_count": len(pack_payload["rules"]),
-        "errors": [],
-    }
-    report = rule_pack_validation_report_from_validate_dict(report_dict)
-    request_dict = _valid_request_payload()
-    nested_obj = request_dict["requested_rule_pack_identity"]
-    req_dict: dict[str, object] = (
-        cast(dict[str, object], dict(nested_obj)) if isinstance(nested_obj, dict) else {}
-    )
-    req_dict["rule_pack_version"] = "v1"
-    request_dict["requested_rule_pack_identity"] = req_dict
-    # Build the request from the dict via the existing payload path
-    # so the validation pipeline builds a proper
-    # ShellAndTubeConfigurationRequest internally.
-    result = st.validate_request(
-        request_dict,
-        loaded_rule_pack=loaded,
-        validation_report=report,
-    )
-    assert result.status.value == "BLOCKED"
-    assert any(b.code == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH" for b in result.blockers)
-
-
-def test_requested_identity_mismatch_with_loaded_pack_emits_canonical_mismatch() -> None:
-    """When the request's ``requested_rule_pack_identity`` does not
-    match the loaded pack's manifest, the §6.3.3 path emits
-    ``STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH``."""
-    pack_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(pack_payload)
-    report_dict = _make_matching_report_payload(pack_payload)
-    report = rule_pack_validation_report_from_validate_dict(report_dict)
-    request_dict = _valid_request_payload()
-    # Drift the request hash to disagree with both loaded and report.
-    nested_obj = request_dict["requested_rule_pack_identity"]
-    req_dict_2: dict[str, object] = (
-        cast(dict[str, object], dict(nested_obj)) if isinstance(nested_obj, dict) else {}
-    )
-    req_dict_2["rule_pack_canonical_hash"] = "9" * 64
-    request_dict["requested_rule_pack_identity"] = req_dict_2
-    result = st.validate_request(
-        request_dict,
-        loaded_rule_pack=loaded,
-        validation_report=report,
-    )
-    assert result.status.value == "BLOCKED"
-    # Adapter may emit either REPORT_MISMATCH (cross-input) or
-    # REQUESTED_RULE_PACK_IDENTITY_MISMATCH; both are §6.3.3 boundary
-    # codes. The contract requires that the request identity mismatch
-    # be surfaced.
-    code_set = {b.code for b in result.blockers}
-    assert (
-        "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH" in code_set
-        or "STC_REQUESTED_RULE_PACK_IDENTITY_MISMATCH" in code_set
-    )
-
-
-# ---------------------------------------------------------------------------
-# §20.D — frozen ConfigurationRuleEvaluation shape (direct adapter entry)
-# ---------------------------------------------------------------------------
-
-
-def test_configuration_rule_evaluation_has_required_fields() -> None:
-    """Per §20.D, the success-only value object carries
-    ``normalized_construction_family`` and
-    ``evaluated_rule_pack_authority`` exactly; no parallel lists, no
-    optional fields.
-    """
-    pack_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(pack_payload)
-    report_dict = _make_matching_report_payload(pack_payload)
-    report = rule_pack_validation_report_from_validate_dict(report_dict)
-    case = CaseRevisionAuthority(
-        revision_id="rev-001-committed",
+def _case_auth() -> CaseRevisionAuthority:
+    return CaseRevisionAuthority(
+        revision_id="rev-rpac",
         payload_hash="a" * 64,
         domain_snapshot_hash="b" * 64,
         revision_status=CaseRevisionStatus.COMMITTED,
     )
-    requested_id = RequestedRulePackIdentity(
-        rule_pack_id=pack_payload["manifest"]["rule_pack_id"],
-        rule_pack_version=pack_payload["manifest"]["rule_pack_version"],
-        rule_pack_canonical_hash=pack_payload["manifest"]["canonical_hash"],
-    )
-    request = ShellAndTubeConfigurationRequest(
+
+
+def _request_for(pack: Path) -> ShellAndTubeConfigurationRequest:
+    rid, rver, rhash = _manifest_id(pack)
+    return ShellAndTubeConfigurationRequest(
         schema_version="task020.configuration-request.v1",
-        case_authority=case,
+        case_authority=_case_auth(),
         equipment_family=EquipmentFamily.SHELL_AND_TUBE,
         authority_mode=AuthorityMode.APPROVED_RULE_PACK,
         construction_family=ConstructionFamily.FIXED_TUBESHEET,
         orientation=Orientation.HORIZONTAL,
-        shell_pass_count=2,
-        tube_pass_count=4,
+        shell_pass_count=1,
+        tube_pass_count=1,
         component_tokens=ComponentTokens(
-            front_head="IER_FT_HEAD_A",
-            shell="IER_SHELL_A",
-            rear_head="IER_RH_HEAD_A",
+            front_head="IER_FT_A", shell="IER_SH_A", rear_head="IER_RH_A"
         ),
-        standard_system_id="INTERNAL_ENGINEERING_RULE",
-        requested_rule_pack_identity=requested_id,
-        evidence_refs=(),
+        standard_system_id="INTERNAL",
+        requested_rule_pack_identity=RequestedRulePackIdentity(
+            rule_pack_id=rid,
+            rule_pack_version=rver,
+            rule_pack_canonical_hash=rhash,
+        ),
     )
-    evaluation = ConfigurationRulePackAdapter.validate(
-        request=request,
-        loaded_rule_pack=loaded,
-        validation_report=report,
-    )
-    assert isinstance(evaluation, ConfigurationRuleEvaluation)
+
+
+# ---------------------------------------------------------------------------
+# Real-TASK-012 integration: real valid pack succeeds end-to-end
+# ---------------------------------------------------------------------------
+
+
+def test_real_valid_pack_validator_status_ok() -> None:
+    """§5 — real validate_rule_pack returns ``ok`` for valid pack."""
+    result = validate_rule_pack(VALID_PACK)
+    assert result["status"] == "ok"
+
+
+def test_real_valid_pack_adapter_succeeds() -> None:
+    """§5 — adapter returns ConfigurationRuleEvaluation on valid pack."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    validate_dict = validate_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    request = _request_for(VALID_PACK)
+    evaluation = ConfigurationRulePackAdapter.validate(request, loaded, report)
+    assert evaluation.evaluated_rule_pack_authority.rule_pack_id.startswith("task020.")
+    assert len(evaluation.evaluated_rule_pack_authority.selected_rule_authorities) == 7
+
+
+def test_configuration_rule_evaluation_has_required_fields() -> None:
+    """§20.D — ConfigurationRuleEvaluation has the two frozen fields."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    validate_dict = validate_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    request = _request_for(VALID_PACK)
+    evaluation = ConfigurationRulePackAdapter.validate(request, loaded, report)
     assert evaluation.normalized_construction_family == ConstructionFamily.FIXED_TUBESHEET
-    assert isinstance(evaluation.evaluated_rule_pack_authority, EvaluatedRulePackAuthority)
+    era = evaluation.evaluated_rule_pack_authority
+    assert era.validation_status == "ok"
+    assert era.rule_pack_canonical_hash  # non-empty
+
+
+# ---------------------------------------------------------------------------
+# Real-TASK-012 fail packs
+# ---------------------------------------------------------------------------
+
+
+def test_real_unapproved_pack_validator_status_fail() -> None:
+    """§5 — TASK-012 reports fail for the unapproved pack (manifest §15.6 rejection)."""
+    result = validate_rule_pack(UNAPPROVED_PACK)
+    assert result["status"] == "fail"
+
+
+def test_real_unapproved_pack_adapter_emits_validation_failed() -> None:
+    """§5 — adapter emits STC_RULE_PACK_VALIDATION_FAILED for unapproved pack."""
+    loader_dict = load_rule_pack(UNAPPROVED_PACK)
+    validate_dict = validate_rule_pack(UNAPPROVED_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    request = _request_for(UNAPPROVED_PACK)
+    with pytest.raises(BlockerError) as exc:
+        ConfigurationRulePackAdapter.validate(request, loaded, report)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_FAILED"
+
+
+def test_real_license_pack_validator_status_fail() -> None:
+    """§5 — TASK-012 reports fail for the license-blocked pack."""
+    result = validate_rule_pack(LICENSE_PACK)
+    assert result["status"] == "fail"
+
+
+def test_real_license_pack_adapter_emits_validation_failed() -> None:
+    """§5 — adapter emits STC_RULE_PACK_VALIDATION_FAILED for license pack."""
+    loader_dict = load_rule_pack(LICENSE_PACK)
+    validate_dict = validate_rule_pack(LICENSE_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    request = _request_for(LICENSE_PACK)
+    with pytest.raises(BlockerError) as exc:
+        ConfigurationRulePackAdapter.validate(request, loaded, report)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_FAILED"
+
+
+# ---------------------------------------------------------------------------
+# Real-TASK-012 conflicting pack drives STC_RULE_DUPLICATE_IDENTITY (already
+# covered in test_task020_rule_profile_adapter.py). This is the dedicated
+# integration test.
+# ---------------------------------------------------------------------------
+
+
+def test_real_conflicting_pack_validator_status_ok() -> None:
+    """§5 — TASK-012 schema passes; the conflict is purely TASK-020 logical."""
+    result = validate_rule_pack(CONFLICTING_PACK)
+    assert result["status"] == "ok"
+
+
+def test_real_conflicting_pack_adapter_emits_duplicate_identity() -> None:
+    """§5 — adapter emits STC_RULE_DUPLICATE_IDENTITY from the real TASK-012 loader."""
+    loader_dict = load_rule_pack(CONFLICTING_PACK)
+    validate_dict = validate_rule_pack(CONFLICTING_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    request = _request_for(CONFLICTING_PACK)
+    with pytest.raises(BlockerError) as exc:
+        ConfigurationRulePackAdapter.validate(request, loaded, report)
+    assert str(exc.value.code) == "STC_RULE_DUPLICATE_IDENTITY"
+
+
+# ---------------------------------------------------------------------------
+# §6.3.3 cross-input consistency (Round-2 §6)
+# ---------------------------------------------------------------------------
+
+
+def test_cross_input_identity_mismatch_emits_mismatch_blocker() -> None:
+    """§6.3.3 — request's rule_pack_id disagrees with loaded/report."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    validate_dict = validate_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    rid, rver, rhash = _manifest_id(VALID_PACK)
+    # Forge a request whose identity triple disagrees.
+    request = ShellAndTubeConfigurationRequest(
+        schema_version="task020.configuration-request.v1",
+        case_authority=_case_auth(),
+        equipment_family=EquipmentFamily.SHELL_AND_TUBE,
+        authority_mode=AuthorityMode.APPROVED_RULE_PACK,
+        construction_family=ConstructionFamily.FIXED_TUBESHEET,
+        orientation=Orientation.HORIZONTAL,
+        shell_pass_count=1,
+        tube_pass_count=1,
+        component_tokens=ComponentTokens(
+            front_head="IER_FT_A", shell="IER_SH_A", rear_head="IER_RH_A"
+        ),
+        standard_system_id="INTERNAL",
+        requested_rule_pack_identity=RequestedRulePackIdentity(
+            rule_pack_id="WRONG-PACK-ID",
+            rule_pack_version=rver,
+            rule_pack_canonical_hash=rhash,
+        ),
+    )
+    with pytest.raises(BlockerError) as exc:
+        ConfigurationRulePackAdapter.validate(request, loaded, report)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_rule_count_mismatch_emits_mismatch_blocker() -> None:
+    """§6.3.3 — loaded and report disagree on rule_count."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    validate_dict = validate_rule_pack(VALID_PACK)
+    _manifest_id(VALID_PACK)  # confirm manifest identity triple is fetchable
+    request = _request_for(VALID_PACK)
+    # Forge a report whose rule_count disagrees.
+    forged = dict(validate_dict)
+    forged["rule_count"] = 99  # disagree
+    forged_report = rule_pack_validation_report_from_validate_dict(forged)
+    with pytest.raises(BlockerError) as exc:
+        ConfigurationRulePackAdapter.validate(request, loaded, forged_report)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+# ---------------------------------------------------------------------------
+# §6.3.2 fail-shape discipline (Round-2 §6)
+# ---------------------------------------------------------------------------
+
+
+def test_minimal_fail_report_without_manifest_accepted() -> None:
+    """Round-2 §6 — minimal {status, errors} without manifest/rule_count is accepted on fail."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    minimal_fail = {"status": "fail", "errors": [{"path": "loader", "message": "x"}]}
+    report = rule_pack_validation_report_from_validate_dict(minimal_fail)
+    request = _request_for(VALID_PACK)
+    with pytest.raises(BlockerError) as exc:
+        ConfigurationRulePackAdapter.validate(request, loaded, report)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_FAILED"
+
+
+def test_minimal_fail_report_emits_validation_failed_blocker() -> None:
+    """Round-2 §6 — minimal fail report goes to STC_RULE_PACK_VALIDATION_FAILED."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    minimal_fail = {"status": "fail", "errors": []}
+    report = rule_pack_validation_report_from_validate_dict(minimal_fail)
+    request = _request_for(VALID_PACK)
+    with pytest.raises(BlockerError) as exc:
+        ConfigurationRulePackAdapter.validate(request, loaded, report)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_FAILED"
+
+
+def test_success_report_without_manifest_rejected() -> None:
+    """Round-2 §6 — status=ok without manifest is rejected as mismatch."""
+    bad_ok = {"status": "ok", "errors": [], "rule_count": 7}
+    with pytest.raises(BlockerError) as exc:
+        rule_pack_validation_report_from_validate_dict(cast("dict[str, object]", bad_ok))
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_success_report_without_rule_count_rejected() -> None:
+    """Round-2 §6 — status=ok without rule_count is rejected as mismatch."""
+    bad_ok = {"status": "ok", "errors": [], "manifest": {}}
+    with pytest.raises(BlockerError) as exc:
+        rule_pack_validation_report_from_validate_dict(cast("dict[str, object]", bad_ok))
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"

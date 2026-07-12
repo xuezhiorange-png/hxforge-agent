@@ -1,5 +1,7 @@
 {
   "edge_id": "conflict_a_edge",
-  "rule_id": "stc-norm-conflict-A",
-  "evidence_refs": ["ier-evidence-conflict-a-001"]
+  "from_rule_id": "external:INTERNAL_ENGINEERING_RULE:conflict-a-source",
+  "to_rule_id": "conflict-a-pass-count",
+  "relation": "paraphrases",
+  "evidence_ref": "internal://engineering-handbook/shell_tube/conflict_a/v1"
 }

@@ -1,19 +1,69 @@
 {
-  "rule_id": "stc-norm-conflict-A",
-  "rule_version": "v1",
-  "rule_type": "CONSTRUCTION_FAMILY_NORMALIZATION",
-  "constraint_id": "conflicting-cfn",
-  "priority": 0,
-  "profile_id": "task020.configuration-rule.v1",
+  "rule_id": "conflict-a-pass-count",
+  "rule_version": "1.0.0",
+  "rule_title": "Conflict A: pass-count range (1..2)",
   "source_class": "INTERNAL_ENGINEERING_RULE",
-  "approval_status": "approved",
-  "license_evidence": {
-    "id": "internal-engineering-license-2026"
+  "jurisdiction": "INTL",
+  "standard_family": "INTERNAL",
+  "bibliographic_reference": "internal://engineering-handbook/shell_tube/conflict-a-pass-count/v1.0.0",
+  "license_evidence": "project_internal_authority",
+  "source_evidence": {
+    "source_class": "INTERNAL_ENGINEERING_RULE",
+    "source_reference": "internal://engineering-handbook/shell_tube/conflict-a-pass-count/v1.0.0",
+    "source_title_or_identifier": "Conflict A: pass-count range (1..2)",
+    "source_locator_or_citation": "Section conflict-a-pass-count",
+    "source_jurisdiction": "INTL",
+    "license_evidence": "project_internal_authority",
+    "source_access_date": "n/a",
+    "source_publisher": "internal",
+    "source_version_or_publication_date": "2026-01-15"
   },
-  "canonical_hash": "111111111111111111111111111111111111111111111111111111111111aaaa",
-  "applies_to_authority_modes": ["APPROVED_RULE_PACK"],
-  "input_value": "FIXED_TUBESHEET",
-  "normalized_value": "FIXED_TUBESHEET",
-  "evidence_refs": ["ier-evidence-conflict-a-001"],
-  "provenance_edges": ["conflict_a_edge"]
+  "rule_body": {
+    "profile_id": "task020.configuration-rule.v1",
+    "rule_type": "PASS_COUNT_ALLOWED_RANGE",
+    "constraint_id": "conflict-001-pass-range",
+    "priority": 0,
+    "applies_to_authority_modes": [
+      "APPROVED_RULE_PACK"
+    ],
+    "applies_to_construction_families": [
+      "FIXED_TUBESHEET"
+    ],
+    "shell_pass_count": {
+      "min_inclusive": 1,
+      "max_inclusive": 2
+    },
+    "tube_pass_count": {
+      "min_inclusive": 1,
+      "max_inclusive": 2
+    },
+    "evidence_refs": [
+      "internal://engineering-handbook/shell_tube/pass_count_a/v1"
+    ]
+  },
+  "forbidden_content_marker_check": [],
+  "applicability_envelope": {
+    "scope": "TASK-020-S2 fixture",
+    "units": "n/a"
+  },
+  "uncertainty": {
+    "type": "structural",
+    "note": "exact"
+  },
+  "review_status": "accepted",
+  "approval_status": "approved",
+  "provenance_edges": [
+    "conflict_a_edge"
+  ],
+  "human_entered_evidence": {
+    "author_identity": "internal_engineer@example.invalid",
+    "author_role": "internal engineer",
+    "entry_timestamp_utc": "2026-07-04T09:00:00Z",
+    "review": {
+      "review_thread_reference": "task020_s2_pack_review_001",
+      "review_timestamp_utc": "2026-07-04T09:15:00Z",
+      "reviewer_identity": "internal_reviewer@example.invalid"
+    }
+  },
+  "canonical_hash": "09d45d9f67034c7092ee995021a450a04e0b9f70083730b26ddab83fdd187bc9"
 }

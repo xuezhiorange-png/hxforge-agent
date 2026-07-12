@@ -1,5 +1,7 @@
 {
   "edge_id": "allowed_tokens_edge",
-  "rule_id": "stc-cta-licenseblocked-001",
-  "evidence_refs": ["ier-evidence-license-blocked-001"]
+  "from_rule_id": "external:INTERNAL_ENGINEERING_RULE:license_blocked-source",
+  "to_rule_id": "license-blocked-pass-range",
+  "relation": "paraphrases",
+  "evidence_ref": "internal://engineering-handbook/shell_tube/license_blocked/v1"
 }

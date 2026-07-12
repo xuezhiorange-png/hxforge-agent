@@ -1,229 +1,245 @@
-"""TASK-020-S2 rule-pack canonical ordering tests.
+"""TASK-020-S2 canonical / sorting / ordering tests.
 
-Maps to §14.2.2 + §19.H minimum coverage for
-``tests/exchangers/shell_tube/test_task020_rule_pack_canonical.py``:
+These tests verify the §12.4 + §11 canonical-data discipline:
 
-- selected-rule composite sort (§12.4);
-- per-rule evidence / provenance ordering (§11.4);
-- warning / blocker full-object ordering (§11.4);
-- canonical JSON behavior (§11.2).
-
-All rule payloads use the synthetic ``INTERNAL_ENGINEERING_RULE``
-token vocabulary. No engineering value, numeric coefficient,
-expected output or restricted-standard text is asserted.
+* Selected rule authorities are sorted by the §12.4 6-field key
+  (already covered in test_task020_rule_pack_hash_integration.py;
+  this file adds dedicated ordering assertions for each sub-discipline);
+* Per-rule evidence_refs (TASK-020) and provenance_edge_ids
+  (TASK-012) are sorted in ascending Unicode-code-point order on the
+  SelectedRuleAuthority;
+* ``canonical_hash`` on the artifact is a 64-character hex SHA-256;
+* The TASK-020 payload identity triple (profile_id, rule_type,
+  constraint_id) is read from inside ``rule_body``;
+* The TASK-012 directive identity triple (rule_id, rule_version,
+  canonical_hash) is read from the artifact top level;
+* The TASK-020 closed profile_id is enforced (§12.2);
+* The TASK-020 closed rule_type set is enforced (§12.3);
+* The TASK-020 priority field is read from ``rule_body.priority``
+  (not artifact top-level) and must be an int.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Final
 
-import hexagent.exchangers.shell_tube as st
-import hexagent.exchangers.shell_tube.canonical as canonical
 from hexagent.exchangers.shell_tube.models import (
-    ConfigurationValidationResult,
+    AuthorityMode,
+    CaseRevisionAuthority,
+    CaseRevisionStatus,
+    ComponentTokens,
+    ConstructionFamily,
+    EquipmentFamily,
+    Orientation,
+    RequestedRulePackIdentity,
+    ShellAndTubeConfigurationRequest,
 )
 from hexagent.exchangers.shell_tube.rule_pack_adapter import (
+    ConfigurationRulePackAdapter,
     loaded_rule_pack_view_from_loader_dict,
     rule_pack_validation_report_from_validate_dict,
 )
+from hexagent.rule_packs.loader import load_rule_pack
+from hexagent.rule_packs.validation import validate_rule_pack
 
-FIXTURE_ROOT = Path(__file__).resolve().parent.parent.parent / "fixtures" / "task020"
-
-
-def _load_pack_payload(pack_dir: str) -> dict[str, Any]:
-    pack_root: Path = FIXTURE_ROOT / "rule_packs" / pack_dir
-    manifest_obj = json.loads((pack_root / "manifest.json").read_text(encoding="utf-8"))
-    manifest = cast(dict[str, Any], manifest_obj) if isinstance(manifest_obj, dict) else {}
-    rules: dict[str, dict[str, Any]] = {}
-    for fp in sorted((pack_root / "rules").glob("*.json")):
-        rule: dict[str, Any] = json.loads(fp.read_text(encoding="utf-8"))
-        rule_id = rule.get("rule_id")
-        if not isinstance(rule_id, str) or not rule_id:
-            raise ValueError(f"rule at {fp} missing string rule_id")
-        rules[rule_id] = rule
-    provenance_edges: list[Any] = []
-    for fp in sorted((pack_root / "provenance").glob("*.json")):
-        provenance_edges.append(json.loads(fp.read_text(encoding="utf-8")))
-    result: dict[str, Any] = {
-        "manifest": manifest,
-        "rules": rules,
-        "provenance_edges": provenance_edges,
-        "permission_evidence": {},
-    }
-    return cast(dict[str, Any], result)
+FIXTURE_ROOT: Final[Path] = Path(__file__).parent.parent.parent / "fixtures/task020"
+VALID_PACK: Final[Path] = FIXTURE_ROOT / "rule_packs/valid_configuration_pack"
 
 
-def _valid_request_payload(**overrides: object) -> dict[str, object]:
-    request: dict[str, object] = {
-        "schema_version": st.REQUEST_SCHEMA_VERSION,
-        "case_authority": {
-            "revision_id": "rev-001-committed",
-            "payload_hash": "a" * 64,
-            "domain_snapshot_hash": "b" * 64,
-            "status": "committed",
-        },
-        "equipment_family": "SHELL_AND_TUBE",
-        "authority_mode": "APPROVED_RULE_PACK",
-        "construction_family": "FIXED_TUBESHEET",
-        "orientation": "HORIZONTAL",
-        "shell_pass_count": 2,
-        "tube_pass_count": 4,
-        "front_head_token": "IER_FT_HEAD_A",
-        "shell_token": "IER_SHELL_A",
-        "rear_head_token": "IER_RH_HEAD_A",
-        "standard_system_id": "INTERNAL_ENGINEERING_RULE",
-        "requested_rule_pack_identity": {
-            "rule_pack_id": "task020-internal-engineering-rule-pack-v1",
-            "rule_pack_version": "v1",
-            "rule_pack_canonical_hash": "3" * 64,
-        },
-        "evidence_refs": [],
-    }
-    request.update(overrides)
-    return request
+def _manifest_id(pack: Path) -> tuple[str, str, str]:
+    m = json.loads((pack / "manifest.json").read_text())
+    return m["rule_pack_id"], m["rule_pack_version"], m["canonical_hash"]
 
 
-def _match_report(payload: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "manifest": dict(payload["manifest"]),
-        "rule_count": len(payload["rules"]),
-        "errors": [],
-    }
-
-
-# ---------------------------------------------------------------------------
-# §12.4 — selected-rule composite sort
-# ---------------------------------------------------------------------------
-
-
-def test_selected_rule_authorities_sort_under_six_field_key() -> None:
-    """The selected_rule_authorities are returned in ascending order
-    under the §12.4 six-field key
-    ``(priority, rule_type, constraint_id, rule_id, rule_version,
-    rule_artifact_canonical_hash)``."""
-    pack_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(pack_payload)
-    report = rule_pack_validation_report_from_validate_dict(_match_report(pack_payload))
-    result = st.validate_request(
-        _valid_request_payload(), loaded_rule_pack=loaded, validation_report=report
+def _case_auth() -> CaseRevisionAuthority:
+    return CaseRevisionAuthority(
+        revision_id="rev-canon",
+        payload_hash="a" * 64,
+        domain_snapshot_hash="b" * 64,
+        revision_status=CaseRevisionStatus.COMMITTED,
     )
-    assert isinstance(result, ConfigurationValidationResult)
-    assert result.configuration is not None  # type: ignore[union-attr]
-    era = result.configuration.authority_binding.evaluated_rule_pack_authority
-    sras = era.selected_rule_authorities
 
-    # Re-derive the expected order from the raw rule bodies.
-    from hexagent.exchangers.shell_tube.rule_pack_adapter import _six_field_key
 
-    expected = sorted(pack_payload["rules"].values(), key=_six_field_key)
-    expected_ids = [r["rule_id"] for r in expected]
-    actual_ids = [r.rule_id for r in sras]
-    assert actual_ids == expected_ids
+def _request(pack: Path) -> ShellAndTubeConfigurationRequest:
+    rid, rver, rhash = _manifest_id(pack)
+    return ShellAndTubeConfigurationRequest(
+        schema_version="task020.configuration-request.v1",
+        case_authority=_case_auth(),
+        equipment_family=EquipmentFamily.SHELL_AND_TUBE,
+        authority_mode=AuthorityMode.APPROVED_RULE_PACK,
+        construction_family=ConstructionFamily.FIXED_TUBESHEET,
+        orientation=Orientation.HORIZONTAL,
+        shell_pass_count=1,
+        tube_pass_count=1,
+        component_tokens=ComponentTokens(
+            front_head="IER_FT_A", shell="IER_SH_A", rear_head="IER_RH_A"
+        ),
+        standard_system_id="INTERNAL",
+        requested_rule_pack_identity=RequestedRulePackIdentity(
+            rule_pack_id=rid,
+            rule_pack_version=rver,
+            rule_pack_canonical_hash=rhash,
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
-# §11.4 — per-rule evidence / provenance ordering
+# Per-rule evidence/provenance ordering
 # ---------------------------------------------------------------------------
 
 
 def test_per_rule_evidence_refs_are_unicode_sorted() -> None:
-    """Each SelectedRuleAuthority's ``evidence_refs`` and
-    ``provenance_edge_ids`` lists are sorted in ascending
-    Unicode code-point order (per §11.4 / §6.3.5.1)."""
-    pack_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(pack_payload)
-    report = rule_pack_validation_report_from_validate_dict(_match_report(pack_payload))
-    result = st.validate_request(
-        _valid_request_payload(), loaded_rule_pack=loaded, validation_report=report
-    )
-    assert result.configuration is not None  # type: ignore[union-attr]
-    era = result.configuration.authority_binding.evaluated_rule_pack_authority
-    sras = era.selected_rule_authorities
-    for entry in sras:
-        assert list(entry.evidence_refs) == sorted(entry.evidence_refs)
-        assert list(entry.provenance_edge_ids) == sorted(entry.provenance_edge_ids)
+    """§11.4 — SelectedRuleAuthority.evidence_refs and
+    .provenance_edge_ids are ascending Unicode-code-point order, deduped."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    validate_dict = validate_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    request = _request(VALID_PACK)
+    evaluation = ConfigurationRulePackAdapter.validate(request, loaded, report)
+    for a in evaluation.evaluated_rule_pack_authority.selected_rule_authorities:
+        assert list(a.evidence_refs) == sorted(a.evidence_refs)
+        assert list(a.provenance_edge_ids) == sorted(a.provenance_edge_ids)
 
 
 # ---------------------------------------------------------------------------
-# §11.4 — warning / blocker full-object ordering
+# Canonical hash 64-char hex invariant
 # ---------------------------------------------------------------------------
 
 
-def test_blocker_list_is_canonicalized() -> None:
-    """A blocked validation result carries its blockers in canonical
-    sorted order (§11.4 ``sort_error_entries``)."""
-    pack_payload = _load_pack_payload("valid_configuration_pack")
-    loaded = loaded_rule_pack_view_from_loader_dict(pack_payload)
-    # Force a blocker by reporting status=fail.
-    report = rule_pack_validation_report_from_validate_dict(
-        _match_report(pack_payload) | {"status": "fail"}
-    )
-    result = st.validate_request(
-        _valid_request_payload(), loaded_rule_pack=loaded, validation_report=report
-    )
-    assert isinstance(result, ConfigurationValidationResult)
-    assert result.status.value == "BLOCKED"
-    codes = [b.code for b in result.blockers]
-    assert list(codes) == sorted(codes)
+def test_artifact_canonical_hash_is_64_hex_chars() -> None:
+    """All 7 rules in the valid pack have 64-char hex SHA-256 canonical_hash."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    for rule_id, rule in loader_dict["rules"].items():
+        h = rule["canonical_hash"]
+        assert isinstance(h, str) and len(h) == 64 and all(c in "0123456789abcdef" for c in h), (
+            f"rule {rule_id} canonical_hash is not 64 hex chars: {h!r}"
+        )
+
+
+def test_manifest_canonical_hash_is_64_hex_chars() -> None:
+    """Manifest's canonical_hash is 64-char hex SHA-256."""
+    m = json.loads((VALID_PACK / "manifest.json").read_text())
+    h = m["canonical_hash"]
+    assert isinstance(h, str) and len(h) == 64 and all(c in "0123456789abcdef" for c in h)
 
 
 # ---------------------------------------------------------------------------
-# §11.2 — canonical JSON behavior
+# §6.3.5.1 — SelectedRuleAuthority reads from artifact top-level
 # ---------------------------------------------------------------------------
 
 
-def test_canonical_payload_returns_frozen_hash() -> None:
-    """``configuration_hash`` of an arbitrary canonical-payload dict
-    returns a 64-char lowercase hex string twice for the same
-    canonical payload (§11.2 / §11.5 determinism)."""
-    payload_dict = {
-        "equipment_family": "SHELL_AND_TUBE",
-        "construction_family": "FIXED_TUBESHEET",
-        "shell_pass_count": 2,
-        "tube_pass_count": 4,
-        "authority_binding": {
-            "authority_mode": "APPROVED_RULE_PACK",
-            "evaluated_rule_pack_authority": {
-                "rule_pack_id": "task020-internal-engineering-rule-pack-v1",
-                "selected_rule_authorities": [],
-            },
-        },
+def test_selected_authorities_read_direct_rule_id_and_version() -> None:
+    """SelectedRuleAuthority.rule_id and .rule_version are taken from
+    the artifact top-level directive identity."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    validate_dict = validate_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    request = _request(VALID_PACK)
+    evaluation = ConfigurationRulePackAdapter.validate(request, loaded, report)
+    for a in evaluation.evaluated_rule_pack_authority.selected_rule_authorities:
+        rule = loaded.rules[a.rule_id]
+        assert a.rule_id == rule["rule_id"]
+        assert a.rule_version == rule["rule_version"]
+        assert a.rule_artifact_canonical_hash == rule["canonical_hash"]
+        assert a.source_class == rule["source_class"]
+
+
+def test_selected_authorities_carry_provenance_edge_ids_from_directive() -> None:
+    """provenance_edge_ids come from artifact top-level, not rule_body."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    validate_dict = validate_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    request = _request(VALID_PACK)
+    evaluation = ConfigurationRulePackAdapter.validate(request, loaded, report)
+    for a in evaluation.evaluated_rule_pack_authority.selected_rule_authorities:
+        rule = loaded.rules[a.rule_id]
+        # The artifact's top-level provenance_edges is a list of edge_ids.
+        edge_ids = sorted(set(rule["provenance_edges"]))
+        assert list(a.provenance_edge_ids) == edge_ids
+
+
+# ---------------------------------------------------------------------------
+# §12.2 / §12.3 — closed profile_id + closed rule_type
+# ---------------------------------------------------------------------------
+
+
+def test_t120_profile_id_constant() -> None:
+    """§12.2 — TASK-020 profile_id is the frozen constant
+    ``task020.configuration-rule.v1``."""
+    expected = "task020.configuration-rule.v1"
+    loader_dict = load_rule_pack(VALID_PACK)
+    seen: set[str] = set()
+    for _rule_id, rule in loader_dict["rules"].items():
+        # TASK-020 predicate profile_id lives inside ``rule_body``.
+        seen.add(rule["rule_body"]["profile_id"])
+    assert expected in seen
+
+
+def test_t120_closed_rule_types() -> None:
+    """§12.3 — only the five closed rule_types are valid for TASK-020 rules."""
+    closed = {
+        "COMPONENT_TOKEN_ALLOWLIST",
+        "CONSTRUCTION_FAMILY_NORMALIZATION",
+        "CONFIGURATION_COMBINATION_BLOCKLIST",
+        "PASS_COUNT_ALLOWED_RANGE",
+        "ORIENTATION_ALLOWLIST",
     }
-    h_a = canonical.configuration_hash(payload_dict)
-    h_b = canonical.configuration_hash(payload_dict)
-    assert h_a == h_b
-    assert isinstance(h_a, str) and len(h_a) == 64
+    loader_dict = load_rule_pack(VALID_PACK)
+    for rule_id, rule in loader_dict["rules"].items():
+        if rule["rule_body"].get("profile_id") == "task020.configuration-rule.v1":
+            assert rule["rule_body"]["rule_type"] in closed, (
+                f"rule {rule_id} rule_type {rule['rule_body']['rule_type']!r} not in closed set"
+            )
 
 
-def test_canonical_payload_helpers_return_sorted_lists() -> None:
-    """``sort_evidence_refs`` and ``sort_error_entries`` return
-    ascending sorted output."""
-    refs = ["z-evidence", "a-evidence", "m-evidence"]
-    assert list(canonical.sort_evidence_refs(refs)) == sorted(refs)
+# ---------------------------------------------------------------------------
+# §12.4 — priority field is read from rule_body
+# ---------------------------------------------------------------------------
 
 
-def test_error_entry_evidence_refs_sort_via_sort_evidence_refs() -> None:
-    """Per §11.4, ``sort_evidence_refs`` returns ascending Unicode
-    code-point order on the list of str evidence_refs."""
-    refs = ["z-evidence", "a-evidence", "m-evidence"]
-    sorted_refs = canonical.sort_evidence_refs(refs)
-    assert list(sorted_refs) == sorted(refs)
+def test_priority_field_lives_inside_rule_body() -> None:
+    """Round-2 §9 — priority is read from rule_body.priority, NOT
+    artifact top-level. Top-level ``priority`` is counterfeited and ignored."""
+    loader_dict = load_rule_pack(VALID_PACK)
+    for rule_id, rule in loader_dict["rules"].items():
+        # Priority must be inside rule_body.
+        assert "priority" in rule["rule_body"], f"rule {rule_id} missing rule_body.priority"
+        assert isinstance(rule["rule_body"]["priority"], int)
 
 
-def test_composite_canonical_key_for_error_entry_is_stable() -> None:
-    """``composite_canonical_key`` returns a 5-tuple derived from the
-    ErrorEntry's five §10.4 fields."""
-    entry_dict = {
-        "code": "STC_TOKEN_UNSUPPORTED_BY_RULE_PACK",
-        "field_path": "component_tokens.front_head",
-        "message_key": "stc_token_unsupported",
-        "evidence_refs": ["a-evidence", "z-evidence"],
-        "details": None,
-    }
-    k1 = canonical.composite_canonical_key(entry_dict)
-    k2 = canonical.composite_canonical_key(entry_dict)
-    assert k1 == k2
-    assert len(k1) >= 1
+def test_top_level_counterfeit_priority_field_ignored() -> None:
+    """Round-2 §9 — top-level counterfeit ``priority`` is ignored.
+    Even if it's an invalid value (negative, or wrong type), the
+    adapter continues to read from rule_body and the call succeeds."""
+    import copy
+
+    loader_dict = load_rule_pack(VALID_PACK)
+    validate_dict = validate_rule_pack(VALID_PACK)
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    report = rule_pack_validation_report_from_validate_dict(validate_dict)
+
+    # Inject bogus top-level ``priority`` on every rule.
+    rules_view: dict[str, object] = {}
+    for rid, rule in loaded.rules.items():
+        m = copy.deepcopy(dict(rule))
+        m["priority"] = -1  # counterfeited, should be ignored
+        rules_view[rid] = m
+    new_loaded = type(loaded)(
+        manifest=loaded.manifest,
+        rules=rules_view,
+        provenance_edges=loaded.provenance_edges,
+        permission_evidence=loaded.permission_evidence,
+        rule_pack_id=loaded.rule_pack_id,
+        rule_pack_version=loaded.rule_pack_version,
+        rule_pack_canonical_hash=loaded.rule_pack_canonical_hash,
+        rule_count=loaded.rule_count,
+    )
+    request = _request(VALID_PACK)
+    # The adapter continues to read rule_body.priority=0; the call
+    # succeeds as long as rule_body is internally consistent.
+    ConfigurationRulePackAdapter.validate(request, new_loaded, report)

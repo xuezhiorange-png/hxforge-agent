@@ -1,17 +1,17 @@
 {
-  "rule_id": "unapproved-pass-range",
-  "rule_version": "0.1.0",
-  "rule_title": "Unapproved pass-count range (needs review)",
+  "rule_id": "stc-cta-front-001",
+  "rule_version": "1.0.0",
+  "rule_title": "Component token allowlist \u2014 front_head",
   "source_class": "INTERNAL_ENGINEERING_RULE",
   "jurisdiction": "INTL",
   "standard_family": "INTERNAL",
-  "bibliographic_reference": "internal://engineering-handbook/shell_tube/unapproved-pass-range/v0.1.0",
+  "bibliographic_reference": "internal://engineering-handbook/shell_tube/stc-cta-front-001/v1.0.0",
   "license_evidence": "project_internal_authority",
   "source_evidence": {
     "source_class": "INTERNAL_ENGINEERING_RULE",
-    "source_reference": "internal://engineering-handbook/shell_tube/unapproved-pass-range/v0.1.0",
-    "source_title_or_identifier": "Unapproved pass-count range (needs review)",
-    "source_locator_or_citation": "Section unapproved-pass-range",
+    "source_reference": "internal://engineering-handbook/shell_tube/stc-cta-front-001/v1.0.0",
+    "source_title_or_identifier": "Component token allowlist \u2014 front_head",
+    "source_locator_or_citation": "Section stc-cta-front-001",
     "source_jurisdiction": "INTL",
     "license_evidence": "project_internal_authority",
     "source_access_date": "n/a",
@@ -19,26 +19,25 @@
     "source_version_or_publication_date": "2026-01-15"
   },
   "rule_body": {
+    "component_slot": "front_head",
+    "nullable": false,
+    "allowed_tokens": [
+      "IER_FT_A",
+      "IER_FT_B",
+      "IER_FT_C"
+    ],
+    "evidence_refs": [
+      "internal://engineering-handbook/shell_tube/front_head_tokens/v1"
+    ],
     "profile_id": "task020.configuration-rule.v1",
-    "rule_type": "PASS_COUNT_ALLOWED_RANGE",
-    "constraint_id": "unapproved-pass-range",
+    "rule_type": "COMPONENT_TOKEN_ALLOWLIST",
+    "constraint_id": "valid-cfg-front-head",
     "priority": 0,
     "applies_to_authority_modes": [
       "APPROVED_RULE_PACK"
     ],
     "applies_to_construction_families": [
       "FIXED_TUBESHEET"
-    ],
-    "shell_pass_count": {
-      "min_inclusive": 1,
-      "max_inclusive": 2
-    },
-    "tube_pass_count": {
-      "min_inclusive": 1,
-      "max_inclusive": 2
-    },
-    "evidence_refs": [
-      "internal://engineering-handbook/shell_tube/unapproved/v1"
     ]
   },
   "forbidden_content_marker_check": [],
@@ -50,10 +49,10 @@
     "type": "structural",
     "note": "exact"
   },
-  "review_status": "pending",
-  "approval_status": "under_review",
+  "review_status": "accepted",
+  "approval_status": "approved",
   "provenance_edges": [
-    "allowed_tokens_edge"
+    "edge_stc_cta_front_001"
   ],
   "human_entered_evidence": {
     "author_identity": "internal_engineer@example.invalid",
@@ -65,5 +64,5 @@
       "reviewer_identity": "internal_reviewer@example.invalid"
     }
   },
-  "canonical_hash": "692887f88a527307f4c96cbc5ac53f2a1692f899d97b0bb7fdc7983355a6b7b2"
+  "canonical_hash": "d50d0af5522ff0c5c93a4ca018fe17ca3179867ee1b54822d60dac2ce6535d77"
 }

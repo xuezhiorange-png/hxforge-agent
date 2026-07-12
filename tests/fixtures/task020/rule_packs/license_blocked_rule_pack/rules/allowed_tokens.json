@@ -1,21 +1,69 @@
 {
-  "rule_id": "stc-cta-licenseblocked-001",
-  "rule_version": "v1",
-  "rule_type": "COMPONENT_TOKEN_ALLOWLIST",
-  "constraint_id": "license-blocked-cfg-front-head",
-  "priority": 0,
-  "profile_id": "task020.configuration-rule.v1",
+  "rule_id": "license-blocked-pass-range",
+  "rule_version": "0.1.0",
+  "rule_title": "License-blocked pass-count range",
   "source_class": "INTERNAL_ENGINEERING_RULE",
-  "approval_status": "approved",
-  "license_evidence": {
-    "id": "missing-internal-engineering-license-2099"
+  "jurisdiction": "INTL",
+  "standard_family": "INTERNAL",
+  "bibliographic_reference": "internal://engineering-handbook/shell_tube/license-blocked-pass-range/v0.1.0",
+  "license_evidence": "totally-bogus-license-form",
+  "source_evidence": {
+    "source_class": "INTERNAL_ENGINEERING_RULE",
+    "source_reference": "internal://engineering-handbook/shell_tube/license-blocked-pass-range/v0.1.0",
+    "source_title_or_identifier": "License-blocked pass-count range",
+    "source_locator_or_citation": "Section license-blocked-pass-range",
+    "source_jurisdiction": "INTL",
+    "license_evidence": "totally-bogus-license-form",
+    "source_access_date": "n/a",
+    "source_publisher": "internal",
+    "source_version_or_publication_date": "2026-01-15"
   },
-  "canonical_hash": "666666666666666666666666666666666666666666666666666666666666ffff",
-  "applies_to_authority_modes": ["APPROVED_RULE_PACK"],
-  "applies_to_construction_families": ["FIXED_TUBESHEET"],
-  "component_slot": "front_head",
-  "nullable": false,
-  "allowed_tokens": ["IER_FT_HEAD_LIC_DENIED"],
-  "evidence_refs": ["ier-evidence-license-blocked-001"],
-  "provenance_edges": ["allowed_tokens_edge"]
+  "rule_body": {
+    "profile_id": "task020.configuration-rule.v1",
+    "rule_type": "PASS_COUNT_ALLOWED_RANGE",
+    "constraint_id": "license-blocked-pass-range",
+    "priority": 0,
+    "applies_to_authority_modes": [
+      "APPROVED_RULE_PACK"
+    ],
+    "applies_to_construction_families": [
+      "FIXED_TUBESHEET"
+    ],
+    "shell_pass_count": {
+      "min_inclusive": 1,
+      "max_inclusive": 2
+    },
+    "tube_pass_count": {
+      "min_inclusive": 1,
+      "max_inclusive": 2
+    },
+    "evidence_refs": [
+      "internal://engineering-handbook/shell_tube/license_blocked/v1"
+    ]
+  },
+  "forbidden_content_marker_check": [],
+  "applicability_envelope": {
+    "scope": "TASK-020-S2 fixture",
+    "units": "n/a"
+  },
+  "uncertainty": {
+    "type": "structural",
+    "note": "exact"
+  },
+  "review_status": "accepted",
+  "approval_status": "approved",
+  "provenance_edges": [
+    "allowed_tokens_edge"
+  ],
+  "human_entered_evidence": {
+    "author_identity": "internal_engineer@example.invalid",
+    "author_role": "internal engineer",
+    "entry_timestamp_utc": "2026-07-04T09:00:00Z",
+    "review": {
+      "review_thread_reference": "task020_s2_pack_review_001",
+      "review_timestamp_utc": "2026-07-04T09:15:00Z",
+      "reviewer_identity": "internal_reviewer@example.invalid"
+    }
+  },
+  "canonical_hash": "c08ce1a31edd6d1d225f134ae99e081babf84d211d12db4c8fd08cdd3dd9528b"
 }
