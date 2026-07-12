@@ -1,0 +1,11 @@
+{
+  "rule_pack_id": "task020-internal-engineering-license-blocked-v1",
+  "rule_pack_version": "v1",
+  "canonical_hash": "555555555555555555555555555555555555555555555555555555555555eeee",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "license": {
+    "id": "missing-internal-engineering-license-2099"
+  },
+  "approval_status": "approved",
+  "task020_profile": "task020.configuration-rule.v1"
+}

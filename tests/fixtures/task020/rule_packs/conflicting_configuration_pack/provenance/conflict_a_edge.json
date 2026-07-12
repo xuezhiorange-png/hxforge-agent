@@ -1,0 +1,5 @@
+{
+  "edge_id": "conflict_a_edge",
+  "rule_id": "stc-norm-conflict-A",
+  "evidence_refs": ["ier-evidence-conflict-a-001"]
+}

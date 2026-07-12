@@ -63,6 +63,11 @@ shards:
       - tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py
       - tests/exchangers/shell_tube/test_task020_models.py
       - tests/exchangers/shell_tube/test_task020_no_upstream_mutation.py
+      - tests/exchangers/shell_tube/test_task020_rule_pack_canonical.py
+      - tests/exchangers/shell_tube/test_task020_rule_pack_adapter.py
+      - tests/exchangers/shell_tube/test_task020_rule_pack_fixtures.py
+      - tests/exchangers/shell_tube/test_task020_rule_pack_hash_integration.py
+      - tests/exchangers/shell_tube/test_task020_rule_profile_adapter.py
       - tests/exchangers/shell_tube/test_task020_schema.py
     timeout: 300
 

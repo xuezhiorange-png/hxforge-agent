@@ -1,0 +1,21 @@
+{
+  "rule_id": "stc-cta-licenseblocked-001",
+  "rule_version": "v1",
+  "rule_type": "COMPONENT_TOKEN_ALLOWLIST",
+  "constraint_id": "license-blocked-cfg-front-head",
+  "priority": 0,
+  "profile_id": "task020.configuration-rule.v1",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "approval_status": "approved",
+  "license_evidence": {
+    "id": "missing-internal-engineering-license-2099"
+  },
+  "canonical_hash": "666666666666666666666666666666666666666666666666666666666666ffff",
+  "applies_to_authority_modes": ["APPROVED_RULE_PACK"],
+  "applies_to_construction_families": ["FIXED_TUBESHEET"],
+  "component_slot": "front_head",
+  "nullable": false,
+  "allowed_tokens": ["IER_FT_HEAD_LIC_DENIED"],
+  "evidence_refs": ["ier-evidence-license-blocked-001"],
+  "provenance_edges": ["allowed_tokens_edge"]
+}

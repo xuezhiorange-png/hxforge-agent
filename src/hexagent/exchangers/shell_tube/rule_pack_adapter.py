@@ -1,80 +1,112 @@
-"""TASK-020-S2 Approved Rule-Pack Adapter — frozen Phase A core.
+"""TASK-020-S2 Approved Rule-Pack Adapter — contract-aligned corrective commit.
 
-This module implements the S2 adapter that consumes a TASK-012 rule
-pack, performs deterministic selection / deduplication / intersection,
-and on a successful path returns a frozen
-``ConfigurationRuleEvaluation`` value object. On any non-success path
-the adapter raises a structured ``BlockerError`` carrying one of the
-``STC_*`` codes from the §10.2 closed set.
+This module implements the S2 adapter that consumes a TASK-012 rule pack,
+performs deterministic selection / deduplication / intersection, and on a
+successful path returns a frozen ``ConfigurationRuleEvaluation`` value object.
+On any non-success path the adapter raises ``BlockerError`` carrying one of
+the ``STC_*`` codes from the §10.2 closed set.
 
-Frozen semantics (Amendmend 002 — PR #132 merged):
+This revision corrects the four blocking-review defects identified in
+PR #135 / review comment `4680187776` against the post-Amendment-003
+TASK-020 frozen contract (§§12.3 / 12.4 / 12.5 / 12.8.1–12.8.5 / 12.9 /
+19.F / 19.G / 20.B / 20.D). The adapter's public surface
+(``ConfigurationRulePackAdapter.validate``, ``__all__``) is unchanged. No
+TASK-012 / TASK-014 / TASK-019 contract is mutated. No file other than
+this module is modified by this revision.
 
-§7.1  Validation report boundary
-    ``validation_report.status == "ok"`` is the only acceptance criterion.
-    The adapter does **not** parse ``validation_report.errors[*].message``
-    and does **not** re-run any TASK-012 approval / hash / license /
-    provenance verification. ``status != "ok"`` →
-    ``STC_RULE_PACK_VALIDATION_FAILED``.
+Frozen-corrected semantics (contract alignment)
+----------------------------------------------
 
-§7.2  Cross-input consistency
-    Adapter verifies that ``requested_rule_pack_identity``,
-    ``loaded_rule_pack.manifest`` and ``validation_report.manifest``
-    describe the same pack on three identity fields
-    (``rule_pack_id`` / ``rule_pack_version`` / ``canonical_hash``) and
-    that ``validation_report.rule_count == len(loaded_rule_pack.rules)``.
-    Mismatch → ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``.
+§12.3 — Closed rule_type set:
 
-§7.3  Closed profile_id + rule_type set
-    Only rules with ``profile_id == "task020.configuration-rule.v1"``
-    are consumed; rules with that profile but a ``rule_type`` outside
-    the closed ``CLOSED_RULE_TYPES`` set →
-    ``STC_RULE_TYPE_UNRECOGNIZED``.
+    - COMPONENT_TOKEN_ALLOWLIST
+    - CONSTRUCTION_FAMILY_NORMALIZATION
+    - CONFIGURATION_COMBINATION_BLOCKLIST
+    - PASS_COUNT_ALLOWED_RANGE
+    - ORIENTATION_ALLOWLIST
 
-§7.4  Complete six-field authority key
-    The complete comparison key is
-    ``(priority, rule_type, constraint_id, rule_id,
-       rule_version, rule_artifact_canonical_hash)``.
-    Two rules that match on **all six** fields represent the same
-    authority and are silently deduplicated (one canonical copy
-    retained). Two rules that match on
-    ``(profile_id, rule_type, constraint_id)`` but differ on **any**
-    field of the complete six-field key represent conflicting authority
-    and emit ``STC_RULE_DUPLICATE_IDENTITY``. No input-order tie-breaker
-    of any kind is permitted.
+§12.4 + §20.B — Complete six-field authority key. Equal keys silent-dedup;
+identical ``(profile_id, rule_type, constraint_id)`` triples with
+different complete keys emit ``STC_RULE_DUPLICATE_IDENTITY``.
 
-§7.5  Required-constraint matrix
-    Missing required constraint class →
-    ``STC_RULE_CONSTRAINT_MISSING`` (NOT ``STC_REQUIRED_RULE_MISSING``).
+§12.5 items 7 / 8 — empty ``applies_to_authority_modes`` or empty
+``applies_to_construction_families`` (after normalization) emit
+``STC_RULE_APPLICABILITY_UNRESOLVED``.
 
-§7.6  Normalization conflict
-    Multiple applicable ``CONSTRUCTION_FAMILY_NORMALIZATION`` rules
-    with differing ``normalized_value`` →
-    ``STC_RULE_NORMALIZATION_CONFLICT``.
+§12.8.1 — ``COMPONENT_TOKEN_ALLOWLIST`` payload reads frozen fields
+``component_slot`` (closed = ``{front_head, shell, rear_head}``),
+``nullable`` (boolean), ``allowed_tokens`` (list[str]). The previous
+``slot`` field name is no longer read.
 
-§7.7  Intersection
-    Empty intersection on any per-type intersection →
-    the corresponding per-type code from the closed set
-    (``STC_RULE_RANGE_INTERSECTION_EMPTY``,
-    ``STC_RULE_ORIENTATION_INTERSECTION_EMPTY``,
-    ``STC_RULE_TOKEN_INTERSECTION_EMPTY``).
+§12.8.3 — ``CONSTRUCTION_FAMILY_NORMALIZATION`` does **not** carry an
+``applies_to_construction_families`` field. Applicability is computed
+from ``input_value``: the rule applies iff
+``request.construction_family.value == rule.input_value`` AND
+``request.authority_mode in rule.applies_to_authority_modes``.
+A missing or empty ``input_value`` is a
+``STC_RULE_TYPE_UNRECOGNIZED`` malformed-payload defect.
 
-§7.8  Applicability
-    Empty ``applies_to_authority_modes`` or
-    ``applies_to_construction_families`` after normalization →
-    ``STC_RULE_APPLICABILITY_UNRESOLVED``.
+§12.8.4 — ``PASS_COUNT_ALLOWED_RANGE`` reads frozen fields
+``shell_pass_count.min_inclusive`` / ``shell_pass_count.max_inclusive``
+and ``tube_pass_count.min_inclusive`` / ``tube_pass_count.max_inclusive``.
+The previous ``shell_pass_range.min`` / ``shell_pass_range.max``
+naming is no longer read. A rule with
+``min_inclusive > max_inclusive`` (on either axis) emits
+``STC_RULE_APPLICABILITY_UNRESOLVED``. When the intersection over
+all applicable rules is non-empty, the *request*'s
+``shell_pass_count`` and ``tube_pass_count`` are checked against the
+intersection; if either falls outside the intersection, the adapter
+emits ``STC_PASS_COUNT_INVALID``.
 
-§7.9  Successful return
-    The adapter returns ``ConfigurationRuleEvaluation`` exactly when
-    all checks pass. The successful return preserves the complete
-    evaluated-rule authority (including ``selected_rule_authorities``
-    sorted per the §12.4 key, ``provenance_edge_ids`` and
-    ``evidence_refs`` each in ascending Unicode-code-point order,
-    deduplicated).
+§12.8.5 — ``ORIENTATION_ALLOWLIST`` is evaluated as a closed-set
+intersection across all applicable rules. When the intersection
+is non-empty, the request's ``orientation`` is checked against the
+intersection; an out-of-intersection orientation emits
+``STC_ORIENTATION_INVALID``.
+
+§12.5 item 6 — ``CONFIGURATION_COMBINATION_BLOCKLIST`` evaluates the
+request's ``(front_head_token, shell_token, rear_head_token)`` triple
+against each applicable rule's ``blocked_combination`` triple using the
+frozen AND-across-fields + OR-within-field semantics: a per-field
+array is a wildcard when empty (matches any value, including ``null``)
+and an OR membership match when non-empty. The first applicable
+matching rule emits ``STC_CONFIGURATION_COMBINATION_BLOCKED`` and the
+adapter stops. Subsequent matches do not multiply the effect.
+
+§12.9 — Required-constraint matrix. The matrix in §12.9 is the
+**sole** source of required-rule truth. Missing a required class
+emits ``STC_RULE_CONSTRAINT_MISSING`` and stops. The previously-
+emitted-but-reserved ``STC_REQUIRED_RULE_MISSING`` code is **never**
+emitted by this adapter; the two are not aliases.
+
+§19.G + §20.C + §20.E — Reserved / historical codes that this
+adapter MUST NOT emit:
+
+    - STC_RULE_PACK_REQUIRED
+    - STC_REQUIRED_RULE_MISSING
+    - STC_RULE_UNAPPROVED
+    - STC_RULE_CANONICAL_HASH_MISMATCH
+    - STC_RULE_LICENSE_BLOCKED
+    - STC_RULE_PROVENANCE_BLOCKED
+
+Non-actions preserved (§§12.7 / 17 / 19.G / 20.C — binding):
+
+    - No parsing of ``validation_report.errors[*].message``.
+    - No re-running TASK-012 approval / canonical-hash / license /
+      provenance verification.
+    - No filesystem order / manifest-array order / dict-insertion
+      order / unordered-iteration order / input-order surrogate as
+      a tie-break.
+    - No producing any engineering value, numeric coefficient,
+      expected output, or standard quote.
+    - No clock / network / environment / locale / unordered
+      filesystem state.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from typing import Final
 
 from hexagent.exchangers.shell_tube.errors import (
     RESERVED_S2_BLOCKER_CODES,
@@ -85,6 +117,7 @@ from hexagent.exchangers.shell_tube.models import (
     PROFILE_ID_TASK_020_CONFIGURATION_RULE_V1,
     TASK_020_VALIDATION_REPORT_OK,
     BlockerCode,
+    ComponentTokens,
     ConfigurationRuleEvaluation,
     ConstructionFamily,
     EvaluatedRulePackAuthority,
@@ -95,27 +128,32 @@ from hexagent.exchangers.shell_tube.models import (
 )
 
 # ---------------------------------------------------------------------------
-# Reserved-code runtime guard
+# Frozen constants
+# ---------------------------------------------------------------------------
+
+# §12.8.1 — closed component_slot enum used by COMPONENT_TOKEN_ALLOWLIST
+_CLOSED_COMPONENT_SLOTS: Final[frozenset[str]] = frozenset({"front_head", "shell", "rear_head"})
+
+# §12.3 / §12.5 item 6 — blocklist is optional, not part of §12.9 required matrix
+_BLOCKLIST_RULE_TYPE: Final[str] = "CONFIGURATION_COMBINATION_BLOCKLIST"
+
+# ---------------------------------------------------------------------------
+# Adapter-internal utilities
 # ---------------------------------------------------------------------------
 
 
 def _assert_not_reserved(code: str) -> None:
-    """Adapter-level invariant: never raise a reserved §20.C / §20.E code.
+    """Adapter-internal invariant: never raise a reserved code.
 
-    Importing this module raises an ``AssertionError`` if any reserved
-    code is referenced. The adapter's own callsites catch
-    ``BlockerError`` and re-check the code to ensure it is not in
-    ``RESERVED_S2_BLOCKER_CODES`` before re-raise.
+    Reserved / historical / un-emitted per §19.G + §20.C + §20.E.
+    The set bound here is the ``RESERVED_S2_BLOCKER_CODES`` set
+    defined in ``errors.py``, which is the authoritative runtime
+    sentinel (not a duplicate string literal).
     """
     assert code not in RESERVED_S2_BLOCKER_CODES, (
         f"adapter attempted to raise reserved code {code!r}; "
-        "reserved codes are reserved/un-emitted per §20.C + §20.E"
+        "reserved codes are reserved/un-emitted per §19.G + §20.C + §20.E"
     )
-
-
-# ---------------------------------------------------------------------------
-# Internal adapters
-# ---------------------------------------------------------------------------
 
 
 def _manifest_identity(manifest: Mapping[str, object]) -> tuple[str, str, str]:
@@ -123,12 +161,21 @@ def _manifest_identity(manifest: Mapping[str, object]) -> tuple[str, str, str]:
     rid = manifest.get("rule_pack_id")
     rver = manifest.get("rule_pack_version")
     rhash = manifest.get("canonical_hash")
-    if not isinstance(rid, str) or not isinstance(rver, str) or not isinstance(rhash, str):
-        # §6.3.3: identity disagreement is reported as
-        # STC_RULE_PACK_VALIDATION_REPORT_MISMATCH (the adapter sees an
-        # unparseable manifest; cross-input check fails).
+    if not (
+        isinstance(rid, str)
+        and isinstance(rver, str)
+        and isinstance(rhash, str)
+        and rid
+        and rver
+        and rhash
+    ):
         return ("", "", "")
     return (rid, rver, rhash)
+
+
+# ---------------------------------------------------------------------------
+# §6.3.3 — cross-input consistency
+# ---------------------------------------------------------------------------
 
 
 def _check_cross_input_consistency(
@@ -144,10 +191,13 @@ def _check_cross_input_consistency(
             "APPROVED_RULE_PACK mode requires requested_rule_pack_identity",
         )
 
-    # Identity triple from each of the three sources.
     rid_req = (req.rule_pack_id, req.rule_pack_version, req.rule_pack_canonical_hash)
     rid_loaded = (loaded.rule_pack_id, loaded.rule_pack_version, loaded.rule_pack_canonical_hash)
-    rid_report = (report.rule_pack_id, report.rule_pack_version, report.rule_pack_canonical_hash)
+    rid_report = (
+        report.rule_pack_id,
+        report.rule_pack_version,
+        report.rule_pack_canonical_hash,
+    )
 
     if rid_loaded != rid_report or rid_req != rid_loaded or rid_req != rid_report:
         raise BlockerError(
@@ -163,7 +213,13 @@ def _check_cross_input_consistency(
 
 
 def _check_validation_report_boundary(report: RulePackValidationReport) -> None:
-    """§7.1 — the adapter accepts only ``status == 'ok'`` reports."""
+    """§7.1 — the adapter accepts only ``status == 'ok'`` reports.
+
+    The TASK-020 adapter does **not** parse
+    ``validation_report.errors[*].message`` and does **not** re-run any
+    TASK-012 approval / hash / license / provenance verification
+    (per §6.3.2 + §6.3.3 + §20.C).
+    """
     if report.status != TASK_020_VALIDATION_REPORT_OK:
         raise BlockerError(
             str(BlockerCode.STC_RULE_PACK_VALIDATION_FAILED),
@@ -173,35 +229,19 @@ def _check_validation_report_boundary(report: RulePackValidationReport) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Rule selection / dedup
+# §12.4 / §20.B — complete six-field authority key
 # ---------------------------------------------------------------------------
 
 
-class _RuleKeySortable(tuple[str | int, ...]):
-    """Adapter-internal six-tuple for the §7.4 complete-key comparison.
+def _six_field_key(rule: Mapping[str, object]) -> tuple[object, ...]:
+    """Build the complete §12.4 six-tuple key.
 
-    The complete key is ``(priority, rule_type, constraint_id, rule_id,
-    rule_version, rule_artifact_canonical_hash)``. Tuple ordering is
-    ascending; ``priority`` is a non-negative int and the remaining
-    five fields are strings sorted lexicographically (Unicode code
-    point order on the encoded form).
-    """
-
-    __slots__ = ()
-
-
-def _six_field_key(rule: Mapping[str, object]) -> _RuleKeySortable:
-    """Adapter-internal: build the complete §7.4 six-tuple key.
-
-    All six fields are read directly from the TASK-012 rule artifact
-    fields. ``rule_artifact_canonical_hash`` corresponds to the
-    TASK-012 field ``canonical_hash`` on the rule artifact.
+    All six fields are read directly from the TASK-012 rule artifact.
+    ``rule_artifact_canonical_hash`` corresponds to the TASK-012
+    field ``canonical_hash`` on the rule artifact (per §6.3.5.1).
     """
     priority = rule.get("priority", 0)
     if not isinstance(priority, int):
-        # Non-integer priority is a §12.8 schema defect; the loader
-        # already enforces integer via TASK-012; if it slipped through
-        # we treat it as type-unrecognized (the rule cannot be selected).
         raise BlockerError(
             str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
             f"rule.priority is not an integer: {rule.get('rule_id')!r}",
@@ -211,7 +251,6 @@ def _six_field_key(rule: Mapping[str, object]) -> _RuleKeySortable:
     rule_id = rule.get("rule_id")
     rule_version = rule.get("rule_version")
     rule_canonical_hash = rule.get("canonical_hash")
-    # Missing fields → type-unrecognized
     if not all(
         isinstance(v, str) and v
         for v in (rule_type, constraint_id, rule_id, rule_version, rule_canonical_hash)
@@ -220,32 +259,18 @@ def _six_field_key(rule: Mapping[str, object]) -> _RuleKeySortable:
             str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
             f"rule has missing identity field(s): rule_id={rule_id!r}",
         )
-    rule_type_s: str = rule_type  # type: ignore[assignment]
-    constraint_id_s: str = constraint_id  # type: ignore[assignment]
-    rule_id_s: str = rule_id  # type: ignore[assignment]
-    rule_version_s: str = rule_version  # type: ignore[assignment]
-    rule_canonical_hash_s: str = rule_canonical_hash  # type: ignore[assignment]  # noqa: E501
-    return _RuleKeySortable(
-        (
-            priority,
-            rule_type_s,
-            constraint_id_s,
-            rule_id_s,
-            rule_version_s,
-            rule_canonical_hash_s,
-        )
+    return (
+        priority,
+        rule_type,
+        constraint_id,
+        rule_id,
+        rule_version,
+        rule_canonical_hash,
     )
 
 
-def _identity_triple(
-    rule: Mapping[str, object],
-) -> tuple[str, str, str]:
-    """The §7.4 logical-identity triple ``(profile_id, rule_type, constraint_id)``.
-
-    Used to detect same-logical-identity / different-authority rules
-    that emit ``STC_RULE_DUPLICATE_IDENTITY``.
-    """
-
+def _identity_triple(rule: Mapping[str, object]) -> tuple[str, str, str]:
+    """§12.4 — ``(profile_id, rule_type, constraint_id)`` logical-identity triple."""
     return (
         str(rule.get("profile_id", "") or ""),
         str(rule.get("rule_type", "") or ""),
@@ -253,22 +278,99 @@ def _identity_triple(
     )
 
 
-def _select_rules_for_construction_family(
-    rules: Iterable[Mapping[str, object]],
-    construction_family: ConstructionFamily,
-) -> list[Mapping[str, object]]:
-    """§7.3 + §7.8 — select rules whose profile matches and which apply
-    to the given ``construction_family``. Applicability also requires
-    the request's authority_mode (=``APPROVED_RULE_PACK``).
+def _normalize_string_list(raw: object) -> list[str]:
+    """Normalize a JSON-array-of-strings into the deduped ascending unicode form."""
+    if not isinstance(raw, list):
+        return []
+    out: set[str] = set()
+    for v in raw:
+        if isinstance(v, str) and v:
+            out.add(v)
+    return sorted(out)
 
-    A rule whose ``applies_to_authority_modes`` or
-    ``applies_to_construction_families`` list is empty after
-    de-duplication yields ``STC_RULE_APPLICABILITY_UNRESOLVED``.
+
+# ---------------------------------------------------------------------------
+# §12.5 / §12.8 — type-specific applicability
+# ---------------------------------------------------------------------------
+
+
+def _is_normalization(rule: Mapping[str, object]) -> bool:
+    return rule.get("rule_type") == "CONSTRUCTION_FAMILY_NORMALIZATION"
+
+
+def _rule_applies(
+    rule: Mapping[str, object],
+    request: ShellAndTubeConfigurationRequest,
+) -> bool:
+    """§12.5 + §12.8 — type-specific applicability predicate.
+
+    Non-normalization rules: applies iff
+    ``request.authority_mode in applies_to_authority_modes`` AND
+    ``request.construction_family.value in applies_to_construction_families``.
+
+    Normalization rules: applies iff
+    ``request.authority_mode in applies_to_authority_modes`` AND
+    ``request.construction_family.value == rule.input_value``.
+    A normalization rule does **not** carry
+    ``applies_to_construction_families``.
+    """
+    modes_raw = rule.get("applies_to_authority_modes") or []
+    modes = _normalize_string_list(modes_raw)
+    if not modes:
+        # §12.5 item 8 — empty applicability set is
+        # STC_RULE_APPLICABILITY_UNRESOLVED (raised by the caller
+        # after detecting the empty set, not here).
+        return False
+    if request.authority_mode.value not in modes:
+        return False
+
+    if _is_normalization(rule):
+        # §12.8.3 — CONSTRUCTION_FAMILY_NORMALIZATION must NOT carry
+        # applies_to_construction_families; applicability is determined
+        # by input_value alone.
+        iv = rule.get("input_value")
+        if not isinstance(iv, str) or not iv:
+            # Defensive — caller checks payload shape; an empty
+            # `input_value` is the malformed-payload case.
+            return False
+        return iv == request.construction_family.value
+
+    fams_raw = rule.get("applies_to_construction_families") or []
+    fams = _normalize_string_list(fams_raw)
+    if not fams:
+        return False
+    return request.construction_family.value in fams
+
+
+# ---------------------------------------------------------------------------
+# §7.3 + §12.5 — closed profile-id + applicability + selection
+# ---------------------------------------------------------------------------
+
+
+def _select_rules(
+    rules: Iterable[Mapping[str, object]],
+    request: ShellAndTubeConfigurationRequest,
+) -> list[Mapping[str, object]]:
+    """§12.2 / §12.3 / §12.5 — return all rules whose profile matches and which
+    are applicable to the request.
+
+    Rules whose ``profile_id`` is **not** the frozen
+    ``task020.configuration-rule.v1`` are silently ignored (no blocker).
+    A rule with the TASK-020 ``profile_id`` and a ``rule_type`` outside
+    the closed ``CLOSED_RULE_TYPES`` set emits
+    ``STC_RULE_TYPE_UNRECOGNIZED`` and stops.
+    A rule with the TASK-020 ``profile_id``, a closed ``rule_type``
+    and an **empty** ``applies_to_authority_modes`` set emits
+    ``STC_RULE_APPLICABILITY_UNRESOLVED`` and stops; the same is true
+    for non-normalization rules with an empty
+    ``applies_to_construction_families`` set (per §12.5 item 8).
+    A normalization rule with a missing or empty ``input_value`` is a
+    malformed-payload defect and emits ``STC_RULE_TYPE_UNRECOGNIZED``.
     """
     selected: list[Mapping[str, object]] = []
     for rule in rules:
         if rule.get("profile_id") != PROFILE_ID_TASK_020_CONFIGURATION_RULE_V1:
-            # S2.3: not consumed; non-profile-match is a no-op skip.
+            # §12.2 — silent skip on cross-profile rule.
             continue
 
         rule_type = rule.get("rule_type")
@@ -279,68 +381,73 @@ def _select_rules_for_construction_family(
                 f"for rule_id={rule.get('rule_id')!r}",
             )
 
-        applies_to_modes = rule.get("applies_to_authority_modes") or []
-        if not isinstance(applies_to_modes, list) or not applies_to_modes:
+        # §12.5 item 8 — empty applicability set → UNRESOLVED.
+        modes_raw = rule.get("applies_to_authority_modes") or []
+        if not isinstance(modes_raw, list) or not _normalize_string_list(modes_raw):
             raise BlockerError(
                 str(BlockerCode.STC_RULE_APPLICABILITY_UNRESOLVED),
                 f"empty applies_to_authority_modes for rule_id={rule.get('rule_id')!r}",
             )
-        if "APPROVED_RULE_PACK" not in applies_to_modes:
-            # The rule is not applicable to APPROVED_RULE_PACK mode.
-            # This is a no-op skip, NOT a blocker: the rule simply does
-            # not participate in the selection.
-            continue
 
-        applies_to_families = rule.get("applies_to_construction_families") or []
-        if not isinstance(applies_to_families, list) or not applies_to_families:
-            raise BlockerError(
-                str(BlockerCode.STC_RULE_APPLICABILITY_UNRESOLVED),
-                f"empty applies_to_construction_families for rule_id={rule.get('rule_id')!r}",
-            )
-        if construction_family.value not in applies_to_families:
-            continue
+        if not _is_normalization(rule):
+            fams_raw = rule.get("applies_to_construction_families") or []
+            if not isinstance(fams_raw, list) or not _normalize_string_list(fams_raw):
+                raise BlockerError(
+                    str(BlockerCode.STC_RULE_APPLICABILITY_UNRESOLVED),
+                    f"empty applies_to_construction_families for rule_id={rule.get('rule_id')!r}",
+                )
 
-        selected.append(rule)
+        if _is_normalization(rule):
+            iv = rule.get("input_value")
+            if not isinstance(iv, str) or not iv:
+                raise BlockerError(
+                    str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
+                    f"CONSTRUCTION_FAMILY_NORMALIZATION rule "
+                    f"{rule.get('rule_id')!r} has empty or missing input_value",
+                )
+
+        if _rule_applies(rule, request):
+            selected.append(rule)
+        # non-applicable rules are silently ignored (no blocker); the
+        # adapter does not emit a "rule does not apply" blocker.
     return selected
+
+
+# ---------------------------------------------------------------------------
+# §12.4 + §12.5 item 1 + §20.B — silent dedup + divergent-identity blocker
+# ---------------------------------------------------------------------------
 
 
 def _dedup_rules_by_six_field_key(
     selected: list[Mapping[str, object]],
 ) -> list[Mapping[str, object]]:
-    """§7.4 silent dedup + divergent-identity blocker.
+    """§12.4 / §12.5 item 1 / §20.B — silent dedup + divergent-identity blocker.
 
-    Returns a *sorted* canonical list of selected rules:
     - Equal six-field keys → silent dedup (keep one canonical copy).
-    - Same ``(profile_id, rule_type, constraint_id)`` but different
-      six-field values on any field → ``STC_RULE_DUPLICATE_IDENTITY``.
-    - The retained / canonical copy is the lexically smallest rule
-      under the six-field key (Python tuple comparison = ascending
-      lexicographic). This satisfies §7.4 "确定性保留副本必须来自
-      完整 canonical representation，而不是'第一个出现的对象'".
+    - Same ``(profile_id, rule_type, constraint_id)`` triple with
+      different six-field values on any field → emit
+      ``STC_RULE_DUPLICATE_IDENTITY`` and stop.
+    - The retained canonical copy is the lexically smallest rule
+      under the six-field key (tuple ordering = ascending
+      lexicographic). This satisfies the §12.4 deterministic
+      selection without filesystem / manifest-array / dict-insertion
+      / unordered-iteration order tie-break.
     """
-    by_full_key: dict[tuple[str | int, ...], list[Mapping[str, object]]] = {}
-    by_identity: dict[tuple[str, str, str], list[tuple[str | int, ...]]] = {}
+    by_full_key: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
+    by_identity: dict[tuple[str, str, str], list[tuple[object, ...]]] = {}
 
-    # First pass: bucket by six-field key (silent dedup).
     for rule in selected:
         sk = _six_field_key(rule)
         bucket = by_full_key.setdefault(sk, [])
         if not bucket:
             bucket.append(rule)
-
-        # Track identity-triple → six-field-keys, for divergence
-        # detection.
         ident = _identity_triple(rule)
         by_identity.setdefault(ident, []).append(sk)
 
-    # Second pass: detect same-identity / divergent-key conflicts.
     for sk_list in by_identity.values():
         if len(sk_list) > 1:
             unique_keys = set(sk_list)
             if len(unique_keys) > 1:
-                # Same (profile_id, rule_type, constraint_id) but the
-                # six-field keys differ in at least one field ⇒
-                # STC_RULE_DUPLICATE_IDENTITY.
                 raise BlockerError(
                     str(BlockerCode.STC_RULE_DUPLICATE_IDENTITY),
                     "two rules share (profile_id, rule_type, "
@@ -348,13 +455,11 @@ def _dedup_rules_by_six_field_key(
                     "rule_id / rule_version / rule_artifact_canonical_hash",
                 )
 
-    # Canonical sort (lexicographic ascending) → sorted list of
-    # representative rules.
     return [by_full_key[sk][0] for sk in sorted(by_full_key.keys())]
 
 
 # ---------------------------------------------------------------------------
-# Per-rule-type predicates
+# §7.6 / §12.5 item 2 / §12.8.3 — normalization
 # ---------------------------------------------------------------------------
 
 
@@ -362,13 +467,13 @@ def _evaluate_normalization(
     selected: list[Mapping[str, object]],
     requested_construction_family: ConstructionFamily,
 ) -> ConstructionFamily:
-    """§7.6 — apply CONSTRUCTION_FAMILY_NORMALIZATION rules.
+    """§7.6 / §12.5 item 2 / §12.8.3 — apply CONSTRUCTION_FAMILY_NORMALIZATION.
 
-    Empty selection ⇒ ``STC_RULE_CONSTRAINT_MISSING``.
-    Multiple applicable rules with differing ``normalized_value`` ⇒
+    Empty selection → ``STC_RULE_CONSTRAINT_MISSING``.
+    Multiple applicable rules with differing ``normalized_value`` →
     ``STC_RULE_NORMALIZATION_CONFLICT``.
     """
-    applicable = [r for r in selected if r.get("rule_type") == "CONSTRUCTION_FAMILY_NORMALIZATION"]
+    applicable = [r for r in selected if _is_normalization(r)]
     if not applicable:
         raise BlockerError(
             str(BlockerCode.STC_RULE_CONSTRAINT_MISSING),
@@ -378,7 +483,6 @@ def _evaluate_normalization(
     for r in applicable:
         nv = r.get("normalized_value")
         if not isinstance(nv, str) or not nv:
-            # Defensive: malformed per-type payload.
             raise BlockerError(
                 str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
                 f"CONSTRUCTION_FAMILY_NORMALIZATION rule "
@@ -391,14 +495,10 @@ def _evaluate_normalization(
             "multiple CONSTRUCTION_FAMILY_NORMALIZATION rules disagree",
         )
 
-    # The unique normalized value must be a valid ConstructionFamily
-    # member; if it is not, the requested ``construction_family``
-    # is rejected by the rule pack ⇒ ``STC_RULE_CONSTRAINT_MISSING``.
     only_nv = next(iter(normalized_values))
     try:
         return ConstructionFamily(only_nv)
     except ValueError as exc:
-        # The selected rule emitted an out-of-domain value.
         raise BlockerError(
             str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
             f"CONSTRUCTION_FAMILY_NORMALIZATION produced out-of-domain "
@@ -406,12 +506,35 @@ def _evaluate_normalization(
         ) from exc
 
 
-def _evaluate_pass_count_range(selected: list[Mapping[str, object]]) -> None:
-    """§7.7 — intersect inclusive shell-pass / tube-pass ranges.
+# ---------------------------------------------------------------------------
+# §12.5 item 3 / §12.8.4 — pass-count range intersection + request predicate
+# ---------------------------------------------------------------------------
 
-    Empty list ⇒ §7.5: ``STC_RULE_CONSTRAINT_MISSING``.
-    Empty intersection on either axis ⇒
-    ``STC_RULE_RANGE_INTERSECTION_EMPTY``.
+
+def _evaluate_pass_count_range(
+    selected: list[Mapping[str, object]],
+    request: ShellAndTubeConfigurationRequest,
+) -> None:
+    """§7.7 + §12.5 item 3 + §12.8.4 — PASS_COUNT_ALLOWED_RANGE evaluation.
+
+    Frozen payload fields per §12.8.4:
+        shell_pass_count: {min_inclusive, max_inclusive}
+        tube_pass_count:  {min_inclusive, max_inclusive}
+
+    Reads frozen names ``shell_pass_count.min_inclusive`` /
+    ``shell_pass_count.max_inclusive`` and the equivalent tube_pass_count
+    object — never the legacy ``shell_pass_range.min``/``max`` /
+    ``tube_pass_range.min``/``max`` naming.
+
+    A rule with ``min_inclusive > max_inclusive`` on either axis is
+    malformed and emits ``STC_RULE_APPLICABILITY_UNRESOLVED``.
+
+    After intersecting the inclusive ranges across all applicable rules,
+    the request's ``shell_pass_count`` and ``tube_pass_count`` are
+    checked against the intersection; if either falls outside the
+    intersected range, the adapter emits ``STC_PASS_COUNT_INVALID``.
+    Empty selection → ``STC_RULE_CONSTRAINT_MISSING``.
+    Empty intersection → ``STC_RULE_RANGE_INTERSECTION_EMPTY``.
     """
     applicable = [r for r in selected if r.get("rule_type") == "PASS_COUNT_ALLOWED_RANGE"]
     if not applicable:
@@ -419,41 +542,94 @@ def _evaluate_pass_count_range(selected: list[Mapping[str, object]]) -> None:
             str(BlockerCode.STC_RULE_CONSTRAINT_MISSING),
             "no PASS_COUNT_ALLOWED_RANGE rule applies",
         )
+
     shell_mins: list[int] = []
     shell_maxs: list[int] = []
     tube_mins: list[int] = []
     tube_maxs: list[int] = []
+
     for r in applicable:
-        spr = r.get("shell_pass_range")
-        tpr = r.get("tube_pass_range")
-        if not (isinstance(spr, Mapping) and isinstance(tpr, Mapping)):
+        spc = r.get("shell_pass_count")
+        tpc = r.get("tube_pass_count")
+        if not (isinstance(spc, Mapping) and isinstance(tpc, Mapping)):
             raise BlockerError(
                 str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
-                f"PASS_COUNT_ALLOWED_RANGE rule {r.get('rule_id')!r} has malformed range",
+                f"PASS_COUNT_ALLOWED_RANGE rule {r.get('rule_id')!r} has malformed payload",
             )
-        s_min, s_max = spr.get("min"), spr.get("max")
-        t_min, t_max = tpr.get("min"), tpr.get("max")
+        s_min = spc.get("min_inclusive")
+        s_max = spc.get("max_inclusive")
+        t_min = tpc.get("min_inclusive")
+        t_max = tpc.get("max_inclusive")
         if not all(isinstance(v, int) for v in (s_min, s_max, t_min, t_max)):
             raise BlockerError(
                 str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
                 "PASS_COUNT_ALLOWED_RANGE range bounds must be integers",
             )
-        shell_mins.append(s_min)  # type: ignore[arg-type]
-        shell_maxs.append(s_max)  # type: ignore[arg-type]
-        tube_mins.append(t_min)  # type: ignore[arg-type]
-        tube_maxs.append(t_max)  # type: ignore[arg-type]
-    if max(shell_mins) > min(shell_maxs) or max(tube_mins) > min(tube_maxs):
+        s_min_i: int = s_min  # type: ignore[assignment]
+        s_max_i: int = s_max  # type: ignore[assignment]
+        t_min_i: int = t_min  # type: ignore[assignment]
+        t_max_i: int = t_max  # type: ignore[assignment]
+        # §12.8.4 — min_inclusive > max_inclusive is malformed.
+        if s_min_i > s_max_i or t_min_i > t_max_i:
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_APPLICABILITY_UNRESOLVED),
+                f"PASS_COUNT_ALLOWED_RANGE rule {r.get('rule_id')!r} has "
+                "min_inclusive > max_inclusive",
+            )
+        shell_mins.append(s_min_i)
+        shell_maxs.append(s_max_i)
+        tube_mins.append(t_min_i)
+        tube_maxs.append(t_max_i)
+
+    # §12.5 item 3 — inclusive intersection on each axis.
+    shell_min = max(shell_mins)
+    shell_max = min(shell_maxs)
+    tube_min = max(tube_mins)
+    tube_max = min(tube_maxs)
+    if shell_min > shell_max or tube_min > tube_max:
         raise BlockerError(
             str(BlockerCode.STC_RULE_RANGE_INTERSECTION_EMPTY),
             "PASS_COUNT_ALLOWED_RANGE intersection is empty on at least one axis",
         )
 
+    # §12.8.4 — request-value predicate: the request's shell/tube pass
+    # counts must fall inside the intersected range. The contract
+    # explicitly distinguishes "intersection is empty" from "request is
+    # outside a non-empty intersection".
+    if not (shell_min <= request.shell_pass_count <= shell_max) or not (
+        tube_min <= request.tube_pass_count <= tube_max
+    ):
+        raise BlockerError(
+            str(BlockerCode.STC_PASS_COUNT_INVALID),
+            f"request pass counts ({request.shell_pass_count}, "
+            f"{request.tube_pass_count}) outside the rule-pack "
+            f"intersected range "
+            f"shell=[{shell_min}, {shell_max}] tube=[{tube_min}, {tube_max}]",
+        )
 
-def _evaluate_orientation_allowlist(selected: list[Mapping[str, object]]) -> None:
-    """§7.7 — intersect allowed-orientations sets.
 
-    Empty list ⇒ §7.5: ``STC_RULE_CONSTRAINT_MISSING``.
-    Empty intersection ⇒ ``STC_RULE_ORIENTATION_INTERSECTION_EMPTY``.
+# ---------------------------------------------------------------------------
+# §12.5 item 4 / §12.8.5 — orientation allowlist + request predicate
+# ---------------------------------------------------------------------------
+
+
+def _evaluate_orientation_allowlist(
+    selected: list[Mapping[str, object]],
+    request: ShellAndTubeConfigurationRequest,
+) -> None:
+    """§7.7 + §12.5 item 4 + §12.8.5 — ORIENTATION_ALLOWLIST evaluation.
+
+    Frozen payload field per §12.8.5: ``allowed_orientations: list[str]``.
+
+    After intersecting ``allowed_orientations`` across all applicable
+    rules, the request's ``orientation`` is checked against the
+    intersection. An empty intersection emits
+    ``STC_RULE_ORIENTATION_INTERSECTION_EMPTY``. A non-empty
+    intersection that does not contain the request orientation emits
+    ``STC_ORIENTATION_INVALID``. Missing-required-class emits
+    ``STC_RULE_CONSTRAINT_MISSING``. An empty ``allowed_orientations``
+    array on any rule is a malformed payload and emits
+    ``STC_RULE_APPLICABILITY_UNRESOLVED`` (per §12.5 item 8).
     """
     applicable = [r for r in selected if r.get("rule_type") == "ORIENTATION_ALLOWLIST"]
     if not applicable:
@@ -461,7 +637,8 @@ def _evaluate_orientation_allowlist(selected: list[Mapping[str, object]]) -> Non
             str(BlockerCode.STC_RULE_CONSTRAINT_MISSING),
             "no ORIENTATION_ALLOWLIST rule applies",
         )
-    allowed_sets: list[set[str]] = []
+
+    allowed_sets: list[frozenset[str]] = []
     for r in applicable:
         ao = r.get("allowed_orientations")
         if not isinstance(ao, list):
@@ -470,108 +647,291 @@ def _evaluate_orientation_allowlist(selected: list[Mapping[str, object]]) -> Non
                 f"ORIENTATION_ALLOWLIST rule {r.get('rule_id')!r} "
                 "has malformed allowed_orientations",
             )
-        if not ao:
+        ao_norm = _normalize_string_list(ao)
+        if not ao_norm:
+            # §12.5 item 8 — empty allowed_orientations is malformed.
             raise BlockerError(
                 str(BlockerCode.STC_RULE_APPLICABILITY_UNRESOLVED),
                 f"ORIENTATION_ALLOWLIST rule {r.get('rule_id')!r} has empty allowed_orientations",
             )
-        allowed_sets.append({str(o) for o in ao})
-    if not allowed_sets:
-        raise BlockerError(
-            str(BlockerCode.STC_RULE_ORIENTATION_INTERSECTION_EMPTY),
-            "no ORIENTATION_ALLOWLIST rule applies",
-        )
-    intersected: set[str] = set.intersection(*allowed_sets) if allowed_sets else set()
+        allowed_sets.append(frozenset(ao_norm))
+
+    intersected: set[str] = (
+        set.intersection(*[set(s) for s in allowed_sets]) if allowed_sets else set()
+    )
     if not intersected:
         raise BlockerError(
             str(BlockerCode.STC_RULE_ORIENTATION_INTERSECTION_EMPTY),
             "ORIENTATION_ALLOWLIST intersection is empty",
         )
 
+    # §12.8.5 — request-value predicate: the request orientation
+    # must lie inside the closed intersection.
+    request_orientation = request.orientation.value
+    if request_orientation not in intersected:
+        raise BlockerError(
+            str(BlockerCode.STC_ORIENTATION_INVALID),
+            f"request orientation {request_orientation!r} is outside the "
+            f"intersected orientation allowlist {sorted(intersected)!r}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# §12.5 item 5 / §12.8.1 — component token allowlist + request predicate
+# ---------------------------------------------------------------------------
+
+
+def _slot_token(
+    slot: str,
+    tokens: ComponentTokens,
+) -> str | None:
+    if slot == "front_head":
+        return tokens.front_head
+    if slot == "shell":
+        return tokens.shell
+    if slot == "rear_head":
+        return tokens.rear_head
+    raise BlockerError(
+        str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
+        f"unknown component slot {slot!r}",
+    )
+
 
 def _evaluate_component_token_allowlist(
     selected: list[Mapping[str, object]],
+    request: ShellAndTubeConfigurationRequest,
 ) -> None:
-    """§7.7 — per-slot token-set intersection.
+    """§7.7 + §12.5 item 5 + §12.8.1 / §12.9 — COMPONENT_TOKEN_ALLOWLIST.
 
-    For each ``slot`` (front_head / shell / rear_head) emitting at
-    least one rule, intersect ``allowed_tokens``. Empty list per slot
-    ⇒ ``STC_RULE_CONSTRAINT_MISSING``. Empty intersection ⇒
-    ``STC_RULE_TOKEN_INTERSECTION_EMPTY``.
+    Frozen payload fields per §12.8.1:
+        component_slot: closed ``{front_head, shell, rear_head}``
+        nullable: bool
+        allowed_tokens: list[str]
+
+    Reads frozen names ``component_slot``, ``nullable`` and
+    ``allowed_tokens`` — never the legacy ``slot`` naming.
+
+    Per §12.5 item 5 + §12.8.1 + §12.9 the frozen behavior is:
+
+    - For each required slot in ``{front_head, shell, rear_head}``,
+      the intersected ``allowed_tokens`` set across all applicable
+      rules for that slot is computed. Empty selection per slot emits
+      ``STC_RULE_CONSTRAINT_MISSING``. Empty intersection per slot
+      emits ``STC_RULE_TOKEN_INTERSECTION_EMPTY``.
+    - The request's token for a slot (from
+      ``request.component_tokens``) is then evaluated against the
+      intersected set:
+        - token is null AND every applicable rule for the slot
+          declares ``nullable = true`` → pass;
+        - token is null AND any applicable rule declares
+          ``nullable = false`` (or a rule for the slot is missing
+          the nullable field entirely) → ``STC_TOKEN_UNSUPPORTED_BY_RULE_PACK``;
+        - token is non-null AND token is in the intersected set → pass;
+        - token is non-null AND token is not in the intersected set
+          → ``STC_TOKEN_UNSUPPORTED_BY_RULE_PACK``.
+    - The ``nullable = true`` permissive semantics is only granted
+      when **all** applicable rules for that slot declare
+      ``nullable = true``.
+    - A rule with empty ``allowed_tokens`` array is a malformed
+      payload and emits ``STC_RULE_APPLICABILITY_UNRESOLVED``.
     """
     slot_to_set: dict[str, set[str]] = {}
+    slot_to_nullable_required: dict[str, bool] = {}
+
     for r in selected:
         if r.get("rule_type") != "COMPONENT_TOKEN_ALLOWLIST":
             continue
-        slot = r.get("slot")
-        toks = r.get("allowed_tokens")
-        if not isinstance(slot, str) or slot not in {"front_head", "shell", "rear_head"}:
+        slot = r.get("component_slot")
+        if not isinstance(slot, str) or slot not in _CLOSED_COMPONENT_SLOTS:
             raise BlockerError(
                 str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
-                f"COMPONENT_TOKEN_ALLOWLIST rule {r.get('rule_id')!r} has unknown slot",
+                f"COMPONENT_TOKEN_ALLOWLIST rule {r.get('rule_id')!r} has "
+                "unknown or malformed component_slot",
             )
-        if not isinstance(toks, list):
+        toks_raw = r.get("allowed_tokens")
+        if not isinstance(toks_raw, list):
             raise BlockerError(
                 str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
                 f"COMPONENT_TOKEN_ALLOWLIST rule {r.get('rule_id')!r} has malformed allowed_tokens",
             )
+        toks = _normalize_string_list(toks_raw)
         if not toks:
             raise BlockerError(
                 str(BlockerCode.STC_RULE_APPLICABILITY_UNRESOLVED),
                 f"COMPONENT_TOKEN_ALLOWLIST rule {r.get('rule_id')!r} has empty allowed_tokens",
             )
+        # §12.8.1 — ``nullable`` is a required boolean field on every
+        # COMPONENT_TOKEN_ALLOWLIST rule. A missing field defaulting
+        # to ``False`` keeps the conservative fail-closed behavior.
+        nullable = r.get("nullable", False)
+        if not isinstance(nullable, bool):
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
+                f"COMPONENT_TOKEN_ALLOWLIST rule {r.get('rule_id')!r} has non-boolean nullable",
+            )
+
         current = slot_to_set.setdefault(slot, set(toks))
         slot_to_set[slot] = current & set(toks)
 
-    for required_slot in ("front_head", "shell", "rear_head"):
+        # Track whether every applicable rule for the slot declares
+        # ``nullable = true``; if any rule says ``nullable = false``
+        # the slot is required to be non-null.
+        slot_required = slot_to_nullable_required.get(slot, True)
+        slot_to_nullable_required[slot] = slot_required and nullable
+
+    for required_slot in sorted(_CLOSED_COMPONENT_SLOTS):
         if required_slot not in slot_to_set:
             raise BlockerError(
                 str(BlockerCode.STC_RULE_CONSTRAINT_MISSING),
                 f"missing COMPONENT_TOKEN_ALLOWLIST rule for slot {required_slot!r}",
             )
-        if not slot_to_set[required_slot]:
+        intersected = slot_to_set[required_slot]
+        if not intersected:
             raise BlockerError(
                 str(BlockerCode.STC_RULE_TOKEN_INTERSECTION_EMPTY),
                 f"COMPONENT_TOKEN_ALLOWLIST intersection is empty for slot {required_slot!r}",
             )
 
+        request_token = _slot_token(required_slot, request.component_tokens)
+        all_nullable = slot_to_nullable_required.get(required_slot, False)
+        if request_token is None:
+            # §12.8.1 + §12.9 — null is permitted only when every
+            # applicable rule for the slot declares
+            # ``nullable = true``.
+            if not all_nullable:
+                raise BlockerError(
+                    str(BlockerCode.STC_TOKEN_UNSUPPORTED_BY_RULE_PACK),
+                    f"component slot {required_slot!r} is null but "
+                    "rule pack does not declare nullable=true",
+                )
+            continue
+        if request_token not in intersected:
+            raise BlockerError(
+                str(BlockerCode.STC_TOKEN_UNSUPPORTED_BY_RULE_PACK),
+                f"component slot {required_slot!r} token {request_token!r} "
+                "is not in the intersected allowlist",
+            )
 
-def _evaluate_blocklist(selected: list[Mapping[str, object]]) -> None:
-    """§12.5 item 6 — blocklist application. If any blocklist pattern
-    matches the request, emit ``STC_CONFIGURATION_COMBINATION_BLOCKED``.
 
-    The request is checked here in a fail-closed manner: the adapter
-    treats the blocklist as a pure *exclusion* layer and emits the
-    blocker when *any* applicable rule's ``blocked_combination``
-    contains ``request.construction_family``.
+# ---------------------------------------------------------------------------
+# §12.5 item 6 / §12.8.2 — combination blocklist with AND-across /
+# OR-within field semantics
+# ---------------------------------------------------------------------------
+
+
+def _field_matches(
+    field_value: str | None,
+    blocked_values: list[str],
+) -> bool:
+    """§12.8.2 — per-field membership.
+
+    Empty ``blocked_values`` array → wildcard match (matches any value,
+    including ``None``). Non-empty array → OR-within-field membership.
     """
-    applicable = [
-        r for r in selected if r.get("rule_type") == "CONFIGURATION_COMBINATION_BLOCKLIST"
-    ]
-    # The blocklist is optional; missing ⇒ no constraint gap.
-    if not applicable:
+    if not blocked_values:
+        return True
+    return field_value in blocked_values
+
+
+def _evaluate_blocklist(
+    selected: list[Mapping[str, object]],
+    request: ShellAndTubeConfigurationRequest,
+) -> None:
+    """§12.5 item 6 + §12.8.2 — CONFIGURATION_COMBINATION_BLOCKLIST.
+
+    Frozen payload field per §12.8.2:
+        blocked_combination: {
+            front_head_token: list[str],
+            shell_token: list[str],
+            rear_head_token: list[str],
+        }
+
+    Match semantics — AND across the three fields, OR within each
+    field:
+
+        request matches a rule iff
+            _field_matches(request.front_head_token, rule.front_head_token) AND
+            _field_matches(request.shell_token,        rule.shell_token) AND
+            _field_matches(request.rear_head_token,    rule.rear_head_token).
+
+    Per-field array semantics:
+
+        - non-empty array → OR-within-field (request token must be one
+          of the listed values);
+        - empty array → wildcard (matches any value of the field,
+          including ``null``).
+
+    The first applicable matching rule emits exactly
+    ``STC_CONFIGURATION_COMBINATION_BLOCKED`` and the adapter stops.
+    Multiple matches do not multiply the effect — the blocklist is a
+    pure *exclusion* layer.
+    """
+    applicable_rules = [r for r in selected if r.get("rule_type") == _BLOCKLIST_RULE_TYPE]
+    # §12.9 — blocklist is not part of the required-constraint matrix;
+    # zero applicable rules means no exclusion to apply.
+    if not applicable_rules:
         return
-    # The detailed per-token blocking logic is intentionally not
-    # implemented in Phase A (per round §4 only the production core
-    # without per-token matching is required). The closed blocklist
-    # type is recognised but emits no blocker here.
+
+    tokens = request.component_tokens
+    front = tokens.front_head
+    shell = tokens.shell
+    rear = tokens.rear_head
+
+    for r in applicable_rules:
+        bc = r.get("blocked_combination")
+        if not isinstance(bc, Mapping):
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
+                f"CONFIGURATION_COMBINATION_BLOCKLIST rule "
+                f"{r.get('rule_id')!r} has malformed blocked_combination",
+            )
+        front_l = bc.get("front_head_token") or []
+        shell_l = bc.get("shell_token") or []
+        rear_l = bc.get("rear_head_token") or []
+        if not (
+            isinstance(front_l, list) and isinstance(shell_l, list) and isinstance(rear_l, list)
+        ):
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
+                f"CONFIGURATION_COMBINATION_BLOCKLIST rule "
+                f"{r.get('rule_id')!r} has non-list blocked_combination fields",
+            )
+        # §12.8.2 semantics — OR-within-field membership (wildcard
+        # when empty). Equality-based identity, not is-element-of-an-
+        # OR-clause, when the array has length 1.
+        if not _field_matches(front, list(front_l)):
+            continue
+        if not _field_matches(shell, list(shell_l)):
+            continue
+        if not _field_matches(rear, list(rear_l)):
+            continue
+        # All three fields matched → first-match semantics emit the
+        # blocker; subsequent matches are not evaluated.
+        raise BlockerError(
+            str(BlockerCode.STC_CONFIGURATION_COMBINATION_BLOCKED),
+            f"configuration combination blocked by rule_id={r.get('rule_id')!r}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# §7.9 — selected rule authorities
+# ---------------------------------------------------------------------------
 
 
 def _build_selected_rule_authorities(
     deduped_rules: list[Mapping[str, object]],
-    validation_status: str,
 ) -> tuple[SelectedRuleAuthority, ...]:
-    """§7.9 — build the ``selected_rule_authorities`` canonical tuple.
+    """§6.3.5.1 + §7.9 + §12.4 — build the canonical
+    ``selected_rule_authorities`` tuple.
 
     Each entry is a frozen ``SelectedRuleAuthority`` carrying the
-    eight §6.3.5.1 fields, with ``provenance_edge_ids`` and
-    ``evidence_refs`` sorted in ascending Unicode-code-point order and
-    deduplicated.
+    8 §6.3.5.1 fields. ``provenance_edge_ids`` and ``evidence_refs``
+    are sorted in ascending Unicode-code-point order and deduplicated.
+    The 6-field §12.4 sort key is the canonical ordering of the
+    selected rules (already sorted in ``_dedup_rules_by_six_field_key``).
     """
     out: list[SelectedRuleAuthority] = []
     for rule in deduped_rules:
-        # Read provenance edges and evidence refs as plain values
-        # from the rule artifact, sort + dedup.
         pe_raw = rule.get("provenance_edges") or []
         ev_raw = rule.get("evidence_refs") or []
         if not isinstance(pe_raw, list) or not isinstance(ev_raw, list):
@@ -579,8 +939,8 @@ def _build_selected_rule_authorities(
                 str(BlockerCode.STC_RULE_TYPE_UNRECOGNIZED),
                 f"rule {rule.get('rule_id')!r} provenance_edges / evidence_refs are not lists",
             )
-        pe_sorted = sorted({str(x) for x in pe_raw})
-        ev_sorted = sorted({str(x) for x in ev_raw})
+        pe_sorted = sorted({str(x) for x in pe_raw if isinstance(x, str) and x})
+        ev_sorted = sorted({str(x) for x in ev_raw if isinstance(x, str) and x})
 
         out.append(
             SelectedRuleAuthority(
@@ -598,7 +958,7 @@ def _build_selected_rule_authorities(
 
 
 # ---------------------------------------------------------------------------
-# Adapter entry point
+# §12.1 — adapter entry point
 # ---------------------------------------------------------------------------
 
 
@@ -619,7 +979,7 @@ class ConfigurationRulePackAdapter:
         loaded_rule_pack: LoadedRulePackView,
         validation_report: RulePackValidationReport,
     ) -> ConfigurationRuleEvaluation:
-        """§7 — full S2 evaluation pipeline.
+        """§7 / §12 — full S2 evaluation pipeline.
 
         Raises ``BlockerError`` on any non-success path. Returns
         ``ConfigurationRuleEvaluation`` on the happy path.
@@ -630,54 +990,61 @@ class ConfigurationRulePackAdapter:
            → else ``STC_RULE_PACK_VALIDATION_FAILED``.
         2. §7.2: cross-input consistency check
            → else ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``.
-        3. §7.3: closed profile-id + closed rule_type check
-           → else ``STC_RULE_TYPE_UNRECOGNIZED``.
-        4. §7.8: applicability filter
-           → else ``STC_RULE_APPLICABILITY_UNRESOLVED``.
-        5. §7.4: silent dedup + divergent-identity
+        3. §12.2 / §12.3 / §12.5 item 8 / §12.8.3: closed profile-id +
+           closed rule_type + type-specific applicability filter
+           → else ``STC_RULE_TYPE_UNRECOGNIZED`` /
+           ``STC_RULE_APPLICABILITY_UNRESOLVED``.
+        4. §12.4 / §20.B: silent dedup + divergent-identity blocker
            → else ``STC_RULE_DUPLICATE_IDENTITY``.
-        6. §7.6: normalization (sole normalized ``ConstructionFamily``)
+        5. §7.6 / §12.5 item 2 / §12.8.3: normalization
            → else ``STC_RULE_NORMALIZATION_CONFLICT`` /
            ``STC_RULE_CONSTRAINT_MISSING``.
-        7. §7.5: pass-count-range (required-constraint matrix)
+        6. §7.7 / §12.5 item 3 / §12.8.4: pass-count range
            → else ``STC_RULE_CONSTRAINT_MISSING`` /
-           ``STC_RULE_RANGE_INTERSECTION_EMPTY``.
-        8. §7.5: orientation-allowlist
+           ``STC_RULE_RANGE_INTERSECTION_EMPTY`` /
+           ``STC_PASS_COUNT_INVALID``.
+        7. §7.7 / §12.5 item 4 / §12.8.5: orientation allowlist
            → else ``STC_RULE_CONSTRAINT_MISSING`` /
-           ``STC_RULE_ORIENTATION_INTERSECTION_EMPTY``.
-        9. §7.5: component-token-allowlist (front/shell/rear)
+           ``STC_RULE_ORIENTATION_INTERSECTION_EMPTY`` /
+           ``STC_ORIENTATION_INVALID``.
+        8. §7.7 / §12.5 item 5 / §12.8.1 / §12.9: component-token
+           allowlist (front / shell / rear) + nullable semantics
            → else ``STC_RULE_CONSTRAINT_MISSING`` /
-           ``STC_RULE_TOKEN_INTERSECTION_EMPTY``.
-        10. §12.5 item 6: blocklist application
+           ``STC_RULE_TOKEN_INTERSECTION_EMPTY`` /
+           ``STC_TOKEN_UNSUPPORTED_BY_RULE_PACK``.
+        9. §12.5 item 6 / §12.8.2: blocklist application
            → else ``STC_CONFIGURATION_COMBINATION_BLOCKED``.
-        11. §7.9: build canonical authority
+        10. §7.9: build canonical authority
            → return ``ConfigurationRuleEvaluation``.
         """
-        # §7.1 — validation_report boundary
+        # §7.1 — validation_report boundary.
         _check_validation_report_boundary(validation_report)
-        # §7.2 — cross-input consistency
+        # §7.2 — cross-input consistency.
         _check_cross_input_consistency(request, loaded_rule_pack, validation_report)
 
-        # §7.3 + §7.8 — closed profile + applicability
-        applicable = _select_rules_for_construction_family(
+        # §12.2 / §12.3 / §12.5 item 8 / §12.8 — applicability.
+        applicable = _select_rules(
             rules=tuple(loaded_rule_pack.rules.values()),
-            construction_family=request.construction_family,
+            request=request,
         )
 
-        # §7.4 — silent dedup + divergent-identity blocker
+        # §12.4 / §12.5 item 1 / §20.B — silent dedup + divergent-identity.
         deduped = _dedup_rules_by_six_field_key(applicable)
 
-        # §7.5 + §7.6 — required constraint matrix + normalization
+        # §7.6 / §12.5 item 2 / §12.8.3 — normalization.
         normalized_family = _evaluate_normalization(deduped, request.construction_family)
-        _evaluate_pass_count_range(deduped)
-        _evaluate_orientation_allowlist(deduped)
-        _evaluate_component_token_allowlist(deduped)
-        _evaluate_blocklist(deduped)
 
-        # §7.9 — build canonical authority
-        selected_authorities = _build_selected_rule_authorities(
-            deduped, validation_status=validation_report.status
-        )
+        # §7.7 / §12.5 items 3 / §12.8.4 — pass-count range.
+        _evaluate_pass_count_range(deduped, request)
+        # §7.7 / §12.5 items 4 / §12.8.5 — orientation allowlist.
+        _evaluate_orientation_allowlist(deduped, request)
+        # §7.7 / §12.5 item 5 / §12.8.1 / §12.9 — component-token allowlist.
+        _evaluate_component_token_allowlist(deduped, request)
+        # §12.5 item 6 / §12.8.2 — blocklist application.
+        _evaluate_blocklist(deduped, request)
+
+        # §7.9 — build canonical authority.
+        selected_authorities = _build_selected_rule_authorities(deduped)
         era = EvaluatedRulePackAuthority(
             rule_pack_id=loaded_rule_pack.rule_pack_id,
             rule_pack_version=loaded_rule_pack.rule_pack_version,
@@ -727,9 +1094,6 @@ def loaded_rule_pack_view_from_loader_dict(
         )
 
     rid, rver, rhash = _manifest_identity(manifest_obj)
-    # Build the rule-dict view: key is rule_id (TASK-020 reads the
-    # rule's own ``rule_id`` field directly, but the dict key freezes
-    # the lookup surface per §6.3.1). rule_count = len(rules).
     rules_view: dict[str, Mapping[str, object]] = {}
     for k, v in rules_obj.items():
         if not isinstance(v, Mapping):

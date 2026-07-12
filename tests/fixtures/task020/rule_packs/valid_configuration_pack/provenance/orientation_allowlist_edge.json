@@ -1,0 +1,5 @@
+{
+  "edge_id": "orientation_allowlist_edge",
+  "rule_id": "stc-oal-001",
+  "evidence_refs": ["ier-evidence-oal-001"]
+}

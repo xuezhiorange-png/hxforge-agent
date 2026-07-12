@@ -1,0 +1,19 @@
+{
+  "rule_id": "stc-oal-001",
+  "rule_version": "v1",
+  "rule_type": "ORIENTATION_ALLOWLIST",
+  "constraint_id": "valid-cfg-orientation",
+  "priority": 0,
+  "profile_id": "task020.configuration-rule.v1",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "approval_status": "approved",
+  "license_evidence": {
+    "id": "internal-engineering-license-2026"
+  },
+  "canonical_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+  "applies_to_authority_modes": ["APPROVED_RULE_PACK"],
+  "applies_to_construction_families": ["FIXED_TUBESHEET"],
+  "allowed_orientations": ["HORIZONTAL", "VERTICAL"],
+  "evidence_refs": ["ier-evidence-oal-001"],
+  "provenance_edges": ["orientation_allowlist_edge"]
+}

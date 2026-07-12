@@ -1,0 +1,5 @@
+{
+  "edge_id": "allowed_tokens_edge",
+  "rule_id": "stc-cta-licenseblocked-001",
+  "evidence_refs": ["ier-evidence-license-blocked-001"]
+}

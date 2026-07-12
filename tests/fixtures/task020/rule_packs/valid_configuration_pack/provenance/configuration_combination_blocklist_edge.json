@@ -1,0 +1,5 @@
+{
+  "edge_id": "configuration_combination_blocklist_edge",
+  "rule_id": "stc-ccb-001",
+  "evidence_refs": ["ier-evidence-ccb-001"]
+}

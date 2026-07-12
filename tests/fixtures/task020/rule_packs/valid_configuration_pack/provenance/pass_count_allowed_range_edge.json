@@ -1,0 +1,5 @@
+{
+  "edge_id": "pass_count_allowed_range_edge",
+  "rule_id": "stc-pcar-001",
+  "evidence_refs": ["ier-evidence-pcar-001"]
+}

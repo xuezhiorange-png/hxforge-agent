@@ -1,0 +1,11 @@
+{
+  "rule_pack_id": "task020-internal-engineering-rule-pack-conflicting-v1",
+  "rule_pack_version": "v1",
+  "canonical_hash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "license": {
+    "id": "internal-engineering-license-2026"
+  },
+  "approval_status": "approved",
+  "task020_profile": "task020.configuration-rule.v1"
+}

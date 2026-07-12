@@ -1,0 +1,11 @@
+{
+  "rule_pack_id": "task020-internal-engineering-unapproved-v1",
+  "rule_pack_version": "v1",
+  "canonical_hash": "333333333333333333333333333333333333333333333333333333333333cccc",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "license": {
+    "id": "internal-engineering-license-2026"
+  },
+  "approval_status": "draft_not_approved",
+  "task020_profile": "task020.configuration-rule.v1"
+}

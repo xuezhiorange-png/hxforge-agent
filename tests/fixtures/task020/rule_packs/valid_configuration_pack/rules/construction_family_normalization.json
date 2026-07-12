@@ -1,0 +1,19 @@
+{
+  "rule_id": "stc-cfn-001",
+  "rule_version": "v1",
+  "rule_type": "CONSTRUCTION_FAMILY_NORMALIZATION",
+  "constraint_id": "valid-cfg-normalization",
+  "priority": 0,
+  "profile_id": "task020.configuration-rule.v1",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "approval_status": "approved",
+  "license_evidence": {
+    "id": "internal-engineering-license-2026"
+  },
+  "canonical_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+  "applies_to_authority_modes": ["APPROVED_RULE_PACK"],
+  "input_value": "FIXED_TUBESHEET",
+  "normalized_value": "FIXED_TUBESHEET",
+  "evidence_refs": ["ier-evidence-cfn-001"],
+  "provenance_edges": ["construction_family_normalization_edge"]
+}
