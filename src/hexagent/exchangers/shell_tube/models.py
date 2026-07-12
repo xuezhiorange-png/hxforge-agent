@@ -606,11 +606,24 @@ class RulePackValidationReport:
     ``canonical_hash``), and ``rule_count``. The ``errors`` list is
     carried so the adapter can confirm the report shape but it is
     **never parsed** to extract per-rule blockers (per §6.3.2 + §6.3.3).
+
+    Final-cleanup-round semantics (binding):
+
+    - ``status`` is required non-empty ``str``.
+    - ``status == "ok"`` ⇒ ``manifest`` is a ``Mapping`` and
+      ``rule_count`` is a non-negative ``int`` (bool rejected as int).
+    - ``status != "ok"`` ⇒ ``manifest`` may be ``None`` and
+      ``rule_count`` may be ``None``. The minimal TASK-012 failure
+      shape ``{status, errors}`` is the canonical source of ``fail``
+      reports; this view must not fabricate ``{}`` / ``0`` to keep the
+      dataclass constructable. ``None`` is the truthful absence.
+    - When a caller supplies non-``None`` on the failure path the type
+      is still validated (do not let ``bool`` slip through as ``int``).
     """
 
     status: str
-    manifest: Mapping[str, object]
-    rule_count: int
+    manifest: Mapping[str, object] | None
+    rule_count: int | None
     errors: tuple[Mapping[str, object], ...] = field(default_factory=tuple)
     rule_pack_id: str = ""
     rule_pack_version: str = ""
@@ -619,8 +632,40 @@ class RulePackValidationReport:
     def __post_init__(self) -> None:
         if not isinstance(self.status, str) or not self.status:
             raise TypeError("RulePackValidationReport.status must be a non-empty str")
-        if not isinstance(self.rule_count, int) or self.rule_count < 0:
-            raise TypeError("RulePackValidationReport.rule_count must be a non-negative int")
+        if self.status == TASK_020_VALIDATION_REPORT_OK:
+            # Success path: manifest + rule_count are REQUIRED.
+            if not isinstance(self.manifest, Mapping):
+                raise TypeError(
+                    "RulePackValidationReport.manifest must be a Mapping when status='ok'"
+                )
+            if (
+                not isinstance(self.rule_count, int)
+                or isinstance(self.rule_count, bool)
+                or self.rule_count < 0
+            ):
+                raise TypeError(
+                    "RulePackValidationReport.rule_count must be a non-negative "
+                    "int (bool rejected) when status='ok'"
+                )
+            return
+        # Failure path: both fields are optional. If a value is supplied,
+        # validate its type. ``None`` is allowed and is the truthful
+        # absence of a manifest / rule_count on the failure path.
+        if self.manifest is not None and not isinstance(self.manifest, Mapping):
+            raise TypeError(
+                "RulePackValidationReport.manifest must be a Mapping or None; "
+                f"got {type(self.manifest).__name__}"
+            )
+        if self.rule_count is not None and (
+            not isinstance(self.rule_count, int)
+            or isinstance(self.rule_count, bool)
+            or self.rule_count < 0
+        ):
+            raise TypeError(
+                "RulePackValidationReport.rule_count must be a non-negative int "
+                "or None; "
+                f"got {type(self.rule_count).__name__}"
+            )
 
 
 # ---------------------------------------------------------------------------

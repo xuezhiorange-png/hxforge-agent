@@ -297,7 +297,20 @@ def _check_cross_input_consistency(
     Only fires when ``status == "ok"``; on ``status == "fail"`` the report
     carries minimal identity (no manifest / rule_count), and the rule-pack
     pre-validation already short-circuits with ``STC_RULE_PACK_VALIDATION_FAILED``.
+
+    Final-cleanup-round narrowing (binding): if the caller somehow
+    managed to construct a ``status == 'ok'`` report without ``manifest``
+    or ``rule_count`` (the dataclass guards forbid it, but defensive
+    check anyway) the cross-input check fails closed with
+    ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``. ``None`` is rejected
+    rather than coerced to ``{}`` / ``0``.
     """
+    if report.manifest is None or report.rule_count is None:
+        raise BlockerError(
+            str(BlockerCode.STC_RULE_PACK_VALIDATION_REPORT_MISMATCH),
+            "status='ok' validation_report must carry manifest and rule_count",
+        )
+
     req = request.requested_rule_pack_identity
     if req is None:
         raise BlockerError(
@@ -1215,15 +1228,24 @@ def loaded_rule_pack_view_from_loader_dict(
     the loader payload is rejected with
     ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``.
 
+    Final-cleanup-round permission-evidence re-keying (binding):
+
+    The input dict's original ``permission_evidence`` mapping is also
+    REJECTED as authority. The output ``permission_view`` dict is keyed
+    by each permission artifact's direct ``permission_id`` (the
+    artifact top-level ``permission_id`` string), not by the input
+    mapping key. A duplicate direct ``permission_id`` is rejected with
+    ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``. Permission artifacts
+    missing a non-empty ``permission_id`` are also rejected.
+
     The TASK-012 ``load_rule_pack`` loader itself keys rules by their
-    direct ``rule_id`` (per Section 7.2); this re-keying step enforces
+    direct ``rule_id`` (per Section 7.2); the rule re-keying enforces
     the adapter's invariant independently of the loader's internal
-    iteration order.
+    iteration order. Permission re-keying is analogous but enforced
+    here for the first time.
 
     Provenance edges are mapped into a tuple without re-keying (the
     adapter does not consume them by edge id).
-
-    Permission evidence is passed through unchanged.
     """
     manifest_obj = loader_result.get("manifest")
     rules_obj = loader_result.get("rules")
@@ -1278,11 +1300,39 @@ def loaded_rule_pack_view_from_loader_dict(
         rules_view[direct_rule_id] = artifact
     pe_view = tuple(e for e in pe_obj if isinstance(e, Mapping))
 
+    # Final-cleanup-round re-keying of permission_evidence. The input
+    # mapping's keys are NOT authoritative; the artifact's direct
+    # ``permission_id`` is. Artifacts missing ``permission_id`` or
+    # carrying a duplicate ``permission_id`` are rejected.
+    permission_view: dict[str, Mapping[str, object]] = {}
+    seen_permission_ids: set[str] = set()
+    for _input_perm_key, artifact in perm_obj.items():
+        if not isinstance(artifact, Mapping):
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_PACK_VALIDATION_REPORT_MISMATCH),
+                f"loaded_rule_pack.permission_evidence[{_input_perm_key!r}] "
+                "is not a permission artifact mapping",
+            )
+        permission_id = artifact.get("permission_id")
+        if not isinstance(permission_id, str) or not permission_id:
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_PACK_VALIDATION_REPORT_MISMATCH),
+                f"loaded_rule_pack.permission_evidence[{_input_perm_key!r}] "
+                "missing direct permission_id",
+            )
+        if permission_id in seen_permission_ids:
+            raise BlockerError(
+                str(BlockerCode.STC_RULE_PACK_VALIDATION_REPORT_MISMATCH),
+                f"duplicate direct permission_id {permission_id!r}",
+            )
+        seen_permission_ids.add(permission_id)
+        permission_view[permission_id] = artifact
+
     return LoadedRulePackView(
         manifest=dict(manifest_obj),
         rules=dict(rules_view),
         provenance_edges=pe_view,
-        permission_evidence=dict(perm_obj),
+        permission_evidence=dict(permission_view),
         rule_pack_id=rid,
         rule_pack_version=rver,
         rule_pack_canonical_hash=rhash,
@@ -1295,22 +1345,30 @@ def rule_pack_validation_report_from_validate_dict(
 ) -> RulePackValidationReport:
     """Adapter helper — wrap a TASK-012 ``validate_rule_pack`` dict result.
 
-    Round-2 fail-shape discipline (binding):
+    Final-cleanup-round fail-shape discipline (binding):
 
-    The adapter reads ``status`` first. On ``status == "fail"`` the
+    The adapter reads ``status`` first. On ``status != "ok"`` the
     minimal TASK-012 failure shape ``{status, errors}`` is accepted
-    without requiring ``manifest`` or ``rule_count``. On
-    ``status == "ok"`` both ``manifest`` (mapping) and ``rule_count``
-    (``int``) are required. The adapter never invents a fake
-    ``manifest`` or ``rule_count`` on the failure path; on the success
-    path it never invents them either — they come from the real TASK-012
-    validator's report.
+    and the resulting ``RulePackValidationReport`` carries:
+
+        * ``manifest: None``
+        * ``rule_count: None``
+
+    The adapter NEVER fabricates ``{}`` / ``0`` to keep the dataclass
+    constructable. ``None`` is the truthful absence of those fields in
+    the validator's failure report.
+
+    On ``status == "ok"`` both ``manifest`` (mapping) and ``rule_count``
+    (``int``, non-negative, ``bool`` rejected) are required. The
+    adapter never invents them either — they come from the real
+    TASK-012 validator's report.
 
     On fail, ``rule_pack_id`` / ``rule_pack_version`` /
-    ``rule_pack_canonical_hash`` are read from ``validate_result``
-    when present; otherwise the empty strings the dataclass default
-    is fine since §6.3.3 cross-input consistency is short-circuited
-    by the §7.1 boundary check.
+    ``rule_pack_canonical_hash`` are read from ``validate_result``'s
+    ``manifest`` mapping when present; otherwise they remain empty
+    strings (the dataclass default). The cross-input consistency check
+    is short-circuited by the §7.1 status-boundary check, so empty
+    identity cannot leak past the boundary.
     """
     status = validate_result.get("status")
     if not isinstance(status, str) or not status:
@@ -1352,23 +1410,24 @@ def rule_pack_validation_report_from_validate_dict(
             rule_pack_canonical_hash=rhash,
         )
 
-    # Failure path — minimal shape accepted. NO fabricated manifest /
-    # rule_count. The adapter does NOT parse ``errors[*].message``.
-    manifest_obj = validate_result.get("manifest")
-    rule_count_obj = validate_result.get("rule_count")
-    if not isinstance(manifest_obj, Mapping):
-        # Minimal failure shape: empty mapping as a neutral default so
-        # the dataclass stays constructable. The cross-input
-        # consistency check is short-circuited by the §7.1 status check,
-        # so the empty manifest cannot leak past the boundary.
-        manifest_obj = {}
-    if not isinstance(rule_count_obj, int) or isinstance(rule_count_obj, bool):
-        rule_count_obj = 0
-    rid, rver, rhash = _manifest_identity(manifest_obj)
+    # Failure path — minimal shape accepted. The dataclass rejects
+    # fabricated ``manifest`` / ``rule_count`` placeholders; both must
+    # be ``None`` unless the validator explicitly supplied them. The
+    # adapter does NOT parse ``errors[*].message``.
+    raw_manifest_obj = validate_result.get("manifest")
+    raw_rule_count_obj = validate_result.get("rule_count")
+    rid = ""
+    rver = ""
+    rhash = ""
+    if isinstance(raw_manifest_obj, Mapping):
+        rid, rver, rhash = _manifest_identity(raw_manifest_obj)
+    failed_rule_count: int | None = None
+    if isinstance(raw_rule_count_obj, int) and not isinstance(raw_rule_count_obj, bool):
+        failed_rule_count = raw_rule_count_obj
     return RulePackValidationReport(
         status=status,
-        manifest=dict(manifest_obj),
-        rule_count=rule_count_obj,
+        manifest=None,
+        rule_count=failed_rule_count,
         errors=errors_view,
         rule_pack_id=rid,
         rule_pack_version=rver,

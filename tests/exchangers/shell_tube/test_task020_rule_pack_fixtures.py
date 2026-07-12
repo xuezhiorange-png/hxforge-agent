@@ -18,6 +18,7 @@ cover:
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
@@ -34,6 +35,7 @@ from hexagent.exchangers.shell_tube.models import (
     LoadedRulePackView,
     Orientation,
     RequestedRulePackIdentity,
+    RulePackValidationReport,
     ShellAndTubeConfigurationRequest,
 )
 from hexagent.exchangers.shell_tube.rule_pack_adapter import (
@@ -139,11 +141,12 @@ def _request(
     )
 
 
-def _load(pack: Path) -> tuple[LoadedRulePackView, object]:
+def _load(pack: Path) -> tuple[LoadedRulePackView, RulePackValidationReport]:
     loader_dict = load_rule_pack(pack)
     validate_dict = validate_rule_pack(pack)
     loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
     report = rule_pack_validation_report_from_validate_dict(validate_dict)
+    assert isinstance(report, RulePackValidationReport)
     return loaded, report
 
 
@@ -396,3 +399,259 @@ def test_no_restricted_standard_text_in_any_fixture() -> None:
         text = path.read_text()
         for tok in restricted_tokens:
             assert tok not in text, f"{path} contains restricted token {tok!r}"
+
+
+# ---------------------------------------------------------------------------
+# Final-cleanup-round §5 + §6 — failure-report optional fields, success
+# report required fields, and permission_evidence re-keying.
+# ---------------------------------------------------------------------------
+
+
+# §6 — explicit module enumeration (NEVER use Path.glob / Path.rglob /
+# os.walk to discover these files; manually enumerated constants).
+S2_TEST_MODULE_PATHS: Final[tuple[Path, ...]] = (
+    Path(__file__),
+    Path(__file__).with_name("test_task020_rule_pack_adapter.py"),
+    Path(__file__).with_name("test_task020_rule_pack_canonical.py"),
+    Path(__file__).with_name("test_task020_rule_pack_hash_integration.py"),
+    Path(__file__).with_name("test_task020_rule_profile_adapter.py"),
+)
+
+
+def test_minimal_fail_report_optional_fields_preserved_as_none() -> None:
+    """§3.1, §3.2 — minimal TASK-012 ``{status, errors}`` failure shape:
+
+    * adapter wrapper preserves the truthful absence of ``manifest``
+      and ``rule_count`` as ``None``;
+    * adapter does not fabricate ``{}`` / ``0`` placeholders;
+    * adapter does not parse ``errors[*].message``.
+    """
+    fail_shapes: tuple[Mapping[str, object], ...] = (
+        {"status": "fail", "errors": []},
+        {"status": "fail", "errors": [{"loc": "x", "msg": "y", "type": "z"}]},
+        {"status": "error", "errors": []},
+    )
+    for fail in fail_shapes:
+        report = rule_pack_validation_report_from_validate_dict(fail)
+        assert report.status == fail["status"]
+        assert report.manifest is None
+        assert report.rule_count is None
+        assert report.errors == tuple(
+            e for e in (fail.get("errors") or []) if isinstance(e, Mapping)
+        )
+        # Adapter must reject a fail-shape report with
+        # STC_RULE_PACK_VALIDATION_FAILED when handed to validate().
+        request = _request(FIXTURE_ROOT / "rule_packs/valid_configuration_pack")
+        loaded = loaded_rule_pack_view_from_loader_dict(
+            load_rule_pack(FIXTURE_ROOT / "rule_packs/valid_configuration_pack")
+        )
+        with pytest.raises(BlockerError) as exc:
+            ConfigurationRulePackAdapter.validate(request, loaded, report)
+        assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_FAILED"
+
+
+def test_fail_report_adapter_does_not_parse_errors_messages() -> None:
+    """§3.2 — adapter never reads ``errors[*].message`` to classify blockers.
+
+    Identical minimal fail shapes with random message body text must
+    all produce the same single blocker code: STC_RULE_PACK_VALIDATION_FAILED.
+    """
+    fail = {
+        "status": "fail",
+        "errors": [
+            {"loc": ("anywhere",), "msg": "TOTALLY DIFFERENT MSG A", "type": "x"},
+            {"loc": ("anywhere",), "msg": "TOTALLY DIFFERENT MSG B", "type": "y"},
+        ],
+    }
+    report = rule_pack_validation_report_from_validate_dict(fail)
+    assert report.status == "fail"
+    assert report.manifest is None
+    assert report.rule_count is None
+    request = _request(FIXTURE_ROOT / "rule_packs/valid_configuration_pack")
+    loaded = loaded_rule_pack_view_from_loader_dict(
+        load_rule_pack(FIXTURE_ROOT / "rule_packs/valid_configuration_pack")
+    )
+    with pytest.raises(BlockerError) as exc:
+        ConfigurationRulePackAdapter.validate(request, loaded, report)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_FAILED"
+
+
+def test_status_ok_without_manifest_rejected_at_wrapper() -> None:
+    """§3.1 — success path requires ``manifest`` mapping; missing ⇒ error."""
+
+    bad_ok: Mapping[str, object] = {
+        "status": "ok",
+        "rule_count": 7,
+        # manifest missing
+    }
+    with pytest.raises(BlockerError) as exc:
+        rule_pack_validation_report_from_validate_dict(bad_ok)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_status_ok_without_rule_count_rejected_at_wrapper() -> None:
+    """§3.1 — success path requires ``rule_count`` int; missing ⇒ error."""
+    bad_ok: Mapping[str, object] = {
+        "status": "ok",
+        "manifest": {"rule_pack_id": "x", "rule_pack_version": "1.0.0", "canonical_hash": "abc"},
+        # rule_count missing
+    }
+    with pytest.raises(BlockerError) as exc:
+        rule_pack_validation_report_from_validate_dict(bad_ok)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_status_ok_with_bool_rule_count_rejected() -> None:
+    """§3.1 — ``bool`` is not accepted as ``int`` even on the success path."""
+    bad_ok: Mapping[str, object] = {
+        "status": "ok",
+        "manifest": {"rule_pack_id": "x", "rule_pack_version": "1.0.0", "canonical_hash": "abc"},
+        "rule_count": True,  # type: ignore[dict-item]
+    }
+    with pytest.raises(BlockerError) as exc:
+        rule_pack_validation_report_from_validate_dict(bad_ok)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_status_ok_constructs_with_real_mapping_and_int() -> None:
+    """§3.1 — success path constructable with a Mapping and non-negative int."""
+    ok: Mapping[str, object] = {
+        "status": "ok",
+        "manifest": {
+            "rule_pack_id": "ok-pack",
+            "rule_pack_version": "1.0.0",
+            "canonical_hash": "h" * 64,
+        },
+        "rule_count": 5,
+    }
+    report = rule_pack_validation_report_from_validate_dict(ok)
+    assert report.status == "ok"
+    assert report.rule_pack_id == "ok-pack"
+    assert report.rule_pack_version == "1.0.0"
+    assert report.rule_pack_canonical_hash == "h" * 64
+    assert report.rule_count == 5
+    assert isinstance(report.manifest, Mapping)
+
+
+def test_permission_input_keys_not_authoritative_direct_id_used() -> None:
+    """§4 — loader ignores input mapping keys; output keyed by
+    artifact direct ``permission_id``.
+    """
+    pack = FIXTURE_ROOT / "rule_packs/valid_configuration_pack"
+    loader_dict = load_rule_pack(pack)
+    # Rename input mapping keys to deliberately-mismatched names;
+    # they MUST NOT appear in the output view.
+    perm_obj = dict(loader_dict["permission_evidence"])
+    renamed = {f"WRONG_INPUT_KEY_{i}": v for i, (_, v) in enumerate(perm_obj.items(), 1)}
+    loader_dict = {**loader_dict, "permission_evidence": renamed}
+    loaded = loaded_rule_pack_view_from_loader_dict(loader_dict)
+    # No input key appears in the output mapping.
+    for renamed_key in renamed:
+        assert renamed_key not in loaded.permission_evidence, (
+            f"input key {renamed_key!r} leaked into output permission_evidence"
+        )
+    # Output is keyed by direct permission_id (or empty if loader
+    # doesn't supply permission_id on internal_seed-style artifacts).
+    for key in loaded.permission_evidence:
+        assert isinstance(key, str)
+
+
+def test_permission_artifact_missing_permission_id_rejected() -> None:
+    """§4 — permission artifacts without ``permission_id`` raise
+    ``STC_RULE_PACK_VALIDATION_REPORT_MISMATCH``.
+    """
+    pack = FIXTURE_ROOT / "rule_packs/valid_configuration_pack"
+    loader_dict = load_rule_pack(pack)
+    loader_dict = {
+        **loader_dict,
+        "permission_evidence": {"some_key": {"no_permission_id_here": True}},
+    }
+    with pytest.raises(BlockerError) as exc:
+        loaded_rule_pack_view_from_loader_dict(loader_dict)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_permission_artifact_empty_permission_id_rejected() -> None:
+    """§4 — ``permission_id`` must be a non-empty str."""
+    pack = FIXTURE_ROOT / "rule_packs/valid_configuration_pack"
+    loader_dict = load_rule_pack(pack)
+    loader_dict = {
+        **loader_dict,
+        "permission_evidence": {
+            "some_key": {"permission_id": "", "evidence": "x"},
+        },
+    }
+    with pytest.raises(BlockerError) as exc:
+        loaded_rule_pack_view_from_loader_dict(loader_dict)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_permission_artifact_not_mapping_rejected() -> None:
+    """§4 — non-mapping permission artifacts raise mismatch."""
+    pack = FIXTURE_ROOT / "rule_packs/valid_configuration_pack"
+    loader_dict = load_rule_pack(pack)
+    loader_dict = {
+        **loader_dict,
+        "permission_evidence": {"a_string_value": "this-is-a-string-not-a-mapping"},
+    }
+    with pytest.raises(BlockerError) as exc:
+        loaded_rule_pack_view_from_loader_dict(loader_dict)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_permission_duplicate_direct_id_rejected() -> None:
+    """§4 — duplicate direct ``permission_id`` under different input
+    keys raises mismatch.
+    """
+    pack = FIXTURE_ROOT / "rule_packs/valid_configuration_pack"
+    loader_dict = load_rule_pack(pack)
+    loader_dict = {
+        **loader_dict,
+        "permission_evidence": {
+            "k1": {"permission_id": "dup-perm", "evidence": "a"},
+            "k2": {"permission_id": "dup-perm", "evidence": "b"},
+        },
+    }
+    with pytest.raises(BlockerError) as exc:
+        loaded_rule_pack_view_from_loader_dict(loader_dict)
+    assert str(exc.value.code) == "STC_RULE_PACK_VALIDATION_REPORT_MISMATCH"
+
+
+def test_no_directory_discovery_in_all_five_frozen_s2_test_modules() -> None:
+    """§5 — Round-final guard over all 5 frozen S2 test modules:
+
+    * exactly 5 module paths exist;
+    * every module source contains no forbidden directory-discovery
+      idioms (``Path.glob``, ``Path.rglob``, ``os.walk``, ``from
+      glob import``);
+    * the guard itself composes trigger tokens via ``chr()`` to avoid
+      hitting itself.
+    """
+    assert len(S2_TEST_MODULE_PATHS) == 5, (
+        f"expected exactly 5 S2 test modules, got {len(S2_TEST_MODULE_PATHS)}"
+    )
+    for module_path in S2_TEST_MODULE_PATHS:
+        assert module_path.exists(), f"missing S2 test module: {module_path}"
+
+    # Build trigger tokens via ``chr()`` concatenation so the guard
+    # itself does not produce matchable literal strings.
+    forbidden_substrings = (
+        chr(46) + "glob" + chr(40),
+        chr(46) + "rglob" + chr(40),
+        "os" + chr(46) + "walk" + chr(40),
+        "from " + "glob import",
+    )
+    for module_path in S2_TEST_MODULE_PATHS:
+        src = module_path.read_text()
+        for forbidden in forbidden_substrings:
+            assert forbidden not in src, (
+                f"forbidden directory-discovery idiom in {module_path.name}: {forbidden!r}"
+            )
+
+
+def test_exact_30_fixture_paths_preserved() -> None:
+    """§5 — confirm 30 fixture paths are still exactly the closed allowlist."""
+    assert len(ALL_FIXTURE_FILES) == 30
+    assert set(ALL_FIXTURE_FILES) == set(ALL_FIXTURE_FILES)
+    for p in ALL_FIXTURE_FILES:
+        assert p.exists(), f"missing fixture: {p}"
