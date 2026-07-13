@@ -69,6 +69,18 @@ shards:
       - tests/exchangers/shell_tube/test_task020_rule_pack_hash_integration.py
       - tests/exchangers/shell_tube/test_task020_rule_profile_adapter.py
       - tests/exchangers/shell_tube/test_task020_schema.py
+      - tests/exchangers/shell_tube/tube_layout/test_models.py
+      - tests/exchangers/shell_tube/tube_layout/test_schema.py
+      - tests/exchangers/shell_tube/tube_layout/test_authority.py
+      - tests/exchangers/shell_tube/tube_layout/test_enumeration.py
+      - tests/exchangers/shell_tube/tube_layout/test_geometry.py
+      - tests/exchangers/shell_tube/tube_layout/test_exclusion_audit.py
+      - tests/exchangers/shell_tube/tube_layout/test_pairing.py
+      - tests/exchangers/shell_tube/tube_layout/test_canonical.py
+      - tests/exchangers/shell_tube/tube_layout/test_validation.py
+      - tests/exchangers/shell_tube/tube_layout/test_warnings_blockers_provenance.py
+      - tests/exchangers/shell_tube/tube_layout/test_architecture_and_boundaries.py
+      - tests/exchangers/shell_tube/tube_layout/test_frozen_design_contract_unchanged.py
     timeout: 300
 
   - name: ci-acceptance
