@@ -321,8 +321,31 @@ Exact fields:
 | `outer_diameter_m` | decimal string | positive |
 | `inner_diameter_m` | decimal string | positive and smaller than OD |
 | `wall_thickness_m` | decimal string | positive and algebraically consistent |
-| `record_hash` | string | lowercase 64-character SHA-256 hex |
+| `record_hash` | string | lowercase 64-character SHA-256 hex; **upstream artifact hash** — TASK-021 core does **not** recalculate this value because the core does not own the upstream record body |
+| `snapshot_hash` | lowercase 64-character SHA-256 hex | TASK-021-recalculable self-identity over the canonical payload of every other field (excluding `snapshot_hash` itself) |
 | `source_binding` | object | complete §6.3 shape |
+
+The `record_hash` field is **upstream evidence** — it is supplied by
+the snapshot adapter and is the record-level identity of the upstream
+approved geometry artifact. TASK-021's deterministic core does not own
+the original upstream record body and therefore does **not** claim to
+re-compute `record_hash`. A future adapter is responsible for:
+
+1. loading the upstream validated geometry object;
+2. verifying the upstream canonical `record_hash` against the supplied
+   value;
+3. refusing to construct `ApprovedTubeGeometrySnapshot` on a mismatch;
+4. constructing a TASK-021 snapshot whose `snapshot_hash` is then
+   verified by the core.
+
+The `snapshot_hash` field is a separate, **TASK-021-recalculable**
+self-identity that the deterministic core MUST recompute and verify
+end-to-end. Its canonical payload is the JSON serialization of every
+other field of the snapshot, with the rules in §11.1 applied
+(Unicode code-point order, canonical decimal strings, no NaN / Infinity
+/ runtime metadata), and the `snapshot_hash` field itself excluded
+from the payload. A mismatch on `snapshot_hash` is a
+`STL_TUBE_GEOMETRY_SNAPSHOT_HASH_MISMATCH` blocker.
 
 The snapshot carries no material grade, allowable stress, corrosion allowance,
 pressure rating, fouling value, vendor availability, procurement state or cost.
@@ -362,7 +385,7 @@ Exact fields:
 | `authority_mode` | enum | `INTERNAL_GENERIC` or `APPROVED_RULE_PACK`; must match TASK-020 configuration mode |
 | `rule_id` | string | non-empty |
 | `rule_version` | string | non-empty |
-| `rule_artifact_canonical_hash` | string | lowercase SHA-256 hex |
+| `rule_artifact_canonical_hash` | string | lowercase SHA-256 hex; **upstream artifact hash** — TASK-021 core does **not** recalculate this value because the core does not own the upstream rule body |
 | `source_class` | TASK-012 enum string | recognized source class |
 | `license_evidence` | JSON value | required, canonicalizable |
 | `approval_status` | string | exact `approved` |
@@ -376,6 +399,40 @@ Exact fields:
 | `allowed_axis_orientations` | array | non-empty closed subset of §6.9 |
 | `allowed_exclusion_zone_types` | array | closed subset of §6.11 |
 | `maximum_candidate_positions` | integer | `1 <= value <= 100000` |
+| `snapshot_hash` | lowercase 64-character SHA-256 hex | TASK-021-recalculable self-identity (same rule as §6.2) |
+
+The `rule_artifact_canonical_hash` field is **upstream evidence** —
+it is supplied by the authority adapter and is the canonical-hash
+identity of the upstream evaluated layout-rule artifact. TASK-021's
+deterministic core does not own the original upstream rule body and
+therefore does **not** claim to re-compute `rule_artifact_canonical_hash`.
+A future adapter is responsible for:
+
+1. loading the upstream validated rule object;
+2. verifying the upstream canonical `rule_artifact_canonical_hash`
+   against the supplied value;
+3. refusing to construct `LayoutRuleAuthoritySnapshot` on a mismatch;
+4. constructing a TASK-021 snapshot whose `snapshot_hash` is then
+   verified by the core.
+
+The `snapshot_hash` field is the **TASK-021-recalculable** self-identity
+that the deterministic core MUST recompute and verify end-to-end. Its
+canonical payload is the JSON serialization of every other field of the
+snapshot, with the rules in §11.1 applied (Unicode code-point order,
+canonical decimal strings, no NaN / Infinity / runtime metadata), and
+the `snapshot_hash` field itself excluded from the payload. A mismatch
+on `snapshot_hash` is a `STL_LAYOUT_RULE_SNAPSHOT_HASH_MISMATCH`
+blocker. For `INTERNAL_GENERIC`, `rule_artifact_canonical_hash` is
+still required (the rules kernel fills it with a fully deterministic
+internal digest over the internal canonical rule body) and remains
+**upstream evidence** that the core does not re-derive.
+
+In **both** modes, the core recomputes only `snapshot_hash`. The
+core never recomputes `rule_artifact_canonical_hash` or any other
+upstream artifact body digest, even though the values are stored in
+the same snapshot. The provenance contract (§12) records **both**
+the upstream record/artifact hash and the TASK-021 `snapshot_hash`
+as separate, non-substitutable entries.
 
 For `INTERNAL_GENERIC`, `source_class` must be
 `INTERNAL_ENGINEERING_RULE`, `rule_pack_identity` must be null, and the result
@@ -393,6 +450,12 @@ Exact fields:
 - `rule_pack_id: str`;
 - `rule_pack_version: str`;
 - `rule_pack_canonical_hash: lowercase SHA-256 hex`.
+
+The `rule_pack_canonical_hash` here is the canonical hash of the
+upstream TASK-012 rule-pack artifact. Like `record_hash` and
+`rule_artifact_canonical_hash`, it is **upstream evidence** carried
+into the TASk-021 runtime; the TASK-021 core does not re-derive it
+because the core does not own the upstream pack body.
 
 This object identifies the pack that produced the evaluated layout rule. It is
 not permission to reinterpret TASK-020 configuration-rule values as layout
@@ -575,7 +638,7 @@ Both coordinates are quantized to `1e-12 m` with `ROUND_HALF_EVEN`. The
 canonical coordinate strings contain no exponent notation and no unnecessary
 trailing zeros.
 
-### 7.5 Finite enumeration bound
+### 7.5 Finite enumeration bound (provably complete via inverse-basis method)
 
 Define:
 
@@ -586,23 +649,144 @@ Define:
 
 If `rho <= 0`, the request is blocked before enumeration.
 
-For the frozen v1 square and triangular bases, the minimum lattice spacing is
-`pitch_m`. Let `offset_norm_upper = abs(offset_x) + abs(offset_y)` and:
+#### 7.5.1 Inverse-basis bound (canonical lattice enumeration, proof-complete)
+
+The candidate enumeration bound MUST be derived from the **inverse** of
+the lattice basis matrix. Let the 2D basis matrix be:
 
 ```text
-N = ceil((rho + offset_norm_upper) / pitch_m) + 2
+A = [[a_x, b_x],
+     [a_y, b_y]]
 ```
 
-The candidate index domain is the complete Cartesian product:
+Compute the inverse exactly under the same frozen Decimal context that
+generates coordinates:
 
 ```text
-u in [-N, N]
-v in [-N, N]
+det = a_x * b_y - a_y * b_x
 ```
 
-Before generating coordinates, the kernel computes `(2N + 1)^2`. If that value
-exceeds `maximum_candidate_positions`, the request is blocked. Truncating the
-index domain or returning a partial result is forbidden.
+If `det == 0` (the chosen `A` is non-invertible), the kernel MUST raise
+`STL_BASIS_NON_INVERTIBLE` and **fail closed** before enumeration —
+returning a truncated or partial result is forbidden.
+
+When `det != 0`:
+
+```text
+B = inverse(A) = [[ B_00, B_01],
+                   [ B_10, B_11 ]]
+```
+
+so that `B · A = I` (verified under Decimal).
+
+Define the conservative offset-aware envelope half-extents under the
+frozen Decimal context:
+
+```text
+d_x = rho + abs(offset_x)
+d_y = rho + abs(offset_y)
+```
+
+The conservative index bounding box is:
+
+```text
+U = ceil(abs(B_00) * d_x + abs(B_01) * d_y) + 1
+V = ceil(abs(B_10) * d_x + abs(B_11) * d_y) + 1
+```
+
+The `+ 1` is an **explicit conservative slack** to guarantee that no
+legal envelope interior lattice point can fall outside the box. The
+inverse computation, the multiplication, the `abs` and the `ceil` all
+use the frozen Decimal context with no independent rounding shortcuts.
+
+The complete candidate index domain is the **full Cartesian product**:
+
+```text
+u in [-U, U]
+v in [-V, V]
+candidate_count = (2 * U + 1) * (2 * V + 1)
+```
+
+Before generating coordinates the kernel MUST compare:
+
+```text
+candidate_count <= maximum_candidate_positions
+```
+
+If the comparison fails (candidate_count exceeds the
+`maximum_candidate_positions` capacity ceiling from the authority
+snapshot), the kernel MUST raise `STL_ENUMERATION_LIMIT_EXCEEDED` and
+**fail closed**. Truncating the index domain, returning a partial
+result, or "best-effort" early termination is forbidden.
+
+**Deterministic independence from output quantization**: the index
+bound is derived strictly from the inverse-basis working values, the
+envelope radius `rho`, the conservative `d_x`/`d_y`, and the offset.
+The bound MUST NOT be reduced or widened by quantized output
+coordinates. Acceptance still uses unrounded Decimal working values
+under the frozen context.
+
+**Axis orientation handling**: for `PRIMARY_AXIS_X`, `A` is constructed
+from `§7.2` directly. For `PRIMARY_AXIS_Y`, the `x`/`y` components of
+both basis vectors are swapped before forming `A`. The whole pipeline
+(index bound, enumeration, envelope test) applies the same swap
+uniformly.
+
+#### 7.5.2 Synthetic mathematical regression vector (proves enumerator completeness)
+
+A synthetic mathematical regression vector exercises the inverse-basis
+bound on a triangular lattice where the simpler "N" formula would
+have **proven incomplete**:
+
+| Input field | Value |
+| --- | --- |
+| pattern | `TRIANGULAR` |
+| axis | `PRIMARY_AXIS_X` |
+| pitch | `1` |
+| rho | `100` |
+| offset | `(0, 0)` |
+| lattice index | `u = -57`, `v = 115` |
+
+Working coordinates:
+
+- `x = u * pitch + v * (pitch / 2) = -57 * 1 + 115 * (1 / 2) = -57 + 57.5 = 0.5`
+- `y = v * (pitch * SQRT_3 / 2) = 115 * SQRT_3 / 2`
+
+so
+
+- `x^2 + y^2 = 0.25 + (115^2 * 3 / 4) = 0.25 + (13225 * 3 / 4) = 0.25 + 9918.75 = 9919`
+- `rho^2 = 10000`
+
+Therefore `x^2 + y^2 = 9919 < rho^2 = 10000`, the candidate is
+**strictly inside the envelope**, and the kernel MUST accept it.
+
+A **historically simpler bound** (a single scalar `N` derived by
+dividing a radius-aware envelope bound by `pitch_m` and adding a small
+constant) cannot account for the rotated basis vectors of a
+non-orthogonal lattice. On the regression vector above, the single
+scalar bound caps both `|u|` and `|v|` at the same magnitude and
+**wrongly rejects the `v = 115` index** even though its working
+coordinate lies inside the envelope. The new inverse-basis bound
+(with `U`, `V`) covers the same candidate and hence proves itself
+strictly more complete for the triangular basis.
+
+This regression vector is a **synthetic mathematical fixture**. It is
+not an engineering Golden value. It must not be cited as TEMA, ASME,
+API, vendor, ISO or any other standard content. It exists only to
+prove enumeration completeness on the triangular lattice.
+
+#### 7.5.3 Capacity ceiling comparison (binding)
+
+After the inverse-basis bound is computed, the kernel MUST run:
+
+```text
+candidate_count = (2 * U + 1) * (2 * V + 1)
+test: candidate_count <= maximum_candidate_positions
+fail_closed_on_exceed: STL_ENUMERATION_LIMIT_EXCEEDED
+```
+
+No truncation of `u in [-U, U]` or `v in [-V, V]` is permitted at
+any point in the pipeline.
 
 ### 7.6 Envelope acceptance
 
@@ -688,7 +872,10 @@ at the end of a stage when blockers exist:
 8. origin, axis and rule-authorization checks;
 9. exclusion-zone exact-shape and duplicate-ID checks;
 10. construction-family and U-tube-pairing prechecks;
-11. finite enumeration-limit calculation;
+11. finite enumeration-limit calculation: inverse-basis bound
+    (`det != 0`, `U`, `V`, `candidate_count`) and the
+    `maximum_candidate_positions` capacity check; a non-invertible
+    basis blocks under `STL_BASIS_NON_INVERTIBLE` here;
 12. lattice enumeration, envelope filtering and exclusion filtering;
 13. duplicate-coordinate guard;
 14. U-tube complete pairing validation, when applicable;
@@ -820,8 +1007,23 @@ boundary, NaN and Infinity are canonicalization blockers.
 - `STL_LAYOUT_RULE_AUTHORITY_MISSING`;
 - `STL_LAYOUT_RULE_PROFILE_UNSUPPORTED`;
 - `STL_LAYOUT_RULE_UNAPPROVED`;
-- `STL_LAYOUT_RULE_HASH_MISMATCH`;
+- `STL_TUBE_GEOMETRY_SNAPSHOT_HASH_MISMATCH` — the `snapshot_hash` field
+  of `ApprovedTubeGeometrySnapshot` does not match the
+  TASK-021-recalculated canonical hash over the rest of the snapshot.
+- `STL_LAYOUT_RULE_SNAPSHOT_HASH_MISMATCH` — the `snapshot_hash` field
+  of `LayoutRuleAuthoritySnapshot` does not match the
+  TASK-021-recalculated canonical hash over the rest of the snapshot.
 - `STL_LAYOUT_RULE_LICENSE_BLOCKED`;
+- `STL_BASIS_NON_INVERTIBLE` — the basis matrix `A` derived from the
+  verified `pattern_family` / `axis_orientation` carries `det == 0`; the
+  enumeration must fail closed.
+- `STL_LAYOUT_RULE_HASH_MISMATCH` *(removed from canonical role; the upstream
+  rule body canonical hash is verified by the adapter, not by the core, and any
+  core-level re-derivation must use the new `STL_LAYOUT_RULE_SNAPSHOT_HASH_MISMATCH`
+  code; legacy uses of `STL_LAYOUT_RULE_HASH_MISMATCH` are not generated by the v1
+  core)*.
+- `STL_TUBE_GEOMETRY_HASH_MISMATCH` *(removed from canonical role; rationale as
+  above for `STL_LAYOUT_RULE_HASH_MISMATCH`)*.
 - `STL_LAYOUT_RULE_PROVENANCE_INCOMPLETE`;
 - `STL_RULE_PACK_IDENTITY_MISSING`;
 - `STL_RULE_PACK_IDENTITY_NOT_EXPECTED`;
@@ -854,15 +1056,111 @@ boundary, NaN and Infinity are canonicalization blockers.
 No blocker in this set may be downgraded to a warning when the requested layout
 cannot be reproduced safely.
 
-### 10.2 Closed warning-code set
+### 10.2 Closed warning-code set (deterministic emission, full five-field content)
 
-- `STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM`;
-- `STL_CALLER_SUPPLIED_ENVELOPE_NOT_SHELL_DIAMETER`;
-- `STL_PASS_PARTITION_ASSIGNMENT_DEFERRED`;
-- `STL_UTUBE_BEND_GEOMETRY_DEFERRED`.
+For every warning emitted by TASK-021 the kernel MUST populate the
+**complete five-field shape**, the **field_path**, the **message_key**,
+the sorted-duplicate-free **evidence_refs** and the canonical **details**
+object specified below. The kernel MUST NOT emit a warning whose trigger
+condition, field_path, message_key, evidence_refs or details are not
+fully specified by this sub-section, and MUST NOT silently omit a
+warning whose trigger condition is satisfied. Warnings MUST be
+generated **before** `layout_hash` is computed, so that the
+`layout_hash_payload` (§11.3) carries the frozen warning set. Warning
+evidence_refs MUST be sorted and duplicate-free before canonicalization.
 
-Warnings are deterministically sorted by the TASK-020 composite ordering rule:
-`(code, field_path or "", message_key, canonical_details_hash)`.
+A blocked result may carry only those warnings whose trigger condition
+and upstream evidence were already determined **before** the failing
+stage. The kernel MUST NOT synthesize warnings for `BLOCKED` results
+that depend on inputs which the failing stage never successfully
+validated.
+
+#### 10.2.1 `STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM`
+
+- **Trigger condition** (single): emitted when the verified request's
+  `layout_rule_authority.authority_mode == INTERNAL_GENERIC`. The
+  warning is **not** emitted for `APPROVED_RULE_PACK`.
+- `code`: exact string `STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM`.
+- `field_path`: exact string
+  `layout_rule_authority.authority_mode`.
+- `message_key`: exact string `internal_generic_no_standard_claim`.
+- `evidence_refs`: the sorted-duplicate-free array copied from
+  `layout_rule_authority.evidence_refs`.
+- `details` (canonical JSON object, exact key set and order):
+  - `authority_mode`: exact string `INTERNAL_GENERIC`.
+  - `standard_claim_status`: exact string `NO_STANDARD_CLAIM`.
+
+#### 10.2.2 `STL_CALLER_SUPPLIED_ENVELOPE_NOT_SHELL_DIAMETER`
+
+- **Trigger condition**: emitted on **every** valid (`status == VALID`)
+  result. The v1 envelope is always supplied by the caller; the
+  envelope radius is therefore not a shell or bundle diameter produced
+  by TASK-021, and the result must say so.
+- `code`: exact string `STL_CALLER_SUPPLIED_ENVELOPE_NOT_SHELL_DIAMETER`.
+- `field_path`: exact string
+  `placement_envelope.tube_center_envelope_diameter_m`.
+- `message_key`: exact string `caller_supplied_envelope_not_shell_diameter`.
+- `evidence_refs`: the sorted-duplicate-free array copied from
+  `placement_envelope.evidence_refs`.
+- `details` (canonical JSON object, exact key set and order):
+  - `semantic_role`: exact string `tube_center_placement_constraint`.
+  - `shell_diameter_status`: exact string `NOT_COMPUTABLE`.
+
+The warning is suppressed only on a `BLOCKED` result whose failing
+stage is reached before the envelope is verified.
+
+#### 10.2.3 `STL_PASS_PARTITION_ASSIGNMENT_DEFERRED`
+
+- **Trigger condition**: emitted on **every** valid (`status == VALID`)
+  result. Pass partition / pass membership is explicitly out of TASK-021
+  v1 scope (§15.3), and the result must state so.
+- `code`: exact string `STL_PASS_PARTITION_ASSIGNMENT_DEFERRED`.
+- `field_path`: exact string
+  `configuration.tube_pass_count`.
+- `message_key`: exact string `pass_partition_assignment_deferred`.
+- `evidence_refs`: the sorted-duplicate-free array copied from
+  `request.evidence_refs`.
+- `details` (canonical JSON object, exact key set and order):
+  - `tube_pass_count`: the **verified integer** copied from the
+    validated TASK-020 `configuration.tube_pass_count` (after type
+    and lexical validation).
+  - `assignment_status`: exact string `NOT_COMPUTABLE`.
+
+The warning is suppressed only on a `BLOCKED` result whose failing
+stage is reached before `tube_pass_count` is fully verified.
+
+#### 10.2.4 `STL_UTUBE_BEND_GEOMETRY_DEFERRED`
+
+- **Trigger condition** (single): emitted when the verified
+  configuration's `construction_family == U_TUBE` (and only then).
+  The warning is **not** emitted for fixed-tubesheet, floating-head or
+  kettle configurations.
+- `code`: exact string `STL_UTUBE_BEND_GEOMETRY_DEFERRED`.
+- `field_path`: exact string `u_tube_pairing_plan`.
+- `message_key`: exact string `u_tube_bend_geometry_deferred`.
+- `evidence_refs`: the sorted-duplicate-free array copied from
+  `u_tube_pairing_plan.evidence_refs`.
+- `details` (canonical JSON object, exact key set and order):
+  - `construction_family`: exact string `U_TUBE`.
+  - `bend_geometry_status`: exact string `NOT_COMPUTABLE`.
+
+The warning is suppressed only on a `BLOCKED` result whose failing
+stage is reached before `u_tube_pairing_plan` is verified.
+
+#### 10.2.5 Deterministic ordering and identity of warnings
+
+The warnings array is deterministically sorted by the TASK-020
+composite ordering rule `(code, field_path or "", message_key,
+canonical_details_hash)` BEFORE it enters `layout_hash_payload`.
+The `canonical_details_hash` is `SHA-256` over the canonical JSON of
+the warning's `details` object (§11.1). Two warnings differing only
+in their `canonical_details_hash` will sort stably, so the array order
+is reproducible.
+
+Forward-references: `internal_generic_no_standard_claim` (10.2.1),
+`caller_supplied_envelope_not_shell_diameter` (10.2.2),
+`pass_partition_assignment_deferred` (10.2.3),
+`u_tube_bend_geometry_deferred` (10.2.4).
 
 ## 11. Canonicalization, hashing and identity
 
@@ -894,29 +1192,119 @@ The request hash covers the complete normalized request, including:
 
 It excludes no computation-authority field.
 
-### 11.3 Layout hash
+### 11.3 Layout hash (no self-reference, ordered build pipeline)
 
-The layout hash covers:
+The layout hash pipeline MUST run in the **exact** order below. No
+`layout_hash` value may be computed before the corresponding
+`layout_hash_payload` is finalized; no `layout_id` may be computed
+before `layout_hash` exists; no final `provenance` may be constructed
+before `layout_hash` exists; no final `TubeLayout` may be assembled
+before both `layout_id` and the final `provenance` exist.
 
-- output schema version;
-- request hash;
-- all accepted positions in canonical order, including position IDs and lattice
-  indices;
-- tube-hole and physical-tube counts;
-- boundary and exclusion rejection counts;
-- complete exclusion audit;
-- complete warnings and empty blockers;
-- complete deferred-capability set;
-- complete provenance.
+#### 11.3.1 `ProvenancePreHashProjection`
 
-`layout_id` is:
+The deterministic core builds a **provenance projection that
+explicitly excludes everything that depends on `layout_hash` or
+`layout_id`**. The projection's exact field set is:
 
-```text
-UUIDv5(
-  UUID_NAMESPACE_URL,
-  "urn:hxforge:task021:tube-layout:v1:" + layout_hash
-)
-```
+- `task_id`: exact string `TASK-021`;
+- `design_contract_path`: the relative path of this design contract;
+- `task020_configuration_id`: copied from the verified configuration;
+- `task020_configuration_hash`: copied from the verified configuration;
+- the complete TASK-020 case authority (by reference / exact fields);
+- `tube_geometry_id`, `tube_geometry_revision`, `tube_geometry_record_hash`,
+  and the complete `tube_geometry.source_binding`;
+- `layout_rule_profile_id`, `layout_rule_rule_id`, `layout_rule_rule_version`,
+  `layout_rule_rule_artifact_canonical_hash`, `layout_rule_source_class`,
+  `layout_rule_approval_status`, the complete
+  `layout_rule_provenance_edge_ids`, the complete
+  `layout_rule_evidence_refs`, and (when present) the complete
+  `rule_pack_identity` triple;
+- `envelope_evidence_refs`;
+- `exclusion_zone_evidence_refs`;
+- (when present) `u_tube_pairing_evidence_refs`;
+- `software_version`;
+- `git_commit` (supplied by the calling application — provenance
+  metadata, not a runtime-now value);
+- `request_hash`;
+- the closed `deferred_capabilities` set;
+
+The projection **MUST NOT** contain:
+
+- `layout_id`;
+- `layout_hash`;
+- the final provenance `layout_hash` entry (which is added only after
+  `layout_hash` is computed, in step 5 below).
+
+The projection **MUST NOT** contain runtime-now values: no
+`timestamp-now`, no current local time, no `os.urandom()` output, no
+host / process / filesystem metadata. All fields are either copied
+from verified upstream input (snapshots) or filled with stable
+compile-time values (schema version, design contract path, deferred
+set, composite ordering constants).
+
+The resulting object is `provenance_pre_hash` and is the value that
+immediately precedes the `layout_hash` step.
+
+#### 11.3.2 `layout_hash_payload`
+
+The exact field set of `layout_hash_payload` is:
+
+- `output_schema_version`: exact string `task021.tube-layout.v1`;
+- `request_hash`: from §11.2;
+- the canonical accepted-positions array in §7.9 order, including
+  `position_id`, lattice index `(u, v)` and quantized coordinates;
+- `tube_hole_count`;
+- `physical_tube_count`;
+- `boundary_rejection_count`;
+- `exclusion_rejection_count`;
+- the canonical `exclusion_audit` array in §9.2 order;
+- the canonical `warnings` array in the deterministic order of §10.2.5;
+- `blockers`: the canonical empty array (a valid layout has no
+  blockers — this field is explicit so a bug that ever flips a valid
+  layout to a blocked-after-the-fact state is impossible to hide);
+- the closed `deferred_capabilities` set;
+- `provenance_pre_hash`: the §11.3.1 projection **exactly**.
+
+The payload **MUST NOT** contain:
+
+- `layout_id`;
+- `layout_hash` itself;
+- any field that references or embeds the final `provenance.layout_hash`
+  entry.
+
+#### 11.3.3 Build order (six steps, all six MUST run, in this exact order)
+
+1. **Build `provenance_pre_hash`** — the §11.3.1 projection, from
+   verified snapshots and stable compile-time values only.
+2. **Build `layout_hash_payload`** — the §11.3.2 payload, ending with
+   `provenance_pre_hash` embedded inside.
+3. **Compute `layout_hash`** = `SHA-256(canonical_json(layout_hash_payload))`
+   under §11.1 canonicalization. The byte length is 32 bytes hex-encoded to
+   64 lowercase hex characters.
+4. **Compute `layout_id`** = `UUIDv5(UUID_NAMESPACE_URL,
+   "urn:hxforge:task021:tube-layout:v1:" + layout_hash)`.
+5. **Construct final `provenance`** = `provenance_pre_hash` plus the
+   single new entry `layout_hash` (lowercase SHA-256 hex). Nothing else
+   is added.
+6. **Construct final `TubeLayout`** — the layout object of §9.3 with
+   `layout_id`, `layout_hash` and the final `provenance` populated.
+
+The kernel MUST refuse to compute `layout_hash` while any field in
+`layout_hash_payload` is missing. The kernel MUST refuse to compute
+`layout_id` until `layout_hash` exists. The kernel MUST refuse to add
+`layout_hash` to the final provenance until step 3 has completed. The
+kernel MUST refuse to assemble the final `TubeLayout` until step 5 is
+complete.
+
+A test expectation covers each of:
+
+- `layout_hash_payload` contains no `layout_hash` element and no
+  `layout_id` element;
+- `layout_hash_payload["provenance_pre_hash"]` contains no `layout_hash`
+  and no `layout_id`;
+- the final `provenance` object contains `layout_hash` only **after**
+  step 3 has completed, and never earlier.
 
 ### 11.4 Blocked-result identity
 
@@ -932,6 +1320,117 @@ point of failure:
 
 It must not be derived from a three-field blocker key or a partial projection.
 
+### 11.5 `UTubePairingPlan.pairing_plan_hash` (canonicalized)
+
+`UTubePairingPlan.pairing_plan_hash` is a lowercase 64-character
+SHA-256 hex digest computed under §11.1 canonicalization. The hash
+builds from a strict ordering pipeline; a hash mismatch or any
+non-conforming input is a `STL_UTUBE_PAIRING_INVALID` blocker
+(distinguished by `message_key`).
+
+#### 11.5.1 Canonical leg
+
+Each leg is a `LatticeIndex`. Its canonical form for hashing is:
+
+```text
+{"u": <canonical_integer>, "v": <canonical_integer>}
+```
+
+The integers MUST be present, MUST be valid `int` (no booleans), and
+MUST NOT carry any extra fields.
+
+#### 11.5.2 Canonical pair
+
+Each `UTubePair` (after leg normalization) is canonicalized as:
+
+1. Legs are sorted by the numeric tuple `(u, v)` in **lexicographic
+   Decimal-numerical order**. The leg with the smaller numeric tuple
+   becomes `leg_a`; the larger becomes `leg_b`. If both legs are equal,
+   the pair is **self-pairing** and the request MUST be rejected with
+   `STL_UTUBE_PAIRING_INVALID` (message_key `u_tube_pair_self`).
+2. The canonical pair payload contains exactly:
+   - `pair_id` (non-empty string);
+   - canonical `leg_a` from §11.5.1;
+   - canonical `leg_b` from §11.5.1;
+   - `evidence_refs`: the pair's array, **sorted** and **duplicate-free**.
+3. `pair_id` MUST be non-empty and **globally unique** across the
+   whole plan. A duplicate `pair_id` blocks with `STL_UTUBE_PAIRING_INVALID`
+   (message_key `u_tube_pair_duplicate_id`).
+
+Any of the following rejection conditions also triggers
+`STL_UTUBE_PAIRING_INVALID` with the listed `message_key`:
+
+- `u_tube_pair_unknown_leg` — `leg_a` or `leg_b` references an unknown
+  index (an index not in the accepted positions set);
+- `u_tube_pair_leg_reused` — the same `(u, v)` leg appears in more
+  than one pair after normalization, or is omitted entirely (a leg
+  appears in zero pairs);
+- `u_tube_pair_missing_coverage` — at least one accepted position is
+  not covered by any canonical pair (the coverage test is performed
+  in the normalized step that already exists, but the canonical
+  coverage representation is the canonical-pairs array).
+
+#### 11.5.3 Pair ordering (independent of input order)
+
+Canonical pairs MUST be sorted by the lexicographic composite key:
+
+```text
+(leg_a.u, leg_a.v, leg_b.u, leg_b.v, pair_id)
+```
+
+using **Decimal-numerical** order on each numeric element and
+**lexicographic** order on `pair_id`. The pipeline MUST NOT rely on
+the input array order or on `hash()` / `id()` of any object.
+
+#### 11.5.4 `pairing_plan_hash_payload`
+
+The exact field set of `pairing_plan_hash_payload` is:
+
+- `schema_version`: exact `task021.u-tube-pairing.v1`;
+- `pairs`: the canonical-pairs array from §11.5.3;
+- `plan_evidence_refs`: the `UTubePairingPlan.evidence_refs` array,
+  **sorted and duplicate-free**.
+
+The payload **MUST NOT** contain:
+
+- `pairing_plan_hash` itself;
+- any upstream hash field;
+- any field outside the three above.
+
+The hash is:
+
+```text
+pairing_plan_hash = SHA-256(canonical_json(pairing_plan_hash_payload))
+```
+
+#### 11.5.5 Validation order (binding)
+
+The pairing-plan validator MUST run the following stages in this
+order. A failure at any stage halts the pipeline and emits
+`STL_UTUBE_PAIRING_INVALID` with the matching `message_key`:
+
+1. raw shape and field-type validation (`message_key`:
+   `u_tube_pair_raw_shape_invalid`);
+2. leg normalization into the canonical `{u, v}` form
+   (`message_key`: `u_tube_pair_leg_normalization_invalid`);
+3. duplicate-`pair_id`, self-pairing, unknown-leg, leg-reuse and
+   missing-coverage checks (`message_key` from the matching condition
+   in §11.5.2);
+4. canonical pair ordering as in §11.5.3;
+5. canonical payload assembly as in §11.5.4;
+6. `pairing_plan_hash` recomputation;
+7. comparison of recomputed vs supplied `pairing_plan_hash`. A mismatch
+   is `STL_UTUBE_PAIRING_HASH_MISMATCH` (this code is preserved as-is
+   because it carries the exact semantic of "hash recomputation
+   mismatch" and is **not** to be downgraded to the
+   invalid-pairing code).
+
+After the seven stages complete cleanly, the normalized pairing plan,
+**including** its `pairing_plan_hash`, is then fed forward into the
+normalized request hash (§11.2). The kernel MUST NOT skip a stage
+because the hash matches an earlier probed value; the stages are
+mandatory.
+
 ## 12. Provenance contract
 
 The valid result provenance object contains:
@@ -941,9 +1440,17 @@ The valid result provenance object contains:
 - `task020_configuration_id`;
 - `task020_configuration_hash`;
 - complete TASK-020 case authority;
-- tube geometry ID, revision, record hash and source binding;
-- layout rule profile, rule identity, rule artifact hash, source class, approval
-  status, rule-pack identity when present, provenance edge IDs and evidence refs;
+- `tube_geometry_id`, `tube_geometry_revision`, `tube_geometry_record_hash`
+  (the upstream record-level identity), `tube_geometry_snapshot_hash`
+  (the TASK-021-recalculable identity) and the complete
+  `tube_geometry.source_binding`;
+- `layout_rule_profile_id`, `layout_rule_rule_id`, `layout_rule_rule_version`,
+  `layout_rule_rule_artifact_canonical_hash` (the upstream
+  artifact-level identity), `layout_rule_source_class`,
+  `layout_rule_approval_status`, `layout_rule_snapshot_hash` (the
+  TASK-021-recalculable identity), complete `provenance_edge_ids` and
+  complete `evidence_refs`, and (when present) the complete
+  `rule_pack_identity` triple;
 - envelope evidence refs;
 - exclusion-zone evidence refs;
 - U-tube pairing evidence refs when present;
@@ -952,6 +1459,16 @@ The valid result provenance object contains:
 - `request_hash`;
 - `layout_hash`;
 - warnings and deferred-capability declarations.
+
+The provenance object records **two distinct** identity triples per
+upstream artifact: the upstream record / artifact body hash
+(`tube_geometry_record_hash`, `layout_rule_rule_artifact_canonical_hash`,
+and (when present) `rule_pack_canonical_hash`) **and** the
+TASK-021-recalculable `snapshot_hash` over the snapshot object. They
+are not interchangeable; a hash recomputation failure on either side
+is a different blocker code (§10.1). The TASK-021 deterministic core
+recalculates only `snapshot_hash`; upstream artifact hashes are
+admitted as supplied by the adapter (see §6.2, §6.4, §6.5).
 
 TASK-021 does not generate a new source claim. It records the supplied approved
 sources and the deterministic transformation it performed.
@@ -1120,9 +1637,45 @@ A future implementation must include tests that prove at least:
 35. a valid output contains no shell-diameter field or value;
 36. pass membership remains explicitly `NOT_COMPUTABLE`;
 37. no filesystem, database or network call occurs in the core;
-38. TASK-019 Amendment 002-K assets are not imported or mutated;
-39. TASK-022 through TASK-039 remain unallocated;
-40. frozen design boundaries are represented in architecture tests.
+- TASK-019 Amendment 002-K assets are not imported or mutated;
+- TASK-022 through TASK-039 remain unallocated;
+- the inverse-basis bound `U = ceil(abs(B_00) * d_x + abs(B_01) * d_y) + 1`,
+  `V = ceil(abs(B_10) * d_x + abs(B_11) * d_y) + 1` covers every
+  envelope-interior lattice point on both square and triangular bases,
+  and the synthetic regression vector `(u=-57, v=115)` on a
+  `TRIANGULAR` lattice with `pitch=1, rho=100` lies strictly inside
+  the envelope (`x^2 + y^2 = 9919 < rho^2 = 10000`);
+- `candidate_count = (2 * U + 1) * (2 * V + 1)` is computed before any
+  coordinate is generated and is blocked under
+  `STL_ENUMERATION_LIMIT_EXCEEDED` when it exceeds
+  `maximum_candidate_positions`;
+- a non-invertible basis (`det == 0`) blocks with
+  `STL_BASIS_NON_INVERTIBLE` before any enumeration;
+- `ApprovedTubeGeometrySnapshot.snapshot_hash` is recalculated by the
+  core and verified, and any mismatch is `STL_TUBE_GEOMETRY_SNAPSHOT_HASH_MISMATCH`;
+- `LayoutRuleAuthoritySnapshot.snapshot_hash` is recalculated by the
+  core and verified, and any mismatch is `STL_LAYOUT_RULE_SNAPSHOT_HASH_MISMATCH`;
+- TASK-021 core does **not** claim to recalculate upstream
+  `record_hash` / `rule_artifact_canonical_hash` /
+  `rule_pack_canonical_hash` (those are verified by the adapter);
+- the `layout_hash_payload` has no self-reference: no `layout_hash`
+  element, no `layout_id` element, and the embedded
+  `provenance_pre_hash` has no `layout_hash` and no `layout_id`;
+- the final `provenance` object receives `layout_hash` only **after**
+  the `layout_hash` step completes (six-step order, §11.3.3);
+- `pairing_plan_hash` is computed over the canonical payload of
+  §11.5.4 only (no `pairing_plan_hash` element included in its own
+  payload), pair ordering is independent of input order, legs are
+  normalized, `pair_id`s are unique, self-pairing is blocked, and the
+  seven-stage validation pipeline of §11.5.5 runs to completion before
+  the plan enters `request_hash`;
+- each closed warning of §10.2 emits under its stated trigger
+  condition only, carries the exact five-field shape and exact
+  field_path / message_key / sorted evidence_refs / canonical
+  details specified for it, is suppressed on a `BLOCKED` result whose
+  upstream evidence was not validated, and is generated before
+  `layout_hash`;
+- frozen design boundaries are represented in architecture tests.
 
 Synthetic mathematical fixtures may use small, internally authored Decimal
 values. They are not engineering Golden values and must not claim external
