@@ -24,9 +24,11 @@ This file exercises that three-layer boundary.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -328,3 +330,254 @@ def test_blocked_returned_by_canonical_raw_is_none_with_non_string_keys() -> Non
 def test_canonical_raw_handles_dict_with_floats_via_none() -> None:
     raw = {"radius": 0.5}
     assert canonical_raw_json_or_none(raw) is None
+
+
+# --------------------------------------------------------------------------- #
+# Round 8 §P0-1 / §P0-2 — detached immutable snapshot invariants
+# ---------------------------------------------------------------------------
+
+
+def test_round8_frozen_json_array_detached_from_input_list() -> None:
+    """Calling-list mutation after construction MUST NOT affect the marker."""
+    source = [1, 2]
+    node = FrozenJsonArray(source)
+    source.append(3)
+    assert node.values == (1, 2)
+    assert isinstance(node.values, tuple)
+
+
+def test_round8_frozen_json_array_detached_for_nested_marker() -> None:
+    """Nested-marker elements are accepted via reference; mutating the
+    outer caller list MUST NOT change the marker."""
+    nested = FrozenJsonObject({"a": 1})
+    source = [nested]
+    node = FrozenJsonArray(source)
+    source.clear()
+    assert len(node.values) == 1
+    assert node.values[0] is nested
+
+
+def test_round8_frozen_json_object_detached_from_input_dict() -> None:
+    """Caller mutation of the input dict MUST NOT affect the marker."""
+    source = {"a": 1, "b": 2}
+    node = FrozenJsonObject(source)
+    source["a"] = 999
+    assert node.values["a"] == 1
+    assert node.values["b"] == 2
+
+
+def test_round8_frozen_json_object_detached_from_mapping_proxy_backing() -> None:
+    """Round 8 §P0-2 — caller mutation through a MappingProxyType that
+    shares its backing dict with a caller-owned dict MUST NOT affect the
+    marker."""
+    source: dict[str, Any] = {"a": 1, "b": 2}
+    proxy: Any = MappingProxyType(source)
+    node = FrozenJsonObject(proxy)
+    source["a"] = 999
+    assert node.values["a"] == 1
+    assert node.values["b"] == 2
+
+
+def test_round8_frozen_json_object_keys_sorted_after_detach() -> None:
+    """Round 8 §P0-2 — keys are sorted at construction."""
+    node = FrozenJsonObject({"z": 1, "a": 2, "m": 3})
+    assert list(node.values.keys()) == ["a", "m", "z"]
+
+
+def test_round8_factory_and_manual_marker_are_equivalent() -> None:
+    """Round 8 §P0-3 — ``strict_public_json_snapshot({...})`` and a
+    manually constructed ``FrozenJsonObject({...})`` MUST be
+    equivalent in container marker type, primitive output, canonical
+    hash, and immunity to caller mutation."""
+    factory_node = strict_public_json_snapshot({"b": 2, "a": [1]})
+    manual_node = FrozenJsonObject({"b": 2, "a": FrozenJsonArray([1])})
+    assert isinstance(factory_node, FrozenJsonObject)
+    assert isinstance(manual_node, FrozenJsonObject)
+    assert internal_frozen_to_primitive(factory_node) == {
+        "a": [1],
+        "b": 2,
+    }
+    assert internal_frozen_to_primitive(manual_node) == {
+        "a": [1],
+        "b": 2,
+    }
+    assert internal_frozen_to_primitive(factory_node) == internal_frozen_to_primitive(manual_node)
+    # Both must use sorted key order regardless of construction style.
+    assert list(factory_node.values.keys()) == ["a", "b"]
+    assert list(manual_node.values.keys()) == ["a", "b"]
+
+
+def test_round8_factory_and_manual_markers_share_canonical_hash() -> None:
+    """Round 8 §P0-3 — both styles produce the same canonical hash."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import _reduce_for_hash
+
+    factory_node = strict_public_json_snapshot({"b": 2, "a": [1]})
+    manual_node = FrozenJsonObject({"b": 2, "a": FrozenJsonArray([1])})
+    assert _reduce_for_hash(factory_node) == _reduce_for_hash(manual_node)
+
+
+def test_round8_factory_node_is_immune_to_caller_dict_mutation() -> None:
+    """Round 8 §P0-3 — ``strict_public_json_snapshot`` must produce a
+    detached marker that is immune to subsequent mutation of the
+    caller's source dict.
+    """
+    source = {"a": 1}
+    node = strict_public_json_snapshot(source)
+    source["a"] = 2
+    assert node.values["a"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# Round 8 §P1-2 — hash reducer dataclass dead-path removed
+# ---------------------------------------------------------------------------
+
+
+def test_round8_reduce_for_hash_rejects_raw_dataclass() -> None:
+    """Round 8 §P1-2 — the R7 ``dataclass`` branch is gone; raw
+    dataclass instances MUST be rejected with ``CanonicalizationError``.
+    """
+    import dataclasses
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import _reduce_for_hash
+
+    @dataclasses.dataclass(frozen=True)
+    class Dummy:
+        value: int
+
+    with pytest.raises(CanonicalizationError):
+        _reduce_for_hash(Dummy(1))
+
+
+def test_round8_reduce_for_hash_accepts_force_frozen_canonical_dict() -> None:
+    """Round 8 §P1-2 — freezing the dataclass explicitly via Layer A
+    produces a hashable primitive."""
+    import dataclasses
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        _reduce_for_hash,
+        force_frozen_canonical,
+    )
+
+    @dataclasses.dataclass(frozen=True)
+    class Dummy:
+        value: int
+
+    frozen = force_frozen_canonical({"value": 1})
+    assert _reduce_for_hash(frozen) == {"value": 1}
+
+
+def test_round8_reduce_for_hash_rejects_raw_tuple() -> None:
+    """Round 8 §P1-2 — raw tuple is still rejected (preserved from R7)."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import _reduce_for_hash
+
+    with pytest.raises(CanonicalizationError):
+        _reduce_for_hash(("a", "b"))
+
+
+def test_round8_reduce_for_hash_rejects_raw_mapping_proxy_type() -> None:
+    """Round 8 §P1-2 — raw MappingProxyType is rejected (must be wrapped
+    in FrozenJsonObject first)."""
+    from types import MappingProxyType
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import _reduce_for_hash
+
+    with pytest.raises(CanonicalizationError):
+        _reduce_for_hash(MappingProxyType({"a": 1}))
+
+
+def test_round8_reduce_for_hash_rejects_non_string_key_dict() -> None:
+    """Round 8 §P1-2 — non-string key dict is rejected; this is enforced
+    via the FrozenJsonObject closed-input invariant at construction.
+    """
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonObject,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        FrozenJsonObject({1: "a"})  # type: ignore[arg-type]
+
+
+# --------------------------------------------------------------------------- #
+# Round 8 §P1-1 — explicit Layer-C converter (freeze_known_*)
+# ---------------------------------------------------------------------------
+
+
+def test_round8_freeze_known_fragment_accepts_pre_frozen_object() -> None:
+    """Round 8 §P1-1 — pre-frozen FrozenJsonObject passes through."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        freeze_known_fragment,
+    )
+
+    pre_frozen = strict_public_json_snapshot({"a": [1]})
+    out = freeze_known_fragment(pre_frozen)
+    assert out is pre_frozen
+
+
+def test_round8_freeze_known_fragment_freezes_raw_dict() -> None:
+    """Round 8 §P1-1 — raw dict is deeply frozen to FrozenJsonObject."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        freeze_known_fragment,
+    )
+
+    out = freeze_known_fragment({"a": [1]})
+    assert isinstance(out, FrozenJsonObject)
+    assert internal_frozen_to_primitive(out) == {"a": [1]}
+
+
+def test_round8_freeze_known_optional_handles_none() -> None:
+    """Round 8 §P1-1 — None passes through."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        freeze_known_optional_fragment,
+    )
+
+    assert freeze_known_optional_fragment(None) is None
+
+
+def test_round8_freeze_known_optional_handles_pre_frozen() -> None:
+    """Round 8 §P1-1 — pre-frozen marker passes through unchanged."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        freeze_known_optional_fragment,
+    )
+
+    pre_frozen = strict_public_json_snapshot({"a": 1})
+    out = freeze_known_optional_fragment(pre_frozen)
+    assert out is pre_frozen
+
+
+def test_round8_freeze_known_optional_rejects_raw_tuple() -> None:
+    """Round 8 §P1-1 — raw tuple is rejected."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        freeze_known_optional_fragment,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_known_optional_fragment(("a", "b"))
+
+
+def test_round8_freeze_known_optional_rejects_decimal() -> None:
+    """Round 8 §P1-1 — Decimal is rejected."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        freeze_known_optional_fragment,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_known_optional_fragment(Decimal("1.5"))
+
+
+# --------------------------------------------------------------------------- #
+# Round 8 §P0-1 / §P0-2 — direct mutation must fail
+# ---------------------------------------------------------------------------
+
+
+def test_round8_frozen_json_array_setattr_is_blocked() -> None:
+    """dataclass(frozen=True) prevents ``node.values = (...)``."""
+    node = FrozenJsonArray([1, 2])
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        node.values = (3, 4)  # type: ignore[misc]
+
+
+def test_round8_frozen_json_object_setattr_is_blocked() -> None:
+    """dataclass(frozen=True) prevents ``node.values = {...}``."""
+    node = FrozenJsonObject({"a": 1})
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        node.values = type(node.values)({"a": 2})  # type: ignore[misc]

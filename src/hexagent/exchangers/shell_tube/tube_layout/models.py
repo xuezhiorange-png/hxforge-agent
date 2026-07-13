@@ -284,23 +284,32 @@ class MessageEntry:
     details: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
-        """Round 4 §6.2: deep-freeze ``details`` to a detached snapshot.
+        """Round 8 §P1-1 — Layer-C deep-freeze ``details`` to a detached snapshot.
 
         Caller-mutation after construction MUST NOT influence:
+
         - ``warnings[*].details``
         - ``blockers[*].details``
         - ``request_hash`` / ``layout_hash`` / ``provenance_pre_hash``
         - any consumer of the canonical hash pipeline
 
-        Accepts None, ordinary canonical dict/list, OR a previously-frozen
-        shape; rejects everything else with ``PublicCanonicalDomainError``.
+        Accepts:
+
+        - ``None``
+        - ordinary public canonical dict / list
+        - already-frozen ``FrozenJsonObject`` / ``FrozenJsonArray``
+        - canonical atoms (``None`` / ``bool`` / ``int`` / ``str``)
+
+        Rejects everything else (``raw tuple`` / ``raw MappingProxyType`
+        / ``Decimal`` / ``float`` / ``bytes`` / arbitrary object /
+        non-string-keyed mapping) with ``PublicCanonicalDomainError``.
         """
 
-        from .canonical import force_frozen_optional_canonical
+        from .canonical import freeze_known_optional_fragment
 
         if self.details is None:
             return
-        frozen = force_frozen_optional_canonical(self.details)
+        frozen = freeze_known_optional_fragment(self.details)
         if frozen is not self.details:
             object.__setattr__(self, "details", frozen)
 

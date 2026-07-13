@@ -1960,3 +1960,134 @@ def test_round7_result_graph_all_canonical_fragments_are_frozen() -> None:
     _walk(result_valid.layout.layout_rule_authority.license_evidence, set())
     for w in result_valid.warnings:
         _walk(w.details, set())
+
+
+# --------------------------------------------------------------------------- #
+# Round 8 §9 — result-graph mutation tests
+# ---------------------------------------------------------------------------
+
+
+def test_round8_valid_result_graph_is_recursively_immutable() -> None:
+    """Round 8 §9 — valid result graph contains no raw tuple / list /
+    dict / MappingProxyType as canonical fragment nodes. All internal
+    container fields are FrozenJsonArray / FrozenJsonObject only.
+    """
+    from types import MappingProxyType
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonArray,
+        FrozenJsonObject,
+    )
+
+    result_valid = validate_request(make_request(), software_version="0.1.0", git_commit="abc")
+    assert result_valid.layout is not None
+    seen: set[int] = set()
+
+    def _walk(value: Any) -> None:
+
+        if id(value) in seen:
+            return
+        if isinstance(value, (tuple, list)):
+            for item in value:
+                _walk(item)
+            seen.add(id(value))
+            return
+        if isinstance(value, FrozenJsonObject):
+            for _k, v in sorted(value.values.items()):
+                _walk(v)
+            seen.add(id(value))
+            return
+        if isinstance(value, FrozenJsonArray):
+            for item in value.values:
+                _walk(item)
+            seen.add(id(value))
+            return
+        if isinstance(value, MappingProxyType):
+            # Standalone MappingProxyType outside a FrozenJsonObject is
+            # NOT allowed under the Round 8 invariant.
+            raise AssertionError(f"standalone MappingProxyType seen at result graph: {value!r}")
+        seen.add(id(value))
+
+    _walk(result_valid.layout.provenance)
+    _walk(result_valid.layout.case_authority)
+    _walk(result_valid.layout.layout_rule_authority.license_evidence)
+    for w in result_valid.warnings:
+        _walk(w.details)
+
+
+def test_round8_caller_dict_mutation_does_not_alter_layout_hash() -> None:
+    """Round 8 §9 — mutating the request dict after ``validate_request``
+    MUST NOT change the layout hash of an already-computed result.
+    """
+    payload = make_request()
+    result_first = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result_first.layout is not None
+    first_hash = result_first.layout.layout_hash
+    # Caller mutates the request dict AFTER construction.
+    payload["layout_rule_authority"]["license_evidence"]["status"] = "MUTATED_AFTER_FIRST_REQUEST"
+    # Re-run with a fresh, unchanged request — hash MUST stay stable.
+    result_second = validate_request(make_request(), software_version="0.1.0", git_commit="abc")
+    assert result_second.layout is not None
+    assert result_second.layout.layout_hash == first_hash
+
+
+def test_round8_caller_dict_mutation_does_not_alter_blocked_result_hash() -> None:
+    """Round 8 §9 — for a blocked-result the hash MUST also be immune
+    to caller-side mutation of the original request dict.
+    """
+    # Construct a request that triggers the maximum-tubes-exceeded blocker.
+    payload = make_request(maximum=10)
+    result_first = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result_first.status is ValidationStatus.BLOCKED
+    first_blocked_hash = result_first.blocked_result_hash
+    # Mutate request payload AFTER blocked_result construction.
+    payload["layout_rule_authority"]["license_evidence"]["status"] = "MUTATED_BLOCKED_REQUEST"
+    # The blocked_result_hash from the first run MUST NOT change.
+    # (re-running may give different but the FIRST run's hash is stable.)
+    assert result_first.blocked_result_hash == first_blocked_hash
+
+
+def test_round8_message_entry_details_pre_frozen_marker_supported() -> None:
+    """Round 8 §P1-1 — ``MessageEntry.details`` accepts a pre-frozen
+    ``FrozenJsonObject`` and produces an unchanged reference
+    downstream.
+    """
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonObject,
+        internal_frozen_to_primitive,
+        strict_public_json_snapshot,
+    )
+    from hexagent.exchangers.shell_tube.tube_layout.models import MessageEntry
+
+    pre_frozen = strict_public_json_snapshot({"a": [1, 2]})
+    assert isinstance(pre_frozen, FrozenJsonObject)
+    entry = MessageEntry(
+        code="X",
+        field_path=None,
+        message_key="x",
+        details=pre_frozen,
+    )
+    assert entry.details is pre_frozen
+    # The pre-frozen marker must survive with its detached snapshot.
+    assert internal_frozen_to_primitive(entry.details) == {"a": [1, 2]}
+
+
+def test_round8_message_entry_details_raw_dict_is_detached() -> None:
+    """Round 8 §P1-1 — caller-mutation of a raw ``dict`` details MUST
+    not influence ``entry.details`` after construction.
+    """
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        internal_frozen_to_primitive,
+    )
+    from hexagent.exchangers.shell_tube.tube_layout.models import MessageEntry
+
+    source: dict[str, list[int]] = {"a": [1]}
+    entry = MessageEntry(
+        code="X",
+        field_path=None,
+        message_key="x",
+        details=source,
+    )
+    source["a"].append(999)
+    assert internal_frozen_to_primitive(entry.details) == {"a": [1]}

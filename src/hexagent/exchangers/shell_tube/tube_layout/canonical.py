@@ -120,7 +120,8 @@ class NonCanonicalFragmentError(CanonicalizationError):
 
 @dataclass(frozen=True)
 class FrozenJsonArray:
-    """Round 5 §6 + Round 6 §4 + Round 7 type-system unification.
+    """Round 5 §6 + Round 6 §4 + Round 7 type-system unification
+    + Round 8 §P0-1 detached immutable snapshot invariant.
 
     ONE of the TWO Layer-B internal canonical container markers
     (alongside :class:`FrozenJsonObject`). Nested elements must
@@ -131,12 +132,34 @@ class FrozenJsonArray:
     arbitrary objects, dataclass, Enum, ``Decimal`` are NOT
     acceptable here — the closed Layer-B value type is exactly
     ``canonical atom | FrozenJsonArray | FrozenJsonObject``.
+
+    Detached immutable snapshot invariant (Round 8 §P0-1):
+    :func:`__post_init__` MUST unconditionally reconstruct the
+    backing ``values`` tuple as a fresh detached tuple, regardless of
+    whether the caller passed a ``list``, ``tuple``, or generator.
+    A caller that mutates their original ``list`` / ``tuple``
+    reference AFTER constructing this marker MUST NOT be able to
+    affect the marker. Nested internal markers are accepted via
+    reference (their own ``__post_init__`` already guarantees
+    invariant), but no mutable container reference may be retained.
     """
 
     values: tuple[Any, ...]  # Layer-B closed-set only — verified at construction
 
     def __post_init__(self) -> None:
-        for index, item in enumerate(self.values):
+        # Round 8 §P0-1 — accept ``tuple`` or ``list`` (defensive
+        # copy in either case) and reject any other iterable type.
+        input_source = self.values
+        if isinstance(input_source, tuple):
+            candidate: tuple[Any, ...] = tuple(input_source)
+        elif isinstance(input_source, list):
+            candidate = tuple(input_source)
+        else:
+            raise PublicCanonicalDomainError(
+                f"FrozenJsonArray 'values' must be a tuple or list; got "
+                f"{type(input_source).__name__}"
+            )
+        for index, item in enumerate(candidate):
             if _is_layer_b_value(item):
                 continue
             raise PublicCanonicalDomainError(
@@ -144,11 +167,14 @@ class FrozenJsonArray:
                 f"{type(item).__name__} is not a Layer-B canonical atom "
                 f"or nested internal marker"
             )
+        # Round 8 §P0-1 — always rewrite ``values`` to the detached
+        # tuple, breaking any alias to the caller's container.
+        object.__setattr__(self, "values", candidate)
 
 
 @dataclass(frozen=True)
 class FrozenJsonObject:
-    """Round 7 (P1-1) — second Layer-B internal canonical container marker.
+    """Round 7 (P1-1) + Round 8 §P0-2 detached immutable snapshot invariant.
 
     ``FrozenJsonObject`` is the explicit wrapper for an internal-frozen
     mapping. Its ``values`` field is a ``MappingProxyType`` (used as a
@@ -162,23 +188,53 @@ class FrozenJsonObject:
     pass it through the internal reducer pipeline, or pass it through
     the Layer-A public boundary (which will reject ``MappingProxyType``
     outright — wrap first).
+
+    Detached immutable snapshot invariant (Round 8 §P0-2):
+    :func:`__post_init__` MUST unconditionally rebuild backing data
+    into a fresh ordinary ``dict`` and re-wrap it in a fresh
+    ``MappingProxyType``. Callers MUST NOT retain the ability to
+    mutate the marker through either (a) a raw ``dict`` passed in, or
+    (b) a ``MappingProxyType`` whose backing ``dict`` they still
+    hold. This closes the backing-alias attack on shared proxies.
     """
 
     values: MappingProxyType[str, Any]  # Layer-B closed-set only
 
     def __post_init__(self) -> None:
-        for key, item in self.values.items():
+        # Round 8 §P0-2 — accept a regular ``dict`` or a raw
+        # ``MappingProxyType`` (both share a shape that can be walked
+        # via ``.items()``) and copy into a brand-new ``dict``.
+        input_source = self.values
+        if isinstance(input_source, (MappingProxyType, dict)):
+            backing_items = input_source.items()
+        else:
+            raise PublicCanonicalDomainError(
+                f"FrozenJsonObject 'values' must be a dict or MappingProxyType; "
+                f"got {type(input_source).__name__}"
+            )
+        # Round 8 §P0-2 — build a brand-new backing dict. No alias to
+        # the caller-owned dict remains after this block.
+        rebuilt: dict[str, Any] = {}
+        for key, item in backing_items:
             if not isinstance(key, str):
                 raise PublicCanonicalDomainError(
                     f"FrozenJsonObject key {key!r} of type {type(key).__name__} is not a string"
                 )
-            if _is_layer_b_value(item):
-                continue
-            raise PublicCanonicalDomainError(
-                f"FrozenJsonObject value for key {key!r} of type "
-                f"{type(item).__name__} is not a Layer-B canonical atom "
-                f"or nested internal marker"
-            )
+            if not _is_layer_b_value(item):
+                raise PublicCanonicalDomainError(
+                    f"FrozenJsonObject value for key {key!r} of type "
+                    f"{type(item).__name__} is not a Layer-B canonical atom "
+                    f"or nested internal marker"
+                )
+            rebuilt[key] = item
+        # Round 8 §P0-2 — always rewrite ``values`` to a fresh
+        # ``MappingProxyType`` wrapping a sorted-key copy. No caller
+        # alias can remain.
+        object.__setattr__(
+            self,
+            "values",
+            MappingProxyType({key: rebuilt[key] for key in sorted(rebuilt)}),
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -396,6 +452,63 @@ def force_frozen_optional_canonical(value: Any | None) -> Any | None:
 
 
 # --------------------------------------------------------------------------- #
+# Layer C — explicit model-reduction converters (Round 8 §P1-1)
+# --------------------------------------------------------------------------- #
+
+
+def freeze_known_fragment(value: Any) -> Any:
+    """Round 8 §P1-1 — explicit Layer-C converter for known model fields.
+
+    Used by model ``__post_init__`` methods (and similar explicit
+    construction sites) that may receive EITHER a public-domain
+    value (``None`` / atom / ``list`` / string-keyed ``dict``) OR a
+    pre-frozen Layer-B marker (``FrozenJsonArray`` /
+    ``FrozenJsonObject`` / canonical atom). The converter:
+
+    - forwards atoms (``None`` / ``bool`` / ``int`` / ``str``) without
+      modification;
+    - forwards an already-Layer-B marker (``FrozenJsonArray`` /
+      ``FrozenJsonObject``) without modification (the marker's own
+      ``__post_init__`` already enforces invariant);
+    - deep-freezes an ordinary ``list`` into a Layer-B
+      :class:`FrozenJsonArray` (Layer A path);
+    - deep-freezes an ordinary string-keyed ``dict`` into a Layer-B
+      :class:`FrozenJsonObject` (Layer A path);
+    - rejects everything else (``raw tuple`` / ``raw MappingProxyType``
+      / ``Decimal`` / ``float`` / ``bytes`` / arbitrary object /
+      non-string-keyed mapping).
+
+    This is intentionally NOT a public Layer-A API — it is private to
+    the package and used only by ``MessageEntry.__post_init__`` and
+    similar explicit model construction sites that need to accept
+    BOTH public-domain input and pre-frozen Layer-B input.
+    """
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, (FrozenJsonArray, FrozenJsonObject)):
+        return value
+    if isinstance(value, list):
+        return force_frozen_canonical(value)
+    if isinstance(value, dict):
+        return force_frozen_canonical(value)
+    raise PublicCanonicalDomainError(
+        f"value of type {type(value).__name__} is not acceptable for a "
+        f"known model fragment; expected None / canonical atom / list / "
+        f"string-keyed dict / FrozenJsonArray / FrozenJsonObject"
+    )
+
+
+def freeze_known_optional_fragment(value: Any | None) -> Any | None:
+    """Round 8 §P1-1 — Layer-C optional counterpart to
+    :func:`freeze_known_fragment`. ``None`` passes through; any
+    non-None value is forwarded to :func:`freeze_known_fragment`.
+    """
+    if value is None:
+        return None
+    return freeze_known_fragment(value)
+
+
+# --------------------------------------------------------------------------- #
 # Layer B — internal helpers
 # --------------------------------------------------------------------------- #
 
@@ -472,41 +585,8 @@ def refreeze_internal_fragment(value: Any) -> Any:
     )
 
 
-def freeze_known_fragment(value: Any) -> Any:
-    """Layer-C explicit converter for dataclass ``__post_init__`` use.
-
-    Round 7 (Layer C): model ``__post_init__`` constructors receive
-    fields that may already be in the public Layer-A canonical form
-    (``dict`` / ``None``) or in the Layer-B internal form
-    (:class:`FrozenJsonArray` / :class:`FrozenJsonObject`). This
-    helper routes the input through the correct canonical path:
-
-    * ``None`` / canonical atoms → pass through.
-    * Public-domain ``list`` / string-keyed ``dict`` → call
-      :func:`force_frozen_canonical` (Layer A → Layer B).
-    * :class:`FrozenJsonArray` / :class:`FrozenJsonObject` → call
-      :func:`refreeze_internal_fragment` (Layer B idempotent walk).
-    * Anything else (``raw tuple`` / ``Decimal`` / arbitrary object /
-      etc.) → :class:`PublicCanonicalDomainError`.
-
-    This is NOT a public API and is not added to ``__all__``.
-    """
-
-    if value is None or _is_canonical_atom(value):
-        return value
-    if isinstance(value, (FrozenJsonArray, FrozenJsonObject)):
-        return refreeze_internal_fragment(value)
-    if isinstance(value, (list, dict)):
-        return force_frozen_canonical(value)
-    raise PublicCanonicalDomainError(
-        f"freeze_known_fragment rejected value of type "
-        f"{type(value).__name__}; allowed: canonical atoms / "
-        f"FrozenJsonArray / FrozenJsonObject / list / dict / None"
-    )
-
-
 # --------------------------------------------------------------------------- #
-# canonical_json — Layer-A serialization boundary
+# Layer C — explicit model-reduction converters (Round 8 §P1-1)
 # --------------------------------------------------------------------------- #
 
 
@@ -679,17 +759,30 @@ def sorted_unique_strings(values: Sequence[str], *, allow_empty: bool = True) ->
 def _reduce_for_hash(value: Any) -> Any:
     """Reduce a Layer-B value to a primitive form before hashing.
 
-    Round 7 (P0-2 / hash-boundary corrective): this helper accepts
-    ONLY canonical atoms / :class:`FrozenJsonArray` /
-    :class:`FrozenJsonObject` / ``dataclass`` (explicit
-    :func:`dataclass_to_mapping`) / ``Enum`` (``value.value``).
-    Raw ``tuple`` / raw ``list`` / raw ``dict`` /
-    ``MappingProxyType`` / arbitrary object / ``Decimal`` / ``bytes``
-    are all rejected with :class:`CanonicalizationError`. The previous
-    lenient ``Mapping`` branch was a security weakness: a raw
-    ``MappingProxyType`` is exactly the pre-R7 frozen-mapping shape,
-    not an explicit Layer-B marker, so it MUST be wrapped in
-    :class:`FrozenJsonObject` first to enter this hash path.
+    Round 8 §P1-2 — closed-input contract:
+
+    Accepts ONLY:
+
+    * canonical atoms (``None`` / ``bool`` / ``int`` / ``str``)
+    * :class:`FrozenJsonArray`
+    * :class:`FrozenJsonObject`
+
+    Rejects (with :class:`CanonicalizationError`):
+
+    * ``raw tuple`` / ``raw list`` / ``raw dict`` /
+      ``MappingProxyType`` / ``set`` / ``frozenset``
+    * ``dataclass`` / ``Enum`` / arbitrary object
+    * ``Decimal`` / ``float`` / ``bytes`` / ``bytearray`` /
+      ``memoryview``
+    * mapping with non-string keys
+
+    The historical R7 ``dataclass`` / ``Enum`` branches have been
+    removed (Round 8 §P1-2) — they were dead code paths, since the
+    recursive call ``_reduce_for_hash(dataclass_to_mapping(value))``
+    was fed a ``dict`` which is itself not a Layer-B node. All
+    callers now MUST deep-freeze their domain model fields via the
+    Layer-A boundary (or via :func:`freeze_known_fragment`) before
+    passing anything to this helper.
     """
     if value is None or isinstance(value, (bool, int, str)):
         return value
@@ -697,15 +790,13 @@ def _reduce_for_hash(value: Any) -> Any:
         return {key: _reduce_for_hash(item) for key, item in sorted(value.values.items())}
     if isinstance(value, FrozenJsonArray):
         return [_reduce_for_hash(item) for item in value.values]
-    if dataclasses.is_dataclass(value):
-        return _reduce_for_hash(dataclass_to_mapping(value))
-    if isinstance(value, enum.Enum):
-        return value.value
     raise CanonicalizationError(
         f"_reduce_for_hash encountered unsupported value of type "
         f"{type(value).__name__}; the canonical hash accepts only "
-        f"canonical atoms / FrozenJsonArray / FrozenJsonObject / "
-        f"dataclass / Enum per Round 7 §P0-2"
+        f"canonical atoms / FrozenJsonArray / FrozenJsonObject; "
+        f"callers must deep-freeze domain models via the Layer-A "
+        f"boundary (or via freeze_known_fragment) before invoking "
+        f"the hash reducer"
     )
 
 
