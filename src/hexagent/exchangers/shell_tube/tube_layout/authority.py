@@ -188,11 +188,29 @@ def verify_geometry_snapshot(snapshot: ApprovedTubeGeometrySnapshot) -> None:
         raise AuthorityFailure(*blockers)
 
 
-def verify_layout_rule_snapshot(
+def verify_authority_mode_match(
+    snapshot: LayoutRuleAuthoritySnapshot,
+    configuration: ShellAndTubeConfiguration,
+) -> None:
+    """Stage 5 — authority-mode match between snapshot and TASK-020 configuration."""
+
+    if snapshot.authority_mode.value != configuration.authority_mode.value:
+        raise AuthorityFailure(
+            _message(
+                BlockerCode.STL_AUTHORITY_MODE_MISMATCH,
+                "layout_rule_authority.authority_mode",
+                "authority_mode_mismatch",
+            )
+        )
+
+
+def verify_layout_rule_profile(
     snapshot: LayoutRuleAuthoritySnapshot,
     configuration: ShellAndTubeConfiguration,
     tube_geometry: ApprovedTubeGeometrySnapshot,
 ) -> None:
+    """Stage 6 — layout-rule profile, approval, snapshot, license, provenance, rule-pack."""
+
     blockers: list[MessageEntry] = []
     if snapshot.profile_id != PROFILE_ID:
         blockers.append(
@@ -208,14 +226,6 @@ def verify_layout_rule_snapshot(
                 BlockerCode.STL_LAYOUT_RULE_UNAPPROVED,
                 "layout_rule_authority.approval_status",
                 "layout_rule_unapproved",
-            )
-        )
-    if snapshot.authority_mode.value != configuration.authority_mode.value:
-        blockers.append(
-            _message(
-                BlockerCode.STL_AUTHORITY_MODE_MISMATCH,
-                "layout_rule_authority.authority_mode",
-                "authority_mode_mismatch",
             )
         )
     if snapshot.source_class not in _RECOGNIZED_SOURCE_CLASSES:
@@ -302,9 +312,22 @@ def verify_layout_rule_snapshot(
         raise AuthorityFailure(*blockers)
 
 
+def verify_layout_rule_snapshot(
+    snapshot: LayoutRuleAuthoritySnapshot,
+    configuration: ShellAndTubeConfiguration,
+    tube_geometry: ApprovedTubeGeometrySnapshot,
+) -> None:
+    """Full layout-rule verification (used by tests that pre-date the stage split)."""
+
+    verify_authority_mode_match(snapshot, configuration)
+    verify_layout_rule_profile(snapshot, configuration, tube_geometry)
+
+
 __all__ = [
     "AuthorityFailure",
+    "verify_authority_mode_match",
     "verify_geometry_snapshot",
+    "verify_layout_rule_profile",
     "verify_layout_rule_snapshot",
     "verify_task020_configuration",
 ]

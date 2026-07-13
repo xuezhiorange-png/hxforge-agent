@@ -9,6 +9,7 @@ import json
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation, localcontext
+from types import MappingProxyType
 from typing import Any
 
 DECIMAL_PRECISION = 50
@@ -82,8 +83,8 @@ def _canonical_value(value: Any) -> Any:
         raise CanonicalizationError("Decimal objects are forbidden at serialization boundary")
     if dataclasses.is_dataclass(value):
         return _canonical_value(dataclass_to_mapping(value))
-    if isinstance(value, tuple | set | frozenset):
-        raise CanonicalizationError("implicit array types are forbidden")
+    if isinstance(value, tuple | frozenset):
+        return [_canonical_value(item) for item in value]
     if isinstance(value, list):
         return [_canonical_value(item) for item in value]
     if isinstance(value, Mapping):
@@ -142,6 +143,50 @@ def to_primitive(value: Any) -> Any:
     return value
 
 
+def freeze_deeply(value: Any) -> Any:
+    """Recursively convert mutable inputs into immutable canonical-JSON-safe structures.
+
+    Used to harden canonical JSON fragments (license_evidence, MessageEntry.details,
+    case_authority, provenance) so that the captured identity payload cannot be
+    mutated after a blocked-result canonicalization. Mapping→MappingProxyType,
+    list/dict→tuple, all leaves preserved.
+    """
+
+    if value is None or isinstance(value, (bool, int, str, bytes)):
+        return value
+    if isinstance(value, enum.Enum):
+        return value.value
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise CanonicalizationError("non-finite Decimal not permitted in fragment")
+        return decimal_string(value)
+    if isinstance(value, tuple | frozenset):
+        return tuple(freeze_deeply(item) for item in value)
+    if isinstance(value, list):
+        return tuple(freeze_deeply(item) for item in value)
+    if isinstance(value, Mapping):
+        if not all(isinstance(key, str) for key in value):
+            raise CanonicalizationError("canonical fragment keys must be strings")
+        return MappingProxyType({key: freeze_deeply(item) for key, item in value.items()})
+    if isinstance(value, float):
+        raise CanonicalizationError("binary floating-point values are forbidden")
+    if dataclasses.is_dataclass(value):
+        return freeze_deeply(dataclass_to_mapping(value))
+    raise CanonicalizationError(f"unsupported canonical fragment value: {type(value).__name__}")
+
+
+def fragment_canonical(value: Any) -> Any:
+    """Canonicalize a deep-frozen fragment to its sorted-key primitive form."""
+
+    return _canonical_value(freeze_deeply(value))
+
+
+def fragment_canonical_json(value: Any) -> str:
+    """Return canonical JSON of a deep-frozen fragment."""
+
+    return canonical_json(freeze_deeply(value))
+
+
 def sorted_unique_strings(values: Sequence[str], *, allow_empty: bool = True) -> tuple[str, ...]:
     """Validate and sort a duplicate-free string array."""
 
@@ -193,6 +238,9 @@ __all__ = [
     "canonical_json",
     "dataclass_to_mapping",
     "decimal_string",
+    "fragment_canonical",
+    "fragment_canonical_json",
+    "freeze_deeply",
     "layout_id",
     "message_sort_key",
     "parse_decimal",
