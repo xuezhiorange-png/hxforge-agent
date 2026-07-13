@@ -49,12 +49,13 @@ from .authority import (
     verify_task020_configuration,
 )
 from .canonical import (
+    CanonicalizationError,
     canonical_raw_json_or_none,
     dataclass_to_mapping,
-    freeze_deeply,
     frozen_fragment_to_primitive,
     layout_id,
     position_id,
+    refreeze_internal_fragment,
     sha256_hex,
     snapshot_then_to_primitive,
     sort_messages,
@@ -328,23 +329,49 @@ def _blocked_result_payload(
     # value via ``to_primitive`` so the snapshot boundary only sees canonical
     # JSON-domain inputs.
     def _reduce_context_value(value: Any) -> Any:
+        # Round 5 §4.1 + §4.3: this reducer is the single entry point for
+        # every value that flows into the frozen ``normalized_context``.
+        # It MUST:
+        #   * accept only canonical JSON-domain primitives (null / bool /
+        #     int / str / list of canonical values / string-keyed dict
+        #     of canonical values); and
+        #   * reject Decimal / float / bytes / tuple / set / frozenset /
+        #     arbitrary object / non-string-keyed mapping AT THIS BOUNDARY
+        #     rather than silently coercing them.
+        # Internal callers that need Decimal or other non-JSON-domain
+        # values MUST convert them to canonical decimal strings BEFORE
+        # they reach this reducer — that's the round 5 §4.3 contract.
+        if value is None or isinstance(value, (bool, int, str)):
+            return value
         if dataclasses.is_dataclass(value):
             return _reduce_context_value(dataclass_to_mapping(value))
         if isinstance(value, MappingProxyType):
             # Already-frozen fragment: reduce to a sorted-key primitive
             # mapping so the public snapshot boundary accepts it.
             return {key: _reduce_context_value(item) for key, item in sorted(value.items())}
-        if isinstance(value, tuple):
+        if isinstance(value, (tuple, list)):
             return [_reduce_context_value(item) for item in value]
-        if isinstance(value, list):
-            return [_reduce_context_value(item) for item in value]
-        if isinstance(value, Decimal):
-            return str(value)
         if isinstance(value, dict):
-            return {key: _reduce_context_value(item) for key, item in value.items()}
-        if isinstance(value, (bool, int, str, type(None))):
-            return value
-        return value
+            primitive: dict[str, Any] = {}
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise CanonicalizationError("normalized_context mapping keys must be strings")
+                primitive[key] = _reduce_context_value(item)
+            return primitive
+        # Round 5 §4.3: Decimal, float, bytes, arbitrary objects — fail
+        # closed rather than silently coercing.
+        if isinstance(value, Decimal):
+            raise CanonicalizationError(
+                "Decimal must be converted to a canonical decimal string before "
+                "reaching normalized_context"
+            )
+        if isinstance(value, float):
+            raise CanonicalizationError(
+                "binary floating-point values are forbidden at context boundary"
+            )
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            raise CanonicalizationError("byte strings are forbidden at context boundary")
+        raise CanonicalizationError(f"unsupported canonical context value: {type(value).__name__}")
 
     context_primitive: dict[str, Any] = {}
     for key, item in dict(normalized_context).items():
@@ -578,9 +605,19 @@ def _validate_authorizations(
 def _parse_zones_for_stage_10(
     raw_zones: Any,
 ) -> tuple[ExclusionZone, ...]:
-    """Stage 10 — exclusion-zone exact shapes + duplicate ID detection."""
+    """Stage 10 — exclusion-zone exact shapes + duplicate ID detection.
 
-    from .schema import parse_zone as _parse_zone_helper
+    Round 5 §5.4 mandates that this stage:
+        1. Verify ``raw_zones`` is a list (array_required blocker if not);
+        2. Validate every zone INDEPENDENTLY through ``parse_zone``;
+        3. Collect every per-zone ``SchemaFailure`` blocker;
+        4. Run duplicate-ID detection ONLY against zones that successfully
+           parsed and have a non-empty ``zone_id``;
+        5. Surface the COMPLETE blocker set on any failure;
+        6. Abort at stage 10 — no Stage 11+ work runs.
+    """
+
+    from .schema import StageAccumulator
 
     if not isinstance(raw_zones, list):
         raise SchemaFailure(
@@ -594,25 +631,51 @@ def _parse_zones_for_stage_10(
             ),
             raw_failing_field=raw_zones,
         )
-    zones = tuple(
-        sorted(
-            (_parse_zone_helper(item, index) for index, item in enumerate(raw_zones)),
-            key=lambda z: z.zone_id,
-        )
-    )
-    if len({zone.zone_id for zone in zones}) != len(zones):
-        raise SchemaFailure(
-            10,
-            (
+
+    acc = StageAccumulator()
+    parsed_zones: list[ExclusionZone] = []
+
+    from .schema import parse_zone as _parse_zone_helper
+
+    for index, item in enumerate(raw_zones):
+        inner_field_path = f"exclusion_zones[{index}]"
+        try:
+            zone = _parse_zone_helper(item, index)
+        except SchemaFailure as exc:
+            # Per-zone failure → collect blocker but continue with the
+            # rest of the zones. Round 5 §5.4 forbids short-circuiting
+            # the entire zone list because one zone had a shape failure.
+            acc.blockers.extend(exc.blockers)
+            continue
+        parsed_zones.append(zone)
+        acc.values[inner_field_path] = zone
+
+    # Round 5 §5.4: duplicate-ID detection only against the zones that
+    # successfully parsed and have a non-empty zone_id.
+    seen_ids: dict[str, int] = {}
+    for zone in parsed_zones:
+        if not zone.zone_id:
+            continue
+        if zone.zone_id in seen_ids:
+            acc.blockers.append(
                 MessageEntry(
                     code=BlockerCode.STL_EXCLUSION_ZONE_DUPLICATE_ID.value,
-                    field_path="exclusion_zones",
+                    field_path=f"exclusion_zones.{zone.zone_id}",
                     message_key="duplicate_zone_id",
-                ),
-            ),
-            raw_failing_field=raw_zones,
+                )
+            )
+        else:
+            seen_ids[zone.zone_id] = 1
+
+    if acc.blockers:
+        raise SchemaFailure(
+            10,
+            tuple(acc.blockers),
+            raw_failing_field=None,
         )
-    return zones
+
+    # Round 5 §5.4: deterministic ordering by zone_id (canonical).
+    return tuple(sorted(parsed_zones, key=lambda z: z.zone_id))
 
 
 # --------------------------------------------------------------------------- #
@@ -652,54 +715,60 @@ def validate_request(
     # --- Stage 2 — raw value types, COMPLETE-blocker per-field collection ---
     stage2: Stage2Result = collect_stage2(data)
     if not stage2.passed:
-        # Round 4 §3.2: every per-field blocker is retained; ``raw_failing_field``
-        # surfaces the FIRST Stage-2 raw via §12.8; the full set is exposed
-        # through normalized_context for downstream audit.
+        # Round 5 §4.2: ``normalized_context`` MUST NOT carry raw failing
+        # values. Only canonical metadata describing which fields failed
+        # is allowed; raw values are surfaced via §12.8 identity through
+        # ``raw_failing_field`` (single primary raw) only.
         blockers_2 = tuple(stage2.all_blockers)
-        raws_2 = dict(stage2.raw_failing_fields)
-        primary_raw = next(iter(raws_2.values()), None) if raws_2 else None
+        failed_paths = stage2.failed_field_paths
+        primary_raw = stage2.primary_raw_failing_field
         return _build_blocked(
             2,
             blockers_2,
             raw_failing_field=primary_raw,
             normalized_context={
                 "stage2_blockers": blockers_2,
-                "stage2_raw_failing_fields": raws_2,
+                "failed_field_paths": failed_paths,
             },
         )
 
     # --- Stage 3 — schema versions, ALL three checks atomically AFTER Stage 2 ---
-    raw_envelope_payload = data["placement_envelope"]
-    raw_pairing_payload = data["u_tube_pairing_plan"]
-    envelope_schema_version = (
-        raw_envelope_payload.get("schema_version")
-        if isinstance(raw_envelope_payload, Mapping)
-        else None
-    )
-    pairing_schema_version = (
-        raw_pairing_payload.get("schema_version")
-        if isinstance(raw_pairing_payload, Mapping)
-        else None
-    )
+    # Round 5 §3.1: every Stage-2 raw check already validated the
+    # schema_version string's raw type and non-emptiness. We now use the
+    # validated strings from the Stage-2 results — NOT raw access of the
+    # payload dict — so Stage 3 only does version equality comparison.
+    from .schema import EnvelopeRaw as _EnvelopeRawT
+    from .schema import PairingPlanRaw as _PairingPlanRawT
+
+    envelope_raw_obj = stage2.placement_envelope.value
+    pairing_raw_obj = stage2.u_tube_pairing_plan.value
+    assert isinstance(envelope_raw_obj, _EnvelopeRawT)
+    envelope_schema_version: str = envelope_raw_obj.schema_version
+    pairing_schema_version: str | None
+    pairing_field_path: str | None
+    if pairing_raw_obj is None:
+        pairing_schema_version = None
+        pairing_field_path = None
+    else:
+        assert isinstance(pairing_raw_obj, _PairingPlanRawT)
+        pairing_schema_version = pairing_raw_obj.schema_version
+        pairing_field_path = "u_tube_pairing_plan.schema_version"
     stage3: Stage3Result = validate_all_schema_versions(
-        request_schema_version=data["schema_version"],
+        request_schema_version=stage2.request_schema_version.value,
         envelope_schema_version=envelope_schema_version,
         envelope_field_path="placement_envelope.schema_version",
         pairing_schema_version=pairing_schema_version,
-        pairing_field_path=(
-            "u_tube_pairing_plan.schema_version" if raw_pairing_payload is not None else None
-        ),
+        pairing_field_path=pairing_field_path,
     )
     if not stage3.passed:
         # Stage 3 BLOCKED: no Stage 4+ work runs.
-        primary_raw_3 = next(iter(stage3.raw_failing_fields.values()), None)
         return _build_blocked(
             3,
             stage3.blockers,
-            raw_failing_field=primary_raw_3,
+            raw_failing_field=None,
             normalized_context={
                 "stage3_blockers": stage3.blockers,
-                "stage3_raw_failing_fields": dict(stage3.raw_failing_fields),
+                "failed_field_paths": stage3.failed_field_paths,
             },
         )
 
@@ -1260,9 +1329,15 @@ def validate_request(
     layout_hash = sha256_hex(layout_hash_payload)
 
     # Final provenance: add the freshly computed layout_hash.
-    provenance_primitive_frozen = freeze_deeply(provenance_primitive)
-    provenance_primitive_final = freeze_deeply(
-        {**frozen_fragment_to_primitive(provenance_primitive_frozen), "layout_hash": layout_hash}
+    # Round 5 §6.2: provenance is built from internal dataclass tuple
+    # fields, so we MUST go through refreeze_internal_fragment instead
+    # of force_frozen_canonical / freeze_deeply.
+    provenance_primitive_frozen = refreeze_internal_fragment(provenance_primitive)
+    provenance_primitive_final = refreeze_internal_fragment(
+        {
+            **frozen_fragment_to_primitive(provenance_primitive_frozen),
+            "layout_hash": layout_hash,
+        }
     )
 
     # --- Stage 21 — final output assembly ---

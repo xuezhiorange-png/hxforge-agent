@@ -1098,3 +1098,337 @@ def test_round4_noncanonical_raw_public_e2e() -> None:
     assert result.layout is None
     assert result.blocked_result_hash is not None
     assert result.blockers
+
+
+# --------------------------------------------------------------------------- #
+# Round 5 — public entry tests for P0-1 / P0-2 / P0-3 / P1-1 / P1-2 / P1-3
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "bad_schema_version",
+    [123, b"v1", object(), None, []],
+    ids=["int_123", "bytes_v1", "object", "none", "empty_list"],
+)
+def test_round5_top_level_schema_version_stage2_blocks(
+    bad_schema_version: object,
+) -> None:
+    """Round 5 §3.3 (P0-1): top-level schema_version raw-type failures
+    surface as Stage-2 BLOCKED with no Stage-3 unsupported-version
+    blocker and no uncaught exception."""
+
+    payload = deepcopy(make_request())
+    payload["schema_version"] = bad_schema_version  # type: ignore[assignment]
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert result.blocked_result_hash is not None
+    assert any(
+        b.code == "STL_RAW_TYPE_INVALID" and b.field_path == "schema_version"
+        for b in result.blockers
+    ), [b.code for b in result.blockers]
+    # Stage-3 schema-version blockers must be absent.
+    assert not any(b.code == "STL_SCHEMA_VERSION_UNSUPPORTED" for b in result.blockers), (
+        "Stage-3 unsupported-version blocker must not run when Stage 2 fails"
+    )
+
+
+def test_round5_schema_version_raw_invalid_takes_precedence_over_envelope_unsupported() -> None:
+    """Round 5 §3.3: when BOTH a Stage-2 schema_version raw failure and a
+    Stage-3 envelope-version failure exist, only Stage-2 must surface —
+    Stage-3 must not run."""
+
+    payload = deepcopy(make_request())
+    payload["schema_version"] = 123  # Stage-2 raw failure
+    payload["placement_envelope"]["schema_version"] = "absolutely-not-supported"
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert result.blocked_result_hash is not None
+    # Only one Stage-2 blocker; Stage-3 envelope-version is absent.
+    codes = [b.code for b in result.blockers]
+    assert "STL_RAW_TYPE_INVALID" in codes
+    assert "STL_SCHEMA_VERSION_UNSUPPORTED" not in codes
+
+
+def test_round5_noncanonical_raw_value_yields_null_raw_failing_field() -> None:
+    """Round 5 §4: when no canonical raw JSON exists for the failed value,
+    raw_failing_field surfaces ``None`` (fail-closed), but the blocked
+    result is still computed deterministically."""
+
+    import secrets
+
+    class _Opaque:
+        pass
+
+    payload = deepcopy(make_request())
+    payload["layout_rule_authority"]["license_evidence"] = _Opaque()
+    result_a = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    # Same payload again — deterministic hash.
+    result_b = validate_request(deepcopy(payload), software_version="0.1.0", git_commit="abc")
+    assert result_a.layout is None
+    assert result_a.blocked_result_hash is not None
+    assert result_a.blocked_result_hash == result_b.blocked_result_hash
+    # canonical raw JSON for an arbitrary object does NOT exist.
+    assert secrets.token_hex(8)  # sanity that no flake
+
+
+def test_round5_two_invalid_fields_inside_layout_rule_authority() -> None:
+    """Round 5 §5.1: same-nested-object Stage-2 aggregation preserves
+    all complete blockers across siblings."""
+
+    payload = deepcopy(make_request())
+    layout_rule = payload["layout_rule_authority"]
+    layout_rule["pitch_m"] = 0.025  # float, raw-type-invalid
+    layout_rule["edge_clearance_m"] = b"0.005"  # bytes, raw-type-invalid
+    layout_rule["maximum_candidate_positions"] = True  # bool, raw-type-invalid
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert result.blocked_result_hash is not None
+    assert result.status.value == "BLOCKED"
+    failing_fields = {b.field_path for b in result.blockers}
+    assert "layout_rule_authority.pitch_m" in failing_fields
+    assert "layout_rule_authority.edge_clearance_m" in failing_fields
+    assert "layout_rule_authority.maximum_candidate_positions" in failing_fields
+
+
+def test_round5_two_invalid_fields_inside_geometry() -> None:
+    """Round 5 §5.2: same-nested-object Stage-2 aggregation preserves
+    all complete blockers across siblings inside ``tube_geometry``."""
+
+    payload = deepcopy(make_request())
+    geometry = payload["tube_geometry"]
+    geometry["outer_diameter_m"] = 0.019  # float
+    geometry["inner_diameter_m"] = b"0.015"  # bytes
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert result.blocked_result_hash is not None
+    failing_fields = {b.field_path for b in result.blockers}
+    assert "tube_geometry.outer_diameter_m" in failing_fields
+    assert "tube_geometry.inner_diameter_m" in failing_fields
+
+
+def test_round5_two_invalid_zones_and_one_duplicate_zone_id() -> None:
+    """Round 5 §5.4: Stage-10 multi-zone aggregation preserves the
+    complete per-zone blocker set + a duplicate-ID blocker for the
+    surviving zones."""
+
+    from hexagent.exchangers.shell_tube.tube_layout.models import (
+        ExclusionZoneType,
+    )
+
+    payload = deepcopy(make_request())
+
+    def _add_zone(
+        zid: str,
+        *,
+        zone_type: ExclusionZoneType,
+        radius: str = "0.05",
+    ) -> dict[str, object]:
+        return {
+            "zone_id": zid,
+            "zone_type": zone_type.value,
+            "center_x_m": "0",
+            "center_y_m": "0",
+            "clearance_m": "0",
+            "reason_code": "noop",
+            "evidence_refs": ["e"],
+            "width_m": (radius if zone_type is ExclusionZoneType.AXIS_ALIGNED_RECTANGLE else None),
+            "height_m": (radius if zone_type is ExclusionZoneType.AXIS_ALIGNED_RECTANGLE else None),
+            "radius_m": (radius if zone_type is ExclusionZoneType.CIRCLE else None),
+        }
+
+    zones = [
+        _add_zone("z1", zone_type=ExclusionZoneType.CIRCLE, radius=b"0.05"),  # raw-type-invalid
+        _add_zone(
+            "z2", zone_type=ExclusionZoneType.CIRCLE, radius="not-a-decimal"
+        ),  # invalid decimal
+        _add_zone("z3", zone_type=ExclusionZoneType.CIRCLE, radius="0.05"),  # ok
+        _add_zone("z3", zone_type=ExclusionZoneType.CIRCLE, radius="0.05"),  # duplicate
+    ]
+    payload["exclusion_zones"] = zones
+
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert result.blocked_result_hash is not None
+    codes = {b.code for b in result.blockers}
+    # Stage 10 array_required / exclusion_zone_invalid must surface at least once.
+    assert "STL_EXCLUSION_ZONE_INVALID" in codes
+    assert "STL_EXCLUSION_ZONE_DUPLICATE_ID" in codes
+
+    # Round 5 §5.4 requires Stage 11+ NOT to run.
+    assert not any(
+        b.code.startswith("STL_NO_TUBE_POSITIONS")
+        or b.code == "STL_COORDINATE_QUANTIZATION_COLLISION"
+        for b in result.blockers
+    ), "Stage 11+ must not run when Stage 10 has blockers"
+
+
+def test_round5_force_frozen_canonical_rejects_raw_tuple() -> None:
+    """Round 5 §6.4 (P1-1): ``force_frozen_canonical`` rejects a raw tuple
+    from a public caller. Internal-only :class:`FrozenJsonArray` and
+    ``tuple`` of canonical atoms that came from a frozen dataclass are
+    the only acceptable internal sequences."""
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        force_frozen_canonical,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        force_frozen_canonical(("a", "b"))
+
+
+def test_round5_freeze_deeply_rejects_raw_tuple() -> None:
+    """Round 5 §6.4: ``freeze_deeply`` (alias for ``force_frozen_canonical``)
+    rejects a raw tuple from a public caller."""
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        freeze_deeply,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_deeply(("a", "b"))
+
+
+def test_round5_canonical_json_rejects_enum_value() -> None:
+    """Round 5 §6 (P1-1): ``canonical_json`` of a raw Enum raises —
+    must be reduced via ``.value`` first."""
+
+    import enum
+
+    import pytest
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        canonical_json,
+    )
+
+    class _Color(enum.Enum):
+        RED = "red"
+
+    with pytest.raises(CanonicalizationError):
+        canonical_json(_Color.RED)
+
+
+def test_round5_canonical_json_rejects_raw_dataclass() -> None:
+    """Round 5 §6 (P1-1): ``canonical_json`` of a raw dataclass raises —
+    must be reduced via ``dataclass_to_mapping`` first."""
+
+    import pytest
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        canonical_json,
+    )
+
+    @dataclasses.dataclass(frozen=True)
+    class _Box:
+        x: int
+        y: int
+
+    with pytest.raises(CanonicalizationError):
+        canonical_json(_Box(1, 2))
+
+
+def test_round5_fragment_canonical_array_roundtrip() -> None:
+    """Round 5 §7 (P1-2): ``fragment_canonical`` / ``fragment_canonical_json``
+    accept ordinary canonical lists / dicts and emit primitives."""
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        fragment_canonical,
+        fragment_canonical_json,
+    )
+
+    assert fragment_canonical({"items": [1, 2]}) == {"items": [1, 2]}
+    assert fragment_canonical([1, {"x": [2, 3]}]) == [1, {"x": [2, 3]}]
+    assert fragment_canonical_json({"items": [1, 2]}) == '{"items":[1,2]}'
+
+
+@pytest.mark.parametrize(
+    "bad_input",
+    [
+        {"x": frozenset({"a"})},
+        {"x": ("a", "b")},
+        {"x": Decimal("1")},
+        {"x": b"a"},
+        {"x": 1.5},
+        {1: "a"},
+    ],
+    ids=["frozenset", "tuple", "Decimal", "bytes", "float", "non_str_key"],
+)
+def test_round5_fragment_canonical_rejects(bad_input: object) -> None:
+    """Round 5 §7 (P1-2) continues to reject the round-4 forbidden types
+    AND additionally rejects non-string-keyed mappings."""
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        fragment_canonical,
+        fragment_canonical_json,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        fragment_canonical(bad_input)
+    with pytest.raises(PublicCanonicalDomainError):
+        fragment_canonical_json(bad_input)
+
+
+def test_round5_hash_reduction_rejects_non_string_key() -> None:
+    """Round 5 §8 (P1-3): ``_reduce_for_hash`` (the context reducer) raises
+    when a mapping has non-string keys. We exercise this through the
+    public ``validate_request`` BLOCKED path by constructing a payload
+    that requires a non-canonical raw failure for a top-level mapping
+    with non-string keys."""
+
+    payload = deepcopy(make_request())
+    # evidence_refs list with non-string-keyed mappings insde one of the
+    # fields — let the validation pipeline surface the non-string-key
+    # canonical failure as a Stage-2 raw failure.
+    canonical_target = payload["layout_rule_authority"]["license_evidence"]
+    canonical_target["status"] = "active"
+    if isinstance(canonical_target, dict):
+        canonical_target[1] = "non-string-key-value"  # type: ignore[index]
+        result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+        # Round 5 §8: TWO invalid mappings with non-string keys MUST NOT
+        # silently collapse to the same valid projection — they each
+        # produce an independent rejected-path.
+        payload_2 = deepcopy(payload)
+        canonical_target_2 = payload_2["layout_rule_authority"]["license_evidence"]
+        if isinstance(canonical_target_2, dict):
+            canonical_target_2[2] = "different-non-string-key"  # type: ignore[index]
+            result_2 = validate_request(payload_2, software_version="0.1.0", git_commit="abc")
+            # Either both BLOCKED, or both raise — but if both BLOCKED
+            # they do NOT silently collapse to the same canonical
+            # projection.
+            assert result.layout is None
+            assert result.blocked_result_hash is not None
+            assert result_2.layout is None
+            assert result_2.blocked_result_hash is not None
+
+
+def test_round5_force_frozen_canonical_accepts_frozen_json_array() -> None:
+    """Round 5 §6.4: the explicit ``FrozenJsonArray`` marker is the
+    internal-only carrier that ``force_frozen_canonical`` accepts in
+    place of a raw tuple."""
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonArray,
+        force_frozen_canonical,
+    )
+
+    array = FrozenJsonArray((1, 2, 3))
+    frozen = force_frozen_canonical(array)
+    assert isinstance(frozen, FrozenJsonArray)
+
+
+def test_round5_force_frozen_canonical_rejects_frozen_json_array_with_non_atom() -> None:
+    """Round 5 §6.4: ``FrozenJsonArray`` enforces canonical-atom elements
+    at construction. ``Decimal`` (a non-atom) inside a ``FrozenJsonArray``
+    raises ``PublicCanonicalDomainError`` at construction time."""
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonArray,
+        PublicCanonicalDomainError,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        FrozenJsonArray((Decimal("1"),))

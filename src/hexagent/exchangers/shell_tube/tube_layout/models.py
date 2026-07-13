@@ -387,7 +387,7 @@ class TubeLayout:
     provenance: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Round 4 §6.3 + §6.4: deep-freeze ``case_authority`` and ``provenance``.
+        """Round 4 §6.3 + §6.4 + round 5 §1.1: deep-freeze case_authority and provenance.
 
         Both fields are detached frozen snapshots on construction; ``provenance``
         is recursive (its nested ``license_evidence`` / ``case_authority`` /
@@ -395,15 +395,21 @@ class TubeLayout:
         ``__post_init__``). The freeze happens exactly once during
         construction; subsequent attempts to mutate raise
         ``dataclasses.FrozenInstanceError``.
+
+        Round 5 §6: the fields may already contain internal-tuple sequences
+        (e.g. ``evidence_refs: tuple[str, ...]``) constructed by ``@dataclass(frozen=True)``.
+        We MUST use the internal-only ``refreeze_internal_fragment`` helper
+        — the strict Layer-A ``force_frozen_canonical`` would reject raw
+        tuples.
         """
 
-        from .canonical import force_frozen_canonical
+        from .canonical import refreeze_internal_fragment
 
-        frozen_ca = force_frozen_canonical(self.case_authority)
+        frozen_ca = refreeze_internal_fragment(self.case_authority)
         if frozen_ca is not self.case_authority:
             object.__setattr__(self, "case_authority", frozen_ca)
 
-        frozen_prov = force_frozen_canonical(self.provenance)
+        frozen_prov = refreeze_internal_fragment(self.provenance)
         if frozen_prov is not self.provenance:
             object.__setattr__(self, "provenance", frozen_prov)
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import enum
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 from hexagent.exchangers.shell_tube.models import ShellAndTubeConfiguration
@@ -300,15 +300,23 @@ def _enum_array(
 
 
 def _canonical_json_value(value: Any, field_path: str, *, stage: int = 2) -> Any:
-    """Validate a raw value as canonical JSON domain. Fail-closed on rejection.
+    """Validate a raw value as canonical JSON domain and return a FROZEN form.
 
-    Public canonical domain (round 3 P1-1): null/bool/int/str/list/string-keyed
-    dict ONLY. Any other type (Decimal, float, bytes, tuple, set, frozenset,
-    non-string-keyed mapping, arbitrary object) raises STL_CANONICALIZATION_FAILED.
+    Round 5 §1.1 (deep immutability): rather than returning the caller-
+    owned original (which the caller might mutate after validation), this
+    function now returns the strict_public_json_snapshot — a value whose
+    mappings are ``MappingProxyType`` and sequences are ``tuple`` of
+    canonical atoms. This is the **detached frozen snapshot** the round-5
+    spec requires.
+
+    Public canonical domain (round 3 P1-1 + round 5 §1.1): null/bool/int/
+    str/list/string-keyed dict ONLY. Any other type (Decimal, float,
+    bytes, tuple, set, frozenset, non-string-keyed mapping, arbitrary
+    object, dataclass, Enum) raises STL_CANONICALIZATION_FAILED.
     """
 
     try:
-        strict_public_json_snapshot(value)
+        return strict_public_json_snapshot(value)
     except Exception as exc:  # PublicCanonicalDomainError is the only expected one
         raise _schema_failure(
             stage,
@@ -322,7 +330,24 @@ def _canonical_json_value(value: Any, field_path: str, *, stage: int = 2) -> Any
             ),
             raw_failing_field=value,
         ) from exc
-    return value
+
+
+def _is_frozen_canonical_fragment(value: Any) -> bool:
+    """Return True if value is already a strict public canonical fragment.
+
+    A strict public canonical fragment is either:
+        * None / bool / int / str (canonical atom); or
+        * MappingProxyType (string-keyed); or
+        * tuple (only non-frozen list tuples are accepted — see round 5 §1.1)
+    Anything else (decimal, bytes, dataclass, Enum, ordinary dict, ordinary
+    list, set, frozenset) returns False so the caller can re-snap.
+    """
+
+    if value is None or isinstance(value, (bool, int, str)):
+        return True
+    from types import MappingProxyType
+
+    return bool(isinstance(value, (tuple, MappingProxyType)))
 
 
 # --------------------------------------------------------------------------- #
@@ -370,6 +395,7 @@ class Stage2Result:
     of every per-field blocker set.
     """
 
+    request_schema_version: Stage2FieldReport
     configuration: Stage2FieldReport
     tube_geometry: Stage2FieldReport
     layout_rule_authority: Stage2FieldReport
@@ -401,8 +427,33 @@ class Stage2Result:
         }
 
     @property
+    def failed_field_paths(self) -> tuple[str, ...]:
+        """Canonical metadata — just the field paths that triggered a Stage-2 failure.
+
+        Round 5 §4.2: this is the only legitimate stage-2-derived description
+        of a failed-field. Raw values are NOT allowed here.
+        """
+
+        return tuple(report.field_path for report in self._reports if report.blockers)
+
+    @property
+    def primary_raw_failing_field(self) -> Any | None:
+        """Return the FIRST failed-field raw value (round 5 §4.2 primary raw).
+
+        ``canonical_raw_json_or_none`` on the §12.8 identity side may decide
+        whether to surface the canonical raw (when one exists) or ``None``
+        (when the value has no canonical raw — e.g. arbitrary object).
+        """
+
+        for report in self._reports:
+            if report.blockers and report.raw_failing_field is not None:
+                return report.raw_failing_field
+        return None
+
+    @property
     def _reports(self) -> tuple[Stage2FieldReport, ...]:
         return (
+            self.request_schema_version,
             self.configuration,
             self.tube_geometry,
             self.layout_rule_authority,
@@ -449,6 +500,10 @@ def collect_stage2(payload: Mapping[str, Any]) -> Stage2Result:
     """
 
     return Stage2Result(
+        request_schema_version=_safe_stage2(
+            field_path="schema_version",
+            parser=lambda: _validate_request_schema_version_raw(payload.get("schema_version")),
+        ),
         configuration=_safe_stage2(
             field_path="configuration",
             parser=lambda: _validate_configuration_shape(payload["configuration"]),
@@ -525,34 +580,64 @@ class Stage3Result:
     """Aggregate of all Stage-3 schema-version blockers."""
 
     blockers: tuple[MessageEntry, ...]
-    raw_failing_fields: dict[str, Any]
+    failed_field_paths: tuple[str, ...]
 
     @property
     def passed(self) -> bool:
         return not self.blockers
 
 
+def _validate_request_schema_version_raw(value: Any) -> str:
+    """Stage 2 — top-level request schema_version raw type check (NO version compare).
+
+    Round 5 §3.1: Stage 2 verifies that ``value`` is a non-empty string; it
+    does NOT compare it against the expected version. Stage 3 does the
+    version comparison after Stage 2 has finished. This function raises
+    SchemaFailure with complete Stage-2 blockers on raw-type failure.
+    """
+
+    if not isinstance(value, str) or not value:
+        raise _schema_failure(
+            2,
+            (
+                _block(
+                    BlockerCode.STL_RAW_TYPE_INVALID,
+                    "schema_version",
+                    "schema_version_raw_type_invalid",
+                    details={
+                        "actual_type": type(value).__name__,
+                        "expected_type": "str",
+                    },
+                ),
+            ),
+            raw_failing_field=value,
+        )
+    return value
+
+
 def validate_all_schema_versions(
-    request_schema_version: Any,
-    envelope_schema_version: Any,
+    request_schema_version: str,
+    envelope_schema_version: str,
     envelope_field_path: str,
-    pairing_schema_version: Any | None,
+    pairing_schema_version: str | None,
     pairing_field_path: str | None,
 ) -> Stage3Result:
     """Stage 3 — ALL schema versions checked atomically AFTER Stage 2 ends.
 
-    Round 4 §3.1 requires that no Stage-2 helper internally compares a
-    schema_version against the expected value; every schema_version check
-    occurs here, after all Stage-2 raw-type validations have completed. The
-    returned blockers are the COMPLETE set of Stage-3 failures across
-    request/envelope/pairing, not just the first one.
+    Round 5 §3 refines round 4: all three schema-version inputs are now
+    pre-validated non-empty strings (Stage 2 is responsible for raw-type
+    checking). Stage 3 only does version equality comparison and emits
+    the COMPLETE set of unsupported-version blockers, never partial.
+
+    The returned ``failed_field_paths`` carries the field paths that
+    triggered a Stage-3 failure for round-5 §4.2 canonical metadata.
+    Raw failing values are NOT included — only field paths.
     """
 
     blockers: list[MessageEntry] = []
-    raw_failing_fields: dict[str, Any] = {}
+    failed_field_paths: list[str] = []
 
-    text = _nonempty_string(request_schema_version, "schema_version")
-    if text != REQUEST_SCHEMA_VERSION:
+    if request_schema_version != REQUEST_SCHEMA_VERSION:
         blockers.append(
             _block(
                 BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
@@ -560,10 +645,9 @@ def validate_all_schema_versions(
                 "request_schema_version_unsupported",
             )
         )
-        raw_failing_fields["schema_version"] = request_schema_version
+        failed_field_paths.append("schema_version")
 
-    envelope_text = _nonempty_string(envelope_schema_version, envelope_field_path)
-    if envelope_text != ENVELOPE_SCHEMA_VERSION:
+    if envelope_schema_version != ENVELOPE_SCHEMA_VERSION:
         blockers.append(
             _block(
                 BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
@@ -571,11 +655,19 @@ def validate_all_schema_versions(
                 "envelope_schema_version_unsupported",
             )
         )
-        raw_failing_fields[envelope_field_path] = envelope_schema_version
+        failed_field_paths.append(envelope_field_path)
 
-    if pairing_field_path is not None and pairing_schema_version is not None:
-        pairing_text = _nonempty_string(pairing_schema_version, pairing_field_path)
-        if pairing_text != PAIRING_SCHEMA_VERSION:
+    if pairing_field_path is not None:
+        if pairing_schema_version is None:
+            blockers.append(
+                _block(
+                    BlockerCode.STL_RAW_TYPE_INVALID,
+                    pairing_field_path,
+                    "pairing_schema_version_missing",
+                )
+            )
+            failed_field_paths.append(pairing_field_path)
+        elif pairing_schema_version != PAIRING_SCHEMA_VERSION:
             blockers.append(
                 _block(
                     BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
@@ -583,18 +675,12 @@ def validate_all_schema_versions(
                     "pairing_schema_version_unsupported",
                 )
             )
-            raw_failing_fields[pairing_field_path] = pairing_schema_version
-    elif pairing_field_path is not None and pairing_schema_version is None:
-        blockers.append(
-            _block(
-                BlockerCode.STL_RAW_TYPE_INVALID,
-                pairing_field_path,
-                "pairing_schema_version_missing",
-            )
-        )
-        raw_failing_fields[pairing_field_path] = pairing_schema_version
+            failed_field_paths.append(pairing_field_path)
 
-    return Stage3Result(blockers=tuple(blockers), raw_failing_fields=raw_failing_fields)
+    return Stage3Result(
+        blockers=tuple(blockers),
+        failed_field_paths=tuple(failed_field_paths),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -676,8 +762,51 @@ def parse_rule_pack_identity(value: Any, field_path: str) -> RulePackIdentitySna
     )
 
 
+# --------------------------------------------------------------------------- #
+# Stage-2 nested-object complete-blocker accumulator (round-5 §5)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class StageAccumulator:
+    """Round-5 §5: per-field independent Stage-2 validator accumulator.
+
+    Each per-field validator is registered via ``capture``; a failing
+    validator contributes its complete ``MessageEntry`` blockers without
+    short-circuiting sibling fields. The accumulator keeps two parallel
+    views: ``blockers`` (the union of every failed-field ``MessageEntry``)
+    and ``values`` (the validated values keyed by field path).
+    """
+
+    blockers: list[MessageEntry] = field(default_factory=list)
+    values: dict[str, Any] = field(default_factory=dict)
+
+    def capture(self, field_path: str, validator: Callable[[], Any]) -> None:
+        try:
+            self.values[field_path] = validator()
+        except SchemaFailure as exc:
+            self.blockers.extend(exc.blockers)
+
+    def finalize(self, *, object_path: str | None = None) -> Mapping[str, Any]:
+        """Return the accumulated values mapping if ``blockers`` is empty,
+        otherwise raise a single SchemaFailure combining every blocker."""
+
+        if not self.blockers:
+            return self.values
+        raise _schema_failure(
+            2,
+            tuple(self.blockers),
+            raw_failing_field=None,
+        )
+
+
 def parse_geometry(value: Any) -> ApprovedTubeGeometrySnapshot:
-    """Pure shape / raw-type validation for tube_geometry (Stages 1-3)."""
+    """Pure shape / raw-type validation for tube_geometry (Stages 1-3).
+
+    Round 5 §5.2: per-field raw checks are independent; each failing field
+    contributes its complete blockers without skipping the rest. Only when
+    the outer mapping check fails is the entire nested-validation skipped.
+    """
 
     if value is None:
         raise _schema_failure(
@@ -703,45 +832,89 @@ def parse_geometry(value: Any) -> ApprovedTubeGeometrySnapshot:
         "snapshot_hash",
         "source_binding",
     }
-    data = _mapping(value, "tube_geometry", fields, stage=2)
-    outer_diameter_m = _decimal(
-        data["outer_diameter_m"],
-        "tube_geometry.outer_diameter_m",
-        positive=True,
-        stage=2,
+
+    # Outer mapping shape check; preserve at-least-one blocker when
+    # the input isn't a mapping.
+    try:
+        data = _mapping(value, "tube_geometry", fields, stage=2)
+    except SchemaFailure as exc:
+        raise SchemaFailure(
+            2,
+            exc.blockers,
+            raw_failing_field=exc.raw_failing_field,
+        ) from exc
+
+    # Per-field raw validators run independently.
+    acc = StageAccumulator()
+
+    def _nonempty_field(field: str) -> Callable[[], str]:
+        def _v() -> str:
+            return _nonempty_string(data[field], f"tube_geometry.{field}", stage=2)
+
+        _v.__name__ = f"_g_nonempty_{field}"
+        return _v
+
+    def _sha_field(field: str) -> Callable[[], str]:
+        def _v() -> str:
+            return _sha(data[field], f"tube_geometry.{field}", stage=2)
+
+        _v.__name__ = f"_g_sha_{field}"
+        return _v
+
+    def _decimal_field(field: str, *, positive: bool = True) -> Callable[[], str]:
+        def _v() -> str:
+            return _decimal(
+                data[field],
+                f"tube_geometry.{field}",
+                positive=positive,
+                stage=2,
+            )
+
+        _v.__name__ = f"_decimal_{field}"
+        return _v
+
+    acc.capture("geometry_id", _nonempty_field("geometry_id"))
+    acc.capture("geometry_type", _nonempty_field("geometry_type"))
+    acc.capture("revision", _nonempty_field("revision"))
+    acc.capture("approval_state", _nonempty_field("approval_state"))
+    acc.capture("outer_diameter_m", _decimal_field("outer_diameter_m"))
+    acc.capture("inner_diameter_m", _decimal_field("inner_diameter_m"))
+    acc.capture("wall_thickness_m", _decimal_field("wall_thickness_m"))
+    acc.capture("record_hash", _sha_field("record_hash"))
+    acc.capture("snapshot_hash", _sha_field("snapshot_hash"))
+    acc.capture(
+        "source_binding",
+        lambda: parse_source_binding(data["source_binding"], "tube_geometry.source_binding"),
     )
-    inner_diameter_m = _decimal(
-        data["inner_diameter_m"],
-        "tube_geometry.inner_diameter_m",
-        positive=True,
-        stage=2,
-    )
-    wall_thickness_m = _decimal(
-        data["wall_thickness_m"],
-        "tube_geometry.wall_thickness_m",
-        positive=True,
-        stage=2,
-    )
+
+    if acc.blockers:
+        raise _schema_failure(
+            2,
+            tuple(acc.blockers),
+            raw_failing_field=None,
+        )
+
     return ApprovedTubeGeometrySnapshot(
-        geometry_id=_nonempty_string(data["geometry_id"], "tube_geometry.geometry_id", stage=2),
-        geometry_type=_nonempty_string(
-            data["geometry_type"], "tube_geometry.geometry_type", stage=2
-        ),
-        revision=_nonempty_string(data["revision"], "tube_geometry.revision", stage=2),
-        approval_state=_nonempty_string(
-            data["approval_state"], "tube_geometry.approval_state", stage=2
-        ),
-        outer_diameter_m=outer_diameter_m,
-        inner_diameter_m=inner_diameter_m,
-        wall_thickness_m=wall_thickness_m,
-        record_hash=_sha(data["record_hash"], "tube_geometry.record_hash", stage=2),
-        snapshot_hash=_sha(data["snapshot_hash"], "tube_geometry.snapshot_hash", stage=2),
-        source_binding=parse_source_binding(data["source_binding"], "tube_geometry.source_binding"),
+        geometry_id=acc.values["geometry_id"],
+        geometry_type=acc.values["geometry_type"],
+        revision=acc.values["revision"],
+        approval_state=acc.values["approval_state"],
+        outer_diameter_m=acc.values["outer_diameter_m"],
+        inner_diameter_m=acc.values["inner_diameter_m"],
+        wall_thickness_m=acc.values["wall_thickness_m"],
+        record_hash=acc.values["record_hash"],
+        snapshot_hash=acc.values["snapshot_hash"],
+        source_binding=acc.values["source_binding"],
     )
 
 
 def parse_layout_rule(value: Any) -> LayoutRuleAuthoritySnapshot:
-    """Pure shape / raw-type validation for layout_rule_authority (Stages 1-3)."""
+    """Pure shape / raw-type validation for layout_rule_authority (Stages 1-3).
+
+    Round 5 §5.1: per-field raw checks are independent; each failing field
+    contributes its complete blockers without skipping the rest. Only when
+    the outer mapping check fails is the entire nested-validation skipped.
+    """
 
     if value is None:
         raise _schema_failure(
@@ -776,145 +949,253 @@ def parse_layout_rule(value: Any) -> LayoutRuleAuthoritySnapshot:
         "maximum_candidate_positions",
         "snapshot_hash",
     }
-    data = _mapping(value, "layout_rule_authority", fields, stage=2)
-    pitch_m = _decimal(
-        data["pitch_m"],
-        "layout_rule_authority.pitch_m",
-        positive=True,
-        code=BlockerCode.STL_PITCH_INVALID,
-        message_key="pitch_invalid",
-        stage=2,
-    )
-    edge_clearance_m = _decimal(
-        data["edge_clearance_m"],
-        "layout_rule_authority.edge_clearance_m",
-        positive=False,
-        code=BlockerCode.STL_EDGE_CLEARANCE_INVALID,
-        message_key="edge_clearance_invalid",
-        stage=2,
-    )
-    rule_pack_raw = data["rule_pack_identity"]
-    rule_pack = (
-        None
-        if rule_pack_raw is None
-        else parse_rule_pack_identity(rule_pack_raw, "layout_rule_authority.rule_pack_identity")
-    )
-    return LayoutRuleAuthoritySnapshot(
-        profile_id=_nonempty_string(
-            data["profile_id"], "layout_rule_authority.profile_id", stage=2
-        ),
-        authority_mode=_enum(
+    try:
+        data = _mapping(value, "layout_rule_authority", fields, stage=2)
+    except SchemaFailure as exc:
+        raise SchemaFailure(
+            2,
+            exc.blockers,
+            raw_failing_field=exc.raw_failing_field,
+        ) from exc
+
+    acc = StageAccumulator()
+
+    def _nonempty_field(field: str) -> Callable[[], str]:
+        def _v() -> str:
+            return _nonempty_string(data[field], f"layout_rule_authority.{field}", stage=2)
+
+        _v.__name__ = f"_lr_nonempty_{field}"
+        return _v
+
+    def _sha_field(field: str) -> Callable[[], str]:
+        def _v() -> str:
+            return _sha(data[field], f"layout_rule_authority.{field}", stage=2)
+
+        _v.__name__ = f"_lr_sha_{field}"
+        return _v
+
+    acc.capture("profile_id", _nonempty_field("profile_id"))
+    acc.capture(
+        "authority_mode",
+        lambda: _enum(
             data["authority_mode"],
             AuthorityMode,
             "layout_rule_authority.authority_mode",
             stage=2,
         ),
-        rule_id=_nonempty_string(data["rule_id"], "layout_rule_authority.rule_id", stage=2),
-        rule_version=_nonempty_string(
-            data["rule_version"], "layout_rule_authority.rule_version", stage=2
-        ),
-        rule_artifact_canonical_hash=_sha(
-            data["rule_artifact_canonical_hash"],
-            "layout_rule_authority.rule_artifact_canonical_hash",
-            stage=2,
-        ),
-        source_class=_nonempty_string(
-            data["source_class"], "layout_rule_authority.source_class", stage=2
-        ),
-        license_evidence=_canonical_json_value(
+    )
+    acc.capture("rule_id", _nonempty_field("rule_id"))
+    acc.capture("rule_version", _nonempty_field("rule_version"))
+    acc.capture("rule_artifact_canonical_hash", _sha_field("rule_artifact_canonical_hash"))
+    acc.capture("source_class", _nonempty_field("source_class"))
+    acc.capture(
+        "license_evidence",
+        lambda: _canonical_json_value(
             data["license_evidence"],
             "layout_rule_authority.license_evidence",
             stage=2,
         ),
-        approval_status=_nonempty_string(
-            data["approval_status"],
-            "layout_rule_authority.approval_status",
-            stage=2,
-        ),
-        provenance_edge_ids=_string_array(
+    )
+    acc.capture("approval_status", _nonempty_field("approval_status"))
+    acc.capture(
+        "provenance_edge_ids",
+        lambda: _string_array(
             data["provenance_edge_ids"],
             "layout_rule_authority.provenance_edge_ids",
             stage=2,
         ),
-        evidence_refs=_string_array(
-            data["evidence_refs"], "layout_rule_authority.evidence_refs", stage=2
+    )
+    acc.capture(
+        "evidence_refs",
+        lambda: _string_array(
+            data["evidence_refs"],
+            "layout_rule_authority.evidence_refs",
+            stage=2,
         ),
-        rule_pack_identity=rule_pack,
-        pattern_family=_enum(
+    )
+
+    def _rule_pack() -> Any:
+        rule_pack_raw = data["rule_pack_identity"]
+        if rule_pack_raw is None:
+            return None
+        return parse_rule_pack_identity(rule_pack_raw, "layout_rule_authority.rule_pack_identity")
+
+    acc.capture("rule_pack_identity", _rule_pack)
+    acc.capture(
+        "pattern_family",
+        lambda: _enum(
             data["pattern_family"],
             PatternFamily,
             "layout_rule_authority.pattern_family",
             stage=2,
         ),
-        pitch_m=pitch_m,
-        edge_clearance_m=edge_clearance_m,
-        allowed_origin_modes=_enum_array(
+    )
+    acc.capture(
+        "pitch_m",
+        lambda: _decimal(
+            data["pitch_m"],
+            "layout_rule_authority.pitch_m",
+            positive=True,
+            code=BlockerCode.STL_PITCH_INVALID,
+            message_key="pitch_invalid",
+            stage=2,
+        ),
+    )
+    acc.capture(
+        "edge_clearance_m",
+        lambda: _decimal(
+            data["edge_clearance_m"],
+            "layout_rule_authority.edge_clearance_m",
+            positive=False,
+            code=BlockerCode.STL_EDGE_CLEARANCE_INVALID,
+            message_key="edge_clearance_invalid",
+            stage=2,
+        ),
+    )
+    acc.capture(
+        "allowed_origin_modes",
+        lambda: _enum_array(
             data["allowed_origin_modes"],
             OriginMode,
             "layout_rule_authority.allowed_origin_modes",
             stage=2,
         ),
-        allowed_axis_orientations=_enum_array(
+    )
+    acc.capture(
+        "allowed_axis_orientations",
+        lambda: _enum_array(
             data["allowed_axis_orientations"],
             AxisOrientation,
             "layout_rule_authority.allowed_axis_orientations",
             stage=2,
         ),
-        allowed_exclusion_zone_types=_enum_array(
+    )
+    acc.capture(
+        "allowed_exclusion_zone_types",
+        lambda: _enum_array(
             data["allowed_exclusion_zone_types"],
             ExclusionZoneType,
             "layout_rule_authority.allowed_exclusion_zone_types",
             allow_empty=True,
             stage=2,
         ),
-        maximum_candidate_positions=_integer(
+    )
+    acc.capture(
+        "maximum_candidate_positions",
+        lambda: _integer(
             data["maximum_candidate_positions"],
             "layout_rule_authority.maximum_candidate_positions",
             minimum=1,
             stage=2,
         ),
-        snapshot_hash=_sha(
-            data["snapshot_hash"],
-            "layout_rule_authority.snapshot_hash",
+    )
+    acc.capture("snapshot_hash", _sha_field("snapshot_hash"))
+
+    if acc.blockers:
+        raise _schema_failure(
+            2,
+            tuple(acc.blockers),
+            raw_failing_field=None,
+        )
+
+    # Round-5 §1: license_evidence must be a frozen canonical fragment.
+    # We post-process the validated value here.
+    license_evidence_frozen = acc.values["license_evidence"]
+    if not _is_frozen_canonical_fragment(license_evidence_frozen):
+        # Re-snap to canonical if validator left a non-frozen value.
+        license_evidence_frozen = _canonical_json_value(
+            data["license_evidence"],
+            "layout_rule_authority.license_evidence",
             stage=2,
-        ),
+        )
+
+    return LayoutRuleAuthoritySnapshot(
+        profile_id=acc.values["profile_id"],
+        authority_mode=acc.values["authority_mode"],
+        rule_id=acc.values["rule_id"],
+        rule_version=acc.values["rule_version"],
+        rule_artifact_canonical_hash=acc.values["rule_artifact_canonical_hash"],
+        source_class=acc.values["source_class"],
+        license_evidence=license_evidence_frozen,
+        approval_status=acc.values["approval_status"],
+        provenance_edge_ids=acc.values["provenance_edge_ids"],
+        evidence_refs=acc.values["evidence_refs"],
+        rule_pack_identity=acc.values["rule_pack_identity"],
+        pattern_family=acc.values["pattern_family"],
+        pitch_m=acc.values["pitch_m"],
+        edge_clearance_m=acc.values["edge_clearance_m"],
+        allowed_origin_modes=acc.values["allowed_origin_modes"],
+        allowed_axis_orientations=acc.values["allowed_axis_orientations"],
+        allowed_exclusion_zone_types=acc.values["allowed_exclusion_zone_types"],
+        maximum_candidate_positions=acc.values["maximum_candidate_positions"],
+        snapshot_hash=acc.values["snapshot_hash"],
     )
 
 
 def parse_envelope_raw(value: Any) -> EnvelopeRaw:
     """Stage-2-only raw parser for the placement envelope.
 
-    Round 4 §3.1: this function MUST NOT compare schema_version against the
-    expected version. The schema_version field is preserved verbatim in the
-    returned :class:`EnvelopeRaw` so that :func:`validate_all_schema_versions`
-    (Stage 3) can evaluate it after every other Stage-2 check has completed.
+    Round 4 §3.1 + round 5 §5.3: this function MUST NOT compare
+    schema_version against the expected version, and per-field raw
+    checks (schema_version/tube_center_envelope_diameter_m/evidence_refs)
+    run independently through the ``StageAccumulator`` so that multiple
+    failures all surface as complete blockers.
 
     Only shape / raw-type / numeric-shape work happens here. The round-3
     public boundary still rejects non-canonical mapping shapes.
     """
 
     fields = {"schema_version", "tube_center_envelope_diameter_m", "evidence_refs"}
-    data = _mapping(value, "placement_envelope", fields, stage=2)
-    schema_version_text = _nonempty_string(
-        data["schema_version"], "placement_envelope.schema_version", stage=2
+    try:
+        data = _mapping(value, "placement_envelope", fields, stage=2)
+    except SchemaFailure as exc:
+        raise SchemaFailure(
+            2,
+            exc.blockers,
+            raw_failing_field=exc.raw_failing_field,
+        ) from exc
+
+    acc = StageAccumulator()
+    acc.capture(
+        "schema_version",
+        lambda: _nonempty_string(
+            data["schema_version"],
+            "placement_envelope.schema_version",
+            stage=2,
+        ),
     )
-    envelope_diameter_m = _decimal(
-        data["tube_center_envelope_diameter_m"],
-        "placement_envelope.tube_center_envelope_diameter_m",
-        positive=True,
-        code=BlockerCode.STL_ENVELOPE_INVALID,
-        message_key="envelope_diameter_invalid",
-        stage=2,
+    acc.capture(
+        "tube_center_envelope_diameter_m",
+        lambda: _decimal(
+            data["tube_center_envelope_diameter_m"],
+            "placement_envelope.tube_center_envelope_diameter_m",
+            positive=True,
+            code=BlockerCode.STL_ENVELOPE_INVALID,
+            message_key="envelope_diameter_invalid",
+            stage=2,
+        ),
     )
-    return EnvelopeRaw(
-        schema_version=schema_version_text,
-        tube_center_envelope_diameter_m=envelope_diameter_m,
-        evidence_refs=_string_array(
+    acc.capture(
+        "evidence_refs",
+        lambda: _string_array(
             data["evidence_refs"],
             "placement_envelope.evidence_refs",
             allow_empty=False,
             stage=2,
         ),
+    )
+
+    if acc.blockers:
+        raise _schema_failure(
+            2,
+            tuple(acc.blockers),
+            raw_failing_field=None,
+        )
+
+    return EnvelopeRaw(
+        schema_version=acc.values["schema_version"],
+        tube_center_envelope_diameter_m=acc.values["tube_center_envelope_diameter_m"],
+        evidence_refs=acc.values["evidence_refs"],
     )
 
 
@@ -1164,11 +1445,10 @@ class PairingPlanRaw:
 def parse_pairing_plan_raw(value: Any) -> PairingPlanRaw | None:
     """Stage-2-only raw parser for the U-tube pairing plan.
 
-    Round 4 §3.1: this function MUST NOT compare schema_version against the
-    expected version. The schema_version field is preserved verbatim (or
-    ``None`` when the plan itself is absent) so that
-    :func:`validate_all_schema_versions` (Stage 3) can evaluate it after
-    every other Stage-2 check has completed.
+    Round 4 §3.1 + round 5 §5.3: schema_version is preserved verbatim
+    (or ``None`` when the plan itself is absent). Per-field raw checks
+    run independently through the ``StageAccumulator`` so multiple
+    failures all surface as complete blockers.
 
     Pair-pair shape validation (Stage 2 numeric / array raw types) DOES
     happen here because that is exactly what Stage 2 is for. Only the
@@ -1177,63 +1457,115 @@ def parse_pairing_plan_raw(value: Any) -> PairingPlanRaw | None:
 
     if value is None:
         return None
-    data = _mapping(
-        value,
-        "u_tube_pairing_plan",
-        {"schema_version", "pairs", "evidence_refs", "pairing_plan_hash"},
-        stage=2,
-    )
-    schema_version_text = _nonempty_string(
-        data["schema_version"], "u_tube_pairing_plan.schema_version", stage=2
-    )
-    raw_pairs = data["pairs"]
-    if not isinstance(raw_pairs, list) or not raw_pairs:
-        raise _schema_failure(
-            2,
-            (
-                _block(
-                    BlockerCode.STL_UTUBE_PAIRING_INVALID,
-                    "u_tube_pairing_plan.pairs",
-                    "u_tube_pair_raw_shape_invalid",
-                ),
-            ),
-            raw_failing_field=raw_pairs,
-        )
-    pairs: list[UTubePair] = []
-    for index, raw_pair in enumerate(raw_pairs):
-        field_path = f"u_tube_pairing_plan.pairs[{index}]"
-        pair_data = _mapping(
-            raw_pair,
-            field_path,
-            {"pair_id", "leg_a", "leg_b", "evidence_refs"},
+    try:
+        data = _mapping(
+            value,
+            "u_tube_pairing_plan",
+            {"schema_version", "pairs", "evidence_refs", "pairing_plan_hash"},
             stage=2,
         )
-        pairs.append(
-            UTubePair(
-                pair_id=_nonempty_string(pair_data["pair_id"], f"{field_path}.pair_id", stage=2),
-                leg_a=parse_leg(pair_data["leg_a"], f"{field_path}.leg_a"),
-                leg_b=parse_leg(pair_data["leg_b"], f"{field_path}.leg_b"),
-                evidence_refs=_string_array(
-                    pair_data["evidence_refs"],
-                    f"{field_path}.evidence_refs",
-                    stage=2,
+    except SchemaFailure as exc:
+        raise SchemaFailure(
+            2,
+            exc.blockers,
+            raw_failing_field=exc.raw_failing_field,
+        ) from exc
+
+    acc = StageAccumulator()
+    acc.capture(
+        "schema_version",
+        lambda: _nonempty_string(
+            data["schema_version"],
+            "u_tube_pairing_plan.schema_version",
+            stage=2,
+        ),
+    )
+
+    # Round-5 §5.3: pair-array raw check runs independently from the
+    # other top-level fields.
+    def _pairs_check() -> tuple[UTubePair, ...]:
+        raw_pairs = data["pairs"]
+        if not isinstance(raw_pairs, list) or not raw_pairs:
+            raise _schema_failure(
+                2,
+                (
+                    _block(
+                        BlockerCode.STL_UTUBE_PAIRING_INVALID,
+                        "u_tube_pairing_plan.pairs",
+                        "u_tube_pair_raw_shape_invalid",
+                    ),
                 ),
+                raw_failing_field=raw_pairs,
             )
-        )
-    return PairingPlanRaw(
-        schema_version=schema_version_text,
-        pairs=tuple(pairs),
-        evidence_refs=_string_array(
+
+        built_pairs: list[UTubePair] = []
+        for index, raw_pair in enumerate(raw_pairs):
+            inner_field_path = f"u_tube_pairing_plan.pairs[{index}]"
+            try:
+                pair_data = _mapping(
+                    raw_pair,
+                    inner_field_path,
+                    {"pair_id", "leg_a", "leg_b", "evidence_refs"},
+                    stage=2,
+                )
+            except SchemaFailure as exc:
+                # Round-5 §5.3: when one pair's shape fails we surface
+                # its blocker but continue validating the rest of the
+                # pairs — at the outer accumulator boundary. We push
+                # the blocker into the parent accumulator via the
+                # exception chain.
+                raise SchemaFailure(
+                    2,
+                    exc.blockers,
+                    raw_failing_field=exc.raw_failing_field,
+                ) from exc
+            built_pairs.append(
+                UTubePair(
+                    pair_id=_nonempty_string(
+                        pair_data["pair_id"], f"{inner_field_path}.pair_id", stage=2
+                    ),
+                    leg_a=parse_leg(pair_data["leg_a"], f"{inner_field_path}.leg_a"),
+                    leg_b=parse_leg(pair_data["leg_b"], f"{inner_field_path}.leg_b"),
+                    evidence_refs=_string_array(
+                        pair_data["evidence_refs"],
+                        f"{inner_field_path}.evidence_refs",
+                        stage=2,
+                    ),
+                )
+            )
+        return tuple(built_pairs)
+
+    acc.capture("pairs", _pairs_check)
+    acc.capture(
+        "evidence_refs",
+        lambda: _string_array(
             data["evidence_refs"],
             "u_tube_pairing_plan.evidence_refs",
             allow_empty=False,
             stage=2,
         ),
-        pairing_plan_hash=_sha(
+    )
+    acc.capture(
+        "pairing_plan_hash",
+        lambda: _sha(
             data["pairing_plan_hash"],
             "u_tube_pairing_plan.pairing_plan_hash",
             stage=2,
         ),
+    )
+
+    if acc.blockers:
+        raise _schema_failure(
+            2,
+            tuple(acc.blockers),
+            raw_failing_field=None,
+        )
+
+    return PairingPlanRaw(
+        schema_version=acc.values["schema_version"],
+        pairs=acc.values["pairs"],
+        evidence_refs=acc.values["evidence_refs"],
+        pairing_plan_hash=acc.values["pairing_plan_hash"],
     )
 
 
