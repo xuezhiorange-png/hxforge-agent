@@ -12,7 +12,7 @@ Round 3 §6 (P1-1) requires a strict three-layer separation:
      list→tuple, leaves preserved). Rejects out-of-domain types and never
      silently coerces.
 
-  3. ``frozen_fragment_to_primitive(value)`` — accepts ONLY the recursive
+  3. ``internal_frozen_to_primitive(value)`` — accepts ONLY the recursive
      frozen shape. Reduces MappingProxyType→dict, tuple→list. Rejects
      arbitrary objects, Decimal, bytes, set, frozenset.
 
@@ -27,7 +27,6 @@ from __future__ import annotations
 import json
 import math
 from decimal import Decimal
-from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -35,13 +34,14 @@ import pytest
 from hexagent.exchangers.shell_tube.tube_layout.canonical import (
     CanonicalizationError,
     FrozenJsonArray,
+    FrozenJsonObject,
     NonCanonicalFragmentError,
     PublicCanonicalDomainError,
     canonical_json,
     canonical_raw_json_or_none,
     fragment_canonical_json,
     freeze_deeply,
-    frozen_fragment_to_primitive,
+    internal_frozen_to_primitive,
     quantized_decimal_string,
     strict_public_json_snapshot,
 )
@@ -114,10 +114,12 @@ def test_strict_snapshot_accepts_lists() -> None:
 
 
 def test_strict_snapshot_accepts_string_keyed_dict() -> None:
+    # Round 7 (P1-1): ``strict_public_json_snapshot(dict)`` returns a
+    # :class:`FrozenJsonObject` (not a raw ``MappingProxyType``).
     snap = strict_public_json_snapshot({"z": 1, "a": [1, 2]})
-    assert isinstance(snap, MappingProxyType)
-    assert tuple(snap.keys()) == ("a", "z")
-    assert isinstance(snap["a"], FrozenJsonArray)
+    assert isinstance(snap, FrozenJsonObject)
+    assert tuple(snap.values.keys()) == ("a", "z")
+    assert isinstance(snap.values["a"], FrozenJsonArray)
 
 
 @pytest.mark.parametrize(
@@ -139,13 +141,13 @@ def test_strict_snapshot_rejects_out_of_domain_inputs(bad_value: Any) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# frozen_fragment_to_primitive — accepts only the strict snapshot shape
+# internal_frozen_to_primitive — accepts only the strict snapshot shape
 # --------------------------------------------------------------------------- #
 
 
 def test_frozen_primitive_reduces_mapping_to_dict() -> None:
     snap = strict_public_json_snapshot({"a": 1, "b": [1, 2]})
-    reduced = frozen_fragment_to_primitive(snap)
+    reduced = internal_frozen_to_primitive(snap)
     assert reduced == {"a": 1, "b": [1, 2]}
     assert isinstance(reduced, dict)
     assert isinstance(reduced["b"], list)
@@ -153,27 +155,27 @@ def test_frozen_primitive_reduces_mapping_to_dict() -> None:
 
 def test_frozen_primitive_rejects_arbitrary_object() -> None:
     with pytest.raises(NonCanonicalFragmentError):
-        frozen_fragment_to_primitive(object())
+        internal_frozen_to_primitive(object())
 
 
 def test_frozen_primitive_rejects_decimal() -> None:
     with pytest.raises(NonCanonicalFragmentError):
-        frozen_fragment_to_primitive(Decimal("1.5"))
+        internal_frozen_to_primitive(Decimal("1.5"))
 
 
 def test_frozen_primitive_rejects_bytes() -> None:
     with pytest.raises(NonCanonicalFragmentError):
-        frozen_fragment_to_primitive(b"raw")
+        internal_frozen_to_primitive(b"raw")
 
 
 def test_frozen_primitive_rejects_frozenset() -> None:
     with pytest.raises(NonCanonicalFragmentError):
-        frozen_fragment_to_primitive(frozenset({"a", "b"}))
+        internal_frozen_to_primitive(frozenset({"a", "b"}))
 
 
 def test_frozen_primitive_rejects_set() -> None:
     with pytest.raises(NonCanonicalFragmentError):
-        frozen_fragment_to_primitive({"a", "b"})
+        internal_frozen_to_primitive({"a", "b"})
 
 
 # --------------------------------------------------------------------------- #
@@ -210,21 +212,24 @@ def test_canonical_raw_json_or_none_stable_for_repeated_invalid_input() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_freeze_deeply_makes_mapping_proxy_for_dict() -> None:
+def test_freeze_deeply_makes_frozen_json_object_for_dict() -> None:
+    # Round 7 (P1-1): ``freeze_deeply`` (``force_frozen_canonical``)
+    # emits :class:`FrozenJsonObject` for ``dict`` inputs.
     frozen = freeze_deeply({"a": 1, "b": 2})
-    assert isinstance(frozen, MappingProxyType)
-    assert frozen["a"] == 1
+    assert isinstance(frozen, FrozenJsonObject)
+    assert frozen.values["a"] == 1
     with pytest.raises(TypeError):
-        frozen["a"] = 99  # type: ignore[index]
+        frozen.values["a"] = 99  # type: ignore[index]
 
 
 def test_freeze_deeply_converts_nested_lists_to_frozen_json_array() -> None:
-    # Round 6 §1 + §4: the only canonical internal-frozen array shape is
-    # ``FrozenJsonArray``; ``freeze_deeply`` emits ``FrozenJsonArray``
-    # rather than raw ``tuple`` for nested lists.
+    # Round 6 §1 + §4 + Round 7: nested lists become
+    # :class:`FrozenJsonArray`; ``freeze_deeply`` produces a
+    # :class:`FrozenJsonObject` for the outer dict.
     frozen = freeze_deeply({"nested": [1, 2, 3]})
-    assert isinstance(frozen["nested"], FrozenJsonArray)
-    assert frozen["nested"].values == (1, 2, 3)
+    assert isinstance(frozen, FrozenJsonObject)
+    assert isinstance(frozen.values["nested"], FrozenJsonArray)
+    assert frozen.values["nested"].values == (1, 2, 3)
 
 
 def test_freeze_deeply_rejects_bytes() -> None:

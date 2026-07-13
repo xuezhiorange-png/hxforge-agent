@@ -50,12 +50,14 @@ from .authority import (
 )
 from .canonical import (
     CanonicalizationError,
+    FrozenJsonArray,
+    FrozenJsonObject,
     canonical_raw_json_or_none,
     dataclass_to_mapping,
-    frozen_fragment_to_primitive,
+    force_frozen_canonical,
+    internal_frozen_to_primitive,
     layout_id,
     position_id,
-    refreeze_internal_fragment,
     sha256_hex,
     snapshot_then_to_primitive,
     sort_messages,
@@ -287,12 +289,14 @@ def _blocked_result_payload(
     canonical_blockers = sort_messages(blockers)
     canonical_warnings = sort_messages(eligible_warnings)
 
-    # Round-3 §6 (P1-1): every canonical JSON fragment must traverse the
-    # public boundary `strict_public_json_snapshot`. Then hash reduction uses
-    # `frozen_fragment_to_primitive`. `canonical_json` itself rejects out-of-
-    # domain types (float, Decimal, bytes, tuple, frozenset, set, arbitrary).
+    # Round 7 (unified canonical-type-system): every canonical JSON
+    # fragment must traverse the public boundary
+    # `strict_public_json_snapshot`. Then hash reduction uses
+    # `internal_frozen_to_primitive`. `canonical_json` itself rejects
+    # out-of-domain types (float, Decimal, bytes, tuple, frozenset,
+    # set, arbitrary) AND internal Layer-B markers.
     from .canonical import (
-        frozen_fragment_to_primitive as _reduce_frozen,
+        internal_frozen_to_primitive as _reduce_frozen,
     )
     from .canonical import (
         strict_public_json_snapshot as _snapshot_public,
@@ -301,16 +305,20 @@ def _blocked_result_payload(
     def _entry_primitive(entry: MessageEntry) -> dict[str, Any]:
         # Convert the dataclass into a literal canonical dict, then route it
         # through the public snapshot boundary so a mutation in entry after
-        # capture cannot influence the blocked_result_hash. Round-4 §6
-        # P0-4 deep-freezes ``details`` in MessageEntry.__post_init__; that
-        # means at this point ``entry.details`` is already a public-boundary
-        # frozen shape (MappingProxyType) OR None. Reduce it via the
-        # fragment-to-primitive path so re-snapshotting does not reject it.
+        # capture cannot influence the blocked_result_hash. Round-7 §3
+        # (canonical-type-system unification): ``entry.details`` is
+        # already a :class:`FrozenJsonObject` after
+        # ``MessageEntry.__post_init__`` ran ``force_frozen_optional_canonical``.
+        # Reduce it via ``_reduce_frozen`` (Layer-B) directly; never
+        # re-snapshot an internal marker through the public boundary.
         details = entry.details
         if details is None:
             details_primitive: Any = None
-        elif isinstance(details, MappingProxyType):
+        elif isinstance(details, (FrozenJsonObject, FrozenJsonArray)):
             details_primitive = _reduce_frozen(details)
+        elif isinstance(details, MappingProxyType):
+            # Legacy safety net for pre-R7 frozen shapes — wrap then reduce.
+            details_primitive = _reduce_frozen(FrozenJsonObject(details))
         else:
             details_primitive = _reduce_frozen(_snapshot_public(details))
         primitive = {
@@ -329,26 +337,23 @@ def _blocked_result_payload(
     # value via ``to_primitive`` so the snapshot boundary only sees canonical
     # JSON-domain inputs.
     def _reduce_context_value(value: Any) -> Any:
-        # Round 5 §4.1 + §4.3: this reducer is the single entry point for
-        # every value that flows into the frozen ``normalized_context``.
-        # It MUST:
-        #   * accept only canonical JSON-domain primitives (null / bool /
-        #     int / str / list of canonical values / string-keyed dict
-        #     of canonical values); and
-        #   * reject Decimal / float / bytes / tuple / set / frozenset /
-        #     arbitrary object / non-string-keyed mapping AT THIS BOUNDARY
-        #     rather than silently coercing them.
-        # Internal callers that need Decimal or other non-JSON-domain
-        # values MUST convert them to canonical decimal strings BEFORE
-        # they reach this reducer — that's the round 5 §4.3 contract.
+        # Round 5 §4.1 + §4.3 + Round 7 type-system unification: this
+        # reducer is the single entry point for every value that flows
+        # into the frozen ``normalized_context``. Round 7 adds explicit
+        # handling of :class:`FrozenJsonObject` and
+        # :class:`FrozenJsonArray` internal markers produced by
+        # ``force_frozen_canonical`` downstream dataclass ``__post_init__``.
         if value is None or isinstance(value, (bool, int, str)):
             return value
         if dataclasses.is_dataclass(value):
             return _reduce_context_value(dataclass_to_mapping(value))
+        if isinstance(value, FrozenJsonObject):
+            return {key: _reduce_context_value(item) for key, item in sorted(value.values.items())}
+        if isinstance(value, FrozenJsonArray):
+            return [_reduce_context_value(item) for item in value.values]
         if isinstance(value, MappingProxyType):
-            # Already-frozen fragment: reduce to a sorted-key primitive
-            # mapping so the public snapshot boundary accepts it.
-            return {key: _reduce_context_value(item) for key, item in sorted(value.items())}
+            # Legacy safety net for pre-R7 frozen shapes — wrap then reduce.
+            return _reduce_context_value(FrozenJsonObject(value))
         if isinstance(value, (tuple, list)):
             return [_reduce_context_value(item) for item in value]
         if isinstance(value, dict):
@@ -1228,29 +1233,35 @@ def validate_request(
     # Build the provenance primitive exactly once and freeze it. Use the
     # already-frozen fragments from the projection dataclass and produce a
     # primitive detached mapping.
-    case_authority_primitive = frozen_fragment_to_primitive(
+    case_authority_primitive = internal_frozen_to_primitive(
         provenance_pre_hash.task020_case_authority
     )
-    geometry_source_primitive = frozen_fragment_to_primitive(
+    geometry_source_primitive = internal_frozen_to_primitive(
         provenance_pre_hash.geometry_source_binding
     )
     rule_pack_primitive = (
         None
         if provenance_pre_hash.rule_pack_identity is None
-        else frozen_fragment_to_primitive(provenance_pre_hash.rule_pack_identity)
+        else internal_frozen_to_primitive(provenance_pre_hash.rule_pack_identity)
     )
 
-    # Round 6 §5: ``snapshot_then_to_primitive`` no longer accepts an
-    # already-frozen fragment as a no-op bypass; the public Layer-A
-    # boundary rejects internal markers outright. Internal canonicalization
-    # of an already-frozen MessageEntry ``details`` (a
-    # ``MappingProxyType`` constructed by ``MessageEntry.__post_init__``)
-    # must go through ``frozen_fragment_to_primitive`` (Layer-B) directly.
+    # Round 7 (unified canonical-type-system): ``snapshot_then_to_primitive``
+    # rejects already-frozen fragments (Layer-A strict public boundary)
+    # outright. The MessageEntry ``details`` field is already a
+    # :class:`FrozenJsonObject` after ``MessageEntry.__post_init__`` ran
+    # through ``force_frozen_optional_canonical``; the hash path reduces
+    # it via ``internal_frozen_to_primitive`` (Layer-B) directly.
+    from .canonical import FrozenJsonArray, FrozenJsonObject  # noqa: F401
+
     def _details_primitive(details: Any) -> Any:
         if details is None:
             return None
+        if isinstance(details, (FrozenJsonObject, FrozenJsonArray)):
+            return internal_frozen_to_primitive(details)
+        # Legacy safety net: a raw ``MappingProxyType`` was the pre-R7
+        # frozen-mapping representation — wrap it and reduce.
         if isinstance(details, MappingProxyType):
-            return frozen_fragment_to_primitive(details)
+            return internal_frozen_to_primitive(FrozenJsonObject(details))
         # Public-domain input — must traverse the strict snapshot path.
         return snapshot_then_to_primitive(details)
 
@@ -1346,16 +1357,16 @@ def validate_request(
     layout_hash = sha256_hex(layout_hash_payload)
 
     # Final provenance: add the freshly computed layout_hash.
-    # Round 5 §6.2: provenance is built from internal dataclass tuple
-    # fields, so we MUST go through refreeze_internal_fragment instead
-    # of force_frozen_canonical / freeze_deeply.
-    provenance_primitive_frozen = refreeze_internal_fragment(provenance_primitive)
-    provenance_primitive_final = refreeze_internal_fragment(
-        {
-            **frozen_fragment_to_primitive(provenance_primitive_frozen),
-            "layout_hash": layout_hash,
-        }
-    )
+    # Round 7 (unified canonical-type-system): provenance is built from
+    # already-validated public-domain primitives, so it crosses the
+    # Layer-A boundary via ``force_frozen_canonical`` (which yields
+    # a :class:`FrozenJsonObject` for ordinary dict input). The
+    # ``TubeLayout.__post_init__`` then performs an idempotent
+    # ``refreeze_internal_fragment`` re-walk.
+    provenance_primitive_with_hash: dict[str, Any] = {
+        **provenance_primitive,
+        "layout_hash": layout_hash,
+    }
 
     # --- Stage 21 — final output assembly ---
     # All canonical JSON fragments are deep-frozen in-place via the snapshot
@@ -1387,7 +1398,7 @@ def validate_request(
         warnings=warnings,
         blockers=(),
         deferred_capabilities=provenance_pre_hash.deferred_capabilities,
-        provenance=provenance_primitive_final,
+        provenance=force_frozen_canonical(provenance_primitive_with_hash),
     )
     return TubeLayoutValidationResult(
         status=ValidationStatus.VALID,

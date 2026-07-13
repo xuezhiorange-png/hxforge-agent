@@ -13,7 +13,8 @@ from hexagent.exchangers.shell_tube.tube_layout import (
     validate_request,
 )
 from hexagent.exchangers.shell_tube.tube_layout.canonical import (
-    frozen_fragment_to_primitive,
+    internal_frozen_to_primitive,
+    refreeze_internal_fragment,
     sha256_hex,
 )
 from tests.exchangers.shell_tube.tube_layout._builders import (
@@ -571,9 +572,15 @@ def test_round3_frozen_fragment_rejects_arbitrary_post_init_mutation() -> None:
     )
 
     frozen = strict_public_json_snapshot({"a": 1, "b": [1, 2]})
-    assert isinstance(frozen, MappingProxyType)
+    # Round 7 (P1-1): ``strict_public_json_snapshot(dict)`` returns a
+    # :class:`FrozenJsonObject` whose internal mapping is a
+    # ``MappingProxyType``.
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import FrozenJsonObject
+
+    assert isinstance(frozen, FrozenJsonObject)
+    assert isinstance(frozen.values, MappingProxyType)
     with pytest.raises(TypeError):
-        frozen["a"] = 99  # type: ignore[index]
+        frozen.values["a"] = 99  # type: ignore[index]
 
 
 # --------------------------------------------------------------------------- #
@@ -1039,7 +1046,7 @@ def test_round4_layout_caller_mutation_does_not_influence_hashes() -> None:
     result = validate_request(payload, software_version="0.1.0", git_commit="abc")
     assert result.layout is not None
 
-    snapshot_license = frozen_fragment_to_primitive(
+    snapshot_license = internal_frozen_to_primitive(
         result.layout.layout_rule_authority.license_evidence
     )
     request_hash_before = result.layout.request_hash
@@ -1050,7 +1057,7 @@ def test_round4_layout_caller_mutation_does_not_influence_hashes() -> None:
     payload["layout_rule_authority"]["license_evidence"]["nested"] = {"x": 1}
 
     # Re-snapshot must still equal the captured snapshot.
-    snapshot_after = frozen_fragment_to_primitive(
+    snapshot_after = internal_frozen_to_primitive(
         result.layout.layout_rule_authority.license_evidence
     )
     assert snapshot_license == snapshot_after, (
@@ -1443,29 +1450,37 @@ def test_round5_force_frozen_canonical_rejects_frozen_json_array_with_non_atom()
 # --------------------------------------------------------------------------- #
 
 
-def test_round6_frozen_fragment_to_primitive_rejects_raw_tuple() -> None:
-    """Round 6 §1: ``frozen_fragment_to_primitive`` is no longer an
-    implicit raw-tuple bypass. A raw ``tuple`` from a public caller MUST
-    be rejected with ``NonCanonicalFragmentError``; only canonical atoms,
-    ``FrozenMapping``, and ``FrozenJsonArray`` are accepted."""
+def test_round6_internal_frozen_to_primitive_rejects_raw_tuple() -> None:
+    """Round 6 §1 + Round 7 type-system unification.
+
+    ``internal_frozen_to_primitive`` is no longer an implicit raw-tuple
+    bypass. A raw ``tuple`` from a public caller MUST be rejected with
+    :class:`NonCanonicalFragmentError`; only canonical atoms,
+    :class:`FrozenJsonObject`, and :class:`FrozenJsonArray` are
+    accepted. The :class:`FrozenJsonObject` constructor itself rejects
+    raw ``tuple`` values at construction (Round 7 §4).
+    """
 
     from hexagent.exchangers.shell_tube.tube_layout.canonical import (
         FrozenJsonArray,
-        FrozenMapping,
         NonCanonicalFragmentError,
-        frozen_fragment_to_primitive,
+        PublicCanonicalDomainError,
+        internal_frozen_to_primitive,
     )
 
-    # raw tuple is rejected
+    # raw tuple is rejected at Layer B
     with pytest.raises(NonCanonicalFragmentError):
-        frozen_fragment_to_primitive((1, 2, 3))
-    # raw tuple inside a MappingProxyType IS rejected (no implicit bypass)
-    internal = FrozenMapping({"a": (1, 2, 3)})
-    with pytest.raises(NonCanonicalFragmentError):
-        frozen_fragment_to_primitive(internal)
+        internal_frozen_to_primitive((1, 2, 3))
+    # raw tuple inside a FrozenJsonObject is rejected at construction
+    with pytest.raises(PublicCanonicalDomainError):
+        from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+            FrozenJsonObject,
+        )
+
+        FrozenJsonObject({"a": (1, 2, 3)})
     # FrozenJsonArray is accepted and reduces to a list
     array = FrozenJsonArray((1, 2, 3))
-    assert frozen_fragment_to_primitive(array) == [1, 2, 3]
+    assert internal_frozen_to_primitive(array) == [1, 2, 3]
 
 
 def test_round6_reduce_for_hash_raises_on_non_string_key() -> None:
@@ -1474,14 +1489,14 @@ def test_round6_reduce_for_hash_raises_on_non_string_key() -> None:
 
     from hexagent.exchangers.shell_tube.tube_layout.canonical import (
         CanonicalizationError,
-        FrozenMapping,
+        FrozenJsonObject,
         _reduce_for_hash,
     )
 
     with pytest.raises(CanonicalizationError):
         _reduce_for_hash({1: "x"})  # raw dict with non-str key
-    bad = FrozenMapping({"a": "ok"})
-    # FrozenMapping always has string keys by construction (public snapshot
+    bad = FrozenJsonObject({"a": "ok"})
+    # FrozenJsonObject always has string keys by construction (public snapshot
     # boundary), so this is the "double-defense" check; verify the helper
     # does not silently rewrite the mapping.
     assert _reduce_for_hash(bad) == {"a": "ok"}
@@ -1506,14 +1521,21 @@ def test_round6_reduce_for_hash_rejects_arbitrary_object() -> None:
 
 
 def test_round6_refreeze_internal_fragment_is_strict_whitelist() -> None:
-    """Round 6 §3: ``refreeze_internal_fragment`` no longer has a fail-open
-    ``return value`` tail. Encountered values not in the canonical atom /
-    FrozenMapping / FrozenJsonArray / tuple / list / dict whitelist
-    MUST raise ``PublicCanonicalDomainError``."""
+    """Round 6 §3 + Round 7 strict-whitelist refinement.
+
+    ``refreeze_internal_fragment`` accepts ONLY canonical atoms
+    (``None`` / ``bool`` / ``int`` / ``str``) /
+    :class:`FrozenJsonArray` / :class:`FrozenJsonObject`. Raw
+    ``tuple`` / raw ``list`` / raw ``dict`` /
+    ``MappingProxyType`` / arbitrary object / ``Decimal`` / ``bytes``
+    are all REJECTED with :class:`PublicCanonicalDomainError`.
+    Generic internal conversion of those shapes has been removed per
+    Round 7 P1-2 (``refreeze_internal_fragment`` must NOT guess
+    tuple-source provenance).
+    """
 
     from hexagent.exchangers.shell_tube.tube_layout.canonical import (
         PublicCanonicalDomainError,
-        refreeze_internal_fragment,
     )
 
     with pytest.raises(PublicCanonicalDomainError):
@@ -1524,12 +1546,18 @@ def test_round6_refreeze_internal_fragment_is_strict_whitelist() -> None:
         refreeze_internal_fragment(object())
     with pytest.raises(PublicCanonicalDomainError):
         refreeze_internal_fragment({1: "x"})
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment((1, 2, 3))
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment([1, 2, 3])
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment({"a": 1})
 
 
 def test_round6_frozen_json_array_rejects_nested_raw_tuple() -> None:
     """Round 6 §4: a ``FrozenJsonArray`` MUST NOT accept a raw ``tuple``
     element as an implicit frozen fragment. Only canonical atoms and
-    authenticated internal markers (``FrozenJsonArray`` / ``FrozenMapping``)
+    authenticated internal markers (``FrozenJsonArray`` / ``FrozenJsonObject``)
     are allowed inside."""
 
     from hexagent.exchangers.shell_tube.tube_layout.canonical import (
@@ -1549,7 +1577,7 @@ def test_round6_snapshot_then_to_primitive_rejects_internal_markers() -> None:
     ``frozenset`` / ``set`` as no-op bypasses. Public callers must hand
     the helper a public-domain value (None / bool / int / str / list /
     string-keyed dict); internal frozen fragments are handled by
-    ``frozen_fragment_to_primitive`` (Layer B) directly."""
+    ``internal_frozen_to_primitive`` (Layer B) directly."""
 
     from hexagent.exchangers.shell_tube.tube_layout.canonical import (
         FrozenJsonArray,
@@ -1568,19 +1596,19 @@ def test_round6_snapshot_then_to_primitive_rejects_internal_markers() -> None:
 def test_round6_force_frozen_canonical_rejects_internal_markers() -> None:
     """Round 6 §6: ``force_frozen_canonical`` is now a strict public
     Layer-A boundary that REJECTS internal-only marker types
-    (``FrozenJsonArray`` / ``FrozenMapping``). Public callers that hold
+    (``FrozenJsonArray`` / ``FrozenJsonObject``). Public callers that hold
     an internal-frozen shape must use ``refreeze_internal_fragment``
     (Layer B) instead."""
 
     from hexagent.exchangers.shell_tube.tube_layout.canonical import (
         FrozenJsonArray,
-        FrozenMapping,
+        FrozenJsonObject,
         PublicCanonicalDomainError,
         force_frozen_canonical,
     )
 
     with pytest.raises(PublicCanonicalDomainError):
-        force_frozen_canonical(FrozenMapping({"a": 1}))
+        force_frozen_canonical(FrozenJsonObject({"a": 1}))
     with pytest.raises(PublicCanonicalDomainError):
         force_frozen_canonical(FrozenJsonArray((1, 2, 3)))
 
@@ -1619,3 +1647,316 @@ def test_round6_canonical_json_path_still_stable_with_frozen_json_array() -> Non
     payload = {"items": [1, 2, 3], "name": "x"}
     assert canonical_json(payload) == '{"items":[1,2,3],"name":"x"}'
     assert sha256_hex(payload) == sha256_hex({"items": [1, 2, 3], "name": "x"})
+
+
+# --------------------------------------------------------------------------- #
+# Round-7 canonical-type-system regression tests.
+# --------------------------------------------------------------------------- #
+
+
+def test_round7_canonical_json_rejects_frozen_json_array() -> None:
+    """Round 7 §P0-4: ``canonical_json`` rejects :class:`FrozenJsonArray`
+    directly (Layer A public boundary rejects internal markers)."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        FrozenJsonArray,
+        canonical_json,
+    )
+
+    with pytest.raises(CanonicalizationError):
+        canonical_json(FrozenJsonArray((1, 2, 3)))
+
+
+def test_round7_canonical_json_rejects_frozen_json_object() -> None:
+    """Round 7 §P0-4: ``canonical_json`` rejects :class:`FrozenJsonObject`
+    directly."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        FrozenJsonObject,
+        canonical_json,
+    )
+
+    with pytest.raises(CanonicalizationError):
+        canonical_json(FrozenJsonObject({"a": 1}))
+
+
+def test_round7_canonical_json_rejects_mapping_proxy() -> None:
+    """Round 7 §P0-4: ``canonical_json`` rejects raw ``MappingProxyType``."""
+    from types import MappingProxyType
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        canonical_json,
+    )
+
+    with pytest.raises(CanonicalizationError):
+        canonical_json(MappingProxyType({"a": 1}))
+
+
+def test_round7_canonical_json_rejects_raw_tuple() -> None:
+    """Round 7 §P0-4: ``canonical_json`` rejects raw ``tuple``."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        canonical_json,
+    )
+
+    with pytest.raises(CanonicalizationError):
+        canonical_json(("a", "b"))
+
+
+def test_round7_force_frozen_canonical_rejects_internal_markers() -> None:
+    """Round 7 §3 Layer A: ``force_frozen_canonical`` rejects
+    :class:`FrozenJsonArray` / :class:`FrozenJsonObject` /
+    ``MappingProxyType`` / raw ``tuple``."""
+    from types import MappingProxyType
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonArray,
+        FrozenJsonObject,
+        PublicCanonicalDomainError,
+        force_frozen_canonical,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        force_frozen_canonical(FrozenJsonArray((1, 2)))
+    with pytest.raises(PublicCanonicalDomainError):
+        force_frozen_canonical(FrozenJsonObject({"a": 1}))
+    with pytest.raises(PublicCanonicalDomainError):
+        force_frozen_canonical(MappingProxyType({"a": 1}))
+    with pytest.raises(PublicCanonicalDomainError):
+        force_frozen_canonical(("a", "b"))
+
+
+def test_round7_snapshot_then_to_primitive_rejects_all_internal_markers() -> None:
+    """Round 7 §3: ``snapshot_then_to_primitive`` rejects all internal
+    markers + raw ``tuple`` / ``frozenset`` / ``set``."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonArray,
+        FrozenJsonObject,
+        PublicCanonicalDomainError,
+        snapshot_then_to_primitive,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        snapshot_then_to_primitive(FrozenJsonObject({"a": 1}))
+    with pytest.raises(PublicCanonicalDomainError):
+        snapshot_then_to_primitive(FrozenJsonArray((1, 2)))
+    with pytest.raises(PublicCanonicalDomainError):
+        snapshot_then_to_primitive((1, 2, 3))
+
+
+def test_round7_strict_public_json_snapshot_returns_frozen_json_object() -> None:
+    """Round 7 §P1-1: ``strict_public_json_snapshot(dict)`` returns
+    :class:`FrozenJsonObject` (not a raw ``MappingProxyType``)."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonArray,
+        FrozenJsonObject,
+        strict_public_json_snapshot,
+    )
+
+    snap_obj = strict_public_json_snapshot({"a": 1, "b": [1, 2]})
+    assert isinstance(snap_obj, FrozenJsonObject)
+    assert isinstance(snap_obj.values["b"], FrozenJsonArray)
+
+
+def test_round7_internal_reducer_rejects_raw_list() -> None:
+    """Round 7 §3: ``refreeze_internal_fragment`` rejects raw ``list``
+    (a generic internal-input shape must NOT be accepted)."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        refreeze_internal_fragment,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment([1, 2, 3])
+
+
+def test_round7_internal_reducer_rejects_raw_dict() -> None:
+    """Round 7 §3: ``refreeze_internal_fragment`` rejects raw ``dict``."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        refreeze_internal_fragment,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment({"a": 1})
+
+
+def test_round7_internal_reducer_rejects_mapping_proxy() -> None:
+    """Round 7 §3: ``refreeze_internal_fragment`` rejects raw
+    ``MappingProxyType`` (callers must wrap in
+    :class:`FrozenJsonObject`)."""
+    from types import MappingProxyType
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        refreeze_internal_fragment,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment(MappingProxyType({"a": 1}))
+
+
+def test_round7_internal_reducer_rejects_arbitrary_object() -> None:
+    """Round 7 §3: ``refreeze_internal_fragment`` rejects arbitrary
+    objects."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        refreeze_internal_fragment,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment(object())
+
+
+def test_round7_internal_reducer_rejects_decimal_and_bytes() -> None:
+    """Round 7 §3: ``refreeze_internal_fragment`` rejects
+    ``Decimal`` / ``bytes`` / ``float``."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        refreeze_internal_fragment,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment(Decimal("1"))
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment(b"raw")
+    with pytest.raises(PublicCanonicalDomainError):
+        refreeze_internal_fragment(1.5)
+
+
+def test_round7_hash_reducer_rejects_raw_tuple() -> None:
+    """Round 7 §P0-2: ``_reduce_for_hash`` rejects raw ``tuple``."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        _reduce_for_hash,
+    )
+
+    with pytest.raises(CanonicalizationError):
+        _reduce_for_hash(("a", "b"))
+
+
+def test_round7_hash_reducer_rejects_raw_list() -> None:
+    """Round 7 §P0-2: ``_reduce_for_hash`` rejects raw ``list`` (only
+    canonical atoms / FrozenJsonArray / FrozenJsonObject / explicit
+    dataclass reduction are accepted)."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        _reduce_for_hash,
+    )
+
+    # Note: list is NOT in the R7 whitelist for _reduce_for_hash — only
+    # canonical atoms / FrozenJsonArray / FrozenJsonObject / dataclass.
+    # This test confirms round 7's whitelist strength.
+    with pytest.raises(CanonicalizationError):
+        _reduce_for_hash([1, 2, 3])
+
+
+def test_round7_hash_reducer_rejects_mapping_proxy() -> None:
+    """Round 7 §P0-2: ``_reduce_for_hash`` rejects raw ``MappingProxyType``
+    (must be wrapped in FrozenJsonObject to be canonical)."""
+    from types import MappingProxyType
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        _reduce_for_hash,
+    )
+
+    with pytest.raises(CanonicalizationError):
+        _reduce_for_hash(MappingProxyType({"a": 1}))
+
+
+def test_round7_hash_reducer_rejects_non_string_key_dict() -> None:
+    """Round 7 §P0-2: ``_reduce_for_hash`` rejects ``dict`` with
+    non-string keys (silent-key-drop is forbidden)."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        CanonicalizationError,
+        _reduce_for_hash,
+    )
+
+    with pytest.raises(CanonicalizationError):
+        _reduce_for_hash({1: "x"})
+
+
+def test_round7_hash_reducer_accepts_frozen_json_array() -> None:
+    """Round 7 §P0-2: ``_reduce_for_hash`` accepts
+    :class:`FrozenJsonArray`."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonArray,
+        _reduce_for_hash,
+    )
+
+    assert _reduce_for_hash(FrozenJsonArray((1, 2, 3))) == [1, 2, 3]
+
+
+def test_round7_hash_reducer_accepts_frozen_json_object() -> None:
+    """Round 7 §P0-2: ``_reduce_for_hash`` accepts
+    :class:`FrozenJsonObject`."""
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonObject,
+        _reduce_for_hash,
+    )
+
+    obj = FrozenJsonObject({"a": 1, "b": 2})
+    assert _reduce_for_hash(obj) == {"a": 1, "b": 2}
+
+
+def test_round7_result_graph_all_canonical_fragments_are_frozen() -> None:
+    """Round 7 §11 result-graph invariant: every public canonical
+    fragment field on a valid ``TubeLayout`` result must be either
+    ``None``, a canonical atom, or recursively use the two Layer-B
+    internal containers — never raw ``tuple`` /
+    ``MappingProxyType`` / raw ``dict``. Caller mutation must not
+    influence the result, and the canonical hashes must remain
+    stable."""
+
+    from hexagent.exchangers.shell_tube.tube_layout import (
+        ValidationStatus,
+        validate_request,
+    )
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        FrozenJsonArray,
+        FrozenJsonObject,
+    )
+    from tests.exchangers.shell_tube.tube_layout._builders import make_request
+
+    def _walk(value: object, seen: set[int]) -> None:
+        if id(value) in seen:
+            return
+        seen.add(id(value))
+        # Fail the invariant on raw tuple / raw MappingProxyType / raw list
+        # (only canonical atom / FrozenJsonArray / FrozenJsonObject survive).
+        if isinstance(value, tuple):
+            pytest.fail(f"raw tuple leaked into result graph: {value!r}")
+        if isinstance(value, MappingProxyType_check):
+            pytest.fail(f"raw MappingProxyType leaked into result graph: {value!r}")
+        if isinstance(value, list):
+            # raw list in user-visible fields is also unexpected
+            # (canonical internal arrays go via FrozenJsonArray).
+            pytest.fail(f"raw list leaked into result graph: {value!r}")
+        if isinstance(value, dict):
+            pytest.fail(f"raw dict leaked into result graph: {value!r}")
+        if isinstance(value, FrozenJsonArray):
+            for item in value.values:
+                _walk(item, seen)
+            return
+        if isinstance(value, FrozenJsonObject):
+            for item in value.values.values():
+                _walk(item, seen)
+            return
+
+    # resolve MappingProxyType through stdlib alias
+    import sys
+
+    MappingProxyType_check = sys.modules["types"].MappingProxyType
+
+    result_valid = validate_request(make_request(), software_version="0.1.0", git_commit="abc")
+    assert result_valid.status is ValidationStatus.VALID
+    assert result_valid.layout is not None
+    # Caller mutation of request has no effect on hash (already covered by
+    # R4 mutation tests).
+    _walk(result_valid.layout.provenance, set())
+    _walk(result_valid.layout.case_authority, set())
+    _walk(result_valid.layout.layout_rule_authority.license_evidence, set())
+    for w in result_valid.warnings:
+        _walk(w.details, set())

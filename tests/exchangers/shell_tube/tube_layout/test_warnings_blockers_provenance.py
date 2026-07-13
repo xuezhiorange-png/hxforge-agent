@@ -22,11 +22,15 @@ def test_exact_valid_warning_set_and_provenance_pipeline() -> None:
         "STL_PASS_PARTITION_ASSIGNMENT_DEFERRED",
     }
     provenance = result.layout.provenance
-    assert provenance["layout_hash"] == result.layout.layout_hash
-    assert "layout_id" not in provenance
-    assert provenance["request_hash"] == result.layout.request_hash
-    assert provenance["tube_geometry_snapshot_hash"]
-    assert provenance["layout_rule_snapshot_hash"]
+    # Round 7 (P1-1): ``provenance`` is a :class:`FrozenJsonObject` whose
+    # canonical-internal mapping is accessed via ``.values``
+    # (a ``MappingProxyType``).
+    provenance_mapping = provenance.values
+    assert provenance_mapping["layout_hash"] == result.layout.layout_hash
+    assert "layout_id" not in provenance_mapping
+    assert provenance_mapping["request_hash"] == result.layout.request_hash
+    assert provenance_mapping["tube_geometry_snapshot_hash"]
+    assert provenance_mapping["layout_rule_snapshot_hash"]
 
 
 def test_valid_warnings_are_sorted_per_canonical_composite_key() -> None:

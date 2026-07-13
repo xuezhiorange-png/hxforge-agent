@@ -337,29 +337,31 @@ class ProvenancePreHashProjection:
     deferred_capabilities: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Round 4 §6: deep-freeze every public canonical fragment.
+        """Round 4 §6 + Round 7 unified canonical-type-system (Layer C).
 
         ``task020_case_authority``, ``geometry_source_binding``, and
         ``rule_pack_identity`` MUST be detached frozen snapshots so that
         a caller mutation after construction cannot influence the
         downstream ``provenance_pre_hash`` or ``layout_hash``.
 
-        ``warnings`` is also recursively walked so each MessageEntry's
-        ``details`` is frozen by its own ``__post_init__`` (already
-        enforced) and the tuple itself is replaced only when a value
-        mutation was attempted.
+        Round 7: callers in :mod:`validation` may pre-freeze the
+        upstream fragments via :func:`.canonical.canonical_mapping`
+        (yielding :class:`FrozenJsonObject` already) or hand us raw
+        public-domain ``dict`` / ``None``. The explicit
+        :func:`freeze_known_fragment` Layer-C converter handles both
+        shapes without breaking either contract.
         """
 
-        from .canonical import refreeze_internal_fragment
+        from .canonical import freeze_known_fragment
 
         for field_name in ("task020_case_authority", "geometry_source_binding"):
             current = getattr(self, field_name)
-            frozen = refreeze_internal_fragment(current)
+            frozen = freeze_known_fragment(current)
             if frozen is not current:
                 object.__setattr__(self, field_name, frozen)
 
         if self.rule_pack_identity is not None:
-            frozen = refreeze_internal_fragment(self.rule_pack_identity)
+            frozen = freeze_known_fragment(self.rule_pack_identity)
             if frozen is not self.rule_pack_identity:
                 object.__setattr__(self, "rule_pack_identity", frozen)
 
@@ -395,29 +397,23 @@ class TubeLayout:
     provenance: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Round 4 §6.3 + §6.4 + round 5 §1.1: deep-freeze case_authority and provenance.
+        """Round 4 §6.3 + §6.4 + Round 7 type-system: deep-freeze case_authority / provenance.
 
-        Both fields are detached frozen snapshots on construction; ``provenance``
-        is recursive (its nested ``license_evidence`` / ``case_authority`` /
-        warning-details are also already deep-frozen by their own dataclass
-        ``__post_init__``). The freeze happens exactly once during
-        construction; subsequent attempts to mutate raise
-        ``dataclasses.FrozenInstanceError``.
+        Both fields are detached frozen snapshots on construction.
 
-        Round 5 §6: the fields may already contain internal-tuple sequences
-        (e.g. ``evidence_refs: tuple[str, ...]``) constructed by ``@dataclass(frozen=True)``.
-        We MUST use the internal-only ``refreeze_internal_fragment`` helper
-        — the strict Layer-A ``force_frozen_canonical`` would reject raw
-        tuples.
+        Round 7 Layer C: callers in :mod:`validation` may hand us raw
+        public-domain ``dict`` (un-frozen primitive from
+        :func:`dataclass_to_mapping`) or pre-frozen Layer-B shapes.
+        :func:`freeze_known_fragment` handles both transparently.
         """
 
-        from .canonical import refreeze_internal_fragment
+        from .canonical import freeze_known_fragment
 
-        frozen_ca = refreeze_internal_fragment(self.case_authority)
+        frozen_ca = freeze_known_fragment(self.case_authority)
         if frozen_ca is not self.case_authority:
             object.__setattr__(self, "case_authority", frozen_ca)
 
-        frozen_prov = refreeze_internal_fragment(self.provenance)
+        frozen_prov = freeze_known_fragment(self.provenance)
         if frozen_prov is not self.provenance:
             object.__setattr__(self, "provenance", frozen_prov)
 

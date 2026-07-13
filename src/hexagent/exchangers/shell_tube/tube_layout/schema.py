@@ -21,6 +21,8 @@ from hexagent.exchangers.shell_tube.models import ShellAndTubeConfiguration
 
 from .canonical import (
     CanonicalizationError,
+    FrozenJsonArray,
+    FrozenJsonObject,
     canonical_json,
     decimal_string,
     parse_decimal,
@@ -335,15 +337,25 @@ def _canonical_json_value(value: Any, field_path: str, *, stage: int = 2) -> Any
 def _is_frozen_canonical_fragment(value: Any) -> bool:
     """Return True if value is already a strict public canonical fragment.
 
-    A strict public canonical fragment is either:
-        * None / bool / int / str (canonical atom); or
-        * MappingProxyType (string-keyed); or
-        * tuple (only non-frozen list tuples are accepted — see round 5 §1.1)
-    Anything else (decimal, bytes, dataclass, Enum, ordinary dict, ordinary
-    list, set, frozenset) returns False so the caller can re-snap.
+    Round 7 type-system unification: a strict public canonical fragment
+    is either:
+
+    * ``None`` / ``bool`` / ``int`` / ``str`` (canonical atom)
+    * :class:`FrozenJsonObject` (the canonical internal-frozen mapping
+      container produced by ``strict_public_json_snapshot(dict)``)
+    * :class:`FrozenJsonArray` (the canonical internal-frozen array
+      container)
+    * legacy ``MappingProxyType`` / ``tuple`` (pre-R7 representations,
+      still detected for safety-net purposes)
+
+    Anything else (decimal, bytes, dataclass, Enum, ordinary dict,
+    ordinary list, set, frozenset) returns False so the caller can
+    re-snap.
     """
 
     if value is None or isinstance(value, (bool, int, str)):
+        return True
+    if isinstance(value, (FrozenJsonArray, FrozenJsonObject)):
         return True
     from types import MappingProxyType
 
