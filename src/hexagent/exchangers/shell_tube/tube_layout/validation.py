@@ -1240,6 +1240,20 @@ def validate_request(
         else frozen_fragment_to_primitive(provenance_pre_hash.rule_pack_identity)
     )
 
+    # Round 6 §5: ``snapshot_then_to_primitive`` no longer accepts an
+    # already-frozen fragment as a no-op bypass; the public Layer-A
+    # boundary rejects internal markers outright. Internal canonicalization
+    # of an already-frozen MessageEntry ``details`` (a
+    # ``MappingProxyType`` constructed by ``MessageEntry.__post_init__``)
+    # must go through ``frozen_fragment_to_primitive`` (Layer-B) directly.
+    def _details_primitive(details: Any) -> Any:
+        if details is None:
+            return None
+        if isinstance(details, MappingProxyType):
+            return frozen_fragment_to_primitive(details)
+        # Public-domain input — must traverse the strict snapshot path.
+        return snapshot_then_to_primitive(details)
+
     provenance_primitive: dict[str, Any] = {
         "task_id": provenance_pre_hash.task_id,
         "design_contract_path": provenance_pre_hash.design_contract_path,
@@ -1279,12 +1293,15 @@ def validate_request(
                 "field_path": w.field_path,
                 "message_key": w.message_key,
                 "evidence_refs": list(w.evidence_refs),
-                "details": (None if w.details is None else snapshot_then_to_primitive(w.details)),
+                "details": _details_primitive(w.details),
             }
             for w in provenance_pre_hash.warnings
         ],
         "deferred_capabilities": list(provenance_pre_hash.deferred_capabilities),
     }
+
+    # Round 6 §5 above also applies to layout_hash_payload's warnings
+    # below; the helper is shared.
 
     layout_hash_payload: dict[str, Any] = {
         "schema_version": LAYOUT_SCHEMA_VERSION,
@@ -1318,7 +1335,7 @@ def validate_request(
                 "field_path": w.field_path,
                 "message_key": w.message_key,
                 "evidence_refs": list(w.evidence_refs),
-                "details": (None if w.details is None else snapshot_then_to_primitive(w.details)),
+                "details": _details_primitive(w.details),
             }
             for w in warnings
         ],

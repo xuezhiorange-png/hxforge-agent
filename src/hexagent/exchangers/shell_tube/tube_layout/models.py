@@ -177,18 +177,26 @@ class LayoutRuleAuthoritySnapshot:
     snapshot_hash: str
 
     def __post_init__(self) -> None:
-        """Round 4 §6.1: deep-freeze ``license_evidence`` to a detached snapshot.
+        """Round 4 §6.1 + Round 6 §6: deep-freeze ``license_evidence``.
 
         Post-capture mutation by the caller MUST NOT influence the value
         stored on this object or any hash derived from it. The freeze happens
         exactly once during construction; further attempts to mutate the
         field raise ``dataclasses.FrozenInstanceError`` because the dataclass
         itself is ``frozen=True``.
+
+        Round 6 §6 turns ``force_frozen_canonical`` into a strict public
+        Layer-A boundary that rejects internal-only markers
+        (``FrozenJsonArray`` / ``FrozenMapping``). Because
+        ``parse_layout_rule`` already passes through
+        ``_canonical_json_value`` which produces an internal-frozen fragment
+        (mapping or array), the second pass here MUST use
+        :func:`refreeze_internal_fragment` (Layer B) instead.
         """
 
-        from .canonical import force_frozen_canonical
+        from .canonical import refreeze_internal_fragment
 
-        frozen = force_frozen_canonical(self.license_evidence)
+        frozen = refreeze_internal_fragment(self.license_evidence)
         if frozen is not self.license_evidence:
             object.__setattr__(self, "license_evidence", frozen)
 
@@ -342,16 +350,16 @@ class ProvenancePreHashProjection:
         mutation was attempted.
         """
 
-        from .canonical import force_frozen_canonical
+        from .canonical import refreeze_internal_fragment
 
         for field_name in ("task020_case_authority", "geometry_source_binding"):
             current = getattr(self, field_name)
-            frozen = force_frozen_canonical(current)
+            frozen = refreeze_internal_fragment(current)
             if frozen is not current:
                 object.__setattr__(self, field_name, frozen)
 
         if self.rule_pack_identity is not None:
-            frozen = force_frozen_canonical(self.rule_pack_identity)
+            frozen = refreeze_internal_fragment(self.rule_pack_identity)
             if frozen is not self.rule_pack_identity:
                 object.__setattr__(self, "rule_pack_identity", frozen)
 

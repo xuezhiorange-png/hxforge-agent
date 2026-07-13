@@ -34,35 +34,37 @@ _FROZEN_ATOM_TYPES = (bool, int, str, type(None))
 
 @dataclass(frozen=True)
 class FrozenJsonArray:
-    """Round 5 §6 (P1-1) internal-only marker for an authorized frozen sequence.
+    """Round 5 §6 (P1-1) + Round 6 §4 internal-only marker for an authorized frozen sequence.
 
-    Round 5 forbids using the raw ``tuple`` Python type as the only marker
-    for an authorized internal-frozen list, because a raw ``tuple`` from a
-    public caller is rejected as out-of-domain. ``FrozenJsonArray`` is the
-    explicit, unambiguous wrapper that internal code (e.g. internal
-    dataclass ``__post_init__`` setters) constructs to say "this is an
-    already-frozen JSON-array whose elements are canonical atoms"; the
-    ``Layer A`` helpers detect this wrapper and serialize the contained
-    values through ``frozen_fragment_to_primitive``. Public callers that
-    pass a raw ``tuple`` continue to be rejected.
+    Round 6 §4 (canonical-boundary defect): a ``FrozenJsonArray`` is the
+    ONE AND ONLY canonical representation of an internal-frozen JSON array.
+    Nested elements must themselves be canonical atoms (``None`` / ``bool``
+    / ``int`` / ``str``) or further nested internal markers
+    (``FrozenJsonArray`` / ``FrozenMapping``). A raw ``tuple`` from a
+    caller is NEVER to be interpreted as an already-frozen fragment
+    (Round 6 §4: "nested raw tuple must no longer be accepted as an
+    implicit frozen fragment; internal array representation must have
+    exactly one canonical representation").
     """
 
     values: tuple[Any, ...]  # canonical atoms only — verified at construction
 
     def __post_init__(self) -> None:
-        # Round 5 §6 (P1-1): only canonical atoms may live inside a
-        # FrozenJsonArray so that ``Layer A`` helpers can serialize the
-        # contents without further nested checks.
+        # Round 6 §4: only canonical JSON-domain atoms or further nested
+        # internal markers may live inside a ``FrozenJsonArray``. Raw
+        # ``tuple`` is NOT acceptable here — it has no authenticated
+        # provenance as a frozen fragment and must be reduced via
+        # :func:`frozen_fragment_to_primitive` (Layer B) before being
+        # wrapped in this marker.
         for index, item in enumerate(self.values):
-            if isinstance(item, tuple) and all(
-                isinstance(sub_item, (str, int, bool, type(None))) for sub_item in item
-            ):
+            if item is None or isinstance(item, (bool, int, str)):
                 continue
-            if item is None or isinstance(item, (bool, int, str, FrozenJsonArray, FrozenMapping)):
+            if isinstance(item, (FrozenJsonArray, FrozenMapping)):
                 continue
             raise PublicCanonicalDomainError(
                 f"FrozenJsonArray element at index {index} of type "
-                f"{type(item).__name__} is not a canonical atom"
+                f"{type(item).__name__} is not a canonical atom or "
+                f"authenticated internal marker"
             )
 
 
@@ -162,16 +164,30 @@ def quantized_decimal_string(value: Decimal) -> str:
 def strict_public_json_snapshot(value: Any) -> Any:
     """Validate ``value`` and return a recursive deep-frozen canonical shape.
 
-    Raises ``PublicCanonicalDomainError`` on any out-of-domain input. The
-    returned structure uses ``MappingProxyType`` for mappings and ``tuple``
-    for sequences and may be safely passed to ``frozen_fragment_to_primitive`` or
-    used as a public canonical value (e.g. for ``license_evidence``,
-    ``MessageEntry.details``, ``case_authority``, ``provenance`` fragments).
+    Round 6 §1 + §6 (canonical-boundary defect): the recursive
+    deep-frozen shape output by this function uses ``FrozenMapping``
+    (the one authenticated internal-frozen mapping, equivalent to
+    :class:`types.MappingProxyType`) for mappings and
+    :class:`FrozenJsonArray` (the one authenticated internal-frozen
+    array) for sequences. ``tuple`` is NEVER produced as an internal
+    sequence marker — the only internal array representation is
+    :class:`FrozenJsonArray`, which is precisely the Level-A-and-B
+    invariant called out in Round 6 §4 ("internal array representation
+    must have exactly one canonical representation").
 
-    ``tuple`` is NOT accepted from raw callers — callers should pass a
-    regular ``list`` and the snapshot path will emit a fresh ``tuple``. Use
-    :func:`force_frozen_canonical` or :func:`frozen_fragment_to_primitive`
-    to handle already-frozen shapes.
+    Raises :class:`PublicCanonicalDomainError` on any out-of-domain
+    input. The returned structure may be safely passed to
+    :func:`frozen_fragment_to_primitive` (which accepts the authenticated
+    internal markers by name), to :func:`fragment_canonical`, or used
+    directly as a public canonical value (e.g. for ``license_evidence``,
+    ``MessageEntry.details``, ``case_authority``, ``provenance``
+    fragments).
+
+    Round 6 §6: this public Layer-A boundary does NOT accept internal
+    marker types as input. A caller that already holds a ``FrozenMapping``
+    or ``FrozenJsonArray`` has reached the boundary from the inside and
+    must use :func:`refreeze_internal_fragment` (Layer-B) or
+    :func:`frozen_fragment_to_primitive` directly instead.
     """
 
     if value is None:
@@ -182,16 +198,39 @@ def strict_public_json_snapshot(value: Any) -> Any:
         return value
     if isinstance(value, str):
         return value
+    if isinstance(value, (tuple, frozenset, set)):
+        # Round 6 §6: a raw ``tuple`` / ``frozenset`` / ``set`` from a
+        # public caller MUST be rejected here. ``tuple`` is reserved for
+        # the internal Layer-B pathway only (see
+        # :func:`refreeze_internal_fragment`), and ``frozenset`` /
+        # ``set`` have no canonical JSON representation at all.
+        raise PublicCanonicalDomainError(
+            f"value of type {type(value).__name__} is forbidden at the "
+            f"public canonical boundary; pass a list of canonical values"
+        )
+    if isinstance(value, (FrozenMapping, FrozenJsonArray)):
+        raise PublicCanonicalDomainError(
+            f"value of type {type(value).__name__} is an internal-only "
+            f"marker and cannot be passed through the public snapshot "
+            f"boundary"
+        )
     if isinstance(value, list):
-        return tuple(strict_public_json_snapshot(item) for item in value)
+        # Round 6 §1 + §4: the only canonical internal-frozen array is
+        # ``FrozenJsonArray``; ``tuple`` is intentionally NOT produced
+        # here. This eliminates the raw-tuple bypass from any downstream
+        # Layer-B helper that walks the snapshot output.
+        frozen_items = tuple(strict_public_json_snapshot(item) for item in value)
+        return FrozenJsonArray(frozen_items)
     if isinstance(value, dict):
         for key in value:
             if not isinstance(key, str):
                 raise PublicCanonicalDomainError(
                     "mapping keys must be strings at the public canonical boundary"
                 )
-        frozen_items = {key: strict_public_json_snapshot(item) for key, item in value.items()}
-        return MappingProxyType({key: frozen_items[key] for key in sorted(frozen_items)})
+        sorted_items: dict[str, Any] = {
+            key: strict_public_json_snapshot(item) for key, item in value.items()
+        }
+        return FrozenMapping({key: sorted_items[key] for key in sorted(sorted_items)})
     raise PublicCanonicalDomainError(
         f"value of type {type(value).__name__} is outside the public canonical domain"
     )
@@ -200,41 +239,86 @@ def strict_public_json_snapshot(value: Any) -> Any:
 def frozen_fragment_to_primitive(value: Any) -> Any:
     """Convert a frozen-fragment snapshot back to a JSON-compatible primitive.
 
-    Accepts ONLY the recursive deep-frozen shape produced by
-    ``strict_public_json_snapshot``. Anything else is rejected with
-    ``NonCanonicalFragmentError`` so internal code never silently accepts a
-    raw callable / Decimal / arbitrary-object that bypassed the snapshot
-    boundary.
+    Round 6 §1 (canonical-boundary defect): this Layer-B helper accepts
+    ONLY an authenticated internal frozen representation:
+
+    * canonical atoms (``None`` / ``bool`` / ``int`` / ``str``)
+    * ``MappingProxyType`` (the only authenticated internal-frozen mapping)
+    * :class:`FrozenJsonArray` (the only authenticated internal-frozen array)
+
+    Round 6 §1 forbids accepting an arbitrary Python ``tuple`` from a
+    caller — public callers can no longer bypass
+    ``strict_public_json_snapshot`` by passing a raw tuple and expecting
+    this function to treat it as an already-frozen fragment.
+
+    The single canonical sequence representation coming out of this
+    helper is therefore ``list`` (the canonical JSON array), and the
+    single canonical mapping representation is ``dict`` (the canonical
+    JSON object); anything that does not match the whitelist above is
+    rejected with :class:`NonCanonicalFragmentError`.
     """
 
     if value is None or isinstance(value, (bool, int, str)):
         return value
-    if isinstance(value, MappingProxyType):
-        # sorted-key ordering for canonical JSON stability.
+    if isinstance(value, FrozenJsonArray):
+        return [frozen_fragment_to_primitive(item) for item in value.values]
+    if isinstance(value, FrozenMapping):
+        # Round 6 §3: ``FrozenMapping`` is ``MappingProxyType``. Sorted-key
+        # ordering for canonical JSON stability is enforced at the public
+        # snapshot boundary; the recursive walk here preserves that order.
         return {key: frozen_fragment_to_primitive(item) for key, item in sorted(value.items())}
-    if isinstance(value, tuple):
-        return [frozen_fragment_to_primitive(item) for item in value]
+    # Round 6 §1: a raw ``tuple`` (or any other sequence / mapping that
+    # has not been authenticated as the canonical internal-frozen mapping
+    # or array) is REJECTED here. Public callers must go through
+    # ``strict_public_json_snapshot`` first; internal callers must wrap a
+    # canonical-atom tuple in :class:`FrozenJsonArray` or reduce it via
+    # ``snapshot_then_to_primitive`` first.
     raise NonCanonicalFragmentError(
-        f"frozen fragment value of type {type(value).__name__} is not a canonical atom"
+        f"frozen fragment value of type {type(value).__name__} is not an "
+        f"authenticated internal frozen representation; expected canonical "
+        f"atom / FrozenMapping / FrozenJsonArray, never raw tuple"
     )
 
 
 def snapshot_then_to_primitive(value: Any) -> Any:
     """Public-boundary pass for callers that hold an ordinary canonical value.
 
-    Accepts a value in the §6.1 canonical JSON domain (null/bool/int/str/list/
-    string-keyed dict) AND an already-frozen fragment (MappingProxyType /
-    ``tuple`` of canonical primitives). Used for ``MessageEntry.details``
-    and other fragments that may have been deep-frozen by the dataclass
-    ``__post_init__``. The public-boundary pass guarantees immutability
-    during the conversion.
+    Round 6 §5 (canonical-boundary defect): this helper no longer
+    accepts a raw ``tuple`` or ``MappingProxyType`` as an implicit
+    already-frozen fragment — every public value, including the
+    already-frozen shapes produced by
+    :func:`strict_public_json_snapshot`, MUST traverse the strict public
+    snapshot boundary so that no caller can bypass the canonical
+    domain check.
+
+    Inputs:
+
+    * canonical JSON-domain primitive (``None`` / ``bool`` / ``int`` / ``str``)
+    * ordinary ``list`` of canonical values
+    * ordinary string-keyed ``dict`` of canonical values
+
+    An already-frozen fragment (``MappingProxyType`` or
+    :class:`FrozenJsonArray`) is REJECTED — public callers that
+    constructed an internal frozen shape MUST unwrap it themselves
+    or use :func:`refreeze_internal_fragment` to do so under Layer-B
+    policy. ``tuple`` from a public caller is REJECTED — pass a list
+    and let the snapshot path emit the canonical primitive back.
     """
 
-    if isinstance(value, MappingProxyType):
-        # Already-frozen fragment: skip the snapshot step and reduce directly.
-        return frozen_fragment_to_primitive(value)
-    if isinstance(value, tuple):
-        return frozen_fragment_to_primitive(value)
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    # Round 6 §5: reject raw tuple and already-frozen internal markers
+    # here; ALL public values must traverse the strict snapshot boundary.
+    if isinstance(value, (tuple, frozenset, set)):
+        raise PublicCanonicalDomainError(
+            f"value of type {type(value).__name__} is forbidden at the public "
+            f"boundary; pass a list of canonical values instead"
+        )
+    if isinstance(value, (FrozenMapping, FrozenJsonArray)):
+        raise PublicCanonicalDomainError(
+            f"value of type {type(value).__name__} is an internal-only marker "
+            f"and cannot be passed through the public snapshot boundary"
+        )
     frozen = strict_public_json_snapshot(value)
     return frozen_fragment_to_primitive(frozen)
 
@@ -271,90 +355,124 @@ def canonical_raw_json_or_none(value: Any) -> Any | None:
 def force_frozen_canonical(value: Any) -> Any:
     """Detach and deep-freeze a public-canonical fragment for dataclass storage.
 
-    Round 5 §6 (P1-1): this is the **strict Layer-A** boundary used at
-    dataclass ``__post_init__`` time. It accepts:
+    Round 6 §6 (canonical-boundary defect): this is the **strict
+    public Layer-A** boundary used at dataclass ``__post_init__`` time.
+    Internal-only marker types (``FrozenJsonArray`` /
+    ``FrozenMapping`` / raw ``tuple``) are NOT accepted as public
+    inputs at this boundary; the strict separation between public
+    JSON-domain inputs and internal frozen representations must be
+    preserved.
+
+    Public-domain inputs accepted (canonical JSON domain only):
 
     - ``None`` → ``None``
-    - ``MappingProxyType`` (already-frozen fragment) → re-emitted as a
-      fresh frozen snapshot (idempotent)
-    - ``FrozenJsonArray`` (explicit internal marker; contains canonical
-      atoms only) → preserved
-    - public-boundary primitives / lists / dicts (the §6.1 canonical JSON
-      domain)
+    - ``bool`` / ``int`` / ``str`` (canonical atoms)
+    - ordinary ``list`` of canonical values (recursively reduced)
+    - ordinary string-keyed ``dict`` of canonical values (recursively
+      reduced, with sorted-key ordering)
 
     Strict rejection:
 
-    - Raw ``tuple`` from a public caller (round 5 §6.4: wrap in
-      ``FrozenJsonArray`` or reduce via :func:`frozen_fragment_to_primitive`
-      first).
-    - ``float``, ``Decimal``, ``bytes``, ``bytearray``, ``memoryview``,
-      ``set``, ``frozenset``, dataclass, Enum, mapping with non-string
-      keys — all rejected at the public boundary.
+    - ``FrozenJsonArray`` / ``FrozenMapping``: internal-only markers;
+      a public caller must unwrap them (or wrap canonical-atom
+      tuples in :class:`FrozenJsonArray` themselves if that's the
+      intended shape).
+    - raw ``tuple`` / ``frozenset`` / ``set`` / ``bytes`` /
+      ``bytearray`` / ``memoryview``: forbidden by the §6 canonical
+      domain rules at the public boundary.
+    - ``float`` / ``Decimal`` / ``None``-only ``dict`` / non-string
+      key: rejected by the strict canonical check at construction.
+    - dataclass / Enum: rejected; the caller must reduce via
+      :func:`dataclass_to_mapping` + ``Enum.value`` first.
     """
 
-    if value is None:
-        return None
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    # Round 6 §6: internal-only marker types are rejected here so that a
+    # public caller can never smuggle an internal-frozen shape past the
+    # Layer-A boundary. The exception is ``force_frozen_canonical`` being
+    # re-applied internally to a value that legitimately returned one
+    # (e.g. an already-frozen MappingProxyType inside an internal
+    # dataclass' ``__post_init__``) — internal callers that need idempotent
+    # re-walking MUST use :func:`refreeze_internal_fragment` instead.
     if isinstance(value, FrozenJsonArray):
-        return FrozenJsonArray(tuple(force_frozen_canonical(item) for item in value.values))
-    if isinstance(value, MappingProxyType):
-        rebuilt: dict[str, Any] = {}
-        for key in sorted(value.keys()):
-            rebuilt[key] = force_frozen_canonical(value[key])
-        return MappingProxyType(rebuilt)
+        raise PublicCanonicalDomainError(
+            "FrozenJsonArray is an internal-only marker and cannot be passed "
+            "through the public Layer-A boundary; use refreeze_internal_fragment"
+        )
+    if isinstance(value, FrozenMapping):
+        raise PublicCanonicalDomainError(
+            "FrozenMapping (MappingProxyType) is an internal-only fragment "
+            "and cannot be passed through the public Layer-A boundary; "
+            "use refreeze_internal_fragment"
+        )
     return _freeze_deeply_recursive(value)
 
 
 def refreeze_internal_fragment(value: Any) -> Any:
-    """Round 5 §6.2 — Layer-B internal-helper re-freeze.
+    """Round 5 §6.2 + Round 6 §3 — Layer-B internal-helper re-freeze (whitelist).
 
-    This helper is the ONE place that knows how to deep-freeze an
-    already-frozen fragment that includes raw ``tuple`` / ``frozenset``
-    sequences that were constructed **internally** (e.g. dataclass
-    ``frozen=True`` tuples). It MUST NOT be exported as a public
-    boundary helper.
+    Round 6 §3 (canonical-boundary defect): this helper is now a strict
+    whitelist-based re-freeze. It accepts ONE of the following shapes:
 
-    The recursive walk converts:
+    * canonical JSON-domain atoms (``None`` / ``bool`` / ``int`` / ``str``)
+    * ``FrozenMapping`` (already authenticated internal-frozen mapping)
+    * :class:`FrozenJsonArray` (already authenticated internal-frozen array)
+    * raw ``tuple`` containing only whitelisted values (frozen dataclass
+      field sequences; this is the SINGLE remaining case where the
+      input type is ``tuple``, which is intentionally allowed only here,
+      NOT at any public Layer-A boundary)
+    * ordinary ``list`` of whitelisted values (in-flight construction;
+      re-emitted as :class:`FrozenJsonArray` so downstream code can
+      detect the authenticated internal-frozen shape)
+    * ordinary ``dict`` of whitelisted values (in-flight construction;
+      re-emitted as ``FrozenMapping`` to preserve idempotent
+      frozen-mapping semantics)
 
-        * ``tuple`` of canonical atoms  →  ``tuple`` of canonical atoms
-          (already-frozen, idempotent)
-        * ``MappingProxyType``  →  ``MappingProxyType`` (recursive)
-        * ordinary ``dict`` / ``list``  →  reduced to a primitive form first
+    Anything else (``Decimal``, ``bytes``, ``float``, arbitrary object,
+    non-string-keyed mapping, ``set``, ``frozenset``, dataclass, Enum)
+    is REJECTED with :class:`PublicCanonicalDomainError`. The former
+    fail-open ``return value`` path has been eliminated — round 6 §3
+    "eliminate the current fail-open ``return value`` path".
     """
 
     if value is None or isinstance(value, _FROZEN_ATOM_TYPES):
         return value
     if isinstance(value, FrozenJsonArray):
         return FrozenJsonArray(tuple(refreeze_internal_fragment(item) for item in value.values))
-    if isinstance(value, MappingProxyType):
-        rebuilt = {}
+    if isinstance(value, FrozenMapping):
+        rebuilt: dict[str, Any] = {}
         for key in sorted(value.keys()):
             rebuilt[key] = refreeze_internal_fragment(value[key])
-        return MappingProxyType(rebuilt)
+        return FrozenMapping(rebuilt)
     if isinstance(value, tuple):
-        return tuple(refreeze_internal_fragment(item) for item in value)
+        # Internal-frozen sequence — round 6 §3 whitelist explicitly
+        # admits raw ``tuple`` at this Layer-B boundary because internal
+        # dataclass fields of ``frozen=True`` type emit raw tuples. Every
+        # element must still pass the recursive whitelist. Re-emitted as
+        # :class:`FrozenJsonArray` so the Layer-A boundary downstream
+        # detects a single canonical internal-frozen array shape.
+        return FrozenJsonArray(tuple(refreeze_internal_fragment(item) for item in value))
     if isinstance(value, list):
-        return tuple(refreeze_internal_fragment(item) for item in value)
+        return FrozenJsonArray(tuple(refreeze_internal_fragment(item) for item in value))
     if isinstance(value, dict):
-        rebuilt = {}
+        rebuilt_dict: dict[str, Any] = {}
         for key, item in value.items():
             if not isinstance(key, str):
                 raise PublicCanonicalDomainError(
                     f"internal fragment mapping keys must be strings; got {type(key).__name__}"
                 )
-            rebuilt[key] = refreeze_internal_fragment(item)
-        return MappingProxyType({key: rebuilt[key] for key in sorted(rebuilt)})
-    # Round 5 §6.1: an internal fragment cannot contain arbitrary Python
-    # objects; reject anything that doesn't match a canonical atom.
-    if isinstance(value, (Decimal, float, bytes, bytearray, memoryview, set, frozenset)):
-        raise PublicCanonicalDomainError(
-            f"internal fragment value of type {type(value).__name__} is forbidden"
-        )
-    if dataclasses.is_dataclass(value) or isinstance(value, enum.Enum):
-        raise PublicCanonicalDomainError(
-            f"internal fragment value of type {type(value).__name__} is forbidden; "
-            "use dataclass_to_mapping + Enum.value before passing"
-        )
-    return value
+            rebuilt_dict[key] = refreeze_internal_fragment(item)
+        return FrozenMapping({key: rebuilt_dict[key] for key in sorted(rebuilt_dict)})
+    # Round 6 §3: every other type is rejected. The previous behavior had a
+    # fail-open ``return value`` at this point which silently passed
+    # through arbitrary objects; it has been removed.
+    raise PublicCanonicalDomainError(
+        f"refreeze_internal_fragment rejected value of type "
+        f"{type(value).__name__}; only canonical atoms / FrozenMapping / "
+        f"FrozenJsonArray / tuple / list / dict are allowed at this Layer-B "
+        f"boundary"
+    )
 
 
 def force_frozen_optional_canonical(value: Any | None) -> Any | None:
@@ -674,10 +792,18 @@ def message_sort_key(entry: Any) -> tuple[str, str, str, str, str]:
 def _reduce_for_hash(value: Any) -> Any:
     """Reduce an arbitrary value to a JSON-safe form before hashing.
 
-    Round 4 §7: this helper handles dataclass / enum / MappingProxyType / tuple
-    values that may appear after the dataclass ``__post_init__`` deep-freeze.
-    Result is canonicalization-clean: a dict of sorted-key primitives whose
-    every element is recursively reduced.
+    Round 4 §7 + Round 6 §2 (canonical-boundary defect): this helper
+    handles ``FrozenJsonArray`` / ``FrozenMapping`` (the authenticated
+    internal markers produced by :func:`refreeze_internal_fragment` and
+    :func:`frozen_fragment_to_primitive`) along with dataclass / Enum /
+    plain ``list`` / plain ``dict`` inputs.
+
+    Round 6 §2 forbids silent-key-drop: a mapping with a non-string key
+    is REJECTED with :class:`CanonicalizationError` so callers can never
+    silently merge an in-domain string-keyed projection while dropping
+    the offending key. The previous fail-open ``return value`` tail has
+    been removed so that arbitrary objects can no longer be smuggled past
+    the hash boundary either.
     """
 
     if value is None or isinstance(value, (bool, int, str)):
@@ -686,20 +812,56 @@ def _reduce_for_hash(value: Any) -> Any:
         return _reduce_for_hash(dataclass_to_mapping(value))
     if isinstance(value, enum.Enum):
         return value.value
+    if isinstance(value, FrozenMapping):
+        # Round 6 §2: a non-string key in an authenticated internal-frozen
+        # mapping is impossible by construction (the public snapshot
+        # boundary rejects such keys). Still, we re-validate here to keep
+        # the boundary fail-closed under future drift.
+        for key in value:
+            if not isinstance(key, str):
+                raise CanonicalizationError(
+                    f"_reduce_for_hash encountered non-string key "
+                    f"{key!r} of type {type(key).__name__} in FrozenMapping"
+                )
+        return {key: _reduce_for_hash(item) for key, item in sorted(value.items())}
+    if isinstance(value, FrozenJsonArray):
+        return [_reduce_for_hash(item) for item in value.values]
     if isinstance(value, Mapping):
-        return {
-            key: _reduce_for_hash(item)
-            for key, item in sorted(value.items())
-            if isinstance(key, str)
-        }
+        rebuilt_map: dict[str, Any] = {}
+        for key, item in value.items():
+            # Round 6 §2: any non-string mapping key must fail-closed
+            # immediately. Silently ignoring it would let two distinct
+            # invalid mappings collapse to the same valid projection.
+            if not isinstance(key, str):
+                raise CanonicalizationError(
+                    f"_reduce_for_hash encountered non-string mapping key "
+                    f"{key!r} of type {type(key).__name__}; "
+                    f"silently ignoring forbidden by Round 6 §2"
+                )
+            rebuilt_map[key] = _reduce_for_hash(item)
+        return {key: rebuilt_map[key] for key in sorted(rebuilt_map)}
     if isinstance(value, list):
         return [_reduce_for_hash(item) for item in value]
     if isinstance(value, tuple):
+        # Round 6 §2: a raw tuple at this Layer-B-equivalent hash helper
+        # is treated only as an already-frozen internal sequence; every
+        # element must walk the recursive whitelist. A non-whitelist
+        # element will raise through the recursion rather than be
+        # silently dropped (``return value`` tail is gone).
         try:
-            return list(value)
-        except TypeError:
-            return None
-    return value
+            return [_reduce_for_hash(item) for item in value]
+        except CanonicalizationError:
+            raise
+    # Round 6 §2: the previous ``return value`` fallback for
+    # ``Decimal`` / ``bytes`` / arbitrary objects has been removed.
+    # Encountering any other type at this hash boundary must fail-closed
+    # so the canonical hash does not silently absorb a non-canonical
+    # shape.
+    raise CanonicalizationError(
+        f"_reduce_for_hash encountered unsupported value of type "
+        f"{type(value).__name__}; canonical hash rejects non-whitelisted "
+        f"types per Round 6 §2"
+    )
 
 
 def sort_messages(entries: Iterable[Any]) -> tuple[Any, ...]:

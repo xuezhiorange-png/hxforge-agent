@@ -34,6 +34,7 @@ import pytest
 
 from hexagent.exchangers.shell_tube.tube_layout.canonical import (
     CanonicalizationError,
+    FrozenJsonArray,
     NonCanonicalFragmentError,
     PublicCanonicalDomainError,
     canonical_json,
@@ -104,16 +105,19 @@ def test_strict_snapshot_accepts_primitives() -> None:
 
 
 def test_strict_snapshot_accepts_lists() -> None:
+    # Round 6 §1 + §4: the only internal-frozen array shape is
+    # ``FrozenJsonArray``; ``tuple`` is no longer produced here.
     snap = strict_public_json_snapshot([1, "two", [None, True]])
-    assert isinstance(snap, tuple)
-    assert snap[2] == (None, True)
+    assert isinstance(snap, FrozenJsonArray)
+    # ``FrozenJsonArray`` exposes its values via ``.values`` as a tuple.
+    assert snap.values == (1, "two", FrozenJsonArray((None, True)))
 
 
 def test_strict_snapshot_accepts_string_keyed_dict() -> None:
     snap = strict_public_json_snapshot({"z": 1, "a": [1, 2]})
     assert isinstance(snap, MappingProxyType)
     assert tuple(snap.keys()) == ("a", "z")
-    assert isinstance(snap["a"], tuple)
+    assert isinstance(snap["a"], FrozenJsonArray)
 
 
 @pytest.mark.parametrize(
@@ -214,9 +218,13 @@ def test_freeze_deeply_makes_mapping_proxy_for_dict() -> None:
         frozen["a"] = 99  # type: ignore[index]
 
 
-def test_freeze_deeply_converts_nested_lists_to_tuples() -> None:
+def test_freeze_deeply_converts_nested_lists_to_frozen_json_array() -> None:
+    # Round 6 §1 + §4: the only canonical internal-frozen array shape is
+    # ``FrozenJsonArray``; ``freeze_deeply`` emits ``FrozenJsonArray``
+    # rather than raw ``tuple`` for nested lists.
     frozen = freeze_deeply({"nested": [1, 2, 3]})
-    assert isinstance(frozen["nested"], tuple)
+    assert isinstance(frozen["nested"], FrozenJsonArray)
+    assert frozen["nested"].values == (1, 2, 3)
 
 
 def test_freeze_deeply_rejects_bytes() -> None:
