@@ -1,4 +1,13 @@
-"""Strict raw-shape validation for TASK-021 Slice A."""
+"""Strict raw-shape validation for TASK-021 Slice A.
+
+This module deliberately splits Stage 1 / Stage 2 / Stage 3 / Stage 10 of the
+frozen §9 pipeline into individual helpers. Round 3 §3 (P0-1) requires the
+real 1→21 ordering to be enforceable: the top-level mapping is checked
+(Stage 1), raw value types are checked (Stage 2), and schema versions are
+checked (Stage 3) BEFORE any Stage-4+ work begins. Stage 10 (zones) must
+run only AFTER Stage 9 (authorizations) per the contract; this module
+exposes helpers the validator calls in that strict order.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +24,7 @@ from .canonical import (
     decimal_string,
     parse_decimal,
     sorted_unique_strings,
+    strict_public_json_snapshot,
 )
 from .models import (
     ENVELOPE_SCHEMA_VERSION,
@@ -41,6 +51,23 @@ from .models import (
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 E = TypeVar("E", bound=enum.StrEnum)
+
+
+# Top-level field-set for the request payload (Stage 1).
+REQUEST_FIELDS: frozenset[str] = frozenset(
+    {
+        "schema_version",
+        "configuration",
+        "tube_geometry",
+        "layout_rule_authority",
+        "placement_envelope",
+        "origin_mode",
+        "axis_orientation",
+        "exclusion_zones",
+        "u_tube_pairing_plan",
+        "evidence_refs",
+    }
+)
 
 
 class SchemaFailure(ValueError):
@@ -93,6 +120,11 @@ def _schema_failure(
         raw_failing_field=raw_failing_field,
         normalized_context=normalized_context,
     )
+
+
+# Raw-type and field-set primitives. Each emits a SchemaFailure at the
+# explicit stage passed in by the caller. Round-3 §3 (P0-1) requires that
+# every failure carries the actual stage at which the check ran.
 
 
 def _mapping(
@@ -267,9 +299,16 @@ def _enum_array(
 
 
 def _canonical_json_value(value: Any, field_path: str, *, stage: int = 2) -> Any:
+    """Validate a raw value as canonical JSON domain. Fail-closed on rejection.
+
+    Public canonical domain (round 3 P1-1): null/bool/int/str/list/string-keyed
+    dict ONLY. Any other type (Decimal, float, bytes, tuple, set, frozenset,
+    non-string-keyed mapping, arbitrary object) raises STL_CANONICALIZATION_FAILED.
+    """
+
     try:
-        canonical_json(value)
-    except CanonicalizationError as exc:
+        strict_public_json_snapshot(value)
+    except Exception as exc:  # PublicCanonicalDomainError is the only expected one
         raise _schema_failure(
             stage,
             (
@@ -277,11 +316,59 @@ def _canonical_json_value(value: Any, field_path: str, *, stage: int = 2) -> Any
                     BlockerCode.STL_CANONICALIZATION_FAILED,
                     field_path,
                     "canonical_value_invalid",
+                    details={"type": type(value).__name__},
                 ),
             ),
             raw_failing_field=value,
         ) from exc
     return value
+
+
+# --------------------------------------------------------------------------- #
+# Public canonical mapping (round 3 P1-1)
+# --------------------------------------------------------------------------- #
+
+
+def canonical_mapping(value: Any) -> Any:
+    """Validate ``value`` as a public canonical boundary fragment.
+
+    This is the round-3 P1-1 boundary function for any "frozen fragment"
+    (license_evidence, MessageEntry.details, etc.). It accepts only the §6.1
+    canonical JSON domain. The caller is expected to capture the result and
+    treat it as immutable (never re-mutate the original mapping).
+    """
+
+    return strict_public_json_snapshot(value)
+
+
+# --------------------------------------------------------------------------- #
+# Stage 1 + Stage 2 + Stage 3 helpers
+# --------------------------------------------------------------------------- #
+
+
+def validate_top_level_mapping(payload: Any) -> Mapping[str, Any]:
+    """Stage 1 — top-level mapping and exact field set."""
+
+    return _mapping(payload, "request", set(REQUEST_FIELDS), stage=1, raw_failing_field=payload)
+
+
+def validate_request_schema_version(value: Any) -> str:
+    """Stage 3 — request schema_version (the top-level version check)."""
+
+    text = _nonempty_string(value, "schema_version", stage=3)
+    if text != REQUEST_SCHEMA_VERSION:
+        raise _schema_failure(
+            3,
+            (
+                _block(
+                    BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
+                    "schema_version",
+                    "request_schema_version_unsupported",
+                ),
+            ),
+            raw_failing_field=value,
+        )
+    return text
 
 
 def parse_source_binding(value: Any, field_path: str) -> SourceBindingSnapshot:
@@ -317,6 +404,8 @@ def parse_rule_pack_identity(value: Any, field_path: str) -> RulePackIdentitySna
 
 
 def parse_geometry(value: Any) -> ApprovedTubeGeometrySnapshot:
+    """Pure shape / raw-type validation for tube_geometry (Stages 1-3)."""
+
     if value is None:
         raise _schema_failure(
             2,
@@ -379,6 +468,8 @@ def parse_geometry(value: Any) -> ApprovedTubeGeometrySnapshot:
 
 
 def parse_layout_rule(value: Any) -> LayoutRuleAuthoritySnapshot:
+    """Pure shape / raw-type validation for layout_rule_authority (Stages 1-3)."""
+
     if value is None:
         raise _schema_failure(
             2,
@@ -518,9 +609,14 @@ def parse_layout_rule(value: Any) -> LayoutRuleAuthoritySnapshot:
 
 
 def parse_envelope(value: Any) -> CircularTubeCenterEnvelope:
+    """Pure shape / raw-type validation for the placement envelope (Stages 1-3)."""
+
     fields = {"schema_version", "tube_center_envelope_diameter_m", "evidence_refs"}
     data = _mapping(value, "placement_envelope", fields, stage=2)
-    if data["schema_version"] != ENVELOPE_SCHEMA_VERSION:
+    schema_version_text = _nonempty_string(
+        data["schema_version"], "placement_envelope.schema_version", stage=2
+    )
+    if schema_version_text != ENVELOPE_SCHEMA_VERSION:
         raise _schema_failure(
             3,
             (
@@ -553,6 +649,8 @@ def parse_envelope(value: Any) -> CircularTubeCenterEnvelope:
 
 
 def parse_zone(value: Any, index: int) -> ExclusionZone:
+    """Stage 10 — exclusion-zone exact shape."""
+
     field_path = f"exclusion_zones[{index}]"
     fields = {
         "zone_id",
@@ -676,6 +774,8 @@ def parse_leg(value: Any, field_path: str) -> LatticeIndex:
 
 
 def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
+    """Pure shape / raw-type validation for the U-tube pairing plan (Stages 1-3)."""
+
     if value is None:
         return None
     data = _mapping(
@@ -684,7 +784,10 @@ def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
         {"schema_version", "pairs", "evidence_refs", "pairing_plan_hash"},
         stage=2,
     )
-    if data["schema_version"] != PAIRING_SCHEMA_VERSION:
+    schema_version_text = _nonempty_string(
+        data["schema_version"], "u_tube_pairing_plan.schema_version", stage=2
+    )
+    if schema_version_text != PAIRING_SCHEMA_VERSION:
         raise _schema_failure(
             3,
             (
@@ -747,36 +850,26 @@ def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
     )
 
 
+# Backwards-compatible aggregator for legacy callers/tests.
+# New validator code MUST NOT call this — it represents the §9 ordering
+# violation that round-3 fixes. Kept only so existing tests still compile.
+
+
 def parse_request(payload: Any) -> TubeLayoutRequest:
-    fields = {
-        "schema_version",
-        "configuration",
-        "tube_geometry",
-        "layout_rule_authority",
-        "placement_envelope",
-        "origin_mode",
-        "axis_orientation",
-        "exclusion_zones",
-        "u_tube_pairing_plan",
-        "evidence_refs",
-    }
-    data = _mapping(payload, "request", fields, stage=1)
-    if data["schema_version"] != REQUEST_SCHEMA_VERSION:
-        raise _schema_failure(
-            3,
-            (
-                _block(
-                    BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
-                    "schema_version",
-                    "request_schema_version_unsupported",
-                ),
-            ),
-            raw_failing_field=data["schema_version"],
-        )
+    """Legacy all-at-once parser for tests and pre-existing tooling only.
+
+    Round-3 §3 (P0-1) requires strict 1→21 ordering. The production validator
+    does NOT use this function; it runs the per-stage helpers directly. This
+    remains for backward compatibility with test helpers and the fixture-based
+    acceptance contract.
+    """
+
+    data = validate_top_level_mapping(payload)
+    validate_request_schema_version(data["schema_version"])
     configuration = data["configuration"]
     if configuration is None:
         raise _schema_failure(
-            2,
+            4,
             (
                 _block(
                     BlockerCode.STL_TASK020_CONFIGURATION_MISSING,
@@ -788,7 +881,7 @@ def parse_request(payload: Any) -> TubeLayoutRequest:
         )
     if not isinstance(configuration, ShellAndTubeConfiguration):
         raise _schema_failure(
-            2,
+            4,
             (
                 _block(
                     BlockerCode.STL_TASK020_CONFIGURATION_INVALID,
@@ -846,7 +939,12 @@ def parse_request(payload: Any) -> TubeLayoutRequest:
 
 
 __all__ = [
+    "CanonicalizationError",
+    "REQUEST_FIELDS",
+    "REQUEST_SCHEMA_VERSION",
     "SchemaFailure",
+    "canonical_mapping",
+    "canonical_json",
     "parse_envelope",
     "parse_geometry",
     "parse_layout_rule",
@@ -854,4 +952,6 @@ __all__ = [
     "parse_request",
     "parse_source_binding",
     "parse_zone",
+    "validate_request_schema_version",
+    "validate_top_level_mapping",
 ]
