@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 from copy import deepcopy
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
@@ -10,6 +11,10 @@ from hexagent.exchangers.shell_tube.models import ConstructionFamily
 from hexagent.exchangers.shell_tube.tube_layout import (
     ValidationStatus,
     validate_request,
+)
+from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+    frozen_fragment_to_primitive,
+    sha256_hex,
 )
 from tests.exchangers.shell_tube.tube_layout._builders import (
     make_configuration,
@@ -569,3 +574,527 @@ def test_round3_frozen_fragment_rejects_arbitrary_post_init_mutation() -> None:
     assert isinstance(frozen, MappingProxyType)
     with pytest.raises(TypeError):
         frozen["a"] = 99  # type: ignore[index]
+
+
+# --------------------------------------------------------------------------- #
+# Round 4 §3.3 — Stage 2 / Stage 3 precedence tests (P0-1)
+# --------------------------------------------------------------------------- #
+
+
+def test_round4_stage2_raw_type_blocks_before_stage3_schema_version() -> None:
+    """Round 4 §3.3 Case A.
+
+    placement_envelope.schema_version = "unsupported" AND
+    origin_mode = 123 (raw-type invalid).
+    Expectation:
+    - failure_stage == 2
+    - STL_RAW_TYPE_INVALID blocker is the only blocker
+    - Stage-3 schema-version blocker is ABSENT (Stage 3 did not run)
+    """
+
+    payload = deepcopy(make_request())
+    payload["placement_envelope"]["schema_version"] = "unsupported"
+    payload["origin_mode"] = 123
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    field_paths = sorted({b.field_path for b in result.blockers})
+    assert "origin_mode" in field_paths
+    # Stage 3 schema-version blocker MUST be absent.
+    for b in result.blockers:
+        assert not b.field_path.startswith("placement_envelope.schema_version"), (
+            f"unexpected Stage 3 blocker: {b.field_path}"
+        )
+
+
+def test_round4_stage2_pairing_raw_blocks_before_stage3_pairing_version() -> None:
+    """Round 4 §3.3 Case B.
+
+    u_tube_pairing_plan.schema_version = "unsupported" AND
+    u_tube_pairing_plan.evidence_refs = "not-an-array" (raw-type invalid).
+    Expectation:
+    - failure_stage == 2
+    - raw evidence_refs blocker present
+    - Stage-3 pairing-version blocker ABSENT
+    """
+
+    payload = deepcopy(make_request())
+    payload["configuration"] = make_configuration(ConstructionFamily.U_TUBE)
+    payload["u_tube_pairing_plan"] = {
+        "schema_version": "task021.unsupported-pairing.v0",
+        "pairs": [
+            {
+                "pair_id": "p0",
+                "leg_a": {"u": 0, "v": 0},
+                "leg_b": {"u": 1, "v": 0},
+                "evidence_refs": ["p-ev"],
+            }
+        ],
+        "evidence_refs": "not-an-array",
+        "pairing_plan_hash": "0" * 64,
+    }
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    field_paths = {b.field_path for b in result.blockers}
+    assert "u_tube_pairing_plan.evidence_refs" in field_paths
+    assert "u_tube_pairing_plan.schema_version" not in field_paths, (
+        "Stage-3 pairing-version blocker leaked into Stage-2 output"
+    )
+
+
+def test_round4_stage2_complete_blocker_retention() -> None:
+    """Round 4 §3.3 Case C.
+
+    Two independent Stage-2 defects (origin_mode=123, axis_orientation=[]).
+    Expectation:
+    - BOTH complete blockers retained
+    - same-stage blocker count >= 2
+    - Stage 3+ did NOT run
+    """
+
+    payload = deepcopy(make_request())
+    payload["origin_mode"] = 123
+    payload["axis_orientation"] = []
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    field_paths = sorted({b.field_path for b in result.blockers})
+    assert "origin_mode" in field_paths
+    assert "axis_orientation" in field_paths
+    assert len(result.blockers) >= 2
+
+
+def test_round4_stage3_all_three_versions_blocks_at_stage_three() -> None:
+    """Round 4 §3.3 Case D.
+
+    Stage 2 fully passes; request / envelope / pairing schema versions
+    ALL unsupported. Expectation:
+    - failure_stage == 3
+    - all three Stage-3 blockers retained
+    - Stage 4 did NOT run
+    """
+
+    payload = deepcopy(make_request())
+    payload["configuration"] = make_configuration(ConstructionFamily.U_TUBE)
+    payload["u_tube_pairing_plan"] = {
+        "schema_version": "task021.unsupported-pairing.v0",
+        "pairs": [
+            {
+                "pair_id": "p0",
+                "leg_a": {"u": 0, "v": 0},
+                "leg_b": {"u": 1, "v": 0},
+                "evidence_refs": ["p-ev"],
+            }
+        ],
+        "evidence_refs": ["plan-ev"],
+        "pairing_plan_hash": "0" * 64,
+    }
+    payload["schema_version"] = "task021.unsupported-request.v0"
+    payload["placement_envelope"]["schema_version"] = "task021.unsupported-envelope.v0"
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    field_paths = sorted({b.field_path for b in result.blockers})
+    assert "schema_version" in field_paths
+    assert "placement_envelope.schema_version" in field_paths
+    assert "u_tube_pairing_plan.schema_version" in field_paths
+    for b in result.blockers:
+        assert not b.field_path.startswith("configuration"), f"Stage 4+ leaked: {b.field_path}"
+
+
+# --------------------------------------------------------------------------- #
+# Round 4 §4 / §5 / §6 / §7 / §8 — P0-2 / P0-3 / P0-4 / P1 E2E tests
+# --------------------------------------------------------------------------- #
+
+
+def test_round4_stage8_envelope_only_no_basis_fields() -> None:
+    """Round 4 §4 (P0-2): Stage 8 returns ONLY the verified radius.
+
+    Tests the structural separation between Stage 8 and Stage 12 by
+    inspecting the public dataclass ``VerifiedEnvelopeRadius`` and confirming
+    it has NO basis / axis / offset / determinant / bound / capacity fields.
+    """
+
+    import dataclasses
+
+    from hexagent.exchangers.shell_tube.tube_layout.enumeration import (
+        VerifiedEnvelopeRadius,
+    )
+
+    field_names = {f.name for f in dataclasses.fields(VerifiedEnvelopeRadius)}
+    # Only rho-decimal / supporting string decimals survive. There must NOT
+    # be any of the Stage-12 basis-vector / axis / offset fields.
+    forbidden = {
+        "a_x",
+        "a_y",
+        "b_x",
+        "b_y",
+        "offset_x",
+        "offset_y",
+        "determinant",
+        "u_bound",
+        "v_bound",
+        "candidate_count",
+    }
+    assert forbidden.isdisjoint(field_names), (
+        f"Stage 8 leaked Stage-12 fields: {forbidden & field_names}"
+    )
+    # The round-4 surface area must contain rho.
+    assert "rho" in field_names
+
+
+def test_round4_stage8_failure_does_not_run_stage12_basis_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Round 4 §4 (P0-2): Stage 12 basis construction MUST NOT run when Stage 8
+    has already failed.
+
+    Spy: monkeypatch the Stage-12 entry point to record calls. Construct
+    a request whose envelope diameter is so small that Stage 8 emits
+    ``STL_ENVELOPE_INVALID`` (``rho <= 0``). Confirm Stage 12 was never
+    invoked.
+    """
+
+    from hexagent.exchangers.shell_tube.tube_layout import enumeration
+
+    calls = {"n": 0}
+    real_basis_for_stage12 = enumeration._compute_basis_for_stage12
+
+    def spy_basis(*args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        return real_basis_for_stage12(*args, **kwargs)
+
+    monkeypatch.setattr(enumeration, "_compute_basis_for_stage12", spy_basis, raising=True)
+
+    payload = deepcopy(make_request())
+    # Drive Stage 8 to negative rho directly: keep geometry large, make
+    # envelope smaller than geometry so rho < 0. The catch requires the
+    # public `placement_envelope` schema_version to remain valid, since
+    # Stage 3 must succeed first.
+    payload["tube_geometry"]["outer_diameter_m"] = "0.5"
+    payload["tube_geometry"]["inner_diameter_m"] = "0.45"
+    payload["tube_geometry"]["wall_thickness_m"] = "0.025"
+    payload["placement_envelope"]["tube_center_envelope_diameter_m"] = "0.01"
+    # Make pitch big enough to exceed tube OD so Stage 4
+    # (verify_task020_configuration) does not reject on pitch_below_tube_od.
+    payload["layout_rule_authority"]["pitch_m"] = "0.7"
+    # Recompute snapshot_hashes so Stage 6 / Stage 7 pass.
+    payload["tube_geometry"]["snapshot_hash"] = sha256_hex(
+        {k: v for k, v in payload["tube_geometry"].items() if k != "snapshot_hash"}
+    )
+    payload["layout_rule_authority"]["snapshot_hash"] = sha256_hex(
+        {k: v for k, v in payload["layout_rule_authority"].items() if k != "snapshot_hash"}
+    )
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert any(b.code == "STL_ENVELOPE_INVALID" for b in result.blockers), [
+        b.code for b in result.blockers
+    ]
+    # Stage 12 basis construction MUST NOT have run.
+    assert calls["n"] == 0
+
+
+def test_round4_stage9_failure_does_not_run_stage12_basis() -> None:
+    """Stage 9 origin authorization failure MUST NOT trigger Stage 12 basis."""
+
+    from hexagent.exchangers.shell_tube.tube_layout import enumeration
+
+    real_basis = enumeration._compute_basis_for_stage12
+    calls = {"n": 0}
+
+    def spy_basis(*args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        return real_basis(*args, **kwargs)
+
+    original = enumeration._compute_basis_for_stage12
+    enumeration._compute_basis_for_stage12 = spy_basis  # type: ignore[assignment]
+    try:
+        payload = deepcopy(make_request())
+        # Restrict allowed origin modes to a single entry and submit a
+        # different (valid enum string) origin_mode to trigger Stage 9.
+        payload["layout_rule_authority"]["allowed_origin_modes"] = ["CENTER_ON_LATTICE_POINT"]
+        payload["origin_mode"] = "CENTER_ON_PRIMITIVE_CELL"
+        # Recompute snapshot_hash so Stage 6 passes.
+        from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+            sha256_hex as _sha,
+        )
+
+        payload["layout_rule_authority"]["snapshot_hash"] = _sha(
+            {k: v for k, v in payload["layout_rule_authority"].items() if k != "snapshot_hash"}
+        )
+        result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+        assert result.layout is None
+        assert any(b.code == "STL_ORIGIN_MODE_NOT_AUTHORIZED" for b in result.blockers), [
+            b.code for b in result.blockers
+        ]
+    finally:
+        enumeration._compute_basis_for_stage12 = original  # type: ignore[assignment]
+    assert calls["n"] == 0
+
+
+def test_round4_stage10_eligibility_three_warnings_no_utube() -> None:
+    """Round 4 §5 (P0-3): Stage 10 (duplicate zone ID) BLOCKED result carries
+    §11.5 / §11.6 / §11.7 eligible warnings; §11.8 (U-tube bend) is ABSENT
+    because construction is not U_TUBE.
+    """
+
+    payload = deepcopy(make_request())
+    payload["exclusion_zones"] = [
+        {
+            "zone_id": "dup-1",
+            "zone_type": "CIRCLE",
+            "center_x_m": "0.01",
+            "center_y_m": "0.01",
+            "clearance_m": "0",
+            "reason_code": "shared",
+            "evidence_refs": ["zone-ev"],
+            "width_m": None,
+            "height_m": None,
+            "radius_m": "0.005",
+        },
+        {
+            "zone_id": "dup-1",  # same id
+            "zone_type": "CIRCLE",
+            "center_x_m": "0.02",
+            "center_y_m": "0.02",
+            "clearance_m": "0",
+            "reason_code": "shared",
+            "evidence_refs": ["zone-ev"],
+            "width_m": None,
+            "height_m": None,
+            "radius_m": "0.005",
+        },
+    ]
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert any(b.code == "STL_EXCLUSION_ZONE_DUPLICATE_ID" for b in result.blockers), [
+        b.code for b in result.blockers
+    ]
+    warning_codes = {w.code for w in result.warnings}
+    assert "STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM" in warning_codes
+    assert "STL_CALLER_SUPPLIED_ENVELOPE_NOT_SHELL_DIAMETER" in warning_codes
+    assert "STL_PASS_PARTITION_ASSIGNMENT_DEFERRED" in warning_codes
+    assert "STL_UTUBE_BEND_GEOMETRY_DEFERRED" not in warning_codes
+
+
+def test_round4_stage11_utube_required_eligibility_three_warnings() -> None:
+    """Round 4 §5 (P0-3): Stage 11 (U-tube pairing required but missing)
+    BLOCKED result carries the three eligible warnings; U-tube bend
+    warning is absent because pairing plan is missing.
+    """
+
+    payload = deepcopy(make_request())
+    payload["configuration"] = make_configuration(ConstructionFamily.U_TUBE)
+    payload["u_tube_pairing_plan"] = None
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert any(b.code == "STL_UTUBE_PAIRING_REQUIRED" for b in result.blockers)
+    warning_codes = {w.code for w in result.warnings}
+    assert "STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM" in warning_codes
+    assert "STL_CALLER_SUPPLIED_ENVELOPE_NOT_SHELL_DIAMETER" in warning_codes
+    assert "STL_PASS_PARTITION_ASSIGNMENT_DEFERRED" in warning_codes
+    assert "STL_UTUBE_BEND_GEOMETRY_DEFERRED" not in warning_codes
+
+
+def test_round4_stage12_capacity_exceeded_eligibility_three_warnings() -> None:
+    """Round 4 §5 (P0-3): Stage 12 candidate capacity exceeded BLOCKED
+    result carries the three eligible warnings.
+    """
+
+    payload = deepcopy(make_request())
+    # Force a small candidate capacity so the stage fails AFTER Stage 8/9/10/11
+    # pass but at Stage 12.
+    payload["layout_rule_authority"]["maximum_candidate_positions"] = 1
+    payload["layout_rule_authority"]["snapshot_hash"] = sha256_hex(
+        {k: v for k, v in payload["layout_rule_authority"].items() if k != "snapshot_hash"}
+    )
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert any(b.code == "STL_ENUMERATION_LIMIT_EXCEEDED" for b in result.blockers), [
+        b.code for b in result.blockers
+    ]
+    warning_codes = {w.code for w in result.warnings}
+    assert "STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM" in warning_codes
+    assert "STL_CALLER_SUPPLIED_ENVELOPE_NOT_SHELL_DIAMETER" in warning_codes
+    assert "STL_PASS_PARTITION_ASSIGNMENT_DEFERRED" in warning_codes
+
+
+def test_round4_stage16_utube_pairing_failure_eligibility_three_warnings() -> None:
+    """Round 4 §5 (P0-3): Stage 16 (invalid U-tube pairing) BLOCKED result
+    carries the three eligible warnings; U-tube bend warning is absent
+    because Stage 16 did NOT succeed.
+    """
+
+    payload = deepcopy(make_request())
+    payload["configuration"] = make_configuration(ConstructionFamily.U_TUBE)
+    payload["u_tube_pairing_plan"] = {
+        "schema_version": "task021.u-tube-pairing.v1",
+        "pairs": [
+            {
+                "pair_id": "broken",
+                "leg_a": {"u": 99999, "v": 99999},  # off-grid
+                "leg_b": {"u": 99998, "v": 99998},
+                "evidence_refs": ["p-ev"],
+            }
+        ],
+        "evidence_refs": ["plan-ev"],
+        "pairing_plan_hash": "0" * 64,
+    }
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert result.blockers
+    # U-tube bend warning must NOT be present (Stage 16 did not succeed).
+    warning_codes = {w.code for w in result.warnings}
+    assert "STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM" in warning_codes
+    assert "STL_CALLER_SUPPLIED_ENVELOPE_NOT_SHELL_DIAMETER" in warning_codes
+    assert "STL_PASS_PARTITION_ASSIGNMENT_DEFERRED" in warning_codes
+    assert "STL_UTUBE_BEND_GEOMETRY_DEFERRED" not in warning_codes
+
+
+def test_round4_stage14_no_positions_eligibility_three_warnings() -> None:
+    """Round 4 §5 (P0-3) + §8.1: Stage 14 STL_NO_TUBE_POSITIONS BLOCKED
+    result carries the three eligible warnings; layout is None.
+    """
+
+    payload = deepcopy(make_request())
+    # Use a zone that covers ALL inside candidates without exceeding
+    # Stage 8 / Stage 12 / Stage 13.
+    payload["placement_envelope"]["tube_center_envelope_diameter_m"] = "0.12"
+    payload["exclusion_zones"] = [
+        {
+            "zone_id": "kill-all",
+            "zone_type": "CIRCLE",
+            "center_x_m": "0",
+            "center_y_m": "0",
+            "clearance_m": "0",
+            "reason_code": "shared",
+            "evidence_refs": ["zone-ev"],
+            "width_m": None,
+            "height_m": None,
+            "radius_m": "0.05",  # covers whole envelope
+        }
+    ]
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert any(b.code == "STL_NO_TUBE_POSITIONS" for b in result.blockers)
+    warning_codes = {w.code for w in result.warnings}
+    assert "STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM" in warning_codes
+    assert "STL_CALLER_SUPPLIED_ENVELOPE_NOT_SHELL_DIAMETER" in warning_codes
+    assert "STL_PASS_PARTITION_ASSIGNMENT_DEFERRED" in warning_codes
+
+
+def test_round4_stage15_collision_public_e2e(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Round 4 §8.2: Stage 15 STL_COORDINATE_QUANTIZATION_COLLISION via
+    validate_request() public entry; layout is None; blocked_result_hash
+    is non-null; eligible warnings present.
+
+    Forced collision: replace ``coordinate_quantization_collision_guard``
+    with a stub that unconditionally raises ``STL_COORDINATE_QUANTIZATION_COLLISION``
+    once Stage 15 is reached. Stages 1-14 still run normally.
+    """
+
+    from hexagent.exchangers.shell_tube.tube_layout import validation as _validation
+    from hexagent.exchangers.shell_tube.tube_layout.geometry import (
+        GeometryFailure,
+    )
+    from hexagent.exchangers.shell_tube.tube_layout.models import (
+        BlockerCode,
+        MessageEntry,
+    )
+
+    def _stub(accepted: Any) -> Any:
+        raise GeometryFailure(
+            MessageEntry(
+                code=BlockerCode.STL_COORDINATE_QUANTIZATION_COLLISION.value,
+                field_path="positions",
+                message_key="coordinate_quantization_collision",
+            )
+        )
+
+    monkeypatch.setattr(
+        _validation,
+        "coordinate_quantization_collision_guard",
+        _stub,
+        raising=True,
+    )
+
+    payload = deepcopy(make_request())
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    codes = [b.code for b in result.blockers]
+    assert "STL_COORDINATE_QUANTIZATION_COLLISION" in codes, codes
+    assert result.blocked_result_hash is not None
+    warning_codes = {w.code for w in result.warnings}
+    assert "STL_INTERNAL_GENERIC_NO_STANDARD_CLAIM" in warning_codes
+    assert "STL_PASS_PARTITION_ASSIGNMENT_DEFERRED" in warning_codes
+
+
+def test_round4_layout_caller_mutation_does_not_influence_hashes() -> None:
+    """Round 4 §6.5 (P0-4): Mutating caller's source dict/list/nested
+    mapping after validate_request() does NOT influence the captured
+    license_evidence, request_hash, layout_hash, or warning/blocker
+    details.
+    """
+
+    payload = deepcopy(make_request())
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is not None
+
+    snapshot_license = frozen_fragment_to_primitive(
+        result.layout.layout_rule_authority.license_evidence
+    )
+    request_hash_before = result.layout.request_hash
+    layout_hash_before = result.layout.layout_hash
+
+    # Mutate the caller dict.
+    payload["layout_rule_authority"]["license_evidence"]["injected"] = "tampered"
+    payload["layout_rule_authority"]["license_evidence"]["nested"] = {"x": 1}
+
+    # Re-snapshot must still equal the captured snapshot.
+    snapshot_after = frozen_fragment_to_primitive(
+        result.layout.layout_rule_authority.license_evidence
+    )
+    assert snapshot_license == snapshot_after, (
+        "license_evidence mutation leaked into returned layout"
+    )
+    assert request_hash_before == result.layout.request_hash
+    assert layout_hash_before == result.layout.layout_hash
+
+
+def test_round4_public_canonical_bypass_rejection() -> None:
+    """Round 4 §7 (P1): All public canonical fragment helpers reject
+    ``frozenset`` / raw ``tuple`` / ``Decimal`` / ``bytes`` / non-string
+    mapping keys.
+    """
+
+    from hexagent.exchangers.shell_tube.tube_layout.canonical import (
+        PublicCanonicalDomainError,
+        fragment_canonical,
+        fragment_canonical_json,
+    )
+
+    with pytest.raises(PublicCanonicalDomainError):
+        fragment_canonical_json({"x": frozenset({"a"})})
+    with pytest.raises(PublicCanonicalDomainError):
+        fragment_canonical_json({"x": ("a", "b")})
+    with pytest.raises(PublicCanonicalDomainError):
+        fragment_canonical_json({"x": Decimal("1")})
+    with pytest.raises(PublicCanonicalDomainError):
+        fragment_canonical_json({"x": b"a"})
+    with pytest.raises(PublicCanonicalDomainError):
+        fragment_canonical_json({1: "a"})
+    with pytest.raises(PublicCanonicalDomainError):
+        fragment_canonical(frozenset({"a"}))
+
+
+def test_round4_noncanonical_raw_public_e2e() -> None:
+    """Round 4 §8.3: Non-canonical raw values flowing into validate_request()
+    must return BLOCKED with no uncaught exception.
+    """
+
+    # Decimal: raw_failing_field is a Decimal — the request will BLOCK.
+    payload = deepcopy(make_request())
+    payload["layout_rule_authority"]["pitch_m"] = Decimal("0.0254")  # type: ignore[arg-type]
+    result = validate_request(payload, software_version="0.1.0", git_commit="abc")
+    assert result.layout is None
+    assert result.blocked_result_hash is not None
+    assert result.blockers

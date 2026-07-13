@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import enum
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from hexagent.exchangers.shell_tube.models import ShellAndTubeConfiguration
@@ -325,6 +326,278 @@ def _canonical_json_value(value: Any, field_path: str, *, stage: int = 2) -> Any
 
 
 # --------------------------------------------------------------------------- #
+# Stage 2 / Stage 3 collector (round 4 P0-1)
+# --------------------------------------------------------------------------- #
+#
+# Round 4 §3.2 requires that every Stage 2 / Stage 3 check emits its OWN
+# complete blocker, that no field's failure short-circuits the rest of the
+# stage, and that the strict ordering between Stage 2 and Stage 3 holds even
+# when individual helpers internally read schema-version fields. The
+# ``Stage2Collector`` accumulates per-field blockers during Stage 2, and the
+# ``Stage3Aggregator`` returns the union of schema-version blockers after
+# every Stage 2 check has run.
+#
+# The frozen design contract states "同一个阶段产生的所有完整 blocker 必须保留".
+# This collector is the single source of truth: every parser above passes its
+# raw Schemafailure through the collector's ``record_failure`` method.
+
+
+@dataclass(frozen=True)
+class Stage2FieldReport:
+    """Per-field Stage-2 verification outcome.
+
+    ``value`` is the canonical-primitive form (after Stage-2 normalization)
+    or ``None`` if the field's validation failed. ``blockers`` is the complete
+    tuple of MessageEntry objects emitted for this field; the empty tuple
+    means the field passed Stage 2. ``raw_failing_field`` is the original raw
+    value that the field validation rejected (for §12.8 identity bookkeeping).
+    """
+
+    field_path: str
+    value: Any
+    blockers: tuple[MessageEntry, ...] = ()
+    raw_failing_field: Any | None = None
+
+
+@dataclass(frozen=True)
+class Stage2Result:
+    """Aggregate of all Stage-2 per-field reports.
+
+    The validator instantiates this with one ``Stage2FieldReport`` per top-level
+    request field. A failed Stage-2 field is represented by a non-empty
+    ``blockers`` tuple; a passed field carries the normalized primitive in
+    ``value`` and an empty ``blockers`` tuple. ``all_blockers`` is the union
+    of every per-field blocker set.
+    """
+
+    configuration: Stage2FieldReport
+    tube_geometry: Stage2FieldReport
+    layout_rule_authority: Stage2FieldReport
+    placement_envelope: Stage2FieldReport
+    origin_mode: Stage2FieldReport
+    axis_orientation: Stage2FieldReport
+    u_tube_pairing_plan: Stage2FieldReport
+    evidence_refs: Stage2FieldReport
+
+    @property
+    def passed(self) -> bool:
+        return all(not report.blockers for report in self._reports)
+
+    @property
+    def all_blockers(self) -> tuple[MessageEntry, ...]:
+        collected: list[MessageEntry] = []
+        for report in self._reports:
+            collected.extend(report.blockers)
+        return tuple(collected)
+
+    @property
+    def raw_failing_fields(self) -> dict[str, Any]:
+        """Return only the per-field raw values that triggered a Stage-2 failure."""
+
+        return {
+            report.field_path: report.raw_failing_field
+            for report in self._reports
+            if report.blockers and report.raw_failing_field is not None
+        }
+
+    @property
+    def _reports(self) -> tuple[Stage2FieldReport, ...]:
+        return (
+            self.configuration,
+            self.tube_geometry,
+            self.layout_rule_authority,
+            self.placement_envelope,
+            self.origin_mode,
+            self.axis_orientation,
+            self.u_tube_pairing_plan,
+            self.evidence_refs,
+        )
+
+
+def _safe_stage2(
+    *,
+    field_path: str,
+    parser: Callable[[], Any],
+) -> Stage2FieldReport:
+    """Run a Stage-2 parser, collecting any ``SchemaFailure`` blockers.
+
+    The parser MUST already use ``stage=2`` for every internal check. The
+    returned report carries the canonical primitive form when the parser
+    succeeds, or the full blockers tuple when it fails.
+    """
+
+    try:
+        value = parser()
+    except SchemaFailure as exc:
+        return Stage2FieldReport(
+            field_path=field_path,
+            value=None,
+            blockers=exc.blockers,
+            raw_failing_field=exc.raw_failing_field,
+        )
+    return Stage2FieldReport(field_path=field_path, value=value)
+
+
+def collect_stage2(payload: Mapping[str, Any]) -> Stage2Result:
+    """Run every Stage-2 parser and accumulate per-field complete blockers.
+
+    This is the round-4 §3.2 collector. Each top-level field produces its
+    OWN Stage-2 report; no per-field failure short-circuits the others. The
+    returned ``Stage2Result`` is the single source of truth that downstream
+    Stage-3 schema-version validation reads after every field has been
+    checked at Stage 2.
+    """
+
+    return Stage2Result(
+        configuration=_safe_stage2(
+            field_path="configuration",
+            parser=lambda: _validate_configuration_shape(payload["configuration"]),
+        ),
+        tube_geometry=_safe_stage2(
+            field_path="tube_geometry",
+            parser=lambda: parse_geometry(payload["tube_geometry"]),
+        ),
+        layout_rule_authority=_safe_stage2(
+            field_path="layout_rule_authority",
+            parser=lambda: parse_layout_rule(payload["layout_rule_authority"]),
+        ),
+        placement_envelope=_safe_stage2(
+            field_path="placement_envelope",
+            parser=lambda: parse_envelope_raw(payload["placement_envelope"]),
+        ),
+        origin_mode=_safe_stage2(
+            field_path="origin_mode",
+            parser=lambda: _enum(payload["origin_mode"], OriginMode, "origin_mode"),
+        ),
+        axis_orientation=_safe_stage2(
+            field_path="axis_orientation",
+            parser=lambda: _enum(payload["axis_orientation"], AxisOrientation, "axis_orientation"),
+        ),
+        u_tube_pairing_plan=_safe_stage2(
+            field_path="u_tube_pairing_plan",
+            parser=lambda: parse_pairing_plan_raw(payload["u_tube_pairing_plan"]),
+        ),
+        evidence_refs=_safe_stage2(
+            field_path="evidence_refs",
+            parser=lambda: _string_array(payload["evidence_refs"], "evidence_refs"),
+        ),
+    )
+
+
+def _validate_configuration_shape(value: Any) -> ShellAndTubeConfiguration:
+    """Stage-2 configuration shape check.
+
+    The TASK-020 fragment is constructed upstream; Stage 2 only checks raw
+    type / null / expected dataclass instance. Future rounds may extend
+    schema_version/raw-fields validation here if §9 Stage 4 ever moves.
+    """
+
+    if value is None:
+        raise _schema_failure(
+            2,
+            (
+                _block(
+                    BlockerCode.STL_RAW_TYPE_INVALID,
+                    "configuration",
+                    "configuration_null",
+                ),
+            ),
+            raw_failing_field=None,
+        )
+    if not isinstance(value, ShellAndTubeConfiguration):
+        raise _schema_failure(
+            2,
+            (
+                _block(
+                    BlockerCode.STL_RAW_TYPE_INVALID,
+                    "configuration",
+                    "configuration_wrong_type",
+                    details={"actual_type": type(value).__name__},
+                ),
+            ),
+            raw_failing_field=value,
+        )
+    return value
+
+
+@dataclass(frozen=True)
+class Stage3Result:
+    """Aggregate of all Stage-3 schema-version blockers."""
+
+    blockers: tuple[MessageEntry, ...]
+    raw_failing_fields: dict[str, Any]
+
+    @property
+    def passed(self) -> bool:
+        return not self.blockers
+
+
+def validate_all_schema_versions(
+    request_schema_version: Any,
+    envelope_schema_version: Any,
+    envelope_field_path: str,
+    pairing_schema_version: Any | None,
+    pairing_field_path: str | None,
+) -> Stage3Result:
+    """Stage 3 — ALL schema versions checked atomically AFTER Stage 2 ends.
+
+    Round 4 §3.1 requires that no Stage-2 helper internally compares a
+    schema_version against the expected value; every schema_version check
+    occurs here, after all Stage-2 raw-type validations have completed. The
+    returned blockers are the COMPLETE set of Stage-3 failures across
+    request/envelope/pairing, not just the first one.
+    """
+
+    blockers: list[MessageEntry] = []
+    raw_failing_fields: dict[str, Any] = {}
+
+    text = _nonempty_string(request_schema_version, "schema_version")
+    if text != REQUEST_SCHEMA_VERSION:
+        blockers.append(
+            _block(
+                BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
+                "schema_version",
+                "request_schema_version_unsupported",
+            )
+        )
+        raw_failing_fields["schema_version"] = request_schema_version
+
+    envelope_text = _nonempty_string(envelope_schema_version, envelope_field_path)
+    if envelope_text != ENVELOPE_SCHEMA_VERSION:
+        blockers.append(
+            _block(
+                BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
+                envelope_field_path,
+                "envelope_schema_version_unsupported",
+            )
+        )
+        raw_failing_fields[envelope_field_path] = envelope_schema_version
+
+    if pairing_field_path is not None and pairing_schema_version is not None:
+        pairing_text = _nonempty_string(pairing_schema_version, pairing_field_path)
+        if pairing_text != PAIRING_SCHEMA_VERSION:
+            blockers.append(
+                _block(
+                    BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
+                    pairing_field_path,
+                    "pairing_schema_version_unsupported",
+                )
+            )
+            raw_failing_fields[pairing_field_path] = pairing_schema_version
+    elif pairing_field_path is not None and pairing_schema_version is None:
+        blockers.append(
+            _block(
+                BlockerCode.STL_RAW_TYPE_INVALID,
+                pairing_field_path,
+                "pairing_schema_version_missing",
+            )
+        )
+        raw_failing_fields[pairing_field_path] = pairing_schema_version
+
+    return Stage3Result(blockers=tuple(blockers), raw_failing_fields=raw_failing_fields)
+
+
+# --------------------------------------------------------------------------- #
 # Public canonical mapping (round 3 P1-1)
 # --------------------------------------------------------------------------- #
 
@@ -608,8 +881,69 @@ def parse_layout_rule(value: Any) -> LayoutRuleAuthoritySnapshot:
     )
 
 
-def parse_envelope(value: Any) -> CircularTubeCenterEnvelope:
-    """Pure shape / raw-type validation for the placement envelope (Stages 1-3)."""
+def parse_envelope_raw(value: Any) -> EnvelopeRaw:
+    """Stage-2-only raw parser for the placement envelope.
+
+    Round 4 §3.1: this function MUST NOT compare schema_version against the
+    expected version. The schema_version field is preserved verbatim in the
+    returned :class:`EnvelopeRaw` so that :func:`validate_all_schema_versions`
+    (Stage 3) can evaluate it after every other Stage-2 check has completed.
+
+    Only shape / raw-type / numeric-shape work happens here. The round-3
+    public boundary still rejects non-canonical mapping shapes.
+    """
+
+    fields = {"schema_version", "tube_center_envelope_diameter_m", "evidence_refs"}
+    data = _mapping(value, "placement_envelope", fields, stage=2)
+    schema_version_text = _nonempty_string(
+        data["schema_version"], "placement_envelope.schema_version", stage=2
+    )
+    envelope_diameter_m = _decimal(
+        data["tube_center_envelope_diameter_m"],
+        "placement_envelope.tube_center_envelope_diameter_m",
+        positive=True,
+        code=BlockerCode.STL_ENVELOPE_INVALID,
+        message_key="envelope_diameter_invalid",
+        stage=2,
+    )
+    return EnvelopeRaw(
+        schema_version=schema_version_text,
+        tube_center_envelope_diameter_m=envelope_diameter_m,
+        evidence_refs=_string_array(
+            data["evidence_refs"],
+            "placement_envelope.evidence_refs",
+            allow_empty=False,
+            stage=2,
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class EnvelopeRaw:
+    """Stage-2 placement-envelope raw value preservation.
+
+    Round 4 §3.1 keeps the schema_version string in this intermediate
+    dataclass; Stage 3 compares it against the expected version AFTER every
+    Stage-2 raw-type check has completed. The legacy constructor path
+    accepts this raw form and constructs the canonical
+    :class:`CircularTubeCenterEnvelope` only when the schema_version check
+    passes.
+    """
+
+    schema_version: str
+    tube_center_envelope_diameter_m: str
+    evidence_refs: tuple[str, ...]
+
+
+def parse_envelope_payload(value: Any) -> CircularTubeCenterEnvelope:
+    """Legacy envelope parser retained for backward compatibility.
+
+    Performs Stage-2 raw validation AND Stage-3 schema_version comparison
+    in one call. Round-4 callers MUST use
+    :func:`parse_envelope_raw` + :func:`validate_all_schema_versions` to keep
+    Stage 2 / Stage 3 strictly separated; this legacy helper exists only for
+    fixture builder compatibility.
+    """
 
     fields = {"schema_version", "tube_center_envelope_diameter_m", "evidence_refs"}
     data = _mapping(value, "placement_envelope", fields, stage=2)
@@ -645,6 +979,45 @@ def parse_envelope(value: Any) -> CircularTubeCenterEnvelope:
             allow_empty=False,
             stage=2,
         ),
+    )
+
+
+def parse_envelope(value: Any) -> CircularTubeCenterEnvelope:
+    """Default public envelope parser.
+
+    Accepts either a raw mapping (Stage-2 + Stage-3 in one call) OR a
+    pre-validated :class:`EnvelopeRaw` (from Stage-2-only raw collection
+    followed by Stage 3). Round 4 keeps both call sites working.
+
+    Callers that want strict Stage-2-then-Stage-3 separation MUST use
+    :func:`parse_envelope_raw` + :func:`validate_all_schema_versions` and
+    then construct :class:`CircularTubeCenterEnvelope` directly from the
+    Stage-2-preserved raw + Stage-3-verified schema_version.
+    """
+
+    if isinstance(value, EnvelopeRaw):
+        return CircularTubeCenterEnvelope(
+            schema_version=ENVELOPE_SCHEMA_VERSION,
+            tube_center_envelope_diameter_m=value.tube_center_envelope_diameter_m,
+            evidence_refs=value.evidence_refs,
+        )
+    raw = parse_envelope_raw(value)
+    if raw.schema_version != ENVELOPE_SCHEMA_VERSION:
+        raise _schema_failure(
+            3,
+            (
+                _block(
+                    BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
+                    "placement_envelope.schema_version",
+                    "envelope_schema_version_unsupported",
+                ),
+            ),
+            raw_failing_field=raw.schema_version,
+        )
+    return CircularTubeCenterEnvelope(
+        schema_version=ENVELOPE_SCHEMA_VERSION,
+        tube_center_envelope_diameter_m=raw.tube_center_envelope_diameter_m,
+        evidence_refs=raw.evidence_refs,
     )
 
 
@@ -773,8 +1146,34 @@ def parse_leg(value: Any, field_path: str) -> LatticeIndex:
     )
 
 
-def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
-    """Pure shape / raw-type validation for the U-tube pairing plan (Stages 1-3)."""
+@dataclass(frozen=True)
+class PairingPlanRaw:
+    """Stage-2 pairing-plan raw value preservation.
+
+    Round 4 §3.1 keeps the schema_version string and the validated pairs in
+    this intermediate dataclass; Stage 3 compares schema_version against
+    the expected version AFTER every other Stage-2 check has completed.
+    """
+
+    schema_version: str | None
+    pairs: tuple[UTubePair, ...]
+    evidence_refs: tuple[str, ...]
+    pairing_plan_hash: str
+
+
+def parse_pairing_plan_raw(value: Any) -> PairingPlanRaw | None:
+    """Stage-2-only raw parser for the U-tube pairing plan.
+
+    Round 4 §3.1: this function MUST NOT compare schema_version against the
+    expected version. The schema_version field is preserved verbatim (or
+    ``None`` when the plan itself is absent) so that
+    :func:`validate_all_schema_versions` (Stage 3) can evaluate it after
+    every other Stage-2 check has completed.
+
+    Pair-pair shape validation (Stage 2 numeric / array raw types) DOES
+    happen here because that is exactly what Stage 2 is for. Only the
+    schema_version comparison is deferred.
+    """
 
     if value is None:
         return None
@@ -787,18 +1186,6 @@ def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
     schema_version_text = _nonempty_string(
         data["schema_version"], "u_tube_pairing_plan.schema_version", stage=2
     )
-    if schema_version_text != PAIRING_SCHEMA_VERSION:
-        raise _schema_failure(
-            3,
-            (
-                _block(
-                    BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
-                    "u_tube_pairing_plan.schema_version",
-                    "pairing_schema_version_unsupported",
-                ),
-            ),
-            raw_failing_field=data["schema_version"],
-        )
     raw_pairs = data["pairs"]
     if not isinstance(raw_pairs, list) or not raw_pairs:
         raise _schema_failure(
@@ -833,8 +1220,8 @@ def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
                 ),
             )
         )
-    return UTubePairingPlan(
-        schema_version=PAIRING_SCHEMA_VERSION,
+    return PairingPlanRaw(
+        schema_version=schema_version_text,
         pairs=tuple(pairs),
         evidence_refs=_string_array(
             data["evidence_refs"],
@@ -847,6 +1234,32 @@ def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
             "u_tube_pairing_plan.pairing_plan_hash",
             stage=2,
         ),
+    )
+
+
+def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
+    """Pure shape / raw-type validation for the U-tube pairing plan (Stages 1-3)."""
+
+    raw = parse_pairing_plan_raw(value)
+    if raw is None:
+        return None
+    if raw.schema_version != PAIRING_SCHEMA_VERSION:
+        raise _schema_failure(
+            3,
+            (
+                _block(
+                    BlockerCode.STL_SCHEMA_VERSION_UNSUPPORTED,
+                    "u_tube_pairing_plan.schema_version",
+                    "pairing_schema_version_unsupported",
+                ),
+            ),
+            raw_failing_field=raw.schema_version,
+        )
+    return UTubePairingPlan(
+        schema_version=PAIRING_SCHEMA_VERSION,
+        pairs=raw.pairs,
+        evidence_refs=raw.evidence_refs,
+        pairing_plan_hash=raw.pairing_plan_hash,
     )
 
 
@@ -940,18 +1353,27 @@ def parse_request(payload: Any) -> TubeLayoutRequest:
 
 __all__ = [
     "CanonicalizationError",
+    "EnvelopeRaw",
+    "PairingPlanRaw",
     "REQUEST_FIELDS",
     "REQUEST_SCHEMA_VERSION",
     "SchemaFailure",
+    "Stage2FieldReport",
+    "Stage2Result",
+    "Stage3Result",
     "canonical_mapping",
     "canonical_json",
+    "collect_stage2",
     "parse_envelope",
+    "parse_envelope_raw",
     "parse_geometry",
     "parse_layout_rule",
     "parse_pairing_plan",
+    "parse_pairing_plan_raw",
     "parse_request",
     "parse_source_binding",
     "parse_zone",
+    "validate_all_schema_versions",
     "validate_request_schema_version",
     "validate_top_level_mapping",
 ]

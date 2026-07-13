@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_CEILING, ROUND_HALF_EVEN, Decimal, localcontext
 
-from .canonical import DECIMAL_PRECISION, SQRT_3, parse_decimal
+from .canonical import DECIMAL_PRECISION, SQRT_3, decimal_string, parse_decimal
 from .models import (
     ApprovedTubeGeometrySnapshot,
     AxisOrientation,
@@ -51,8 +51,31 @@ class Candidate:
 
 
 @dataclass(frozen=True)
+class VerifiedEnvelopeRadius:
+    """Frozen Stage 8 output: envelope/radius only, NO basis work.
+
+    Round 4 §4 (P0-2) requires Stage 8 to expose ONLY ``rho`` (the verified
+    effective radius) and the supporting envelope / geometry decimals needed
+    for hashing. There are intentionally NO basis vectors, NO axis swap, NO
+    origin offset, NO determinant, NO bounds, and NO candidate count.
+    """
+
+    envelope_diameter_m: str
+    outer_diameter_m: str
+    edge_clearance_m: str
+    rho: str
+
+
+@dataclass(frozen=True)
 class EnumeratedBasisInputs:
-    """Frozen Stage 8 output: envelope/radius only, no basis work yet."""
+    """Frozen Stage-12-pre-stage snapshot: basis vectors, axis swap, origin offset.
+
+    Round 4 §4 (P0-2) makes this the SECOND stage's responsibility. It is
+    produced by :func:`_compute_basis_for_stage12` and consumed by
+    :func:`verify_inverse_basis_and_candidate_capacity`. Stage 8 NEVER sees
+    or produces this; doing so would leak Stage-12 basis construction into
+    Stage 8.
+    """
 
     a_x: Decimal
     a_y: Decimal
@@ -64,20 +87,6 @@ class EnumeratedBasisInputs:
     pattern_family: PatternFamily
     origin_mode: OriginMode
     axis_orientation: AxisOrientation
-
-
-@dataclass(frozen=True)
-class EnumerationPlan:
-    a_x: Decimal
-    a_y: Decimal
-    b_x: Decimal
-    b_y: Decimal
-    offset_x: Decimal
-    offset_y: Decimal
-    rho: Decimal
-    u_bound: int
-    v_bound: int
-    candidate_count: int
 
 
 def _block(code: BlockerCode, field_path: str, message_key: str) -> EnumerationFailure:
@@ -92,9 +101,10 @@ def _basis_vectors(
 ) -> tuple[Decimal, Decimal, Decimal, Decimal]:
     """Return (a_x, a_y, b_x, b_y) for the given pattern_family and orientation.
 
-    Pure stage-8 derivation: the basis vectors themselves do not require
-    invertibility or bounds. Invertibility and candidate capacity are deferred
-    to stage 12.
+    This is pure Stage-12 derivation: it does not call any Stage-8 helper and
+    does not validate the envelope. Round 4 §4 (P0-2) keeps this private to
+    :mod:`enumeration` so that only :func:`verify_inverse_basis_and_candidate_capacity`
+    can introduce basis work.
     """
 
     p = parse_decimal(rule.pitch_m, positive=True)
@@ -116,11 +126,17 @@ def verify_envelope_shape_and_radius(
     envelope: CircularTubeCenterEnvelope,
     origin_mode: OriginMode,
     axis_orientation: AxisOrientation,
-) -> EnumeratedBasisInputs:
-    """Stage 8 — envelope shape + positive effective radius only.
+) -> VerifiedEnvelopeRadius:
+    """Stage 8 — envelope shape AND positive effective radius ONLY.
 
-    No basis determinant, no inverse basis, no bounds, no candidate count.
-    Those are deferred to Stage 12.
+    Round 4 §4 (P0-2): this function MUST NOT construct the pattern basis
+    vectors. It MUST NOT perform axis swap. It MUST NOT compute origin
+    offset. It MUST NOT check invertibility or candidate capacity.
+
+    The returned :class:`VerifiedEnvelopeRadius` carries the verified
+    ``rho`` decimal string plus the raw decimal strings needed to derive
+    it, so downstream Stage-12 work can compute the basis without
+    touching Stage-8 inputs.
     """
 
     with localcontext() as ctx:
@@ -129,13 +145,6 @@ def verify_envelope_shape_and_radius(
         outer = parse_decimal(geometry.outer_diameter_m, positive=True)
         diameter = parse_decimal(envelope.tube_center_envelope_diameter_m, positive=True)
         edge_clearance = parse_decimal(rule.edge_clearance_m, positive=False)
-        a_x, a_y, b_x, b_y = _basis_vectors(rule, axis_orientation)
-        if origin_mode is OriginMode.CENTER_ON_LATTICE_POINT:
-            offset_x = Decimal(0)
-            offset_y = Decimal(0)
-        else:
-            offset_x = (a_x + b_x) / Decimal(2)
-            offset_y = (a_y + b_y) / Decimal(2)
         rho = diameter / Decimal(2) - outer / Decimal(2) - edge_clearance
     if rho <= 0:
         raise _block(
@@ -143,6 +152,36 @@ def verify_envelope_shape_and_radius(
             "placement_envelope",
             "effective_radius_nonpositive",
         )
+    return VerifiedEnvelopeRadius(
+        envelope_diameter_m=envelope.tube_center_envelope_diameter_m,
+        outer_diameter_m=geometry.outer_diameter_m,
+        edge_clearance_m=rule.edge_clearance_m,
+        rho=decimal_string(rho),
+    )
+
+
+def _compute_basis_for_stage12(
+    rule: LayoutRuleAuthoritySnapshot,
+    geometry: ApprovedTubeGeometrySnapshot,
+    envelope: CircularTubeCenterEnvelope,
+    origin_mode: OriginMode,
+    axis_orientation: AxisOrientation,
+    rho_decimal: Decimal,
+) -> EnumeratedBasisInputs:
+    """Stage 12 internal: produce the full :class:`EnumeratedBasisInputs`.
+
+    Round 4 §4 (P0-2): this is the ONLY place where basis vectors, axis
+    swap, and origin offset get derived. It does not run if Stage 8 has
+    not already produced :func:`verify_envelope_shape_and_radius`.
+    """
+
+    a_x, a_y, b_x, b_y = _basis_vectors(rule, axis_orientation)
+    if origin_mode is OriginMode.CENTER_ON_LATTICE_POINT:
+        offset_x = Decimal(0)
+        offset_y = Decimal(0)
+    else:
+        offset_x = (a_x + b_x) / Decimal(2)
+        offset_y = (a_y + b_y) / Decimal(2)
     return EnumeratedBasisInputs(
         a_x=a_x,
         a_y=a_y,
@@ -150,7 +189,7 @@ def verify_envelope_shape_and_radius(
         b_y=b_y,
         offset_x=offset_x,
         offset_y=offset_y,
-        rho=rho,
+        rho=rho_decimal,
         pattern_family=rule.pattern_family,
         origin_mode=origin_mode,
         axis_orientation=axis_orientation,
@@ -159,13 +198,31 @@ def verify_envelope_shape_and_radius(
 
 def verify_inverse_basis_and_candidate_capacity(
     rule: LayoutRuleAuthoritySnapshot,
-    basis: EnumeratedBasisInputs,
+    geometry: ApprovedTubeGeometrySnapshot,
+    envelope: CircularTubeCenterEnvelope,
+    origin_mode: OriginMode,
+    axis_orientation: AxisOrientation,
+    stage8: VerifiedEnvelopeRadius,
 ) -> EnumerationPlan:
-    """Stage 12 — inverse basis, bounds, candidate capacity."""
+    """Stage 12 — inverse basis, bounds, candidate capacity.
+
+    Round 4 §4 (P0-2): the basis construction that was previously leaked
+    into Stage 8 now happens here. Caller passes the verified radius from
+    Stage 8; we rebuild the basis internally and compute determinant,
+    inverse basis, U/V bounds, and candidate count. Blocker codes emitted:
+
+    - ``STL_BASIS_NON_INVERTIBLE`` on zero determinant.
+    - ``STL_ENUMERATION_LIMIT_EXCEEDED`` when the candidate count exceeds
+      the rule's frozen capacity.
+    """
 
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PRECISION
         ctx.rounding = ROUND_HALF_EVEN
+        rho_decimal = parse_decimal(stage8.rho, positive=True)
+        basis = _compute_basis_for_stage12(
+            rule, geometry, envelope, origin_mode, axis_orientation, rho_decimal
+        )
         a_x, a_y = basis.a_x, basis.a_y
         b_x, b_y = basis.b_x, basis.b_y
         det = a_x * b_y - a_y * b_x
@@ -179,8 +236,8 @@ def verify_inverse_basis_and_candidate_capacity(
         b01 = -b_x / det
         b10 = -a_y / det
         b11 = a_x / det
-        d_x = basis.rho + abs(basis.offset_x)
-        d_y = basis.rho + abs(basis.offset_y)
+        d_x = rho_decimal + abs(basis.offset_x)
+        d_y = rho_decimal + abs(basis.offset_y)
         u_bound_decimal = abs(b00) * d_x + abs(b01) * d_y
         v_bound_decimal = abs(b10) * d_x + abs(b11) * d_y
         u_bound = int(u_bound_decimal.to_integral_value(rounding=ROUND_CEILING)) + 1
@@ -193,13 +250,13 @@ def verify_inverse_basis_and_candidate_capacity(
             "candidate_capacity_exceeded",
         )
     return EnumerationPlan(
-        a_x=basis.a_x,
-        a_y=basis.a_y,
-        b_x=basis.b_x,
-        b_y=basis.b_y,
+        a_x=a_x,
+        a_y=a_y,
+        b_x=b_x,
+        b_y=b_y,
         offset_x=basis.offset_x,
         offset_y=basis.offset_y,
-        rho=basis.rho,
+        rho=rho_decimal,
         u_bound=u_bound,
         v_bound=v_bound,
         candidate_count=candidate_count,
@@ -217,13 +274,30 @@ def build_plan(
 
     New code MUST call :func:`verify_envelope_shape_and_radius` and
     :func:`verify_inverse_basis_and_candidate_capacity` separately so that
-    the stage ordinals in the blocker remain correct.
+    the stage ordinals in the blocker remain correct and Stage 8 stays free
+    of basis work.
     """
 
-    basis = verify_envelope_shape_and_radius(
+    stage8 = verify_envelope_shape_and_radius(
         rule, geometry, envelope, origin_mode, axis_orientation
     )
-    return verify_inverse_basis_and_candidate_capacity(rule, basis)
+    return verify_inverse_basis_and_candidate_capacity(
+        rule, geometry, envelope, origin_mode, axis_orientation, stage8
+    )
+
+
+@dataclass(frozen=True)
+class EnumerationPlan:
+    a_x: Decimal
+    a_y: Decimal
+    b_x: Decimal
+    b_y: Decimal
+    offset_x: Decimal
+    offset_y: Decimal
+    rho: Decimal
+    u_bound: int
+    v_bound: int
+    candidate_count: int
 
 
 def enumerate_candidates(plan: EnumerationPlan) -> tuple[Candidate, ...]:
@@ -244,6 +318,7 @@ __all__ = [
     "EnumeratedBasisInputs",
     "EnumerationFailure",
     "EnumerationPlan",
+    "VerifiedEnvelopeRadius",
     "build_plan",
     "enumerate_candidates",
     "verify_envelope_shape_and_radius",

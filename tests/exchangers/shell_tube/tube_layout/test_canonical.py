@@ -229,13 +229,30 @@ def test_freeze_deeply_rejects_decimals_silently_stringifying() -> None:
         freeze_deeply({"d": Decimal("0.1")})
 
 
-def test_freeze_deeply_rejects_set_but_accepts_tuple_as_atom() -> None:
+def test_freeze_deeply_rejects_set_and_tuple_and_uses_public_boundary() -> None:
+    """Round 4 §7: ``freeze_deeply`` is now a thin wrapper over the public
+    canonical JSON boundary. It MUST reject ``set``, ``tuple``, ``frozenset``,
+    ``Decimal``, ``bytes``, ``float``, ``memoryview``, dataclasses, enums, and
+    arbitrary objects — every historical bypass route is closed.
+    """
+
+    # Set / tuple / frozenset: rejected.
     with pytest.raises(PublicCanonicalDomainError):
         freeze_deeply({"items": {"a", "b"}})
-    # tuple is accepted as a frozen atom: no silent conversion.
-    frozen = freeze_deeply({"items": ("a", "b")})
-    assert isinstance(frozen["items"], tuple)
-    assert frozen["items"] == ("a", "b")
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_deeply({"items": ("a", "b")})
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_deeply({"items": frozenset({"a", "b"})})
+    # Decimal / bytes / float: rejected.
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_deeply({"x": Decimal("1")})
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_deeply({"x": b"a"})
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_deeply({"x": 1.5})
+    # Arbitrary object / dataclass / enum: rejected.
+    with pytest.raises(PublicCanonicalDomainError):
+        freeze_deeply({"x": object()})
 
 
 def test_freeze_deeply_rejects_non_string_mapping_key() -> None:

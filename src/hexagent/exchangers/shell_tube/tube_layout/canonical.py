@@ -128,10 +128,15 @@ def strict_public_json_snapshot(value: Any) -> Any:
     """Validate ``value`` and return a recursive deep-frozen canonical shape.
 
     Raises ``PublicCanonicalDomainError`` on any out-of-domain input. The
-    returned structure uses ``MappingProxyType`` for mappings and ``tuple`` for
-    sequences and may be safely passed to ``frozen_fragment_to_primitive`` or
+    returned structure uses ``MappingProxyType`` for mappings and ``tuple``
+    for sequences and may be safely passed to ``frozen_fragment_to_primitive`` or
     used as a public canonical value (e.g. for ``license_evidence``,
     ``MessageEntry.details``, ``case_authority``, ``provenance`` fragments).
+
+    ``tuple`` is NOT accepted from raw callers — callers should pass a
+    regular ``list`` and the snapshot path will emit a fresh ``tuple``. Use
+    :func:`force_frozen_canonical` or :func:`frozen_fragment_to_primitive`
+    to handle already-frozen shapes.
     """
 
     if value is None:
@@ -183,12 +188,18 @@ def snapshot_then_to_primitive(value: Any) -> Any:
     """Public-boundary pass for callers that hold an ordinary canonical value.
 
     Accepts a value in the §6.1 canonical JSON domain (null/bool/int/str/list/
-    string-keyed dict) and returns the canonical-primitive form. Used for
-    MessageEntry.details and other fragments that may still be ordinary
-    dicts on internal data flows. The recursive snapshot guarantees
-    immutability during the conversion.
+    string-keyed dict) AND an already-frozen fragment (MappingProxyType /
+    ``tuple`` of canonical primitives). Used for ``MessageEntry.details``
+    and other fragments that may have been deep-frozen by the dataclass
+    ``__post_init__``. The public-boundary pass guarantees immutability
+    during the conversion.
     """
 
+    if isinstance(value, MappingProxyType):
+        # Already-frozen fragment: skip the snapshot step and reduce directly.
+        return frozen_fragment_to_primitive(value)
+    if isinstance(value, tuple):
+        return frozen_fragment_to_primitive(value)
     frozen = strict_public_json_snapshot(value)
     return frozen_fragment_to_primitive(frozen)
 
@@ -218,7 +229,49 @@ def canonical_raw_json_or_none(value: Any) -> Any | None:
 
 
 # --------------------------------------------------------------------------- #
-# Internal canonical primitive reduction (round 3 P0-3 / P1-1)
+# Round 4 P0-4 — public-boundary deep freeze for dataclass __post_init__
+# --------------------------------------------------------------------------- #
+
+
+def force_frozen_canonical(value: Any) -> Any:
+    """Detach and deep-freeze a public-canonical fragment for dataclass storage.
+
+    Round 4 §6 (P0-4): every dataclass that exposes a canonical JSON fragment
+    in its public state (``license_evidence``, ``MessageEntry.details``,
+    ``case_authority``, ``provenance`` fragments, ...) MUST run the value
+    through this helper in ``__post_init__`` so a caller-mutation that
+    happens after object construction cannot influence the returned object's
+    payload or any subsequent hash.
+
+    Accepts:
+    - ``None`` → ``None``
+    - ``MappingProxyType`` (already-frozen fragment) → re-emitted as a
+      fresh frozen snapshot (idempotent)
+    - public-boundary primitives / lists / dicts (the §6.1 canonical JSON
+      domain)
+
+    Rejects:
+    - ``float``, ``Decimal``, ``bytes``, ``bytearray``, ``memoryview``
+    - ``set``, ``frozenset``
+    - ``dataclass``, ``Enum``, arbitrary objects, mapping with non-string keys
+    """
+
+    return _freeze_deeply_recursive(value)
+
+
+def force_frozen_optional_canonical(value: Any | None) -> Any | None:
+    """Detach and deep-freeze an OPTIONAL public-canonical fragment.
+
+    Round 4 §6 (P0-4): ``MessageEntry.details`` is optional. When the
+    caller passes ``None`` the helper passes it through unchanged; otherwise
+    it delegates to :func:`force_frozen_canonical`.
+    """
+
+    if value is None:
+        return None
+    return force_frozen_canonical(value)
+
+
 # --------------------------------------------------------------------------- #
 #
 # `canonical_json` is the ONLY public JSON serialization boundary. It accepts
@@ -227,6 +280,15 @@ def canonical_raw_json_or_none(value: Any) -> Any | None:
 
 
 def _canonical_value(value: Any) -> Any:
+    """Top-level canonical serialization primitive.
+
+    Rejects raw ``tuple`` / ``frozenset`` / ``Decimal`` / ``bytes`` /
+    non-``str`` mapping keys / arbitrary objects at the top level, as per
+    round 4 §7. Already-frozen internal fragments are converted by
+    :func:`frozen_fragment_to_primitive` BEFORE this is called; nested
+    sub-calls see only canonical primitives.
+    """
+
     if value is None or isinstance(value, (bool, int, str)):
         return value
     if isinstance(value, enum.Enum):
@@ -302,7 +364,15 @@ def to_primitive(value: Any) -> Any:
     if isinstance(value, Decimal):
         raise CanonicalizationError("Decimal objects must be expressed as canonical strings")
     if isinstance(value, tuple):
-        return [to_primitive(item) for item in value]
+        # Round 4: tuples of canonical atoms (frozen-fragment sequences) are
+        # converted to lists. Tuples must contain only canonical-atom types
+        # to be representable here; anything else propagates the failure.
+        try:
+            return [to_primitive(item) for item in value]
+        except CanonicalizationError as exc:
+            raise CanonicalizationError(
+                f"tuple element of type {type(value).__name__} cannot be serialized: {exc}"
+            ) from exc
     if isinstance(value, list):
         return [to_primitive(item) for item in value]
     if isinstance(value, Mapping):
@@ -331,69 +401,67 @@ def to_primitive(value: Any) -> Any:
 
 
 def freeze_deeply(value: Any) -> Any:
-    """Internal: deep-freeze a value IF it is already in the canonical domain.
+    """Internal: deep-freeze a value via the public canonical JSON boundary.
 
-    For the public boundary, prefer `strict_public_json_snapshot`. This helper
-    remains exported because internal pipeline code uses it after upstream code
-    has guaranteed the input is already a canonical primitive mapping or list
-    of canonical primitives. It rejects out-of-domain types aggressively and
-    never silently coerces.
+    Round 4 (P1) makes ``freeze_deeply`` a thin wrapper that runs the value
+    through ``strict_public_json_snapshot`` for fresh inputs and accepts
+    already-frozen fragments (``MappingProxyType`` / canonical-atom ``tuple``)
+    as idempotent re-freezes.
 
-    ``tuple`` and ``frozenset`` are accepted as atoms (already immutable);
-    ``set`` is rejected because its iteration order is implementation-defined
-    and would break canonical reproducibility.
+    It accepts:
+    - public-boundary primitives / lists / dicts (the §6.1 canonical JSON
+      domain)
+    - already-frozen shapes (``MappingProxyType`` / canonical-atom ``tuple``)
+
+    It MUST reject (mirroring ``strict_public_json_snapshot``):
+    - ``float``, ``Decimal``, ``bytes``, ``bytearray``, ``memoryview``
+    - ``set``, ``frozenset``, raw ``tuple`` outside an already-frozen shape
+    - arbitrary objects, dataclasses, enums, mapping with non-string keys
+    """
+
+    return _freeze_deeply_recursive(value)
+
+
+def _freeze_deeply_recursive(value: Any) -> Any:
+    """Recursive form of :func:`freeze_deeply` that walks already-frozen
+    nested fragments as well.
     """
 
     if value is None or isinstance(value, _FROZEN_ATOM_TYPES):
         return value
-    if isinstance(value, (tuple, frozenset)):
-        return tuple(freeze_deeply(item) for item in value)
-    if isinstance(value, bytes | bytearray | memoryview):
-        raise PublicCanonicalDomainError(
-            "byte strings are forbidden at the frozen-fragment boundary"
-        )
-    if isinstance(value, float):
-        raise PublicCanonicalDomainError(
-            "binary floating-point values are forbidden at the frozen-fragment boundary"
-        )
-    if isinstance(value, Decimal):
-        raise PublicCanonicalDomainError(
-            "Decimal objects must be expressed as canonical strings at the frozen-fragment boundary"
-        )
-    if isinstance(value, set):
-        raise PublicCanonicalDomainError("set values are forbidden at the frozen-fragment boundary")
-    if dataclasses.is_dataclass(value):
-        return freeze_deeply(dataclass_to_mapping(value))
-    if isinstance(value, enum.Enum):
-        return value.value
-    if isinstance(value, list):
-        return tuple(freeze_deeply(item) for item in value)
-    if isinstance(value, Mapping):
-        for key in value:
-            if not isinstance(key, str):
-                raise PublicCanonicalDomainError("canonical fragment keys must be strings")
-        frozen_items = {key: freeze_deeply(item) for key, item in value.items()}
-        return MappingProxyType(frozen_items)
-    raise PublicCanonicalDomainError(
-        f"unsupported canonical fragment value: {type(value).__name__}"
-    )
+    if isinstance(value, MappingProxyType):
+        rebuilt: dict[str, Any] = {}
+        for key in sorted(value.keys()):
+            rebuilt[key] = _freeze_deeply_recursive(value[key])
+        return MappingProxyType(rebuilt)
+    if isinstance(value, tuple):
+        # Already-frozen sequence (canonical atoms only). Recurse into each
+        # element so nested MappingProxyType / dict / list values are also
+        # idempotently re-frozen.
+        return tuple(_freeze_deeply_recursive(item) for item in value)
+    return strict_public_json_snapshot(value)
 
 
 def fragment_canonical(value: Any) -> Any:
-    """Canonicalize a frozen fragment to its sorted-key primitive form."""
+    """Canonicalize a public-boundary value to its sorted-key primitive form.
 
-    return _canonical_value(freeze_deeply(value))
+    Rejects out-of-domain types (``frozenset``, ``tuple``, ``Decimal``,
+    ``bytes``, ``float``, etc.); the public boundary pass raises
+    ``PublicCanonicalDomainError`` before reducing to a primitive.
+    """
+
+    return _canonical_value(strict_public_json_snapshot(value))
 
 
 def fragment_canonical_json(value: Any) -> str:
-    """Return canonical JSON of a public-boundary frozen fragment.
+    """Return canonical JSON of a public-boundary value.
 
-    Callers must have already reduced the input through
-    `strict_public_json_snapshot` (or fed in a dataclass that is intended for
-    capture under a §12.6/§12.7 slot).
+    The input MUST be in the §6.1 canonical JSON domain. Anything else raises
+    ``PublicCanonicalDomainError``. The historic bypass that accepted
+    ``frozenset`` / ``tuple`` / ``Decimal`` is closed in round 4.
     """
 
-    frozen = freeze_deeply(value)
+    frozen = strict_public_json_snapshot(value)
     reduced = frozen_fragment_to_primitive(frozen)
     return canonical_json(reduced)
 
@@ -430,7 +498,14 @@ def sorted_unique_strings(values: Sequence[str], *, allow_empty: bool = True) ->
 
 
 def message_sort_key(entry: Any) -> tuple[str, str, str, str, str]:
-    """Return the frozen warning/blocker composite ordering key."""
+    """Return the frozen warning/blocker composite ordering key.
+
+    Round 4 §7: ``details`` may be either an ordinary canonical dict/list
+    OR an already-frozen MappingProxyType (after dataclass ``__post_init__``
+    deep-freeze). The hash path uses :func:`frozen_fragment_to_primitive`
+    so :func:`canonical_json` never sees a raw ``tuple`` / ``frozenset`` /
+    ``MappingProxyType`` top-level value.
+    """
 
     details = getattr(entry, "details", None)
     evidence_refs = list(getattr(entry, "evidence_refs", ()))
@@ -438,9 +513,40 @@ def message_sort_key(entry: Any) -> tuple[str, str, str, str, str]:
         str(entry.code),
         "" if getattr(entry, "field_path", None) is None else str(entry.field_path),
         str(entry.message_key),
-        sha256_hex(details),
+        sha256_hex(_reduce_for_hash(details)),
         sha256_hex(evidence_refs),
     )
+
+
+def _reduce_for_hash(value: Any) -> Any:
+    """Reduce an arbitrary value to a JSON-safe form before hashing.
+
+    Round 4 §7: this helper handles dataclass / enum / MappingProxyType / tuple
+    values that may appear after the dataclass ``__post_init__`` deep-freeze.
+    Result is canonicalization-clean: a dict of sorted-key primitives whose
+    every element is recursively reduced.
+    """
+
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if dataclasses.is_dataclass(value):
+        return _reduce_for_hash(dataclass_to_mapping(value))
+    if isinstance(value, enum.Enum):
+        return value.value
+    if isinstance(value, Mapping):
+        return {
+            key: _reduce_for_hash(item)
+            for key, item in sorted(value.items())
+            if isinstance(key, str)
+        }
+    if isinstance(value, list):
+        return [_reduce_for_hash(item) for item in value]
+    if isinstance(value, tuple):
+        try:
+            return list(value)
+        except TypeError:
+            return None
+    return value
 
 
 def sort_messages(entries: Iterable[Any]) -> tuple[Any, ...]:
@@ -469,6 +575,8 @@ __all__ = [
     "canonical_raw_json_or_none",
     "dataclass_to_mapping",
     "decimal_string",
+    "force_frozen_canonical",
+    "force_frozen_optional_canonical",
     "fragment_canonical",
     "fragment_canonical_json",
     "freeze_deeply",

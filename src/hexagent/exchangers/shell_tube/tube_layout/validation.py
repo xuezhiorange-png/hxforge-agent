@@ -34,11 +34,11 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Mapping
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Any
 
 from hexagent.exchangers.shell_tube.models import (
     ConstructionFamily,
-    ShellAndTubeConfiguration,
 )
 
 from .authority import (
@@ -75,9 +75,12 @@ from .geometry import (
 from .models import (
     DEFERRED_CAPABILITIES,
     DESIGN_CONTRACT_PATH,
+    ENVELOPE_SCHEMA_VERSION,
     LAYOUT_SCHEMA_VERSION,
+    PAIRING_SCHEMA_VERSION,
     AuthorityMode,
     BlockerCode,
+    CircularTubeCenterEnvelope,
     ExclusionZone,
     MessageEntry,
     ProvenancePreHashProjection,
@@ -85,6 +88,7 @@ from .models import (
     TubeLayoutRequest,
     TubeLayoutValidationResult,
     TubePosition,
+    UTubePairingPlan,
     ValidationStatus,
     WarningCode,
 )
@@ -92,13 +96,11 @@ from .pairing import PairingFailure, canonical_pairs, validate_pairing_plan
 from .schema import (
     REQUEST_SCHEMA_VERSION,
     SchemaFailure,
+    Stage2Result,
+    Stage3Result,
     canonical_mapping,
-    parse_envelope,
-    parse_geometry,
-    parse_layout_rule,
-    parse_pairing_plan,
-    parse_zone,
-    validate_request_schema_version,
+    collect_stage2,
+    validate_all_schema_versions,
     validate_top_level_mapping,
 )
 
@@ -226,6 +228,41 @@ def _build_partial_request(
 
 
 # --------------------------------------------------------------------------- #
+# Round 4 P0-3 — unified `build_stage_blocked` helper for Stages 4-16
+# --------------------------------------------------------------------------- #
+
+
+def build_stage_blocked(
+    *,
+    failure_stage: int,
+    blockers: tuple[MessageEntry, ...],
+    verified_request_context: TubeLayoutRequest,
+    raw_failing_field: Any | None = None,
+    normalized_context: Mapping[str, Any] | None = None,
+) -> TubeLayoutValidationResult:
+    """Round 4 P0-3 unified Stage 4-16 blocked-result constructor.
+
+    Computes the eligible warning set per §11.5-§11.8 against the verified
+    request skeleton, then funnels both into :func:`_build_blocked` to build
+    the final ``TubeLayoutValidationResult``. ``eligible_warnings`` is
+    included in the §12.8 blocked_result_hash so any eligibility-rule change
+    changes the hash.
+
+    This is the single source of truth for blocked-result identity across
+    Stages 4-16; no branch may bypass it.
+    """
+
+    eligible = _filter_eligible_warnings(failure_stage, verified_request_context)
+    return _build_blocked(
+        failure_stage,
+        blockers,
+        raw_failing_field=raw_failing_field,
+        normalized_context=normalized_context,
+        eligible_warnings=eligible,
+    )
+
+
+# --------------------------------------------------------------------------- #
 # §12.8 blocked-result identity payload
 # --------------------------------------------------------------------------- #
 
@@ -263,13 +300,24 @@ def _blocked_result_payload(
     def _entry_primitive(entry: MessageEntry) -> dict[str, Any]:
         # Convert the dataclass into a literal canonical dict, then route it
         # through the public snapshot boundary so a mutation in entry after
-        # capture cannot influence the blocked_result_hash.
+        # capture cannot influence the blocked_result_hash. Round-4 §6
+        # P0-4 deep-freezes ``details`` in MessageEntry.__post_init__; that
+        # means at this point ``entry.details`` is already a public-boundary
+        # frozen shape (MappingProxyType) OR None. Reduce it via the
+        # fragment-to-primitive path so re-snapshotting does not reject it.
+        details = entry.details
+        if details is None:
+            details_primitive: Any = None
+        elif isinstance(details, MappingProxyType):
+            details_primitive = _reduce_frozen(details)
+        else:
+            details_primitive = _reduce_frozen(_snapshot_public(details))
         primitive = {
             "code": entry.code,
             "field_path": entry.field_path,
             "message_key": entry.message_key,
             "evidence_refs": list(entry.evidence_refs),
-            "details": entry.details,
+            "details": details_primitive,
         }
         frozen = _snapshot_public(primitive)
         return _reduce_frozen(frozen)  # type: ignore[no-any-return]  # _reduce_frozen returns dict-like at this point.
@@ -282,6 +330,10 @@ def _blocked_result_payload(
     def _reduce_context_value(value: Any) -> Any:
         if dataclasses.is_dataclass(value):
             return _reduce_context_value(dataclass_to_mapping(value))
+        if isinstance(value, MappingProxyType):
+            # Already-frozen fragment: reduce to a sorted-key primitive
+            # mapping so the public snapshot boundary accepts it.
+            return {key: _reduce_context_value(item) for key, item in sorted(value.items())}
         if isinstance(value, tuple):
             return [_reduce_context_value(item) for item in value]
         if isinstance(value, list):
@@ -528,6 +580,8 @@ def _parse_zones_for_stage_10(
 ) -> tuple[ExclusionZone, ...]:
     """Stage 10 — exclusion-zone exact shapes + duplicate ID detection."""
 
+    from .schema import parse_zone as _parse_zone_helper
+
     if not isinstance(raw_zones, list):
         raise SchemaFailure(
             10,
@@ -542,7 +596,7 @@ def _parse_zones_for_stage_10(
         )
     zones = tuple(
         sorted(
-            (parse_zone(item, index) for index, item in enumerate(raw_zones)),
+            (_parse_zone_helper(item, index) for index, item in enumerate(raw_zones)),
             key=lambda z: z.zone_id,
         )
     )
@@ -595,77 +649,105 @@ def validate_request(
             normalized_context=exc.normalized_context,
         )
 
-    # --- Stage 2 — raw value types (per-field, fail-fast on first failure) ---
-    try:
-        configuration = data["configuration"]
-        if configuration is None:
-            raise SchemaFailure(
-                4,
-                (
-                    MessageEntry(
-                        code=BlockerCode.STL_TASK020_CONFIGURATION_MISSING.value,
-                        field_path="configuration",
-                        message_key="task020_configuration_missing",
-                    ),
-                ),
-                raw_failing_field=None,
-            )
-        if not isinstance(configuration, ShellAndTubeConfiguration):
-            raise SchemaFailure(
-                4,
-                (
-                    MessageEntry(
-                        code=BlockerCode.STL_TASK020_CONFIGURATION_INVALID.value,
-                        field_path="configuration",
-                        message_key="task020_configuration_type_invalid",
-                    ),
-                ),
-                raw_failing_field=configuration,
-            )
-        tube_geometry = parse_geometry(data["tube_geometry"])
-        layout_rule_authority = parse_layout_rule(data["layout_rule_authority"])
-        placement_envelope = parse_envelope(data["placement_envelope"])
-        from .models import AxisOrientation, OriginMode
-        from .schema import _enum as _schema_enum
-        from .schema import _string_array as _schema_string_array
-
-        origin_mode = _schema_enum(data["origin_mode"], OriginMode, "origin_mode")
-        axis_orientation = _schema_enum(
-            data["axis_orientation"], AxisOrientation, "axis_orientation"
-        )
-        u_tube_pairing_plan = parse_pairing_plan(data["u_tube_pairing_plan"])
-        evidence_refs = _schema_string_array(data["evidence_refs"], "evidence_refs")
-    except SchemaFailure as exc:
+    # --- Stage 2 — raw value types, COMPLETE-blocker per-field collection ---
+    stage2: Stage2Result = collect_stage2(data)
+    if not stage2.passed:
+        # Round 4 §3.2: every per-field blocker is retained; ``raw_failing_field``
+        # surfaces the FIRST Stage-2 raw via §12.8; the full set is exposed
+        # through normalized_context for downstream audit.
+        blockers_2 = tuple(stage2.all_blockers)
+        raws_2 = dict(stage2.raw_failing_fields)
+        primary_raw = next(iter(raws_2.values()), None) if raws_2 else None
         return _build_blocked(
-            exc.stage,
-            exc.blockers,
-            raw_failing_field=exc.raw_failing_field,
-            normalized_context=exc.normalized_context,
+            2,
+            blockers_2,
+            raw_failing_field=primary_raw,
+            normalized_context={
+                "stage2_blockers": blockers_2,
+                "stage2_raw_failing_fields": raws_2,
+            },
         )
 
-    # --- Stage 3 — schema versions ---
-    try:
-        validate_request_schema_version(data["schema_version"])
-    except SchemaFailure as exc:
+    # --- Stage 3 — schema versions, ALL three checks atomically AFTER Stage 2 ---
+    raw_envelope_payload = data["placement_envelope"]
+    raw_pairing_payload = data["u_tube_pairing_plan"]
+    envelope_schema_version = (
+        raw_envelope_payload.get("schema_version")
+        if isinstance(raw_envelope_payload, Mapping)
+        else None
+    )
+    pairing_schema_version = (
+        raw_pairing_payload.get("schema_version")
+        if isinstance(raw_pairing_payload, Mapping)
+        else None
+    )
+    stage3: Stage3Result = validate_all_schema_versions(
+        request_schema_version=data["schema_version"],
+        envelope_schema_version=envelope_schema_version,
+        envelope_field_path="placement_envelope.schema_version",
+        pairing_schema_version=pairing_schema_version,
+        pairing_field_path=(
+            "u_tube_pairing_plan.schema_version" if raw_pairing_payload is not None else None
+        ),
+    )
+    if not stage3.passed:
+        # Stage 3 BLOCKED: no Stage 4+ work runs.
+        primary_raw_3 = next(iter(stage3.raw_failing_fields.values()), None)
         return _build_blocked(
-            exc.stage,
-            exc.blockers,
-            raw_failing_field=exc.raw_failing_field,
-            normalized_context=exc.normalized_context,
+            3,
+            stage3.blockers,
+            raw_failing_field=primary_raw_3,
+            normalized_context={
+                "stage3_blockers": stage3.blockers,
+                "stage3_raw_failing_fields": dict(stage3.raw_failing_fields),
+            },
         )
 
-    # --- Construct the partially-validated request skeleton used in stages 4-11 ---
-    from .models import TubeLayoutRequest
+    # --- Build canonical fragments from the Stage 2/3-validated intermediates ---
+    from .schema import EnvelopeRaw, PairingPlanRaw
 
-    # Note: stage-by-stage partial requests are built on demand via
-    # `_build_partial_request` so that each stage-4+ blocked branch carries
-    # only the verified fragments up to that failure.
+    configuration = stage2.configuration.value
+    tube_geometry = stage2.tube_geometry.value
+    layout_rule_authority = stage2.layout_rule_authority.value
+    envelope_raw = stage2.placement_envelope.value
+    assert isinstance(envelope_raw, EnvelopeRaw)
+    # Round 4: schema_version already verified at Stage 3; build the canonical
+    # envelope directly from the Stage-2-preserved raw without re-running
+    # Stage 2 shape checks.
+    placement_envelope = CircularTubeCenterEnvelope(
+        schema_version=ENVELOPE_SCHEMA_VERSION,
+        tube_center_envelope_diameter_m=envelope_raw.tube_center_envelope_diameter_m,
+        evidence_refs=envelope_raw.evidence_refs,
+    )
+    origin_mode = stage2.origin_mode.value
+    axis_orientation = stage2.axis_orientation.value
+    pairing_raw = stage2.u_tube_pairing_plan.value
+    if pairing_raw is None:
+        u_tube_pairing_plan = None
+    else:
+        assert isinstance(pairing_raw, PairingPlanRaw)
+        # Round 4: schema_version already verified at Stage 3; build the
+        # canonical pairing plan directly from Stage-2-preserved raw.
+        u_tube_pairing_plan = UTubePairingPlan(
+            schema_version=PAIRING_SCHEMA_VERSION,
+            pairs=pairing_raw.pairs,
+            evidence_refs=pairing_raw.evidence_refs,
+            pairing_plan_hash=pairing_raw.pairing_plan_hash,
+        )
+    evidence_refs = stage2.evidence_refs.value
 
-    # --- Stage 4 — TASK-020 configuration completeness and identity ---
-    try:
-        verify_task020_configuration(configuration)
-    except AuthorityFailure as exc:
-        request_stage4 = _build_partial_request(
+    # Helper: build a Stage-4+ blocked result from the Stage-2 + verified
+    # partial-request skeleton, falling through to ``_build_blocked`` so the
+    # eligibility warning set is always computed (round-4 P0-3).
+    def _partial_then_block(
+        *,
+        failure_stage: int,
+        blockers: tuple[MessageEntry, ...],
+        raw_failing_field: Any | None = None,
+        normalized_context: Mapping[str, Any] | None = None,
+        zones: tuple[ExclusionZone, ...] = (),
+    ) -> TubeLayoutValidationResult:
+        partial = _build_partial_request(
             configuration=configuration,
             tube_geometry=tube_geometry,
             layout_rule_authority=layout_rule_authority,
@@ -675,39 +757,52 @@ def validate_request(
             u_tube_pairing_plan=u_tube_pairing_plan,
             evidence_refs=evidence_refs,
         )
-        eligible_4 = _filter_eligible_warnings(4, request_stage4)
-        return _build_blocked(
-            4,
-            exc.blockers,
+        # If the failing stage runs after Zone parsing (Stage 10+), the
+        # caller may pass ``zones``; rebuild the partial with zones too.
+        if zones:
+            partial = TubeLayoutRequest(
+                schema_version=REQUEST_SCHEMA_VERSION,
+                configuration=configuration,
+                tube_geometry=tube_geometry,
+                layout_rule_authority=layout_rule_authority,
+                placement_envelope=placement_envelope,
+                origin_mode=origin_mode,
+                axis_orientation=axis_orientation,
+                exclusion_zones=zones,
+                u_tube_pairing_plan=u_tube_pairing_plan,
+                evidence_refs=evidence_refs,
+            )
+        return build_stage_blocked(
+            failure_stage=failure_stage,
+            blockers=blockers,
+            verified_request_context=partial,
+            raw_failing_field=raw_failing_field,
+            normalized_context=normalized_context,
+        )
+
+    # --- Stage 4 — TASK-020 configuration completeness and identity ---
+    try:
+        verify_task020_configuration(configuration)
+    except AuthorityFailure as exc:
+        return _partial_then_block(
+            failure_stage=4,
+            blockers=exc.blockers,
             raw_failing_field=configuration,
             normalized_context={"configuration": configuration},
-            eligible_warnings=eligible_4,
         )
 
     # --- Stage 5 — authority-mode match ---
     try:
         verify_authority_mode_match(layout_rule_authority, configuration)
     except AuthorityFailure as exc:
-        request_stage5 = _build_partial_request(
-            configuration=configuration,
-            tube_geometry=tube_geometry,
-            layout_rule_authority=layout_rule_authority,
-            placement_envelope=placement_envelope,
-            origin_mode=origin_mode,
-            axis_orientation=axis_orientation,
-            u_tube_pairing_plan=u_tube_pairing_plan,
-            evidence_refs=evidence_refs,
-        )
-        eligible_5 = _filter_eligible_warnings(5, request_stage5)
-        return _build_blocked(
-            5,
-            exc.blockers,
+        return _partial_then_block(
+            failure_stage=5,
+            blockers=exc.blockers,
             raw_failing_field=layout_rule_authority.authority_mode.value,
             normalized_context={
                 "configuration": configuration,
                 "layout_rule_authority_authority_mode": layout_rule_authority.authority_mode.value,
             },
-            eligible_warnings=eligible_5,
         )
 
     # --- Stage 6 — layout-rule profile, approval, snapshot, license, provenance,
@@ -715,58 +810,34 @@ def validate_request(
     try:
         verify_layout_rule_profile(layout_rule_authority, configuration, tube_geometry)
     except AuthorityFailure as exc:
-        request_stage6 = _build_partial_request(
-            configuration=configuration,
-            tube_geometry=tube_geometry,
-            layout_rule_authority=layout_rule_authority,
-            placement_envelope=placement_envelope,
-            origin_mode=origin_mode,
-            axis_orientation=axis_orientation,
-            u_tube_pairing_plan=u_tube_pairing_plan,
-            evidence_refs=evidence_refs,
-        )
-        eligible_6 = _filter_eligible_warnings(6, request_stage6)
-        return _build_blocked(
-            6,
-            exc.blockers,
+        return _partial_then_block(
+            failure_stage=6,
+            blockers=exc.blockers,
             raw_failing_field=layout_rule_authority,
             normalized_context={
                 "configuration": configuration,
                 "layout_rule_authority": layout_rule_authority,
             },
-            eligible_warnings=eligible_6,
         )
 
     # --- Stage 7 — tube-geometry approval, source, snapshot hash, dimensions ---
     try:
         verify_geometry_snapshot(tube_geometry)
     except AuthorityFailure as exc:
-        request_stage7 = _build_partial_request(
-            configuration=configuration,
-            tube_geometry=tube_geometry,
-            layout_rule_authority=layout_rule_authority,
-            placement_envelope=placement_envelope,
-            origin_mode=origin_mode,
-            axis_orientation=axis_orientation,
-            u_tube_pairing_plan=u_tube_pairing_plan,
-            evidence_refs=evidence_refs,
-        )
-        eligible = _filter_eligible_warnings(7, request_stage7)
-        return _build_blocked(
-            7,
-            exc.blockers,
+        return _partial_then_block(
+            failure_stage=7,
+            blockers=exc.blockers,
             raw_failing_field=tube_geometry,
             normalized_context={
                 "configuration": configuration,
                 "layout_rule_authority": layout_rule_authority,
                 "tube_geometry": tube_geometry,
             },
-            eligible_warnings=eligible,
         )
 
-    # --- Stage 8 — envelope shape and positive effective radius (no basis work) ---
+    # --- Stage 8 — envelope shape and positive effective radius ONLY ---
     try:
-        basis = verify_envelope_shape_and_radius(
+        stage8 = verify_envelope_shape_and_radius(
             layout_rule_authority,
             tube_geometry,
             placement_envelope,
@@ -774,20 +845,9 @@ def validate_request(
             axis_orientation,
         )
     except EnumerationFailure as exc:
-        request_stage8 = _build_partial_request(
-            configuration=configuration,
-            tube_geometry=tube_geometry,
-            layout_rule_authority=layout_rule_authority,
-            placement_envelope=placement_envelope,
-            origin_mode=origin_mode,
-            axis_orientation=axis_orientation,
-            u_tube_pairing_plan=u_tube_pairing_plan,
-            evidence_refs=evidence_refs,
-        )
-        eligible_8 = _filter_eligible_warnings(8, request_stage8)
-        return _build_blocked(
-            8,
-            (exc.blocker,),
+        return _partial_then_block(
+            failure_stage=8,
+            blockers=(exc.blocker,),
             raw_failing_field=placement_envelope,
             normalized_context={
                 "configuration": configuration,
@@ -797,7 +857,6 @@ def validate_request(
                 "origin_mode": origin_mode.value,
                 "axis_orientation": axis_orientation.value,
             },
-            eligible_warnings=eligible_8,
         )
 
     # --- Stage 9 — origin and axis authorization (zones not yet parsed) ---
@@ -822,20 +881,9 @@ def validate_request(
             )
         )
     if blockers_9:
-        request_stage9 = _build_partial_request(
-            configuration=configuration,
-            tube_geometry=tube_geometry,
-            layout_rule_authority=layout_rule_authority,
-            placement_envelope=placement_envelope,
-            origin_mode=origin_mode,
-            axis_orientation=axis_orientation,
-            u_tube_pairing_plan=u_tube_pairing_plan,
-            evidence_refs=evidence_refs,
-        )
-        eligible_9 = _filter_eligible_warnings(9, request_stage9)
-        return _build_blocked(
-            9,
-            tuple(blockers_9),
+        return _partial_then_block(
+            failure_stage=9,
+            blockers=tuple(blockers_9),
             raw_failing_field={
                 "origin_mode": origin_mode.value,
                 "axis_orientation": axis_orientation.value,
@@ -848,20 +896,15 @@ def validate_request(
                 "origin_mode": origin_mode.value,
                 "axis_orientation": axis_orientation.value,
             },
-            eligible_warnings=eligible_9,
         )
 
     # --- Stage 10 — exclusion-zone exact shapes + duplicate zone IDs ---
     try:
         zones = _parse_zones_for_stage_10(data["exclusion_zones"])
     except SchemaFailure as exc:
-        # Stage 10 also runs the per-zone type authorization; emit
-        # STL_EXCLUSION_ZONE_TYPE_NOT_AUTHORIZED for each violation.
-        # If the schema stage produced only one failure, surface it; we cannot
-        # reach authorization because zones failed first.
-        return _build_blocked(
-            exc.stage,
-            exc.blockers,
+        return _partial_then_block(
+            failure_stage=10,
+            blockers=exc.blockers,
             raw_failing_field=exc.raw_failing_field,
             normalized_context={
                 "configuration": configuration,
@@ -883,10 +926,11 @@ def validate_request(
         if zone.zone_type not in rule.allowed_exclusion_zone_types
     ]
     if zone_type_blockers:
-        return _build_blocked(
-            10,
-            tuple(zone_type_blockers),
+        return _partial_then_block(
+            failure_stage=10,
+            blockers=tuple(zone_type_blockers),
             raw_failing_field=[zone.zone_type.value for zone in zones],
+            zones=zones,
             normalized_context={
                 "configuration": configuration,
                 "layout_rule_authority": layout_rule_authority,
@@ -918,15 +962,16 @@ def validate_request(
         configuration.construction_family is ConstructionFamily.U_TUBE
         and request.u_tube_pairing_plan is None
     ):
-        return _build_blocked(
-            11,
-            (
+        return build_stage_blocked(
+            failure_stage=11,
+            blockers=(
                 MessageEntry(
                     code=BlockerCode.STL_UTUBE_PAIRING_REQUIRED.value,
                     field_path="u_tube_pairing_plan",
                     message_key="u_tube_pairing_required",
                 ),
             ),
+            verified_request_context=request,
             raw_failing_field=None,
             normalized_context={
                 "configuration": configuration,
@@ -942,15 +987,16 @@ def validate_request(
         configuration.construction_family is not ConstructionFamily.U_TUBE
         and request.u_tube_pairing_plan is not None
     ):
-        return _build_blocked(
-            11,
-            (
+        return build_stage_blocked(
+            failure_stage=11,
+            blockers=(
                 MessageEntry(
                     code=BlockerCode.STL_UTUBE_PAIRING_NOT_EXPECTED.value,
                     field_path="u_tube_pairing_plan",
                     message_key="u_tube_pairing_not_expected",
                 ),
             ),
+            verified_request_context=request,
             raw_failing_field=request.u_tube_pairing_plan,
             normalized_context={
                 "configuration": configuration,
@@ -963,14 +1009,22 @@ def validate_request(
             },
         )
 
-    # --- Stage 12 — inverse basis + candidate capacity ---
+    # --- Stage 12 — inverse basis + candidate capacity (P0-2 split) ---
     try:
-        plan = verify_inverse_basis_and_candidate_capacity(layout_rule_authority, basis)
+        plan = verify_inverse_basis_and_candidate_capacity(
+            layout_rule_authority,
+            tube_geometry,
+            placement_envelope,
+            origin_mode,
+            axis_orientation,
+            stage8,
+        )
     except EnumerationFailure as exc:
-        return _build_blocked(
-            12,
-            (exc.blocker,),
-            raw_failing_field=basis,
+        return build_stage_blocked(
+            failure_stage=12,
+            blockers=(exc.blocker,),
+            verified_request_context=request,
+            raw_failing_field=stage8,
             normalized_context={
                 "configuration": configuration,
                 "layout_rule_authority": layout_rule_authority,
@@ -993,9 +1047,10 @@ def validate_request(
             multi_zone_exclusion_evaluation(inside_13, tube_geometry, zones)
         )
     except GeometryFailure as exc:
-        return _build_blocked(
-            14,
-            (exc.blocker,),
+        return build_stage_blocked(
+            failure_stage=14,
+            blockers=(exc.blocker,),
+            verified_request_context=request,
             raw_failing_field=None,
             normalized_context={
                 "configuration": configuration,
@@ -1012,9 +1067,10 @@ def validate_request(
     try:
         accepted_coords = coordinate_quantization_collision_guard(accepted_14)
     except GeometryFailure as exc:
-        return _build_blocked(
-            15,
-            (exc.blocker,),
+        return build_stage_blocked(
+            failure_stage=15,
+            blockers=(exc.blocker,),
+            verified_request_context=request,
             raw_failing_field=None,
             normalized_context={
                 "configuration": configuration,
@@ -1039,9 +1095,10 @@ def validate_request(
                 request.u_tube_pairing_plan, accepted_coords
             )
         except PairingFailure as exc:
-            return _build_blocked(
-                16,
-                exc.blockers,
+            return build_stage_blocked(
+                failure_stage=16,
+                blockers=exc.blockers,
+                verified_request_context=request,
                 raw_failing_field=request.u_tube_pairing_plan,
                 normalized_context={
                     "configuration": configuration,
@@ -1249,4 +1306,4 @@ def validate_request(
     )
 
 
-__all__ = ["validate_request"]
+__all__ = ["build_stage_blocked", "validate_request"]

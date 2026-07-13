@@ -176,6 +176,22 @@ class LayoutRuleAuthoritySnapshot:
     maximum_candidate_positions: int
     snapshot_hash: str
 
+    def __post_init__(self) -> None:
+        """Round 4 §6.1: deep-freeze ``license_evidence`` to a detached snapshot.
+
+        Post-capture mutation by the caller MUST NOT influence the value
+        stored on this object or any hash derived from it. The freeze happens
+        exactly once during construction; further attempts to mutate the
+        field raise ``dataclasses.FrozenInstanceError`` because the dataclass
+        itself is ``frozen=True``.
+        """
+
+        from .canonical import force_frozen_canonical
+
+        frozen = force_frozen_canonical(self.license_evidence)
+        if frozen is not self.license_evidence:
+            object.__setattr__(self, "license_evidence", frozen)
+
 
 @dataclass(frozen=True)
 class CircularTubeCenterEnvelope:
@@ -259,6 +275,27 @@ class MessageEntry:
     evidence_refs: tuple[str, ...] = field(default_factory=tuple)
     details: Mapping[str, Any] | None = None
 
+    def __post_init__(self) -> None:
+        """Round 4 §6.2: deep-freeze ``details`` to a detached snapshot.
+
+        Caller-mutation after construction MUST NOT influence:
+        - ``warnings[*].details``
+        - ``blockers[*].details``
+        - ``request_hash`` / ``layout_hash`` / ``provenance_pre_hash``
+        - any consumer of the canonical hash pipeline
+
+        Accepts None, ordinary canonical dict/list, OR a previously-frozen
+        shape; rejects everything else with ``PublicCanonicalDomainError``.
+        """
+
+        from .canonical import force_frozen_optional_canonical
+
+        if self.details is None:
+            return
+        frozen = force_frozen_optional_canonical(self.details)
+        if frozen is not self.details:
+            object.__setattr__(self, "details", frozen)
+
 
 @dataclass(frozen=True)
 class ProvenancePreHashProjection:
@@ -291,6 +328,33 @@ class ProvenancePreHashProjection:
     warnings: tuple[MessageEntry, ...]
     deferred_capabilities: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        """Round 4 §6: deep-freeze every public canonical fragment.
+
+        ``task020_case_authority``, ``geometry_source_binding``, and
+        ``rule_pack_identity`` MUST be detached frozen snapshots so that
+        a caller mutation after construction cannot influence the
+        downstream ``provenance_pre_hash`` or ``layout_hash``.
+
+        ``warnings`` is also recursively walked so each MessageEntry's
+        ``details`` is frozen by its own ``__post_init__`` (already
+        enforced) and the tuple itself is replaced only when a value
+        mutation was attempted.
+        """
+
+        from .canonical import force_frozen_canonical
+
+        for field_name in ("task020_case_authority", "geometry_source_binding"):
+            current = getattr(self, field_name)
+            frozen = force_frozen_canonical(current)
+            if frozen is not current:
+                object.__setattr__(self, field_name, frozen)
+
+        if self.rule_pack_identity is not None:
+            frozen = force_frozen_canonical(self.rule_pack_identity)
+            if frozen is not self.rule_pack_identity:
+                object.__setattr__(self, "rule_pack_identity", frozen)
+
 
 @dataclass(frozen=True)
 class TubeLayout:
@@ -321,6 +385,27 @@ class TubeLayout:
     blockers: tuple[MessageEntry, ...]
     deferred_capabilities: tuple[str, ...]
     provenance: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Round 4 §6.3 + §6.4: deep-freeze ``case_authority`` and ``provenance``.
+
+        Both fields are detached frozen snapshots on construction; ``provenance``
+        is recursive (its nested ``license_evidence`` / ``case_authority`` /
+        warning-details are also already deep-frozen by their own dataclass
+        ``__post_init__``). The freeze happens exactly once during
+        construction; subsequent attempts to mutate raise
+        ``dataclasses.FrozenInstanceError``.
+        """
+
+        from .canonical import force_frozen_canonical
+
+        frozen_ca = force_frozen_canonical(self.case_authority)
+        if frozen_ca is not self.case_authority:
+            object.__setattr__(self, "case_authority", frozen_ca)
+
+        frozen_prov = force_frozen_canonical(self.provenance)
+        if frozen_prov is not self.provenance:
+            object.__setattr__(self, "provenance", frozen_prov)
 
 
 @dataclass(frozen=True)
