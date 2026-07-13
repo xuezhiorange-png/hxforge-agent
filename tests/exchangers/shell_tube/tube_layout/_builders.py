@@ -5,6 +5,8 @@ from typing import Any
 from hexagent.exchangers.shell_tube import canonical as task020_canonical
 from hexagent.exchangers.shell_tube.models import (
     AuthorityMode as Task020AuthorityMode,
+)
+from hexagent.exchangers.shell_tube.models import (
     CaseRevisionAuthority,
     CaseRevisionStatus,
     ComponentTokens,
@@ -139,9 +141,7 @@ def geometry_payload() -> dict[str, Any]:
     return payload
 
 
-def rule_payload(
-    *, pattern_family: str = "SQUARE", maximum: int = 100000
-) -> dict[str, Any]:
+def rule_payload(*, pattern_family: str = "SQUARE", maximum: int = 100000) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "profile_id": "hxforge.shell_tube.tube_layout.v1",
         "authority_mode": "INTERNAL_GENERIC",
@@ -179,9 +179,7 @@ def make_request(
         "schema_version": REQUEST_SCHEMA_VERSION,
         "configuration": make_configuration(construction_family),
         "tube_geometry": geometry_payload(),
-        "layout_rule_authority": rule_payload(
-            pattern_family=pattern_family, maximum=maximum
-        ),
+        "layout_rule_authority": rule_payload(pattern_family=pattern_family, maximum=maximum),
         "placement_envelope": {
             "schema_version": ENVELOPE_SCHEMA_VERSION,
             "tube_center_envelope_diameter_m": "0.12",

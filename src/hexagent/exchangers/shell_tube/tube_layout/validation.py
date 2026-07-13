@@ -171,9 +171,7 @@ def _provenance(
         if rule.rule_pack_identity is None
         else to_primitive(rule.rule_pack_identity),
         envelope_evidence_refs=request.placement_envelope.evidence_refs,
-        exclusion_zone_evidence_refs=tuple(
-            zone.evidence_refs for zone in request.exclusion_zones
-        ),
+        exclusion_zone_evidence_refs=tuple(zone.evidence_refs for zone in request.exclusion_zones),
         u_tube_pairing_evidence_refs=None
         if request.u_tube_pairing_plan is None
         else request.u_tube_pairing_plan.evidence_refs,
@@ -244,7 +242,7 @@ def validate_request(
             request.tube_geometry,
         )
     except AuthorityFailure as exc:
-        return _blocked(6, exc.blockers)
+        return _blocked(5, exc.blockers)
     try:
         verify_geometry_snapshot(request.tube_geometry)
     except (AuthorityFailure, CanonicalizationError) as exc:
@@ -259,14 +257,14 @@ def validate_request(
                 ),
             )
         )
-        return _blocked(7, blockers)
+        return _blocked(6, blockers)
     authorization_blockers = _validate_authorizations(request)
     if authorization_blockers:
-        return _blocked(9, authorization_blockers)
+        return _blocked(8, authorization_blockers)
     construction_family = request.configuration.construction_family
     if construction_family is ConstructionFamily.U_TUBE and request.u_tube_pairing_plan is None:
         return _blocked(
-            11,
+            10,
             (
                 MessageEntry(
                     code=BlockerCode.STL_UTUBE_PAIRING_REQUIRED.value,
@@ -275,9 +273,12 @@ def validate_request(
                 ),
             ),
         )
-    if construction_family is not ConstructionFamily.U_TUBE and request.u_tube_pairing_plan is not None:
+    if (
+        construction_family is not ConstructionFamily.U_TUBE
+        and request.u_tube_pairing_plan is not None
+    ):
         return _blocked(
-            11,
+            10,
             (
                 MessageEntry(
                     code=BlockerCode.STL_UTUBE_PAIRING_NOT_EXPECTED.value,
@@ -296,7 +297,7 @@ def validate_request(
         )
         candidates = enumerate_candidates(plan)
     except EnumerationFailure as exc:
-        return _blocked(12, (exc.blocker,))
+        return _blocked(11, (exc.blocker,))
     try:
         geometry_result = evaluate_geometry(
             candidates,
@@ -305,18 +306,21 @@ def validate_request(
             request.exclusion_zones,
         )
     except GeometryFailure as exc:
-        return _blocked(15, (exc.blocker,))
+        return _blocked(12, (exc.blocker,))
     physical_tube_count = len(geometry_result.accepted)
     normalized_plan = request.u_tube_pairing_plan
     if construction_family is ConstructionFamily.U_TUBE:
-        assert request.u_tube_pairing_plan is not None
+        if request.u_tube_pairing_plan is None:
+            raise AssertionError(
+                "U_TUBE configuration requires u_tube_pairing_plan (defense-in-depth)"
+            )
         try:
             normalized_plan, physical_tube_count = validate_pairing_plan(
                 request.u_tube_pairing_plan,
                 geometry_result.accepted,
             )
         except PairingFailure as exc:
-            return _blocked(16, exc.blockers)
+            return _blocked(14, exc.blockers)
         request = TubeLayoutRequest(
             schema_version=request.schema_version,
             configuration=request.configuration,
@@ -356,9 +360,7 @@ def validate_request(
         "physical_tube_count": physical_tube_count,
         "boundary_rejection_count": geometry_result.boundary_rejection_count,
         "exclusion_rejection_count": geometry_result.exclusion_rejection_count,
-        "exclusion_audit": [
-            dataclass_to_mapping(item) for item in geometry_result.exclusion_audit
-        ],
+        "exclusion_audit": [dataclass_to_mapping(item) for item in geometry_result.exclusion_audit],
         "warnings": [dataclass_to_mapping(item) for item in warnings],
         "blockers": [],
         "deferred_capabilities": list(provenance_pre_hash.deferred_capabilities),
@@ -376,7 +378,7 @@ def validate_request(
         task020_configuration_hash=request.configuration.configuration_hash,
         case_authority=to_primitive(request.configuration.case_authority),
         construction_family=request.configuration.construction_family.value,
-        equipment_orientation=request.configuration.orientation.value,
+        equipment_orientation=request.configuration.orientation,
         shell_pass_count=request.configuration.shell_pass_count,
         tube_pass_count=request.configuration.tube_pass_count,
         tube_geometry=request.tube_geometry,

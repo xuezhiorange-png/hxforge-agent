@@ -24,9 +24,7 @@ class PairingFailure(ValueError):
         self.blockers = blockers
 
 
-def _block(
-    message_key: str, *, field_path: str = "u_tube_pairing_plan"
-) -> MessageEntry:
+def _block(message_key: str, *, field_path: str = "u_tube_pairing_plan") -> MessageEntry:
     return MessageEntry(
         code=BlockerCode.STL_UTUBE_PAIRING_INVALID.value,
         field_path=field_path,
@@ -85,9 +83,7 @@ def validate_pairing_plan(
     blockers: list[MessageEntry] = []
     pair_ids = [pair.pair_id for pair in plan.pairs]
     if len(set(pair_ids)) != len(pair_ids):
-        blockers.append(
-            _block("u_tube_pair_duplicate_id", field_path="u_tube_pairing_plan.pairs")
-        )
+        blockers.append(_block("u_tube_pair_duplicate_id", field_path="u_tube_pairing_plan.pairs"))
     normalized = canonical_pairs(plan)
     for pair in normalized:
         if pair.leg_a == pair.leg_b:

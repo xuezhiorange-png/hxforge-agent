@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_EVEN, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 
 from .canonical import DECIMAL_PRECISION, parse_decimal, quantized_decimal_string
 from .enumeration import Candidate, EnumerationPlan
@@ -59,12 +59,14 @@ def _matches_zone(
         ctx.prec = DECIMAL_PRECISION
         ctx.rounding = ROUND_HALF_EVEN
         if zone.zone_type is ExclusionZoneType.CIRCLE:
-            assert zone.radius_m is not None
+            if zone.radius_m is None:
+                return False
             radius = parse_decimal(zone.radius_m, positive=True)
             return (candidate.x - center_x) ** 2 + (candidate.y - center_y) ** 2 <= (
                 radius + tube_radius + clearance
             ) ** 2
-        assert zone.width_m is not None and zone.height_m is not None
+        if zone.width_m is None or zone.height_m is None:
+            return False
         half_width = parse_decimal(zone.width_m, positive=True) / Decimal(2)
         half_height = parse_decimal(zone.height_m, positive=True) / Decimal(2)
         min_x = center_x - half_width
@@ -97,9 +99,7 @@ def evaluate_geometry(
             if candidate.x**2 + candidate.y**2 > rho_squared:
                 boundary_rejections += 1
                 continue
-            matched = [
-                zone for zone in zones if _matches_zone(candidate, zone, tube_radius)
-            ]
+            matched = [zone for zone in zones if _matches_zone(candidate, zone, tube_radius)]
             if matched:
                 exclusion_rejections += 1
                 for zone in matched:
@@ -107,9 +107,7 @@ def evaluate_geometry(
                 continue
             accepted_raw.append(candidate)
     if not accepted_raw:
-        raise _block(
-            BlockerCode.STL_NO_TUBE_POSITIONS, "positions", "no_tube_positions"
-        )
+        raise _block(BlockerCode.STL_NO_TUBE_POSITIONS, "positions", "no_tube_positions")
     quantized: dict[tuple[str, str], tuple[int, int]] = {}
     accepted: list[AcceptedCoordinate] = []
     for candidate in accepted_raw:
@@ -135,6 +133,7 @@ def evaluate_geometry(
             )
         )
     accepted.sort(key=lambda item: (item.y, item.x, item.u, item.v))
+    sorted_zones = tuple(sorted(zones, key=lambda zone: zone.zone_id))
     audits = tuple(
         ExclusionAudit(
             zone_id=zone.zone_id,
@@ -142,7 +141,7 @@ def evaluate_geometry(
             reason_code=zone.reason_code,
             evidence_refs=zone.evidence_refs,
         )
-        for zone in zones
+        for zone in sorted_zones
     )
     return GeometryResult(
         accepted=tuple(accepted),

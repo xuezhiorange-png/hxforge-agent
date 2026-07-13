@@ -5,9 +5,7 @@ from tests.exchangers.shell_tube.tube_layout._builders import make_request
 
 
 def test_exact_valid_warning_set_and_provenance_pipeline() -> None:
-    result = validate_request(
-        make_request(), software_version="0.1.0", git_commit="abc"
-    )
+    result = validate_request(make_request(), software_version="0.1.0", git_commit="abc")
     assert result.layout is not None
     codes = {item.code for item in result.warnings}
     assert codes == {

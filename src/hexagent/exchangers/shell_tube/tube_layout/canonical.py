@@ -8,7 +8,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation, localcontext
 from typing import Any
 
 DECIMAL_PRECISION = 50
@@ -79,9 +79,7 @@ def _canonical_value(value: Any) -> Any:
     if isinstance(value, float):
         raise CanonicalizationError("binary floating-point values are forbidden")
     if isinstance(value, Decimal):
-        raise CanonicalizationError(
-            "Decimal objects are forbidden at serialization boundary"
-        )
+        raise CanonicalizationError("Decimal objects are forbidden at serialization boundary")
     if dataclasses.is_dataclass(value):
         return _canonical_value(dataclass_to_mapping(value))
     if isinstance(value, tuple | set | frozenset):
@@ -144,9 +142,7 @@ def to_primitive(value: Any) -> Any:
     return value
 
 
-def sorted_unique_strings(
-    values: Sequence[str], *, allow_empty: bool = True
-) -> tuple[str, ...]:
+def sorted_unique_strings(values: Sequence[str], *, allow_empty: bool = True) -> tuple[str, ...]:
     """Validate and sort a duplicate-free string array."""
 
     if not isinstance(values, list | tuple):
@@ -166,9 +162,9 @@ def message_sort_key(entry: Any) -> tuple[str, str, str, str, str]:
     details = getattr(entry, "details", None)
     evidence_refs = list(getattr(entry, "evidence_refs", ()))
     return (
-        str(getattr(entry, "code")),
+        str(entry.code),
         "" if getattr(entry, "field_path", None) is None else str(entry.field_path),
-        str(getattr(entry, "message_key")),
+        str(entry.message_key),
         sha256_hex(details),
         sha256_hex(evidence_refs),
     )
@@ -179,9 +175,7 @@ def sort_messages(entries: Iterable[Any]) -> tuple[Any, ...]:
 
 
 def position_id(request_hash: str, u: int, v: int) -> str:
-    return str(
-        uuid.uuid5(UUID_NAMESPACE_URL, f"{POSITION_URN_PREFIX}{request_hash}:{u}:{v}")
-    )
+    return str(uuid.uuid5(UUID_NAMESPACE_URL, f"{POSITION_URN_PREFIX}{request_hash}:{u}:{v}"))
 
 
 def layout_id(layout_hash: str) -> str:

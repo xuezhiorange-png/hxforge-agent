@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from decimal import Decimal, ROUND_HALF_EVEN, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from typing import Any
 
 from hexagent.exchangers.shell_tube import canonical as task020_canonical
@@ -107,7 +107,10 @@ def verify_task020_configuration(configuration: ShellAndTubeConfiguration) -> No
     )
     actual_hash = task020_canonical.configuration_hash(payload)
     actual_id = task020_canonical.configuration_id(actual_hash)
-    if actual_hash != configuration.configuration_hash or actual_id != configuration.configuration_id:
+    if (
+        actual_hash != configuration.configuration_hash
+        or actual_id != configuration.configuration_id
+    ):
         raise AuthorityFailure(
             _message(
                 BlockerCode.STL_TASK020_CONFIGURATION_IDENTITY_MISMATCH,

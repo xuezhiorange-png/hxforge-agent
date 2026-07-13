@@ -7,7 +7,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from hexagent.exchangers.shell_tube.models import ShellAndTubeConfiguration
+from hexagent.exchangers.shell_tube.models import (
+    Orientation,
+    ShellAndTubeConfiguration,
+)
 
 REQUEST_SCHEMA_VERSION = "task021.tube-layout-request.v1"
 ENVELOPE_SCHEMA_VERSION = "task021.circular-envelope.v1"
@@ -72,9 +75,7 @@ class BlockerCode(enum.StrEnum):
     STL_RAW_TYPE_INVALID = "STL_RAW_TYPE_INVALID"
     STL_TASK020_CONFIGURATION_MISSING = "STL_TASK020_CONFIGURATION_MISSING"
     STL_TASK020_CONFIGURATION_INVALID = "STL_TASK020_CONFIGURATION_INVALID"
-    STL_TASK020_CONFIGURATION_IDENTITY_MISMATCH = (
-        "STL_TASK020_CONFIGURATION_IDENTITY_MISMATCH"
-    )
+    STL_TASK020_CONFIGURATION_IDENTITY_MISMATCH = "STL_TASK020_CONFIGURATION_IDENTITY_MISMATCH"
     STL_AUTHORITY_MODE_MISMATCH = "STL_AUTHORITY_MODE_MISMATCH"
     STL_LAYOUT_RULE_AUTHORITY_MISSING = "STL_LAYOUT_RULE_AUTHORITY_MISSING"
     STL_LAYOUT_RULE_PROFILE_UNSUPPORTED = "STL_LAYOUT_RULE_PROFILE_UNSUPPORTED"
@@ -88,9 +89,7 @@ class BlockerCode(enum.StrEnum):
     STL_TUBE_GEOMETRY_TYPE_INVALID = "STL_TUBE_GEOMETRY_TYPE_INVALID"
     STL_TUBE_GEOMETRY_UNAPPROVED = "STL_TUBE_GEOMETRY_UNAPPROVED"
     STL_TUBE_GEOMETRY_SOURCE_INCOMPLETE = "STL_TUBE_GEOMETRY_SOURCE_INCOMPLETE"
-    STL_TUBE_GEOMETRY_SNAPSHOT_HASH_MISMATCH = (
-        "STL_TUBE_GEOMETRY_SNAPSHOT_HASH_MISMATCH"
-    )
+    STL_TUBE_GEOMETRY_SNAPSHOT_HASH_MISMATCH = "STL_TUBE_GEOMETRY_SNAPSHOT_HASH_MISMATCH"
     STL_TUBE_DIMENSION_INVALID = "STL_TUBE_DIMENSION_INVALID"
     STL_TUBE_DIMENSION_INCONSISTENT = "STL_TUBE_DIMENSION_INCONSISTENT"
     STL_DECIMAL_LEXICAL_INVALID = "STL_DECIMAL_LEXICAL_INVALID"
@@ -303,7 +302,7 @@ class TubeLayout:
     task020_configuration_hash: str
     case_authority: Mapping[str, Any]
     construction_family: str
-    equipment_orientation: str
+    equipment_orientation: Orientation
     shell_pass_count: int
     tube_pass_count: int
     tube_geometry: ApprovedTubeGeometrySnapshot
@@ -321,7 +320,7 @@ class TubeLayout:
     warnings: tuple[MessageEntry, ...]
     blockers: tuple[MessageEntry, ...]
     deferred_capabilities: tuple[str, ...]
-    provenance: Mapping[str, Any]
+    provenance: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

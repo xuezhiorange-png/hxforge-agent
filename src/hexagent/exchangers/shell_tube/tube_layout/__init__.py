@@ -1,5 +1,6 @@
 """TASK-021 deterministic shell-and-tube layout core."""
 
+from . import models as _models
 from .authority import (
     AuthorityFailure,
     verify_geometry_snapshot,
@@ -30,7 +31,6 @@ from .geometry import (
     GeometryResult,
     evaluate_geometry,
 )
-from . import models as _models
 from .models import *  # noqa: F403
 from .pairing import (
     PairingFailure,

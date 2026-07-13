@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_CEILING, ROUND_HALF_EVEN, localcontext
+from decimal import ROUND_CEILING, ROUND_HALF_EVEN, Decimal, localcontext
 
 from .canonical import DECIMAL_PRECISION, SQRT_3, parse_decimal
 from .models import (

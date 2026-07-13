@@ -94,9 +94,7 @@ def _mapping(value: Any, field_path: str, expected: set[str]) -> Mapping[str, An
 
 def _nonempty_string(value: Any, field_path: str) -> str:
     if not isinstance(value, str) or not value:
-        raise _block(
-            BlockerCode.STL_RAW_TYPE_INVALID, field_path, "nonempty_string_required"
-        )
+        raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, "nonempty_string_required")
     return value
 
 
@@ -118,9 +116,7 @@ def _decimal(
 def _sha(value: Any, field_path: str) -> str:
     text = _nonempty_string(value, field_path)
     if not _SHA256_RE.fullmatch(text):
-        raise _block(
-            BlockerCode.STL_RAW_TYPE_INVALID, field_path, "sha256_hex_required"
-        )
+        raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, "sha256_hex_required")
     return text
 
 
@@ -128,17 +124,13 @@ def _integer(value: Any, field_path: str, *, minimum: int | None = None) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, "integer_required")
     if minimum is not None and value < minimum:
-        raise _block(
-            BlockerCode.STL_RAW_TYPE_INVALID, field_path, "integer_below_minimum"
-        )
+        raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, "integer_below_minimum")
     return value
 
 
 def _enum(value: Any, enum_type: type[E], field_path: str) -> E:
     if not isinstance(value, str):
-        raise _block(
-            BlockerCode.STL_RAW_TYPE_INVALID, field_path, "enum_string_required"
-        )
+        raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, "enum_string_required")
     try:
         return enum_type(value)
     except ValueError as exc:
@@ -150,19 +142,13 @@ def _enum(value: Any, enum_type: type[E], field_path: str) -> E:
         ) from exc
 
 
-def _string_array(
-    value: Any, field_path: str, *, allow_empty: bool = True
-) -> tuple[str, ...]:
+def _string_array(value: Any, field_path: str, *, allow_empty: bool = True) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, "array_required")
     try:
         return sorted_unique_strings(value, allow_empty=allow_empty)
     except (TypeError, ValueError) as exc:
-        message_key = (
-            "duplicate_array_item"
-            if "duplicate" in str(exc)
-            else "string_array_invalid"
-        )
+        message_key = "duplicate_array_item" if "duplicate" in str(exc) else "string_array_invalid"
         raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, message_key) from exc
 
 
@@ -177,9 +163,7 @@ def _enum_array(
         raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, "enum_array_invalid")
     items = tuple(_enum(item, enum_type, f"{field_path}[]") for item in value)
     if len(set(items)) != len(items):
-        raise _block(
-            BlockerCode.STL_RAW_TYPE_INVALID, field_path, "duplicate_array_item"
-        )
+        raise _block(BlockerCode.STL_RAW_TYPE_INVALID, field_path, "duplicate_array_item")
     order = {member: index for index, member in enumerate(list(enum_type))}
     return tuple(sorted(items, key=order.__getitem__))
 
@@ -208,10 +192,7 @@ def parse_source_binding(value: Any, field_path: str) -> SourceBindingSnapshot:
     }
     data = _mapping(value, field_path, fields)
     return SourceBindingSnapshot(
-        **{
-            name: _nonempty_string(data[name], f"{field_path}.{name}")
-            for name in fields
-        }
+        **{name: _nonempty_string(data[name], f"{field_path}.{name}") for name in fields}
     )
 
 
@@ -219,9 +200,7 @@ def parse_rule_pack_identity(value: Any, field_path: str) -> RulePackIdentitySna
     fields = {"rule_pack_id", "rule_pack_version", "rule_pack_canonical_hash"}
     data = _mapping(value, field_path, fields)
     return RulePackIdentitySnapshot(
-        rule_pack_id=_nonempty_string(
-            data["rule_pack_id"], f"{field_path}.rule_pack_id"
-        ),
+        rule_pack_id=_nonempty_string(data["rule_pack_id"], f"{field_path}.rule_pack_id"),
         rule_pack_version=_nonempty_string(
             data["rule_pack_version"], f"{field_path}.rule_pack_version"
         ),
@@ -262,21 +241,15 @@ def parse_geometry(value: Any) -> ApprovedTubeGeometrySnapshot:
     )
     return ApprovedTubeGeometrySnapshot(
         geometry_id=_nonempty_string(data["geometry_id"], "tube_geometry.geometry_id"),
-        geometry_type=_nonempty_string(
-            data["geometry_type"], "tube_geometry.geometry_type"
-        ),
+        geometry_type=_nonempty_string(data["geometry_type"], "tube_geometry.geometry_type"),
         revision=_nonempty_string(data["revision"], "tube_geometry.revision"),
-        approval_state=_nonempty_string(
-            data["approval_state"], "tube_geometry.approval_state"
-        ),
+        approval_state=_nonempty_string(data["approval_state"], "tube_geometry.approval_state"),
         outer_diameter_m=outer_diameter_m,
         inner_diameter_m=inner_diameter_m,
         wall_thickness_m=wall_thickness_m,
         record_hash=_sha(data["record_hash"], "tube_geometry.record_hash"),
         snapshot_hash=_sha(data["snapshot_hash"], "tube_geometry.snapshot_hash"),
-        source_binding=parse_source_binding(
-            data["source_binding"], "tube_geometry.source_binding"
-        ),
+        source_binding=parse_source_binding(data["source_binding"], "tube_geometry.source_binding"),
     )
 
 
@@ -327,30 +300,22 @@ def parse_layout_rule(value: Any) -> LayoutRuleAuthoritySnapshot:
     rule_pack = (
         None
         if rule_pack_raw is None
-        else parse_rule_pack_identity(
-            rule_pack_raw, "layout_rule_authority.rule_pack_identity"
-        )
+        else parse_rule_pack_identity(rule_pack_raw, "layout_rule_authority.rule_pack_identity")
     )
     return LayoutRuleAuthoritySnapshot(
-        profile_id=_nonempty_string(
-            data["profile_id"], "layout_rule_authority.profile_id"
-        ),
+        profile_id=_nonempty_string(data["profile_id"], "layout_rule_authority.profile_id"),
         authority_mode=_enum(
             data["authority_mode"],
             AuthorityMode,
             "layout_rule_authority.authority_mode",
         ),
         rule_id=_nonempty_string(data["rule_id"], "layout_rule_authority.rule_id"),
-        rule_version=_nonempty_string(
-            data["rule_version"], "layout_rule_authority.rule_version"
-        ),
+        rule_version=_nonempty_string(data["rule_version"], "layout_rule_authority.rule_version"),
         rule_artifact_canonical_hash=_sha(
             data["rule_artifact_canonical_hash"],
             "layout_rule_authority.rule_artifact_canonical_hash",
         ),
-        source_class=_nonempty_string(
-            data["source_class"], "layout_rule_authority.source_class"
-        ),
+        source_class=_nonempty_string(data["source_class"], "layout_rule_authority.source_class"),
         license_evidence=_canonical_json_value(
             data["license_evidence"], "layout_rule_authority.license_evidence"
         ),
@@ -360,9 +325,7 @@ def parse_layout_rule(value: Any) -> LayoutRuleAuthoritySnapshot:
         provenance_edge_ids=_string_array(
             data["provenance_edge_ids"], "layout_rule_authority.provenance_edge_ids"
         ),
-        evidence_refs=_string_array(
-            data["evidence_refs"], "layout_rule_authority.evidence_refs"
-        ),
+        evidence_refs=_string_array(data["evidence_refs"], "layout_rule_authority.evidence_refs"),
         rule_pack_identity=rule_pack,
         pattern_family=_enum(
             data["pattern_family"],
@@ -392,9 +355,7 @@ def parse_layout_rule(value: Any) -> LayoutRuleAuthoritySnapshot:
             "layout_rule_authority.maximum_candidate_positions",
             minimum=1,
         ),
-        snapshot_hash=_sha(
-            data["snapshot_hash"], "layout_rule_authority.snapshot_hash"
-        ),
+        snapshot_hash=_sha(data["snapshot_hash"], "layout_rule_authority.snapshot_hash"),
     )
 
 
@@ -462,11 +423,7 @@ def parse_zone(value: Any, index: int) -> ExclusionZone:
     height = data["height_m"]
     radius = data["radius_m"]
     if zone_type is ExclusionZoneType.AXIS_ALIGNED_RECTANGLE:
-        if (
-            not isinstance(width, str)
-            or not isinstance(height, str)
-            or radius is not None
-        ):
+        if not isinstance(width, str) or not isinstance(height, str) or radius is not None:
             raise _block(
                 BlockerCode.STL_EXCLUSION_ZONE_INVALID,
                 field_path,
@@ -548,9 +505,7 @@ def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
     pairs: list[UTubePair] = []
     for index, raw_pair in enumerate(raw_pairs):
         field_path = f"u_tube_pairing_plan.pairs[{index}]"
-        pair_data = _mapping(
-            raw_pair, field_path, {"pair_id", "leg_a", "leg_b", "evidence_refs"}
-        )
+        pair_data = _mapping(raw_pair, field_path, {"pair_id", "leg_a", "leg_b", "evidence_refs"})
         pairs.append(
             UTubePair(
                 pair_id=_nonempty_string(pair_data["pair_id"], f"{field_path}.pair_id"),
@@ -569,9 +524,7 @@ def parse_pairing_plan(value: Any) -> UTubePairingPlan | None:
             "u_tube_pairing_plan.evidence_refs",
             allow_empty=False,
         ),
-        pairing_plan_hash=_sha(
-            data["pairing_plan_hash"], "u_tube_pairing_plan.pairing_plan_hash"
-        ),
+        pairing_plan_hash=_sha(data["pairing_plan_hash"], "u_tube_pairing_plan.pairing_plan_hash"),
     )
 
 
@@ -610,9 +563,7 @@ def parse_request(payload: Any) -> TubeLayoutRequest:
         )
     zones_raw = data["exclusion_zones"]
     if not isinstance(zones_raw, list):
-        raise _block(
-            BlockerCode.STL_RAW_TYPE_INVALID, "exclusion_zones", "array_required"
-        )
+        raise _block(BlockerCode.STL_RAW_TYPE_INVALID, "exclusion_zones", "array_required")
     zones = tuple(
         sorted(
             (parse_zone(item, index) for index, item in enumerate(zones_raw)),
@@ -632,9 +583,7 @@ def parse_request(payload: Any) -> TubeLayoutRequest:
         layout_rule_authority=parse_layout_rule(data["layout_rule_authority"]),
         placement_envelope=parse_envelope(data["placement_envelope"]),
         origin_mode=_enum(data["origin_mode"], OriginMode, "origin_mode"),
-        axis_orientation=_enum(
-            data["axis_orientation"], AxisOrientation, "axis_orientation"
-        ),
+        axis_orientation=_enum(data["axis_orientation"], AxisOrientation, "axis_orientation"),
         exclusion_zones=zones,
         u_tube_pairing_plan=parse_pairing_plan(data["u_tube_pairing_plan"]),
         evidence_refs=_string_array(data["evidence_refs"], "evidence_refs"),
