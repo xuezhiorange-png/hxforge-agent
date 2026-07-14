@@ -30,12 +30,12 @@ from hexagent.exchangers.shell_tube.shell_bundle_geometry import (
     RULE_PACK_ADAPTER_BLOCKER_CODES,
     AdapterFailure,
     RulePackAdapterBlockerCode,
-    build_message_entry,
-    sort_adapter_blockers,
 )
 from hexagent.exchangers.shell_tube.shell_bundle_geometry.adapter_blockers import (
     RULE_PACK_ADAPTER_DEFAULT_FIELD_PATH,
     RULE_PACK_ADAPTER_DEFAULT_MESSAGE_KEY,
+    build_message_entry,
+    sort_adapter_blockers,
 )
 from hexagent.exchangers.shell_tube.shell_bundle_geometry.models import MessageEntry
 
@@ -61,6 +61,23 @@ EXPECTED_FROZEN_CODES: tuple[str, ...] = (
     "SBG_RULE_ADAPTER_SNAPSHOT_HASH_MISMATCH",
     "SBG_RULE_ADAPTER_SNAPSHOT_VERIFICATION_FAILED",
 )
+
+
+def test_package_root_does_not_export_internal_helpers() -> None:
+    """The public-API contract fixup must keep ``build_message_entry`` and
+    ``sort_adapter_blockers`` out of the package root. The two helpers are
+    consumed via the ``.adapter_blockers`` submodule only — never via
+    ``from hexagent.exchangers.shell_tube.shell_bundle_geometry import ...``.
+    """
+    import hexagent.exchangers.shell_tube.shell_bundle_geometry as package
+
+    assert not hasattr(package, "build_message_entry")
+    assert not hasattr(package, "sort_adapter_blockers")
+    # The four-name B1 surface MUST still be present at root.
+    assert hasattr(package, "AdapterFailure")
+    assert hasattr(package, "RulePackAdapterBlockerCode")
+    assert hasattr(package, "RULE_PACK_ADAPTER_BLOCKER_CODES")
+    assert hasattr(package, "build_shell_bundle_rule_authority_snapshot")
 
 
 def test_public_api_signature_is_frozen() -> None:
