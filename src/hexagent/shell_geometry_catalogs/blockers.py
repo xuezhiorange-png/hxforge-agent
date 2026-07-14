@@ -31,15 +31,18 @@ execution-side inferred substitute is permitted.
 code globally. The same code may be emitted at different validation
 occurrences and therefore may carry different stage ranks. Every
 blocker construction call MUST explicitly pass the actual
-occurrence stage rank. The module therefore refuses to expose a
-code-derived stage-rank lookup table, an implicit/default rank, or
-any zero-rank fallback.
+occurrence stage rank. The module therefore refuses to expose any
+code-derived stage-rank lookup table, an implicit / default / zero
+rank, or any synonym of a code-to-stage map.
 
-Forbidden:
+Forbidden (per Amendment 001 §3 + Issue #152 Comment 4970130136):
 
-* ``SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE`` (and synonyms)
-* any code-derived stage-rank mapping
-* implicit / default / zero stage-rank fallback
+* any code-derived stage-rank mapping (table / dict / function /
+  implicit lookup that returns a rank from a code token);
+* implicit / default / zero stage-rank fallback;
+* any synonym of a code-to-stage map (the exact forbidden tokens
+  are listed in the architecture scan in
+  ``test_architecture.py`` — production MUST stay zero-hit).
 
 ## Frozen public surface
 
@@ -53,6 +56,18 @@ Forbidden:
 * ``thaw_for_canonical_json`` — recursive plain-JSON projection
 * ``composite_order_key`` / ``sort_blockers`` — design §6 ordering
 
+## Construction-boundary deep freeze (Round 2 §3)
+
+``ShellGeometryCatalogBlockerEntry.__post_init__`` is the SOLE
+authoritative freeze boundary: any caller (test, parser helper,
+manual construction) MAY pass ordinary Python ``dict`` / ``list``
+containers and the dataclass will deep-freeze them in place via
+``object.__setattr__``. Non-JSON-compatible values (``set`` /
+``frozenset`` / custom objects / ``Decimal`` / ``bytes`` /
+non-string mapping keys / NaN / ±Infinity) are rejected up front
+with a :class:`TypeError` so the rejection happens at the
+construction boundary rather than at sort / canonical-hash time.
+
 The module forbids filesystem / network / database / environment /
 runtime-now / locale / registry / dynamic-import / executable-
 deserialization operations. It only imports stdlib + the canonical
@@ -62,6 +77,7 @@ SHA-256 helper.
 from __future__ import annotations
 
 import enum
+import math
 import types as _types  # noqa: I001  -- explicit import for MappingProxyType thaw
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -257,29 +273,64 @@ _MIN_STAGE_RANK: Final[int] = 1
 
 
 def _deep_freeze_value(value: Any) -> Any:
-    """Recursively freeze a value into immutable primitives.
+    """Recursively freeze a value into immutable primitives (Round 2 §4).
 
-    * nested mappings are converted to a ``MappingProxyType`` over a
-      recursive copy (the surface mapping is read-only via proxy);
-    * nested sequences (``list`` / ``tuple``) become a tuple of
-      recursively-frozen values;
-    * ``None`` is preserved (so ``details is None`` continues to hash
-      as JSON ``null``);
-    * JSON scalar primitives (``str`` / ``int`` / ``float`` / ``bool``)
-      are returned unchanged.
+    Accepted JSON scalar types:
 
-    ``set`` / ``frozenset`` / non-Mapping / non-Sequence custom objects
-    (including ``Decimal`` and ``datetime``) are rejected up front via
-    :class:`TypeError` — Amendment 001 §7 forbids canonical-JSON
-    non-compliance from leaking past blocker construction.
+    * ``None`` (preserved so ``details is None`` continues to hash as
+      JSON ``null``);
+    * ``str`` (returned unchanged);
+    * ``bool`` (a non-bool subclass of ``int``);
+    * ``int`` (returned unchanged — note: the repository canonical
+      JSON serializer may reject non-finite / out-of-range integers;
+      if so, that rejection is intentionally not duplicated here);
+    * ``float`` — must be **finite** (``math.isfinite``); ``NaN``,
+      ``+Infinity`` and ``-Infinity`` are rejected with
+      :class:`TypeError` so the rejection happens at the construction
+      boundary, not at sort / hash time.
+
+    Composite types:
+
+    * ``Mapping`` — converted to a ``MappingProxyType`` over a recursive
+      copy. **Mapping keys MUST be strings** (no ``str(k)`` silent
+      conversion). Non-string keys raise :class:`TypeError`.
+    * ``list`` / ``tuple`` — converted to a tuple of recursively-frozen
+      values.
+
+    Rejected at construction:
+
+    * ``set`` / ``frozenset``;
+    * custom objects (anything not covered above, including ``Decimal``,
+      ``datetime``, ``bytes``/``bytearray``/``memoryview``,
+      ``OrderedDict``, custom class instances, etc.).
     """
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            label = "NaN" if value != value else ("+Infinity" if value > 0 else "-Infinity")
+            raise TypeError(f"blocker details must use finite floats; got {value!r} ({label})")
         return value
     if isinstance(value, Mapping):
-        return _types.MappingProxyType({str(k): _deep_freeze_value(v) for k, v in value.items()})
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise TypeError(
+                    "blocker details mapping keys must be str; "
+                    f"got key {k!r} of type {type(k).__name__}"
+                )
+            out[k] = _deep_freeze_value(v)
+        return _types.MappingProxyType(out)
     if isinstance(value, (list, tuple)):
         return tuple(_deep_freeze_value(v) for v in value)
-    # Reject anything else — set/frozenset/custom objects/Decimal/datetime.
+    # Reject anything else — set / frozenset / Decimal / bytes /
+    # datetime / custom objects / OrderedDict.
     raise TypeError(
         "blocker details must be built from dict/list/tuple/scalar primitives; "
         f"got {type(value).__name__}"
@@ -375,13 +426,24 @@ class ShellGeometryCatalogBlockerEntry:
     the code and will reject a rank outside ``[1, 20]`` or below
     ``_MIN_STAGE_RANK``. Amendment 001 §3 forbids code-derived or
     implicit rank fallbacks.
+
+    Round 2 §3 — the dataclass ``__post_init__`` is the **sole
+    authoritative freeze boundary**. Direct construction MAY pass
+    ordinary Python ``dict`` / ``list`` payloads; the dataclass will
+    deep-freeze them in place via ``object.__setattr__`` so the
+    frozen entry is not aliased to the caller's mutable container.
+    Non-JSON-compatible values (``set`` / ``frozenset`` / custom
+    objects / ``Decimal`` / ``bytes`` / non-string mapping keys /
+    NaN / ``±Infinity``) are rejected up front with
+    :class:`TypeError` so the rejection happens at the construction
+    boundary rather than at sort / canonical-hash time.
     """
 
     code: str
     field_path: str
     message_key: str
     stage_rank: int
-    evidence_refs: tuple[str, ...] = field(default_factory=tuple)
+    evidence_refs: Sequence[str] | tuple[str, ...] = field(default_factory=tuple)
     details: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
@@ -400,17 +462,23 @@ class ShellGeometryCatalogBlockerEntry:
                 f"stage_rank {self.stage_rank} out of valid "
                 f"[{_MIN_STAGE_RANK}, {_MAX_STAGE_RANK}] range"
             )
-        if not isinstance(self.evidence_refs, tuple):
-            raise ValueError("evidence_refs must be tuple")
-        for entry in self.evidence_refs:
-            if not isinstance(entry, str) or not entry:
-                raise ValueError("evidence_refs entries must be non-empty strings")
-        # details must already be deep-frozen BEFORE the dataclass
-        # construction. ``deep_freeze_details`` enforces the set /
-        # frozenset / custom-object / Decimal / datetime rejection
-        # required by Amendment 001 §7. Do NOT silently coerce.
-        if self.details is not None and not isinstance(self.details, Mapping):
-            raise ValueError("details must be a Mapping or None")
+        # Round 2 §3 — the construction boundary is the SOLE freeze
+        # authority. The caller may pass ordinary ``Sequence[str]`` or
+        # a pre-built ``tuple``; we copy to a tuple via
+        # ``freeze_evidence_refs`` which also rejects non-string /
+        # empty entries at this boundary.
+        frozen_refs = freeze_evidence_refs(self.evidence_refs)
+        object.__setattr__(self, "evidence_refs", frozen_refs)
+        # Round 2 §3 + §4 — ``details`` is auto-deep-frozen. Pass
+        # ``None`` through unchanged; otherwise deep_freeze_details
+        # validates every nested layer against the strict JSON
+        # contract (str keys, finite floats, no set / frozenset /
+        # Decimal / bytes / custom object).
+        if self.details is None:
+            frozen_details: Mapping[str, Any] | None = None
+        else:
+            frozen_details = deep_freeze_details(self.details)
+        object.__setattr__(self, "details", frozen_details)
 
 
 # ---------------------------------------------------------------------------

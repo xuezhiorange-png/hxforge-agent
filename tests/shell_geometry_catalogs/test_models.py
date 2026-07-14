@@ -23,6 +23,8 @@ Covered items per authorization §13:
 
 from __future__ import annotations
 
+import decimal
+import math
 from dataclasses import FrozenInstanceError
 from typing import Any
 
@@ -1029,7 +1031,7 @@ def test_round4_nested_caller_dict_mutation_does_not_alter_blocker() -> None:
         message_key="sgc_raw_type_invalid",
         stage_rank=1,
         evidence_refs=tuple(call_refs),
-        details=deep_freeze_details(call_details),
+        details=call_details,
     )
     # Mutate caller's containers AFTER the deep-freeze took its copies.
     call_details["second"] = "MUTATED"
@@ -1049,7 +1051,7 @@ def test_round4_nested_caller_list_mutation_does_not_alter_blocker() -> None:
         field_path="x",
         message_key="sgc_raw_type_invalid",
         stage_rank=1,
-        details=deep_freeze_details(call_details),
+        details=call_details,
     )
     call_details["lst"][0].append(999)
     assert e.details is not None
@@ -1069,7 +1071,7 @@ def test_round4_blocker_nested_details_cannot_be_mutated() -> None:
         field_path="x",
         message_key="sgc_raw_type_invalid",
         stage_rank=1,
-        details=deep_freeze_details(call_details),
+        details=call_details,
     )
     assert e.details is not None
     # Surface: MappingProxyType blocks item assignment.
@@ -1098,7 +1100,7 @@ def test_round4_canonical_ordering_stable_before_after_mutation() -> None:
         field_path="p",
         message_key="sgc_raw_type_invalid",
         stage_rank=1,
-        details=deep_freeze_details(call_details),
+        details=call_details,
         evidence_refs=("a",),
     )
     k_before = composite_order_key(e)
@@ -1120,10 +1122,398 @@ def test_round4_blocker_no_mutable_exposure() -> None:
         field_path="p",
         message_key="sgc_raw_type_invalid",
         stage_rank=1,
-        details=deep_freeze_details({"x": 1, "y": [1, 2]}),
+        details={"x": 1, "y": [1, 2]},
         evidence_refs=("a", "b"),
     )
     assert isinstance(e.details, types.MappingProxyType)
     assert isinstance(e.evidence_refs, tuple)
     # Nested list frozen to tuple.
     assert isinstance(e.details["y"], tuple)  # type: ignore[index]
+
+
+"""TASK-023 Option B implementation fixup — Round 2 unit tests.
+
+Amendment 001 §5 + Round 2 §1–§5 corrections. All tests are
+deterministic and operate purely in-memory. The required imports
+(``decimal``, ``math``, ``Any``, ``pytest``, ``_compute_bundle_hash``,
+the catalog package, and the synthetic builders) are already
+imported at the top of ``test_models.py``.
+"""
+
+# Round 2 local re-imports intentionally omitted; see module docstring.
+
+
+def _make_record_kwargs(*, record_key: str, source_class: str = "PUBLIC_DOMAIN"):
+    return dict(
+        record_key=record_key,
+        catalog_id="synthetic-catalog-1",
+        revision="1",
+        source_class=source_class,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Correction 3 — construction-boundary deep freeze
+# ---------------------------------------------------------------------------
+
+
+def test_round4b_direct_construction_deep_freezes_nested_dict_list() -> None:
+    """``ShellGeometryCatalogBlockerEntry`` MUST deep-freeze nested
+    dict / list inputs at construction time without the caller
+    pre-freezing.
+    """
+    call_details = {"outer": [{"inner": [1, 2, 3]}], "second": "abc"}
+    call_refs = ["r1", "r2"]
+    e = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="p",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=1,
+        evidence_refs=call_refs,
+        details=call_details,
+    )
+    # Caller mutates the original containers — entry must NOT change.
+    call_details["second"] = "MUTATED"
+    call_details["outer"][0]["inner"].append(999)
+    call_details["new_key"] = "new"
+    call_refs.append("r3")
+    assert e.details is not None
+    assert e.details["second"] == "abc"
+    assert e.details["outer"][0]["inner"] == (1, 2, 3)
+    assert "new_key" not in e.details
+    assert e.evidence_refs == ("r1", "r2")
+
+
+def test_round4b_direct_construction_rejects_set() -> None:
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={"x": {1, 2, 3}},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_rejects_frozenset() -> None:
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={"x": frozenset({1, 2})},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_rejects_custom_object() -> None:
+    class _MyType:
+        pass
+
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={"x": _MyType()},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_rejects_bytes() -> None:
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={"x": b"raw-bytes"},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_rejects_decimal() -> None:
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={"x": decimal.Decimal("1.5")},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_rejects_non_string_mapping_key() -> None:
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={1: "value"},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_rejects_nan() -> None:
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={"x": float("nan")},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_rejects_infinity() -> None:
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={"x": float("inf")},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_rejects_negative_infinity() -> None:
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="p",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=1,
+            details={"x": float("-inf")},  # type: ignore[dict-item]
+        )
+
+
+def test_round4b_direct_construction_accepts_finite_floats() -> None:
+    e = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="p",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=1,
+        details={"x": 1.5, "y": 0.0, "z": -3.14},
+    )
+    assert e.details is not None
+    assert e.details["x"] == 1.5
+    assert e.details["y"] == 0.0
+    assert e.details["z"] == -3.14
+    # math.isfinite() must hold.
+    assert math.isfinite(e.details["x"])
+
+
+def test_round4b_direct_construction_accepts_str_mapping_keys() -> None:
+    e = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="p",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=1,
+        details={"alpha": 1, "beta": 2},
+    )
+    assert e.details is not None
+    assert set(e.details.keys()) == {"alpha", "beta"}
+
+
+# ---------------------------------------------------------------------------
+# Correction 2 — 2-pass duplicate detection
+# ---------------------------------------------------------------------------
+
+
+def test_round4b_duplicate_permission_plus_invalid_scope_accumulates_both() -> None:
+    """Duplicate permission_id + invalid scope MUST emit BOTH the
+    duplicate blocker AND the raw-type blocker (same-stage accumulation).
+    """
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-bad-scope"))
+    # Two permission entries with the same id; second has invalid scope.
+    perm_good = synthetic_permission_payload(permission_id="dup-scope")
+    perm_bad = dict(synthetic_permission_payload(permission_id="dup-scope"))
+    perm_bad["permission_scope"] = "not-a-list"  # type: ignore[assignment]
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm_good, perm_bad),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id=f"edge-{record['geometry_id']}-provenance",
+            ),
+        ),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_PERMISSION_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+    # No substitute.
+    assert "SGC_CATALOG_HASH_MISMATCH" not in codes
+
+
+def test_round4b_duplicate_permission_plus_invalid_hash_accumulates_both() -> None:
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-bad-hash"))
+    perm_good = synthetic_permission_payload(permission_id="dup-hash")
+    perm_bad = dict(synthetic_permission_payload(permission_id="dup-hash"))
+    perm_bad["permission_hash"] = "not-a-64-hex-string"
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm_good, perm_bad),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id=f"edge-{record['geometry_id']}-provenance",
+            ),
+        ),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_PERMISSION_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+    assert "SGC_CATALOG_HASH_MISMATCH" not in codes
+
+
+def test_round4b_duplicate_edge_plus_invalid_relation_type_accumulates_both() -> None:
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-bad-rel"))
+    perm = synthetic_permission_payload(permission_id="perm-bad-rel")
+    edge_good = synthetic_edge_payload(
+        edge_id="dup-rel",
+        target_geometry_id=record["geometry_id"],
+    )
+    edge_bad = dict(
+        synthetic_edge_payload(
+            edge_id="dup-rel",
+            target_geometry_id=record["geometry_id"],
+        )
+    )
+    edge_bad["relation_type"] = ""  # empty string is not a valid non-empty string
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge_good, edge_bad),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_PROVENANCE_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+
+
+def test_round4b_duplicate_edge_plus_invalid_evidence_refs_accumulates_both() -> None:
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-bad-ev"))
+    perm = synthetic_permission_payload(permission_id="perm-bad-ev")
+    edge_good = synthetic_edge_payload(
+        edge_id="dup-ev",
+        target_geometry_id=record["geometry_id"],
+    )
+    edge_bad = dict(
+        synthetic_edge_payload(
+            edge_id="dup-ev",
+            target_geometry_id=record["geometry_id"],
+        )
+    )
+    edge_bad["evidence_refs"] = "not-a-list"  # type: ignore[assignment]
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge_good, edge_bad),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_PROVENANCE_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+
+
+# ---------------------------------------------------------------------------
+# Correction 1 — gate before bundle-hash computation
+# ---------------------------------------------------------------------------
+
+
+def test_round4b_duplicate_permission_prevents_compute_bundle_hash_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A duplicate permission_id MUST short-circuit BEFORE
+    ``_compute_bundle_hash`` is called. The test monkeypatches the
+    private helper with a sentinel that records the call; the parser
+    must raise the structured duplicate failure WITHOUT invoking the
+    helper. No filesystem / network monkeypatching is used.
+    """
+    import hexagent.shell_geometry_catalogs.catalog as _cat_mod
+
+    call_log: list[bool] = []
+
+    def _sentinel_compute_bundle_hash(**_kwargs: Any) -> str:
+        call_log.append(True)
+        return "SENTINEL_WAS_CALLED"
+
+    monkeypatch.setattr(_cat_mod, "_compute_bundle_hash", _sentinel_compute_bundle_hash)
+
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-gate-perm"))
+    perm = synthetic_permission_payload(permission_id="gate-perm-dup")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm, perm),  # duplicate
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id=f"edge-{record['geometry_id']}-provenance",
+            ),
+        ),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    assert any(b.code == "SGC_PERMISSION_DUPLICATE_ID" for b in excinfo.value.blockers)
+    assert call_log == [], (
+        "Round 2 §1: _compute_bundle_hash MUST NOT be called when the "
+        f"permission stage produced a duplicate blocker; call_log={call_log}"
+    )
+
+
+def test_round4b_duplicate_edge_prevents_compute_bundle_hash_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A duplicate edge_id MUST short-circuit BEFORE
+    ``_compute_bundle_hash`` is called.
+    """
+    import hexagent.shell_geometry_catalogs.catalog as _cat_mod
+
+    call_log: list[bool] = []
+
+    def _sentinel_compute_bundle_hash(**_kwargs: Any) -> str:
+        call_log.append(True)
+        return "SENTINEL_WAS_CALLED"
+
+    monkeypatch.setattr(_cat_mod, "_compute_bundle_hash", _sentinel_compute_bundle_hash)
+
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-gate-edge"))
+    perm = synthetic_permission_payload(permission_id="perm-gate-edge")
+    edge = synthetic_edge_payload(
+        edge_id="gate-edge-dup",
+        target_geometry_id=record["geometry_id"],
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge, edge),  # duplicate edge
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    assert any(b.code == "SGC_PROVENANCE_DUPLICATE_ID" for b in excinfo.value.blockers)
+    assert call_log == [], (
+        "Round 2 §1: _compute_bundle_hash MUST NOT be called when the "
+        f"edge stage produced a duplicate blocker; call_log={call_log}"
+    )
+
+
+def test_round4b_compute_bundle_hash_helper_signature_is_module_private() -> None:
+    """``_compute_bundle_hash`` MUST be module-private (leading
+    underscore) so the public parser surface cannot accidentally
+    bypass the upstream gate.
+    """
+    import hexagent.shell_geometry_catalogs as pkg
+
+    assert not hasattr(pkg, "_compute_bundle_hash"), (
+        "_compute_bundle_hash must not be re-exported through the public package surface"
+    )
+    import hexagent.shell_geometry_catalogs.catalog as _cat_mod
+
+    assert hasattr(_cat_mod, "_compute_bundle_hash")
+    assert callable(_cat_mod._compute_bundle_hash)

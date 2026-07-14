@@ -649,6 +649,48 @@ def _canonical_edge_hash_sequence(
     )
 
 
+def _compute_bundle_hash(
+    *,
+    schema_version: str,
+    bundle_id: str,
+    bundle_version: str,
+    bundle_approval: str,
+    perm_records_tuple: tuple[VendorPermissionEvidenceSnapshot, ...],
+    edge_records_tuple: tuple[ProvenanceEdgeSnapshot, ...],
+    local_kernel_usage_canon: tuple[str, ...],
+    bundle_evidence_refs_canon: tuple[str, ...],
+    task012_validation_hash: str,
+) -> str:
+    """Return the canonical SHA-256 hash of the evidence bundle.
+
+    Round 2 §1 — the caller MUST pass already-validated full-fidelity
+    snapshot tuples. Any caller that intends to compute the bundle
+    hash from a partial snapshot set (i.e. after a permission /
+    edge stage failure) MUST gate before calling this helper; the
+    helper itself does NOT re-validate the snapshots. This isolates
+    the canonical-hash domain construction from the upstream stage
+    gating.
+
+    The helper is intentionally module-private (leading underscore)
+    so the public parser surface cannot accidentally bypass the
+    upstream gate. It is registered as a candidate for monkeypatch
+    in Round 2 architecture tests to prove the gate fires before
+    the hash is computed.
+    """
+    bundle_hash_payload = {
+        "schema_version": schema_version,
+        "bundle_id": bundle_id,
+        "bundle_version": bundle_version,
+        "approval_status": bundle_approval,
+        "permission_hashes": _canonical_permission_hash_sequence(perm_records_tuple),
+        "edge_hashes": _canonical_edge_hash_sequence(edge_records_tuple),
+        "local_kernel_usage_scope": sorted(local_kernel_usage_canon),
+        "evidence_refs": sorted(bundle_evidence_refs_canon),
+        "task012_validation_hash": task012_validation_hash,
+    }
+    return canonical_sha256(bundle_hash_payload)
+
+
 # ---------------------------------------------------------------------------
 # Top-level parser
 # ---------------------------------------------------------------------------
@@ -926,7 +968,7 @@ def parse_shell_geometry_catalog(
     )
 
     # ------------------------------------------------------------------
-    # Stage 5 — permission snapshots: exact fields, raw types, identity, duplicates
+    # Stage 5 — permission snapshots: 2-pass identity + full validation
     # ------------------------------------------------------------------
     perm_expected = frozenset(
         {
@@ -940,14 +982,54 @@ def parse_shell_geometry_catalog(
         }
     )
     perm_records: list[VendorPermissionEvidenceSnapshot] = []
-    perm_id_set: dict[str, int] = {}
+    perm_id_seen_order: list[str] = []
+    perm_id_positions: dict[str, list[int]] = {}
     perm_hash_set: dict[str, int] = {}
-    # Amendment 001 §5 (Option B, comment 4970130136): duplicate
-    # permission_id MUST emit only ``SGC_PERMISSION_DUPLICATE_ID`` at
-    # Stage 5 occurrence rank; duplicate detection runs BEFORE any
-    # dict overwrite / bundle-hash verification / downstream gate.
+
+    # Stage 5 PASS 1 — identity pre-pass (Amendment 001 §5 + Round 2 §2).
+    # Collect every non-empty ``permission_id`` from the raw entries
+    # REGARDLESS of scope / usage-scope / hash validity. The pre-pass
+    # must not short-circuit on other field failures so the duplicate
+    # blocker is reachable even when the same entry has independent
+    # validation errors. Pre-pass failures (non-string permission_id)
+    # continue into Pass 2 so full-validation raw-type blockers still
+    # accumulate on the SAME entry alongside the duplicate blocker.
     for i, raw_perm in enumerate(perms_seq):
-        # _expect_sequence already filtered non-list; further type check:
+        if not isinstance(raw_perm, Mapping):
+            continue
+        pid = raw_perm.get("permission_id")
+        if not isinstance(pid, str) or not pid:
+            continue
+        perm_id_positions.setdefault(pid, []).append(i)
+        if pid not in perm_id_seen_order:
+            perm_id_seen_order.append(pid)
+
+    # Emit one SGC_PERMISSION_DUPLICATE_ID per duplicate group. The
+    # first occurrence participates in ``perm_id_positions`` as a
+    # natural index so the failure carries a deterministic
+    # ``first_seen`` field path.
+    for pid, positions in perm_id_positions.items():
+        if len(positions) < 2:
+            continue
+        for pos in positions:
+            failures.append(
+                _make_entry(
+                    "SGC_PERMISSION_DUPLICATE_ID",
+                    stage_rank=_STAGE_PERMISSION_FIELDS,
+                    field_path=f"evidence_bundle.permission_evidence[{pos}].permission_id",
+                    details={"permission_id": pid, "duplicate_group": pid},
+                )
+            )
+
+    # Stage 5 PASS 2 — full validation. The same entry is re-validated
+    # for ALL independent fields (exact fields / raw types / scope /
+    # usage / evidence_ref / approved_by / approved_at / hash) so
+    # additional raw-type / hash-mismatch blockers accumulate on the
+    # SAME entry alongside the duplicate blocker. Duplicate entries
+    # (i.e. entries whose permission_id is in a duplicate group) MUST
+    # NOT enter the trusted snapshot tuple.
+    duplicate_permission_ids = {pid for pid, pos in perm_id_positions.items() if len(pos) >= 2}
+    for i, raw_perm in enumerate(perms_seq):
         if not isinstance(raw_perm, Mapping):
             failures.append(
                 _make_entry(
@@ -957,7 +1039,6 @@ def parse_shell_geometry_catalog(
                 )
             )
             continue
-        # Stage 5a — exact fields
         actual_keys = frozenset(raw_perm)
         extras = actual_keys - perm_expected
         missing = perm_expected - actual_keys
@@ -979,7 +1060,6 @@ def parse_shell_geometry_catalog(
                     )
                 )
             continue
-        # Stage 5b — raw types
         pid = raw_perm.get("permission_id")
         if not isinstance(pid, str) or not pid:
             failures.append(
@@ -990,32 +1070,39 @@ def parse_shell_geometry_catalog(
                 )
             )
             continue
-        # Stage 5c — duplicate permission_id (Amendment 001 §5).
-        # Reject duplicates BEFORE canonical sorting, dict construction,
-        # reference resolution, or bundle-hash verification. Each
-        # independent duplicate group emits its own
-        # ``SGC_PERMISSION_DUPLICATE_ID`` blocker (deterministic
-        # accumulation) rather than first-error-only.
-        if pid in perm_id_set:
-            failures.append(
-                _make_entry(
-                    "SGC_PERMISSION_DUPLICATE_ID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{perm_id_set[pid]}].permission_id",
-                    details={"permission_id": pid, "duplicate_group": pid},
+        # Round 2 §2 — duplicate entries MUST NOT enter the trusted
+        # snapshot tuple. They still emit their independent
+        # validation blockers above (raw-type / hash / scope) so
+        # the same-stage accumulation contract holds, but they do
+        # not contribute to ``perm_records``.
+        if pid in duplicate_permission_ids:
+            # Re-run the full per-field validation so a duplicate
+            # entry with an invalid scope / usage / hash accumulates
+            # an additional SGC_RAW_TYPE_INVALID or
+            # SGC_CATALOG_HASH_MISMATCH alongside the
+            # SGC_PERMISSION_DUPLICATE_ID emitted in Pass 1.
+            perm_scope_raw = raw_perm.get("permission_scope")
+            perm_usage_raw = raw_perm.get("usage_scope")
+            if not _is_str_seq(perm_scope_raw) or not _is_str_seq(perm_usage_raw):
+                failures.append(
+                    _make_entry(
+                        "SGC_RAW_TYPE_INVALID",
+                        stage_rank=_STAGE_PERMISSION_FIELDS,
+                        field_path=f"evidence_bundle.permission_evidence[{i}].permission_scope",
+                    )
                 )
-            )
-            failures.append(
-                _make_entry(
-                    "SGC_PERMISSION_DUPLICATE_ID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{i}].permission_id",
-                    details={"permission_id": pid, "duplicate_group": pid},
+            perm_hash_in = raw_perm.get("permission_hash")
+            if not _is_nonempty_str(perm_hash_in) or not re.fullmatch(
+                r"[0-9a-f]{64}", perm_hash_in
+            ):
+                failures.append(
+                    _make_entry(
+                        "SGC_RAW_TYPE_INVALID",
+                        stage_rank=_STAGE_PERMISSION_FIELDS,
+                        field_path=f"evidence_bundle.permission_evidence[{i}].permission_hash",
+                    )
                 )
-            )
             continue
-        perm_id_set[pid] = i
-        # ... scope / usage_scope / evidence_ref / approved_by / approved_at raw types
         perm_scope_raw = raw_perm.get("permission_scope")
         perm_usage_raw = raw_perm.get("usage_scope")
         if not _is_str_seq(perm_scope_raw):
@@ -1036,9 +1123,6 @@ def parse_shell_geometry_catalog(
                 )
             )
             continue
-        # After TypeGuard narrow + canonicalize we have a tuple, but mypy
-        # cannot propagate through the helper. Use ``cast`` to make the
-        # invariant explicit.
         scope_tuple_l = _canonicalize_str_seq(perm_scope_raw)
         usage_tuple_l = _canonicalize_str_seq(perm_usage_raw)
         if scope_tuple_l is None or usage_tuple_l is None:
@@ -1078,12 +1162,6 @@ def parse_shell_geometry_catalog(
                 )
             )
             continue
-        # Duplicate permission_hash separately rejected. After
-        # Amendment 001 Option B the duplicate ``permission_id``
-        # branch is the only path that uses ``SGC_PERMISSION_DUPLICATE_ID``;
-        # the duplicate-permission-hash branch remains a downstream
-        # hash collision against the not-yet-computed bundle hash and
-        # maps to ``SGC_CATALOG_HASH_MISMATCH`` for backward continuity.
         if perm_hash_in in perm_hash_set:
             failures.append(
                 _make_entry(
@@ -1107,7 +1185,7 @@ def parse_shell_geometry_catalog(
         perm_records.append(snapshot)
 
     # ------------------------------------------------------------------
-    # Stage 6 — provenance edges: exact fields, raw types, identity, duplicates
+    # Stage 6 — provenance edges: 2-pass identity + full validation
     # ------------------------------------------------------------------
     edge_expected = frozenset(
         {
@@ -1120,14 +1198,39 @@ def parse_shell_geometry_catalog(
         }
     )
     edge_records: list[ProvenanceEdgeSnapshot] = []
-    edge_id_set: dict[str, int] = {}
+    edge_id_positions: dict[str, list[int]] = {}
     edge_hash_set: dict[str, int] = {}
+
+    # Stage 6 PASS 1 — identity pre-pass (Amendment 001 §5 + Round 2 §2).
     for i, raw_edge in enumerate(edges_seq):
-        # Amendment 001 §5 (Option B, comment 4970130136): duplicate
-        # edge_id MUST emit only ``SGC_PROVENANCE_DUPLICATE_ID`` at
-        # Stage 6 occurrence rank; duplicate detection runs BEFORE
-        # any dict overwrite / bundle-hash verification / downstream
-        # gate.
+        if not isinstance(raw_edge, Mapping):
+            continue
+        eid = raw_edge.get("edge_id")
+        if not isinstance(eid, str) or not eid:
+            continue
+        edge_id_positions.setdefault(eid, []).append(i)
+
+    for eid, positions in edge_id_positions.items():
+        if len(positions) < 2:
+            continue
+        for pos in positions:
+            failures.append(
+                _make_entry(
+                    "SGC_PROVENANCE_DUPLICATE_ID",
+                    stage_rank=_STAGE_EDGE_FIELDS,
+                    field_path=f"evidence_bundle.provenance_edges[{pos}].edge_id",
+                    details={"edge_id": eid, "duplicate_group": eid},
+                )
+            )
+
+    # Stage 6 PASS 2 — full validation. The same entry is re-validated
+    # for ALL independent fields (exact fields / raw types /
+    # relation_type / evidence_refs / hash) so additional raw-type
+    # blockers accumulate on the SAME entry alongside the duplicate
+    # blocker. Duplicate entries MUST NOT enter the trusted snapshot
+    # tuple.
+    duplicate_edge_ids = {eid for eid, pos in edge_id_positions.items() if len(pos) >= 2}
+    for i, raw_edge in enumerate(edges_seq):
         if not isinstance(raw_edge, Mapping):
             failures.append(
                 _make_entry(
@@ -1173,6 +1276,28 @@ def parse_shell_geometry_catalog(
                 )
             )
             continue
+        # Round 2 §2 — duplicate entries MUST NOT enter the trusted
+        # snapshot tuple. They still emit their independent
+        # validation blockers (relation_type / evidence_refs / hash)
+        # so the same-stage accumulation contract holds.
+        if eid in duplicate_edge_ids:
+            if not isinstance(rel, str) or not rel:
+                failures.append(
+                    _make_entry(
+                        "SGC_RAW_TYPE_INVALID",
+                        stage_rank=_STAGE_EDGE_FIELDS,
+                        field_path=f"evidence_bundle.provenance_edges[{i}].relation_type",
+                    )
+                )
+            if not _is_str_seq(ev_refs_raw):
+                failures.append(
+                    _make_entry(
+                        "SGC_RAW_TYPE_INVALID",
+                        stage_rank=_STAGE_EDGE_FIELDS,
+                        field_path=f"evidence_bundle.provenance_edges[{i}].evidence_refs",
+                    )
+                )
+            continue
         if not isinstance(rel, str) or not rel:
             failures.append(
                 _make_entry(
@@ -1210,31 +1335,6 @@ def parse_shell_geometry_catalog(
                 )
             )
             continue
-        # Stage 6c — duplicate edge_id (Amendment 001 §5). Reject
-        # duplicates BEFORE canonical sorting, dict construction,
-        # reference resolution, or bundle-hash verification. Each
-        # independent duplicate group emits its own
-        # ``SGC_PROVENANCE_DUPLICATE_ID`` blocker (deterministic
-        # accumulation) rather than first-error-only.
-        if eid in edge_id_set:
-            failures.append(
-                _make_entry(
-                    "SGC_PROVENANCE_DUPLICATE_ID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{edge_id_set[eid]}].edge_id",
-                    details={"edge_id": eid, "duplicate_group": eid},
-                )
-            )
-            failures.append(
-                _make_entry(
-                    "SGC_PROVENANCE_DUPLICATE_ID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{i}].edge_id",
-                    details={"edge_id": eid, "duplicate_group": eid},
-                )
-            )
-            continue
-        edge_id_set[eid] = i
         if edge_hash_in in edge_hash_set:
             failures.append(
                 _make_entry(
@@ -1257,32 +1357,29 @@ def parse_shell_geometry_catalog(
         edge_records.append(edge_snapshot)
 
     # ------------------------------------------------------------------
-    # Stage 4-extension: bundle_hash recomputation
+    # Stage 4-extension: dependent-stage gating MUST fire BEFORE any
+    # partial snapshot tuple construction or bundle-hash computation.
     # ------------------------------------------------------------------
+    # Round 2 §1 — the upstream-stage gate fires before
+    # (a) building the trusted snapshot tuples,
+    # (b) building the bundle-hash payload,
+    # (c) calling canonical_sha256,
+    # (d) comparing the supplied bundle_hash.
+    # If either the permission or the edge stage produced ANY blocker
+    # we MUST raise the ordered failure immediately; the partial
+    # snapshot set MUST NOT be hashed.
+    permission_stage_failed = any(
+        f.field_path.startswith("evidence_bundle.permission_evidence") for f in failures
+    )
+    edge_stage_failed = any(
+        f.field_path.startswith("evidence_bundle.provenance_edges") for f in failures
+    )
+    if permission_stage_failed or edge_stage_failed:
+        _raise(failures)
+
     perm_records_tuple = tuple(cast(Sequence[VendorPermissionEvidenceSnapshot], perm_records))
     edge_records_tuple = tuple(cast(Sequence[ProvenanceEdgeSnapshot], edge_records))
-    # Round 3 §4 — dependent-stage gating: if ANY permission-snapshot
-    # raw-type / exact-field / identity / duplicate validation failed,
-    # we MUST NOT compute the bundle hash from a partial snapshot set
-    # (the bundle_hash depends on every permission_hash in the set, and
-    # a missing snapshot would change the hash domain silently). Same
-    # logic for provenance edges.
-    permission_failure_count = sum(
-        1
-        for f in failures
-        if "permission_evidence" in f.field_path
-        or "permission_id" in f.field_path
-        or "permission_hash" in f.field_path
-    )
-    edge_failure_count = sum(
-        1
-        for f in failures
-        if "provenance_edges" in f.field_path
-        or "edge_id" in f.field_path
-        or "edge_hash" in f.field_path
-    )
-    permission_stage_failed = permission_failure_count > 0
-    edge_stage_failed = edge_failure_count > 0
+
     # Round 3 §3 — raw-before-hash: validate ``local_kernel_usage_scope``
     # and ``evidence_refs`` BEFORE computing the bundle_hash payload.
     # Without this pre-validation an int submitted in place of
@@ -1336,28 +1433,21 @@ def parse_shell_geometry_catalog(
         )
         _raise(failures)
 
-    # Bundle hash domain: bundle fields minus bundle_hash, plus ordered
-    # permission_hash sequence AND ordered (permission_id, permission_hash)
-    # binding plus edge_hash sequence bound by edge_id ordering.
-    bundle_hash_payload = {
-        "schema_version": "task023.shell-authority-evidence-bundle.v1",
-        "bundle_id": bundle_id,
-        "bundle_version": bundle_version,
-        "approval_status": bundle_approval,
-        "permission_hashes": _canonical_permission_hash_sequence(perm_records_tuple),
-        "edge_hashes": _canonical_edge_hash_sequence(edge_records_tuple),
-        "local_kernel_usage_scope": sorted(local_kernel_usage_canon),
-        "evidence_refs": sorted(bundle_evidence_refs_canon),
-        "task012_validation_hash": task012_validation_hash,
-    }
-    expected_bundle_hash = canonical_sha256(bundle_hash_payload)
-    if permission_stage_failed or edge_stage_failed:
-        # Round 3 §4 — do not even compare bundle hash when permission
-        # / edge stages produced incomplete partial snapshots. The
-        # block above for "expected != actual" is retained for the
-        # case where upstream is clean but the supplied bundle_hash is
-        # wrong (separate failure cause).
-        _raise(failures)
+    # Round 2 §1 — ONLY NOW, after the upstream stage gate has fired
+    # AND the snapshot tuples are full-fidelity, call the private
+    # bundle-hash helper. The helper does NOT re-validate the
+    # snapshots; the gate above is the only check.
+    expected_bundle_hash = _compute_bundle_hash(
+        schema_version="task023.shell-authority-evidence-bundle.v1",
+        bundle_id=cast(str, bundle_id),
+        bundle_version=cast(str, bundle_version),
+        bundle_approval=bundle_approval,
+        perm_records_tuple=perm_records_tuple,
+        edge_records_tuple=edge_records_tuple,
+        local_kernel_usage_canon=local_kernel_usage_canon,
+        bundle_evidence_refs_canon=bundle_evidence_refs_canon,
+        task012_validation_hash=task012_validation_hash,
+    )
     if expected_bundle_hash != bundle_hash_in:
         failures.append(
             _make_entry(
