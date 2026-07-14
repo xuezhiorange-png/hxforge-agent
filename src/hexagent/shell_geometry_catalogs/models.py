@@ -20,8 +20,8 @@ are pure.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Final
 
 # Frozen constants — exact tokens from the merged design contract §4.
@@ -30,6 +30,7 @@ RECORD_SCHEMA_VERSION: Final[str] = "task023.approved-shell-geometry-record.v1"
 EVIDENCE_BUNDLE_SCHEMA_VERSION: Final[str] = "task023.shell-authority-evidence-bundle.v1"
 PROFILE_ID: Final[str] = "hxforge.shell_geometry_catalog.v1"
 GEOMETRY_TYPE: Final[str] = "shell"
+GEOMETRY_ROLE: Final[str] = "shell"
 APPROVAL_STATES: Final[tuple[str, ...]] = (
     "approved",
     "pending",
@@ -68,6 +69,56 @@ VENDOR_PERMISSION_REQUIRED_SCOPE_TOKENS: Final[tuple[str, ...]] = (
     "repository_storage",
     "repository_redistribution",
 )
+
+
+# ---------------------------------------------------------------------------
+# Deep-freeze helper — used to detach caller-mutable mappings and lists.
+# ---------------------------------------------------------------------------
+
+
+def _freeze_nested(value: Any) -> Any:
+    """Return a read-only view of ``value`` with caller mutability removed.
+
+    - Mappings become a ``MappingProxyType`` with frozen inner mappings /
+      frozen inner sequences.
+    - Sequences become tuples; inner elements recursively frozen.
+    - Other values are returned unchanged.
+
+    The returned structure is read-only via Python's ``MappingProxyType``
+    and tuple immutability; the parser layer still rebuilds structural
+    copies for hash-domain stability.
+    """
+    import types
+    from collections.abc import Mapping as _Mapping
+
+    if isinstance(value, _Mapping):
+        # Build a new dict (copy) then return a read-only proxy.
+        frozen_inner = {key: _freeze_nested(item) for key, item in value.items()}
+        return types.MappingProxyType(frozen_inner)
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_nested(item) for item in value)
+    return value
+
+
+def _str_seq(value: Sequence[Any] | None) -> tuple[str, ...]:
+    """Validate and coerce ``value`` to a ``tuple[str, ...]`` with no
+    caller-mutable alias. Empty sequence allowed unless caller requires
+    non-empty.
+    """
+    if value is None:
+        return ()
+    items = tuple(value)
+    for entry in items:
+        if not isinstance(entry, str):
+            raise ValueError("sequence entries must be strings")
+    return items
+
+
+def _str_seq_nonempty(value: Sequence[Any] | None) -> tuple[str, ...]:
+    seq = _str_seq(value)
+    if not seq:
+        raise ValueError("sequence must be non-empty")
+    return seq
 
 
 # ---------------------------------------------------------------------------
@@ -112,9 +163,8 @@ class ShellSourceBinding:
 class VendorPermissionEvidenceSnapshot:
     """Closed TASK-023 vendor permission evidence snapshot.
 
-    Field set is exactly the design contract §5.5 record. Every snapshot
-    carries its own ``permission_hash``; the hash domain is covered in
-    ``catalog.py``.
+    Field set is exactly the design contract §5.5 record. ``scope`` and
+    ``usage_scope`` are tuples of sorted canonical strings.
     """
 
     permission_id: str
@@ -150,11 +200,7 @@ class VendorPermissionEvidenceSnapshot:
 
 @dataclass(frozen=True)
 class ProvenanceEdgeSnapshot:
-    """Closed TASK-023 provenance-edge snapshot.
-
-    Field set is exactly the design contract §5.6 record. The hash
-    domain is covered in ``catalog.py``.
-    """
+    """Closed TASK-023 provenance-edge snapshot."""
 
     edge_id: str
     source_id: str
@@ -173,10 +219,9 @@ class ProvenanceEdgeSnapshot:
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value:
                 raise ValueError(f"ProvenanceEdgeSnapshot.{field_name} must be non-empty string")
-        refs = self.evidence_refs
-        if not isinstance(refs, tuple):
+        if not isinstance(self.evidence_refs, tuple):
             raise ValueError("ProvenanceEdgeSnapshot.evidence_refs must be tuple")
-        for entry in refs:
+        for entry in self.evidence_refs:
             if not isinstance(entry, str) or not entry:
                 raise ValueError("ProvenanceEdgeSnapshot.evidence_refs entries must be non-empty")
         if not isinstance(self.edge_hash, str):
@@ -187,10 +232,9 @@ class ProvenanceEdgeSnapshot:
 class ShellAuthorityEvidenceBundle:
     """Closed TASK-023 evidence-bundle snapshot.
 
-    Field set is exactly the design contract §5.7 record. The bundle
-    is the canonical authority holder; record-level ``permission_evidence_refs``
-    and ``provenance_edge_ids`` are reference IDs that must resolve
-    against the in-memory bundle held here.
+    Field set is exactly the design contract §5.7 record. Permissions
+    and edges are sorted canonically (by identity then hash) so the
+    bundle_hash domain is deterministic.
     """
 
     schema_version: str
@@ -243,10 +287,8 @@ class ShellAuthorityEvidenceBundle:
                     "entries must be non-empty strings"
                 )
         refs = self.evidence_refs
-        if not isinstance(refs, tuple) or not refs:
-            raise ValueError(
-                "ShellAuthorityEvidenceBundle.evidence_refs must be a non-empty tuple of strings"
-            )
+        if not isinstance(refs, tuple):
+            raise ValueError("ShellAuthorityEvidenceBundle.evidence_refs must be a tuple")
         for entry in refs:
             if not isinstance(entry, str) or not entry:
                 raise ValueError(
@@ -262,14 +304,9 @@ class ShellAuthorityEvidenceBundle:
 class ShellGeometryRecord:
     """Closed TASK-023 shell-geometry record.
 
-    Field set is exactly the design contract §5.4 record. The
-    ``record_hash`` covers every other field (cf. design contract §6
-    "Hashing and ordering" and implementation requirement §8).
-
-    The model does NOT keep any caller-mutable container alias:
-    reference arrays are rebuilt into fresh tuples in
-    ``__post_init__`` so that mutating the caller's list, mapping
-    or source-binding cannot leak through the model layer.
+    All reference arrays are stored as canonicalized (deduplicated,
+    sorted-by-Unicode-codepoint) tuples. The model surface preserves
+    caller-mutable isolation.
     """
 
     schema_version: str
@@ -305,7 +342,7 @@ class ShellGeometryRecord:
             raise ValueError(
                 f"ShellGeometryRecord.approval_state must be one of {APPROVAL_STATES!r}"
             )
-        if not isinstance(self.shell_inside_diameter_m, str) or not self.shell_inside_diameter_m:
+        if not isinstance(self.shell_inside_diameter_m, str) or not (self.shell_inside_diameter_m):
             raise ValueError(
                 "ShellGeometryRecord.shell_inside_diameter_m must be a non-empty string"
             )
@@ -343,15 +380,11 @@ class ShellGeometryRecord:
 class ShellGeometryCatalog:
     """Closed TASK-023 shell-geometry catalog.
 
-    Field set is exactly the design contract §5.8 record. The
-    ``catalog_hash`` covers every other field plus the canonical
-    ordered ``evidence_bundle_hash`` and ``record_hash`` sequence.
-
     The records tuple is rebuilt in ``__post_init__`` and sorted
-    deterministically by ``(geometry_id, revision)`` per the design
-    contract "Hashing and ordering" §6 — duplicates already fail at
-    the parser layer, but sorting at model layer guarantees the hash
-    domain is stable.
+    deterministically by ``(geometry_id, revision, record_hash)`` per
+    the design contract "Hashing and ordering" §6 — duplicates already
+    fail at the parser layer, but sorting at model layer guarantees
+    the hash domain is stable across input orderings.
     """
 
     schema_version: str
@@ -363,7 +396,7 @@ class ShellGeometryCatalog:
     records: tuple[ShellGeometryRecord, ...]
     evidence_bundle_hash: str
     catalog_hash: str
-    effective_at: str
+    effective_at: str | None
 
     def __post_init__(self) -> None:
         if self.schema_version != CATALOG_SCHEMA_VERSION:
@@ -375,11 +408,14 @@ class ShellGeometryCatalog:
             "catalog_version",
             "authority",
             "source_revision",
-            "effective_at",
         ):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value:
                 raise ValueError(f"ShellGeometryCatalog.{field_name} must be non-empty string")
+        if self.effective_at is not None and (
+            not isinstance(self.effective_at, str) or self.effective_at == ""
+        ):
+            raise ValueError("ShellGeometryCatalog.effective_at must be None or a non-empty string")
         if self.profile_id != PROFILE_ID:
             raise ValueError(f"ShellGeometryCatalog.profile_id must equal {PROFILE_ID!r}")
         recs = self.records
@@ -395,24 +431,8 @@ class ShellGeometryCatalog:
         if not isinstance(self.catalog_hash, str):
             raise ValueError("ShellGeometryCatalog.catalog_hash must be string")
 
-        sorted_records = tuple(sorted(recs, key=lambda r: (r.geometry_id, r.revision)))
+        sorted_records = tuple(
+            sorted(recs, key=lambda r: (r.geometry_id, r.revision, r.record_hash))
+        )
         if sorted_records != recs:
             object.__setattr__(self, "records", sorted_records)
-
-
-# ---------------------------------------------------------------------------
-# Internal helper — kept here so models.py remains authority-self-sufficient
-# for ``canonical_sha256`` callers, without exposing second canonical-JSON
-# implementation publicly.
-# ---------------------------------------------------------------------------
-
-
-def _empty_mapping_view() -> Mapping[str, Any]:
-    """Return a frozen empty mapping view for the model layer.
-
-    The model layer never mutates this object; callers and tests use it
-    as a default ``license_evidence`` substitute only when explicitly
-    constructing a synthetic, non-production record. It is intentionally
-    not exposed via ``__all__``.
-    """
-    return field(default_factory=lambda: dict()).default if False else {}

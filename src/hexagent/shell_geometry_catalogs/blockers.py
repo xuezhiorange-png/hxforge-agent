@@ -196,9 +196,18 @@ class ShellGeometryCatalogBlockerEntry:
 
 
 def _canonical_details_hash(details: Mapping[str, Any] | None) -> str:
-    """Return canonical-JSON hash of ``details``."""
+    """Return canonical-JSON hash of ``details``.
+
+    ``details is None`` MUST hash as the JSON literal ``null``
+    (4-byte lowercase ``null``). The blocker ordering contract
+    requires ``details=None`` and ``details={}`` to sort separately,
+    which is only achievable when ``None`` hashes as ``null``.
+    """
+    import hashlib
+    import json as _json
+
     if details is None:
-        return canonical_sha256({})
+        return hashlib.sha256(_json.dumps(None).encode("utf-8")).hexdigest()
     if isinstance(details, Mapping):
         return canonical_sha256(dict(details))
     raise TypeError("details must be a Mapping or None")
@@ -207,8 +216,19 @@ def _canonical_details_hash(details: Mapping[str, Any] | None) -> str:
 def _canonical_evidence_refs_hash(
     evidence_refs: Sequence[str],
 ) -> str:
-    """Return canonical-JSON hash of an evidence_refs sequence."""
-    return canonical_sha256({"refs": list(evidence_refs)})
+    """Return SHA-256 of the canonical JSON of the RAW ``evidence_refs``
+    array (not wrapped in ``{"refs": [...]}``).
+
+    Per contract, two blockers with distinct evidence_refs sequences
+    MUST sort deterministically and distinct from each other; we hash
+    the list-of-strings via RFC 8785 directly.
+    """
+    import hashlib
+
+    import rfc8785
+
+    payload_bytes = rfc8785.dumps(list(evidence_refs))
+    return hashlib.sha256(payload_bytes).hexdigest()
 
 
 def composite_order_key(

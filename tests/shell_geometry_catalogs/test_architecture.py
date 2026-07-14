@@ -210,11 +210,11 @@ def test_no_task_016_mutation_or_widening() -> None:
         for tok in canonical_literals:
             assert tok in text, f"TASK-016 canonical {tok} missing in geometry_catalogs/models.py"
 
-    # The TASK-023 implementation MUST NOT widen or rename
-    # TASK-016 types. Production modules MUST NOT import the
-    # TASK-016 / geometry_catalogs / rule_packs / shell_bundle_geometry
-    # / shell_tube module surfaces — this enforces the
-    # TASK-023 independent-framework invariant.
+    # TASK-023 implementation MUST NOT widen or rename TASK-016
+    # types. Production modules MUST NOT import TASK-022 runtime
+    # (geometry_catalogs, exchangers.shell_tube.shell_bundle_geometry,
+    # exchangers.shell_tube.models). TASK-012 (``hexagent.rule_packs``)
+    # IS in scope per design §9 / §18 license gate.
     for path in PRODUCTION_MODULES:
         text = _read(path)
         for forbidden_marker in (
@@ -222,8 +222,6 @@ def test_no_task_016_mutation_or_widening() -> None:
             "import hexagent.geometry_catalogs",
             "from hexagent.exchangers.shell_tube.models",
             "import hexagent.exchangers.shell_tube.models",
-            "from hexagent.rule_packs",
-            "import hexagent.rule_packs",
             "from hexagent.exchangers.shell_tube.shell_bundle_geometry",
             "import hexagent.exchangers.shell_tube.shell_bundle_geometry",
         ):
