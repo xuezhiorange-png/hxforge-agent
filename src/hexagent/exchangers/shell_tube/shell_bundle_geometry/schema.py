@@ -14,6 +14,7 @@ from .models import (
     BlockerCode,
     CallerSuppliedShellInsideDiameter,
     MessageEntry,
+    REQUEST_SCHEMA_VERSION,
     RuleAuthorityMode,
     RulePackIdentitySnapshot,
     ShellBundleGeometryRequest,
@@ -464,6 +465,21 @@ def parse_request(payload: Any) -> ShellBundleGeometryRequest:
         )
     _exact_fields(payload, _TOP_LEVEL_FIELDS, "", stage=1)
 
+    schema_version = payload["schema_version"]
+    if not isinstance(schema_version, str) or schema_version != REQUEST_SCHEMA_VERSION:
+        raise SchemaFailure(
+            2,
+            (
+                _message(
+                    BlockerCode.SBG_SCHEMA_VERSION_UNSUPPORTED,
+                    "schema_version",
+                    "request_schema_version_unsupported",
+                    details={"actual": schema_version},
+                ),
+            ),
+            raw_failing_field=schema_version,
+        )
+
     configuration = payload["configuration"]
     if configuration is None:
         raise SchemaFailure(
@@ -515,7 +531,7 @@ def parse_request(payload: Any) -> ShellBundleGeometryRequest:
         )
 
     return ShellBundleGeometryRequest(
-        schema_version=_string(payload["schema_version"], "schema_version"),
+        schema_version=schema_version,
         configuration=configuration,
         tube_layout=tube_layout,
         geometry_rule_authority=_rule_authority(payload["geometry_rule_authority"]),
