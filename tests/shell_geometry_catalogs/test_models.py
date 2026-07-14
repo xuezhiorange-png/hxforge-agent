@@ -36,12 +36,14 @@ from hexagent.shell_geometry_catalogs import (
     parse_shell_geometry_catalog,
 )
 from hexagent.shell_geometry_catalogs.blockers import (
-    SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE,
+    SHELL_GEOMETRY_CATALOG_DEFAULT_FIELD_PATH,
+    SHELL_GEOMETRY_CATALOG_DEFAULT_MESSAGE_KEY,
     ShellGeometryCatalogBlockerEntry,
     _canonical_details_hash,
     _canonical_evidence_refs_hash,
     deep_freeze_details,
     sort_blockers,
+    thaw_for_canonical_json,
 )
 from hexagent.shell_geometry_catalogs.catalog import select_approved_shell_geometry
 from hexagent.shell_geometry_catalogs.models import (
@@ -160,8 +162,13 @@ def _make_record(
 
 
 def test_closed_sets_have_frozen_sizes() -> None:
-    assert len(SHELL_GEOMETRY_CATALOG_BLOCKER_CODES) == 25
-    assert len(set(ShellGeometryCatalogBlockerCode)) == 25
+    """Round 4 (Amendment 001): the closed blocker taxonomy now has
+    exactly 27 codes — 25 originals plus SGC_PERMISSION_DUPLICATE_ID and
+    SGC_PROVENANCE_DUPLICATE_ID inserted after SGC_CATALOG_HASH_MISMATCH
+    per Issue #152 Comment 4970130136.
+    """
+    assert len(SHELL_GEOMETRY_CATALOG_BLOCKER_CODES) == 27
+    assert len(set(ShellGeometryCatalogBlockerCode)) == 27
 
 
 def test_blocker_enum_matches_canonical_tuple() -> None:
@@ -651,10 +658,7 @@ def test_round3_selection_blockers_carry_explicit_stage_rank() -> None:
     assert "SGC_RECORD_NOT_FOUND" in codes
     not_found_entries = [b for b in excinfo.value.blockers if b.code == "SGC_RECORD_NOT_FOUND"]
     assert not_found_entries
-    assert all(
-        e.stage_rank == SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE["SGC_RECORD_NOT_FOUND"]
-        for e in not_found_entries
-    )
+    assert all(e.stage_rank == 20 for e in not_found_entries)
 
 
 def test_round3_blocker_details_are_deeply_immutable() -> None:
@@ -696,6 +700,7 @@ def test_round3_blocker_constructor_deep_freezes_details_and_refs() -> None:
     call_refs = ["ref-1", "ref-2"]
     entry = _make_entry(
         "SGC_RAW_TYPE_INVALID",
+        stage_rank=1,
         field_path="x",
         evidence_refs=call_refs,
         details=call_details,
@@ -709,3 +714,416 @@ def test_round3_blocker_constructor_deep_freezes_details_and_refs() -> None:
     # Evidence refs are a tuple.
     assert isinstance(entry.evidence_refs, tuple)
     assert entry.evidence_refs == ("ref-1", "ref-2")
+
+
+# --------------------------------------------------------------------------
+# TASK-023 Design Amendment 001 (Option B) — round 4 unit tests.
+# --------------------------------------------------------------------------
+
+
+def test_round4_taxonomy_has_exactly_27_codes() -> None:
+    """Amendment 001 §2: the closed set expands from 25 to exactly 27."""
+    assert len(SHELL_GEOMETRY_CATALOG_BLOCKER_CODES) == 27
+    assert len(set(SHELL_GEOMETRY_CATALOG_BLOCKER_CODES)) == 27
+
+
+def test_round4_taxonomy_enum_tuple_exact_order() -> None:
+    """Position-by-position equality between the enum members and the tuple.
+
+    Verify ONLY the design-relative insertion-point contract: the two new
+    codes are at positions 24-25 (after SGC_CATALOG_HASH_MISMATCH), and
+    the two selection codes are pushed to positions 26-27. The original
+    23 codes preceding them retain their relative order verbatim.
+    """
+    # Insertion-point contract.
+    assert SHELL_GEOMETRY_CATALOG_BLOCKER_CODES[23] == "SGC_PERMISSION_DUPLICATE_ID"
+    assert SHELL_GEOMETRY_CATALOG_BLOCKER_CODES[24] == "SGC_PROVENANCE_DUPLICATE_ID"
+    assert SHELL_GEOMETRY_CATALOG_BLOCKER_CODES[25] == "SGC_RECORD_NOT_FOUND"
+    assert SHELL_GEOMETRY_CATALOG_BLOCKER_CODES[26] == "SGC_SELECTION_NOT_APPROVED"
+    # The 23 codes before the insertion are unchanged from the prior 25
+    # minus the two pushed-out selection codes.
+    original_23_unchanged = SHELL_GEOMETRY_CATALOG_BLOCKER_CODES[:23]
+    assert original_23_unchanged == (
+        "SGC_RAW_TYPE_INVALID",
+        "SGC_UNKNOWN_FIELD",
+        "SGC_SCHEMA_VERSION_UNSUPPORTED",
+        "SGC_CATALOG_ID_INVALID",
+        "SGC_CATALOG_VERSION_INVALID",
+        "SGC_PROFILE_UNSUPPORTED",
+        "SGC_CATALOG_AUTHORITY_INVALID",
+        "SGC_RECORDS_INVALID",
+        "SGC_RECORD_ID_INVALID",
+        "SGC_RECORD_DUPLICATE_ID",
+        "SGC_GEOMETRY_TYPE_INVALID",
+        "SGC_REVISION_INVALID",
+        "SGC_APPROVAL_STATE_INVALID",
+        "SGC_RECORD_UNAPPROVED",
+        "SGC_SHELL_INSIDE_DIAMETER_INVALID",
+        "SGC_SOURCE_BINDING_INCOMPLETE",
+        "SGC_SOURCE_CLASS_INVALID",
+        "SGC_LICENSE_BLOCKED",
+        "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
+        "SGC_PROVENANCE_INCOMPLETE",
+        "SGC_EVIDENCE_REFS_INVALID",
+        "SGC_RECORD_HASH_MISMATCH",
+        "SGC_CATALOG_HASH_MISMATCH",
+    )
+    # Enum-order invariance.
+    enum_in_order = tuple(m.value for m in ShellGeometryCatalogBlockerCode.__members__.values())
+    assert enum_in_order == SHELL_GEOMETRY_CATALOG_BLOCKER_CODES
+
+
+def test_round4_taxonomy_no_aliases() -> None:
+    """Each blocker token appears exactly once; no reserved alias."""
+    assert len(SHELL_GEOMETRY_CATALOG_BLOCKER_CODES) == len(
+        set(SHELL_GEOMETRY_CATALOG_BLOCKER_CODES)
+    )
+
+
+def test_round4_taxonomy_new_codes_independently_reachable() -> None:
+    """Default message_key + default_field_path frozen for both new codes."""
+    assert (
+        SHELL_GEOMETRY_CATALOG_DEFAULT_MESSAGE_KEY["SGC_PERMISSION_DUPLICATE_ID"]
+        == "sgc_permission_duplicate_id"
+    )
+    assert (
+        SHELL_GEOMETRY_CATALOG_DEFAULT_FIELD_PATH["SGC_PERMISSION_DUPLICATE_ID"]
+        == "evidence_bundle.permission_evidence"
+    )
+    assert (
+        SHELL_GEOMETRY_CATALOG_DEFAULT_MESSAGE_KEY["SGC_PROVENANCE_DUPLICATE_ID"]
+        == "sgc_provenance_duplicate_id"
+    )
+    assert (
+        SHELL_GEOMETRY_CATALOG_DEFAULT_FIELD_PATH["SGC_PROVENANCE_DUPLICATE_ID"]
+        == "evidence_bundle.provenance_edges"
+    )
+
+
+def test_round4_public_exports_exactly_seven() -> None:
+    """``__all__`` has exactly 7 names and they are stable across Amendment 001."""
+    import hexagent.shell_geometry_catalogs as pkg
+
+    assert sorted(pkg.__all__) == sorted(
+        [
+            "SHELL_GEOMETRY_CATALOG_BLOCKER_CODES",
+            "ShellGeometryCatalog",
+            "ShellGeometryCatalogBlockerCode",
+            "ShellGeometryCatalogFailure",
+            "ShellGeometryRecord",
+            "parse_shell_geometry_catalog",
+            "select_approved_shell_geometry",
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# §9.B — Duplicate permission identity
+# ---------------------------------------------------------------------------
+
+
+def _make_record_kwargs(*, record_key: str, source_class: str = "PUBLIC_DOMAIN"):
+    return dict(
+        record_key=record_key,
+        catalog_id="synthetic-catalog-1",
+        revision="1",
+        source_class=source_class,
+    )
+
+
+def test_round4_same_code_with_two_ranks() -> None:
+    """``SGC_RECORD_DUPLICATE_ID`` may carry two different occurrence
+    ranks — one for the first-occurrence index, one for the duplicate
+    index. Both are valid construction sites.
+    """
+    e1 = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RECORD_DUPLICATE_ID",
+        field_path="raw_catalog.records[0].geometry_id",
+        message_key="sgc_record_duplicate_id",
+        stage_rank=9,
+    )
+    e2 = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RECORD_DUPLICATE_ID",
+        field_path="raw_catalog.records[1].geometry_id",
+        message_key="sgc_record_duplicate_id",
+        stage_rank=9,
+    )
+    assert e1.stage_rank == 9
+    assert e2.stage_rank == 9
+    # Same code, possibly DIFFERENT rank. The dataclass must allow it.
+    e_alt = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RECORD_DUPLICATE_ID",
+        field_path="raw_catalog.records[2].geometry_id",
+        message_key="sgc_record_duplicate_id",
+        stage_rank=10,  # different occurrence
+    )
+    assert e_alt.stage_rank == 10
+
+
+def test_round4_occurrence_stage_rank_wins_over_code() -> None:
+    """Earlier occurrence WINS even when its code is lexically LATER.
+    Two blocks: one with stage_rank=2, code=Z; another with
+    stage_rank=5, code=A. Sorted order should be Z@2 then A@5.
+    """
+    early = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="raw_catalog",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=2,
+    )
+    later = ShellGeometryCatalogBlockerEntry(
+        code="SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
+        field_path="raw_catalog.records[0].permission_evidence_refs",
+        message_key="sgc_vendor_permission_scope_incomplete",
+        stage_rank=5,
+    )
+    ordered = sort_blockers([later, early])  # input deliberately reversed
+    assert ordered[0].stage_rank == 2
+    assert ordered[0].code == "SGC_RAW_TYPE_INVALID"
+    assert ordered[1].stage_rank == 5
+
+
+def test_round4_make_entry_requires_stage_rank() -> None:
+    """``_make_entry`` MUST require an explicit ``stage_rank`` and MUST
+    NOT infer the rank from the code.
+    """
+    from hexagent.shell_geometry_catalogs.catalog import _make_entry
+
+    with pytest.raises(TypeError):
+        _make_entry("SGC_RAW_TYPE_INVALID")  # missing stage_rank
+    with pytest.raises(TypeError):
+        _make_entry(code="SGC_RAW_TYPE_INVALID")  # missing stage_rank
+    # Stage rank explicitly passed succeeds.
+    e = _make_entry("SGC_RAW_TYPE_INVALID", stage_rank=1)
+    assert e.stage_rank == 1
+
+
+def test_round4_stage_rank_zero_rejected() -> None:
+    """Stage rank 0 is the forbidden fallback; the dataclass rejects it."""
+    with pytest.raises(ValueError):
+        ShellGeometryCatalogBlockerEntry(
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="x",
+            message_key="sgc_raw_type_invalid",
+            stage_rank=0,
+        )
+
+
+def test_round4_no_default_stage_rank() -> None:
+    """``stage_rank`` has no default — constructing the dataclass WITHOUT
+    an explicit ``stage_rank`` MUST raise ``TypeError``.
+    """
+    with pytest.raises(TypeError):
+        ShellGeometryCatalogBlockerEntry(  # missing stage_rank
+            code="SGC_RAW_TYPE_INVALID",
+            field_path="x",
+            message_key="sgc_raw_type_invalid",
+        )
+
+
+def test_round4_no_code_derived_stage_map() -> None:
+    """Architecture-level proof: the canonical name of the code-derived
+    map is not importable and not even defined as a name in
+    ``blockers`` module.
+    """
+    import hexagent.shell_geometry_catalogs.blockers as _b
+
+    forbidden_names = [
+        "SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE",
+        "CODE_DERIVED_STAGE_RANK",
+        "DEFAULT_STAGE_RANK",
+        "STAGE_RANK_ZERO_FALLBACK",
+        "CODE_TO_STAGE",
+        "BLOCKER_STAGE_MAP",
+    ]
+    for name in forbidden_names:
+        assert not hasattr(_b, name), (
+            f"Amendment 001 §3 forbids the code-derived map; got attribute {name}"
+        )
+
+
+def test_round4_thaw_recursively_projects_to_plain_json() -> None:
+    """``thaw_for_canonical_json`` recurses through Mapping / tuple /
+    list and rejects custom objects / set / frozenset / bytes / Decimal.
+    """
+    details = {"x": (1, 2, 3), "y": [{"nested": (4, 5)}]}
+    frozen = deep_freeze_details(details)
+    thawed = thaw_for_canonical_json(frozen)
+    assert thawed == {"x": [1, 2, 3], "y": [{"nested": [4, 5]}]}
+    # No MappingProxyType in thawed.
+    assert not isinstance(thawed, type({}.items).__class__)  # not proxy
+    assert not any(
+        isinstance(v, tuple)
+        for vs in thawed.values()
+        for v in (vs if isinstance(vs, list) else [vs])
+    )
+
+
+def test_round4_set_frozenset_custom_object_rejected_in_details() -> None:
+    """``deep_freeze_details`` rejects non-JSON-compatible values in
+    details — ``set`` / ``frozenset`` / custom objects raise TypeError
+    up front, BEFORE the blocker enters the catalog failure surface.
+    """
+    with pytest.raises(TypeError):
+        deep_freeze_details({"x": {1, 2, 3}})  # type: ignore[dict-item]
+    with pytest.raises(TypeError):
+        deep_freeze_details({"x": frozenset({1, 2})})  # type: ignore[dict-item]
+    with pytest.raises(TypeError):
+        deep_freeze_details({"x": object()})  # type: ignore[dict-item]
+    # Bytes / Decimal — both forbidden by Amendment 001 §7.
+
+    import decimal
+
+    with pytest.raises(TypeError):
+        deep_freeze_details({"x": decimal.Decimal("1.5")})  # type: ignore[dict-item]
+    with pytest.raises(TypeError):
+        deep_freeze_details({"x": b"raw-bytes"})  # type: ignore[dict-item]
+
+
+def test_round4_details_none_hashes_as_json_null() -> None:
+    """``details=None`` hashes as JSON ``null`` so it sorts separately
+    from ``details={}``.
+    """
+    from hexagent.shell_geometry_catalogs.blockers import (
+        _canonical_details_hash,
+    )
+
+    h_none = _canonical_details_hash(None)
+    h_empty = _canonical_details_hash({})
+    assert h_none != h_empty
+    # JSON literal ``null`` hash is sha256("null") per Python.
+    import hashlib
+    import json as _json
+
+    expected = hashlib.sha256(_json.dumps(None).encode("utf-8")).hexdigest()
+    assert h_none == expected
+
+
+def test_round4_evidence_refs_hashes_as_raw_json_array() -> None:
+    """``evidence_refs`` is hashed as a raw JSON array (NOT wrapped in
+    ``{"refs": ...}``). Two distinct sequences sort distinctly.
+    """
+    from hexagent.shell_geometry_catalogs.blockers import (
+        _canonical_evidence_refs_hash,
+    )
+
+    h1 = _canonical_evidence_refs_hash(("a", "b"))
+    h2 = _canonical_evidence_refs_hash(("b", "a"))
+    assert h1 != h2
+
+
+def test_round4_nested_caller_dict_mutation_does_not_alter_blocker() -> None:
+    """Mutating the caller's nested dict after construction MUST NOT
+    alter the blocker's frozen details. ``deep_freeze_details`` is the
+    public immutable projection used by both ``_make_entry`` and direct
+    ``ShellGeometryCatalogBlockerEntry`` construction.
+    """
+    call_details: dict[str, Any] = {
+        "outer": [{"inner": [1, 2, 3]}, {"key2": "val2"}],
+        "second": "abc",
+    }
+    call_refs = ["r1", "r2"]
+    e = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="x",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=1,
+        evidence_refs=tuple(call_refs),
+        details=deep_freeze_details(call_details),
+    )
+    # Mutate caller's containers AFTER the deep-freeze took its copies.
+    call_details["second"] = "MUTATED"
+    call_details["outer"][0]["inner"].append(999)
+    call_details["new_key"] = "new"
+    # Blocker unaffected.
+    assert e.details is not None
+    assert e.details["second"] == "abc"
+    assert e.details["outer"][0]["inner"] == (1, 2, 3)  # tuple, not list
+    assert "new_key" not in e.details
+
+
+def test_round4_nested_caller_list_mutation_does_not_alter_blocker() -> None:
+    call_details = {"lst": [[1], [2]]}
+    e = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="x",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=1,
+        details=deep_freeze_details(call_details),
+    )
+    call_details["lst"][0].append(999)
+    assert e.details is not None
+    # Frozen to tuple.
+    assert e.details["lst"][0] == (1,)
+
+
+def test_round4_blocker_nested_details_cannot_be_mutated() -> None:
+    """Direct mutation of the exposed Mapping MUST raise.
+
+    Verifies both surface-mapping mutation (assignment to a top-level key)
+    AND nested-list mutation (item assignment) — both MUST raise.
+    """
+    call_details = {"x": [{"y": [1, 2]}]}
+    e = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="x",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=1,
+        details=deep_freeze_details(call_details),
+    )
+    assert e.details is not None
+    # Surface: MappingProxyType blocks item assignment.
+    with pytest.raises(TypeError):
+        e.details["x"] = "MUTATED"  # type: ignore[index]
+    # Nested mapping is also MappingProxyType — mutation blocked.
+    with pytest.raises(TypeError):
+        e.details["x"][0]["y"] = "MUTATED"  # type: ignore[index]
+    # Item mutation (overwrite) on the surface sequence (which is a tuple)
+    # raises TypeError because tuples do not support item assignment.
+    with pytest.raises(TypeError):
+        e.details["x"][0]["y"][0] = 999  # type: ignore[index]
+
+
+def test_round4_canonical_ordering_stable_before_after_mutation() -> None:
+    """Caller mutation of the original dict (passed through deep-freeze)
+    MUST NOT change the canonical order key of the blocker.
+    """
+    from hexagent.shell_geometry_catalogs.blockers import (
+        composite_order_key,
+    )
+
+    call_details = {"k": [{"nest": [1, 2]}]}
+    e = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="p",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=1,
+        details=deep_freeze_details(call_details),
+        evidence_refs=("a",),
+    )
+    k_before = composite_order_key(e)
+    call_details["k"].append({"injected": True})  # type: ignore[union-attr]
+    call_details["k"][0]["nest"].append(999)  # type: ignore[index]
+    k_after = composite_order_key(e)
+    assert k_before == k_after
+
+
+def test_round4_blocker_no_mutable_exposure() -> None:
+    """After construction, the exposed ``details`` MUST be a
+    ``MappingProxyType`` (or recursive freeze class), ``evidence_refs``
+    a tuple.
+    """
+    import types
+
+    e = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="p",
+        message_key="sgc_raw_type_invalid",
+        stage_rank=1,
+        details=deep_freeze_details({"x": 1, "y": [1, 2]}),
+        evidence_refs=("a", "b"),
+    )
+    assert isinstance(e.details, types.MappingProxyType)
+    assert isinstance(e.evidence_refs, tuple)
+    # Nested list frozen to tuple.
+    assert isinstance(e.details["y"], tuple)  # type: ignore[index]

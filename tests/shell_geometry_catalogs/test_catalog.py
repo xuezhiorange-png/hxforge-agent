@@ -509,8 +509,12 @@ def test_permission_missing_in_bundle_emits_SGC_EVIDENCE_REFS_INVALID() -> None:
 
 
 def test_duplicate_permission_id_in_bundle_fails_closed() -> None:
-    """Duplicate ``permission_id`` values in the bundle MUST fail closed
-    via raw-type rejection; we do NOT silently overwrite."""
+    """Amendment 001 §5 — duplicate ``permission_id`` values in the bundle
+    MUST fail closed by emitting ``SGC_PERMISSION_DUPLICATE_ID`` and
+    MUST NOT silently overwrite; detection runs BEFORE any dict
+    construction, sort, reference resolution, or bundle-hash
+    verification.
+    """
     perm = synthetic_permission_payload(permission_id="dup-perm")
     bundle = synthetic_bundle_payload(
         permission_evidence=(perm, perm),
@@ -519,12 +523,22 @@ def test_duplicate_permission_id_in_bundle_fails_closed() -> None:
     catalog = synthetic_catalog_payload(records=(_make_record(),), evidence_bundle_hash="a" * 64)
     with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
         parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
-    # The parser emits one error per duplicate occurrence
+    # The parser emits one SGC_PERMISSION_DUPLICATE_ID per duplicate
+    # occurrence (deterministic same-stage accumulation).
     codes = [b.code for b in excinfo.value.blockers]
     assert codes, "expected at least one blocker"
+    assert all(c == "SGC_PERMISSION_DUPLICATE_ID" for c in codes), (
+        f"only SGC_PERMISSION_DUPLICATE_ID may be emitted for duplicate permission_id; got {codes}"
+    )
 
 
 def test_duplicate_edge_id_in_bundle_fails_closed() -> None:
+    """Amendment 001 §5 — duplicate ``edge_id`` values in the bundle
+    MUST fail closed by emitting ``SGC_PROVENANCE_DUPLICATE_ID`` and
+    MUST NOT silently overwrite; detection runs BEFORE any dict
+    construction, sort, reference resolution, or bundle-hash
+    verification.
+    """
     edge = synthetic_edge_payload(edge_id="dup-edge", evidence_refs=("synthetic.X",))
     bundle = synthetic_bundle_payload(
         permission_evidence=(synthetic_permission_payload(),),
@@ -533,8 +547,13 @@ def test_duplicate_edge_id_in_bundle_fails_closed() -> None:
     catalog = synthetic_catalog_payload(records=(_make_record(),), evidence_bundle_hash="a" * 64)
     with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
         parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    # The parser emits one SGC_PROVENANCE_DUPLICATE_ID per duplicate
+    # occurrence (deterministic same-stage accumulation).
     codes = [b.code for b in excinfo.value.blockers]
     assert codes, "expected at least one blocker"
+    assert all(c == "SGC_PROVENANCE_DUPLICATE_ID" for c in codes), (
+        f"only SGC_PROVENANCE_DUPLICATE_ID may be emitted for duplicate edge_id; got {codes}"
+    )
 
 
 def test_provenance_missing_in_bundle_emits_SGC_PROVENANCE_INCOMPLETE() -> None:
@@ -1262,3 +1281,260 @@ def test_round3_vendor_unknown_local_token_blocks() -> None:
     )
     assert failing.details["reason"] == "vendor_usage_token_not_in_local_kernel_scope"
     assert "mystery_token" in failing.details["vendor_usage_tokens_not_in_local_kernel_scope"]
+
+
+# --------------------------------------------------------------------------
+# TASK-023 Design Amendment 001 (Option B) — round 4 unit tests.
+# --------------------------------------------------------------------------
+
+
+def test_round4_duplicate_permission_id_emits_only_new_code() -> None:
+    """Duplicate ``permission_id`` MUST emit only
+    ``SGC_PERMISSION_DUPLICATE_ID`` — not ``SGC_RAW_TYPE_INVALID`` or
+    ``SGC_CATALOG_HASH_MISMATCH``.
+    """
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-perm-1"))
+    perm = synthetic_permission_payload(permission_id="dup-perm-id")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm, perm),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id="edge-synthetic-catalog-1/shell/rec-dup-perm-1/1-provenance",
+            ),
+        ),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = [b.code for b in excinfo.value.blockers]
+    # Only SGC_PERMISSION_DUPLICATE_ID for the duplicate-id path; the
+    # second occurrence produces a second SGC_PERMISSION_DUPLICATE_ID
+    # blocker; no SGC_RAW_TYPE_INVALID or SGC_CATALOG_HASH_MISMATCH
+    # is permitted to substitute.
+    perm_dup = [c for c in codes if c == "SGC_PERMISSION_DUPLICATE_ID"]
+    assert len(perm_dup) >= 2, (
+        "Amendment 001 §5 mandates at least one SGC_PERMISSION_DUPLICATE_ID "
+        "blocker per duplicate occurrence"
+    )
+    assert "SGC_CATALOG_HASH_MISMATCH" not in codes or all(
+        c == "SGC_PERMISSION_DUPLICATE_ID" for c in codes if c != "SGC_CATALOG_HASH_MISMATCH"
+    ), (
+        "Amendment 001 §5: duplicate permission_id MUST NOT be substituted "
+        f"by SGC_CATALOG_HASH_MISMATCH or SGC_RAW_TYPE_INVALID — got {codes}"
+    )
+
+
+def test_round4_duplicate_permission_rejected_before_bundle_hash() -> None:
+    """The duplicate blocker MUST fire BEFORE bundle-hash comparison.
+    If it fired AFTER, we would see ``SGC_CATALOG_HASH_MISMATCH``
+    alongside (because the partial snapshot set would change the
+    bundle-hash domain).
+    """
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-perm-2"))
+    perm = synthetic_permission_payload(permission_id="dup-perm-2")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm, perm),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id="edge-synthetic-catalog-1/shell/rec-dup-perm-2/1-provenance",
+            ),
+        ),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    perm_dup_codes = [
+        b.code for b in excinfo.value.blockers if b.code == "SGC_PERMISSION_DUPLICATE_ID"
+    ]
+    assert perm_dup_codes, "expected at least one SGC_PERMISSION_DUPLICATE_ID blocker"
+    bundle_hash_mismatch = [
+        b for b in excinfo.value.blockers if b.code == "SGC_CATALOG_HASH_MISMATCH"
+    ]
+    # Dependent-stage gating §4: permission-stage failure MUST skip the
+    # bundle-hash comparison, so we should not see a downstream catalog
+    # hash mismatch created by a partial snapshot set.
+    assert not bundle_hash_mismatch, (
+        "Amendment 001 §4 dependent-stage gating: permission stage "
+        "failure MUST skip bundle hash comparison; "
+        f"got {bundle_hash_mismatch}"
+    )
+
+
+def test_round4_two_duplicate_permission_groups_accumulate() -> None:
+    """Two independent duplicate groups produce deterministic accumulated
+    blockers (not first-error-only)."""
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-perm-3"))
+    p1 = synthetic_permission_payload(permission_id="dup-A")
+    p2 = synthetic_permission_payload(permission_id="dup-B")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(p1, p1, p2, p2),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id="edge-synthetic-catalog-1/shell/rec-dup-perm-3/1-provenance",
+            ),
+        ),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    perm_dup = [b for b in excinfo.value.blockers if b.code == "SGC_PERMISSION_DUPLICATE_ID"]
+    details_groups = sorted({b.details.get("duplicate_group") for b in perm_dup if b.details})
+    assert details_groups == ["dup-A", "dup-B"], (
+        f"Both duplicate groups MUST accumulate; got only {details_groups}"
+    )
+
+
+def test_round4_valid_unique_permissions_parse() -> None:
+    """Non-duplicate permissions produce a successful catalog parse."""
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-uniq"))
+    perm = synthetic_permission_payload(permission_id="uniq-perm")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id="edge-synthetic-catalog-1/shell/rec-uniq/1-provenance",
+            ),
+        ),
+    )
+    parsed = parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    assert parsed.catalog_id == "synthetic-catalog-1"
+
+
+# ---------------------------------------------------------------------------
+# §9.C — Duplicate provenance edge identity
+# ---------------------------------------------------------------------------
+
+
+def test_round4_duplicate_edge_id_emits_only_new_code() -> None:
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-edge-1"))
+    perm = synthetic_permission_payload(permission_id="perm-edge-dup")
+    edge = synthetic_edge_payload(
+        edge_id="dup-edge-1",
+        target_geometry_id=record["geometry_id"],
+        evidence_refs=("synthetic.dup-edge.evidence",),
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge, edge),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = [b.code for b in excinfo.value.blockers]
+    edge_dup = [c for c in codes if c == "SGC_PROVENANCE_DUPLICATE_ID"]
+    assert len(edge_dup) >= 2, (
+        "Amendment 001 §5 mandates at least one SGC_PROVENANCE_DUPLICATE_ID "
+        "blocker per duplicate edge_id"
+    )
+    assert "SGC_RAW_TYPE_INVALID" not in codes or all(
+        c == "SGC_PROVENANCE_DUPLICATE_ID" for c in codes if c != "SGC_RAW_TYPE_INVALID"
+    ), (
+        "Amendment 001 §5: duplicate edge_id MUST NOT be substituted "
+        f"by SGC_RAW_TYPE_INVALID — got {codes}"
+    )
+
+
+def test_round4_duplicate_edge_rejected_before_bundle_hash() -> None:
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-edge-2"))
+    perm = synthetic_permission_payload(permission_id="perm-edge-dup-2")
+    edge = synthetic_edge_payload(
+        edge_id="dup-edge-2",
+        target_geometry_id=record["geometry_id"],
+        evidence_refs=("synthetic.dup-edge-2.evidence",),
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge, edge),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    edge_dup = [b for b in excinfo.value.blockers if b.code == "SGC_PROVENANCE_DUPLICATE_ID"]
+    assert edge_dup
+    bundle_hash_mismatch = [
+        b for b in excinfo.value.blockers if b.code == "SGC_CATALOG_HASH_MISMATCH"
+    ]
+    assert not bundle_hash_mismatch, (
+        "Amendment 001 §4: edge-stage failure MUST skip bundle-hash comparison"
+    )
+
+
+def test_round4_two_duplicate_edge_groups_accumulate() -> None:
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-edge-3"))
+    perm = synthetic_permission_payload(permission_id="perm-edge-dup-3")
+    e1 = synthetic_edge_payload(
+        edge_id="dup-X", target_geometry_id=record["geometry_id"], evidence_refs=("synthetic.e1",)
+    )
+    e2 = synthetic_edge_payload(
+        edge_id="dup-Y", target_geometry_id=record["geometry_id"], evidence_refs=("synthetic.e2",)
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(e1, e1, e2, e2),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    edge_dup = [b for b in excinfo.value.blockers if b.code == "SGC_PROVENANCE_DUPLICATE_ID"]
+    groups = sorted({b.details.get("duplicate_group") for b in edge_dup if b.details})
+    assert groups == ["dup-X", "dup-Y"], f"both groups accumulate: got {groups}"
+
+
+def test_round4_valid_unique_edges_parse() -> None:
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-uniq-edge"))
+    perm = synthetic_permission_payload(permission_id="perm-uniq-edge")
+    edge = synthetic_edge_payload(target_geometry_id=record["geometry_id"])
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    parsed = parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    assert parsed.catalog_id == "synthetic-catalog-1"
+
+
+# ---------------------------------------------------------------------------
+# §9.D — Occurrence-stage ordering
+# ---------------------------------------------------------------------------
+
+
+def test_round4_selection_blockers_carry_occurrence_rank() -> None:
+    """Selection (raw input / exact lookup / approval recheck) MUST
+    emit blockers with stage_rank=20 (the selection occurrence).
+    """
+    # Trigger selection by passing a non-string geometry_id.
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(synthetic_record_payload(record_key="rec-sel-1"),),
+        permission_payloads=(synthetic_permission_payload(),),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id="synthetic-catalog-1/shell/rec-sel-1/1",
+                edge_id="edge-synthetic-catalog-1/shell/rec-sel-1/1-provenance",
+            ),
+        ),
+    )
+    parsed = parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        select_approved_shell_geometry(catalog=parsed, geometry_id=123)  # type: ignore[arg-type]
+    selection_ranks = sorted({b.stage_rank for b in excinfo.value.blockers})
+    assert selection_ranks == [20]
+
+
+# ---------------------------------------------------------------------------
+# §9.E — Architecture / static test (forbid identifiers)
+# ---------------------------------------------------------------------------
+
+
+def _make_record_kwargs(*, record_key: str, source_class: str = "PUBLIC_DOMAIN"):
+    """Build kwargs for synthetic_record_payload used by Amendment 001 tests."""
+    return dict(
+        record_key=record_key,
+        catalog_id="synthetic-catalog-1",
+        revision="1",
+        source_class=source_class,
+    )

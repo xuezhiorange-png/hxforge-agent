@@ -443,3 +443,86 @@ def test_no_production_or_restricted_standard_data_in_worktree() -> None:
             assert tk not in text, (
                 f"{path.relative_to(REPO_ROOT)} contains forbidden production token {tk!r}"
             )
+
+
+# --------------------------------------------------------------------------
+# TASK-023 Design Amendment 001 (Option B) — round 4 unit tests.
+# --------------------------------------------------------------------------
+
+
+def test_round4_architecture_forbidden_identifiers_in_production_source() -> None:
+    """Forbidden production-source identifiers MUST NOT exist in the
+    production implementation files. Tests may mention them as
+    prohibited spellings; this scan checks the production tree only.
+    Use the ``ast`` module to exclude code inside docstrings AND
+    comments so the prohibition list may quote the forbidden names
+    inside its own documentation.
+    """
+    import ast
+
+    forbidden = {
+        "SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE",
+        "CODE_DERIVED_STAGE_RANK",
+        "DEFAULT_STAGE_RANK",
+        "STAGE_RANK_ZERO_FALLBACK",
+        "CODE_TO_STAGE",
+        "BLOCKER_STAGE_MAP",
+        "IMPLICIT_STAGE_RANK",
+    }
+    src_dir = Path("/root/hxforge-agent/src/hexagent/shell_geometry_catalogs")
+
+    def names_in_module(tree: ast.AST) -> set[str]:
+        """Set of Name-id references that appear in executable code
+        (module-level + function bodies — but NOT string literals or
+        docstring bodies).
+        """
+        seen: set[str] = set()
+
+        class V(ast.NodeVisitor):
+            def visit_Name(self, node: ast.Name) -> None:  # type: ignore[override]
+                seen.add(node.id)
+                self.generic_visit(node)
+
+            def visit_Attribute(self, node: ast.Attribute) -> None:  # type: ignore[override]
+                seen.add(node.attr)
+                self.generic_visit(node)
+
+        V().visit(tree)
+        return seen
+
+    production_hits: list[tuple[str, str]] = []
+    for path in src_dir.glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            production_hits.append((str(path), "syntax_error"))
+            continue
+        bound_names = names_in_module(tree)
+        for forbidden_name in forbidden:
+            if forbidden_name in bound_names:
+                production_hits.append((str(path), forbidden_name))
+    assert not production_hits, (
+        f"Amendment 001 §3 forbids these production-source identifiers; hits: {production_hits}"
+    )
+
+
+def test_round4_architecture_no_implicit_default_in_make_entry() -> None:
+    """``_make_entry`` source MUST NOT include the literal ``stage_rank=0``
+    anywhere as an implicit default.
+    """
+    src_path = Path("/root/hxforge-agent/src/hexagent/shell_geometry_catalogs/catalog.py")
+    text = src_path.read_text(encoding="utf-8")
+    # The forbidden lines would be ``stage_rank: int = 0`` /
+    # ``stage_rank=0`` as a default keyword on the ``_make_entry``
+    # signature. The signature line is the obvious carrier.
+    bad_lines: list[tuple[int, str]] = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        if "stage_rank" in line and ("=0" in line or "= 0" in line):
+            bad_lines.append((lineno, line.strip()))
+    assert not bad_lines, f"Amendment 001 §3 forbids an implicit zero default; hits: {bad_lines}"
+
+
+# ---------------------------------------------------------------------------
+# §9.F — Deep immutability and recursive canonical thaw
+# ---------------------------------------------------------------------------
