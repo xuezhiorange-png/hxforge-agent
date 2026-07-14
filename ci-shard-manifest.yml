@@ -95,6 +95,9 @@ shards:
       - tests/exchangers/shell_tube/shell_bundle_geometry/test_adapter_blockers.py
       - tests/exchangers/shell_tube/shell_bundle_geometry/test_rule_pack_adapter.py
       - tests/exchangers/shell_tube/shell_bundle_geometry/test_rule_pack_adapter_architecture.py
+      - tests/shell_geometry_catalogs/test_models.py
+      - tests/shell_geometry_catalogs/test_catalog.py
+      - tests/shell_geometry_catalogs/test_architecture.py
     timeout: 300
 
   - name: ci-acceptance
