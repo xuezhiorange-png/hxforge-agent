@@ -73,9 +73,7 @@ def parse_explicit_constraints(
             )
         )
     try:
-        minimum = parse_decimal(
-            request.required_minimum_radial_clearance_m, positive=False
-        )
+        minimum = parse_decimal(request.required_minimum_radial_clearance_m, positive=False)
     except CanonicalizationError:
         minimum = Decimal(0)
         blockers.append(
@@ -155,9 +153,7 @@ def compute_bundle_envelope(
             if not extents:
                 raise CanonicalizationError("layout positions are empty")
             bare_radius = max(item[1] for item in extents)
-            limiting = tuple(
-                sorted(item[0] for item in extents if item[1] == bare_radius)
-            )
+            limiting = tuple(sorted(item[0] for item in extents if item[1] == bare_radius))
             bare_diameter = bare_radius * Decimal(2)
             outer_radius = bare_radius + allowance
             outer_diameter = outer_radius * Decimal(2)
@@ -221,9 +217,7 @@ def compute_clearance(
                 "radial_clearance_below_required_minimum",
                 details={
                     "actual_radial_clearance_m": decimal_string(radial),
-                    "required_minimum_radial_clearance_m": decimal_string(
-                        required_minimum
-                    ),
+                    "required_minimum_radial_clearance_m": decimal_string(required_minimum),
                     "margin_m": decimal_string(margin),
                 },
             ),

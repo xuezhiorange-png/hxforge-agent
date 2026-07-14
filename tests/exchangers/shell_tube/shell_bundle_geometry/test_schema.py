@@ -17,9 +17,7 @@ def test_unknown_top_level_field_blocks() -> None:
     payload["extra"] = True
     result = _blocked(payload)
     assert result.geometry is None
-    assert {item.code for item in result.blockers} == {
-        BlockerCode.SBG_UNKNOWN_FIELD.value
-    }
+    assert {item.code for item in result.blockers} == {BlockerCode.SBG_UNKNOWN_FIELD.value}
 
 
 def test_raw_tuple_evidence_is_not_silently_coerced() -> None:
@@ -32,15 +30,10 @@ def test_raw_tuple_evidence_is_not_silently_coerced() -> None:
 
 def test_partial_upstream_projection_is_rejected() -> None:
     payload = make_request()
-    payload["configuration"] = {
-        "configuration_id": payload["configuration"].configuration_id
-    }
+    payload["configuration"] = {"configuration_id": payload["configuration"].configuration_id}
     result = _blocked(payload)
     assert result.geometry is None
-    assert (
-        result.blockers[0].message_key
-        == "complete_task020_configuration_instance_required"
-    )
+    assert result.blockers[0].message_key == "complete_task020_configuration_instance_required"
 
 
 def test_duplicate_evidence_refs_block() -> None:

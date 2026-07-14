@@ -10,9 +10,9 @@ from hexagent.exchangers.shell_tube.shell_bundle_geometry import (
     REQUEST_SCHEMA_VERSION,
     RULE_SNAPSHOT_SCHEMA_VERSION,
     CallerSuppliedShellInsideDiameter,
+    RuleAuthorityMode,
     ShellBundleGeometryRuleAuthoritySnapshot,
     ShellInsideDiameterAuthorityMode,
-    RuleAuthorityMode,
     sha256_hex,
 )
 from hexagent.exchangers.shell_tube.tube_layout import (
@@ -91,9 +91,7 @@ def make_request(
         "schema_version": REQUEST_SCHEMA_VERSION,
         "configuration": layout_to_configuration(layout),
         "tube_layout": layout,
-        "geometry_rule_authority": rule_payload(
-            maximum_position_count=maximum_position_count
-        ),
+        "geometry_rule_authority": rule_payload(maximum_position_count=maximum_position_count),
         "shell_authority_mode": ShellInsideDiameterAuthorityMode.CALLER_SUPPLIED_EXPLICIT.value,
         "caller_supplied_shell": caller_shell_payload(shell_diameter),
         "approved_shell_geometry": None,
@@ -137,9 +135,7 @@ def parsed_rule_snapshot(
             ShellInsideDiameterAuthorityMode(item)
             for item in sorted(payload["allowed_shell_authority_modes"])
         ),
-        minimum_bundle_peripheral_allowance_m=payload[
-            "minimum_bundle_peripheral_allowance_m"
-        ],
+        minimum_bundle_peripheral_allowance_m=payload["minimum_bundle_peripheral_allowance_m"],
         minimum_radial_clearance_m=payload["minimum_radial_clearance_m"],
         maximum_position_count=payload["maximum_position_count"],
         snapshot_hash=payload["snapshot_hash"],

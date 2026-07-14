@@ -27,9 +27,7 @@ def test_corrupted_task021_layout_hash_blocks() -> None:
 
 def test_cross_binding_mismatch_blocks() -> None:
     payload = make_request()
-    payload["tube_layout"] = replace(
-        payload["tube_layout"], task020_configuration_hash="e" * 64
-    )
+    payload["tube_layout"] = replace(payload["tube_layout"], task020_configuration_hash="e" * 64)
     result = validate_request(payload, software_version="tests", git_commit="abc")
     assert result.geometry is None
     assert BlockerCode.SBG_TASK021_LAYOUT_IDENTITY_MISMATCH.value in {

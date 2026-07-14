@@ -128,9 +128,7 @@ def verify_task020_configuration(request: ShellBundleGeometryRequest) -> None:
                 BlockerCode.SBG_TASK020_CONFIGURATION_INVALID,
                 "configuration.blockers",
                 "task020_configuration_has_blockers",
-                details={
-                    "blockers": [_primitive(item) for item in configuration.blockers]
-                },
+                details={"blockers": [_primitive(item) for item in configuration.blockers]},
             )
         )
     if blockers:
@@ -202,9 +200,7 @@ def verify_task021_layout(layout: TubeLayout) -> None:
                 BlockerCode.SBG_TUBE_GEOMETRY_SNAPSHOT_INVALID,
                 "tube_layout.tube_geometry",
                 "task021_tube_geometry_snapshot_invalid",
-                details={
-                    "upstream_blockers": [_primitive(item) for item in exc.blockers]
-                },
+                details={"upstream_blockers": [_primitive(item) for item in exc.blockers]},
             )
         )
     if blockers:
@@ -404,9 +400,7 @@ def verify_rule_authority(snapshot: ShellBundleGeometryRuleAuthoritySnapshot) ->
                     "rule_pack_identity_required",
                 )
             )
-        elif not _HEX_RE.fullmatch(
-            snapshot.rule_pack_identity.rule_pack_canonical_hash
-        ):
+        elif not _HEX_RE.fullmatch(snapshot.rule_pack_identity.rule_pack_canonical_hash):
             blockers.append(
                 _message(
                     BlockerCode.SBG_RULE_LICENSE_BLOCKED,
@@ -415,9 +409,7 @@ def verify_rule_authority(snapshot: ShellBundleGeometryRuleAuthoritySnapshot) ->
                 )
             )
     if snapshot.source_class == "VENDOR_PERMISSIONED" and not (
-        _contains_token(
-            snapshot.license_evidence, "REPOSITORY_REDISTRIBUTION_PERMITTED"
-        )
+        _contains_token(snapshot.license_evidence, "REPOSITORY_REDISTRIBUTION_PERMITTED")
         and _contains_token(snapshot.license_evidence, "RUNTIME_USE_PERMITTED")
     ):
         blockers.append(
@@ -438,10 +430,7 @@ def verify_rule_authority(snapshot: ShellBundleGeometryRuleAuthoritySnapshot) ->
                 "rule_minimum_decimal_invalid",
             )
         )
-    if (
-        isinstance(snapshot.maximum_position_count, bool)
-        or snapshot.maximum_position_count <= 0
-    ):
+    if isinstance(snapshot.maximum_position_count, bool) or snapshot.maximum_position_count <= 0:
         blockers.append(
             _message(
                 BlockerCode.SBG_RULE_AUTHORITY_MODE_INVALID,

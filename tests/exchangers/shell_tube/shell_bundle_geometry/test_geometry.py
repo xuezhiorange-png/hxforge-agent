@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 from hexagent.exchangers.shell_tube.shell_bundle_geometry import (
     BlockerCode,
@@ -12,27 +12,32 @@ from ._builders import make_request
 
 
 def test_valid_geometry_satisfies_exact_clearance_identities() -> None:
-    result = validate_request(
-        make_request(), software_version="tests", git_commit="abc"
-    )
+    result = validate_request(make_request(), software_version="tests", git_commit="abc")
     assert result.status is ValidationStatus.VALID
     assert result.geometry is not None
     geometry = result.geometry
-    assert Decimal(geometry.bare_tube_bundle_diameter_m) == (
-        Decimal(geometry.bare_tube_bundle_radius_m) * 2
-    )
-    assert Decimal(geometry.bundle_outer_envelope_radius_m) == (
-        Decimal(geometry.bare_tube_bundle_radius_m)
-        + Decimal(geometry.bundle_peripheral_allowance_m)
-    )
-    assert Decimal(geometry.shell_to_bundle_diametral_clearance_m) == (
-        Decimal(geometry.shell_inside_diameter_m)
-        - Decimal(geometry.bundle_outer_envelope_diameter_m)
-    )
-    assert Decimal(geometry.radial_clearance_margin_m) == (
-        Decimal(geometry.shell_to_bundle_radial_clearance_m)
-        - Decimal(geometry.required_minimum_radial_clearance_m)
-    )
+    # The frozen design §6.4 fixes the internal arithmetic precision at 50
+    # significant decimal digits. The exact-identity assertions below are only
+    # reproducible under the same internal arithmetic context, so the test
+    # reproduces that context here before exercising the identities.
+    with localcontext() as ctx:
+        ctx.prec = 50
+        ctx.rounding = "ROUND_HALF_EVEN"
+        assert Decimal(geometry.bare_tube_bundle_diameter_m) == (
+            Decimal(geometry.bare_tube_bundle_radius_m) * 2
+        )
+        assert Decimal(geometry.bundle_outer_envelope_radius_m) == (
+            Decimal(geometry.bare_tube_bundle_radius_m)
+            + Decimal(geometry.bundle_peripheral_allowance_m)
+        )
+        assert Decimal(geometry.shell_to_bundle_diametral_clearance_m) == (
+            Decimal(geometry.shell_inside_diameter_m)
+            - Decimal(geometry.bundle_outer_envelope_diameter_m)
+        )
+        assert Decimal(geometry.radial_clearance_margin_m) == (
+            Decimal(geometry.shell_to_bundle_radial_clearance_m)
+            - Decimal(geometry.required_minimum_radial_clearance_m)
+        )
 
 
 def test_shell_not_larger_than_bundle_blocks_without_partial_geometry() -> None:

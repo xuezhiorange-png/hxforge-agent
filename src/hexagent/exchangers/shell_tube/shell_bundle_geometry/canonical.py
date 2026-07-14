@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Mapping
-from decimal import Decimal, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from typing import Any
 
 from hexagent.exchangers.shell_tube.tube_layout import canonical as task021_canonical
@@ -38,14 +38,12 @@ def geometry_id(geometry_hash: str) -> str:
 def decimal_sqrt(value: Decimal) -> Decimal:
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PRECISION
-        ctx.rounding = task021_canonical.ROUND_HALF_EVEN
+        ctx.rounding = ROUND_HALF_EVEN
         return value.sqrt()
 
 
 def message_to_primitive(entry: MessageEntry) -> dict[str, Any]:
-    details = (
-        None if entry.details is None else internal_frozen_to_primitive(entry.details)
-    )
+    details = None if entry.details is None else internal_frozen_to_primitive(entry.details)
     return {
         "code": entry.code,
         "field_path": entry.field_path,
@@ -58,9 +56,7 @@ def message_to_primitive(entry: MessageEntry) -> dict[str, Any]:
 def message_sort_key(
     entry: MessageEntry, stage_rank: int = 0
 ) -> tuple[int, str, str, str, str, str]:
-    details = (
-        None if entry.details is None else internal_frozen_to_primitive(entry.details)
-    )
+    details = None if entry.details is None else internal_frozen_to_primitive(entry.details)
     return (
         stage_rank,
         entry.code,
@@ -78,15 +74,11 @@ def sort_messages(
 ) -> tuple[MessageEntry, ...]:
     ranks = stage_by_identity or {}
     return tuple(
-        sorted(
-            entries, key=lambda entry: message_sort_key(entry, ranks.get(id(entry), 0))
-        )
+        sorted(entries, key=lambda entry: message_sort_key(entry, ranks.get(id(entry), 0)))
     )
 
 
-def canonical_string_array(
-    raw: Any, *, non_empty: bool, field_path: str
-) -> tuple[str, ...]:
+def canonical_string_array(raw: Any, *, non_empty: bool, field_path: str) -> tuple[str, ...]:
     if not isinstance(raw, list):
         raise TypeError(f"{field_path} must be a list")
     if non_empty and not raw:

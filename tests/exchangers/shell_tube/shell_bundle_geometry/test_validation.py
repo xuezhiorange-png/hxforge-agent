@@ -19,9 +19,7 @@ def test_public_entry_point_requires_explicit_provenance_inputs() -> None:
 
 
 def test_valid_result_shape_is_complete() -> None:
-    result = validate_request(
-        make_request(), software_version="tests", git_commit="abc"
-    )
+    result = validate_request(make_request(), software_version="tests", git_commit="abc")
     assert result.status is ValidationStatus.VALID
     assert result.geometry is not None
     assert result.blockers == ()

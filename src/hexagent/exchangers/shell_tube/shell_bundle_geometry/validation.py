@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from decimal import ROUND_HALF_EVEN, localcontext
 from typing import Any
 
 from hexagent.exchangers.shell_tube.models import ConstructionFamily
@@ -16,6 +17,7 @@ from .authority import (
     verify_task021_layout,
 )
 from .canonical import (
+    DECIMAL_PRECISION,
     CanonicalizationError,
     canonical_raw_json_or_none,
     dataclass_to_mapping,
@@ -193,11 +195,7 @@ def _blocked(
     request: ShellBundleGeometryRequest | None = None,
     normalized_context: Mapping[str, Any] | None = None,
 ) -> ShellBundleGeometryValidationResult:
-    warnings = (
-        ()
-        if request is None
-        else _eligible_warnings(request, failure_stage=failure_stage)
-    )
+    warnings = () if request is None else _eligible_warnings(request, failure_stage=failure_stage)
     ranks = {id(item): failure_stage for item in blockers}
     ordered_blockers = sort_messages(blockers, stage_by_identity=ranks)
     if normalized_context is not None:
@@ -250,9 +248,7 @@ def _provenance_pre_hash(
             "geometry_id": request.approved_shell_geometry.geometry_id,
             "record_hash": request.approved_shell_geometry.record_hash,
             "snapshot_hash": request.approved_shell_geometry.snapshot_hash,
-            "source_binding": dataclass_to_mapping(
-                request.approved_shell_geometry.source_binding
-            ),
+            "source_binding": dataclass_to_mapping(request.approved_shell_geometry.source_binding),
         }
     return {
         "task_id": "TASK-022",
@@ -349,10 +345,7 @@ def validate_request(
             request=request,
         )
 
-    if (
-        len(request.tube_layout.positions)
-        > request.geometry_rule_authority.maximum_position_count
-    ):
+    if len(request.tube_layout.positions) > request.geometry_rule_authority.maximum_position_count:
         return _blocked(
             failure_stage=10,
             blockers=(
@@ -400,7 +393,10 @@ def validate_request(
             software_version=software_version,
             git_commit=git_commit,
         )
-        margin = radial - required_minimum
+        with localcontext() as margin_ctx:
+            margin_ctx.prec = DECIMAL_PRECISION
+            margin_ctx.rounding = ROUND_HALF_EVEN
+            margin = radial - required_minimum
         geometry_payload = {
             "schema_version": RESULT_SCHEMA_VERSION,
             "request_hash": request_hash,
@@ -413,9 +409,7 @@ def validate_request(
             "shell_pass_count": request.configuration.shell_pass_count,
             "tube_pass_count": request.configuration.tube_pass_count,
             "tube_geometry_snapshot_hash": request.tube_layout.tube_geometry.snapshot_hash,
-            "geometry_rule_authority": dataclass_to_mapping(
-                request.geometry_rule_authority
-            ),
+            "geometry_rule_authority": dataclass_to_mapping(request.geometry_rule_authority),
             "shell_authority_mode": request.shell_authority_mode.value,
             "caller_supplied_shell": (
                 None

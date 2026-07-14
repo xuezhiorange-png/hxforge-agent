@@ -10,11 +10,11 @@ from hexagent.exchangers.shell_tube.tube_layout.models import TubeLayout
 
 from .canonical import canonical_string_array, freeze_known_fragment
 from .models import (
+    REQUEST_SCHEMA_VERSION,
     ApprovedShellGeometrySnapshot,
     BlockerCode,
     CallerSuppliedShellInsideDiameter,
     MessageEntry,
-    REQUEST_SCHEMA_VERSION,
     RuleAuthorityMode,
     RulePackIdentitySnapshot,
     ShellBundleGeometryRequest,
@@ -166,11 +166,7 @@ def _string(value: Any, field_path: str, *, non_empty: bool = True) -> str:
     if not isinstance(value, str) or (non_empty and not value):
         raise SchemaFailure(
             3,
-            (
-                _message(
-                    BlockerCode.SBG_RAW_TYPE_INVALID, field_path, "string_required"
-                ),
-            ),
+            (_message(BlockerCode.SBG_RAW_TYPE_INVALID, field_path, "string_required"),),
             raw_failing_field=value,
         )
     return value
@@ -180,11 +176,7 @@ def _enum(enum_type: type[Any], value: Any, field_path: str) -> Any:
     if not isinstance(value, str):
         raise SchemaFailure(
             3,
-            (
-                _message(
-                    BlockerCode.SBG_RAW_TYPE_INVALID, field_path, "enum_string_required"
-                ),
-            ),
+            (_message(BlockerCode.SBG_RAW_TYPE_INVALID, field_path, "enum_string_required"),),
             raw_failing_field=value,
         )
     try:
@@ -215,11 +207,7 @@ def _array(value: Any, field_path: str, *, non_empty: bool) -> tuple[str, ...]:
     except (TypeError, ValueError) as exc:
         raise SchemaFailure(
             3,
-            (
-                _message(
-                    BlockerCode.SBG_RAW_TYPE_INVALID, field_path, "string_array_invalid"
-                ),
-            ),
+            (_message(BlockerCode.SBG_RAW_TYPE_INVALID, field_path, "string_array_invalid"),),
             raw_failing_field=value,
         ) from exc
 
@@ -230,12 +218,8 @@ def _source_binding(raw: Any, field_path: str) -> SourceBindingSnapshot:
     return SourceBindingSnapshot(
         source_id=_string(value["source_id"], f"{field_path}.source_id"),
         source_type=_string(value["source_type"], f"{field_path}.source_type"),
-        source_revision=_string(
-            value["source_revision"], f"{field_path}.source_revision"
-        ),
-        source_location=_string(
-            value["source_location"], f"{field_path}.source_location"
-        ),
+        source_revision=_string(value["source_revision"], f"{field_path}.source_revision"),
+        source_location=_string(value["source_location"], f"{field_path}.source_location"),
         evidence_ref=_string(value["evidence_ref"], f"{field_path}.evidence_ref"),
         approved_by=_string(value["approved_by"], f"{field_path}.approved_by"),
         approved_at=_string(value["approved_at"], f"{field_path}.approved_at"),
@@ -249,9 +233,7 @@ def _rule_pack(raw: Any, field_path: str) -> RulePackIdentitySnapshot | None:
     _exact_fields(value, _RULE_PACK_FIELDS, field_path, stage=3)
     return RulePackIdentitySnapshot(
         rule_pack_id=_string(value["rule_pack_id"], f"{field_path}.rule_pack_id"),
-        rule_pack_version=_string(
-            value["rule_pack_version"], f"{field_path}.rule_pack_version"
-        ),
+        rule_pack_version=_string(value["rule_pack_version"], f"{field_path}.rule_pack_version"),
         rule_pack_canonical_hash=_string(
             value["rule_pack_canonical_hash"], f"{field_path}.rule_pack_canonical_hash"
         ),
@@ -305,9 +287,7 @@ def _rule_authority(raw: Any) -> ShellBundleGeometryRuleAuthoritySnapshot:
             ),
         )
     maximum_position_count = value["maximum_position_count"]
-    if isinstance(maximum_position_count, bool) or not isinstance(
-        maximum_position_count, int
-    ):
+    if isinstance(maximum_position_count, bool) or not isinstance(maximum_position_count, int):
         raise SchemaFailure(
             3,
             (
@@ -334,9 +314,7 @@ def _rule_authority(raw: Any) -> ShellBundleGeometryRuleAuthoritySnapshot:
             raw_failing_field=value["license_evidence"],
         ) from exc
     return ShellBundleGeometryRuleAuthoritySnapshot(
-        schema_version=_string(
-            value["schema_version"], "geometry_rule_authority.schema_version"
-        ),
+        schema_version=_string(value["schema_version"], "geometry_rule_authority.schema_version"),
         profile_id=_string(value["profile_id"], "geometry_rule_authority.profile_id"),
         authority_mode=_enum(
             RuleAuthorityMode,
@@ -344,16 +322,12 @@ def _rule_authority(raw: Any) -> ShellBundleGeometryRuleAuthoritySnapshot:
             "geometry_rule_authority.authority_mode",
         ),
         rule_id=_string(value["rule_id"], "geometry_rule_authority.rule_id"),
-        rule_version=_string(
-            value["rule_version"], "geometry_rule_authority.rule_version"
-        ),
+        rule_version=_string(value["rule_version"], "geometry_rule_authority.rule_version"),
         rule_artifact_canonical_hash=_string(
             value["rule_artifact_canonical_hash"],
             "geometry_rule_authority.rule_artifact_canonical_hash",
         ),
-        source_class=_string(
-            value["source_class"], "geometry_rule_authority.source_class"
-        ),
+        source_class=_string(value["source_class"], "geometry_rule_authority.source_class"),
         license_evidence=frozen_license,
         approval_status=_string(
             value["approval_status"], "geometry_rule_authority.approval_status"
@@ -371,9 +345,7 @@ def _rule_authority(raw: Any) -> ShellBundleGeometryRuleAuthoritySnapshot:
         rule_pack_identity=_rule_pack(
             value["rule_pack_identity"], "geometry_rule_authority.rule_pack_identity"
         ),
-        allowed_shell_authority_modes=tuple(
-            sorted(parsed_modes, key=lambda item: item.value)
-        ),
+        allowed_shell_authority_modes=tuple(sorted(parsed_modes, key=lambda item: item.value)),
         minimum_bundle_peripheral_allowance_m=_string(
             value["minimum_bundle_peripheral_allowance_m"],
             "geometry_rule_authority.minimum_bundle_peripheral_allowance_m",
@@ -383,9 +355,7 @@ def _rule_authority(raw: Any) -> ShellBundleGeometryRuleAuthoritySnapshot:
             "geometry_rule_authority.minimum_radial_clearance_m",
         ),
         maximum_position_count=maximum_position_count,
-        snapshot_hash=_string(
-            value["snapshot_hash"], "geometry_rule_authority.snapshot_hash"
-        ),
+        snapshot_hash=_string(value["snapshot_hash"], "geometry_rule_authority.snapshot_hash"),
     )
 
 
@@ -395,9 +365,7 @@ def _caller_shell(raw: Any) -> CallerSuppliedShellInsideDiameter | None:
     value = _mapping(raw, "caller_supplied_shell", stage=3)
     _exact_fields(value, _CALLER_FIELDS, "caller_supplied_shell", stage=3)
     return CallerSuppliedShellInsideDiameter(
-        schema_version=_string(
-            value["schema_version"], "caller_supplied_shell.schema_version"
-        ),
+        schema_version=_string(value["schema_version"], "caller_supplied_shell.schema_version"),
         shell_inside_diameter_m=_string(
             value["shell_inside_diameter_m"],
             "caller_supplied_shell.shell_inside_diameter_m",
@@ -407,9 +375,7 @@ def _caller_shell(raw: Any) -> CallerSuppliedShellInsideDiameter | None:
             "caller_supplied_shell.evidence_refs",
             non_empty=True,
         ),
-        authority_hash=_string(
-            value["authority_hash"], "caller_supplied_shell.authority_hash"
-        ),
+        authority_hash=_string(value["authority_hash"], "caller_supplied_shell.authority_hash"),
     )
 
 
@@ -419,39 +385,25 @@ def _approved_shell(raw: Any) -> ApprovedShellGeometrySnapshot | None:
     value = _mapping(raw, "approved_shell_geometry", stage=3)
     _exact_fields(value, _APPROVED_SHELL_FIELDS, "approved_shell_geometry", stage=3)
     return ApprovedShellGeometrySnapshot(
-        schema_version=_string(
-            value["schema_version"], "approved_shell_geometry.schema_version"
-        ),
-        geometry_id=_string(
-            value["geometry_id"], "approved_shell_geometry.geometry_id"
-        ),
-        geometry_type=_string(
-            value["geometry_type"], "approved_shell_geometry.geometry_type"
-        ),
+        schema_version=_string(value["schema_version"], "approved_shell_geometry.schema_version"),
+        geometry_id=_string(value["geometry_id"], "approved_shell_geometry.geometry_id"),
+        geometry_type=_string(value["geometry_type"], "approved_shell_geometry.geometry_type"),
         revision=_string(value["revision"], "approved_shell_geometry.revision"),
-        approval_state=_string(
-            value["approval_state"], "approved_shell_geometry.approval_state"
-        ),
+        approval_state=_string(value["approval_state"], "approved_shell_geometry.approval_state"),
         shell_inside_diameter_m=_string(
             value["shell_inside_diameter_m"],
             "approved_shell_geometry.shell_inside_diameter_m",
         ),
-        record_hash=_string(
-            value["record_hash"], "approved_shell_geometry.record_hash"
-        ),
+        record_hash=_string(value["record_hash"], "approved_shell_geometry.record_hash"),
         source_binding=_source_binding(
             value["source_binding"], "approved_shell_geometry.source_binding"
         ),
-        snapshot_hash=_string(
-            value["snapshot_hash"], "approved_shell_geometry.snapshot_hash"
-        ),
+        snapshot_hash=_string(value["snapshot_hash"], "approved_shell_geometry.snapshot_hash"),
     )
 
 
 def parse_request(payload: Any) -> ShellBundleGeometryRequest:
-    if not isinstance(payload, Mapping) or any(
-        not isinstance(key, str) for key in payload
-    ):
+    if not isinstance(payload, Mapping) or any(not isinstance(key, str) for key in payload):
         raise SchemaFailure(
             1,
             (
