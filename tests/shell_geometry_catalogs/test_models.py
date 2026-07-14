@@ -645,11 +645,12 @@ def test_round3_failure_constructor_preserves_stage_rank() -> None:
 
 
 def test_round3_selection_blockers_carry_explicit_stage_rank() -> None:
-    """Round 3 §1 — selection-time blockers (stage 20) MUST carry an
-    explicit stage_rank bound through the ``_make_entry`` helper inside
-    ``catalog.py`` (which itself consults the authoritative stage map).
-    We trigger a real ``SGC_RECORD_NOT_FOUND`` failure and assert the
-    emitted entry's stage_rank equals the §11 selection rank.
+    """Round 3 §1 — selection-time blockers MUST carry an explicit
+    operation-local ``stage_rank`` bound through the ``_make_entry``
+    helper inside ``catalog.py``. We trigger a real
+    ``SGC_RECORD_NOT_FOUND`` failure and assert the emitted entry's
+    stage_rank equals the §11 selection rank (round 3 freezes
+    selection-exact-lookup as rank 2, not 20).
     """
     record = _make_record()
     cat_raw, _bun = _assemble((record,))
@@ -660,7 +661,10 @@ def test_round3_selection_blockers_carry_explicit_stage_rank() -> None:
     assert "SGC_RECORD_NOT_FOUND" in codes
     not_found_entries = [b for b in excinfo.value.blockers if b.code == "SGC_RECORD_NOT_FOUND"]
     assert not_found_entries
-    assert all(e.stage_rank == 20 for e in not_found_entries)
+    # Round 3 §2 — selection is an INDEPENDENT operation with its own
+    # occurrence rank sequence (1/2/3). The not-found path is the
+    # exact-lookup occurrence (rank 2).
+    assert all(e.stage_rank == 2 for e in not_found_entries)
 
 
 def test_round3_blocker_details_are_deeply_immutable() -> None:

@@ -1505,7 +1505,10 @@ def test_round4_valid_unique_edges_parse() -> None:
 
 def test_round4_selection_blockers_carry_occurrence_rank() -> None:
     """Selection (raw input / exact lookup / approval recheck) MUST
-    emit blockers with stage_rank=20 (the selection occurrence).
+    emit blockers with the operation-local raw-input occurrence rank
+    (1, NOT 20). Round 3 freezes selection as an INDEPENDENT
+    operation with its own 1..3 rank sequence, distinct from the
+    parser 1..20 sequence.
     """
     # Trigger selection by passing a non-string geometry_id.
     cat, bun = assemble_synthetic_catalog_and_bundle(
@@ -1522,7 +1525,8 @@ def test_round4_selection_blockers_carry_occurrence_rank() -> None:
     with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
         select_approved_shell_geometry(catalog=parsed, geometry_id=123)  # type: ignore[arg-type]
     selection_ranks = sorted({b.stage_rank for b in excinfo.value.blockers})
-    assert selection_ranks == [20]
+    # Round 3 §2 — selection raw-input occurrence is rank 1.
+    assert selection_ranks == [1]
 
 
 # ---------------------------------------------------------------------------
@@ -1538,3 +1542,568 @@ def _make_record_kwargs(*, record_key: str, source_class: str = "PUBLIC_DOMAIN")
         revision="1",
         source_class=source_class,
     )
+
+
+# ===========================================================================
+# Round 3 fixup tests — occurrence-stage 1..20 + selection 1..3 frozen
+# ===========================================================================
+
+
+def _src_module() -> Any:
+    """Return the catalog module object."""
+    from src.hexagent.shell_geometry_catalogs import catalog as _cat_mod  # type: ignore
+
+    return _cat_mod
+
+
+def test_round3_parser_stage_constants_match_exact_1_to_20() -> None:
+    """Round 3 §1 — parser occurrence ranks MUST match the exact
+    1..20 frozen sequence (no collapsed ``_STAGE_HASHES`` covering
+    multiple ranks, no implicit default rank, no code-derived
+    lookup). Selection ranks are operation-local (1/2/3) and MUST
+    NOT appear in the parser 1..20 sequence.
+    """
+    cat_mod = _src_module()
+    expected_parser = {
+        1: "_STAGE_RAW_TYPES",
+        2: "_STAGE_TOP_FIELDS",
+        3: "_STAGE_CATALOG_HEADER",
+        4: "_STAGE_BUNDLE_AUTHORITY",
+        5: "_STAGE_PERMISSION_SNAPSHOTS",
+        6: "_STAGE_PROVENANCE_SNAPSHOTS",
+        7: "_STAGE_RECORDS_ARRAY",
+        8: "_STAGE_RECORD_EXACT_FIELDS",
+        9: "_STAGE_RECORD_IDENTITY",
+        10: "_STAGE_APPROVAL_LEXICAL",
+        11: "_STAGE_APPROVAL_NONAPPROVED",
+        12: "_STAGE_DECIMAL",
+        13: "_STAGE_SOURCE_BINDING",
+        14: "_STAGE_SOURCE_CLASS_LICENSE",
+        15: "_STAGE_AUTHORITY_RESOLUTION",
+        16: "_STAGE_EVIDENCE_ARRAYS",
+        17: "_STAGE_RECORD_HASH",
+        18: "_STAGE_RECORD_ORDERING",
+        19: "_STAGE_CATALOG_BUNDLE_BINDING",
+        20: "_STAGE_CATALOG_HASH",
+    }
+    actual = {getattr(cat_mod, name): name for name in expected_parser.values()}
+    assert actual == expected_parser, (
+        f"parser stage constants must match the exact 1..20 frozen sequence; got {actual}"
+    )
+    # Selection ranks are operation-local, not parser 1..20
+    assert cat_mod._SELECTION_STAGE_RAW_ID == 1
+    assert cat_mod._SELECTION_STAGE_EXACT_LOOKUP == 2
+    assert cat_mod._SELECTION_STAGE_APPROVAL_RECHECK == 3
+
+
+def test_round3_source_binding_rank_precedes_source_class_license_rank() -> None:
+    """Round 3 §1 — source binding (rank 13) MUST precede source
+    class / license disposition (rank 14). Verify that ALL
+    SGC_SOURCE_BINDING_INCOMPLETE blockers carry stage_rank=13
+    and ALL SGC_SOURCE_CLASS_INVALID blockers carry stage_rank=14
+    (when both kinds of errors are present in the catalog).
+
+    We trigger each independently so both ranks are observable in
+    the accumulated blocker tuple.
+    """
+    # 1. A record with malformed source_binding (missing source_type /
+    # source_revision / source_location)
+    record_bad_binding = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-binding-vs-source-class-1"),
+    )
+    # Directly overwrite source_binding to drop the required fields
+    record_bad_binding["source_binding"] = {
+        "source_id": "src-1",
+        # source_type / source_revision / source_location REMOVED
+        "evidence_ref": "ev-ref-1",
+        "approved_by": "approver-1",
+        "approved_at": "1970-01-01T00:00:00Z",
+    }
+    # 2. A record with valid binding but unrecognized source_class
+    record_bad_class = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-binding-vs-source-class-2"),
+    )
+    record_bad_class["source_class"] = "NOT_A_REAL_SOURCE_CLASS"
+    perm = synthetic_permission_payload(permission_id="perm-binding-vs-class")
+    perm2 = synthetic_permission_payload(permission_id="perm-binding-vs-class-2")
+    edge_for_1 = synthetic_edge_payload(
+        target_geometry_id=record_bad_binding["geometry_id"],
+        edge_id="edge-binding-vs-class-1-provenance",
+    )
+    edge_for_2 = synthetic_edge_payload(
+        target_geometry_id=record_bad_class["geometry_id"],
+        edge_id="edge-binding-vs-class-2-provenance",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record_bad_binding, record_bad_class),
+        permission_payloads=(perm, perm2),
+        edge_payloads=(edge_for_1, edge_for_2),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    binding_blockers = [
+        b for b in excinfo.value.blockers if b.code == "SGC_SOURCE_BINDING_INCOMPLETE"
+    ]
+    source_class_blockers = [
+        b for b in excinfo.value.blockers if b.code == "SGC_SOURCE_CLASS_INVALID"
+    ]
+    assert binding_blockers, "expected SGC_SOURCE_BINDING_INCOMPLETE blockers"
+    assert source_class_blockers, "expected SGC_SOURCE_CLASS_INVALID blocker"
+    # All binding blockers MUST carry rank 13 (source binding)
+    assert all(b.stage_rank == 13 for b in binding_blockers), (
+        f"source binding blockers must carry stage_rank=13; got "
+        f"{[b.stage_rank for b in binding_blockers]}"
+    )
+    # The source_class blocker MUST carry rank 14 (source class/license)
+    assert all(b.stage_rank == 14 for b in source_class_blockers), (
+        f"source class blockers must carry stage_rank=14; got "
+        f"{[b.stage_rank for b in source_class_blockers]}"
+    )
+
+
+def test_round3_evidence_array_blocker_uses_rank_16() -> None:
+    """Round 3 §1 — an empty ``evidence_refs`` field emits a
+    SGC_EVIDENCE_REFS_INVALID blocker at stage_rank=16
+    (EVIDENCE_ARRAYS), NOT stage_rank=15.
+    """
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-empty-evidence-refs"),
+    )
+    # Replace evidence_refs with an empty tuple (canonical-empty)
+    record["evidence_refs"] = ()
+    perm = synthetic_permission_payload(permission_id="perm-empty-evidence-refs")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id="edge-empty-evidence-refs-provenance",
+            ),
+        ),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    evidence_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_EVIDENCE_REFS_INVALID" and b.field_path.endswith(".evidence_refs")
+    ]
+    assert evidence_blockers, "expected an evidence_refs blocker"
+    assert all(b.stage_rank == 16 for b in evidence_blockers), (
+        f"evidence_refs blockers must carry stage_rank=16; got "
+        f"{[b.stage_rank for b in evidence_blockers]}"
+    )
+
+
+def test_round3_record_hash_blocker_uses_rank_17() -> None:
+    """Round 3 §1 — a wrong record_hash emits SGC_RECORD_HASH_MISMATCH
+    at stage_rank=17 (RECORD_HASH).
+    """
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-bad-record-hash"),
+    )
+    # Invalidate the record_hash
+    record["record_hash"] = "0" * 64
+    perm = synthetic_permission_payload(permission_id="perm-bad-record-hash")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id="edge-bad-record-hash-provenance",
+            ),
+        ),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    hash_blockers = [b for b in excinfo.value.blockers if b.code == "SGC_RECORD_HASH_MISMATCH"]
+    assert hash_blockers, "expected SGC_RECORD_HASH_MISMATCH blocker"
+    assert all(b.stage_rank == 17 for b in hash_blockers), (
+        f"record_hash mismatch must carry stage_rank=17; got "
+        f"{[b.stage_rank for b in hash_blockers]}"
+    )
+
+
+def test_round3_catalog_bundle_binding_mismatch_uses_rank_19() -> None:
+    """Round 3 §1 — a wrong raw_catalog.evidence_bundle_hash emits
+    SGC_CATALOG_HASH_MISMATCH at stage_rank=19 (CATALOG_BUNDLE_BINDING).
+    """
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-bad-bundle-binding"),
+    )
+    perm = synthetic_permission_payload(permission_id="perm-bad-bundle-binding")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id="edge-bad-bundle-binding-provenance",
+            ),
+        ),
+    )
+    # Invalidate the catalog's evidence_bundle_hash reference
+    cat["evidence_bundle_hash"] = "f" * 64
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    binding_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH"
+        and b.field_path == "raw_catalog.evidence_bundle_hash"
+    ]
+    assert binding_blockers, "expected an evidence_bundle_hash mismatch blocker"
+    assert all(b.stage_rank == 19 for b in binding_blockers), (
+        f"catalog-bundle binding mismatch must carry stage_rank=19; got "
+        f"{[b.stage_rank for b in binding_blockers]}"
+    )
+
+
+def test_round3_catalog_hash_mismatch_uses_rank_20() -> None:
+    """Round 3 §1 — a wrong raw_catalog.catalog_hash emits
+    SGC_CATALOG_HASH_MISMATCH at stage_rank=20 (CATALOG_HASH).
+    """
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-bad-catalog-hash"),
+    )
+    perm = synthetic_permission_payload(permission_id="perm-bad-catalog-hash")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record["geometry_id"],
+                edge_id="edge-bad-catalog-hash-provenance",
+            ),
+        ),
+    )
+    # Invalidate the catalog's catalog_hash reference
+    cat["catalog_hash"] = "0" * 64
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    hash_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH" and b.field_path == "raw_catalog.catalog_hash"
+    ]
+    assert hash_blockers, "expected a catalog_hash mismatch blocker"
+    assert all(b.stage_rank == 20 for b in hash_blockers), (
+        f"catalog_hash mismatch must carry stage_rank=20; got "
+        f"{[b.stage_rank for b in hash_blockers]}"
+    )
+
+
+def test_round3_selection_approval_recheck_uses_rank_3() -> None:
+    """Round 3 §2 — selection approval-recheck (not-approved
+    record) MUST emit a SGC_SELECTION_NOT_APPROVED blocker at
+    stage_rank=3 (SELECTION_STAGE_APPROVAL_RECHECK).
+    """
+    record_valid = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-sel-valid-3"),
+    )
+    cat_valid, bun_valid = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record_valid,),
+        permission_payloads=[synthetic_permission_payload(permission_id="perm-sel-valid-3")],
+        edge_payloads=(
+            synthetic_edge_payload(
+                target_geometry_id=record_valid["geometry_id"],
+                edge_id="edge-sel-valid-3-provenance",
+            ),
+        ),
+    )
+    parsed = parse_shell_geometry_catalog(raw_catalog=cat_valid, evidence_bundle=bun_valid)
+    # Mutate the model record's approval_state to a non-approved
+    # value via object.__setattr__ (frozen model).
+    rec = parsed.records[0]
+    object.__setattr__(rec, "approval_state", "not_approved")
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        select_approved_shell_geometry(catalog=parsed, geometry_id=rec.geometry_id)
+    approval_blockers = [
+        b for b in excinfo.value.blockers if b.code == "SGC_SELECTION_NOT_APPROVED"
+    ]
+    assert approval_blockers, "expected SGC_SELECTION_NOT_APPROVED blocker"
+    assert all(b.stage_rank == 3 for b in approval_blockers), (
+        f"selection approval-recheck must carry stage_rank=3; got "
+        f"{[b.stage_rank for b in approval_blockers]}"
+    )
+
+
+def test_round3_duplicate_permission_invalid_usage_scope_accumulates_both() -> None:
+    """Round 3 §3 — duplicate permission + invalid usage_scope
+    MUST accumulate BOTH SGC_PERMISSION_DUPLICATE_ID AND
+    SGC_RAW_TYPE_INVALID (with the .usage_scope field_path).
+    """
+    # Two entries with same permission_id, one with bad usage_scope
+    good = synthetic_permission_payload(permission_id="dup-bad-usage-scope-1")
+    bad_payload = dict(good)
+    bad_payload["usage_scope"] = [1, 2, 3]  # not strings
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-dup-bad-usage-scope"),
+    )
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-dup-bad-usage-scope-provenance",
+    )
+    # Build a bundle manually (synthetic_bundle_payload does not
+    # accept a list-of-int usage_scope, so we construct it ourselves).
+    # For the bundle, we just need the test to focus on permission
+    # validation, so build a bundle that points to the two
+    # permissions and a valid record. The permission_hash for the
+    # bad one will be wrong, but that doesn't matter for the
+    # duplicate detection test.
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(good, bad_payload),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    perm_dup = [b for b in excinfo.value.blockers if b.code == "SGC_PERMISSION_DUPLICATE_ID"]
+    assert perm_dup, "expected SGC_PERMISSION_DUPLICATE_ID blocker"
+    # The bad usage_scope MUST emit a SGC_RAW_TYPE_INVALID at the
+    # .usage_scope field path
+    usage_scope_failures = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and ".usage_scope" in b.field_path
+    ]
+    assert usage_scope_failures, "expected SGC_RAW_TYPE_INVALID at .usage_scope field_path"
+    # The bad entry is at index 1 (second permission). Its
+    # permission_id IS in the duplicate group, so the duplicate
+    # code should also appear for index 1.
+    usage_idx_1 = [
+        b
+        for b in usage_scope_failures
+        if b.field_path == "evidence_bundle.permission_evidence[1].usage_scope"
+    ]
+    assert usage_idx_1, (
+        f"expected usage_scope raw-type blocker at index [1]; got "
+        f"{[b.field_path for b in usage_scope_failures]}"
+    )
+    # Both code types must be present
+    codes = {b.code for b in excinfo.value.blockers}
+    assert "SGC_PERMISSION_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+
+
+def test_round3_invalid_usage_scope_path_is_exact() -> None:
+    """Round 3 §3 — the usage_scope failure field_path MUST end in
+    ``.usage_scope`` (NOT ``.permission_scope``).
+    """
+    good = synthetic_permission_payload(permission_id="dup-usage-scope-path-1")
+    bad_payload = dict(good)
+    bad_payload["usage_scope"] = ["valid", 999, "also_valid"]  # mixed types
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-usage-scope-path"),
+    )
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-usage-scope-path-provenance",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(good, bad_payload),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    usage_scope_failures = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and b.field_path.endswith(".usage_scope")
+    ]
+    assert usage_scope_failures, (
+        f"expected SGC_RAW_TYPE_INVALID with .usage_scope field_path; "
+        f"got {[b.field_path for b in excinfo.value.blockers if b.code == 'SGC_RAW_TYPE_INVALID']}"
+    )
+
+
+def test_round3_duplicate_permission_invalid_evidence_ref_accumulates_both() -> None:
+    """Round 3 §3 — duplicate permission + invalid evidence_ref
+    MUST accumulate BOTH SGC_PERMISSION_DUPLICATE_ID AND
+    SGC_RAW_TYPE_INVALID.
+    """
+    good = synthetic_permission_payload(permission_id="dup-ev-ref-1")
+    bad_payload = dict(good)
+    bad_payload["evidence_ref"] = 12345  # not a string
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-dup-ev-ref"),
+    )
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-dup-ev-ref-provenance",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(good, bad_payload),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = {b.code for b in excinfo.value.blockers}
+    assert "SGC_PERMISSION_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+    ev_ref_failures = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and "evidence_ref" in b.field_path
+    ]
+    assert ev_ref_failures, "expected SGC_RAW_TYPE_INVALID at evidence_ref path"
+
+
+def test_round3_duplicate_permission_invalid_approved_by_accumulates_both() -> None:
+    """Round 3 §3 — duplicate permission + invalid approved_by
+    MUST accumulate BOTH SGC_PERMISSION_DUPLICATE_ID AND
+    SGC_RAW_TYPE_INVALID.
+    """
+    good = synthetic_permission_payload(permission_id="dup-approved-by-1")
+    bad_payload = dict(good)
+    bad_payload["approved_by"] = None  # not a non-empty string
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-dup-approved-by"),
+    )
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-dup-approved-by-provenance",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(good, bad_payload),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = {b.code for b in excinfo.value.blockers}
+    assert "SGC_PERMISSION_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+
+
+def test_round3_duplicate_permission_invalid_approved_at_accumulates_both() -> None:
+    """Round 3 §3 — duplicate permission + invalid approved_at
+    MUST accumulate BOTH SGC_PERMISSION_DUPLICATE_ID AND
+    SGC_RAW_TYPE_INVALID.
+    """
+    good = synthetic_permission_payload(permission_id="dup-approved-at-1")
+    bad_payload = dict(good)
+    bad_payload["approved_at"] = ""  # empty string
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-dup-approved-at"),
+    )
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-dup-approved-at-provenance",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(good, bad_payload),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = {b.code for b in excinfo.value.blockers}
+    assert "SGC_PERMISSION_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+
+
+def test_round3_duplicate_edge_invalid_source_id_accumulates_both() -> None:
+    """Round 3 §4 — duplicate edge + invalid source_id MUST
+    accumulate BOTH SGC_PROVENANCE_DUPLICATE_ID AND
+    SGC_RAW_TYPE_INVALID.
+    """
+    good = synthetic_edge_payload(
+        edge_id="dup-edge-src-1",
+        target_geometry_id="synthetic-catalog-1/shell/rec-dup-edge-src-1/1",
+    )
+    bad_payload = dict(good)
+    bad_payload["source_id"] = None  # invalid
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-dup-edge-src-1"),
+    )
+    # Override the edge target_geometry_id to match the record
+    bad_payload["target_geometry_id"] = record["geometry_id"]
+    perm = synthetic_permission_payload(permission_id="perm-dup-edge-src-1")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(good, bad_payload),  # type: ignore[arg-type]
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = {b.code for b in excinfo.value.blockers}
+    assert "SGC_PROVENANCE_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+    src_id_failures = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and "source_id" in b.field_path
+    ]
+    assert src_id_failures, "expected SGC_RAW_TYPE_INVALID at source_id path"
+
+
+def test_round3_duplicate_edge_invalid_target_geometry_id_accumulates_both() -> None:
+    """Round 3 §4 — duplicate edge + invalid target_geometry_id
+    MUST accumulate BOTH SGC_PROVENANCE_DUPLICATE_ID AND
+    SGC_RAW_TYPE_INVALID.
+    """
+    good = synthetic_edge_payload(
+        edge_id="dup-edge-tgt-1",
+        target_geometry_id="synthetic-catalog-1/shell/rec-dup-edge-tgt-1/1",
+    )
+    bad_payload = dict(good)
+    bad_payload["target_geometry_id"] = ""  # invalid
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-dup-edge-tgt-1"),
+    )
+    perm = synthetic_permission_payload(permission_id="perm-dup-edge-tgt-1")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(good, bad_payload),  # type: ignore[arg-type]
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = {b.code for b in excinfo.value.blockers}
+    assert "SGC_PROVENANCE_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+    tgt_failures = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and "target_geometry_id" in b.field_path
+    ]
+    assert tgt_failures, "expected SGC_RAW_TYPE_INVALID at target_geometry_id path"
+
+
+def test_round3_duplicate_edge_invalid_edge_hash_accumulates_both() -> None:
+    """Round 3 §4 — duplicate edge + invalid edge_hash MUST
+    accumulate BOTH SGC_PROVENANCE_DUPLICATE_ID AND
+    SGC_RAW_TYPE_INVALID.
+    """
+    good = synthetic_edge_payload(
+        edge_id="dup-edge-hash-1",
+        target_geometry_id="synthetic-catalog-1/shell/rec-dup-edge-hash-1/1",
+    )
+    bad_payload = dict(good)
+    bad_payload["edge_hash"] = "not-a-valid-hex"  # invalid
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-dup-edge-hash-1"),
+    )
+    bad_payload["target_geometry_id"] = record["geometry_id"]
+    perm = synthetic_permission_payload(permission_id="perm-dup-edge-hash-1")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(good, bad_payload),  # type: ignore[arg-type]
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    codes = {b.code for b in excinfo.value.blockers}
+    assert "SGC_PROVENANCE_DUPLICATE_ID" in codes
+    assert "SGC_RAW_TYPE_INVALID" in codes
+    hash_failures = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and "edge_hash" in b.field_path
+    ]
+    assert hash_failures, "expected SGC_RAW_TYPE_INVALID at edge_hash path"

@@ -106,28 +106,50 @@ class ShellGeometryCatalogFailure(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Stage ranks (design contract §11 / §18 pipeline).
+# Stage ranks (Option B / Round 3 — exact 1..20 frozen sequence).
+#
+# Each rank binds the parser **occurrence** that emits blockers at
+# that point. The sequence is design-frozen; do not renumber. Every
+# ``_make_entry`` call MUST pass the actual occurrence rank (one of
+# the ``_STAGE_RAW_TYPES`` … ``_STAGE_CATALOG_HASH`` constants below).
+# There is no code-derived rank lookup, no default rank, and no
+# collapsed stage (e.g. no ``_STAGE_CATALOG_HASH`` covering ranks 17–20,
+# no single ``_SELECTION_STAGE_RAW_ID`` covering all selection occurrences).
 # ---------------------------------------------------------------------------
 
 
 _STAGE_RAW_TYPES = 1
 _STAGE_TOP_FIELDS = 2
 _STAGE_CATALOG_HEADER = 3
-_STAGE_BUNDLE_HEADER = 4
-_STAGE_PERMISSION_FIELDS = 5
-_STAGE_EDGE_FIELDS = 6
-_STAGE_RECORDS_LIST = 7
-_STAGE_RECORD_FIELDS = 8
-_STAGE_DUPLICATE_IDS = 9
+_STAGE_BUNDLE_AUTHORITY = 4
+_STAGE_PERMISSION_SNAPSHOTS = 5
+_STAGE_PROVENANCE_SNAPSHOTS = 6
+_STAGE_RECORDS_ARRAY = 7
+_STAGE_RECORD_EXACT_FIELDS = 8
+_STAGE_RECORD_IDENTITY = 9
 _STAGE_APPROVAL_LEXICAL = 10
-_STAGE_APPROVAL_STATE = 11
-_STAGE_DIAMETER_DECIMAL = 12
-_STAGE_SOURCE_CLASS = 13
-_STAGE_LICENSE_DISPOSITION = 14
-_STAGE_SOURCE_BINDING = 15
-_STAGE_REF_RESOLUTION = 16
-_STAGE_HASHES = 17
-_STAGE_SELECTION = 20  # Amendment 001 §3: select_approved_shell_geometry occurrences
+_STAGE_APPROVAL_NONAPPROVED = 11
+_STAGE_DECIMAL = 12
+_STAGE_SOURCE_BINDING = 13
+_STAGE_SOURCE_CLASS_LICENSE = 14
+_STAGE_AUTHORITY_RESOLUTION = 15
+_STAGE_EVIDENCE_ARRAYS = 16
+_STAGE_RECORD_HASH = 17
+_STAGE_RECORD_ORDERING = 18
+_STAGE_CATALOG_BUNDLE_BINDING = 19
+_STAGE_CATALOG_HASH = 20
+
+
+# ---------------------------------------------------------------------------
+# Selection is an INDEPENDENT operation. Its failure tuple is
+# distinct from the parser failure tuple; the ranks are operation-
+# local, not aligned with the parser 1..20 sequence.
+# ---------------------------------------------------------------------------
+
+
+_SELECTION_STAGE_RAW_ID = 1
+_SELECTION_STAGE_EXACT_LOOKUP = 2
+_SELECTION_STAGE_APPROVAL_RECHECK = 3
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +218,7 @@ def _make_entry(
     binds the validation **occurrence** that emitted this entry. There
     is no code-derived lookup table and no default rank. Every parser
     call site MUST pass the actual occurrence rank (typically one of
-    the ``_STAGE_RAW_TYPES`` … ``_STAGE_HASHES`` constants in this
+    the ``_STAGE_RAW_TYPES`` … ``_STAGE_CATALOG_HASH`` constants in this
     module). The dataclass ``__post_init__`` rejects any entry whose
     rank is outside ``[1, 20]``.
 
@@ -895,13 +917,13 @@ def parse_shell_geometry_catalog(
         path="evidence_bundle.schema_version",
         failures=failures,
         code="SGC_SCHEMA_VERSION_UNSUPPORTED",
-        stage_rank=_STAGE_BUNDLE_HEADER,
+        stage_rank=_STAGE_BUNDLE_AUTHORITY,
     )
     if bundle_schema is None or bundle_schema != "task023.shell-authority-evidence-bundle.v1":
         failures.append(
             _make_entry(
                 "SGC_SCHEMA_VERSION_UNSUPPORTED",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.schema_version",
             )
         )
@@ -912,21 +934,21 @@ def parse_shell_geometry_catalog(
         path="evidence_bundle.bundle_id",
         failures=failures,
         code="SGC_CATALOG_ID_INVALID",
-        stage_rank=_STAGE_BUNDLE_HEADER,
+        stage_rank=_STAGE_BUNDLE_AUTHORITY,
     )
     bundle_version = _expect_str(
         evidence_bundle.get("bundle_version"),
         path="evidence_bundle.bundle_version",
         failures=failures,
         code="SGC_CATALOG_VERSION_INVALID",
-        stage_rank=_STAGE_BUNDLE_HEADER,
+        stage_rank=_STAGE_BUNDLE_AUTHORITY,
     )
     bundle_approval = evidence_bundle.get("approval_status")
     if not isinstance(bundle_approval, str) or bundle_approval not in APPROVAL_STATES:
         failures.append(
             _make_entry(
                 "SGC_APPROVAL_STATE_INVALID",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.approval_status",
             )
         )
@@ -935,7 +957,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_RECORD_UNAPPROVED",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.approval_status",
             )
         )
@@ -946,7 +968,7 @@ def parse_shell_geometry_catalog(
         path="evidence_bundle.task012_validation_hash",
         failures=failures,
         code="SGC_PROVENANCE_INCOMPLETE",
-        stage_rank=_STAGE_BUNDLE_HEADER,
+        stage_rank=_STAGE_BUNDLE_AUTHORITY,
     )
     if task012_validation_hash is None or not re.fullmatch(
         r"[0-9a-f]{64}", task012_validation_hash
@@ -954,7 +976,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_PROVENANCE_INCOMPLETE",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.task012_validation_hash",
             )
         )
@@ -964,7 +986,7 @@ def parse_shell_geometry_catalog(
         path="evidence_bundle.bundle_hash",
         failures=failures,
         code="SGC_CATALOG_HASH_MISMATCH",
-        stage_rank=_STAGE_BUNDLE_HEADER,
+        stage_rank=_STAGE_BUNDLE_AUTHORITY,
     )
 
     # ------------------------------------------------------------------
@@ -1015,174 +1037,33 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_PERMISSION_DUPLICATE_ID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
+                    stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
                     field_path=f"evidence_bundle.permission_evidence[{pos}].permission_id",
                     details={"permission_id": pid, "duplicate_group": pid},
                 )
             )
 
-    # Stage 5 PASS 2 — full validation. The same entry is re-validated
-    # for ALL independent fields (exact fields / raw types / scope /
-    # usage / evidence_ref / approved_by / approved_at / hash) so
-    # additional raw-type / hash-mismatch blockers accumulate on the
-    # SAME entry alongside the duplicate blocker. Duplicate entries
-    # (i.e. entries whose permission_id is in a duplicate group) MUST
-    # NOT enter the trusted snapshot tuple.
+    # Stage 5 PASS 2 — full validation. Every entry (unique OR
+    # duplicate) MUST run the SAME per-field validator so independent
+    # errors accumulate on the SAME entry alongside the duplicate
+    # blocker emitted in Pass 1. Duplicate entries (those whose
+    # ``permission_id`` is in a duplicate group) MUST NOT enter the
+    # trusted snapshot tuple, but their per-field validation must
+    # still run to surface scope / usage / hash / evidence_ref /
+    # approved_by / approved_at errors.
     duplicate_permission_ids = {pid for pid, pos in perm_id_positions.items() if len(pos) >= 2}
     for i, raw_perm in enumerate(perms_seq):
-        if not isinstance(raw_perm, Mapping):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{i}]",
-                )
-            )
-            continue
-        actual_keys = frozenset(raw_perm)
-        extras = actual_keys - perm_expected
-        missing = perm_expected - actual_keys
-        if extras or missing:
-            for extra in sorted(extras):
-                failures.append(
-                    _make_entry(
-                        "SGC_UNKNOWN_FIELD",
-                        stage_rank=_STAGE_PERMISSION_FIELDS,
-                        field_path=f"evidence_bundle.permission_evidence[{i}].{extra}",
-                    )
-                )
-            for m in sorted(missing):
-                failures.append(
-                    _make_entry(
-                        "SGC_UNKNOWN_FIELD",
-                        stage_rank=_STAGE_PERMISSION_FIELDS,
-                        field_path=f"evidence_bundle.permission_evidence[{i}].{m}",
-                    )
-                )
-            continue
-        pid = raw_perm.get("permission_id")
-        if not isinstance(pid, str) or not pid:
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{i}].permission_id",
-                )
-            )
-            continue
-        # Round 2 §2 — duplicate entries MUST NOT enter the trusted
-        # snapshot tuple. They still emit their independent
-        # validation blockers above (raw-type / hash / scope) so
-        # the same-stage accumulation contract holds, but they do
-        # not contribute to ``perm_records``.
-        if pid in duplicate_permission_ids:
-            # Re-run the full per-field validation so a duplicate
-            # entry with an invalid scope / usage / hash accumulates
-            # an additional SGC_RAW_TYPE_INVALID or
-            # SGC_CATALOG_HASH_MISMATCH alongside the
-            # SGC_PERMISSION_DUPLICATE_ID emitted in Pass 1.
-            perm_scope_raw = raw_perm.get("permission_scope")
-            perm_usage_raw = raw_perm.get("usage_scope")
-            if not _is_str_seq(perm_scope_raw) or not _is_str_seq(perm_usage_raw):
-                failures.append(
-                    _make_entry(
-                        "SGC_RAW_TYPE_INVALID",
-                        stage_rank=_STAGE_PERMISSION_FIELDS,
-                        field_path=f"evidence_bundle.permission_evidence[{i}].permission_scope",
-                    )
-                )
-            perm_hash_in = raw_perm.get("permission_hash")
-            if not _is_nonempty_str(perm_hash_in) or not re.fullmatch(
-                r"[0-9a-f]{64}", perm_hash_in
-            ):
-                failures.append(
-                    _make_entry(
-                        "SGC_RAW_TYPE_INVALID",
-                        stage_rank=_STAGE_PERMISSION_FIELDS,
-                        field_path=f"evidence_bundle.permission_evidence[{i}].permission_hash",
-                    )
-                )
-            continue
-        perm_scope_raw = raw_perm.get("permission_scope")
-        perm_usage_raw = raw_perm.get("usage_scope")
-        if not _is_str_seq(perm_scope_raw):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{i}].permission_scope",
-                )
-            )
-            continue
-        if not _is_str_seq(perm_usage_raw):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{i}].usage_scope",
-                )
-            )
-            continue
-        scope_tuple_l = _canonicalize_str_seq(perm_scope_raw)
-        usage_tuple_l = _canonicalize_str_seq(perm_usage_raw)
-        if scope_tuple_l is None or usage_tuple_l is None:
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{i}]",
-                )
-            )
-            continue
-        scope_tuple: tuple[str, ...] = scope_tuple_l
-        usage_tuple: tuple[str, ...] = usage_tuple_l
-        ev_ref = raw_perm.get("evidence_ref")
-        approved_by = raw_perm.get("approved_by")
-        approved_at = raw_perm.get("approved_at")
-        if (
-            not _is_nonempty_str(ev_ref)
-            or not _is_nonempty_str(approved_by)
-            or not _is_nonempty_str(approved_at)
-        ):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{i}]",
-                )
-            )
-            continue
-        perm_hash_in = raw_perm.get("permission_hash")
-        if not _is_nonempty_str(perm_hash_in) or not re.fullmatch(r"[0-9a-f]{64}", perm_hash_in):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{i}].permission_hash",
-                )
-            )
-            continue
-        if perm_hash_in in perm_hash_set:
-            failures.append(
-                _make_entry(
-                    "SGC_CATALOG_HASH_MISMATCH",
-                    stage_rank=_STAGE_PERMISSION_FIELDS,
-                    field_path=f"evidence_bundle.permission_evidence[{perm_hash_set[perm_hash_in]}].permission_hash",
-                    details={"permission_hash": perm_hash_in},
-                )
-            )
-            continue
-        perm_hash_set[perm_hash_in] = i
-        snapshot = VendorPermissionEvidenceSnapshot(
-            permission_id=pid,
-            permission_scope=scope_tuple,
-            usage_scope=usage_tuple,
-            evidence_ref=ev_ref,
-            approved_by=approved_by,
-            approved_at=approved_at,
-            permission_hash=perm_hash_in,
+        perm_snapshot, perm_entry_blockers = _validate_permission_snapshot_entry(
+            raw_perm=raw_perm,
+            index=i,
+            perm_expected=perm_expected,
+            perm_hash_set=perm_hash_set,
+            duplicate_permission_ids=duplicate_permission_ids,
         )
-        perm_records.append(snapshot)
+        if perm_entry_blockers:
+            failures.extend(perm_entry_blockers)
+        if perm_snapshot is not None:
+            perm_records.append(perm_snapshot)
 
     # ------------------------------------------------------------------
     # Stage 6 — provenance edges: 2-pass identity + full validation
@@ -1217,144 +1098,33 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_PROVENANCE_DUPLICATE_ID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
+                    stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
                     field_path=f"evidence_bundle.provenance_edges[{pos}].edge_id",
                     details={"edge_id": eid, "duplicate_group": eid},
                 )
             )
 
-    # Stage 6 PASS 2 — full validation. The same entry is re-validated
-    # for ALL independent fields (exact fields / raw types /
-    # relation_type / evidence_refs / hash) so additional raw-type
-    # blockers accumulate on the SAME entry alongside the duplicate
-    # blocker. Duplicate entries MUST NOT enter the trusted snapshot
-    # tuple.
+    # Stage 6 PASS 2 — full validation. Every entry (unique OR
+    # duplicate) MUST run the SAME per-field validator so independent
+    # errors accumulate on the SAME entry alongside the duplicate
+    # blocker emitted in Pass 1. Duplicate entries (those whose
+    # ``edge_id`` is in a duplicate group) MUST NOT enter the trusted
+    # snapshot tuple, but their per-field validation must still run
+    # to surface source_id / target_geometry_id / relation_type /
+    # evidence_refs / edge_hash errors.
     duplicate_edge_ids = {eid for eid, pos in edge_id_positions.items() if len(pos) >= 2}
     for i, raw_edge in enumerate(edges_seq):
-        if not isinstance(raw_edge, Mapping):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{i}]",
-                )
-            )
-            continue
-        actual_keys = frozenset(raw_edge)
-        extras = actual_keys - edge_expected
-        missing = edge_expected - actual_keys
-        if extras or missing:
-            for extra in sorted(extras):
-                failures.append(
-                    _make_entry(
-                        "SGC_UNKNOWN_FIELD",
-                        stage_rank=_STAGE_EDGE_FIELDS,
-                        field_path=f"evidence_bundle.provenance_edges[{i}].{extra}",
-                    )
-                )
-            for m in sorted(missing):
-                failures.append(
-                    _make_entry(
-                        "SGC_UNKNOWN_FIELD",
-                        stage_rank=_STAGE_EDGE_FIELDS,
-                        field_path=f"evidence_bundle.provenance_edges[{i}].{m}",
-                    )
-                )
-            continue
-        eid = raw_edge.get("edge_id")
-        sid = raw_edge.get("source_id")
-        tgt = raw_edge.get("target_geometry_id")
-        rel = raw_edge.get("relation_type")
-        ev_refs_raw = raw_edge.get("evidence_refs")
-        edge_hash_in = raw_edge.get("edge_hash")
-        if not _is_nonempty_str(eid) or not _is_nonempty_str(sid) or not _is_nonempty_str(tgt):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{i}]",
-                )
-            )
-            continue
-        # Round 2 §2 — duplicate entries MUST NOT enter the trusted
-        # snapshot tuple. They still emit their independent
-        # validation blockers (relation_type / evidence_refs / hash)
-        # so the same-stage accumulation contract holds.
-        if eid in duplicate_edge_ids:
-            if not isinstance(rel, str) or not rel:
-                failures.append(
-                    _make_entry(
-                        "SGC_RAW_TYPE_INVALID",
-                        stage_rank=_STAGE_EDGE_FIELDS,
-                        field_path=f"evidence_bundle.provenance_edges[{i}].relation_type",
-                    )
-                )
-            if not _is_str_seq(ev_refs_raw):
-                failures.append(
-                    _make_entry(
-                        "SGC_RAW_TYPE_INVALID",
-                        stage_rank=_STAGE_EDGE_FIELDS,
-                        field_path=f"evidence_bundle.provenance_edges[{i}].evidence_refs",
-                    )
-                )
-            continue
-        if not isinstance(rel, str) or not rel:
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{i}].relation_type",
-                )
-            )
-            continue
-        if not _is_str_seq(ev_refs_raw):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{i}].evidence_refs",
-                )
-            )
-            continue
-        ev_refs_canon = _canonicalize_str_seq(ev_refs_raw, unique=True)
-        if ev_refs_canon is None:
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{i}].evidence_refs",
-                )
-            )
-            continue
-        if not _is_nonempty_str(edge_hash_in) or not re.fullmatch(r"[0-9a-f]{64}", edge_hash_in):
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{i}].edge_hash",
-                )
-            )
-            continue
-        if edge_hash_in in edge_hash_set:
-            failures.append(
-                _make_entry(
-                    "SGC_CATALOG_HASH_MISMATCH",
-                    stage_rank=_STAGE_EDGE_FIELDS,
-                    field_path=f"evidence_bundle.provenance_edges[{edge_hash_set[edge_hash_in]}].edge_hash",
-                    details={"edge_hash": edge_hash_in},
-                )
-            )
-            continue
-        edge_hash_set[edge_hash_in] = i
-        edge_snapshot = ProvenanceEdgeSnapshot(
-            edge_id=eid,
-            source_id=sid,
-            target_geometry_id=tgt,
-            relation_type=rel,
-            evidence_refs=ev_refs_canon,
-            edge_hash=edge_hash_in,
+        edge_snapshot, edge_entry_blockers = _validate_provenance_edge_entry(
+            raw_edge=raw_edge,
+            index=i,
+            edge_expected=edge_expected,
+            edge_hash_set=edge_hash_set,
+            duplicate_edge_ids=duplicate_edge_ids,
         )
-        edge_records.append(edge_snapshot)
+        if edge_entry_blockers:
+            failures.extend(edge_entry_blockers)
+        if edge_snapshot is not None:
+            edge_records.append(edge_snapshot)
 
     # ------------------------------------------------------------------
     # Stage 4-extension: dependent-stage gating MUST fire BEFORE any
@@ -1396,7 +1166,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.local_kernel_usage_scope",
             )
         )
@@ -1406,7 +1176,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.local_kernel_usage_scope",
             )
         )
@@ -1417,7 +1187,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.evidence_refs",
             )
         )
@@ -1427,7 +1197,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.evidence_refs",
             )
         )
@@ -1452,7 +1222,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_CATALOG_HASH_MISMATCH",
-                stage_rank=_STAGE_BUNDLE_HEADER,
+                stage_rank=_STAGE_BUNDLE_AUTHORITY,
                 field_path="evidence_bundle.bundle_hash",
                 details={
                     "expected": expected_bundle_hash,
@@ -1489,7 +1259,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_RECORDS_INVALID",
-                stage_rank=_STAGE_RECORDS_LIST,
+                stage_rank=_STAGE_RECORDS_ARRAY,
                 field_path="raw_catalog.records",
             )
         )
@@ -1526,7 +1296,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}]",
                 )
             )
@@ -1539,7 +1309,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_UNKNOWN_FIELD",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].{extra}",
                 )
             )
@@ -1547,7 +1317,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_UNKNOWN_FIELD",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].{m}",
                 )
             )
@@ -1558,7 +1328,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].schema_version",
                 )
             )
@@ -1567,7 +1337,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_SCHEMA_VERSION_UNSUPPORTED",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].schema_version",
                 )
             )
@@ -1580,7 +1350,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RECORD_ID_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].geometry_id",
                 )
             )
@@ -1590,7 +1360,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_GEOMETRY_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].geometry_type",
                 )
             )
@@ -1599,7 +1369,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_GEOMETRY_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].geometry_type",
                 )
             )
@@ -1609,7 +1379,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_PROFILE_UNSUPPORTED",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].profile_id",
                 )
             )
@@ -1619,7 +1389,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_REVISION_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].revision",
                 )
             )
@@ -1629,7 +1399,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].approval_state",
                 )
             )
@@ -1643,14 +1413,14 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].shell_inside_diameter_m",
                 )
             )
             failures.append(
                 _make_entry(
                     "SGC_SHELL_INSIDE_DIAMETER_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].shell_inside_diameter_m",
                 )
             )
@@ -1660,7 +1430,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].nominal_label",
                 )
             )
@@ -1669,92 +1439,41 @@ def parse_shell_geometry_catalog(
         if not _is_nonempty_str(src_cls_raw):
             failures.append(
                 _make_entry(
-                    "SGC_SOURCE_CLASS_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    "SGC_RAW_TYPE_INVALID",
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].source_class",
                 )
             )
             continue
-        if src_cls_raw not in RECOGNIZED_SOURCE_CLASSES:
-            failures.append(
-                _make_entry(
-                    "SGC_SOURCE_CLASS_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
-                    field_path=f"raw_catalog.records[{idx}].source_class",
-                )
-            )
-            continue
+        # NOTE: source_class **recognition** (RECOGNIZED_SOURCE_CLASSES
+        # membership) is deferred to Stage 14 (source class / license
+        # disposition). Per the new spec, Stage 8 is a raw-type pass
+        # only.
 
-        # License evidence raw type
+        # License evidence raw type (Stage 8 only)
         license_raw = raw_rec.get("license_evidence")
         if not _is_nonempty_mapping(license_raw):
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].license_evidence",
                 )
             )
             continue
 
-        # Source binding: raw type, exact fields
+        # Source binding: raw type only at Stage 8; full validation
+        # (exact fields + string fields) is Stage 13.
         binding_raw = raw_rec.get("source_binding")
         if not _is_nonempty_mapping(binding_raw):
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].source_binding",
                 )
             )
             continue
-        binding_expected = frozenset(
-            {
-                "source_id",
-                "source_type",
-                "source_revision",
-                "source_location",
-                "evidence_ref",
-                "approved_by",
-                "approved_at",
-            }
-        )
-        binding_extras = frozenset(binding_raw) - binding_expected
-        for extra in sorted(binding_extras):
-            failures.append(
-                _make_entry(
-                    "SGC_SOURCE_BINDING_INCOMPLETE",
-                    stage_rank=_STAGE_RECORD_FIELDS,
-                    field_path=f"raw_catalog.records[{idx}].source_binding.{extra}",
-                )
-            )
-        binding_missing = binding_expected - frozenset(binding_raw)
-        for m in sorted(binding_missing):
-            failures.append(
-                _make_entry(
-                    "SGC_SOURCE_BINDING_INCOMPLETE",
-                    stage_rank=_STAGE_RECORD_FIELDS,
-                    field_path=f"raw_catalog.records[{idx}].source_binding.{m}",
-                )
-            )
-
-        if binding_extras or binding_missing:
-            continue
-        # binding string fields raw type
-        binding_ok = True
-        for key in binding_expected:
-            if not _is_nonempty_str(binding_raw.get(key)):
-                failures.append(
-                    _make_entry(
-                        "SGC_RAW_TYPE_INVALID",
-                        stage_rank=_STAGE_RECORD_FIELDS,
-                        field_path=f"raw_catalog.records[{idx}].source_binding.{key}",
-                    )
-                )
-                binding_ok = False
-        if not binding_ok:
-            continue
-        binding = ShellSourceBinding(**{key: binding_raw[key] for key in binding_expected})
 
         # Reference arrays: canonical deduplication + sort
         perm_refs_raw = raw_rec.get("permission_evidence_refs")
@@ -1768,7 +1487,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].permission_evidence_refs",
                 )
             )
@@ -1777,7 +1496,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].provenance_edge_ids",
                 )
             )
@@ -1786,7 +1505,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].evidence_refs",
                 )
             )
@@ -1798,7 +1517,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}]",
                 )
             )
@@ -1810,7 +1529,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].record_hash",
                 )
             )
@@ -1825,7 +1544,7 @@ def parse_shell_geometry_catalog(
             catalog_id=catalog_id,
             raw_id=geom_id_raw,
             failures=failures,
-            stage_rank=_STAGE_DUPLICATE_IDS,
+            stage_rank=_STAGE_RECORD_IDENTITY,
         )
         if parsed_id is None:
             continue
@@ -1837,7 +1556,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_REVISION_INVALID",
-                    stage_rank=_STAGE_RECORD_FIELDS,
+                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].geometry_id",
                     details={
                         "geometry_id_revision": revision_in_id,
@@ -1857,7 +1576,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RECORD_DUPLICATE_ID",
-                    stage_rank=_STAGE_DUPLICATE_IDS,
+                    stage_rank=_STAGE_RECORD_IDENTITY,
                     field_path=f"raw_catalog.records[{first_index}].geometry_id",
                     details={"stable_geometry_id": stable_id},
                 )
@@ -1865,7 +1584,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_RECORD_DUPLICATE_ID",
-                    stage_rank=_STAGE_DUPLICATE_IDS,
+                    stage_rank=_STAGE_RECORD_IDENTITY,
                     field_path=f"raw_catalog.records[{idx}].geometry_id",
                     details={"stable_geometry_id": stable_id},
                 )
@@ -1894,7 +1613,7 @@ def parse_shell_geometry_catalog(
             raw_records_seen.append(
                 {
                     "raw": dict(raw_rec),
-                    "binding": binding,
+                    "binding_raw": dict(binding_raw),  # Stage 13 source binding
                     "license_raw": dict(license_raw),
                     "perm_refs": perm_refs_canon,
                     "edge_refs": edge_refs_canon,
@@ -1937,8 +1656,32 @@ def parse_shell_geometry_catalog(
     for ri, info in enumerate(raw_records_seen):
         src_cls = info["src_cls"]
 
-        # Stage 13 — decimal
-        # Stage 13 — decimal validation
+        # Stage 10 — approval lexical validation
+        approval_raw_v = info["approval_raw"]
+        if approval_raw_v not in APPROVAL_STATES:
+            failures.append(
+                _make_entry(
+                    "SGC_APPROVAL_STATE_INVALID",
+                    stage_rank=_STAGE_APPROVAL_LEXICAL,
+                    field_path=f"raw_catalog.records[{ri}].approval_state",
+                    details={"value": approval_raw_v},
+                )
+            )
+            continue
+
+        # Stage 11 — known non-approved rejection
+        if approval_raw_v != "approved":
+            failures.append(
+                _make_entry(
+                    "SGC_RECORD_UNAPPROVED",
+                    stage_rank=_STAGE_APPROVAL_NONAPPROVED,
+                    field_path=f"raw_catalog.records[{ri}].approval_state",
+                    details={"value": approval_raw_v},
+                )
+            )
+            continue
+
+        # Stage 12 — canonical decimal validation
         # Even if the raw-type check passed (empty/leading-+ rejections
         # the design explicitly tracks under DIAMETER_INVALID), the
         # canonical-decimal rules emit SGC_SHELL_INSIDE_DIAMETER_INVALID
@@ -1952,37 +1695,81 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_SHELL_INSIDE_DIAMETER_INVALID",
-                    stage_rank=_STAGE_DIAMETER_DECIMAL,
+                    stage_rank=_STAGE_DECIMAL,
                     field_path=f"raw_catalog.records[{ri}].shell_inside_diameter_m",
                 )
             )
             continue
 
-        # Stage 10 — approval lexical
-        approval_raw_v = info["approval_raw"]
-        if approval_raw_v not in APPROVAL_STATES:
+        # Stage 13 — source binding (raw type + exact fields + string
+        # fields). Deferred from Stage 8 to its own occurrence so
+        # source binding precedes source class / license disposition
+        # (Stage 14).
+        binding_raw = info["binding_raw"]
+        binding_expected = frozenset(
+            {
+                "source_id",
+                "source_type",
+                "source_revision",
+                "source_location",
+                "evidence_ref",
+                "approved_by",
+                "approved_at",
+            }
+        )
+        binding_extras = frozenset(binding_raw) - binding_expected
+        binding_missing = binding_expected - frozenset(binding_raw)
+        binding_field_errors = False
+        for extra in sorted(binding_extras):
             failures.append(
                 _make_entry(
-                    "SGC_APPROVAL_STATE_INVALID",
-                    stage_rank=_STAGE_APPROVAL_LEXICAL,
-                    field_path=f"raw_catalog.records[{ri}].approval_state",
-                    details={"value": approval_raw_v},
+                    "SGC_SOURCE_BINDING_INCOMPLETE",
+                    stage_rank=_STAGE_SOURCE_BINDING,
+                    field_path=f"raw_catalog.records[{ri}].source_binding.{extra}",
                 )
             )
-            continue
-        # Stage 11 — approved only via parser
-        if approval_raw_v != "approved":
+            binding_field_errors = True
+        for m in sorted(binding_missing):
             failures.append(
                 _make_entry(
-                    "SGC_RECORD_UNAPPROVED",
-                    stage_rank=_STAGE_APPROVAL_STATE,
-                    field_path=f"raw_catalog.records[{ri}].approval_state",
-                    details={"value": approval_raw_v},
+                    "SGC_SOURCE_BINDING_INCOMPLETE",
+                    stage_rank=_STAGE_SOURCE_BINDING,
+                    field_path=f"raw_catalog.records[{ri}].source_binding.{m}",
                 )
             )
+            binding_field_errors = True
+        binding_ok = True
+        for key in binding_expected:
+            if not _is_nonempty_str(binding_raw.get(key)):
+                failures.append(
+                    _make_entry(
+                        "SGC_RAW_TYPE_INVALID",
+                        stage_rank=_STAGE_SOURCE_BINDING,
+                        field_path=f"raw_catalog.records[{ri}].source_binding.{key}",
+                    )
+                )
+                binding_ok = False
+        if binding_field_errors or not binding_ok:
             continue
+        binding = ShellSourceBinding(**{key: binding_raw[key] for key in binding_expected})
+        # Record the constructed binding object on the info dict so
+        # Stage 17 (record hash) can read it AFTER the upstream-
+        # failures gate confirms this record survived Stages 10–14.
+        info["binding_obj"] = binding
 
-        # Stage 14 — license disposition gate
+        # Stage 14 — source class recognition + license disposition.
+        # The two checks share the same occurrence rank per the new
+        # spec: source class is the value-level key, license
+        # disposition is the legal gate on top of it.
+        if src_cls not in RECOGNIZED_SOURCE_CLASSES:
+            failures.append(
+                _make_entry(
+                    "SGC_SOURCE_CLASS_INVALID",
+                    stage_rank=_STAGE_SOURCE_CLASS_LICENSE,
+                    field_path=f"raw_catalog.records[{ri}].source_class",
+                )
+            )
+            continue
         try:
             # Validate the license form for any non-internal source class.
             # For internal sources we only verify that the form token
@@ -1993,7 +1780,7 @@ def parse_shell_geometry_catalog(
             failures.append(
                 _make_entry(
                     "SGC_LICENSE_BLOCKED",
-                    stage_rank=_STAGE_LICENSE_DISPOSITION,
+                    stage_rank=_STAGE_SOURCE_CLASS_LICENSE,
                     field_path=f"raw_catalog.records[{ri}].license_evidence",
                 )
             )
@@ -2006,13 +1793,12 @@ def parse_shell_geometry_catalog(
                 failures.append(
                     _make_entry(
                         "SGC_LICENSE_BLOCKED",
-                        stage_rank=_STAGE_LICENSE_DISPOSITION,
+                        stage_rank=_STAGE_SOURCE_CLASS_LICENSE,
                         field_path=f"raw_catalog.records[{ri}].license_evidence",
                     )
                 )
                 continue
-        # Stage 14 — vendor permission scope gate (and reference
-        # resolution for non-vendor records).
+        # Stage 15 — permission / provenance resolution + local usage gate
         if src_cls == "VENDOR_PERMISSIONED":
             # every vendor record MUST have at least one permission ref
             # whose permission is RESOLVED in the bundle AND whose
@@ -2023,7 +1809,7 @@ def parse_shell_geometry_catalog(
                 failures.append(
                     _make_entry(
                         "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
-                        stage_rank=_STAGE_REF_RESOLUTION,
+                        stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                         field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
                     )
                 )
@@ -2034,7 +1820,7 @@ def parse_shell_geometry_catalog(
                     failures.append(
                         _make_entry(
                             "SGC_EVIDENCE_REFS_INVALID",
-                            stage_rank=_STAGE_REF_RESOLUTION,
+                            stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                             field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
                             evidence_refs=(perm_ref,),
                         )
@@ -2050,7 +1836,7 @@ def parse_shell_geometry_catalog(
                     failures.append(
                         _make_entry(
                             "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
-                            stage_rank=_STAGE_REF_RESOLUTION,
+                            stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                             field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
                             evidence_refs=(perm_ref,),
                             details={"missing": missing_scopes},
@@ -2067,7 +1853,7 @@ def parse_shell_geometry_catalog(
                     failures.append(
                         _make_entry(
                             "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
-                            stage_rank=_STAGE_REF_RESOLUTION,
+                            stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                             field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
                             evidence_refs=(perm_ref,),
                             details={
@@ -2092,7 +1878,7 @@ def parse_shell_geometry_catalog(
                     failures.append(
                         _make_entry(
                             "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
-                            stage_rank=_STAGE_REF_RESOLUTION,
+                            stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                             field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
                             evidence_refs=(perm_ref,),
                             details={
@@ -2123,7 +1909,7 @@ def parse_shell_geometry_catalog(
                     failures.append(
                         _make_entry(
                             "SGC_EVIDENCE_REFS_INVALID",
-                            stage_rank=_STAGE_REF_RESOLUTION,
+                            stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                             field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
                             evidence_refs=(perm_ref,),
                         )
@@ -2139,20 +1925,22 @@ def parse_shell_geometry_catalog(
                 failures.append(
                     _make_entry(
                         "SGC_EVIDENCE_REFS_INVALID",
-                        stage_rank=_STAGE_REF_RESOLUTION,
+                        stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                         field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
                     )
                 )
                 continue
 
-        # Stage 16 — provenance_edge_ids must each resolve to a known edge
+        # Stage 15 — provenance_edge_ids must each resolve to a known edge
         # whose target_geometry_id matches THIS record's geometry_id.
+        # (Provenance-edge ref resolution is part of the authority
+        # resolution occurrence, NOT evidence arrays.)
         for edge_ref in info["edge_refs"]:
             if edge_ref not in edge_by_id:
                 failures.append(
                     _make_entry(
                         "SGC_PROVENANCE_INCOMPLETE",
-                        stage_rank=_STAGE_REF_RESOLUTION,
+                        stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                         field_path=f"raw_catalog.records[{ri}].provenance_edge_ids",
                         evidence_refs=(edge_ref,),
                     )
@@ -2163,7 +1951,7 @@ def parse_shell_geometry_catalog(
                 failures.append(
                     _make_entry(
                         "SGC_PROVENANCE_INCOMPLETE",
-                        stage_rank=_STAGE_REF_RESOLUTION,
+                        stage_rank=_STAGE_AUTHORITY_RESOLUTION,
                         field_path=f"raw_catalog.records[{ri}].provenance_edge_ids",
                         evidence_refs=(edge_ref,),
                         details={
@@ -2173,16 +1961,15 @@ def parse_shell_geometry_catalog(
                     )
                 )
 
-        # Stage 17 preparation — evidence_refs on a record must be non-empty
-        # and properly canonicalized BEFORE the record_hash domain is
-        # computed. (Original loop ran at stage 8; the gate is now placed
-        # in the ref-resolution stage so the failure is recorded at the
-        # right occurrence rank.)
+        # Stage 16 — evidence arrays (non-empty + canonicalized) is a
+        # separate occurrence from ref resolution (Stage 15). The gate
+        # ensures record_hash recomputation (Stage 17) is only
+        # attempted on records that have evidence_refs.
         if not info["evidence_refs"]:
             failures.append(
                 _make_entry(
                     "SGC_EVIDENCE_REFS_INVALID",
-                    stage_rank=_STAGE_REF_RESOLUTION,
+                    stage_rank=_STAGE_EVIDENCE_ARRAYS,
                     field_path=f"raw_catalog.records[{ri}].evidence_refs",
                 )
             )
@@ -2226,6 +2013,18 @@ def parse_shell_geometry_catalog(
         "SGC_RECORD_HASH_MISMATCH",
     }
     for ri, info in enumerate(raw_records_seen):
+        # Round 3 §4 — dependent-stage gating: if THIS record already
+        # has any upstream semantic-stage failure, do not compute its
+        # record_hash. The expected hash would not match the supplied
+        # raw hash (different content), producing a misleading
+        # RECORD_HASH_MISMATCH layered on top of the true root cause.
+        # Gating happens BEFORE the binding access so we never read
+        # ``info["binding_obj"]`` for records that failed Stage 13.
+        upstream_failures_for_record = per_record_upstream_failures.get(ri, set())
+        semantic_upstream = upstream_failures_for_record - record_stage_fail_codes
+        if semantic_upstream:
+            continue
+        binding = info["binding_obj"]
         rec_payload = {
             "schema_version": "task023.approved-shell-geometry-record.v1",
             "geometry_id": info["geom_id"],
@@ -2237,13 +2036,13 @@ def parse_shell_geometry_catalog(
             "source_class": info["src_cls"],
             "license_evidence": dict(info["license_raw"]),
             "source_binding": {
-                "source_id": info["binding"].source_id,
-                "source_type": info["binding"].source_type,
-                "source_revision": info["binding"].source_revision,
-                "source_location": info["binding"].source_location,
-                "evidence_ref": info["binding"].evidence_ref,
-                "approved_by": info["binding"].approved_by,
-                "approved_at": info["binding"].approved_at,
+                "source_id": binding.source_id,
+                "source_type": binding.source_type,
+                "source_revision": binding.source_revision,
+                "source_location": binding.source_location,
+                "evidence_ref": binding.evidence_ref,
+                "approved_by": binding.approved_by,
+                "approved_at": binding.approved_at,
             },
             "permission_evidence_refs": list(info["perm_refs"]),
             "provenance_edge_ids": list(info["edge_refs"]),
@@ -2254,22 +2053,13 @@ def parse_shell_geometry_catalog(
         hash_payload = {
             k: v for k, v in rec_payload.items() if k not in {"nominal_label", "record_hash"}
         }
-        # Round 3 §4 — dependent-stage gating: if THIS record already
-        # has any upstream semantic-stage failure, do not compute its
-        # record_hash. The expected hash would not match the supplied
-        # raw hash (different content), producing a misleading
-        # RECORD_HASH_MISMATCH layered on top of the true root cause.
-        upstream_failures_for_record = per_record_upstream_failures.get(ri, set())
-        semantic_upstream = upstream_failures_for_record - record_stage_fail_codes
-        if semantic_upstream:
-            continue
         expected_record_hash = canonical_sha256(hash_payload)
 
         if expected_record_hash != info["record_hash_in"]:
             failures.append(
                 _make_entry(
                     "SGC_RECORD_HASH_MISMATCH",
-                    stage_rank=_STAGE_HASHES,
+                    stage_rank=_STAGE_RECORD_HASH,
                     field_path=f"raw_catalog.records[{ri}].record_hash",
                     details={
                         "expected": expected_record_hash,
@@ -2290,7 +2080,7 @@ def parse_shell_geometry_catalog(
             nominal_label=info["nominal_label"] if isinstance(info["nominal_label"], str) else None,
             source_class=info["src_cls"],
             license_evidence=_DeepFrozen(info["license_raw"]).view(),
-            source_binding=info["binding"],
+            source_binding=binding,
             permission_evidence_refs=info["perm_refs"],
             provenance_edge_ids=info["edge_refs"],
             evidence_refs=info["evidence_refs"],
@@ -2304,13 +2094,45 @@ def parse_shell_geometry_catalog(
         _raise(failures)
 
     # ------------------------------------------------------------------
-    # Stage 18 — catalog hash recomputation (covers records in
-    # canonical identity order: (geometry_id, revision, record_hash)).
+    # Stage 18 — record ordering (canonical identity sort for the
+    # catalog_payload). Independent occurrence from record hash (17)
+    # so the same-stage accumulation contract holds.
     # ------------------------------------------------------------------
     sorted_records = tuple(
         sorted(constructed, key=lambda r: (r.geometry_id, r.revision, r.record_hash))
     )
     record_hashes_canonical = tuple(r.record_hash for r in sorted_records)
+
+    # ------------------------------------------------------------------
+    # Stage 19 — catalog-bundle binding: the raw catalog's
+    # ``evidence_bundle_hash`` field MUST equal the validated bundle
+    # hash. This is a separate occurrence from the catalog hash (20)
+    # so a binding mismatch is reported at its own stage rank.
+    # ------------------------------------------------------------------
+    raw_evidence_bundle_hash = raw_catalog.get("evidence_bundle_hash")
+    if (
+        not _is_nonempty_str(raw_evidence_bundle_hash)
+        or not re.fullmatch(r"[0-9a-f]{64}", raw_evidence_bundle_hash)
+        or raw_evidence_bundle_hash != expected_bundle_hash
+    ):
+        failures.append(
+            _make_entry(
+                "SGC_CATALOG_HASH_MISMATCH",
+                stage_rank=_STAGE_CATALOG_BUNDLE_BINDING,
+                field_path="raw_catalog.evidence_bundle_hash",
+                details={
+                    "expected": expected_bundle_hash,
+                    "actual": raw_evidence_bundle_hash,
+                },
+            )
+        )
+        _raise(failures)
+
+    # ------------------------------------------------------------------
+    # Stage 20 — catalog hash recomputation (covers records in
+    # canonical identity order: (geometry_id, revision, record_hash))
+    # AND verifies the lexical-form ``catalog_hash`` field.
+    # ------------------------------------------------------------------
     catalog_payload = {
         "schema_version": "task023.approved-shell-geometry-catalog.v1",
         "catalog_id": catalog_id,
@@ -2328,7 +2150,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_CATALOG_HASH_MISMATCH",
-                stage_rank=_STAGE_HASHES,
+                stage_rank=_STAGE_CATALOG_HASH,
                 field_path="raw_catalog.catalog_hash",
             )
         )
@@ -2343,7 +2165,7 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry(
                 "SGC_CATALOG_HASH_MISMATCH",
-                stage_rank=_STAGE_HASHES,
+                stage_rank=_STAGE_CATALOG_HASH,
                 field_path="raw_catalog.catalog_hash",
                 details={
                     "expected": expected_catalog_hash,
@@ -2390,38 +2212,38 @@ def select_approved_shell_geometry(
     - Returns the frozen record held by the catalog.
     """
     if not isinstance(geometry_id, str) or not geometry_id:
-        # Stage 20 — selection raw input (occurrence: raw ID)
+        # Selection occurrence 1 — selection raw input (raw ID)
         raise ShellGeometryCatalogFailure(
             [
                 _make_entry(
                     "SGC_RECORD_ID_INVALID",
-                    stage_rank=_STAGE_SELECTION,
+                    stage_rank=_SELECTION_STAGE_RAW_ID,
                     field_path="geometry_id",
                 )
             ]
         )
     if not isinstance(catalog, ShellGeometryCatalog):
-        # Stage 20 — selection raw input (occurrence: catalog type)
+        # Selection occurrence 1 — selection raw input (catalog type)
         raise ShellGeometryCatalogFailure(
             [
                 _make_entry(
                     "SGC_RECORD_ID_INVALID",
-                    stage_rank=_STAGE_SELECTION,
+                    stage_rank=_SELECTION_STAGE_RAW_ID,
                     field_path="catalog",
                 )
             ]
         )
 
-    # Stage 20 — selection exact lookup
+    # Selection occurrence 2 — selection exact lookup
     for rec in catalog.records:
         if rec.geometry_id == geometry_id:
-            # Stage 20 — selection approval recheck
+            # Selection occurrence 3 — selection approval recheck
             if rec.approval_state != "approved":
                 raise ShellGeometryCatalogFailure(
                     [
                         _make_entry(
                             "SGC_SELECTION_NOT_APPROVED",
-                            stage_rank=_STAGE_SELECTION,
+                            stage_rank=_SELECTION_STAGE_APPROVAL_RECHECK,
                             field_path="geometry_id",
                             details={"geometry_id": geometry_id},
                         )
@@ -2432,7 +2254,7 @@ def select_approved_shell_geometry(
         [
             _make_entry(
                 "SGC_RECORD_NOT_FOUND",
-                stage_rank=_STAGE_SELECTION,
+                stage_rank=_SELECTION_STAGE_EXACT_LOOKUP,
                 field_path="geometry_id",
                 details={"geometry_id": geometry_id},
             )
@@ -2527,3 +2349,375 @@ def _raise(failures: list[ShellGeometryCatalogBlockerEntry]) -> NoReturn:
 
 def _is_nonempty_str_strict(v: Any) -> bool:
     return isinstance(v, str) and bool(v)
+
+
+# ---------------------------------------------------------------------------
+# Stage 5 helper — full per-field validation for a single permission
+# entry. Returns the validated ``VendorPermissionEvidenceSnapshot`` (or
+# ``None`` on any failure) AND the list of per-field blockers
+# accumulated for this entry. The caller decides whether to add the
+# snapshot to ``perm_records`` based on duplicate-id membership.
+#
+# Round 3 §3 — UNIFIED validator: the SAME full per-field checks run
+# for both unique and duplicate ``permission_id``s. The duplicate
+# identity only blocks the trusted-tuple contribution; it does NOT
+# reduce the per-field validation set, NOR does it cause us to skip
+# the snapshot construction (we still record any per-field blockers).
+# ---------------------------------------------------------------------------
+
+
+def _validate_permission_snapshot_entry(
+    *,
+    raw_perm: Any,
+    index: int,
+    perm_expected: frozenset[str],
+    perm_hash_set: dict[str, int],
+    duplicate_permission_ids: set[str],
+) -> tuple[VendorPermissionEvidenceSnapshot | None, list[ShellGeometryCatalogBlockerEntry]]:
+    """Round 3 §3 — unified full-field validator for a single
+    permission snapshot entry. The SAME validator runs for unique
+    and duplicate ``permission_id``s so independent errors
+    accumulate alongside the duplicate blocker.
+    """
+    entry_blockers: list[ShellGeometryCatalogBlockerEntry] = []
+    if not isinstance(raw_perm, Mapping):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}]",
+            )
+        )
+        return None, entry_blockers
+
+    actual_keys = frozenset(raw_perm)
+    extras = actual_keys - perm_expected
+    missing = perm_expected - actual_keys
+    if extras or missing:
+        for extra in sorted(extras):
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_UNKNOWN_FIELD",
+                    stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                    field_path=f"evidence_bundle.permission_evidence[{index}].{extra}",
+                )
+            )
+        for m in sorted(missing):
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_UNKNOWN_FIELD",
+                    stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                    field_path=f"evidence_bundle.permission_evidence[{index}].{m}",
+                )
+            )
+        return None, entry_blockers
+
+    pid = raw_perm.get("permission_id")
+    if not isinstance(pid, str) or not pid:
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].permission_id",
+            )
+        )
+        return None, entry_blockers
+
+    # permission_scope: raw type → canonical
+    perm_scope_raw = raw_perm.get("permission_scope")
+    if not _is_str_seq(perm_scope_raw):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].permission_scope",
+            )
+        )
+        return None, entry_blockers
+    scope_tuple_l = _canonicalize_str_seq(perm_scope_raw, unique=True)
+    if scope_tuple_l is None:
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].permission_scope",
+            )
+        )
+        return None, entry_blockers
+
+    # usage_scope: raw type → canonical (field_path MUST be
+    # ``.usage_scope``, NOT ``.permission_scope``).
+    perm_usage_raw = raw_perm.get("usage_scope")
+    if not _is_str_seq(perm_usage_raw):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].usage_scope",
+            )
+        )
+        return None, entry_blockers
+    usage_tuple_l = _canonicalize_str_seq(perm_usage_raw, unique=True)
+    if usage_tuple_l is None:
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].usage_scope",
+            )
+        )
+        return None, entry_blockers
+    scope_tuple: tuple[str, ...] = scope_tuple_l
+    usage_tuple: tuple[str, ...] = usage_tuple_l
+
+    # evidence_ref / approved_by / approved_at
+    ev_ref = raw_perm.get("evidence_ref")
+    approved_by = raw_perm.get("approved_by")
+    approved_at = raw_perm.get("approved_at")
+    if not _is_nonempty_str(ev_ref):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].evidence_ref",
+            )
+        )
+    if not _is_nonempty_str(approved_by):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].approved_by",
+            )
+        )
+    if not _is_nonempty_str(approved_at):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].approved_at",
+            )
+        )
+    if any(not _is_nonempty_str(x) for x in (ev_ref, approved_by, approved_at)):
+        return None, entry_blockers
+    # mypy narrowing: the `if any(...)` check above guarantees all
+    # three values are non-empty strings.
+    assert isinstance(ev_ref, str) and ev_ref
+    assert isinstance(approved_by, str) and approved_by
+    assert isinstance(approved_at, str) and approved_at
+
+    # permission_hash: lexical + hash-domain
+    perm_hash_in = raw_perm.get("permission_hash")
+    if not _is_nonempty_str(perm_hash_in) or not re.fullmatch(r"[0-9a-f]{64}", perm_hash_in):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{index}].permission_hash",
+            )
+        )
+        return None, entry_blockers
+
+    # If THIS entry has any of the above blockers, it cannot enter the
+    # trusted snapshot. We still propagate the blockers (above) so the
+    # same-stage accumulation contract holds.
+    if entry_blockers:
+        return None, entry_blockers
+
+    # Round 3 §3 — duplicate entries (permission_id in a duplicate
+    # group) MUST NOT enter the trusted snapshot tuple. The validator
+    # ran the SAME per-field checks above and emitted any per-field
+    # blockers; we now refuse the trusted-tuple contribution.
+    if pid in duplicate_permission_ids:
+        return None, entry_blockers
+
+    # permission_hash duplicate check (only for non-duplicate-pid
+    # entries, since duplicates were already filtered above).
+    if perm_hash_in in perm_hash_set:
+        entry_blockers.append(
+            _make_entry(
+                "SGC_CATALOG_HASH_MISMATCH",
+                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                field_path=f"evidence_bundle.permission_evidence[{perm_hash_set[perm_hash_in]}].permission_hash",
+                details={"permission_hash": perm_hash_in},
+            )
+        )
+        return None, entry_blockers
+    perm_hash_set[perm_hash_in] = index
+    snapshot = VendorPermissionEvidenceSnapshot(
+        permission_id=pid,
+        permission_scope=scope_tuple,
+        usage_scope=usage_tuple,
+        evidence_ref=ev_ref,
+        approved_by=approved_by,
+        approved_at=approved_at,
+        permission_hash=perm_hash_in,
+    )
+    return snapshot, entry_blockers
+
+
+# ---------------------------------------------------------------------------
+# Stage 6 helper — full per-field validation for a single provenance
+# edge entry. Returns the validated ``ProvenanceEdgeSnapshot`` (or
+# ``None`` on any failure) AND the list of per-field blockers
+# accumulated for this entry. The caller decides whether to add the
+# snapshot to ``edge_records`` based on duplicate-id membership.
+#
+# Round 3 §4 — UNIFIED validator: the SAME full per-field checks run
+# for both unique and duplicate ``edge_id``s.
+# ---------------------------------------------------------------------------
+
+
+def _validate_provenance_edge_entry(
+    *,
+    raw_edge: Any,
+    index: int,
+    edge_expected: frozenset[str],
+    edge_hash_set: dict[str, int],
+    duplicate_edge_ids: set[str],
+) -> tuple[ProvenanceEdgeSnapshot | None, list[ShellGeometryCatalogBlockerEntry]]:
+    """Round 3 §4 — unified full-field validator for a single
+    provenance edge entry. The SAME validator runs for unique and
+    duplicate ``edge_id``s so independent errors accumulate
+    alongside the duplicate blocker.
+    """
+    entry_blockers: list[ShellGeometryCatalogBlockerEntry] = []
+    if not isinstance(raw_edge, Mapping):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{index}]",
+            )
+        )
+        return None, entry_blockers
+
+    actual_keys = frozenset(raw_edge)
+    extras = actual_keys - edge_expected
+    missing = edge_expected - actual_keys
+    if extras or missing:
+        for extra in sorted(extras):
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_UNKNOWN_FIELD",
+                    stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                    field_path=f"evidence_bundle.provenance_edges[{index}].{extra}",
+                )
+            )
+        for m in sorted(missing):
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_UNKNOWN_FIELD",
+                    stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                    field_path=f"evidence_bundle.provenance_edges[{index}].{m}",
+                )
+            )
+        return None, entry_blockers
+
+    eid = raw_edge.get("edge_id")
+    sid = raw_edge.get("source_id")
+    tgt = raw_edge.get("target_geometry_id")
+    rel = raw_edge.get("relation_type")
+    ev_refs_raw = raw_edge.get("evidence_refs")
+    edge_hash_in = raw_edge.get("edge_hash")
+    if not _is_nonempty_str(eid):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{index}].edge_id",
+            )
+        )
+    if not _is_nonempty_str(sid):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{index}].source_id",
+            )
+        )
+    if not _is_nonempty_str(tgt):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{index}].target_geometry_id",
+            )
+        )
+    if not isinstance(rel, str) or not rel:
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{index}].relation_type",
+            )
+        )
+    if not _is_str_seq(ev_refs_raw):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{index}].evidence_refs",
+            )
+        )
+    if not _is_nonempty_str(edge_hash_in) or not re.fullmatch(r"[0-9a-f]{64}", edge_hash_in):
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{index}].edge_hash",
+            )
+        )
+    # If we have any raw-type blockers, we cannot enter the trusted
+    # snapshot; the validators above have already recorded them.
+    raw_type_blockers = [b for b in entry_blockers if b.code == "SGC_RAW_TYPE_INVALID"]
+    if raw_type_blockers:
+        return None, entry_blockers
+
+    ev_refs_canon_l = _canonicalize_str_seq(ev_refs_raw, unique=True)
+    if ev_refs_canon_l is None:
+        entry_blockers.append(
+            _make_entry(
+                "SGC_RAW_TYPE_INVALID",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{index}].evidence_refs",
+            )
+        )
+        return None, entry_blockers
+
+    # Round 3 §4 — duplicate entries (edge_id in a duplicate group)
+    # MUST NOT enter the trusted snapshot tuple. The validator ran
+    # the SAME per-field checks above and emitted any per-field
+    # blockers; we now refuse the trusted-tuple contribution.
+    if eid in duplicate_edge_ids:
+        return None, entry_blockers
+
+    # edge_hash duplicate check (only for non-duplicate-eid entries).
+    if edge_hash_in in edge_hash_set:
+        entry_blockers.append(
+            _make_entry(
+                "SGC_CATALOG_HASH_MISMATCH",
+                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                field_path=f"evidence_bundle.provenance_edges[{edge_hash_set[edge_hash_in]}].edge_hash",
+                details={"edge_hash": edge_hash_in},
+            )
+        )
+        return None, entry_blockers
+    # mypy narrowing: the raw-type checks above guarantee all
+    # identifier / target / relation / hash fields are non-empty strings.
+    assert isinstance(eid, str) and eid
+    assert isinstance(sid, str) and sid
+    assert isinstance(tgt, str) and tgt
+    assert isinstance(rel, str) and rel
+    assert isinstance(edge_hash_in, str) and edge_hash_in
+    assert isinstance(edge_hash_in, str)
+    edge_hash_set[edge_hash_in] = index
+    edge_snapshot = ProvenanceEdgeSnapshot(
+        edge_id=eid,
+        source_id=sid,
+        target_geometry_id=tgt,
+        relation_type=rel,
+        evidence_refs=ev_refs_canon_l,
+        edge_hash=edge_hash_in,
+    )
+    return edge_snapshot, entry_blockers
