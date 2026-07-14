@@ -36,10 +36,14 @@ from hexagent.shell_geometry_catalogs import (
     parse_shell_geometry_catalog,
 )
 from hexagent.shell_geometry_catalogs.blockers import (
+    SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE,
     ShellGeometryCatalogBlockerEntry,
     _canonical_details_hash,
     _canonical_evidence_refs_hash,
+    deep_freeze_details,
+    sort_blockers,
 )
+from hexagent.shell_geometry_catalogs.catalog import select_approved_shell_geometry
 from hexagent.shell_geometry_catalogs.models import (
     APPROVAL_STATES,
     CATALOG_SCHEMA_VERSION,
@@ -504,13 +508,17 @@ def test_blocker_details_none_and_empty_sort_distinctly() -> None:
     sort separately — the composite key prevents collisions.
     """
     a = ShellGeometryCatalogBlockerEntry(
-        code="SGC_RAW_TYPE_INVALID", field_path="x", message_key="y"
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="x",
+        message_key="y",
+        stage_rank=1,
     )
     b = ShellGeometryCatalogBlockerEntry(
         code="SGC_RAW_TYPE_INVALID",
         field_path="x",
         message_key="y",
         details={},
+        stage_rank=1,
     )
     assert _canonical_details_hash(a.details) != _canonical_details_hash(b.details)
 
@@ -565,3 +573,139 @@ def test_catalog_hash_follows_record_identity_order_not_hash_order() -> None:
         edge_payloads=(edge_a, edge_b),
     )
     assert catalog_forward["catalog_hash"] == catalog_reverse["catalog_hash"]
+
+
+# ===========================================================================
+# Round 3 fixup tests — §1 stage rank authoritative + §6 deep immutability
+# ===========================================================================
+
+
+def test_round3_stage_rank_precedes_code_lexical() -> None:
+    """Round 3 §1 — stage rank wins over code lexical order.
+
+    Construct a blocker at stage 13 (``SGC_LICENSE_BLOCKED``,
+    lexical-first "L") and one at stage 1
+    (``SGC_RAW_TYPE_INVALID``, lexical-late "R"). The sorted tuple
+    MUST put stage 1 first because stage_rank precedes code in the
+    composite ordering key.
+    """
+    early_stage = ShellGeometryCatalogBlockerEntry(
+        code="SGC_RAW_TYPE_INVALID",
+        field_path="x",
+        message_key="m",
+        stage_rank=1,
+    )
+    late_stage = ShellGeometryCatalogBlockerEntry(
+        code="SGC_LICENSE_BLOCKED",
+        field_path="x",
+        message_key="m",
+        stage_rank=13,
+    )
+    sorted_entries = sort_blockers([late_stage, early_stage])
+    assert sorted_entries[0] is early_stage
+    assert sorted_entries[1] is late_stage
+
+
+def test_round3_failure_constructor_preserves_stage_rank() -> None:
+    """Round 3 §1 — ``ShellGeometryCatalogFailure`` MUST retain each
+    entry's stage_rank through ``sort_blockers``. We construct entries
+    with mismatched code-lexical vs stage-rank orderings and assert the
+    exceptions preserve them.
+    """
+    high_lex_low_stage = ShellGeometryCatalogBlockerEntry(
+        code="SGC_UNKNOWN_FIELD",
+        field_path="x",
+        message_key="m",
+        stage_rank=2,
+    )
+    low_lex_high_stage = ShellGeometryCatalogBlockerEntry(
+        code="SGC_APPROVAL_STATE_INVALID",
+        field_path="x",
+        message_key="m",
+        stage_rank=4,
+    )
+    try:
+        raise ShellGeometryCatalogFailure([high_lex_low_stage, low_lex_high_stage])
+    except ShellGeometryCatalogFailure as exc:
+        ranks = [b.stage_rank for b in exc.blockers]
+        # stage 2 (UNKNOWN_FIELD) precedes stage 4 (APPROVAL_STATE_INVALID)
+        assert ranks == [2, 4]
+        # and the stage 2 entry MUST come before the stage 4 one
+        assert exc.blockers[0].code == "SGC_UNKNOWN_FIELD"
+        assert exc.blockers[1].code == "SGC_APPROVAL_STATE_INVALID"
+
+
+def test_round3_selection_blockers_carry_explicit_stage_rank() -> None:
+    """Round 3 §1 — selection-time blockers (stage 20) MUST carry an
+    explicit stage_rank bound through the ``_make_entry`` helper inside
+    ``catalog.py`` (which itself consults the authoritative stage map).
+    We trigger a real ``SGC_RECORD_NOT_FOUND`` failure and assert the
+    emitted entry's stage_rank equals the §11 selection rank.
+    """
+    record = _make_record()
+    cat_raw, _bun = _assemble((record,))
+    cat = parse_shell_geometry_catalog(raw_catalog=cat_raw, evidence_bundle=_bun)
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        select_approved_shell_geometry(catalog=cat, geometry_id="nonexistent")
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_RECORD_NOT_FOUND" in codes
+    not_found_entries = [b for b in excinfo.value.blockers if b.code == "SGC_RECORD_NOT_FOUND"]
+    assert not_found_entries
+    assert all(
+        e.stage_rank == SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE["SGC_RECORD_NOT_FOUND"]
+        for e in not_found_entries
+    )
+
+
+def test_round3_blocker_details_are_deeply_immutable() -> None:
+    """Round 3 §6 — ``deep_freeze_details`` MUST freeze every nested
+    mapping AND nested list/tuple inside the details dict. Mutating the
+    caller's original container after construction MUST NOT change the
+    blocker entry's ``details``.
+    """
+    nested = {
+        "outer": {"inner_dict": {"x": 1, "y": [1, 2, 3]}},
+        "outer_list": [{"z": "a"}, {"z": "b"}],
+    }
+    frozen = deep_freeze_details(nested)
+    # Mutate the original; the frozen snapshot MUST not change.
+    nested["outer"]["inner_dict"]["x"] = 999
+    nested["outer"]["inner_dict"]["y"].append(999)
+    nested["outer_list"].append({"z": "modified"})
+    # The frozen copy must use immutable structures.
+    import types
+
+    assert isinstance(frozen, types.MappingProxyType)
+    assert isinstance(frozen["outer"], types.MappingProxyType)
+    assert isinstance(frozen["outer"]["inner_dict"], types.MappingProxyType)
+    assert isinstance(frozen["outer"]["inner_dict"]["y"], tuple)
+    assert isinstance(frozen["outer_list"], tuple)
+    assert frozen["outer"]["inner_dict"]["x"] == 1
+    assert list(frozen["outer"]["inner_dict"]["y"]) == [1, 2, 3]
+    assert len(frozen["outer_list"]) == 2
+
+
+def test_round3_blocker_constructor_deep_freezes_details_and_refs() -> None:
+    """Round 3 §6 — the public ``_make_entry`` helper inside catalog.py
+    must deep-freeze ``details`` and ``evidence_refs`` so callers
+    cannot mutate them post-construction.
+    """
+    from hexagent.shell_geometry_catalogs.catalog import _make_entry
+
+    call_details = {"x": [{"nested_list": [1, 2, 3]}]}
+    call_refs = ["ref-1", "ref-2"]
+    entry = _make_entry(
+        "SGC_RAW_TYPE_INVALID",
+        field_path="x",
+        evidence_refs=call_refs,
+        details=call_details,
+    )
+    call_details["x"][0]["nested_list"].append(999)
+    call_details["new_key"] = "new"
+    call_refs.append("ref-3")
+    # Mutation must not affect the entry.
+    assert "new_key" not in entry.details
+    assert "new" not in entry.details["x"]
+    # Evidence refs are a tuple.
+    assert isinstance(entry.evidence_refs, tuple)
+    assert entry.evidence_refs == ("ref-1", "ref-2")

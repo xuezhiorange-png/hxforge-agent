@@ -333,11 +333,12 @@ def test_every_blocker_code_is_reachable(scenario: str) -> None:
     elif scenario == "record_hash_mismatch":
         bad = dict(record)
         bad["record_hash"] = "0" * 64
-        catalog_target = synthetic_catalog_payload(records=(bad,), evidence_bundle_hash="a" * 64)
-        bundle_target = synthetic_bundle_payload(
-            permission_evidence=(synthetic_permission_payload(),),
-            provenance_edges=(synthetic_edge_payload(),),
-        )
+        # Round 3 fixup: assemble the catalog properly so the only
+        # mismatch is on record_hash. The previous version set
+        # evidence_bundle_hash to a fake value "a"*64 which made
+        # SGC_CATALOG_HASH_MISMATCH fire upstream of record_hash
+        # validation, hiding SGC_RECORD_HASH_MISMATCH.
+        catalog_target, bundle_target = _assemble((bad,))
     elif scenario == "catalog_hash_mismatch":
         catalog_target = dict(catalog)
         catalog_target["catalog_hash"] = "0" * 64
@@ -834,3 +835,430 @@ def test_nested_caller_mutation_cannot_alter_blocker_details() -> None:
                 b.details["post_mutation"] = True  # type: ignore[index]
     after_hashes = [_canonical_details_hash(b.details) for b in excinfo.value.blockers]
     assert original_details_hashes == after_hashes
+
+
+# ===========================================================================
+# Round 3 fixup tests — §2/§3/§4/§5/§6/§7 parser-level checks
+# ===========================================================================
+
+
+def test_round3_stable_id_rejects_record_key_containing_slash() -> None:
+    """Round 3 §2 — ``<catalog_id>/shell/<record_key>/<revision>``;
+    ``record_key`` MUST NOT contain ``/`` itself. We hand-craft the
+    geometry_id with an extra slash inside the record key segment and
+    assert the parser emits ``SGC_RECORD_ID_INVALID`` rather than
+    silently coercing or splitting.
+    """
+    bad = _make_record(record_key="shell-a/b")
+    # The synthetic builder constructs geometry_id from
+    # catalog_id/shell/<record_key>/<revision>; with the extra
+    # ``/b`` the resulting string has 5 segments, breaking the
+    # four-part contract.
+    assert bad["geometry_id"].count("/") == 4
+    catalog, bundle = _assemble((bad,))
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_RECORD_ID_INVALID" in codes
+
+
+def test_round3_stable_id_rejects_extra_segment_form() -> None:
+    """Round 3 §2 — ``catalog/shell/a/1/extra`` MUST block.
+
+    Hand-craft a record whose geometry_id has 5 segments. The parser
+    must reject with ``SGC_RECORD_ID_INVALID`` (segment_count != 4).
+    """
+    bad = _make_record(record_key="shell-a")
+    # Force 5 segments in the raw geometry_id.
+    bad["geometry_id"] = f"{bad['geometry_id']}/extra"
+    catalog, bundle = _assemble((bad,))
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_RECORD_ID_INVALID" in codes
+
+
+def test_round3_stable_id_rejects_empty_record_key() -> None:
+    """Round 3 §2 — ``catalog/shell//1`` (empty record_key) MUST block."""
+    bad = _make_record(record_key="shell-a")
+    parts = bad["geometry_id"].split("/")
+    assert len(parts) == 4
+    parts[2] = ""  # empty record_key
+    bad["geometry_id"] = "/".join(parts)
+    catalog, bundle = _assemble((bad,))
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_RECORD_ID_INVALID" in codes
+
+
+def test_round3_stable_id_rejects_wrong_case_role() -> None:
+    """Round 3 §2 — ``catalog/SHELL/a/1`` (uppercase role) MUST block
+    because the design rejects case folding.
+    """
+    bad = _make_record(record_key="shell-a")
+    parts = bad["geometry_id"].split("/")
+    parts[1] = parts[1].upper()
+    bad["geometry_id"] = "/".join(parts)
+    catalog, bundle = _assemble((bad,))
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_RECORD_ID_INVALID" in codes
+
+
+def test_round3_stable_id_revision_binding_remains_exact() -> None:
+    """Round 3 §2 — final revision segment MUST equal the record's
+    ``revision`` field byte-for-byte. We provide a record whose
+    geometry_id has a revision that does NOT match the record's
+    ``revision``; the parser MUST reject with EITHER
+    ``SGC_RECORD_ID_INVALID`` (stable-identity level) OR
+    ``SGC_REVISION_INVALID`` (record-field level) — both block.
+    """
+    bad = _make_record(record_key="shell-a", revision="1")
+    # Mismatch the trailing segment.
+    parts = bad["geometry_id"].split("/")
+    parts[-1] = "99"
+    bad["geometry_id"] = "/".join(parts)
+    catalog, bundle = _assemble((bad,))
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_RECORD_ID_INVALID" in codes or "SGC_REVISION_INVALID" in codes
+
+
+def test_round3_invalid_local_kernel_usage_scope_int_returns_structured_failure() -> None:
+    """Round 3 §3 — local_kernel_usage_scope MUST be a list of strings.
+    Submitting an ``int`` MUST produce a structured
+    ``SGC_RAW_TYPE_INVALID`` blocker (not a TypeError escaping).
+    """
+    record = _make_record()
+    catalog, bundle = _assemble((record,))
+    bundle["local_kernel_usage_scope"] = 42  # not a sequence of strings
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_RAW_TYPE_INVALID" in codes
+    field_paths = [b.field_path for b in excinfo.value.blockers if b.code == "SGC_RAW_TYPE_INVALID"]
+    assert any("local_kernel_usage_scope" in p for p in field_paths), field_paths
+
+
+def test_round3_invalid_evidence_refs_mapping_returns_structured_failure() -> None:
+    """Round 3 §3 — bundle ``evidence_refs`` MUST be a list of strings.
+    Submitting a ``dict`` (mapping) MUST produce a structured
+    ``SGC_RAW_TYPE_INVALID`` blocker, never a TypeError.
+    """
+    record = _make_record()
+    catalog, bundle = _assemble((record,))
+    bundle["evidence_refs"] = {"key": "value"}  # dict, not list of strings
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_RAW_TYPE_INVALID" in codes
+    field_paths = [b.field_path for b in excinfo.value.blockers if b.code == "SGC_RAW_TYPE_INVALID"]
+    assert any("evidence_refs" in p for p in field_paths), field_paths
+
+
+def test_round3_invalid_permission_stage_does_not_produce_bundle_hash_mismatch() -> None:
+    """Round 3 §4 — when a permission-level raw-type fails, the parser
+    MUST NOT also emit a derivative ``SGC_CATALOG_HASH_MISMATCH`` for
+    the bundle_hash check. The bundle_hash failure would be a
+    misleading diagnosis layered on top of the true root cause.
+    """
+    record = _make_record()
+    catalog, bundle = _assemble((record,))
+    # Break one permission's raw type (scope list is not a list).
+    bundle["permission_evidence"][0]["permission_scope"] = "not-a-list-of-strings"  # type: ignore[assignment]
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_CATALOG_HASH_MISMATCH" not in codes
+    # The permission-level raw-type block IS present.
+    assert "SGC_RAW_TYPE_INVALID" in codes
+
+
+def test_round3_invalid_edge_stage_does_not_produce_bundle_hash_mismatch() -> None:
+    """Round 3 §4 — same gating as the permission test, but for
+    provenance edges.
+    """
+    record = _make_record()
+    catalog, bundle = _assemble((record,))
+    bundle["provenance_edges"][0]["edge_hash"] = "not-a-hex-64-char-string"  # type: ignore[assignment]
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    codes = [b.code for b in excinfo.value.blockers]
+    assert "SGC_CATALOG_HASH_MISMATCH" not in codes
+
+
+def test_round3_two_invalid_permissions_accumulate_two_blockers() -> None:
+    """Round 3 — two independently broken permissions MUST each emit
+    their own blocker. Same-stage accumulation must hold.
+    """
+    record = _make_record()
+    perm_a = synthetic_permission_payload(permission_id="perm-a")
+    perm_b = synthetic_permission_payload(permission_id="perm-b")
+    perm_a["permission_scope"] = "not-a-list"  # type: ignore[assignment]
+    perm_b["permission_scope"] = "also-not-a-list"  # type: ignore[assignment]
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+    )
+    catalog, bundle = _assemble((record,), permissions=(perm_a, perm_b), edges=(edge,))
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    permission_raw_type_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and "permission_evidence" in b.field_path
+    ]
+    assert len(permission_raw_type_blockers) >= 2
+
+
+def test_round3_two_invalid_edges_accumulate_two_blockers() -> None:
+    """Round 3 — two independently broken edges MUST each emit their
+    own ``SGC_RAW_TYPE_INVALID`` blocker.
+    """
+    record = _make_record()
+    edge_a = synthetic_edge_payload(
+        edge_id="edge-a",
+        target_geometry_id=record["geometry_id"],
+    )
+    edge_b = synthetic_edge_payload(
+        edge_id="edge-b",
+        target_geometry_id=record["geometry_id"],
+    )
+    edge_a["edge_hash"] = "not-hex"  # type: ignore[assignment]
+    edge_b["edge_hash"] = "also-not-hex"  # type: ignore[assignment]
+    perm = synthetic_permission_payload(permission_id="perm-synthetic-1")
+    catalog, bundle = _assemble((record,), permissions=(perm,), edges=(edge_a, edge_b))
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    edge_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and "provenance_edges" in b.field_path
+    ]
+    assert len(edge_blockers) >= 2
+
+
+def test_round3_vendor_one_token_overlap_is_sufficient() -> None:
+    """Round 3 §5 — semantic clarification: vendor.usage_scope ⊆
+    kernel.local_kernel_usage_scope is the ONLY acceptable posture
+    for PASS. The kernel MAY declare extras beyond the vendor grant
+    (the kernel can implement a superset without violating the
+    vendor's authorization). The auth's "complete compatible scope"
+    covers both equality and proper subset; "one overlapping token
+    but incomplete scope" maps to vendor tokens the kernel does NOT
+    have ("vendor_usage_token_not_in_local_kernel_scope").
+
+    This test verifies the SUBSET case parses cleanly. The
+    kernel-supersets-vendor case is the parsed record's basic
+    invariant and must not regress here.
+    """
+    record = _make_record(
+        source_class="VENDOR_PERMISSIONED",
+        record_key="vendor-overlap",
+        permission_refs=("perm-vendor-overlap",),
+    )
+    perm = synthetic_permission_payload(
+        permission_id="perm-vendor-overlap",
+        permission_scope=(
+            "repository_storage",
+            "repository_redistribution",
+            "usage_scope",
+            "public_artifact_allowed",
+        ),
+        usage_scope=("internal_runtime",),
+    )
+    edge = synthetic_edge_payload(
+        edge_id="edge-synthetic-catalog-1/shell/vendor-overlap/1-provenance",
+        target_geometry_id=record["geometry_id"],
+    )
+    catalog, bundle = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+        bundle_local_kernel_usage_scope=("internal_runtime", "extra_kernel_token"),
+    )
+    cat = parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    assert cat.records
+
+
+def test_round3_vendor_partial_overlap_incomplete_blocks() -> None:
+    """Round 3 §5 — overlap but incomplete: vendor has 2 tokens, kernel
+    has only 1 of them. The vendor's second token is NOT supported by
+    the kernel so the record MUST block with reason
+    ``vendor_usage_token_not_in_local_kernel_scope``.
+    """
+    record = _make_record(
+        source_class="VENDOR_PERMISSIONED",
+        record_key="vendor-partial-overlap",
+        permission_refs=("perm-vendor-partial",),
+    )
+    perm = synthetic_permission_payload(
+        permission_id="perm-vendor-partial",
+        permission_scope=(
+            "repository_storage",
+            "repository_redistribution",
+            "usage_scope",
+            "public_artifact_allowed",
+        ),
+        usage_scope=("internal_runtime", "mystery_token"),
+    )
+    edge = synthetic_edge_payload(
+        edge_id="edge-synthetic-catalog-1/shell/vendor-partial-overlap/1-provenance",
+        target_geometry_id=record["geometry_id"],
+    )
+    catalog, bundle = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+        bundle_local_kernel_usage_scope=("internal_runtime",),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    failing = next(
+        b for b in excinfo.value.blockers if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"
+    )
+    assert "mystery_token" in failing.details["vendor_usage_tokens_not_in_local_kernel_scope"]
+
+
+def test_round3_vendor_complete_usage_compatibility_passes() -> None:
+    """Round 3 §5 — vendor.usage_scope EQUALS
+    kernel.local_kernel_usage_scope passes.
+    """
+    record = _make_record(
+        source_class="VENDOR_PERMISSIONED",
+        record_key="vendor-pass",
+        permission_refs=("perm-vendor-pass",),
+    )
+    perm = synthetic_permission_payload(
+        permission_id="perm-vendor-pass",
+        permission_scope=(
+            "repository_storage",
+            "repository_redistribution",
+            "usage_scope",
+            "public_artifact_allowed",
+        ),
+        usage_scope=("internal_runtime",),
+    )
+    # Round 3 fixup: _make_record derives the default provenance_edge_id
+    # from the full stable geometry_id
+    # (``f"edge-{catalog_id}/shell/{record_key}/{revision}-provenance"``)
+    # so we mirror that here.
+    edge = synthetic_edge_payload(
+        edge_id="edge-synthetic-catalog-1/shell/vendor-pass/1-provenance",
+        target_geometry_id=record["geometry_id"],
+    )
+    catalog, bundle = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+        bundle_local_kernel_usage_scope=("internal_runtime",),
+    )
+    cat = parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    assert cat.records
+
+    # Strict subset (vendor ⊂ kernel) MUST also pass.
+    record2 = _make_record(
+        source_class="VENDOR_PERMISSIONED",
+        record_key="vendor-subset",
+        permission_refs=("perm-vendor-subset",),
+    )
+    perm2 = synthetic_permission_payload(
+        permission_id="perm-vendor-subset",
+        permission_scope=(
+            "repository_storage",
+            "repository_redistribution",
+            "usage_scope",
+            "public_artifact_allowed",
+        ),
+        usage_scope=("internal_runtime",),
+    )
+    edge2 = synthetic_edge_payload(
+        edge_id="edge-synthetic-catalog-1/shell/vendor-subset/1-provenance",
+        target_geometry_id=record2["geometry_id"],
+    )
+    catalog2, bundle2 = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record2,),
+        permission_payloads=(perm2,),
+        edge_payloads=(edge2,),
+        bundle_local_kernel_usage_scope=("internal_runtime", "vendor_subset_extra"),
+    )
+    cat2 = parse_shell_geometry_catalog(raw_catalog=catalog2, evidence_bundle=bundle2)
+    assert cat2.records
+
+
+def test_round3_vendor_empty_usage_scope_blocks() -> None:
+    """Round 3 §5 — vendor usage_scope = empty means vendor grants
+    nothing; must block with reason=empty_vendor_usage_scope.
+    """
+    record = _make_record(
+        source_class="VENDOR_PERMISSIONED",
+        record_key="vendor-empty",
+        permission_refs=("perm-vendor-empty",),
+    )
+    perm = synthetic_permission_payload(
+        permission_id="perm-vendor-empty",
+        permission_scope=(
+            "repository_storage",
+            "repository_redistribution",
+            "usage_scope",
+            "public_artifact_allowed",
+        ),
+        usage_scope=(),
+    )
+    edge = synthetic_edge_payload(
+        edge_id="edge-synthetic-catalog-1/shell/vendor-empty/1-provenance",
+        target_geometry_id=record["geometry_id"],
+    )
+    catalog, bundle = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+        bundle_local_kernel_usage_scope=("internal_runtime",),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    failing = next(
+        b for b in excinfo.value.blockers if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"
+    )
+    assert failing.details["reason"] == "empty_vendor_usage_scope"
+
+
+def test_round3_vendor_unknown_local_token_blocks() -> None:
+    """Round 3 §5 — usage tokens declared by the vendor that are not
+    in the local kernel's authorized scope MUST block with reason
+    ``vendor_usage_token_not_in_local_kernel_scope``.
+    """
+    record = _make_record(
+        source_class="VENDOR_PERMISSIONED",
+        record_key="vendor-unk",
+        permission_refs=("perm-vendor-unk",),
+    )
+    perm = synthetic_permission_payload(
+        permission_id="perm-vendor-unk",
+        permission_scope=(
+            "repository_storage",
+            "repository_redistribution",
+            "usage_scope",
+            "public_artifact_allowed",
+        ),
+        usage_scope=("internal_runtime", "mystery_token"),
+    )
+    edge = synthetic_edge_payload(
+        edge_id="edge-synthetic-catalog-1/shell/vendor-unk/1-provenance",
+        target_geometry_id=record["geometry_id"],
+    )
+    catalog, bundle = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+        bundle_local_kernel_usage_scope=("internal_runtime",),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    failing = next(
+        b for b in excinfo.value.blockers if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"
+    )
+    assert failing.details["reason"] == "vendor_usage_token_not_in_local_kernel_scope"
+    assert "mystery_token" in failing.details["vendor_usage_tokens_not_in_local_kernel_scope"]

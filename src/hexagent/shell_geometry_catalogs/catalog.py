@@ -57,7 +57,10 @@ from hexagent.rule_packs.models import (
 from .blockers import (
     SHELL_GEOMETRY_CATALOG_DEFAULT_FIELD_PATH,
     SHELL_GEOMETRY_CATALOG_DEFAULT_MESSAGE_KEY,
+    SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE,
     ShellGeometryCatalogBlockerEntry,
+    deep_freeze_details,
+    freeze_evidence_refs,
     sort_blockers,
 )
 from .models import (
@@ -183,15 +186,34 @@ def _make_entry(
     code: str,
     *,
     field_path: str | None = None,
-    evidence_refs: tuple[str, ...] = (),
+    evidence_refs: Sequence[str] | tuple[str, ...] = (),
     details: Mapping[str, Any] | None = None,
 ) -> ShellGeometryCatalogBlockerEntry:
+    """Construct a TASK-023 blocker entry with the §11 stage rank bound.
+
+    Round 3 fixup: every parser-level blocker entry MUST carry an
+    authoritative ``stage_rank`` read from
+    ``SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE``. The dataclass
+    ``__post_init__`` rejects any entry whose ``stage_rank`` does not
+    match the authoritative value for its code; this is the hard
+    guarantee that ``ShellGeometryCatalogFailure`` can never default to
+    stage 0 and that the composite ordering key remains correct even
+    when a downstream caller passes a wrong stage_rank.
+
+    ``details`` is deep-frozen through ``deep_freeze_details`` and
+    ``evidence_refs`` is normalized through ``freeze_evidence_refs`` so
+    the caller cannot mutate the blocker entry post-construction.
+    """
+    stage_rank = SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE[code]
+    frozen_details = deep_freeze_details(details)
+    frozen_refs = freeze_evidence_refs(evidence_refs)
     return ShellGeometryCatalogBlockerEntry(
         code=code,
         field_path=field_path or SHELL_GEOMETRY_CATALOG_DEFAULT_FIELD_PATH[code],
         message_key=SHELL_GEOMETRY_CATALOG_DEFAULT_MESSAGE_KEY[code],
-        evidence_refs=tuple(evidence_refs),
-        details=details,
+        stage_rank=stage_rank,
+        evidence_refs=frozen_refs,
+        details=frozen_details,
     )
 
 
@@ -304,36 +326,23 @@ def _stable_geometry_id(
 ) -> str:
     """Compute the stable, design-frozen geometry identity.
 
-    The identity is ``<catalog_id>/shell/<record_key>/<revision>`` —
-    four segments, no extras, no normalization, no case folding.
+    The identity is ``<catalog_id>/shell/<record_key>/<revision>`` — four
+    segments, no extras, no normalization, no case folding. Both
+    ``record_key`` and ``revision`` MUST NOT contain the ``/`` separator
+    because the identity form strictly disallows nested slashes past the
+    three structural separators.
     """
+    if "/" in record_key:
+        raise ValueError(
+            "record_key must not contain '/' separator "
+            "(four-part stable identity is exactly four segments)"
+        )
+    if "/" in revision:
+        raise ValueError(
+            "revision must not contain '/' separator "
+            "(four-part stable identity is exactly four segments)"
+        )
     return f"{catalog_id}/{GEOMETRY_ROLE}/{record_key}/{revision}"
-
-
-def _split_stable_geometry_id(
-    *,
-    catalog_id: str,
-    raw_id: str,
-) -> tuple[str, str] | None:
-    """Return ``(record_key, revision)`` parsed from ``raw_id``.
-
-    Returns None if the raw_id does not match the canonical
-    ``<catalog_id>/shell/<record_key>/<revision>`` form.
-    """
-    prefix = f"{catalog_id}/{GEOMETRY_ROLE}/"
-    if not raw_id.startswith(prefix):
-        return None
-    rest = raw_id[len(prefix) :]
-    # The trailing "/<revision>" is the LAST segment; record_key MAY
-    # contain slashes itself. We split on the LAST "/" only.
-    if "/" not in rest:
-        return None
-    last_slash = rest.rfind("/")
-    record_key = rest[:last_slash]
-    revision = rest[last_slash + 1 :]
-    if not record_key or not revision:
-        return None
-    return (record_key, revision)
 
 
 def _verify_stable_geometry_identity(
@@ -344,36 +353,122 @@ def _verify_stable_geometry_identity(
 ) -> tuple[str, str] | None:
     """Reject any deviation from the design-frozen identity format.
 
-    Returns the parsed ``(record_key, revision)`` on success.
-    Returns ``None`` on rejection (after appending a blocker) AND
-    appends a ``SGC_RECORD_ID_INVALID`` blocker.
+    Round 3 fixup §2 enforces the **exact four-part** form
+    ``<catalog_id>/shell/<record_key>/<revision>``:
+
+    * The raw id MUST contain EXACTLY THREE ``/`` separators (four
+      segments).  Forms such as ``catalog/shell/a/b/1`` (four segments),
+      ``catalog/shell//1`` (empty record_key), ``catalog/SHELL/a/1``
+      (wrong role case), and ``catalog/shell/a/1/extra`` (extra
+      revision segment) all reject with ``SGC_RECORD_ID_INVALID``.
+    * ``record_key`` MUST NOT contain ``/`` after the role (separate
+      condition; same code).
+    * ``revision`` MUST equal the record's ``revision`` field byte-for-byte.
+    * No Unicode normalization or case folding is applied; the caller
+      must pass raw ASCII path-literal segment tokens.
     """
-    parsed = _split_stable_geometry_id(catalog_id=catalog_id, raw_id=raw_id)
-    if parsed is None:
+    if not isinstance(raw_id, str) or not raw_id:
         failures.append(
             _make_entry(
                 "SGC_RECORD_ID_INVALID",
                 details={
-                    "expected_prefix": f"{catalog_id}/{GEOMETRY_ROLE}/<record_key>/<revision>",
-                    "actual": raw_id,
+                    "expected_form": "<catalog_id>/shell/<record_key>/<revision>",
+                    "actual": repr(raw_id),
                 },
             )
         )
         return None
-    record_key, revision = parsed
-    expected = _stable_geometry_id(catalog_id=catalog_id, record_key=record_key, revision=revision)
-    if raw_id != expected:
+    segments = raw_id.split("/")
+    if len(segments) != 4:
         failures.append(
             _make_entry(
                 "SGC_RECORD_ID_INVALID",
                 details={
-                    "expected": expected,
+                    "expected_form": "<catalog_id>/shell/<record_key>/<revision>",
                     "actual": raw_id,
+                    "segment_count": len(segments),
+                    "expected_segment_count": 4,
                 },
             )
         )
         return None
-    return parsed
+    seg_catalog, seg_role, seg_record_key, seg_revision = segments
+    if seg_catalog != catalog_id:
+        failures.append(
+            _make_entry(
+                "SGC_RECORD_ID_INVALID",
+                details={
+                    "expected_form": f"{catalog_id}/shell/<record_key>/<revision>",
+                    "actual": raw_id,
+                    "mismatch": "catalog_id",
+                    "expected_prefix": catalog_id,
+                },
+            )
+        )
+        return None
+    if seg_role != GEOMETRY_ROLE:
+        failures.append(
+            _make_entry(
+                "SGC_RECORD_ID_INVALID",
+                details={
+                    "expected_form": f"{catalog_id}/shell/<record_key>/<revision>",
+                    "actual": raw_id,
+                    "mismatch": "geometry_role",
+                    "expected_role": GEOMETRY_ROLE,
+                    "actual_role": seg_role,
+                },
+            )
+        )
+        return None
+    if not seg_record_key:
+        failures.append(
+            _make_entry(
+                "SGC_RECORD_ID_INVALID",
+                details={
+                    "expected_form": f"{catalog_id}/shell/<record_key>/<revision>",
+                    "actual": raw_id,
+                    "mismatch": "record_key_empty",
+                },
+            )
+        )
+        return None
+    if not seg_revision:
+        failures.append(
+            _make_entry(
+                "SGC_RECORD_ID_INVALID",
+                details={
+                    "expected_form": f"{catalog_id}/shell/<record_key>/<revision>",
+                    "actual": raw_id,
+                    "mismatch": "revision_empty",
+                },
+            )
+        )
+        return None
+    if "/" in seg_record_key:
+        failures.append(
+            _make_entry(
+                "SGC_RECORD_ID_INVALID",
+                details={
+                    "expected_form": f"{catalog_id}/shell/<record_key>/<revision>",
+                    "actual": raw_id,
+                    "mismatch": "record_key_contains_slash",
+                },
+            )
+        )
+        return None
+    if "/" in seg_revision:
+        failures.append(
+            _make_entry(
+                "SGC_RECORD_ID_INVALID",
+                details={
+                    "expected_form": f"{catalog_id}/shell/<record_key>/<revision>",
+                    "actual": raw_id,
+                    "mismatch": "revision_contains_slash",
+                },
+            )
+        )
+        return None
+    return (seg_record_key, seg_revision)
 
 
 # ---------------------------------------------------------------------------
@@ -789,7 +884,25 @@ def parse_shell_geometry_catalog(
                 )
             )
             continue
-        # Stage 5c — duplicate permission_id (canonical-stage, fail-closed)
+        # Stage 5c — duplicate permission_id (canonical-stage, fail-closed).
+        #
+        # Round 3 §7 ambiguity: the merged design §10 closed code set
+        # has ``SGC_RECORD_DUPLICATE_ID`` for records but no explicit
+        # permission-level duplicate code. The most source-supported
+        # interpretation is that a duplicate ``permission_id`` is a
+        # canonical-identity structural violation on the raw bundle,
+        # which maps to ``SGC_RAW_TYPE_INVALID`` (Stage 1 — raw types
+        # / canonical identity). The mapping is **not** using
+        # ``SGC_CATALOG_HASH_MISMATCH`` because the bundle hash itself
+        # is not yet computed at Stage 5.
+        #
+        # TODO(TASK-023-DESIGN-AMENDMENT-001): surface the §7 authority
+        # ambiguity to Charles for a separate design amendment round
+        # that introduces an explicit duplicate-id code for the
+        # permission and edge snapshot dimensions. Until then, the
+        # parser continues to emit ``SGC_RAW_TYPE_INVALID`` which is
+        # the only source-supported candidate given the §10 closed
+        # taxonomy.
         if pid in perm_id_set:
             failures.append(
                 _make_entry(
@@ -976,6 +1089,8 @@ def parse_shell_geometry_catalog(
                 )
             )
             continue
+        # Stage 6c — duplicate edge_id (canonical-stage, fail-closed).
+        # Same §7 ambiguity comment as Stage 5c applies.
         if eid in edge_id_set:
             failures.append(
                 _make_entry(
@@ -1011,37 +1126,34 @@ def parse_shell_geometry_catalog(
     # ------------------------------------------------------------------
     perm_records_tuple = tuple(cast(Sequence[VendorPermissionEvidenceSnapshot], perm_records))
     edge_records_tuple = tuple(cast(Sequence[ProvenanceEdgeSnapshot], edge_records))
-    # Bundle hash domain: bundle fields minus bundle_hash, plus ordered
-    # permission_hash sequence AND ordered (permission_id, permission_hash)
-    # binding plus edge_hash sequence bound by edge_id ordering.
-    bundle_hash_payload = {
-        "schema_version": "task023.shell-authority-evidence-bundle.v1",
-        "bundle_id": bundle_id,
-        "bundle_version": bundle_version,
-        "approval_status": bundle_approval,
-        "permission_hashes": _canonical_permission_hash_sequence(perm_records_tuple),
-        "edge_hashes": _canonical_edge_hash_sequence(edge_records_tuple),
-        "local_kernel_usage_scope": sorted(evidence_bundle.get("local_kernel_usage_scope", [])),
-        "evidence_refs": sorted(
-            _canonicalize_str_seq(evidence_bundle.get("evidence_refs", [])) or ()
-        ),
-        "task012_validation_hash": task012_validation_hash,
-    }
-    expected_bundle_hash = canonical_sha256(bundle_hash_payload)
-    if expected_bundle_hash != bundle_hash_in:
-        failures.append(
-            _make_entry(
-                "SGC_CATALOG_HASH_MISMATCH",
-                field_path="evidence_bundle.bundle_hash",
-                details={
-                    "expected": expected_bundle_hash,
-                    "actual": bundle_hash_in,
-                },
-            )
-        )
-        _raise(failures)
-
-    # local_kernel_usage_scope and evidence_refs raw types validated.
+    # Round 3 §4 — dependent-stage gating: if ANY permission-snapshot
+    # raw-type / exact-field / identity / duplicate validation failed,
+    # we MUST NOT compute the bundle hash from a partial snapshot set
+    # (the bundle_hash depends on every permission_hash in the set, and
+    # a missing snapshot would change the hash domain silently). Same
+    # logic for provenance edges.
+    permission_failure_count = sum(
+        1
+        for f in failures
+        if "permission_evidence" in f.field_path
+        or "permission_id" in f.field_path
+        or "permission_hash" in f.field_path
+    )
+    edge_failure_count = sum(
+        1
+        for f in failures
+        if "provenance_edges" in f.field_path
+        or "edge_id" in f.field_path
+        or "edge_hash" in f.field_path
+    )
+    permission_stage_failed = permission_failure_count > 0
+    edge_stage_failed = edge_failure_count > 0
+    # Round 3 §3 — raw-before-hash: validate ``local_kernel_usage_scope``
+    # and ``evidence_refs`` BEFORE computing the bundle_hash payload.
+    # Without this pre-validation an int submitted in place of
+    # ``local_kernel_usage_scope`` leaks a ``TypeError`` from
+    # ``sorted(...)`` instead of producing a structured
+    # ``SGC_RAW_TYPE_INVALID`` blocker.
     raw_local_kernel_usage_scope = evidence_bundle.get("local_kernel_usage_scope")
     if not _is_str_seq(raw_local_kernel_usage_scope):
         failures.append(
@@ -1069,6 +1181,41 @@ def parse_shell_geometry_catalog(
     if bundle_evidence_refs_canon is None or not bundle_evidence_refs_canon:
         failures.append(
             _make_entry("SGC_RAW_TYPE_INVALID", field_path="evidence_bundle.evidence_refs")
+        )
+        _raise(failures)
+
+    # Bundle hash domain: bundle fields minus bundle_hash, plus ordered
+    # permission_hash sequence AND ordered (permission_id, permission_hash)
+    # binding plus edge_hash sequence bound by edge_id ordering.
+    bundle_hash_payload = {
+        "schema_version": "task023.shell-authority-evidence-bundle.v1",
+        "bundle_id": bundle_id,
+        "bundle_version": bundle_version,
+        "approval_status": bundle_approval,
+        "permission_hashes": _canonical_permission_hash_sequence(perm_records_tuple),
+        "edge_hashes": _canonical_edge_hash_sequence(edge_records_tuple),
+        "local_kernel_usage_scope": sorted(local_kernel_usage_canon),
+        "evidence_refs": sorted(bundle_evidence_refs_canon),
+        "task012_validation_hash": task012_validation_hash,
+    }
+    expected_bundle_hash = canonical_sha256(bundle_hash_payload)
+    if permission_stage_failed or edge_stage_failed:
+        # Round 3 §4 — do not even compare bundle hash when permission
+        # / edge stages produced incomplete partial snapshots. The
+        # block above for "expected != actual" is retained for the
+        # case where upstream is clean but the supplied bundle_hash is
+        # wrong (separate failure cause).
+        _raise(failures)
+    if expected_bundle_hash != bundle_hash_in:
+        failures.append(
+            _make_entry(
+                "SGC_CATALOG_HASH_MISMATCH",
+                field_path="evidence_bundle.bundle_hash",
+                details={
+                    "expected": expected_bundle_hash,
+                    "actual": bundle_hash_in,
+                },
+            )
         )
         _raise(failures)
 
@@ -1600,16 +1747,53 @@ def parse_shell_geometry_catalog(
                     ok = False
                     continue
                 usage_set = set(perm.usage_scope)
-                if not usage_set & set(local_kernel_usage_canon):
+                kernel_scope_set = set(local_kernel_usage_canon)
+                if not usage_set:
+                    # Round 3 §5: an empty vendor usage_scope means the
+                    # vendor grants nothing; the record MUST block.
                     failures.append(
                         _make_entry(
                             "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
                             field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
                             evidence_refs=(perm_ref,),
-                            details={"usage_scope": sorted(usage_set)},
+                            details={
+                                "missing": sorted(kernel_scope_set),
+                                "usage_scope": [],
+                                "local_kernel_usage_scope": sorted(kernel_scope_set),
+                                "reason": "empty_vendor_usage_scope",
+                            },
                         )
                     )
                     ok = False
+                    continue
+                # Round 3 §5 — semantics:
+                #   vendor.usage_scope MUST be a non-empty subset of
+                #   kernel.local_kernel_usage_scope. Strict equality IS
+                #   allowed (vendor authorized exactly what the kernel
+                #   implements). Vendor-authorized tokens that the local
+                #   kernel does NOT support MUST block. The kernel
+                #   declaring extra tokens beyond the vendor grant does
+                #   not block (the kernel can implement a superset of
+                #   the vendor's grants without violating anything).
+                not_authorized_by_kernel = sorted(usage_set - kernel_scope_set)
+                if not_authorized_by_kernel:
+                    failures.append(
+                        _make_entry(
+                            "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
+                            field_path=f"raw_catalog.records[{ri}].permission_evidence_refs",
+                            evidence_refs=(perm_ref,),
+                            details={
+                                "vendor_usage_tokens_not_in_local_kernel_scope": (
+                                    not_authorized_by_kernel
+                                ),
+                                "usage_scope": sorted(usage_set),
+                                "local_kernel_usage_scope": sorted(kernel_scope_set),
+                                "reason": "vendor_usage_token_not_in_local_kernel_scope",
+                            },
+                        )
+                    )
+                    ok = False
+                    continue
             if not ok:
                 continue
 
@@ -1697,6 +1881,28 @@ def parse_shell_geometry_catalog(
         pass
 
     constructed: list[ShellGeometryRecord] = []
+    # Round 3 §4 — dependent-stage gating: track which records had any
+    # upstream semantic-stage failure (stages 8/10/11/12/13/14) so we
+    # do NOT compute the record_hash for those records. Computing the
+    # hash from a half-validated record would produce a misleading
+    # RECORD_HASH_MISMATCH layered on top of the true root cause.
+    per_record_upstream_failures: dict[int, set[str]] = {}
+    for ri, _ in enumerate(raw_records_seen):
+        per_record_upstream_failures[ri] = set()
+    # Re-scan the existing failures to bucket them by record index.
+    for failure in failures:
+        # field_path patterns like "raw_catalog.records[<idx>]..."
+        if failure.field_path.startswith("raw_catalog.records["):
+            try:
+                bracket_close = failure.field_path.index("]")
+                ri_str = failure.field_path[len("raw_catalog.records[") : bracket_close]
+                ri = int(ri_str)
+            except (ValueError, IndexError):
+                continue
+            per_record_upstream_failures.setdefault(ri, set()).add(failure.code)
+    record_stage_fail_codes = {
+        "SGC_RECORD_HASH_MISMATCH",
+    }
     for ri, info in enumerate(raw_records_seen):
         rec_payload = {
             "schema_version": "task023.approved-shell-geometry-record.v1",
@@ -1726,6 +1932,15 @@ def parse_shell_geometry_catalog(
         hash_payload = {
             k: v for k, v in rec_payload.items() if k not in {"nominal_label", "record_hash"}
         }
+        # Round 3 §4 — dependent-stage gating: if THIS record already
+        # has any upstream semantic-stage failure, do not compute its
+        # record_hash. The expected hash would not match the supplied
+        # raw hash (different content), producing a misleading
+        # RECORD_HASH_MISMATCH layered on top of the true root cause.
+        upstream_failures_for_record = per_record_upstream_failures.get(ri, set())
+        semantic_upstream = upstream_failures_for_record - record_stage_fail_codes
+        if semantic_upstream:
+            continue
         expected_record_hash = canonical_sha256(hash_payload)
 
         if expected_record_hash != info["record_hash_in"]:
@@ -1790,6 +2005,12 @@ def parse_shell_geometry_catalog(
         failures.append(
             _make_entry("SGC_CATALOG_HASH_MISMATCH", field_path="raw_catalog.catalog_hash")
         )
+        _raise(failures)
+    # Round 3 §4 — dependent-stage gating: if any record_hash failed
+    # in the previous stage, do not even compare catalog_hash (which
+    # would produce a spurious SGC_CATALOG_HASH_MISMATCH from the
+    # incomplete constructed record set).
+    if any(f.code == "SGC_RECORD_HASH_MISMATCH" for f in failures):
         _raise(failures)
     if expected_catalog_hash != catalog_hash_in:
         failures.append(

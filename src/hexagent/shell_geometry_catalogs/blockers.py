@@ -7,10 +7,16 @@ unsanctioned codes.
 
 The blocker codes are frozen at the values specified in the merged
 TASK-023 design contract §10 and Issue #151. The TASK-023
-``catalog.parse_shell_geometry_catalog`` performs the 18-stage
-validation pipeline in design-contract order; this module exposes the
-closed 25-code taxonomy plus minimal ordered blocker-entry helpers
-and the composite-sort key required by design contract §6 / §11.
+``catalog.parse_shell_geometry_catalog`` performs the validation
+pipeline in design-contract order; this module exposes the
+closed 25-code taxonomy, an **authoritative stage rank** for every
+code based on design contract §11, plus minimal ordered blocker-entry
+helpers and the composite-sort key required by design contract §6/§11.
+
+Every blocker entry MUST carry its real internal ``stage_rank`` —
+the parser layer MUST NOT default stage_rank to 0; round-3 fixup
+established that ``ShellGeometryCatalogFailure`` reordering must not
+silently fall back to a 0-rank bucket.
 
 The module forbids filesystem / network / database / environment /
 runtime-now / locale / registry / dynamic-import / executable-
@@ -24,7 +30,7 @@ from __future__ import annotations
 import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Final
+from typing import Any, Final, cast
 
 from hexagent.canonical_json import canonical_sha256
 
@@ -98,6 +104,107 @@ class ShellGeometryCatalogBlockerCode(enum.StrEnum):
     SGC_SELECTION_NOT_APPROVED = "SGC_SELECTION_NOT_APPROVED"
 
 
+# ---------------------------------------------------------------------------
+# Authoritative stage rank per design contract §11
+# ---------------------------------------------------------------------------
+#
+# The §11 parser pipeline stages are:
+#   1. raw types                            (stage_rank 1)
+#   2. exact top fields                     (stage_rank 2)
+#   3. schemas/profiles/IDs/versions/authority (stage_rank 3)
+#   4. bundle approval / TASK-012 hash / bundle hash (stage_rank 4)
+#   5. permission snapshots                 (stage_rank 5)
+#   6. provenance snapshots                 (stage_rank 6)
+#   7. records array                        (stage_rank 7)
+#   8. record fields (identity/duplicates/type/profile/revision) (stage_rank 8)
+#   9. approval lexical                     (stage_rank 9)
+#  10. non-approved rejection               (stage_rank 10)
+#  11. decimal                              (stage_rank 11)
+#  12. source binding                       (stage_rank 12)
+#  13. source class / license               (stage_rank 13)
+#  14. permission / provenance resolution + local usage gate (stage_rank 14)
+#  15. evidence arrays                      (stage_rank 15)
+#  16. record hashes                        (stage_rank 16)
+#  17. record ordering                      (stage_rank 17)
+#  18. catalog-bundle binding               (stage_rank 18)
+#  19. catalog hash                         (stage_rank 19)
+#  20. selection stages                     (stage_rank 20)
+#
+# Each blocker code below maps to exactly one stage. Selection codes
+# (SGC_RECORD_NOT_FOUND, SGC_SELECTION_NOT_APPROVED) are stage 20.
+# Round 3 fixup hardened this map — every parser-level _make_entry call
+# binds its code to its declared stage; no blocker enters the failure
+# pool with a default rank 0.
+
+_STAGE_RANK_RAW_TYPES = 1
+_STAGE_RANK_EXACT_FIELDS = 2
+_STAGE_RANK_SCHEMAS = 3
+_STAGE_RANK_BUNDLE_APPROVAL = 4
+_STAGE_RANK_PERMISSION_SNAPSHOT = 5
+_STAGE_RANK_PROVENANCE_SNAPSHOT = 6
+_STAGE_RANK_RECORDS_ARRAY = 7
+_STAGE_RANK_RECORD_FIELDS = 8
+_STAGE_RANK_APPROVAL_LEXICAL = 9
+_STAGE_RANK_APPROVAL_NONAPPROVED = 10
+_STAGE_RANK_DECIMAL = 11
+_STAGE_RANK_SOURCE_BINDING = 12
+_STAGE_RANK_SOURCE_CLASS_LICENSE = 13
+_STAGE_RANK_PERMISSION_RESOLUTION = 14
+_STAGE_RANK_EVIDENCE_ARRAYS = 15
+_STAGE_RANK_RECORD_HASHES = 16
+_STAGE_RANK_RECORD_ORDERING = 17
+_STAGE_RANK_CATALOG_BINDING = 18
+_STAGE_RANK_CATALOG_HASH = 19
+_STAGE_RANK_SELECTION = 20
+
+SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE: Final[Mapping[str, int]] = {
+    # Stage 1 — raw types
+    "SGC_RAW_TYPE_INVALID": _STAGE_RANK_RAW_TYPES,
+    # Stage 2 — exact top fields
+    "SGC_UNKNOWN_FIELD": _STAGE_RANK_EXACT_FIELDS,
+    # Stage 3 — schemas / profiles / IDs / versions / authority
+    "SGC_SCHEMA_VERSION_UNSUPPORTED": _STAGE_RANK_SCHEMAS,
+    "SGC_CATALOG_ID_INVALID": _STAGE_RANK_SCHEMAS,
+    "SGC_CATALOG_VERSION_INVALID": _STAGE_RANK_SCHEMAS,
+    "SGC_PROFILE_UNSUPPORTED": _STAGE_RANK_SCHEMAS,
+    "SGC_CATALOG_AUTHORITY_INVALID": _STAGE_RANK_SCHEMAS,
+    # Stage 4 — bundle approval / TASK-012 hash / bundle hash (approval_status)
+    "SGC_APPROVAL_STATE_INVALID": _STAGE_RANK_BUNDLE_APPROVAL,
+    # Stage 10 — non-approved bundle rejection
+    "SGC_RECORD_UNAPPROVED": _STAGE_RANK_APPROVAL_NONAPPROVED,
+    # Stage 7 — records array lexical structure
+    "SGC_RECORDS_INVALID": _STAGE_RANK_RECORDS_ARRAY,
+    # Stage 8 — record fields / identity / duplicates / type / profile / revision
+    "SGC_RECORD_ID_INVALID": _STAGE_RANK_RECORD_FIELDS,
+    "SGC_RECORD_DUPLICATE_ID": _STAGE_RANK_RECORD_FIELDS,
+    "SGC_GEOMETRY_TYPE_INVALID": _STAGE_RANK_RECORD_FIELDS,
+    "SGC_REVISION_INVALID": _STAGE_RANK_RECORD_FIELDS,
+    # Stage 11 — decimal
+    "SGC_SHELL_INSIDE_DIAMETER_INVALID": _STAGE_RANK_DECIMAL,
+    # Stage 12 — source binding
+    "SGC_SOURCE_BINDING_INCOMPLETE": _STAGE_RANK_SOURCE_BINDING,
+    # Stage 13 — source class / license
+    "SGC_SOURCE_CLASS_INVALID": _STAGE_RANK_SOURCE_CLASS_LICENSE,
+    "SGC_LICENSE_BLOCKED": _STAGE_RANK_SOURCE_CLASS_LICENSE,
+    # Stage 14 — permission / provenance resolution + local usage gate
+    "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE": _STAGE_RANK_PERMISSION_RESOLUTION,
+    "SGC_PROVENANCE_INCOMPLETE": _STAGE_RANK_PERMISSION_RESOLUTION,
+    # Stage 15 — evidence arrays
+    "SGC_EVIDENCE_REFS_INVALID": _STAGE_RANK_EVIDENCE_ARRAYS,
+    # Stage 16 — record hashes
+    "SGC_RECORD_HASH_MISMATCH": _STAGE_RANK_RECORD_HASHES,
+    # Stage 17 — record ordering
+    "SGC_CATALOG_HASH_MISMATCH": _STAGE_RANK_RECORD_ORDERING,
+    # Stage 20 — selection
+    "SGC_RECORD_NOT_FOUND": _STAGE_RANK_SELECTION,
+    "SGC_SELECTION_NOT_APPROVED": _STAGE_RANK_SELECTION,
+}
+
+assert set(SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE) == set(
+    SHELL_GEOMETRY_CATALOG_BLOCKER_CODES
+), "stage_rank map must cover every closed-set code exactly once"
+
+
 # Default message_key mapping per design contract §10 / Issue #151.
 SHELL_GEOMETRY_CATALOG_DEFAULT_MESSAGE_KEY: Final[Mapping[str, str]] = {
     "SGC_RAW_TYPE_INVALID": "sgc_raw_type_invalid",
@@ -158,6 +265,74 @@ SHELL_GEOMETRY_CATALOG_DEFAULT_FIELD_PATH: Final[Mapping[str, str]] = {
 
 
 # ---------------------------------------------------------------------------
+# Deep-freeze helpers for blocker payloads (Round 3 §6)
+# ---------------------------------------------------------------------------
+
+
+def _deep_freeze_value(value: Any) -> Any:
+    """Recursively freeze a value into immutable primitives.
+
+    Nested mappings are converted to a frozen ``MappingProxyType`` over a
+    recursive copy. Nested sequences (list / tuple) become a tuple of
+    recursively-frozen values. Scalars are returned unchanged. ``None``
+    is preserved as-is so ``details is None`` continues to hash as JSON
+    ``null``.
+    """
+    import types
+
+    if value is None or isinstance(value, (str, bytes, int, float, bool)):
+        return value
+    if isinstance(value, Mapping):
+        return types.MappingProxyType({str(k): _deep_freeze_value(v) for k, v in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_deep_freeze_value(v) for v in value)
+    if isinstance(value, (set, frozenset)):
+        return frozenset(_deep_freeze_value(v) for v in value)
+    # Anything else (custom objects, etc.) is returned unchanged — the
+    # caller is responsible for not placing non-hashable mutables into
+    # the blocker payload.
+    return value
+
+
+def deep_freeze_details(
+    details: Mapping[str, Any] | None,
+) -> Mapping[str, Any] | None:
+    """Deep-freeze a ``details`` mapping for a blocker entry.
+
+    Returns a new Mapping whose nested mutable layers (mappings / lists /
+    tuples) are themselves immutable. Tests assert that mutating the
+    caller's original dict/list does NOT change this frozen snapshot.
+    ``None`` is preserved so ``details None`` continues to hash as JSON
+    ``null``.
+    """
+    if details is None:
+        return None
+    if not isinstance(details, Mapping):
+        raise TypeError("details must be a Mapping or None")
+    return cast(Mapping[str, Any], _deep_freeze_value(details))
+
+
+def freeze_evidence_refs(
+    evidence_refs: Sequence[str],
+) -> tuple[str, ...]:
+    """Copy a ``Sequence[str]`` into an immutable tuple.
+
+    The convertion preserves duplicates and ordering but rejects any
+    non-string entry. Used by ``ShellGeometryCatalogBlockerEntry`` and
+    independently by ``catalog.py`` so the public parser cannot leak a
+    mutable list back to callers.
+    """
+    if not isinstance(evidence_refs, Sequence) or isinstance(evidence_refs, str):
+        raise TypeError("evidence_refs must be a Sequence[str], not str")
+    out: list[str] = []
+    for entry in evidence_refs:
+        if not isinstance(entry, str) or not entry:
+            raise TypeError("evidence_refs entries must be non-empty strings")
+        out.append(entry)
+    return tuple(out)
+
+
+# ---------------------------------------------------------------------------
 # Ordered blocker entry
 # ---------------------------------------------------------------------------
 
@@ -169,6 +344,7 @@ class ShellGeometryCatalogBlockerEntry:
     code: str
     field_path: str
     message_key: str
+    stage_rank: int
     evidence_refs: tuple[str, ...] = field(default_factory=tuple)
     details: Mapping[str, Any] | None = None
 
@@ -181,11 +357,25 @@ class ShellGeometryCatalogBlockerEntry:
             raise ValueError("field_path must be non-empty string")
         if not isinstance(self.message_key, str) or not self.message_key:
             raise ValueError("message_key must be non-empty string")
+        if not isinstance(self.stage_rank, int) or isinstance(self.stage_rank, bool):
+            raise ValueError("stage_rank must be a non-bool integer")
+        if self.stage_rank < 1 or self.stage_rank > _STAGE_RANK_SELECTION:
+            raise ValueError(
+                f"stage_rank {self.stage_rank} out of valid 1..{_STAGE_RANK_SELECTION} range"
+            )
+        expected_rank = SHELL_GEOMETRY_CATALOG_STAGE_RANK_BY_CODE[self.code]
+        if self.stage_rank != expected_rank:
+            raise ValueError(
+                f"stage_rank {self.stage_rank} does not match authoritative "
+                f"rank {expected_rank} for code {self.code!r}; round 3 fixup "
+                "binds every blocker to its §11 stage"
+            )
         if not isinstance(self.evidence_refs, tuple):
             raise ValueError("evidence_refs must be tuple")
         for entry in self.evidence_refs:
             if not isinstance(entry, str) or not entry:
                 raise ValueError("evidence_refs entries must be non-empty strings")
+        # details may be None or a frozen mapping; do not silently coerce dict → tuple.
         if self.details is not None and not isinstance(self.details, Mapping):
             raise ValueError("details must be a Mapping or None")
 
@@ -209,6 +399,7 @@ def _canonical_details_hash(details: Mapping[str, Any] | None) -> str:
     if details is None:
         return hashlib.sha256(_json.dumps(None).encode("utf-8")).hexdigest()
     if isinstance(details, Mapping):
+        # convert MappingProxyType back to a dict for canonical hashing
         return canonical_sha256(dict(details))
     raise TypeError("details must be a Mapping or None")
 
@@ -217,7 +408,7 @@ def _canonical_evidence_refs_hash(
     evidence_refs: Sequence[str],
 ) -> str:
     """Return SHA-256 of the canonical JSON of the RAW ``evidence_refs``
-    array (not wrapped in ``{"refs": [...]}``).
+    array (not wrapped in ``{"refs": [...]}`).
 
     Per contract, two blockers with distinct evidence_refs sequences
     MUST sort deterministically and distinct from each other; we hash
@@ -233,11 +424,14 @@ def _canonical_evidence_refs_hash(
 
 def composite_order_key(
     entry: ShellGeometryCatalogBlockerEntry,
-    stage_rank: int,
 ) -> tuple[int, str, str, str, str, str]:
-    """Composite ordering key per design contract §6."""
+    """Composite ordering key per design contract §6.
+
+    The stage_rank is read from the entry's internal field; the caller
+    no longer provides an identity→rank mapping.
+    """
     return (
-        stage_rank,
+        entry.stage_rank,
         entry.code,
         entry.field_path,
         entry.message_key,
@@ -248,20 +442,13 @@ def composite_order_key(
 
 def sort_blockers(
     entries: Sequence[ShellGeometryCatalogBlockerEntry],
-    *,
-    stage_by_identity: Mapping[int, int] | None = None,
 ) -> tuple[ShellGeometryCatalogBlockerEntry, ...]:
-    """Apply design contract §6 composite ordering."""
+    """Apply design contract §6 composite ordering using each entry's
+    internal ``stage_rank``. No external identity→rank mapping is used.
+    """
     if not isinstance(entries, Sequence):
         raise TypeError("entries must be a Sequence[ShellGeometryCatalogBlockerEntry]")
     for entry in entries:
         if not isinstance(entry, ShellGeometryCatalogBlockerEntry):
             raise TypeError("every entry must be a ShellGeometryCatalogBlockerEntry")
-    ranks: Mapping[int, int] = stage_by_identity or {}
-
-    def key(
-        e: ShellGeometryCatalogBlockerEntry,
-    ) -> tuple[int, str, str, str, str, str]:
-        return composite_order_key(e, ranks.get(id(e), 0))
-
-    return tuple(sorted(entries, key=key))
+    return tuple(sorted(entries, key=composite_order_key))
