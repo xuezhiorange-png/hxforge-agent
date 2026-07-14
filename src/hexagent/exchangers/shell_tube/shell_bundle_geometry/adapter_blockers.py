@@ -267,7 +267,10 @@ def _evidence_refs_hash(evidence_refs: Sequence[str]) -> str:
     return sha256_hex(canonical_json(list(evidence_refs)))
 
 
-def _composite_order_key(entry: MessageEntry, stage_rank: int) -> tuple[int, str, str, str, str, str]:
+def _composite_order_key(
+    entry: MessageEntry,
+    stage_rank: int,
+) -> tuple[int, str, str, str, str, str]:
     """Composite ordering key per Issue #147 Record 4.
 
     Returns ``(adapter_stage_rank, code, field_path or "", message_key,
