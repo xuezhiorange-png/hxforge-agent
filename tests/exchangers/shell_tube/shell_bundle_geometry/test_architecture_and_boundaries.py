@@ -17,7 +17,7 @@ FORBIDDEN_IMPORT_TOKENS = {
 
 def test_core_has_exact_module_boundary_and_no_forbidden_io_imports() -> None:
     root = Path("src/hexagent/exchangers/shell_tube/shell_bundle_geometry")
-    assert {path.name for path in root.glob("*.py")} == {
+    expected = {
         "__init__.py",
         "models.py",
         "canonical.py",
@@ -25,7 +25,11 @@ def test_core_has_exact_module_boundary_and_no_forbidden_io_imports() -> None:
         "authority.py",
         "geometry.py",
         "validation.py",
+        "adapter_blockers.py",
+        "rule_pack_adapter.py",
     }
+    actual = {path.name for path in root.glob("*.py")}
+    assert actual == expected
     for path in root.glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
