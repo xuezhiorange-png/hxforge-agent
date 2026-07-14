@@ -83,6 +83,15 @@ shards:
       - tests/exchangers/shell_tube/tube_layout/test_frozen_design_contract_unchanged.py
       - tests/exchangers/shell_tube/tube_layout/test_geometry_adapter.py
       - tests/exchangers/shell_tube/tube_layout/test_rule_pack_adapter.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_models.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_schema.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_authority.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_geometry.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_canonical.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_validation.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_warnings_blockers_provenance.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_architecture_and_boundaries.py
+      - tests/exchangers/shell_tube/shell_bundle_geometry/test_frozen_design_contract_unchanged.py
     timeout: 300
 
   - name: ci-acceptance
