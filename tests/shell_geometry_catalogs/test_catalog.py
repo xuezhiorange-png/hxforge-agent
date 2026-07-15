@@ -2161,28 +2161,14 @@ def test_round4_permission_payload_mutation_unchanged_hash_blocks() -> None:
     assert hash_mismatch[0].stage_rank == 5
 
 
-def _deprecated_round4_permission_payload_mutation_recomputed_hashes_still_blocks() -> None:
-    """DEPRECATED — REMOVED FROM PYTEST COLLECTION IN ROUND 6.
-
-    This test was a Round 4 duplicate of
-    ``test_round4_permission_payload_mutation_unchanged_hash_blocks``:
-    it mutated the payload but did NOT recompute ``permission_hash``,
-    so it never exercised the "child hash domain passed but caller
-    tried to slip through with a wrong hash" path. The corrected
-    coverage is provided by
-    ``test_round5_permission_recomputed_child_hash_stale_bundle_hash``
-    (which actually recomputes the child hash and stales the
-    bundle_hash) and ``test_round5_all_hashes_fresh_no_hash_mismatch``
-    (which proves full chain integrity).
-
-    Per Round 6 §7.1 — the function is retained as a non-collected
-    historical comment so the audit trail is preserved, but pytest
-    will not execute it (the name does not start with ``test_``).
-    DO NOT rename back to ``test_`` without Charles authorization
-    AND real hash recomputation in the test body.
-    """
-    # Body intentionally not executed — see comment above.
-    raise NotImplementedError("DEPRECATED Round 4 duplicate; see docstring for replacement tests.")
+# Round 6 / Round 7 — the two false Round 4 "recomputed_hashes_still_blocks"
+# functions were removed from this file in Round 7. They were duplicates
+# of the genuine "unchanged_hash_blocks" tests; their docstrings claimed
+# the caller recomputed the hash, but the test body never did. Replacement
+# coverage (truly recomputing child hash + staling bundle_hash) is provided
+# by ``test_round5_permission_recomputed_child_hash_stale_bundle_hash``,
+# ``test_round5_edge_recomputed_child_hash_stale_bundle_hash``, and
+# ``test_round5_all_hashes_fresh_no_hash_mismatch``.
 
 
 def test_round4_edge_payload_mutation_unchanged_hash_blocks() -> None:
@@ -2218,30 +2204,6 @@ def test_round4_edge_payload_mutation_unchanged_hash_blocks() -> None:
         f"got codes={[b.code for b in excinfo.value.blockers]}"
     )
     assert hash_mismatch[0].stage_rank == 6
-
-
-def _deprecated_round4_edge_payload_mutation_recomputed_hashes_still_blocks() -> None:
-    """DEPRECATED — REMOVED FROM PYTEST COLLECTION IN ROUND 6.
-
-    This test was a Round 4 duplicate of
-    ``test_round4_edge_payload_mutation_unchanged_hash_blocks``:
-    it mutated the payload but did NOT recompute ``edge_hash``, so it
-    never exercised the "child hash domain passed but caller tried
-    to slip through with a wrong hash" path. The corrected coverage
-    is provided by
-    ``test_round5_edge_recomputed_child_hash_stale_bundle_hash``
-    (which actually recomputes the child hash and stales the
-    bundle_hash) and ``test_round5_all_hashes_fresh_no_hash_mismatch``
-    (which proves full chain integrity).
-
-    Per Round 6 §7.1 — the function is retained as a non-collected
-    historical comment so the audit trail is preserved, but pytest
-    will not execute it (the name does not start with ``test_``).
-    DO NOT rename back to ``test_`` without Charles authorization
-    AND real hash recomputation in the test body.
-    """
-    # Body intentionally not executed — see comment above.
-    raise NotImplementedError("DEPRECATED Round 4 duplicate; see docstring for replacement tests.")
 
 
 def test_round4_permission_hash_mismatch_prevents_bundle_hash_helper() -> None:
@@ -3153,7 +3115,7 @@ def test_round6_unknown_token_prevents_bundle_hash_helper() -> None:
 
 
 def test_round6_usage_scope_deployment_tokens_not_validated_against_vendor_enum() -> None:
-    """Round 6 §7.3.9 — ``usage_scope`` is NOT a
+    """Round 6 §7.3.9 + Round 7 — ``usage_scope`` is NOT a
     ``VendorPermissionScope`` enum member. Deployment / runtime
     tokens such as ``internal_runtime``, ``external_runtime``, and
     ``vendor_subset_extra`` MUST remain potentially valid
@@ -3161,12 +3123,18 @@ def test_round6_usage_scope_deployment_tokens_not_validated_against_vendor_enum(
     ``usage_scope ⊆ local_kernel_usage_scope`` contract, and MUST
     NOT be rejected by the Stage-5 membership check.
 
-    Concretely, this test builds a permission whose
-    ``permission_scope`` is a legal VendorPermissionScope token
-    and whose ``usage_scope`` is a deployment token not in the
-    enum; it asserts that no
-    ``SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE`` blocker fires on
-    the ``usage_scope`` field.
+    Round 7 — direct-success assertion (no try/except swallowing).
+    The test MUST require a successful parse; any
+    ``ShellGeometryCatalogFailure`` propagates to pytest as a real
+    failure. The fixture is constructed so that every input
+    constraint is satisfied:
+      - ``permission_scope`` = legal TASK-012 enum token
+      - ``usage_scope``     = the three deployment / runtime tokens
+      - ``local_kernel_usage_scope`` is a superset of ``usage_scope``
+
+    Concretely, after the parser returns, ``catalog.records`` is
+    asserted non-empty, which proves the parser accepted the entire
+    payload including the ``usage_scope`` deployment tokens.
     """
     perm = synthetic_permission_payload(
         permission_id="perm-usage-scope-non-vendor",
@@ -3196,22 +3164,16 @@ def test_round6_usage_scope_deployment_tokens_not_validated_against_vendor_enum(
             "vendor_subset_extra",
         ),
     )
-    try:
-        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
-    except ShellGeometryCatalogFailure as exc:
-        # If parse fails, it MUST NOT be because of
-        # SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE — that code only
-        # applies to permission_scope (TASK-012 enum), not to
-        # usage_scope (vendor deployment / runtime token set).
-        scope_blockers = [
-            b for b in exc.blockers if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"
-        ]
-        assert not scope_blockers, (
-            "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE must NOT fire on "
-            f"usage_scope deployment tokens; got {scope_blockers!r}"
-        )
-        # Re-raise if the failure is something else; the test's
-        # intent is that ``usage_scope`` is not validated against
-        # the TASK-012 enum. We allow this test to pass either by
-        # success or by a non-scope-authority failure, as long as
-        # no scope-authority blocker fires on usage_scope.
+    # Direct-success assertion: any ShellGeometryCatalogFailure
+    # propagates as a real test failure (no try/except swallowing).
+    catalog = parse_shell_geometry_catalog(
+        raw_catalog=cat,
+        evidence_bundle=bun,
+    )
+    assert catalog.records, (
+        "expected parse to succeed AND return a non-empty records "
+        "list when permission_scope is a legal TASK-012 enum token "
+        "and usage_scope contains the three deployment / runtime "
+        "tokens (internal_runtime, external_runtime, "
+        "vendor_subset_extra) supported by local_kernel_usage_scope"
+    )
