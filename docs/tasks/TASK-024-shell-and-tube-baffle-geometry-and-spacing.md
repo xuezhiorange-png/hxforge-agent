@@ -352,11 +352,13 @@ Binary floating-point values are forbidden at all public and hash boundaries.
 precision=50
 rounding=ROUND_HALF_EVEN
 coordinate_quantum_m=0.000000000001
+squared_coordinate_quantum_m2=0.000000000000000000000001
 canonical_zero=0
 ```
 
 All arithmetic uses `Decimal` under this context. `sqrt` uses the Decimal square
-root under the same context.
+root under the same context. The squared-output quantum is not an independent
+engineering value; it is exactly `coordinate_quantum_m * coordinate_quantum_m`.
 
 ### 7.3 Quantization ordering discipline
 
@@ -462,6 +464,101 @@ and deterministic.
 
 Semantic arrays are not re-sorted by generic serialized representation.
 
+### 7.6 Total raw-value projection for blocked requests
+
+A blocked result must remain deterministic even when the ordinary validated
+`request_hash` cannot be computed. TASK-024 therefore freezes one total,
+non-executable diagnostic projection:
+
+```text
+RAW_BLOCKED_PROJECTION_VERSION=task024.raw-blocked-projection.v1
+```
+
+The projection is used only for `blocked_result_hash`. It never authorizes a raw
+value, never repairs a request, and never enters a successful geometry. The
+underlying invalid value still emits its ordinary blocker, including
+`BFG_RAW_TYPE_INVALID` where applicable.
+
+The recursive tagged-value mapping is exact:
+
+| Python/raw value | Canonical tagged projection |
+|---|---|
+| `None` | `{"raw_type":"null"}` |
+| `bool` | `{"raw_type":"bool","value":<JSON boolean>}` |
+| `int` excluding bool | `{"raw_type":"int","value":<base-10 string>}` |
+| `str` | `{"raw_type":"str","code_points":[<lowercase hexadecimal ordinals>]}` preserving code-point order |
+| finite `float` | `{"raw_type":"float","value":<lowercase float.hex()>}` |
+| float NaN | `{"raw_type":"float","value":"nan"}` |
+| float positive infinity | `{"raw_type":"float","value":"+infinity"}` |
+| float negative infinity | `{"raw_type":"float","value":"-infinity"}` |
+| `Decimal` | `{"raw_type":"decimal","sign":<0-or-1>,"digits":<digit string>,"exponent":<DecimalTuple exponent string>}` |
+| `bytes` | `{"raw_type":"bytes","hex":<lowercase hex>}` |
+| exact built-in `list` | `{"raw_type":"list","items":[...]}` preserving order |
+| exact built-in `tuple` | `{"raw_type":"tuple","items":[...]}` preserving order |
+| exact built-in `dict` | `{"raw_type":"mapping","entries":[...]}` under the ordering rule below |
+| exact built-in `set` | `{"raw_type":"set","items":[...]}` under the ordering rule below |
+| exact built-in `frozenset` | `{"raw_type":"frozenset","items":[...]}` under the ordering rule below |
+| enum member | `{"raw_type":"enum","enum_type":<module.qualname>,"member":<exact name>}` |
+| recognized TASK-020/021/022/024 public dataclass | `{"raw_type":"dataclass","dataclass_type":<module.qualname>,"fields":[...]}` in declaration order |
+| every other object | `{"raw_type":"unsupported_object","python_type":<module.qualname>}` |
+
+For an exact built-in dict, every entry is represented as:
+
+```text
+{
+  "key": raw_value_projection(key),
+  "value": raw_value_projection(value)
+}
+```
+
+Entries sort by:
+
+```text
+(
+  canonical_json_bytes(key_projection),
+  canonical_json_bytes(value_projection)
+)
+```
+
+Set and frozenset items sort by their canonical projection bytes. A raw string
+is represented by lowercase hexadecimal Unicode code-point ordinals, so even a
+Python string containing an unpaired surrogate has an ASCII-only total
+projection. The projector accepts only the exact built-in container types listed
+above; container subclasses and custom mappings are `unsupported_object` and
+are never iterated. It never uses `repr`, `str(object)`, memory address, object
+ID, hash randomization, locale, or iteration order of an unordered collection.
+
+A pre-scan traverses only exact supported containers and recognized public
+dataclasses. If a reference cycle exists in that traversed graph, the entire raw
+value component is represented by the exact token:
+
+```text
+{"raw_type":"cyclic_graph"}
+```
+
+This deliberate collapse is diagnostic only. Likewise, state inside an
+`unsupported_object` is deliberately not inspected. These projections may group
+different invalid programmer objects into the same diagnostic identity; they do
+not weaken successful-result identity because they can occur only in a blocked
+result.
+
+The complete fallback request projection is:
+
+```text
+{
+  "projection_version": "task024.raw-blocked-projection.v1",
+  "request": raw_value_projection(raw_request)
+}
+```
+
+This function is total for the public validation boundary without invoking
+user-defined iteration, conversion, representation, or serialization methods.
+Float, NaN, Infinity, live Decimal, bytes, sets, malformed containers, wrong raw
+types, cyclic graphs, surrogate-containing strings, custom mappings, container
+subclasses, and unsupported objects therefore produce a deterministic blocked
+hash rather than a serialization exception. No projected invalid value is
+coerced into a valid engineering input.
+
 ## 8. Exact domain models
 
 All models are immutable dataclasses with exact field sets. Unknown fields block.
@@ -540,7 +637,24 @@ Endpoint order is fixed:
 - horizontal chord: endpoint A has negative x; endpoint B has positive x;
 - vertical chord: endpoint A has negative y; endpoint B has positive y.
 
-### 8.5 `TubeHoleClassification`
+### 8.5 `PhysicalTubeDiskAudit`
+
+This audit has an exact closed field set:
+
+| Field | Type | Rule |
+|---|---|---|
+| `physical_tube_radius_m` | decimal string | `tube_outer_diameter_m / 2` |
+| `signed_window_distance_m` | decimal string | same quantized public `s` as the parent classification |
+| `cut_boundary_margin_m` | decimal string | positive successful physical-disk margin under §9.7.1 |
+| `classification` | `TubeRegionClassification` | exactly equal to the parent primary classification |
+
+Unknown fields block. The audit is created only after the baffle-hole clearance
+disk has classified successfully. Because `baffle_hole_radius_m >=
+physical_tube_radius_m`, a successful primary classification guarantees the
+physical tube disk is wholly in the same region. This audit never changes,
+overrides, or substitutes for the baffle-hole clearance-disk authority.
+
+### 8.6 `TubeHoleClassification`
 
 | Field | Type | Rule |
 |---|---|---|
@@ -553,12 +667,12 @@ Endpoint order is fixed:
 | `cut_boundary_margin_m` | decimal string | positive successful margin |
 | `classification` | enum | `WINDOW` or `CROSSFLOW_REFERENCE` |
 | `outer_boundary_margin_squared_m2` | decimal string or null | required for covered class |
-| `physical_tube_disk_audit` | object | audit only; never classification authority |
+| `physical_tube_disk_audit` | `PhysicalTubeDiskAudit` | exact closed audit; never classification authority |
 
 The complete baffle-hole clearance disk is the primary cut-classification disk.
 The physical tube disk is an audit projection only.
 
-### 8.6 `BafflePlaneGeometry`
+### 8.7 `BafflePlaneGeometry`
 
 | Field | Type |
 |---|---|
@@ -586,7 +700,7 @@ baffle_covered_region_semantics=BAFFLE_DISK_MINUS_WINDOW_SEGMENT
 crossflow_reference_region_semantics=CLASSIFICATION_REFERENCE_ONLY_NOT_FLOW_AREA
 ```
 
-### 8.7 `BaffleGeometry`
+### 8.8 `BaffleGeometry`
 
 | Field | Type |
 |---|---|
@@ -624,7 +738,7 @@ crossflow_reference_region_semantics=CLASSIFICATION_REFERENCE_ONLY_NOT_FLOW_AREA
 
 A successful geometry has empty blockers.
 
-### 8.8 `BaffleGeometryValidationResult`
+### 8.9 `BaffleGeometryValidationResult`
 
 | Field | Type |
 |---|---|
@@ -835,6 +949,60 @@ s==-r_h -> BLOCKED_TANGENT_TO_CUT
 ```
 
 There is no epsilon and no tolerance band.
+
+#### 9.7.1 Successful classification margins and physical-tube audit
+
+All formulas in this subsection are evaluated on unquantized precision-50
+Decimal values after the primary classification predicates have succeeded.
+Let:
+
+```text
+r_t=physical_tube_radius_m
+```
+
+The exact primary clearance-disk cut margin is:
+
+```text
+WINDOW:
+  cut_boundary_margin_m_unquantized=s-r_h
+
+CROSSFLOW_REFERENCE:
+  cut_boundary_margin_m_unquantized=-r_h-s
+```
+
+The exact physical-tube audit margin is:
+
+```text
+WINDOW:
+  physical_cut_boundary_margin_m_unquantized=s-r_t
+
+CROSSFLOW_REFERENCE:
+  physical_cut_boundary_margin_m_unquantized=-r_t-s
+```
+
+Every successful cut margin is strictly positive. The physical audit
+classification must exactly equal the primary classification. The public
+`signed_window_distance_m`, primary `cut_boundary_margin_m`, physical-audit
+`signed_window_distance_m`, and physical-audit `cut_boundary_margin_m` are
+formatted only after these predicates and formulas complete, using
+`coordinate_quantum_m`.
+
+For outer containment, the exact unquantized squared margin is:
+
+```text
+outer_boundary_margin_squared_m2_unquantized
+=
+(R-r_h)^2-d2
+```
+
+It is required to be non-negative for `CROSSFLOW_REFERENCE`, is exactly zero for
+accepted outer tangency, and is `null` for `WINDOW`. Its public decimal string is
+formatted only after containment classification, using
+`squared_coordinate_quantum_m2`.
+
+No margin is re-derived from a quantized coordinate, radius, signed distance, or
+squared distance. These exact formulas are part of each
+`classification_audit_hash` projection.
 
 ### 9.8 Covered-region outer containment
 
@@ -1134,58 +1302,116 @@ geometry_id=uuid5(UUID_NAMESPACE, GEOMETRY_URN_PREFIX+geometry_hash)
 
 ### 14.6 Blocked result hash
 
-The blocked-result hash covers:
+The blocked-result hash covers exactly:
 
-- exact request hash when computable;
-- otherwise the canonical raw request projection;
+- `request_identity`, which is the exact validated `request_hash` when
+  computable, otherwise the complete
+  `task024.raw-blocked-projection.v1` projection from §7.6;
 - ordered warnings;
 - ordered blockers;
 - deferred capabilities;
-- profile ID and design contract path.
+- profile ID;
+- design contract path.
 
-Two identical invalid requests must produce identical blocked-result hashes.
+No raw value is passed directly to canonical JSON. The tagged fallback
+projection is computed first, so every contract-defined invalid request has a
+non-null deterministic blocked-result hash. Two identical invalid requests must
+produce identical blocked-result hashes.
+
+### 14.7 Acyclic hash dependency graph
+
+The dependency graph is exact and one-directional:
+
+```text
+axial_authority_payload -> axial_span_authority_hash
+baffle_authority_payload -> baffle_design_authority_hash
+
+validated_complete_request
+  including frozen upstream leaf hashes
+  -> request_hash
+
+unquantized predicates
+  -> classification identities
+  -> quantized public geometry values
+  -> classification_audit_hashes
+
+request_hash
++ quantized result fields
++ classification_audit_hashes
++ ordered messages
++ deferred_capabilities
++ exact closed provenance
+  -> geometry_hash
+
+geometry_hash -> geometry_id
+
+validated request hash OR raw blocked projection
++ ordered messages
++ deferred_capabilities
++ profile identity
+  -> blocked_result_hash
+```
+
+TASK-021 and TASK-022 `request_hash` values are frozen upstream leaf strings in
+the complete upstream objects; TASK-024 never writes back to those objects.
+TASK-024 provenance may contain TASK-024 `request_hash`, but request hashing does
+not include TASK-024 result or provenance. Provenance excludes `geometry_hash`,
+`geometry_id`, and `blocked_result_hash`. Therefore:
+
+```text
+HASH_DEPENDENCY_CYCLE_COUNT=0
+```
 
 ## 15. Provenance contract
 
-A valid result provenance mapping includes at least:
+`BaffleGeometry.provenance` is an exact closed mapping. Additional fields are
+forbidden. Field omission, field addition, or use of a non-bound source emits
+`BFG_CANONICALIZATION_FAILED` and blocks result construction with no partial
+geometry.
 
-```text
-task_id
-design_contract_path
-profile_id
-software_version
-git_commit
+| Field | Exact source or value |
+|---|---|
+| `task_id` | exact `TASK-024` |
+| `design_contract_path` | exact design contract path constant |
+| `profile_id` | exact TASK-024 profile constant |
+| `software_version` | non-empty canonical module constant; no runtime lookup |
+| `git_commit` | lowercase 40-hex build constant; no runtime lookup |
+| `task020_configuration_id` | validated TASK-020 value |
+| `task020_configuration_hash` | validated TASK-020 value |
+| `task020_case_authority` | exact detached canonical projection of validated TASK-020 case authority |
+| `task021_layout_id` | validated TASK-021 value |
+| `task021_layout_hash` | validated TASK-021 value |
+| `task021_tube_geometry_snapshot_hash` | validated TASK-021 snapshot hash |
+| `task021_layout_rule_snapshot_hash` | validated TASK-021 rule snapshot hash |
+| `task022_geometry_id` | validated TASK-022 value |
+| `task022_geometry_hash` | validated TASK-022 value |
+| `task022_shell_authority_mode` | validated TASK-022 value |
+| `task022_shell_authority_identity` | exact detached canonical TASK-022 authority identity projection |
+| `task022_geometry_rule_snapshot_hash` | validated TASK-022 rule snapshot hash |
+| `axial_span_authority_hash` | validated TASK-024 axial authority hash |
+| `baffle_design_authority_hash` | validated TASK-024 design authority hash |
+| `request_hash` | exact TASK-024 request hash |
+| `source_claim_status` | exact `NO_STANDARD_CLAIM` |
+| `automatic_selection_performed` | exact `false` |
+| `nozzle_position_inference_performed` | exact `false` |
+| `flow_area_calculation_performed` | exact `false` |
+| `warnings` | exact ordered canonical projections of result warnings |
+| `deferred_capabilities` | exact frozen ordered tuple from the result |
 
-task020_configuration_id
-task020_configuration_hash
-task020_case_authority
+`software_version` and `git_commit` are immutable code/build constants supplied
+without filesystem, environment, subprocess, network, registry, or clock access
+in the calculation path. They are not caller engineering inputs and are not
+looked up dynamically.
 
-task021_layout_id
-task021_layout_hash
-task021_tube_geometry_snapshot_hash
-task021_layout_rule_snapshot_hash
+The nested upstream authority projections are the exact canonical projections
+already validated under their owning task contracts. TASK-024 does not add
+fields to them and does not substitute a free-form mapping.
 
-task022_geometry_id
-task022_geometry_hash
-task022_shell_authority_mode
-task022_shell_authority_identity
-task022_geometry_rule_snapshot_hash
-
-axial_span_authority_hash
-baffle_design_authority_hash
-request_hash
-
-source_claim_status=NO_STANDARD_CLAIM
-automatic_selection_performed=false
-nozzle_position_inference_performed=false
-flow_area_calculation_performed=false
-
-warnings
-deferred_capabilities
-```
-
-Provenance is a detached immutable canonical snapshot. Caller mutation after
-construction cannot alter any hash or result.
+The provenance mapping contains neither `geometry_hash`, `geometry_id`, nor
+`blocked_result_hash`. It is detached and immutable. Caller mutation after
+construction cannot alter any provenance value, hash, or result. The complete
+closed provenance mapping is included in `geometry_hash`; an implementation may
+not append diagnostic, host, timestamp, environment, or extension fields.
 
 ## 16. Public operation
 
@@ -1418,6 +1644,35 @@ they are not engineering recommendations.
    `rounding=ROUND_HALF_EVEN`). A `float` value at any of these positions
    fails the test.
 
+### 19.9 Closed result and failure-projection tests
+
+At minimum:
+
+1. `PhysicalTubeDiskAudit` accepts exactly four fields, rejects unknown fields,
+   and always matches the successful primary region classification;
+2. `WINDOW` primary margin equals `s-r_h`, crossflow-reference primary margin
+   equals `-r_h-s`, and the physical audit uses the same formulas with `r_t`;
+3. `outer_boundary_margin_squared_m2` is `null` for `WINDOW`, equals
+   `(R-r_h)^2-d2` for covered positions, and is zero at accepted tangency;
+4. margin predicates are evaluated before formatting; metre margins use
+   `coordinate_quantum_m` and squared margins use the exactly derived
+   `squared_coordinate_quantum_m2`;
+5. fallback blocked hashing is stable for finite float, signed zero float, NaN,
+   positive/negative Infinity, live Decimal, bytes, surrogate-containing string,
+   exact built-in list, tuple, dict, set, frozenset, enum, recognized dataclass,
+   cyclic graph, custom mapping, container subclass, and unsupported object;
+6. mapping and unordered-collection projections are stable under insertion or
+   iteration-order changes;
+7. raw fallback projection never validates or coerces an invalid engineering
+   value;
+8. provenance accepts exactly the closed field set in §15 and rejects one
+   missing field or one additional field;
+9. module/build provenance constants require no forbidden I/O;
+10. request, audit, geometry, UUID, provenance, and blocked-result dependency
+    tests prove `HASH_DEPENDENCY_CYCLE_COUNT=0`;
+11. changing an exact physical-audit field, public margin, raw projection tag,
+    or provenance field changes the owning hash deterministically.
+
 ## 20. Future implementation acceptance gates
 
 A future implementation is acceptable only if:
@@ -1469,7 +1724,13 @@ A design reviewer must verify:
     intersection, outer-containment, and pairwise non-overlap all execute on
     unquantized high-precision Decimal derivations, and only the public
     output canonicalization step quantizes to the public decimal lexical
-    form. `coordinate_quantum_m=0.000000000001` applies only to that step.
+    form. `coordinate_quantum_m=0.000000000001` applies only to that step;
+19. `PhysicalTubeDiskAudit` and every public margin have exact closed schemas
+    and formulas;
+20. blocked-result hashing is total for the frozen raw-value projection and
+    performs no executable or host-dependent serialization;
+21. provenance has an exact closed field set and deterministic field sources;
+22. the complete hash dependency graph is acyclic.
 
 ## 22. Explicit non-authorization statement
 
