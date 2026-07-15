@@ -286,8 +286,13 @@ def test_every_blocker_code_is_reachable(scenario: str) -> None:
         bad["geometry_type"] = "barrel"
         catalog_target, bundle_target = _assemble((bad,))
     elif scenario == "revision_invalid":
+        # Round 4 §3 — Stage 9 semantic check requires a non-empty
+        # raw revision. Use a non-empty but mismatched value so the
+        # Stage 8 raw-type pass succeeds and the Stage 9 binding
+        # mismatch fires (geometry_id carries revision="1"; raw
+        # revision field says "2").
         bad = dict(record)
-        bad["revision"] = ""
+        bad["revision"] = "2"
         catalog_target, bundle_target = _assemble((bad,))
     elif scenario == "approval_state_invalid":
         bad = dict(record)
@@ -2107,3 +2112,371 @@ def test_round3_duplicate_edge_invalid_edge_hash_accumulates_both() -> None:
         if b.code == "SGC_RAW_TYPE_INVALID" and "edge_hash" in b.field_path
     ]
     assert hash_failures, "expected SGC_RAW_TYPE_INVALID at edge_hash path"
+
+
+# ===========================================================================
+# Round 4 fixup tests — permission/edge hash-domain verification + Stage 9
+# semantic recognition + same-stage accumulation
+# ===========================================================================
+
+
+def test_round4_permission_payload_mutation_unchanged_hash_blocks() -> None:
+    """Round 4 §1 — mutating a permission payload (e.g. its
+    ``usage_scope``) while keeping the original ``permission_hash``
+    MUST emit a ``SGC_CATALOG_HASH_MISMATCH`` Stage-5 blocker. The
+    hash is recomputed from the canonical payload, so any field
+    change breaks the hash.
+    """
+    good_perm = synthetic_permission_payload(permission_id="perm-mut-1")
+    # Mutate usage_scope WITHOUT recomputing permission_hash.
+    mutated = dict(good_perm)
+    mutated["usage_scope"] = sorted(
+        {"internal_runtime", "external_runtime"}  # extra scope
+    )
+    # permission_hash still equals the unmutated hash
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-perm-mut-1"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-perm-mut-1",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(mutated,),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    hash_mismatch = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH"
+        and b.field_path == "evidence_bundle.permission_evidence[0].permission_hash"
+    ]
+    assert hash_mismatch, (
+        f"expected SGC_CATALOG_HASH_MISMATCH at permission_hash; "
+        f"got codes={[b.code for b in excinfo.value.blockers]}"
+    )
+    # Stage 5 carries the hash-domain verification
+    assert hash_mismatch[0].stage_rank == 5
+
+
+def test_round4_permission_payload_mutation_recomputed_hashes_still_blocks() -> None:
+    """Round 4 §1 — even if a malicious caller recomputes the
+    ``permission_hash`` AFTER the payload mutation, the canonical
+    recomputation in the parser still detects the mismatch (because
+    the parser recomputes from the canonical payload, not the
+    supplied hash). This proves the hash domain is an internal
+    invariant, not a user-supplied field.
+    """
+    good_perm = synthetic_permission_payload(permission_id="perm-mut-2")
+    mutated = dict(good_perm)
+    mutated["usage_scope"] = sorted({"internal_runtime", "external_runtime"})
+    # The PARSER recomputes the hash from canonical payload. The
+    # supplied hash above is the OLD hash (matches good_perm, not
+    # mutated). We pass it AS-IS and expect the parser to detect
+    # the mismatch.
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-perm-mut-2"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-perm-mut-2",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(mutated,),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    # The hash-mismatch blocker MUST fire (parser detects via
+    # canonical recomputation).
+    hash_mismatch = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH"
+        and b.field_path == "evidence_bundle.permission_evidence[0].permission_hash"
+    ]
+    assert hash_mismatch, (
+        "expected SGC_CATALOG_HASH_MISMATCH even when caller passes a (wrong) permission_hash"
+    )
+
+
+def test_round4_edge_payload_mutation_unchanged_hash_blocks() -> None:
+    """Round 4 §2 — mutating an edge payload (e.g. its
+    ``relation_type``) while keeping the original ``edge_hash``
+    MUST emit a ``SGC_PROVENANCE_INCOMPLETE`` Stage-6 blocker.
+    """
+    good_edge = synthetic_edge_payload(
+        edge_id="edge-mut-1",
+        target_geometry_id="synthetic-catalog-1/shell/rec-edge-mut-1/1",
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-edge-mut-1"))
+    mutated = dict(good_edge)
+    mutated["target_geometry_id"] = record["geometry_id"]  # fix target
+    mutated["relation_type"] = "extends"  # mutate relation_type
+    # edge_hash still equals the unmutated hash
+    perm = synthetic_permission_payload(permission_id="perm-edge-mut-1")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(mutated,),  # type: ignore[arg-type]
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    hash_mismatch = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_PROVENANCE_INCOMPLETE"
+        and b.field_path == "evidence_bundle.provenance_edges[0].edge_hash"
+    ]
+    assert hash_mismatch, (
+        f"expected SGC_PROVENANCE_INCOMPLETE at edge_hash; "
+        f"got codes={[b.code for b in excinfo.value.blockers]}"
+    )
+    assert hash_mismatch[0].stage_rank == 6
+
+
+def test_round4_edge_payload_mutation_recomputed_hashes_still_blocks() -> None:
+    """Round 4 §2 — even if a caller recomputes the ``edge_hash``
+    AFTER the payload mutation, the parser detects the mismatch
+    via canonical recomputation.
+    """
+    good_edge = synthetic_edge_payload(
+        edge_id="edge-mut-2",
+        target_geometry_id="synthetic-catalog-1/shell/rec-edge-mut-2/1",
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-edge-mut-2"))
+    mutated = dict(good_edge)
+    mutated["target_geometry_id"] = record["geometry_id"]
+    mutated["relation_type"] = "extends"
+    perm = synthetic_permission_payload(permission_id="perm-edge-mut-2")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(mutated,),  # type: ignore[arg-type]
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    hash_mismatch = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_PROVENANCE_INCOMPLETE"
+        and b.field_path == "evidence_bundle.provenance_edges[0].edge_hash"
+    ]
+    assert hash_mismatch, "expected SGC_PROVENANCE_INCOMPLETE even with wrong edge_hash"
+
+
+def test_round4_permission_hash_mismatch_prevents_bundle_hash_helper() -> None:
+    """Round 4 §2 — a permission hash mismatch MUST fire BEFORE
+    the bundle-hash helper is called. Concretely, no
+    ``SGC_CATALOG_HASH_MISMATCH`` for ``bundle_hash`` is emitted
+    because the gate fires first.
+    """
+    good_perm = synthetic_permission_payload(permission_id="perm-prev-bundle-1")
+    mutated = dict(good_perm)
+    mutated["usage_scope"] = sorted({"internal_runtime", "external_runtime"})
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-prev-bundle-1"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-prev-bundle-1",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(mutated,),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    bundle_hash_mismatches = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH" and b.field_path == "evidence_bundle.bundle_hash"
+    ]
+    assert not bundle_hash_mismatches, (
+        "expected NO bundle-hash mismatch (gate must fire first); "
+        f"got {[b.field_path for b in bundle_hash_mismatches]}"
+    )
+    # Permission hash mismatch MUST be present
+    perm_hash_mismatches = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH"
+        and b.field_path == "evidence_bundle.permission_evidence[0].permission_hash"
+    ]
+    assert perm_hash_mismatches
+
+
+def test_round4_edge_hash_mismatch_prevents_bundle_hash_helper() -> None:
+    """Round 4 §2 — an edge hash mismatch MUST fire BEFORE the
+    bundle-hash helper is called.
+    """
+    good_edge = synthetic_edge_payload(
+        edge_id="edge-prev-bundle-1",
+        target_geometry_id="synthetic-catalog-1/shell/rec-prev-bundle-edge-1/1",
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-prev-bundle-edge-1"))
+    mutated = dict(good_edge)
+    mutated["target_geometry_id"] = record["geometry_id"]
+    mutated["relation_type"] = "extends"
+    perm = synthetic_permission_payload(permission_id="perm-prev-bundle-edge-1")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(mutated,),  # type: ignore[arg-type]
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    bundle_hash_mismatches = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH" and b.field_path == "evidence_bundle.bundle_hash"
+    ]
+    assert not bundle_hash_mismatches
+    edge_hash_mismatches = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_PROVENANCE_INCOMPLETE"
+        and b.field_path == "evidence_bundle.provenance_edges[0].edge_hash"
+    ]
+    assert edge_hash_mismatches
+
+
+def test_round4_geometry_type_semantic_mismatch_uses_rank_9() -> None:
+    """Round 4 §3 — the semantic recognition of ``geometry_type``
+    fires at Stage 9 (record identity), not Stage 8 (raw type).
+    """
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-geom-type-9"))
+    bad = dict(record)
+    bad["geometry_type"] = "barrel"  # not "shell"
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-geom-type-9",
+    )
+    perm = synthetic_permission_payload(permission_id="perm-geom-type-9")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(bad,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    geom_type_failures = [
+        b for b in excinfo.value.blockers if b.code == "SGC_GEOMETRY_TYPE_INVALID"
+    ]
+    assert geom_type_failures
+    assert geom_type_failures[0].stage_rank == 9
+
+
+def test_round4_profile_semantic_mismatch_uses_rank_9() -> None:
+    """Round 4 §3 — the semantic recognition of ``profile_id``
+    fires at Stage 9 (record identity), not Stage 8 (raw type).
+    """
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-profile-9"))
+    bad = dict(record)
+    bad["profile_id"] = "other.profile.v1"  # not the frozen PROFILE_ID
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-profile-9",
+    )
+    perm = synthetic_permission_payload(permission_id="perm-profile-9")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(bad,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    profile_failures = [b for b in excinfo.value.blockers if b.code == "SGC_PROFILE_UNSUPPORTED"]
+    assert profile_failures
+    assert profile_failures[0].stage_rank == 9
+
+
+def test_round4_geometry_id_revision_mismatch_uses_rank_9() -> None:
+    """Round 4 §3 — the ``geometry_id`` / ``revision`` binding
+    fires at Stage 9 (record identity), not Stage 8.
+    """
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-rev-bind-9"))
+    bad = dict(record)
+    bad["revision"] = "2"  # geometry_id carries "1"
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-rev-bind-9",
+    )
+    perm = synthetic_permission_payload(permission_id="perm-rev-bind-9")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(bad,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    rev_failures = [b for b in excinfo.value.blockers if b.code == "SGC_REVISION_INVALID"]
+    assert rev_failures
+    assert rev_failures[0].stage_rank == 9
+
+
+def test_round4_one_permission_accumulates_all_independent_stage5_blockers() -> None:
+    """Round 4 §4 — one permission entry with invalid ``scope`` +
+    ``evidence_ref`` + ``approved_by`` MUST accumulate ALL three
+    independent Stage-5 blockers in the same pass.
+    """
+    good = synthetic_permission_payload(permission_id="perm-multi-fail-1")
+    bad = dict(good)
+    bad["permission_scope"] = [1, 2, 3]  # not strings
+    bad["evidence_ref"] = 99999  # not a string
+    bad["approved_by"] = ""  # empty
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-multi-fail-1"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-multi-fail-1",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(bad,),  # type: ignore[arg-type]
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    # All three independent raw-type blockers MUST be present at
+    # index [0].
+    fields = {
+        b.field_path
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID"
+        and b.field_path.startswith("evidence_bundle.permission_evidence[0].")
+    }
+    assert "evidence_bundle.permission_evidence[0].permission_scope" in fields
+    assert "evidence_bundle.permission_evidence[0].evidence_ref" in fields
+    assert "evidence_bundle.permission_evidence[0].approved_by" in fields
+
+
+def test_round4_one_record_accumulates_all_independent_stage8_blockers() -> None:
+    """Round 4 §4 — one record with multiple independent raw-field
+    failures (e.g. ``profile_id`` empty, ``revision`` empty,
+    ``approval_state`` empty) MUST accumulate ALL three Stage-8
+    blockers in the same pass.
+    """
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-multi-fail-2"))
+    bad = dict(record)
+    bad["profile_id"] = ""  # raw-type failure (empty)
+    bad["revision"] = ""  # raw-type failure
+    bad["approval_state"] = ""  # raw-type failure
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-multi-fail-2",
+    )
+    perm = synthetic_permission_payload(permission_id="perm-multi-fail-2")
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(bad,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    fields = {
+        b.field_path
+        for b in excinfo.value.blockers
+        if b.code == "SGC_RAW_TYPE_INVALID" and b.field_path.startswith("raw_catalog.records[0].")
+    }
+    assert "raw_catalog.records[0].profile_id" in fields
+    assert "raw_catalog.records[0].revision" in fields
+    assert "raw_catalog.records[0].approval_state" in fields

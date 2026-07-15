@@ -1292,21 +1292,60 @@ def parse_shell_geometry_catalog(
     raw_records_seen: list[dict[str, Any]] = []  # for later duplicate/full hashing
 
     for idx, raw_rec in enumerate(records_seq):
+        # Round 4 §4 — Record Stage 8 same-stage accumulation.
+        # Each raw-type / exact-field check is INDEPENDENT: the failure
+        # of one field does NOT short-circuit the check of another.
+        # Only when a missing value makes a dependent Stage-9 or
+        # later check logically unexecutable do we gate the
+        # dependent check. We use a ``record_blockers`` accumulator
+        # local to this record and extend ``failures`` with the
+        # accumulated list at the end of the iteration.
+        record_blockers: list[ShellGeometryCatalogBlockerEntry] = []
+        # Sentinels used when a value is missing so subsequent
+        # dependent code paths can still execute safely (e.g. to
+        # decide whether to gate). They are NEVER written to the
+        # downstream ``raw_records_seen`` payload.
+        geom_id_raw: str | None = None
+        geom_type_raw: str | None = None
+        profile_id_raw: str | None = None
+        revision_raw: str | None = None
+        approval_raw: str | None = None
+        sid_raw: str | None = None
+        nominal_raw: str | None = None
+        src_cls_raw: str | None = None
+        license_raw_v: Mapping[str, Any] | None = None
+        binding_raw_v: Mapping[str, Any] | None = None
+        perm_refs_canon: tuple[str, ...] | None = None
+        edge_refs_canon: tuple[str, ...] | None = None
+        ev_refs_canon: tuple[str, ...] | None = None
+        rec_hash_in: str | None = None
+
         if not isinstance(raw_rec, Mapping):
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}]",
                 )
             )
+            # The whole record is unusable — every field is a missing
+            # value from a structural standpoint. Flush blockers and
+            # continue. (Dependent Stage 9+ checks are logically
+            # unexecutable for a non-Mapping record.)
+            failures.extend(record_blockers)
             continue
 
         actual_keys = frozenset(raw_rec)
         extras = actual_keys - record_expected
         missing = record_expected - actual_keys
+        # extras/missing are independent raw-type checks that do not
+        # require the underlying value to be a specific type. Emit
+        # both per-field and continue. (The subsequent raw-type
+        # checks below will not have values to read, so they will
+        # emit SGC_RAW_TYPE_INVALID independently — same-stage
+        # accumulation.)
         for extra in sorted(extras):
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_UNKNOWN_FIELD",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
@@ -1314,7 +1353,7 @@ def parse_shell_geometry_catalog(
                 )
             )
         for m in sorted(missing):
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_UNKNOWN_FIELD",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
@@ -1322,241 +1361,309 @@ def parse_shell_geometry_catalog(
                 )
             )
 
-        # Strict raw types — all of these are Stage 8 record-fields.
-        rec_schema = raw_rec.get("schema_version")
-        if not _is_nonempty_str(rec_schema):
-            failures.append(
+        # schema_version raw type + lexical
+        rec_schema_v = raw_rec.get("schema_version")
+        if not _is_nonempty_str(rec_schema_v):
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].schema_version",
                 )
             )
-            continue
-        if rec_schema != "task023.approved-shell-geometry-record.v1":
-            failures.append(
+        elif rec_schema_v != "task023.approved-shell-geometry-record.v1":
+            record_blockers.append(
                 _make_entry(
                     "SGC_SCHEMA_VERSION_UNSUPPORTED",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].schema_version",
                 )
             )
-            continue
 
-        # geometry_id raw-type stage (must be non-empty string). Stable-id
-        # binding verified at stage 9 once revision is also validated.
-        geom_id_raw = raw_rec.get("geometry_id")
-        if not _is_nonempty_str(geom_id_raw):
-            failures.append(
+        # geometry_id raw type (no semantic check at Stage 8).
+        geom_id_v = raw_rec.get("geometry_id")
+        if not _is_nonempty_str(geom_id_v):
+            record_blockers.append(
                 _make_entry(
                     "SGC_RECORD_ID_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].geometry_id",
                 )
             )
-            continue
-        geom_type_raw = raw_rec.get("geometry_type")
-        if not _is_nonempty_str(geom_type_raw):
-            failures.append(
+        else:
+            geom_id_raw = geom_id_v
+
+        # Round 4 §3 — Stage 8 is a raw-type pass ONLY for
+        # ``geometry_type`` / ``profile_id`` / ``revision``. The
+        # semantic recognition of the value (e.g. ``geometry_type ==
+        # "shell"``, ``profile_id == PROFILE_ID``, ``revision ==
+        # revision_in_id``) is deferred to Stage 9.
+        geom_type_v = raw_rec.get("geometry_type")
+        if not _is_nonempty_str(geom_type_v):
+            record_blockers.append(
                 _make_entry(
-                    "SGC_GEOMETRY_TYPE_INVALID",
+                    "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].geometry_type",
                 )
             )
-            continue
-        if geom_type_raw != GEOMETRY_TYPE:
-            failures.append(
+        else:
+            geom_type_raw = geom_type_v
+
+        profile_id_v = raw_rec.get("profile_id")
+        if not _is_nonempty_str(profile_id_v):
+            record_blockers.append(
                 _make_entry(
-                    "SGC_GEOMETRY_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
-                    field_path=f"raw_catalog.records[{idx}].geometry_type",
-                )
-            )
-            continue
-        profile_id_raw = raw_rec.get("profile_id")
-        if not _is_nonempty_str(profile_id_raw) or profile_id_raw != PROFILE_ID:
-            failures.append(
-                _make_entry(
-                    "SGC_PROFILE_UNSUPPORTED",
+                    "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].profile_id",
                 )
             )
-            continue
-        revision_raw = raw_rec.get("revision")
-        if not _is_nonempty_str(revision_raw):
-            failures.append(
+        else:
+            profile_id_raw = profile_id_v
+
+        revision_v = raw_rec.get("revision")
+        if not _is_nonempty_str(revision_v):
+            record_blockers.append(
                 _make_entry(
-                    "SGC_REVISION_INVALID",
+                    "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].revision",
                 )
             )
-            continue
-        approval_raw = raw_rec.get("approval_state")
-        if not _is_nonempty_str(approval_raw):
-            failures.append(
+        else:
+            revision_raw = revision_v
+
+        approval_v = raw_rec.get("approval_state")
+        if not _is_nonempty_str(approval_v):
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].approval_state",
                 )
             )
-            continue
-        sid_raw = raw_rec.get("shell_inside_diameter_m")
-        if not _is_nonempty_str(sid_raw):
+        else:
+            approval_raw = approval_v
+
+        # shell_inside_diameter_m raw type (decimal canonicalization
+        # is Stage 12).
+        sid_v = raw_rec.get("shell_inside_diameter_m")
+        if not _is_nonempty_str(sid_v):
             # Raw-type violation: emit BOTH the general raw-type and
             # the design-frozen SGC_SHELL_INSIDE_DIAMETER_INVALID
             # blocker so callers can detect decimal-specific failures
             # even when the raw type is wrong.
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].shell_inside_diameter_m",
                 )
             )
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_SHELL_INSIDE_DIAMETER_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].shell_inside_diameter_m",
                 )
             )
-            continue
-        nominal_raw = raw_rec.get("nominal_label")
-        if nominal_raw is not None and (not isinstance(nominal_raw, str) or not nominal_raw):
-            failures.append(
+        else:
+            sid_raw = sid_v
+
+        nominal_v = raw_rec.get("nominal_label")
+        if nominal_v is not None and (not isinstance(nominal_v, str) or not nominal_v):
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].nominal_label",
                 )
             )
-            continue
-        src_cls_raw = raw_rec.get("source_class")
-        if not _is_nonempty_str(src_cls_raw):
-            failures.append(
+        else:
+            nominal_raw = nominal_v
+
+        src_cls_v = raw_rec.get("source_class")
+        if not _is_nonempty_str(src_cls_v):
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].source_class",
                 )
             )
-            continue
+        else:
+            src_cls_raw = src_cls_v
         # NOTE: source_class **recognition** (RECOGNIZED_SOURCE_CLASSES
         # membership) is deferred to Stage 14 (source class / license
         # disposition). Per the new spec, Stage 8 is a raw-type pass
         # only.
 
         # License evidence raw type (Stage 8 only)
-        license_raw = raw_rec.get("license_evidence")
-        if not _is_nonempty_mapping(license_raw):
-            failures.append(
+        license_v = raw_rec.get("license_evidence")
+        if not _is_nonempty_mapping(license_v):
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].license_evidence",
                 )
             )
-            continue
+        else:
+            license_raw_v = license_v
 
         # Source binding: raw type only at Stage 8; full validation
         # (exact fields + string fields) is Stage 13.
-        binding_raw = raw_rec.get("source_binding")
-        if not _is_nonempty_mapping(binding_raw):
-            failures.append(
+        binding_v = raw_rec.get("source_binding")
+        if not _is_nonempty_mapping(binding_v):
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].source_binding",
                 )
             )
-            continue
+        else:
+            binding_raw_v = binding_v
 
-        # Reference arrays: canonical deduplication + sort
+        # Reference arrays: raw type + canonicalization.
         perm_refs_raw = raw_rec.get("permission_evidence_refs")
         edge_refs_raw = raw_rec.get("provenance_edge_ids")
         evidence_refs_raw = raw_rec.get("evidence_refs")
-
-        # evidence_refs on records: same-stage accumulation per index,
-        # but we need values for further hash stage — defer validation
-        # of non-empty-ness to stage 17. For now strict types only.
         if not _is_str_seq(perm_refs_raw):
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].permission_evidence_refs",
                 )
             )
-            continue
+        else:
+            perm_refs_canon = _canonicalize_str_seq(perm_refs_raw, unique=True)
+            if perm_refs_canon is None:
+                record_blockers.append(
+                    _make_entry(
+                        "SGC_RAW_TYPE_INVALID",
+                        stage_rank=_STAGE_RECORD_EXACT_FIELDS,
+                        field_path=f"raw_catalog.records[{idx}].permission_evidence_refs",
+                    )
+                )
+                perm_refs_canon = ()
         if not _is_str_seq(edge_refs_raw):
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].provenance_edge_ids",
                 )
             )
-            continue
+        else:
+            edge_refs_canon = _canonicalize_str_seq(edge_refs_raw, unique=True)
+            if edge_refs_canon is None:
+                record_blockers.append(
+                    _make_entry(
+                        "SGC_RAW_TYPE_INVALID",
+                        stage_rank=_STAGE_RECORD_EXACT_FIELDS,
+                        field_path=f"raw_catalog.records[{idx}].provenance_edge_ids",
+                    )
+                )
+                edge_refs_canon = ()
         if not _is_str_seq(evidence_refs_raw):
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].evidence_refs",
                 )
             )
-            continue
-        perm_refs_canon = _canonicalize_str_seq(perm_refs_raw, unique=True)
-        edge_refs_canon = _canonicalize_str_seq(edge_refs_raw, unique=True)
-        ev_refs_canon = _canonicalize_str_seq(evidence_refs_raw, unique=True)
-        if perm_refs_canon is None or edge_refs_canon is None or ev_refs_canon is None:
-            failures.append(
-                _make_entry(
-                    "SGC_RAW_TYPE_INVALID",
-                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
-                    field_path=f"raw_catalog.records[{idx}]",
+        else:
+            ev_refs_canon = _canonicalize_str_seq(evidence_refs_raw, unique=True)
+            if ev_refs_canon is None:
+                record_blockers.append(
+                    _make_entry(
+                        "SGC_RAW_TYPE_INVALID",
+                        stage_rank=_STAGE_RECORD_EXACT_FIELDS,
+                        field_path=f"raw_catalog.records[{idx}].evidence_refs",
+                    )
                 )
-            )
-            continue
+                ev_refs_canon = ()
 
         # record_hash raw type
-        rec_hash_in = raw_rec.get("record_hash")
-        if not _is_nonempty_str(rec_hash_in) or not re.fullmatch(r"[0-9a-f]{64}", rec_hash_in):
-            failures.append(
+        rec_hash_v = raw_rec.get("record_hash")
+        if not _is_nonempty_str(rec_hash_v) or not re.fullmatch(r"[0-9a-f]{64}", rec_hash_v):
+            record_blockers.append(
                 _make_entry(
                     "SGC_RAW_TYPE_INVALID",
                     stage_rank=_STAGE_RECORD_EXACT_FIELDS,
                     field_path=f"raw_catalog.records[{idx}].record_hash",
                 )
             )
-            continue
+        else:
+            rec_hash_in = rec_hash_v
 
         # Stage 9 — duplicate stable geometry_id (within this run)
-        # We split the raw geometry_id into (record_key, revision) and
-        # check the canonical form. The raw value is the full stable id.
+        # requires a non-empty geom_id_raw. If geom_id_raw is None
+        # (raw-type failure at Stage 8), we cannot run the
+        # stable-identity parser. The Stage-9 family of semantic
+        # checks is gated.
+        if geom_id_raw is None:
+            # Flush the accumulated Stage-8 blockers and continue.
+            # The dependent Stage 9 stable-identity + semantic
+            # checks are logically unexecutable.
+            failures.extend(record_blockers)
+            continue
+
+        # Stage 9 — stable identity parser. We split the raw
+        # geometry_id into (record_key, revision) and check the
+        # canonical form. The raw value is the full stable id.
         # _verify_stable_geometry_identity carries its own occurrence
         # rank: the four-part check is itself a Stage-9 occurrence.
         parsed_id = _verify_stable_geometry_identity(
             catalog_id=catalog_id,
             raw_id=geom_id_raw,
-            failures=failures,
+            failures=record_blockers,
             stage_rank=_STAGE_RECORD_IDENTITY,
         )
         if parsed_id is None:
+            failures.extend(record_blockers)
             continue
         record_key, revision_in_id = parsed_id
-        if revision_in_id != revision_raw:
+        # Round 4 §3 — Stage 9 carries the semantic recognition for
+        # ``geometry_type``, ``profile_id``, and the ``geometry_id``
+        # / ``revision`` binding. These were Stage-8 occurrences in
+        # the prior round; they are now Stage-9 because the new
+        # contract delegates semantic recognition to a separate
+        # occurrence so that Stage 8 is a raw-type-only pass.
+        # These checks are independent — each emits its own blocker
+        # so all three surface on a single record.
+        if geom_type_raw is not None and geom_type_raw != GEOMETRY_TYPE:
+            record_blockers.append(
+                _make_entry(
+                    "SGC_GEOMETRY_TYPE_INVALID",
+                    stage_rank=_STAGE_RECORD_IDENTITY,
+                    field_path=f"raw_catalog.records[{idx}].geometry_type",
+                )
+            )
+        if profile_id_raw is not None and profile_id_raw != PROFILE_ID:
+            record_blockers.append(
+                _make_entry(
+                    "SGC_PROFILE_UNSUPPORTED",
+                    stage_rank=_STAGE_RECORD_IDENTITY,
+                    field_path=f"raw_catalog.records[{idx}].profile_id",
+                )
+            )
+        if (
+            revision_raw is not None
+            and revision_in_id is not None
+            and revision_in_id != revision_raw
+        ):
             # The revision component embedded in the geometry_id MUST
-            # equal the raw revision field. This is a record-fields
-            # stage occurrence (Stage 8), not duplicate-ids.
-            failures.append(
+            # equal the raw revision field. This is a Stage-9
+            # occurrence (semantic binding) per the new contract.
+            record_blockers.append(
                 _make_entry(
                     "SGC_REVISION_INVALID",
-                    stage_rank=_STAGE_RECORD_EXACT_FIELDS,
+                    stage_rank=_STAGE_RECORD_IDENTITY,
                     field_path=f"raw_catalog.records[{idx}].geometry_id",
                     details={
                         "geometry_id_revision": revision_in_id,
@@ -1564,7 +1671,14 @@ def parse_shell_geometry_catalog(
                     },
                 )
             )
-            continue
+        # Flush the Stage 8 + Stage 9 blockers for this record so
+        # far BEFORE we do the duplicate-id check — the duplicate
+        # blocker is a Stage-9 occurrence and must join the same
+        # same-stage accumulation list.
+        failures.extend(record_blockers)
+        # Reset record_blockers to capture only the (potential)
+        # duplicate-Stage-9 entries.
+        record_blockers = []
         stable_id = geom_id_raw
         # Stage 9 — duplicate stable geometry_id (within this run).
         # Same-stage accumulation: when a duplicate is detected, ALL
@@ -1573,7 +1687,7 @@ def parse_shell_geometry_catalog(
         # computation that produces the model record list.
         first_index = used_stable_ids.get(stable_id)
         if first_index is not None:
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_RECORD_DUPLICATE_ID",
                     stage_rank=_STAGE_RECORD_IDENTITY,
@@ -1581,7 +1695,7 @@ def parse_shell_geometry_catalog(
                     details={"stable_geometry_id": stable_id},
                 )
             )
-            failures.append(
+            record_blockers.append(
                 _make_entry(
                     "SGC_RECORD_DUPLICATE_ID",
                     stage_rank=_STAGE_RECORD_IDENTITY,
@@ -1601,6 +1715,7 @@ def parse_shell_geometry_catalog(
         # downstream (per-design stable-identity binding) without
         # recomputing from the raw geometry_id.
         _ = record_key
+        failures.extend(record_blockers)
 
         # We collect raw dict + validated fields. Phase-2 stages (10+)
         # operate on each independently. Same-stage accumulation is
@@ -1613,11 +1728,11 @@ def parse_shell_geometry_catalog(
             raw_records_seen.append(
                 {
                     "raw": dict(raw_rec),
-                    "binding_raw": dict(binding_raw),  # Stage 13 source binding
-                    "license_raw": dict(license_raw),
-                    "perm_refs": perm_refs_canon,
-                    "edge_refs": edge_refs_canon,
-                    "evidence_refs": ev_refs_canon,
+                    "binding_raw": dict(binding_raw_v) if binding_raw_v is not None else {},
+                    "license_raw": dict(license_raw_v) if license_raw_v is not None else {},
+                    "perm_refs": perm_refs_canon if perm_refs_canon is not None else (),
+                    "edge_refs": edge_refs_canon if edge_refs_canon is not None else (),
+                    "evidence_refs": ev_refs_canon if ev_refs_canon is not None else (),
                     "record_hash_in": rec_hash_in,
                     "stable_id": stable_id,
                     "geom_id": geom_id_raw,
@@ -1705,7 +1820,15 @@ def parse_shell_geometry_catalog(
         # fields). Deferred from Stage 8 to its own occurrence so
         # source binding precedes source class / license disposition
         # (Stage 14).
-        binding_raw = info["binding_raw"]
+        # ``info["binding_raw"]`` is either a ``dict[str, Any]`` (from
+        # a valid raw value at Stage 8) or an empty sentinel ``{}``
+        # (from a Stage-8 raw-type failure). The first loop uses the
+        # sentinel pattern so the type at this read site is
+        # ``dict[str, Any]``. Use a local rename so mypy does not see
+        # the optional union from the heterogeneous dict literal.
+        binding_for_stage13: dict[str, Any] = info["binding_raw"]
+        if not isinstance(binding_for_stage13, dict):
+            binding_for_stage13 = {}
         binding_expected = frozenset(
             {
                 "source_id",
@@ -1717,8 +1840,8 @@ def parse_shell_geometry_catalog(
                 "approved_at",
             }
         )
-        binding_extras = frozenset(binding_raw) - binding_expected
-        binding_missing = binding_expected - frozenset(binding_raw)
+        binding_extras = frozenset(binding_for_stage13) - binding_expected
+        binding_missing = binding_expected - frozenset(binding_for_stage13)
         binding_field_errors = False
         for extra in sorted(binding_extras):
             failures.append(
@@ -1740,7 +1863,7 @@ def parse_shell_geometry_catalog(
             binding_field_errors = True
         binding_ok = True
         for key in binding_expected:
-            if not _is_nonempty_str(binding_raw.get(key)):
+            if not _is_nonempty_str(binding_for_stage13.get(key)):
                 failures.append(
                     _make_entry(
                         "SGC_RAW_TYPE_INVALID",
@@ -1751,7 +1874,7 @@ def parse_shell_geometry_catalog(
                 binding_ok = False
         if binding_field_errors or not binding_ok:
             continue
-        binding = ShellSourceBinding(**{key: binding_raw[key] for key in binding_expected})
+        binding = ShellSourceBinding(**{key: binding_for_stage13[key] for key in binding_expected})
         # Record the constructed binding object on the info dict so
         # Stage 17 (record hash) can read it AFTER the upstream-
         # failures gate confirms this record survived Stages 10–14.
@@ -2374,10 +2497,17 @@ def _validate_permission_snapshot_entry(
     perm_hash_set: dict[str, int],
     duplicate_permission_ids: set[str],
 ) -> tuple[VendorPermissionEvidenceSnapshot | None, list[ShellGeometryCatalogBlockerEntry]]:
-    """Round 3 §3 — unified full-field validator for a single
-    permission snapshot entry. The SAME validator runs for unique
-    and duplicate ``permission_id``s so independent errors
+    """Round 3 §3 + Round 4 §1 — unified full-field validator for a
+    single permission snapshot entry. The SAME validator runs for
+    unique and duplicate ``permission_id``s so independent errors
     accumulate alongside the duplicate blocker.
+
+    Round 4 §1 — Stage 5 carries a HASH DOMAIN verification:
+    ``expected_permission_hash`` is computed from the canonical
+    payload of every other field. A mismatch emits a
+    ``SGC_CATALOG_HASH_MISMATCH`` Stage-5 blocker and refuses the
+    trusted-tuple contribution. A hash mismatch also blocks the
+    bundle-hash helper call at the call site.
     """
     entry_blockers: list[ShellGeometryCatalogBlockerEntry] = []
     if not isinstance(raw_perm, Mapping):
@@ -2423,8 +2553,14 @@ def _validate_permission_snapshot_entry(
         )
         return None, entry_blockers
 
-    # permission_scope: raw type → canonical
+    # Round 4 §4 — same-stage accumulation. Each per-field check is
+    # INDEPENDENT. We accumulate all raw-type / canonical blockers
+    # before deciding to gate. The helper returns ``None`` ONLY when
+    # a dependent check needs a value that is missing (e.g. canonical
+    # list construction requires a ``Sequence``).
     perm_scope_raw = raw_perm.get("permission_scope")
+    perm_scope_ok = False
+    scope_tuple: tuple[str, ...] = ()
     if not _is_str_seq(perm_scope_raw):
         entry_blockers.append(
             _make_entry(
@@ -2433,21 +2569,25 @@ def _validate_permission_snapshot_entry(
                 field_path=f"evidence_bundle.permission_evidence[{index}].permission_scope",
             )
         )
-        return None, entry_blockers
-    scope_tuple_l = _canonicalize_str_seq(perm_scope_raw, unique=True)
-    if scope_tuple_l is None:
-        entry_blockers.append(
-            _make_entry(
-                "SGC_RAW_TYPE_INVALID",
-                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
-                field_path=f"evidence_bundle.permission_evidence[{index}].permission_scope",
+    else:
+        scope_tuple_l = _canonicalize_str_seq(perm_scope_raw, unique=True)
+        if scope_tuple_l is None:
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_RAW_TYPE_INVALID",
+                    stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                    field_path=f"evidence_bundle.permission_evidence[{index}].permission_scope",
+                )
             )
-        )
-        return None, entry_blockers
+        else:
+            scope_tuple = scope_tuple_l
+            perm_scope_ok = True
 
     # usage_scope: raw type → canonical (field_path MUST be
     # ``.usage_scope``, NOT ``.permission_scope``).
     perm_usage_raw = raw_perm.get("usage_scope")
+    perm_usage_ok = False
+    usage_tuple: tuple[str, ...] = ()
     if not _is_str_seq(perm_usage_raw):
         entry_blockers.append(
             _make_entry(
@@ -2456,25 +2596,28 @@ def _validate_permission_snapshot_entry(
                 field_path=f"evidence_bundle.permission_evidence[{index}].usage_scope",
             )
         )
-        return None, entry_blockers
-    usage_tuple_l = _canonicalize_str_seq(perm_usage_raw, unique=True)
-    if usage_tuple_l is None:
-        entry_blockers.append(
-            _make_entry(
-                "SGC_RAW_TYPE_INVALID",
-                stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
-                field_path=f"evidence_bundle.permission_evidence[{index}].usage_scope",
+    else:
+        usage_tuple_l = _canonicalize_str_seq(perm_usage_raw, unique=True)
+        if usage_tuple_l is None:
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_RAW_TYPE_INVALID",
+                    stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                    field_path=f"evidence_bundle.permission_evidence[{index}].usage_scope",
+                )
             )
-        )
-        return None, entry_blockers
-    scope_tuple: tuple[str, ...] = scope_tuple_l
-    usage_tuple: tuple[str, ...] = usage_tuple_l
+        else:
+            usage_tuple = usage_tuple_l
+            perm_usage_ok = True
 
-    # evidence_ref / approved_by / approved_at
+    # evidence_ref / approved_by / approved_at — each independent.
     ev_ref = raw_perm.get("evidence_ref")
     approved_by = raw_perm.get("approved_by")
     approved_at = raw_perm.get("approved_at")
-    if not _is_nonempty_str(ev_ref):
+    ev_ref_ok = _is_nonempty_str(ev_ref)
+    approved_by_ok = _is_nonempty_str(approved_by)
+    approved_at_ok = _is_nonempty_str(approved_at)
+    if not ev_ref_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2482,7 +2625,7 @@ def _validate_permission_snapshot_entry(
                 field_path=f"evidence_bundle.permission_evidence[{index}].evidence_ref",
             )
         )
-    if not _is_nonempty_str(approved_by):
+    if not approved_by_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2490,7 +2633,7 @@ def _validate_permission_snapshot_entry(
                 field_path=f"evidence_bundle.permission_evidence[{index}].approved_by",
             )
         )
-    if not _is_nonempty_str(approved_at):
+    if not approved_at_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2498,17 +2641,13 @@ def _validate_permission_snapshot_entry(
                 field_path=f"evidence_bundle.permission_evidence[{index}].approved_at",
             )
         )
-    if any(not _is_nonempty_str(x) for x in (ev_ref, approved_by, approved_at)):
-        return None, entry_blockers
-    # mypy narrowing: the `if any(...)` check above guarantees all
-    # three values are non-empty strings.
-    assert isinstance(ev_ref, str) and ev_ref
-    assert isinstance(approved_by, str) and approved_by
-    assert isinstance(approved_at, str) and approved_at
 
     # permission_hash: lexical + hash-domain
     perm_hash_in = raw_perm.get("permission_hash")
-    if not _is_nonempty_str(perm_hash_in) or not re.fullmatch(r"[0-9a-f]{64}", perm_hash_in):
+    perm_hash_lexical_ok = _is_nonempty_str(perm_hash_in) and bool(
+        re.fullmatch(r"[0-9a-f]{64}", perm_hash_in) if perm_hash_in else False
+    )
+    if not perm_hash_lexical_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2516,12 +2655,67 @@ def _validate_permission_snapshot_entry(
                 field_path=f"evidence_bundle.permission_evidence[{index}].permission_hash",
             )
         )
-        return None, entry_blockers
 
-    # If THIS entry has any of the above blockers, it cannot enter the
-    # trusted snapshot. We still propagate the blockers (above) so the
-    # same-stage accumulation contract holds.
-    if entry_blockers:
+    # Round 4 §1 — HASH DOMAIN verification. Requires every other
+    # field to be raw-valid + canonical. If so, recompute the
+    # expected hash from the canonical payload and compare to the
+    # supplied ``permission_hash``. A mismatch emits a Stage-5
+    # ``SGC_CATALOG_HASH_MISMATCH`` blocker.
+    hash_domain_ok = (
+        perm_scope_ok
+        and perm_usage_ok
+        and ev_ref_ok
+        and approved_by_ok
+        and approved_at_ok
+        and perm_hash_lexical_ok
+    )
+    if hash_domain_ok:
+        # mypy narrowing — every value above is now a non-empty str /
+        # canonical tuple.
+        assert isinstance(ev_ref, str) and ev_ref
+        assert isinstance(approved_by, str) and approved_by
+        assert isinstance(approved_at, str) and approved_at
+        assert isinstance(perm_hash_in, str) and perm_hash_in
+        hash_payload: dict[str, Any] = {
+            "permission_id": pid,
+            "permission_scope": list(scope_tuple),
+            "usage_scope": list(usage_tuple),
+            "evidence_ref": ev_ref,
+            "approved_by": approved_by,
+            "approved_at": approved_at,
+        }
+        expected_permission_hash = canonical_sha256(hash_payload)
+        if expected_permission_hash != perm_hash_in:
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_CATALOG_HASH_MISMATCH",
+                    stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                    field_path=f"evidence_bundle.permission_evidence[{index}].permission_hash",
+                    details={
+                        "expected": expected_permission_hash,
+                        "actual": perm_hash_in,
+                    },
+                )
+            )
+            # Per Round 4 §2 — hash-domain failure prevents the
+            # trusted-tuple contribution AND prevents the bundle-hash
+            # helper call.
+            return None, entry_blockers
+
+    # If THIS entry has any raw-type / canonical / hash-domain
+    # blockers, it cannot enter the trusted snapshot. We still
+    # propagate the blockers (above) so the same-stage accumulation
+    # contract holds.
+    raw_or_hash_blockers = [
+        b
+        for b in entry_blockers
+        if b.code
+        in (
+            "SGC_RAW_TYPE_INVALID",
+            "SGC_CATALOG_HASH_MISMATCH",
+        )
+    ]
+    if raw_or_hash_blockers:
         return None, entry_blockers
 
     # Round 3 §3 — duplicate entries (permission_id in a duplicate
@@ -2533,6 +2727,7 @@ def _validate_permission_snapshot_entry(
 
     # permission_hash duplicate check (only for non-duplicate-pid
     # entries, since duplicates were already filtered above).
+    assert isinstance(perm_hash_in, str) and perm_hash_in
     if perm_hash_in in perm_hash_set:
         entry_blockers.append(
             _make_entry(
@@ -2544,6 +2739,11 @@ def _validate_permission_snapshot_entry(
         )
         return None, entry_blockers
     perm_hash_set[perm_hash_in] = index
+    # mypy narrowing: hash_domain_ok + duplicate-permission gate
+    # guarantees every value is a non-empty str.
+    assert isinstance(ev_ref, str) and ev_ref
+    assert isinstance(approved_by, str) and approved_by
+    assert isinstance(approved_at, str) and approved_at
     snapshot = VendorPermissionEvidenceSnapshot(
         permission_id=pid,
         permission_scope=scope_tuple,
@@ -2576,10 +2776,17 @@ def _validate_provenance_edge_entry(
     edge_hash_set: dict[str, int],
     duplicate_edge_ids: set[str],
 ) -> tuple[ProvenanceEdgeSnapshot | None, list[ShellGeometryCatalogBlockerEntry]]:
-    """Round 3 §4 — unified full-field validator for a single
-    provenance edge entry. The SAME validator runs for unique and
-    duplicate ``edge_id``s so independent errors accumulate
-    alongside the duplicate blocker.
+    """Round 3 §4 + Round 4 §2 — unified full-field validator for a
+    single provenance edge entry. The SAME validator runs for
+    unique and duplicate ``edge_id``s so independent errors
+    accumulate alongside the duplicate blocker.
+
+    Round 4 §2 — Stage 6 carries a HASH DOMAIN verification:
+    ``expected_edge_hash`` is computed from the canonical payload
+    of every other field. A mismatch emits a
+    ``SGC_PROVENANCE_INCOMPLETE`` Stage-6 blocker and refuses the
+    trusted-tuple contribution. A hash mismatch also blocks the
+    bundle-hash helper call at the call site.
     """
     entry_blockers: list[ShellGeometryCatalogBlockerEntry] = []
     if not isinstance(raw_edge, Mapping):
@@ -2614,13 +2821,21 @@ def _validate_provenance_edge_entry(
             )
         return None, entry_blockers
 
+    # Round 4 §4 — same-stage accumulation. Each per-field check is
+    # INDEPENDENT. We accumulate all raw-type blockers before
+    # deciding to gate.
     eid = raw_edge.get("edge_id")
     sid = raw_edge.get("source_id")
     tgt = raw_edge.get("target_geometry_id")
     rel = raw_edge.get("relation_type")
     ev_refs_raw = raw_edge.get("evidence_refs")
     edge_hash_in = raw_edge.get("edge_hash")
-    if not _is_nonempty_str(eid):
+
+    eid_ok = _is_nonempty_str(eid)
+    sid_ok = _is_nonempty_str(sid)
+    tgt_ok = _is_nonempty_str(tgt)
+    rel_ok = isinstance(rel, str) and bool(rel)
+    if not eid_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2628,7 +2843,7 @@ def _validate_provenance_edge_entry(
                 field_path=f"evidence_bundle.provenance_edges[{index}].edge_id",
             )
         )
-    if not _is_nonempty_str(sid):
+    if not sid_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2636,7 +2851,7 @@ def _validate_provenance_edge_entry(
                 field_path=f"evidence_bundle.provenance_edges[{index}].source_id",
             )
         )
-    if not _is_nonempty_str(tgt):
+    if not tgt_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2644,7 +2859,7 @@ def _validate_provenance_edge_entry(
                 field_path=f"evidence_bundle.provenance_edges[{index}].target_geometry_id",
             )
         )
-    if not isinstance(rel, str) or not rel:
+    if not rel_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2652,7 +2867,8 @@ def _validate_provenance_edge_entry(
                 field_path=f"evidence_bundle.provenance_edges[{index}].relation_type",
             )
         )
-    if not _is_str_seq(ev_refs_raw):
+    ev_refs_raw_ok = _is_str_seq(ev_refs_raw)
+    if not ev_refs_raw_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2660,7 +2876,10 @@ def _validate_provenance_edge_entry(
                 field_path=f"evidence_bundle.provenance_edges[{index}].evidence_refs",
             )
         )
-    if not _is_nonempty_str(edge_hash_in) or not re.fullmatch(r"[0-9a-f]{64}", edge_hash_in):
+    edge_hash_lexical_ok = _is_nonempty_str(edge_hash_in) and bool(
+        re.fullmatch(r"[0-9a-f]{64}", edge_hash_in) if edge_hash_in else False
+    )
+    if not edge_hash_lexical_ok:
         entry_blockers.append(
             _make_entry(
                 "SGC_RAW_TYPE_INVALID",
@@ -2668,21 +2887,78 @@ def _validate_provenance_edge_entry(
                 field_path=f"evidence_bundle.provenance_edges[{index}].edge_hash",
             )
         )
-    # If we have any raw-type blockers, we cannot enter the trusted
-    # snapshot; the validators above have already recorded them.
-    raw_type_blockers = [b for b in entry_blockers if b.code == "SGC_RAW_TYPE_INVALID"]
-    if raw_type_blockers:
-        return None, entry_blockers
 
-    ev_refs_canon_l = _canonicalize_str_seq(ev_refs_raw, unique=True)
-    if ev_refs_canon_l is None:
-        entry_blockers.append(
-            _make_entry(
-                "SGC_RAW_TYPE_INVALID",
-                stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
-                field_path=f"evidence_bundle.provenance_edges[{index}].evidence_refs",
+    # Round 4 §4 — evidence_refs canonical deduplication. The check
+    # requires a sequence to canonicalize, so we gate on
+    # ev_refs_raw_ok.
+    ev_refs_canon: tuple[str, ...] = ()
+    if ev_refs_raw_ok:
+        ev_refs_canon_l = _canonicalize_str_seq(ev_refs_raw, unique=True)
+        if ev_refs_canon_l is None:
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_RAW_TYPE_INVALID",
+                    stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                    field_path=f"evidence_bundle.provenance_edges[{index}].evidence_refs",
+                )
             )
+        else:
+            ev_refs_canon = ev_refs_canon_l
+
+    # Round 4 §2 — HASH DOMAIN verification. Requires every other
+    # field to be raw-valid + canonical. If so, recompute the
+    # expected hash from the canonical payload and compare to the
+    # supplied ``edge_hash``. A mismatch emits a Stage-6
+    # ``SGC_PROVENANCE_INCOMPLETE`` blocker.
+    hash_domain_ok = (
+        eid_ok and sid_ok and tgt_ok and rel_ok and ev_refs_raw_ok and edge_hash_lexical_ok
+    )
+    if hash_domain_ok:
+        # mypy narrowing — every value above is now a non-empty str /
+        # canonical tuple.
+        assert isinstance(eid, str) and eid
+        assert isinstance(sid, str) and sid
+        assert isinstance(tgt, str) and tgt
+        assert isinstance(rel, str) and rel
+        assert isinstance(edge_hash_in, str) and edge_hash_in
+        hash_payload: dict[str, Any] = {
+            "edge_id": eid,
+            "source_id": sid,
+            "target_geometry_id": tgt,
+            "relation_type": rel,
+            "evidence_refs": list(ev_refs_canon),
+        }
+        expected_edge_hash = canonical_sha256(hash_payload)
+        if expected_edge_hash != edge_hash_in:
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_PROVENANCE_INCOMPLETE",
+                    stage_rank=_STAGE_PROVENANCE_SNAPSHOTS,
+                    field_path=f"evidence_bundle.provenance_edges[{index}].edge_hash",
+                    details={
+                        "expected": expected_edge_hash,
+                        "actual": edge_hash_in,
+                    },
+                )
+            )
+            # Per Round 4 §2 — hash-domain failure prevents the
+            # trusted-tuple contribution AND prevents the bundle-hash
+            # helper call.
+            return None, entry_blockers
+
+    # If we have any raw-type / hash-domain blockers, we cannot
+    # enter the trusted snapshot; the validators above have already
+    # recorded them.
+    raw_or_hash_blockers = [
+        b
+        for b in entry_blockers
+        if b.code
+        in (
+            "SGC_RAW_TYPE_INVALID",
+            "SGC_PROVENANCE_INCOMPLETE",
         )
+    ]
+    if raw_or_hash_blockers:
         return None, entry_blockers
 
     # Round 3 §4 — duplicate entries (edge_id in a duplicate group)
@@ -2693,6 +2969,7 @@ def _validate_provenance_edge_entry(
         return None, entry_blockers
 
     # edge_hash duplicate check (only for non-duplicate-eid entries).
+    assert isinstance(edge_hash_in, str) and edge_hash_in
     if edge_hash_in in edge_hash_set:
         entry_blockers.append(
             _make_entry(
@@ -2703,21 +2980,19 @@ def _validate_provenance_edge_entry(
             )
         )
         return None, entry_blockers
-    # mypy narrowing: the raw-type checks above guarantee all
-    # identifier / target / relation / hash fields are non-empty strings.
+    edge_hash_set[edge_hash_in] = index
+    # mypy narrowing: hash_domain_ok + duplicate-edge gate guarantees
+    # every value is a non-empty str.
     assert isinstance(eid, str) and eid
     assert isinstance(sid, str) and sid
     assert isinstance(tgt, str) and tgt
     assert isinstance(rel, str) and rel
-    assert isinstance(edge_hash_in, str) and edge_hash_in
-    assert isinstance(edge_hash_in, str)
-    edge_hash_set[edge_hash_in] = index
     edge_snapshot = ProvenanceEdgeSnapshot(
         edge_id=eid,
         source_id=sid,
         target_geometry_id=tgt,
         relation_type=rel,
-        evidence_refs=ev_refs_canon_l,
+        evidence_refs=ev_refs_canon,
         edge_hash=edge_hash_in,
     )
     return edge_snapshot, entry_blockers
