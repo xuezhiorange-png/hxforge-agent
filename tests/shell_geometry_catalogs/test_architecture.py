@@ -37,6 +37,75 @@ PRODUCTION_MODULES = (
     REPO_ROOT / "src" / "hexagent" / "shell_geometry_catalogs" / "__init__.py",
 )
 
+# Exact frozen base commit. Bound by TASK-023 source-definition audit and
+# Issue #151 / #152. The architecture checks compare the current HEAD
+# against this exact commit, not against a moving ``origin/main``.
+TASK023_FROZEN_BASE_SHA = "195ad692e4aa0148b28c8f6b86e37e73dfb3a194"
+
+
+def _ensure_frozen_base_commit() -> str:
+    """Guarantee the exact frozen base commit object is locally available.
+
+    Behaviour:
+
+    1. Check whether ``TASK023_FROZEN_BASE_SHA^{commit}`` exists using
+       ``git cat-file -e``.
+    2. If already present, perform no fetch.
+    3. If absent, fetch exactly the frozen SHA from ``origin``.
+    4. Re-check that the commit exists.
+    5. Fail loudly with captured stderr if the exact frozen commit
+       remains unavailable.
+    6. Return the exact frozen SHA.
+
+    The helper MUST NOT use mutable ``origin/main`` as authority, MUST
+    NOT fetch or merge current main, MUST NOT rebase, MUST NOT mutate
+    the working tree, MUST NOT silently return an empty diff, MUST NOT
+    skip or xfail the architecture assertions, and MUST NOT swallow
+    subprocess errors.
+    """
+    cat = subprocess.run(
+        ["git", "cat-file", "-e", TASK023_FROZEN_BASE_SHA + "^{commit}"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+    )
+    if cat.returncode != 0:
+        fetch = subprocess.run(
+            [
+                "git",
+                "fetch",
+                "--no-tags",
+                "--depth=1",
+                "origin",
+                TASK023_FROZEN_BASE_SHA,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+        )
+        if fetch.returncode != 0:
+            raise AssertionError(
+                "TASK023 frozen-base commit "
+                + TASK023_FROZEN_BASE_SHA
+                + " is unavailable after fetch: "
+                + (fetch.stderr.strip() or "<no stderr>")
+            )
+        recheck = subprocess.run(
+            ["git", "cat-file", "-e", TASK023_FROZEN_BASE_SHA + "^{commit}"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+        )
+        if recheck.returncode != 0:
+            raise AssertionError(
+                "TASK023 frozen-base commit "
+                + TASK023_FROZEN_BASE_SHA
+                + " is still unavailable after fetch: "
+                + (recheck.stderr.strip() or "<no stderr>")
+            )
+    return TASK023_FROZEN_BASE_SHA
+
+
 ALLOWED_PATHS = {
     "src/hexagent/shell_geometry_catalogs/__init__.py",
     "src/hexagent/shell_geometry_catalogs/models.py",
@@ -248,24 +317,31 @@ def test_no_task_016_mutation_or_widening() -> None:
 
 
 def _all_changed_paths() -> list[str]:
-    """Return the union of committed-changes (vs origin/main),
-    staged-changes (vs HEAD), and untracked new files inside the
-    allowlist. The origin/main...HEAD range covers only
-    committed changes - when the implementation is staged but not
-    yet committed, the index-vs-HEAD diff plus the untracked-file
-    list cover the gap.
+    """Return the union of committed-changes (vs the exact frozen
+    base commit), staged-changes (vs HEAD), and untracked new files
+    inside the allowlist. The two-tree diff against
+    ``TASK023_FROZEN_BASE_SHA`` covers only committed changes —
+    when the implementation is staged but not yet committed, the
+    index-vs-HEAD diff plus the untracked-file list cover the gap.
     """
-    changed = set()
+    _ensure_frozen_base_commit()
+    changed: set[str] = set()
 
-    # Committed (HEAD vs origin/main)
+    # Committed (HEAD vs frozen base)
     r = subprocess.run(
-        ["git", "diff", "--name-only", "origin/main...HEAD"],
+        [
+            "git",
+            "diff",
+            "--name-only",
+            TASK023_FROZEN_BASE_SHA,
+            "HEAD",
+        ],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        check=True,
     )
-    if r.returncode == 0:
-        changed.update(line for line in r.stdout.splitlines() if line)
+    changed.update(line for line in r.stdout.splitlines() if line)
 
     # Staged (index vs HEAD)
     r = subprocess.run(
@@ -273,9 +349,9 @@ def _all_changed_paths() -> list[str]:
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        check=True,
     )
-    if r.returncode == 0:
-        changed.update(line for line in r.stdout.splitlines() if line)
+    changed.update(line for line in r.stdout.splitlines() if line)
 
     # Untracked inside the allowlist roots
     r = subprocess.run(
@@ -291,9 +367,9 @@ def _all_changed_paths() -> list[str]:
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        check=True,
     )
-    if r.returncode == 0:
-        changed.update(line for line in r.stdout.splitlines() if line)
+    changed.update(line for line in r.stdout.splitlines() if line)
 
     return sorted(changed)
 
@@ -310,17 +386,35 @@ def test_exact_9_path_allowlist() -> None:
 
 def test_ci_shard_manifest_exact_delta() -> None:
     """ci-shard-manifest.yml: exactly +3 insertions / -0 deletions."""
+    _ensure_frozen_base_commit()
     r = subprocess.run(
-        ["git", "diff", "--numstat", "origin/main...HEAD", "--", "ci-shard-manifest.yml"],
+        [
+            "git",
+            "diff",
+            "--numstat",
+            TASK023_FROZEN_BASE_SHA,
+            "HEAD",
+            "--",
+            "ci-shard-manifest.yml",
+        ],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        check=True,
     )
     r_cached = subprocess.run(
-        ["git", "diff", "--cached", "--numstat", "--", "ci-shard-manifest.yml"],
+        [
+            "git",
+            "diff",
+            "--cached",
+            "--numstat",
+            "--",
+            "ci-shard-manifest.yml",
+        ],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        check=True,
     )
     sum_adds = 0
     sum_dels = 0
@@ -343,12 +437,14 @@ def test_no_task_022_mutation_or_widening() -> None:
     # Already verified by test_production_modules_do_not_import_task_022_runtime.
     # This test re-affirms that no file outside the allowlist touches
     # any TASK-022 module file in the cumulative diff.
+    _ensure_frozen_base_commit()
     result = subprocess.run(
         [
             "git",
             "diff",
             "--name-only",
-            "origin/main...HEAD",
+            TASK023_FROZEN_BASE_SHA,
+            "HEAD",
             "--",
             "src/hexagent/exchangers/shell_tube/shell_bundle_geometry/",
             "src/hexagent/exchangers/shell_tube/tube_layout/",
@@ -362,8 +458,8 @@ def test_no_task_022_mutation_or_widening() -> None:
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        check=True,
     )
-    assert result.returncode == 0
     assert not result.stdout.strip(), (
         f"TASK-022 / TASK-016 / docs mutation detected:\n{result.stdout}"
     )
@@ -371,12 +467,14 @@ def test_no_task_022_mutation_or_widening() -> None:
 
 def test_no_workflow_dependency_lockfile_or_doc_mutation() -> None:
     """Workflow / deps / lockfile / design docs MUST NOT be modified."""
+    _ensure_frozen_base_commit()
     result = subprocess.run(
         [
             "git",
             "diff",
             "--name-only",
-            "origin/main...HEAD",
+            TASK023_FROZEN_BASE_SHA,
+            "HEAD",
             "--",
             ".github/",
             "pyproject.toml",
@@ -402,8 +500,8 @@ def test_no_workflow_dependency_lockfile_or_doc_mutation() -> None:
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        check=True,
     )
-    assert result.returncode == 0
     assert not result.stdout.strip(), (
         f"Workflow / dependency / lockfile / doc mutation detected:\n{result.stdout}"
     )
@@ -469,7 +567,7 @@ def test_round4_architecture_forbidden_identifiers_in_production_source() -> Non
         "BLOCKER_STAGE_MAP",
         "IMPLICIT_STAGE_RANK",
     }
-    src_dir = Path("/root/hxforge-agent/src/hexagent/shell_geometry_catalogs")
+    src_dir = REPO_ROOT / "src" / "hexagent" / "shell_geometry_catalogs"
 
     def names_in_module(tree: ast.AST) -> set[str]:
         """Set of Name-id references that appear in executable code
@@ -479,11 +577,11 @@ def test_round4_architecture_forbidden_identifiers_in_production_source() -> Non
         seen: set[str] = set()
 
         class V(ast.NodeVisitor):
-            def visit_Name(self, node: ast.Name) -> None:  # type: ignore[override]
+            def visit_Name(self, node: ast.Name) -> None:
                 seen.add(node.id)
                 self.generic_visit(node)
 
-            def visit_Attribute(self, node: ast.Attribute) -> None:  # type: ignore[override]
+            def visit_Attribute(self, node: ast.Attribute) -> None:
                 seen.add(node.attr)
                 self.generic_visit(node)
 
@@ -511,7 +609,7 @@ def test_round4_architecture_no_implicit_default_in_make_entry() -> None:
     """``_make_entry`` source MUST NOT include the literal ``stage_rank=0``
     anywhere as an implicit default.
     """
-    src_path = Path("/root/hxforge-agent/src/hexagent/shell_geometry_catalogs/catalog.py")
+    src_path = REPO_ROOT / "src" / "hexagent" / "shell_geometry_catalogs" / "catalog.py"
     text = src_path.read_text(encoding="utf-8")
     # The forbidden lines would be ``stage_rank: int = 0`` /
     # ``stage_rank=0`` as a default keyword on the ``_make_entry``
