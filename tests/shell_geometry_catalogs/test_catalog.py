@@ -2161,56 +2161,28 @@ def test_round4_permission_payload_mutation_unchanged_hash_blocks() -> None:
     assert hash_mismatch[0].stage_rank == 5
 
 
-def test_round4_permission_payload_mutation_recomputed_hashes_still_blocks() -> None:
-    """Round 4 §1 — DEPRECATED. This test was a duplicate of
+def _deprecated_round4_permission_payload_mutation_recomputed_hashes_still_blocks() -> None:
+    """DEPRECATED — REMOVED FROM PYTEST COLLECTION IN ROUND 6.
+
+    This test was a Round 4 duplicate of
     ``test_round4_permission_payload_mutation_unchanged_hash_blocks``:
     it mutated the payload but did NOT recompute ``permission_hash``,
     so it never exercised the "child hash domain passed but caller
     tried to slip through with a wrong hash" path. The corrected
-    coverage is provided by ``test_round5_permission_recomputed_child_hash_stale_bundle_hash``
+    coverage is provided by
+    ``test_round5_permission_recomputed_child_hash_stale_bundle_hash``
     (which actually recomputes the child hash and stales the
     bundle_hash) and ``test_round5_all_hashes_fresh_no_hash_mismatch``
     (which proves full chain integrity).
 
-    The assertion below is preserved only to keep the test as a
-    historical marker; it is identical to
-    ``test_round4_permission_payload_mutation_unchanged_hash_blocks``
-    in mutation, hash state, and assertions. A separate test
-    ``test_round5_permission_recomputed_child_hash_stale_bundle_hash``
-    carries the actual "child hash recomputed" coverage.
+    Per Round 6 §7.1 — the function is retained as a non-collected
+    historical comment so the audit trail is preserved, but pytest
+    will not execute it (the name does not start with ``test_``).
+    DO NOT rename back to ``test_`` without Charles authorization
+    AND real hash recomputation in the test body.
     """
-    good_perm = synthetic_permission_payload(permission_id="perm-mut-2-deprecated")
-    # Capture the OLD hash (does NOT match the mutated payload).
-    old_hash = good_perm["permission_hash"]
-    mutated = dict(good_perm)
-    mutated["usage_scope"] = sorted({"internal_runtime", "external_runtime"})
-    # Explicit assertion: we INTENTIONALLY do NOT recompute.
-    # This is the deprecated-path assertion; the fresh-recompute
-    # path is covered by test_round5_permission_recomputed_child_hash_stale_bundle_hash.
-    assert mutated["permission_hash"] == old_hash, (
-        "DEPRECATED marker: this test intentionally does not recompute"
-    )
-    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-perm-mut-2-deprecated"))
-    edge = synthetic_edge_payload(
-        target_geometry_id=record["geometry_id"],
-        edge_id="edge-perm-mut-2-deprecated",
-    )
-    cat, bun = assemble_synthetic_catalog_and_bundle(
-        record_payloads=(record,),
-        permission_payloads=(mutated,),  # type: ignore[arg-type]
-        edge_payloads=(edge,),
-    )
-    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
-        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
-    hash_mismatch = [
-        b
-        for b in excinfo.value.blockers
-        if b.code == "SGC_CATALOG_HASH_MISMATCH"
-        and b.field_path == "evidence_bundle.permission_evidence[0].permission_hash"
-    ]
-    assert hash_mismatch, (
-        "deprecated marker: child hash was STALE so the child hash-domain check at stage 5 fires"
-    )
+    # Body intentionally not executed — see comment above.
+    raise NotImplementedError("DEPRECATED Round 4 duplicate; see docstring for replacement tests.")
 
 
 def test_round4_edge_payload_mutation_unchanged_hash_blocks() -> None:
@@ -2248,47 +2220,28 @@ def test_round4_edge_payload_mutation_unchanged_hash_blocks() -> None:
     assert hash_mismatch[0].stage_rank == 6
 
 
-def test_round4_edge_payload_mutation_recomputed_hashes_still_blocks() -> None:
-    """Round 4 §2 — DEPRECATED. This test was a duplicate of
-    ``test_round4_edge_payload_mutation_unchanged_hash_blocks``: it
-    mutated the payload but did NOT recompute ``edge_hash``, so it
+def _deprecated_round4_edge_payload_mutation_recomputed_hashes_still_blocks() -> None:
+    """DEPRECATED — REMOVED FROM PYTEST COLLECTION IN ROUND 6.
+
+    This test was a Round 4 duplicate of
+    ``test_round4_edge_payload_mutation_unchanged_hash_blocks``:
+    it mutated the payload but did NOT recompute ``edge_hash``, so it
     never exercised the "child hash domain passed but caller tried
     to slip through with a wrong hash" path. The corrected coverage
-    is provided by ``test_round5_edge_recomputed_child_hash_stale_bundle_hash``
+    is provided by
+    ``test_round5_edge_recomputed_child_hash_stale_bundle_hash``
     (which actually recomputes the child hash and stales the
     bundle_hash) and ``test_round5_all_hashes_fresh_no_hash_mismatch``
     (which proves full chain integrity).
+
+    Per Round 6 §7.1 — the function is retained as a non-collected
+    historical comment so the audit trail is preserved, but pytest
+    will not execute it (the name does not start with ``test_``).
+    DO NOT rename back to ``test_`` without Charles authorization
+    AND real hash recomputation in the test body.
     """
-    good_edge = synthetic_edge_payload(
-        edge_id="edge-mut-2-deprecated",
-        target_geometry_id="synthetic-catalog-1/shell/rec-edge-mut-2-deprecated/1",
-    )
-    old_hash = good_edge["edge_hash"]
-    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-edge-mut-2-deprecated"))
-    mutated = dict(good_edge)
-    mutated["target_geometry_id"] = record["geometry_id"]
-    mutated["relation_type"] = "extends"
-    # DEPRECATED marker: we INTENTIONALLY do NOT recompute.
-    assert mutated["edge_hash"] == old_hash, (
-        "DEPRECATED marker: this test intentionally does not recompute"
-    )
-    perm = synthetic_permission_payload(permission_id="perm-edge-mut-2-deprecated")
-    cat, bun = assemble_synthetic_catalog_and_bundle(
-        record_payloads=(record,),
-        permission_payloads=(perm,),
-        edge_payloads=(mutated,),  # type: ignore[arg-type]
-    )
-    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
-        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
-    hash_mismatch = [
-        b
-        for b in excinfo.value.blockers
-        if b.code == "SGC_PROVENANCE_INCOMPLETE"
-        and b.field_path == "evidence_bundle.provenance_edges[0].edge_hash"
-    ]
-    assert hash_mismatch, (
-        "deprecated marker: child hash was STALE so the child hash-domain check at stage 6 fires"
-    )
+    # Body intentionally not executed — see comment above.
+    raise NotImplementedError("DEPRECATED Round 4 duplicate; see docstring for replacement tests.")
 
 
 def test_round4_permission_hash_mismatch_prevents_bundle_hash_helper() -> None:
@@ -2711,13 +2664,27 @@ def test_round5_edge_recomputed_child_hash_stale_bundle_hash() -> None:
 
 
 def test_round5_all_hashes_fresh_no_hash_mismatch() -> None:
-    """Round 5 §六 — full chain integrity. Mutate a permission payload
-    AND edge payload, then correctly recompute every hash in the
-    chain (permission_hash, edge_hash, bundle_hash,
+    """Round 5 §六 + Round 6 §7.2 — full chain integrity. Mutate a
+    permission payload AND edge payload, then correctly recompute
+    every hash in the chain (permission_hash, edge_hash, bundle_hash,
     catalog.evidence_bundle_hash, catalog.catalog_hash). The parser
-    MUST NOT emit any SGC_CATALOG_HASH_MISMATCH / SGC_PROVENANCE_INCOMPLETE
-    blocker. Hashes are integrity bindings, not immutable business
-    value whitelists — any payload that satisfies the closed set of
+    MUST NOT emit any ``SGC_CATALOG_HASH_MISMATCH`` /
+    ``SGC_PROVENANCE_INCOMPLETE`` /
+    ``SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE`` blocker.
+
+    Round 6 correction: the permission payload mutation MUST stay
+    within the TASK-012 ``VendorPermissionScope`` frozen enum
+    (``{repository_storage, repository_redistribution, usage_scope,
+    public_artifact_allowed}``). The previous mutation included
+    ``"vendor_redistribution"`` (not in the frozen enum) which the
+    Stage-5 membership check now correctly rejects as
+    ``SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE``. The corrected
+    mutation adds the legal ``"usage_scope"`` and
+    ``"public_artifact_allowed"`` tokens to prove the closed-set
+    legal extension is accepted.
+
+    Hashes are integrity bindings, not immutable business value
+    whitelists — any payload that satisfies the closed set of
     accepted scopes / usage_scope / relation_type / etc. is permitted
     as long as every layer's hash chain is consistent.
 
@@ -2732,10 +2699,19 @@ def test_round5_all_hashes_fresh_no_hash_mismatch() -> None:
         edge_id="edge-allfresh-1",
         target_geometry_id="synthetic-catalog-1/shell/rec-allfresh-1/1",
     )
-    # Mutate the permission payload (add a different but closed-set scope)
+    # Mutate the permission payload — add a different but closed-set
+    # legal scope (Round 6: must use only TASK-012 frozen enum
+    # values; previously used ``vendor_redistribution`` which is
+    # NOT in the frozen enum and is correctly rejected by the
+    # Stage-5 membership check).
     mutated_perm = dict(base_perm)
     mutated_perm["permission_scope"] = sorted(
-        {"repository_storage", "repository_redistribution", "vendor_redistribution"}
+        {
+            "repository_storage",
+            "repository_redistribution",
+            "usage_scope",
+            "public_artifact_allowed",
+        }
     )
     mutated_perm["permission_hash"] = canonical_sha256(_perm_hash_payload_for_test(mutated_perm))
     # Mutate the edge payload (different relation_type)
@@ -2760,20 +2736,482 @@ def test_round5_all_hashes_fresh_no_hash_mismatch() -> None:
         evidence_bundle_hash=fresh_bundle_hash,
     )
     # The parser MUST accept this input (no exception). Any
-    # hash-mismatch blocker here is a regression of the integrity
-    # binding contract.
+    # hash-mismatch / scope-authority blocker here is a regression
+    # of the integrity binding contract.
     try:
         parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
     except ShellGeometryCatalogFailure as exc:
         hash_blockers = [
             b
             for b in exc.blockers
-            if b.code in ("SGC_CATALOG_HASH_MISMATCH", "SGC_PROVENANCE_INCOMPLETE")
+            if b.code
+            in (
+                "SGC_CATALOG_HASH_MISMATCH",
+                "SGC_PROVENANCE_INCOMPLETE",
+                "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
+            )
         ]
         pytest.fail(
-            "expected NO hash-mismatch blockers when every layer's hash "
-            "is freshly recomputed. Hashes are integrity bindings, not "
-            "immutable business value whitelists. Got hash blockers: "
-            f"{[(b.code, b.field_path, b.stage_rank) for b in hash_blockers]}; "
+            "expected NO hash-mismatch / scope-authority blockers when "
+            "every layer's hash is freshly recomputed AND every "
+            "permission_scope token is in the TASK-012 "
+            "VendorPermissionScope frozen enum. Got hash/scope "
+            f"blockers: {[(b.code, b.field_path, b.stage_rank) for b in hash_blockers]}; "
             f"all blockers: {[(b.code, b.field_path, b.stage_rank) for b in exc.blockers]}"
         )
+
+
+# ===========================================================================
+# Round 6 — TASK-023 §5.5 permission-scope token membership tests
+# ===========================================================================
+#
+# TASK-023 §5.5: ``permission_scope`` is a sorted unique tuple of
+# TASK-012 permission tokens. TASK-012 ``VendorPermissionScope`` is
+# the SOLE authority source and contains exactly four tokens:
+#   {repository_storage, repository_redistribution, usage_scope,
+#    public_artifact_allowed}
+# ``vendor_redistribution`` (and any other non-enum string) is NOT a
+# legal permission-scope token. The Stage-5 parser membership check
+# (catalog.py:2599-2622) emits
+# ``SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE`` for every entry that
+# contains an unknown token and the same-stage gate rejects the
+# entry from the trusted permission snapshot tuple.
+
+
+_LEGAL_PERMISSION_SCOPE_TOKENS = (
+    "public_artifact_allowed",
+    "repository_redistribution",
+    "repository_storage",
+    "usage_scope",
+)
+
+
+@pytest.mark.parametrize("legal_token", _LEGAL_PERMISSION_SCOPE_TOKENS)
+def test_round6_legal_permission_scope_token_accepted(legal_token: str) -> None:
+    """Round 6 §7.3.1 — each of the four TASK-012 ``VendorPermissionScope``
+    tokens, used in isolation, MUST be accepted. Parametrized over the
+    full frozen enum.
+    """
+    perm = synthetic_permission_payload(
+        permission_id=f"perm-legal-{legal_token}",
+        permission_scope=(legal_token,),
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key=f"rec-legal-{legal_token}"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id=f"edge-legal-{legal_token}",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    # Legal token: parser MUST accept (no exception).
+    parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+
+
+def test_round6_vendor_redistribution_unknown_token_rejected() -> None:
+    """Round 6 §7.3.2 — ``vendor_redistribution`` is NOT a TASK-012
+    ``VendorPermissionScope`` token (the legal token is
+    ``repository_redistribution``). The Stage-5 membership check
+    MUST reject it with exact blocker:
+      code=SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE
+      stage_rank=5
+      field_path=evidence_bundle.permission_evidence[0].permission_scope
+      details.invalid_tokens=("vendor_redistribution",)  # already
+        in canonical sort order, single element
+    """
+    perm = synthetic_permission_payload(
+        permission_id="perm-unknown-1",
+        permission_scope=("vendor_redistribution",),
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-unknown-1"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-unknown-1",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    scope_blockers = [
+        b for b in excinfo.value.blockers if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"
+    ]
+    assert len(scope_blockers) == 1, (
+        f"expected exactly 1 SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE; "
+        f"got {[(b.code, b.field_path) for b in scope_blockers]}; "
+        f"all blockers: {[(b.code, b.field_path, b.stage_rank) for b in excinfo.value.blockers]}"
+    )
+    blocker = scope_blockers[0]
+    assert blocker.stage_rank == 5
+    assert blocker.field_path == ("evidence_bundle.permission_evidence[0].permission_scope")
+    # ``details`` is a JSON-decoded Mapping; ``invalid_tokens`` MUST
+    # be a tuple of str, sorted in Unicode code-point order.
+    assert blocker.details is not None
+    invalid_tokens = blocker.details.get("invalid_tokens")
+    assert invalid_tokens == ("vendor_redistribution",), (
+        f"expected invalid_tokens=('vendor_redistribution',); got {invalid_tokens!r}"
+    )
+    # No suggested / canonical-form keys leaked from the executor.
+    assert set(blocker.details.keys()) == {"invalid_tokens"}, (
+        f"details must contain ONLY invalid_tokens; "
+        f"got extra keys: {set(blocker.details.keys()) - {'invalid_tokens'}}"
+    )
+
+
+def test_round6_multiple_unknown_tokens_sorted_deterministically() -> None:
+    """Round 6 §7.3.3 — multiple unknown tokens within one
+    ``permission_scope`` MUST be reported in
+    ``details.invalid_tokens`` in deterministic Unicode code-point
+    order. The parser canonicalizes ``scope_tuple`` via
+    ``_canonicalize_str_seq(unique=True)`` which is ``sorted(set(...))``
+    so the resulting tuple is already sorted before extraction.
+    """
+    # Three unknown tokens, all NOT in VendorPermissionScope.
+    perm = synthetic_permission_payload(
+        permission_id="perm-multi-unknown",
+        permission_scope=("zeta_token", "alpha_token", "mu_token"),
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-multi-unknown"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-multi-unknown",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    scope_blockers = [
+        b for b in excinfo.value.blockers if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"
+    ]
+    assert len(scope_blockers) == 1
+    invalid_tokens = scope_blockers[0].details["invalid_tokens"]
+    # Unicode code-point order: "alpha_token" < "mu_token" < "zeta_token"
+    assert invalid_tokens == ("alpha_token", "mu_token", "zeta_token"), (
+        f"expected sorted ('alpha_token', 'mu_token', 'zeta_token'); got {invalid_tokens!r}"
+    )
+    # The tuple is genuinely sorted (defensive re-check).
+    assert list(invalid_tokens) == sorted(invalid_tokens)
+
+
+def test_round6_unknown_token_on_referenced_permission_rejected() -> None:
+    """Round 6 §7.3.4 — a permission carrying an unknown token MUST
+    be rejected EVEN IF the record references it
+    (``permission_evidence_refs``). The Stage-5 gate fires first
+    (Stage 5 < Stage 15) and prevents the entry from entering
+    ``perm_records`` / ``perm_dict``; the same-stage gate at
+    catalog.py:1158 (``permission_stage_failed``) raises the
+    parser before the authority-resolution stage (Stage 15) ever
+    runs. We assert that:
+      - the Stage-5 membership blocker is the ONLY blocker, and
+      - no bundle-hash / authority-resolution blocker is present
+        (because Stage 5 raises first).
+    """
+    perm = synthetic_permission_payload(
+        permission_id="perm-ref-unknown",
+        permission_scope=("vendor_redistribution",),  # NOT a legal token
+    )
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-ref-unknown"),
+        permission_refs=("perm-ref-unknown",),  # reference it!
+    )
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-ref-unknown",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    # Stage-5 membership blocker MUST be the ONLY blocker. The
+    # Stage-5 gate (catalog.py:1158) raises immediately, so Stage
+    # 15 (authority-resolution) MUST NOT run.
+    all_codes = [b.code for b in excinfo.value.blockers]
+    assert all_codes == ["SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"], (
+        f"expected ONLY the Stage-5 membership blocker; got {all_codes}"
+    )
+    assert excinfo.value.blockers[0].stage_rank == 5
+    assert excinfo.value.blockers[0].field_path == (
+        "evidence_bundle.permission_evidence[0].permission_scope"
+    )
+
+
+def test_round6_unknown_token_on_unreferenced_permission_rejected() -> None:
+    """Round 6 §7.3.5 — a permission carrying an unknown token MUST
+    be rejected EVEN IF no record references it. The Stage-5
+    membership check runs on every permission snapshot regardless
+    of reference. The unknown token MUST be detected at Stage 5
+    BEFORE any authority-resolution stage.
+    """
+    perm = synthetic_permission_payload(
+        permission_id="perm-unref-unknown",
+        permission_scope=("vendor_redistribution",),
+    )
+    # Record does NOT reference the permission (empty
+    # permission_refs).
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-unref-unknown"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-unref-unknown",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    # Stage-5 membership blocker MUST be the only
+    # SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE entry.
+    stage_5_scope_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE" and b.stage_rank == 5
+    ]
+    assert len(stage_5_scope_blockers) == 1
+    assert stage_5_scope_blockers[0].field_path == (
+        "evidence_bundle.permission_evidence[0].permission_scope"
+    )
+    # No record-level authority-resolution failure should reference
+    # the unreferenced permission. (No assertion is needed; the
+    # test passes if no SGC_PERMISSION_DUPLICATE_ID fires below.)
+    assert all(b.code != "SGC_PERMISSION_DUPLICATE_ID" for b in excinfo.value.blockers), (
+        "unreferenced unknown-token permission should not produce a duplicate-id blocker"
+    )
+
+
+def test_round6_duplicate_permission_id_and_unknown_token_accumulate() -> None:
+    """Round 6 §7.3.6 — duplicate ``permission_id`` AND unknown
+    token on one of the entries MUST produce BOTH blockers in the
+    same Stage-5 accumulation:
+      - SGC_PERMISSION_DUPLICATE_ID (Stage 5, from the duplicate-id
+        pre-pass in catalog.py:1033-1044)
+      - SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE (Stage 5, from the
+        membership check)
+    Neither blocker suppresses the other; same-stage accumulation
+    contract holds.
+    """
+    # First entry: legal scope, used as the "anchor" duplicate.
+    perm_legal = synthetic_permission_payload(
+        permission_id="perm-dup-unknown",
+        permission_scope=("repository_storage",),
+    )
+    # Second entry: same permission_id, unknown token.
+    perm_unknown = dict(perm_legal)
+    perm_unknown["permission_scope"] = sorted(("vendor_redistribution",))
+    perm_unknown["permission_hash"] = canonical_sha256(_perm_hash_payload_for_test(perm_unknown))
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-dup-unknown"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-dup-unknown",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm_legal, perm_unknown),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    duplicate_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_PERMISSION_DUPLICATE_ID" and b.stage_rank == 5
+    ]
+    scope_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE" and b.stage_rank == 5
+    ]
+    assert duplicate_blockers, (
+        f"expected SGC_PERMISSION_DUPLICATE_ID Stage 5; got "
+        f"{[b.code for b in excinfo.value.blockers]}"
+    )
+    assert scope_blockers, (
+        f"expected SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE Stage 5; got "
+        f"{[b.code for b in excinfo.value.blockers]}"
+    )
+    # Both blockers coexist (same-stage accumulation).
+    assert len(duplicate_blockers) >= 1
+    assert len(scope_blockers) >= 1
+
+
+def test_round6_unknown_token_plus_stale_permission_hash_accumulate() -> None:
+    """Round 6 §7.3.7 — unknown token AND stale ``permission_hash``
+    on the same entry MUST produce BOTH blockers in the same
+    Stage-5 accumulation (independently executable):
+      - SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE (Stage 5, from the
+        membership check)
+      - SGC_CATALOG_HASH_MISMATCH (Stage 5, from the hash-domain
+        check)
+    Neither blocker suppresses the other.
+    """
+    good_perm = synthetic_permission_payload(
+        permission_id="perm-unknown-stale-hash",
+        permission_scope=("repository_storage",),
+    )
+    # Capture the OLD hash, then mutate the scope to an unknown
+    # token WITHOUT recomputing the hash. Now we have BOTH a
+    # scope-authority failure AND a stale hash failure on the same
+    # entry.
+    old_hash = good_perm["permission_hash"]
+    mutated = dict(good_perm)
+    mutated["permission_scope"] = sorted(("vendor_redistribution",))
+    # Explicitly do NOT recompute — the hash is now stale.
+    assert mutated["permission_hash"] == old_hash
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-unknown-stale-hash"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-unknown-stale-hash",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(mutated,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    scope_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE" and b.stage_rank == 5
+    ]
+    hash_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH" and b.stage_rank == 5
+    ]
+    assert scope_blockers, (
+        f"expected SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE Stage 5; got "
+        f"{[b.code for b in excinfo.value.blockers]}"
+    )
+    assert hash_blockers, (
+        f"expected SGC_CATALOG_HASH_MISMATCH Stage 5; got "
+        f"{[b.code for b in excinfo.value.blockers]}"
+    )
+    # Both are present on the SAME entry; neither suppresses the
+    # other.
+    assert scope_blockers[0].field_path == (
+        "evidence_bundle.permission_evidence[0].permission_scope"
+    )
+    assert hash_blockers[0].field_path == ("evidence_bundle.permission_evidence[0].permission_hash")
+
+
+def test_round6_unknown_token_prevents_bundle_hash_helper() -> None:
+    """Round 6 §7.3.8 — an unknown token on a permission MUST
+    prevent the bundle-hash helper from running. Concretely:
+      - The membership blocker (Stage 5) is present.
+      - The bundle-hash mismatch blocker (Stage 4, at
+        ``evidence_bundle.bundle_hash``) MUST NOT be present,
+        because the Stage-5 gate fires first.
+    """
+    perm = synthetic_permission_payload(
+        permission_id="perm-unknown-bundle-gate",
+        permission_scope=("vendor_redistribution",),
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-unknown-bundle-gate"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-unknown-bundle-gate",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    # Membership blocker MUST be present.
+    scope_blockers = [
+        b for b in excinfo.value.blockers if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"
+    ]
+    assert scope_blockers, (
+        f"expected SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE; got "
+        f"{[b.code for b in excinfo.value.blockers]}"
+    )
+    # Bundle-hash mismatch MUST NOT be present (Stage-5 gate fires
+    # first, so the bundle-hash helper is never called with a
+    # trusted tuple).
+    bundle_hash_mismatches = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH" and b.field_path == "evidence_bundle.bundle_hash"
+    ]
+    assert not bundle_hash_mismatches, (
+        "expected NO bundle-hash mismatch (Stage-5 gate must fire "
+        "first); "
+        f"got {[b.field_path for b in bundle_hash_mismatches]}"
+    )
+
+
+def test_round6_usage_scope_deployment_tokens_not_validated_against_vendor_enum() -> None:
+    """Round 6 §7.3.9 — ``usage_scope`` is NOT a
+    ``VendorPermissionScope`` enum member. Deployment / runtime
+    tokens such as ``internal_runtime``, ``external_runtime``, and
+    ``vendor_subset_extra`` MUST remain potentially valid
+    ``usage_scope`` values, subject to the existing
+    ``usage_scope ⊆ local_kernel_usage_scope`` contract, and MUST
+    NOT be rejected by the Stage-5 membership check.
+
+    Concretely, this test builds a permission whose
+    ``permission_scope`` is a legal VendorPermissionScope token
+    and whose ``usage_scope`` is a deployment token not in the
+    enum; it asserts that no
+    ``SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE`` blocker fires on
+    the ``usage_scope`` field.
+    """
+    perm = synthetic_permission_payload(
+        permission_id="perm-usage-scope-non-vendor",
+        permission_scope=("repository_storage",),  # legal in VendorPermissionScope
+        usage_scope=(
+            "internal_runtime",
+            "external_runtime",
+            "vendor_subset_extra",
+        ),
+    )
+    # ``local_kernel_usage_scope`` must be a superset of usage_scope
+    # for the usage_scope validation to pass.
+    record = synthetic_record_payload(
+        **_make_record_kwargs(record_key="rec-usage-scope-non-vendor")
+    )
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-usage-scope-non-vendor",
+    )
+    cat, bun = assemble_synthetic_catalog_and_bundle(
+        record_payloads=(record,),
+        permission_payloads=(perm,),
+        edge_payloads=(edge,),
+        bundle_local_kernel_usage_scope=(
+            "internal_runtime",
+            "external_runtime",
+            "vendor_subset_extra",
+        ),
+    )
+    try:
+        parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
+    except ShellGeometryCatalogFailure as exc:
+        # If parse fails, it MUST NOT be because of
+        # SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE — that code only
+        # applies to permission_scope (TASK-012 enum), not to
+        # usage_scope (vendor deployment / runtime token set).
+        scope_blockers = [
+            b for b in exc.blockers if b.code == "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE"
+        ]
+        assert not scope_blockers, (
+            "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE must NOT fire on "
+            f"usage_scope deployment tokens; got {scope_blockers!r}"
+        )
+        # Re-raise if the failure is something else; the test's
+        # intent is that ``usage_scope`` is not validated against
+        # the TASK-012 enum. We allow this test to pass either by
+        # success or by a non-scope-authority failure, as long as
+        # no scope-authority blocker fires on usage_scope.

@@ -52,6 +52,7 @@ from hexagent.exchangers.shell_tube.tube_layout.canonical import (
 )
 from hexagent.rule_packs.models import (
     LicenseEvidenceForm,
+    VendorPermissionScope,
 )
 
 from .blockers import (
@@ -138,6 +139,16 @@ _STAGE_RECORD_HASH = 17
 _STAGE_RECORD_ORDERING = 18
 _STAGE_CATALOG_BUNDLE_BINDING = 19
 _STAGE_CATALOG_HASH = 20
+
+
+# TASK-023 §5.5: ``permission_scope`` is a sorted unique tuple of
+# TASK-012 permission tokens. TASK-012 ``VendorPermissionScope`` is
+# the SOLE authority source; this derived frozenset is a lookup-only
+# shortcut and MUST NOT drift from the enum. If a new token is added
+# to TASK-012, it is automatically included here.
+_VENDOR_PERMISSION_SCOPE_ALLOWED_TOKENS: Final[frozenset[str]] = frozenset(
+    member.value for member in VendorPermissionScope
+)
 
 
 # ---------------------------------------------------------------------------
@@ -2583,6 +2594,29 @@ def _validate_permission_snapshot_entry(
             scope_tuple = scope_tuple_l
             perm_scope_ok = True
 
+    # TASK-023 §5.5 + Round 6 — membership check against TASK-012
+    # ``VendorPermissionScope``. ``scope_tuple`` is already in
+    # Unicode code-point order (canonical sort+unique), so the
+    # resulting ``invalid_tokens`` tuple is also sorted. We append the
+    # scope-authority blocker to the SAME stage's accumulation list
+    # and continue validating every other field (usage_scope /
+    # evidence_ref / approved_by / approved_at / permission_hash
+    # lexical / permission_hash domain) so the same-stage
+    # accumulation contract holds.
+    if perm_scope_ok:
+        invalid_tokens: tuple[str, ...] = tuple(
+            token for token in scope_tuple if token not in _VENDOR_PERMISSION_SCOPE_ALLOWED_TOKENS
+        )
+        if invalid_tokens:
+            entry_blockers.append(
+                _make_entry(
+                    "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
+                    stage_rank=_STAGE_PERMISSION_SNAPSHOTS,
+                    field_path=f"evidence_bundle.permission_evidence[{index}].permission_scope",
+                    details={"invalid_tokens": invalid_tokens},
+                )
+            )
+
     # usage_scope: raw type → canonical (field_path MUST be
     # ``.usage_scope``, NOT ``.permission_scope``).
     perm_usage_raw = raw_perm.get("usage_scope")
@@ -2702,10 +2736,13 @@ def _validate_permission_snapshot_entry(
             # helper call.
             return None, entry_blockers
 
-    # If THIS entry has any raw-type / canonical / hash-domain
-    # blockers, it cannot enter the trusted snapshot. We still
-    # propagate the blockers (above) so the same-stage accumulation
-    # contract holds.
+    # If THIS entry has any raw-type / canonical / hash-domain /
+    # scope-authority blockers, it cannot enter the trusted snapshot.
+    # We still propagate the blockers (above) so the same-stage
+    # accumulation contract holds. Round 6 — scope-authority blocker
+    # (``SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE``) joined this set so
+    # unknown TASK-012 tokens reject the trusted-tuple contribution
+    # and gate the bundle-hash helper.
     raw_or_hash_blockers = [
         b
         for b in entry_blockers
@@ -2713,6 +2750,7 @@ def _validate_permission_snapshot_entry(
         in (
             "SGC_RAW_TYPE_INVALID",
             "SGC_CATALOG_HASH_MISMATCH",
+            "SGC_VENDOR_PERMISSION_SCOPE_INCOMPLETE",
         )
     ]
     if raw_or_hash_blockers:
