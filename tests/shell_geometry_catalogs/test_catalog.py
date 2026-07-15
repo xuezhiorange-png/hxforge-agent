@@ -29,6 +29,7 @@ from typing import Any
 
 import pytest
 
+from hexagent.canonical_json import canonical_sha256
 from hexagent.shell_geometry_catalogs import (
     ShellGeometryCatalogFailure,
     parse_shell_geometry_catalog,
@@ -2161,24 +2162,38 @@ def test_round4_permission_payload_mutation_unchanged_hash_blocks() -> None:
 
 
 def test_round4_permission_payload_mutation_recomputed_hashes_still_blocks() -> None:
-    """Round 4 §1 — even if a malicious caller recomputes the
-    ``permission_hash`` AFTER the payload mutation, the canonical
-    recomputation in the parser still detects the mismatch (because
-    the parser recomputes from the canonical payload, not the
-    supplied hash). This proves the hash domain is an internal
-    invariant, not a user-supplied field.
+    """Round 4 §1 — DEPRECATED. This test was a duplicate of
+    ``test_round4_permission_payload_mutation_unchanged_hash_blocks``:
+    it mutated the payload but did NOT recompute ``permission_hash``,
+    so it never exercised the "child hash domain passed but caller
+    tried to slip through with a wrong hash" path. The corrected
+    coverage is provided by ``test_round5_permission_recomputed_child_hash_stale_bundle_hash``
+    (which actually recomputes the child hash and stales the
+    bundle_hash) and ``test_round5_all_hashes_fresh_no_hash_mismatch``
+    (which proves full chain integrity).
+
+    The assertion below is preserved only to keep the test as a
+    historical marker; it is identical to
+    ``test_round4_permission_payload_mutation_unchanged_hash_blocks``
+    in mutation, hash state, and assertions. A separate test
+    ``test_round5_permission_recomputed_child_hash_stale_bundle_hash``
+    carries the actual "child hash recomputed" coverage.
     """
-    good_perm = synthetic_permission_payload(permission_id="perm-mut-2")
+    good_perm = synthetic_permission_payload(permission_id="perm-mut-2-deprecated")
+    # Capture the OLD hash (does NOT match the mutated payload).
+    old_hash = good_perm["permission_hash"]
     mutated = dict(good_perm)
     mutated["usage_scope"] = sorted({"internal_runtime", "external_runtime"})
-    # The PARSER recomputes the hash from canonical payload. The
-    # supplied hash above is the OLD hash (matches good_perm, not
-    # mutated). We pass it AS-IS and expect the parser to detect
-    # the mismatch.
-    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-perm-mut-2"))
+    # Explicit assertion: we INTENTIONALLY do NOT recompute.
+    # This is the deprecated-path assertion; the fresh-recompute
+    # path is covered by test_round5_permission_recomputed_child_hash_stale_bundle_hash.
+    assert mutated["permission_hash"] == old_hash, (
+        "DEPRECATED marker: this test intentionally does not recompute"
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-perm-mut-2-deprecated"))
     edge = synthetic_edge_payload(
         target_geometry_id=record["geometry_id"],
-        edge_id="edge-perm-mut-2",
+        edge_id="edge-perm-mut-2-deprecated",
     )
     cat, bun = assemble_synthetic_catalog_and_bundle(
         record_payloads=(record,),
@@ -2187,8 +2202,6 @@ def test_round4_permission_payload_mutation_recomputed_hashes_still_blocks() -> 
     )
     with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
         parse_shell_geometry_catalog(raw_catalog=cat, evidence_bundle=bun)
-    # The hash-mismatch blocker MUST fire (parser detects via
-    # canonical recomputation).
     hash_mismatch = [
         b
         for b in excinfo.value.blockers
@@ -2196,7 +2209,7 @@ def test_round4_permission_payload_mutation_recomputed_hashes_still_blocks() -> 
         and b.field_path == "evidence_bundle.permission_evidence[0].permission_hash"
     ]
     assert hash_mismatch, (
-        "expected SGC_CATALOG_HASH_MISMATCH even when caller passes a (wrong) permission_hash"
+        "deprecated marker: child hash was STALE so the child hash-domain check at stage 5 fires"
     )
 
 
@@ -2236,19 +2249,30 @@ def test_round4_edge_payload_mutation_unchanged_hash_blocks() -> None:
 
 
 def test_round4_edge_payload_mutation_recomputed_hashes_still_blocks() -> None:
-    """Round 4 §2 — even if a caller recomputes the ``edge_hash``
-    AFTER the payload mutation, the parser detects the mismatch
-    via canonical recomputation.
+    """Round 4 §2 — DEPRECATED. This test was a duplicate of
+    ``test_round4_edge_payload_mutation_unchanged_hash_blocks``: it
+    mutated the payload but did NOT recompute ``edge_hash``, so it
+    never exercised the "child hash domain passed but caller tried
+    to slip through with a wrong hash" path. The corrected coverage
+    is provided by ``test_round5_edge_recomputed_child_hash_stale_bundle_hash``
+    (which actually recomputes the child hash and stales the
+    bundle_hash) and ``test_round5_all_hashes_fresh_no_hash_mismatch``
+    (which proves full chain integrity).
     """
     good_edge = synthetic_edge_payload(
-        edge_id="edge-mut-2",
-        target_geometry_id="synthetic-catalog-1/shell/rec-edge-mut-2/1",
+        edge_id="edge-mut-2-deprecated",
+        target_geometry_id="synthetic-catalog-1/shell/rec-edge-mut-2-deprecated/1",
     )
-    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-edge-mut-2"))
+    old_hash = good_edge["edge_hash"]
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-edge-mut-2-deprecated"))
     mutated = dict(good_edge)
     mutated["target_geometry_id"] = record["geometry_id"]
     mutated["relation_type"] = "extends"
-    perm = synthetic_permission_payload(permission_id="perm-edge-mut-2")
+    # DEPRECATED marker: we INTENTIONALLY do NOT recompute.
+    assert mutated["edge_hash"] == old_hash, (
+        "DEPRECATED marker: this test intentionally does not recompute"
+    )
+    perm = synthetic_permission_payload(permission_id="perm-edge-mut-2-deprecated")
     cat, bun = assemble_synthetic_catalog_and_bundle(
         record_payloads=(record,),
         permission_payloads=(perm,),
@@ -2262,7 +2286,9 @@ def test_round4_edge_payload_mutation_recomputed_hashes_still_blocks() -> None:
         if b.code == "SGC_PROVENANCE_INCOMPLETE"
         and b.field_path == "evidence_bundle.provenance_edges[0].edge_hash"
     ]
-    assert hash_mismatch, "expected SGC_PROVENANCE_INCOMPLETE even with wrong edge_hash"
+    assert hash_mismatch, (
+        "deprecated marker: child hash was STALE so the child hash-domain check at stage 6 fires"
+    )
 
 
 def test_round4_permission_hash_mismatch_prevents_bundle_hash_helper() -> None:
@@ -2480,3 +2506,274 @@ def test_round4_one_record_accumulates_all_independent_stage8_blockers() -> None
     assert "raw_catalog.records[0].profile_id" in fields
     assert "raw_catalog.records[0].revision" in fields
     assert "raw_catalog.records[0].approval_state" in fields
+
+
+# ===========================================================================
+# Round 5 — test truth correction: hash-chain matrix
+#
+# Round 4's two "recomputed_hashes_still_blocks" tests were duplicates of
+# the "unchanged_hash_blocks" tests: they mutated the payload but never
+# actually recomputed the child hash. The tests below restore real coverage
+# of the full hash chain:
+#
+#   Layer 0: child permission/edge raw payload
+#   Layer 1: child permission_hash / edge_hash  (Stage 5 / Stage 6)
+#   Layer 2: evidence_bundle.bundle_hash         (Stage 4)
+#   Layer 3: catalog.evidence_bundle_hash        (Stage 19)
+#   Layer 4: catalog.catalog_hash                (Stage 20)
+#
+# Each test below mutates exactly one layer to STALE and asserts that the
+# failure surfaces at the EXACT corresponding stage_rank + field_path.
+# The all-fresh test proves the chain is not over-constrained: when every
+# hash is correctly recomputed, no hash-mismatch blocker fires.
+# ===========================================================================
+
+
+def _perm_hash_payload_for_test(perm: dict[str, Any]) -> dict[str, Any]:
+    """Build the EXACT canonical hash payload the parser's Stage 5 builds
+    (see ``_validate_permission_snapshot_entry``). Used by Round 5 tests
+    to recompute ``permission_hash`` after a payload mutation."""
+    return {
+        "permission_id": perm["permission_id"],
+        "permission_scope": sorted(set(perm["permission_scope"])),
+        "usage_scope": sorted(set(perm["usage_scope"])),
+        "evidence_ref": perm["evidence_ref"],
+        "approved_by": perm["approved_by"],
+        "approved_at": perm["approved_at"],
+    }
+
+
+def _edge_hash_payload_for_test(edge: dict[str, Any]) -> dict[str, Any]:
+    """Build the EXACT canonical hash payload the parser's Stage 6 builds
+    (see ``_validate_provenance_edge_entry``)."""
+    return {
+        "edge_id": edge["edge_id"],
+        "source_id": edge["source_id"],
+        "target_geometry_id": edge["target_geometry_id"],
+        "relation_type": edge["relation_type"],
+        "evidence_refs": sorted(set(edge["evidence_refs"])),
+    }
+
+
+def test_round5_permission_recomputed_child_hash_stale_bundle_hash() -> None:
+    """Round 5 §四.B — payload change, ``permission_hash`` correctly
+    RECOMPUTED, but ``bundle_hash`` STALE. The child hash domain MUST
+    pass (no permission_hash blocker) and the failure MUST surface at
+    Stage 4 ``evidence_bundle.bundle_hash``.
+    """
+    good_perm = synthetic_permission_payload(permission_id="perm-recmp-1")
+    mutated = dict(good_perm)
+    mutated["usage_scope"] = sorted({"internal_runtime", "external_runtime"})
+    # RECOMPUTE the child hash from the mutated canonical payload —
+    # this is the whole point of the test.
+    new_perm_hash = canonical_sha256(_perm_hash_payload_for_test(mutated))
+    mutated["permission_hash"] = new_perm_hash
+    # Assert the new hash really is new (proves we actually recomputed).
+    assert new_perm_hash != good_perm["permission_hash"], (
+        "precondition: recomputed permission_hash must differ from the "
+        "original; otherwise the test would degenerate into the stale-hash "
+        "case covered by test_round4_permission_payload_mutation_unchanged_hash_blocks"
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-perm-recmp-1"))
+    edge = synthetic_edge_payload(
+        target_geometry_id=record["geometry_id"],
+        edge_id="edge-perm-recmp-1",
+    )
+    # Build a fresh bundle from the (re-hashed) permission. The
+    # ``synthetic_bundle_payload`` helper will recompute ``bundle_hash``
+    # from the canonical payload, so it will be FRESH relative to the
+    # mutated permission.
+    bundle = synthetic_bundle_payload(
+        permission_evidence=(mutated,),  # type: ignore[arg-type]
+        provenance_edges=(edge,),
+    )
+    # Capture the FRESH bundle_hash computed by the builder, then
+    # override the field with a STALE value to simulate the
+    # "child-fresh, bundle-stale" hash-chain failure.
+    fresh_bundle_hash = bundle["bundle_hash"]
+    stale_bundle_hash = "0" * 64
+    assert fresh_bundle_hash != stale_bundle_hash
+    bundle["bundle_hash"] = stale_bundle_hash
+    # Build the catalog manually so that ``evidence_bundle_hash``
+    # points at the STALE bundle_hash (this is what would happen if a
+    # caller updated the child hash + recomputed bundle_hash locally
+    # but forgot to push to the catalog).
+    catalog = synthetic_catalog_payload(
+        records=(record,),
+        evidence_bundle_hash=stale_bundle_hash,
+        # catalog_hash override is not needed — the catalog hash is
+        # recomputed from the (stale) evidence_bundle_hash and the
+        # test does not stale the catalog_hash.
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    # Child hash domain MUST pass: NO blocker on the permission_hash
+    # field_path.
+    child_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH"
+        and b.field_path == "evidence_bundle.permission_evidence[0].permission_hash"
+    ]
+    assert not child_blockers, (
+        "precondition: permission_hash was correctly recomputed; the "
+        "child hash-domain check at stage 5 MUST pass. Got: "
+        f"{[(b.code, b.field_path, b.stage_rank) for b in excinfo.value.blockers]}"
+    )
+    # Stage 4 (bundle_authority) MUST fire at evidence_bundle.bundle_hash.
+    bundle_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH" and b.field_path == "evidence_bundle.bundle_hash"
+    ]
+    assert bundle_blockers, (
+        "expected SGC_CATALOG_HASH_MISMATCH at evidence_bundle.bundle_hash "
+        "(child-fresh, bundle-stale hash chain). Got: "
+        f"{[(b.code, b.field_path, b.stage_rank) for b in excinfo.value.blockers]}"
+    )
+    assert bundle_blockers[0].stage_rank == 4
+    # No blocker should reach the catalog-bundle-binding or catalog-hash
+    # layer (Stage 19 / 20) because Stage 4 raises first.
+    deeper_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH"
+        and b.field_path in ("raw_catalog.evidence_bundle_hash", "raw_catalog.catalog_hash")
+    ]
+    assert not deeper_blockers, (
+        "expected NO deeper-layer blockers (Stage 4 raises first); got: "
+        f"{[(b.code, b.field_path, b.stage_rank) for b in deeper_blockers]}"
+    )
+
+
+def test_round5_edge_recomputed_child_hash_stale_bundle_hash() -> None:
+    """Round 5 §五.B — payload change, ``edge_hash`` correctly
+    RECOMPUTED, but ``bundle_hash`` STALE. The child hash domain MUST
+    pass and the failure MUST surface at Stage 4.
+    """
+    good_edge = synthetic_edge_payload(
+        edge_id="edge-recmp-1",
+        target_geometry_id="synthetic-catalog-1/shell/rec-edge-recmp-1/1",
+    )
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-edge-recmp-1"))
+    mutated = dict(good_edge)
+    mutated["target_geometry_id"] = record["geometry_id"]
+    mutated["relation_type"] = "extends"
+    new_edge_hash = canonical_sha256(_edge_hash_payload_for_test(mutated))
+    mutated["edge_hash"] = new_edge_hash
+    assert new_edge_hash != good_edge["edge_hash"], (
+        "precondition: recomputed edge_hash must differ from the original; "
+        "otherwise the test would degenerate into the stale-hash case"
+    )
+    perm = synthetic_permission_payload(permission_id="perm-edge-recmp-1")
+    bundle = synthetic_bundle_payload(
+        permission_evidence=(perm,),
+        provenance_edges=(mutated,),  # type: ignore[arg-type]
+    )
+    fresh_bundle_hash = bundle["bundle_hash"]
+    stale_bundle_hash = "0" * 64
+    assert fresh_bundle_hash != stale_bundle_hash
+    bundle["bundle_hash"] = stale_bundle_hash
+    catalog = synthetic_catalog_payload(
+        records=(record,),
+        evidence_bundle_hash=stale_bundle_hash,
+    )
+    with pytest.raises(ShellGeometryCatalogFailure) as excinfo:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    child_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_PROVENANCE_INCOMPLETE"
+        and b.field_path == "evidence_bundle.provenance_edges[0].edge_hash"
+    ]
+    assert not child_blockers, (
+        "precondition: edge_hash was correctly recomputed; the child "
+        "hash-domain check at stage 6 MUST pass. Got: "
+        f"{[(b.code, b.field_path, b.stage_rank) for b in excinfo.value.blockers]}"
+    )
+    bundle_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH" and b.field_path == "evidence_bundle.bundle_hash"
+    ]
+    assert bundle_blockers, (
+        "expected SGC_CATALOG_HASH_MISMATCH at evidence_bundle.bundle_hash "
+        "(child-fresh, bundle-stale hash chain)"
+    )
+    assert bundle_blockers[0].stage_rank == 4
+    deeper_blockers = [
+        b
+        for b in excinfo.value.blockers
+        if b.code == "SGC_CATALOG_HASH_MISMATCH"
+        and b.field_path in ("raw_catalog.evidence_bundle_hash", "raw_catalog.catalog_hash")
+    ]
+    assert not deeper_blockers
+
+
+def test_round5_all_hashes_fresh_no_hash_mismatch() -> None:
+    """Round 5 §六 — full chain integrity. Mutate a permission payload
+    AND edge payload, then correctly recompute every hash in the
+    chain (permission_hash, edge_hash, bundle_hash,
+    catalog.evidence_bundle_hash, catalog.catalog_hash). The parser
+    MUST NOT emit any SGC_CATALOG_HASH_MISMATCH / SGC_PROVENANCE_INCOMPLETE
+    blocker. Hashes are integrity bindings, not immutable business
+    value whitelists — any payload that satisfies the closed set of
+    accepted scopes / usage_scope / relation_type / etc. is permitted
+    as long as every layer's hash chain is consistent.
+
+    The test asserts the NEGATIVE outcome: a successful parse (no
+    exception). If the parser incorrectly fires a hash-mismatch
+    blocker, the success proves the test's premise. We use
+    ``try / except`` rather than ``pytest.raises`` so that a
+    successful parse is observable as a test pass.
+    """
+    base_perm = synthetic_permission_payload(permission_id="perm-allfresh-1")
+    base_edge = synthetic_edge_payload(
+        edge_id="edge-allfresh-1",
+        target_geometry_id="synthetic-catalog-1/shell/rec-allfresh-1/1",
+    )
+    # Mutate the permission payload (add a different but closed-set scope)
+    mutated_perm = dict(base_perm)
+    mutated_perm["permission_scope"] = sorted(
+        {"repository_storage", "repository_redistribution", "vendor_redistribution"}
+    )
+    mutated_perm["permission_hash"] = canonical_sha256(_perm_hash_payload_for_test(mutated_perm))
+    # Mutate the edge payload (different relation_type)
+    record = synthetic_record_payload(**_make_record_kwargs(record_key="rec-allfresh-1"))
+    mutated_edge = dict(base_edge)
+    mutated_edge["target_geometry_id"] = record["geometry_id"]
+    mutated_edge["relation_type"] = "derives_from_v2"  # different but valid
+    mutated_edge["edge_hash"] = canonical_sha256(_edge_hash_payload_for_test(mutated_edge))
+    # Build the bundle via the canonical builder — it will recompute
+    # bundle_hash from the canonical payload, so bundle_hash is FRESH.
+    bundle = synthetic_bundle_payload(
+        permission_evidence=(mutated_perm,),  # type: ignore[arg-type]
+        provenance_edges=(mutated_edge,),
+    )
+    fresh_bundle_hash = bundle["bundle_hash"]
+    # Build the catalog via the canonical builder — it sets
+    # evidence_bundle_hash = fresh_bundle_hash and recomputes
+    # catalog_hash from the canonical catalog payload, so EVERY hash
+    # in the chain is FRESH.
+    catalog = synthetic_catalog_payload(
+        records=(record,),
+        evidence_bundle_hash=fresh_bundle_hash,
+    )
+    # The parser MUST accept this input (no exception). Any
+    # hash-mismatch blocker here is a regression of the integrity
+    # binding contract.
+    try:
+        parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    except ShellGeometryCatalogFailure as exc:
+        hash_blockers = [
+            b
+            for b in exc.blockers
+            if b.code in ("SGC_CATALOG_HASH_MISMATCH", "SGC_PROVENANCE_INCOMPLETE")
+        ]
+        pytest.fail(
+            "expected NO hash-mismatch blockers when every layer's hash "
+            "is freshly recomputed. Hashes are integrity bindings, not "
+            "immutable business value whitelists. Got hash blockers: "
+            f"{[(b.code, b.field_path, b.stage_rank) for b in hash_blockers]}; "
+            f"all blockers: {[(b.code, b.field_path, b.stage_rank) for b in exc.blockers]}"
+        )
