@@ -236,8 +236,15 @@ The core verifies:
 - orientation is one exact existing `Orientation` token;
 - case authority is accepted under the frozen TASK-020/TASK-014 contract.
 
-TASK-024 preserves `equipment_orientation` but does not assign gravity,
-top/bottom process meaning, nozzle position, or installation adequacy from it.
+TASK-024 carries `equipment_orientation` as identity-and-provenance binding only.
+The value is copied from the upstream `ShellBundleGeometry.equipment_orientation`
+field (§5.3) and cross-checked against `ShellAndTubeConfiguration.orientation`
+(§5.1) and `TubeLayout.equipment_orientation` (§5.2). The field does not exist
+on `ShellAndTubeConfiguration`. TASK-024 does not assign gravity, top/bottom
+process meaning, nozzle position, baffle cut orientation, or installation
+adequacy from `equipment_orientation`. The baffle cut orientation is selected
+by the dedicated `BaffleOrientation` input from the caller, never by
+`equipment_orientation`.
 
 ### 5.2 TASK-021 `TubeLayout`
 
@@ -351,7 +358,77 @@ canonical_zero=0
 All arithmetic uses `Decimal` under this context. `sqrt` uses the Decimal square
 root under the same context.
 
-### 7.3 Canonical JSON domain
+### 7.3 Quantization ordering discipline
+
+The classification, tangency, intersection, outer-containment, and pairwise
+non-overlap decisions are bound to the following exact ordering, frozen from
+Geometry Fixup 001:
+
+```text
+HIGH_PRECISION_DECIMAL_DERIVATION
+AND BOUNDARY_COMPARISON
+THEN
+CLASSIFICATION
+TANGENCY
+INTERSECTION
+OUTER_CONTAINMENT
+PAIRWISE_NON_OVERLAP
+THEN
+PUBLIC_OUTPUT_QUANTIZATION
+```
+
+This binds three frozen tokens for any future implementation:
+
+```text
+CLASSIFICATION_BEFORE_PUBLIC_OUTPUT_QUANTIZATION=REQUIRED
+BOUNDARY_PREDICATES_USE_UNQUANTIZED_DECIMAL_DERIVATIONS=REQUIRED
+PUBLIC_OUTPUT_QUANTIZATION_MUST_NOT_CHANGE_CLASSIFICATION=REQUIRED
+```
+
+The discipline is:
+
+1. The TASK-021 already-accepted `x_m` and `y_m` values are accepted as input
+   coordinates. They are never re-quantized before TASK-024 derives geometry;
+2. Every TASK-024 derived quantity — radius, chord offset, signed distance,
+   squared distance, and boundary margin — is computed as a `Decimal` under the
+   frozen context above (`precision=50`, `rounding=ROUND_HALF_EVEN`);
+3. The following boundary predicates all execute on the unquantized
+   high-precision Decimal derivations, and complete before any public output
+   quantization step:
+
+   ```text
+   s > r_h
+   s < -r_h
+   s == r_h
+   s == -r_h
+   -r_h < s < r_h
+   d² <= (R - r_h)²
+   d²_ij >= (2 * r_h)²
+   ```
+4. The `coordinate_quantum_m=0.000000000001` value applies only to the public
+   output canonicalization step that formats the canonical decimal string of a
+   public unit-bearing field. It never applies to the boundary predicates
+   above;
+5. It is forbidden to first quantize `s`, `r_h`, `d²`, any boundary margin,
+   or any chord geometry value and then run classification. Classification
+   must operate on unquantized high-precision Decimal;
+6. Quantization to the public decimal lexical form must not change a
+   classification result. The seven classification outcomes
+   `WINDOW`, `CROSSFLOW_REFERENCE`, `TANGENT`, `INTERSECTION`, `OUTSIDE`,
+   `OVERLAP`, and any error classification must be byte-identical before and
+   after the public output quantization step;
+7. Every classification outcome, every warning, and every blocker is derived
+   from the unquantized high-precision Decimal predicate evaluation, never
+   from a quantized value;
+8. Hash projections whose inputs are public geometric values use the
+   post-quantization canonical decimal strings for the geometric values
+   themselves, but the classification identity — which classification token
+   attaches to which position — is fixed by the unquantized predicate pass.
+
+This discipline is closed. No future implementation may reorder these steps,
+shorten the precision, or insert a quantization boundary before classification.
+
+### 7.4 Canonical JSON domain
 
 Canonical values may contain only:
 
@@ -370,7 +447,7 @@ arbitrary Python objects.
 Object keys are lexicographically ordered. Canonical JSON is UTF-8, compact,
 and deterministic.
 
-### 7.4 Semantic array ordering
+### 7.5 Semantic array ordering
 
 - `spacing_sequence_m` preserves axial semantic order;
 - `orientation_sequence` preserves baffle-index order;
@@ -524,7 +601,7 @@ crossflow_reference_region_semantics=CLASSIFICATION_REFERENCE_ONLY_NOT_FLOW_AREA
 | `task022_geometry_id` | string |
 | `task022_geometry_hash` | SHA-256 hex |
 | `construction_family` | exact `FIXED_TUBESHEET` |
-| `equipment_orientation` | existing TASK-020 `Orientation` |
+| `equipment_orientation` | copied from `ShellBundleGeometry.equipment_orientation` and cross-checked against `ShellAndTubeConfiguration.orientation` and `TubeLayout.equipment_orientation` |
 | `shell_pass_count` | exact `1` |
 | `tube_pass_count` | positive integer copied upstream |
 | `shell_inside_diameter_m` | decimal string |
@@ -1310,6 +1387,37 @@ At minimum:
 - exact CI-manifest delta;
 - global collection and merge-ref collection.
 
+### 19.8 Quantization-discipline tests
+
+At minimum, the future implementation must demonstrate the following design
+tests pass. The values used in these tests are design-only synthetic values;
+they are not engineering recommendations.
+
+1. value just above cut tangency before quantization remains `WINDOW` after
+   the public output quantization step;
+2. value just below cut tangency before quantization remains `INTERSECTION`
+   or `CROSSFLOW_REFERENCE` as mathematically applicable after the public
+   output quantization step;
+3. public quantization collision cannot alter classification — the seven
+   classification outcomes
+   `WINDOW`, `CROSSFLOW_REFERENCE`, `TANGENT`, `INTERSECTION`, `OUTSIDE`,
+   `OVERLAP`, and any error classification must be byte-identical before
+   and after the public output quantization step;
+4. outer-containment decision occurs before public quantization — the
+   `d² <= (R - r_h)²` predicate is evaluated on the unquantized Decimal
+   derivation, and the resulting containment token is not re-derived from
+   any quantized value;
+5. pairwise-overlap decision occurs before public quantization — the
+   `d²_ij >= (2 * r_h)²` predicate is evaluated on the unquantized Decimal
+   derivation, and the resulting overlap token is not re-derived from any
+   quantized value;
+6. binary float remains forbidden — every input coordinate, every derived
+   radius, every chord offset, every signed distance, every squared
+   distance, and every boundary margin that participates in any predicate
+   above is a `Decimal` under the frozen context (`precision=50`,
+   `rounding=ROUND_HALF_EVEN`). A `float` value at any of these positions
+   fails the test.
+
 ## 20. Future implementation acceptance gates
 
 A future implementation is acceptable only if:
@@ -1356,7 +1464,12 @@ A design reviewer must verify:
 14. hashes and UUID projections are exact;
 15. architecture forbids external state and third-party geometry;
 16. future implementation allowlist and CI delta are exact;
-17. TASK-025 through TASK-039 remain unallocated.
+17. TASK-025 through TASK-039 remain unallocated;
+18. quantization ordering discipline is closed: classification, tangency,
+    intersection, outer-containment, and pairwise non-overlap all execute on
+    unquantized high-precision Decimal derivations, and only the public
+    output canonicalization step quantizes to the public decimal lexical
+    form. `coordinate_quantum_m=0.000000000001` applies only to that step.
 
 ## 22. Explicit non-authorization statement
 
