@@ -645,7 +645,7 @@ This audit has an exact closed field set:
 |---|---|---|
 | `physical_tube_radius_m` | decimal string | `tube_outer_diameter_m / 2` |
 | `signed_window_distance_m` | decimal string | same quantized public `s` as the parent classification |
-| `cut_boundary_margin_m` | decimal string | positive successful physical-disk margin under §9.7.1 |
+| `cut_boundary_margin_m` | decimal string | non-negative public quantized physical-disk margin; its unquantized source is strictly positive and public zero does not mean tangency |
 | `classification` | `TubeRegionClassification` | exactly equal to the parent primary classification |
 
 Unknown fields block. The audit is created only after the baffle-hole clearance
@@ -664,7 +664,7 @@ overrides, or substitutes for the baffle-hole clearance-disk authority.
 | `physical_tube_radius_m` | decimal string | tube OD / 2 |
 | `baffle_hole_radius_m` | decimal string | derived hole diameter / 2 |
 | `signed_window_distance_m` | decimal string | `normal·center - offset` |
-| `cut_boundary_margin_m` | decimal string | positive successful margin |
+| `cut_boundary_margin_m` | decimal string | non-negative public quantized margin; its unquantized source is strictly positive and public zero does not mean tangency |
 | `classification` | enum | `WINDOW` or `CROSSFLOW_REFERENCE` |
 | `outer_boundary_margin_squared_m2` | decimal string or null | required for covered class |
 | `physical_tube_disk_audit` | `PhysicalTubeDiskAudit` | exact closed audit; never classification authority |
@@ -980,12 +980,28 @@ CROSSFLOW_REFERENCE:
   physical_cut_boundary_margin_m_unquantized=-r_t-s
 ```
 
-Every successful cut margin is strictly positive. The physical audit
-classification must exactly equal the primary classification. The public
+Every successful **unquantized** cut margin is strictly positive. The physical
+audit classification must exactly equal the primary classification. The public
 `signed_window_distance_m`, primary `cut_boundary_margin_m`, physical-audit
 `signed_window_distance_m`, and physical-audit `cut_boundary_margin_m` are
 formatted only after these predicates and formulas complete, using
 `coordinate_quantum_m`.
+
+The public margin domain is deliberately different from the unquantized
+predicate domain:
+
+```text
+UNQUANTIZED_SUCCESS_MARGIN_GT_ZERO=REQUIRED
+PUBLIC_QUANTIZED_SUCCESS_MARGIN_GTE_ZERO=REQUIRED
+PUBLIC_ZERO_MARGIN_DOES_NOT_IMPLY_TANGENCY=REQUIRED
+```
+
+A strictly positive unquantized margin may canonicalize to public zero under
+`ROUND_HALF_EVEN` when its magnitude is below the public coordinate resolution,
+including the exact half-quantum tie that rounds to canonical zero. Such a
+public zero remains a successful `WINDOW` or `CROSSFLOW_REFERENCE` result.
+Tangency exists only when the unquantized predicate is exactly `s==r_h` or
+`s==-r_h`; it is never inferred from a quantized public margin.
 
 For outer containment, the exact unquantized squared margin is:
 
@@ -995,14 +1011,17 @@ outer_boundary_margin_squared_m2_unquantized
 (R-r_h)^2-d2
 ```
 
-It is required to be non-negative for `CROSSFLOW_REFERENCE`, is exactly zero for
-accepted outer tangency, and is `null` for `WINDOW`. Its public decimal string is
-formatted only after containment classification, using
-`squared_coordinate_quantum_m2`.
+It is required to be non-negative for `CROSSFLOW_REFERENCE`, is exactly zero in
+the **unquantized** domain for accepted outer tangency, and is `null` for
+`WINDOW`. Its public decimal string is formatted only after containment
+classification, using `squared_coordinate_quantum_m2`. A positive unquantized
+outer margin may also quantize to public zero; the outer-tangency warning is
+emitted only for exact unquantized equality and is never inferred from that
+public zero.
 
 No margin is re-derived from a quantized coordinate, radius, signed distance, or
-squared distance. These exact formulas are part of each
-`classification_audit_hash` projection.
+squared distance. These exact formulas and the unquantized classification
+identity are part of each `classification_audit_hash` projection.
 
 ### 9.8 Covered-region outer containment
 
@@ -1086,7 +1105,8 @@ area, hydraulic area, Kern area, or Bell–Delaware area.
 
 Validation runs in this exact stage order:
 
-1. request schema version, exact field set, and raw types;
+1. exported raw boundary and strict in-memory parsing: request schema version,
+   exact field set, and raw types;
 2. complete TASK-020 configuration validation;
 3. complete TASK-021 layout validation;
 4. complete TASK-022 geometry validation;
@@ -1386,7 +1406,7 @@ geometry.
 | `task022_geometry_id` | validated TASK-022 value |
 | `task022_geometry_hash` | validated TASK-022 value |
 | `task022_shell_authority_mode` | validated TASK-022 value |
-| `task022_shell_authority_identity` | exact detached canonical TASK-022 authority identity projection |
+| `task022_shell_authority_identity` | exact closed `Task022ShellAuthorityIdentity` mapping defined below |
 | `task022_geometry_rule_snapshot_hash` | validated TASK-022 rule snapshot hash |
 | `axial_span_authority_hash` | validated TASK-024 axial authority hash |
 | `baffle_design_authority_hash` | validated TASK-024 design authority hash |
@@ -1397,6 +1417,80 @@ geometry.
 | `flow_area_calculation_performed` | exact `false` |
 | `warnings` | exact ordered canonical projections of result warnings |
 | `deferred_capabilities` | exact frozen ordered tuple from the result |
+
+### 15.1 Exact TASK-022 shell-authority identity projection
+
+`Task022ShellAuthorityIdentity` is an exact closed mapping with exactly these
+three fields:
+
+| Field | Type | Exact rule |
+|---|---|---|
+| `shell_authority_mode` | string | exact validated TASK-022 enum token |
+| `caller_supplied_shell` | canonical mapping or null | complete selected TASK-022 caller object, otherwise null |
+| `approved_shell_geometry` | canonical mapping or null | complete selected TASK-022 approved snapshot, otherwise null |
+
+The projection is constructed from the validated `ShellBundleGeometry` fields:
+
+```text
+shell_bundle_geometry.shell_authority_mode
+shell_bundle_geometry.caller_supplied_shell
+shell_bundle_geometry.approved_shell_geometry
+```
+
+The mode-dependent projection is exact:
+
+```text
+CALLER_SUPPLIED_EXPLICIT:
+  shell_authority_mode="CALLER_SUPPLIED_EXPLICIT"
+  caller_supplied_shell=<complete canonical caller object>
+  approved_shell_geometry=null
+
+APPROVED_CATALOG_SNAPSHOT:
+  shell_authority_mode="APPROVED_CATALOG_SNAPSHOT"
+  caller_supplied_shell=null
+  approved_shell_geometry=<complete canonical approved snapshot>
+```
+
+The complete caller-object field set is:
+
+```text
+schema_version
+shell_inside_diameter_m
+evidence_refs
+authority_hash
+```
+
+The complete approved-snapshot field set is:
+
+```text
+schema_version
+geometry_id
+geometry_type
+revision
+approval_state
+shell_inside_diameter_m
+record_hash
+source_binding
+snapshot_hash
+```
+
+Its nested `source_binding` field set is exactly:
+
+```text
+source_id
+source_type
+source_revision
+source_location
+evidence_ref
+approved_by
+approved_at
+```
+
+No alias, reduced identity subset, free-form mapping, or additional field is
+permitted. A mode/object nullability mismatch, an additional or missing nested
+field, or disagreement with the validated TASK-022 result emits
+`BFG_CANONICALIZATION_FAILED`. The complete closed mapping enters provenance and
+therefore `geometry_hash`.
 
 `software_version` and `git_commit` are immutable code/build constants supplied
 without filesystem, environment, subprocess, network, registry, or clock access
@@ -1413,25 +1507,74 @@ construction cannot alter any provenance value, hash, or result. The complete
 closed provenance mapping is included in `geometry_hash`; an implementation may
 not append diagnostic, host, timestamp, environment, or extension fields.
 
-## 16. Public operation
+## 16. Public raw-schema and calculation operation
 
-The future core exposes one public calculation operation:
+The future core exposes exactly one public operation:
 
 ```python
 validate_request(
+    raw_request: Any,
+) -> BaffleGeometryValidationResult
+```
+
+`BaffleGeometryRequest` is the immutable typed representation produced only
+after strict in-memory parsing. It is not the raw public boundary type.
+
+The public successful-input shape is exact:
+
+- the top-level value is an exact built-in `dict` with string keys;
+- its field set is exactly the §8.3 `BaffleGeometryRequest` field set;
+- nested TASK-024 authority structures are exact built-in `dict` values with
+  their frozen field sets;
+- raw array fields are exact built-in `list` values and are converted to frozen
+  tuples only after validation;
+- `configuration`, `tube_layout`, and `shell_bundle_geometry` are complete exact
+  instances of their TASK-020, TASK-021, and TASK-022 public models;
+- custom mappings, mapping subclasses, container subclasses, aliases, and
+  coercion are forbidden.
+
+The implementation has two non-exported helpers with exact responsibilities:
+
+```python
+parse_request(
+    raw_request: Any,
+) -> BaffleGeometryRequest
+
+validate_typed_request(
     request: BaffleGeometryRequest,
 ) -> BaffleGeometryValidationResult
 ```
 
-This operation:
+`parse_request` may raise only an internal `BaffleGeometrySchemaFailure`
+containing the validation-stage rank, ordered structured blockers, the raw
+failing component, and any already validated context. It performs no geometry
+and no external I/O.
+
+The exported `validate_request` owns the full public no-exception boundary:
+
+1. preserve the complete `raw_request` solely for deterministic blocked hashing;
+2. call `parse_request`;
+3. catch every contract-defined `BaffleGeometrySchemaFailure`;
+4. return `status=BLOCKED`, `geometry=null`, the ordered schema blockers, allowed
+   prior-stage warnings, exact deferred capabilities, and a non-null
+   `blocked_result_hash` based on the complete §7.6 raw projection;
+5. call `validate_typed_request` only after parsing succeeds;
+6. convert every later contract-defined validation failure into the same
+   structured blocked-result contract.
+
+Unknown fields, wrong top-level raw types, malformed nested structures, wrong
+schema versions, and all other stage-1 raw failures are therefore reachable
+through the exported operation. No caller must construct a dataclass before
+receiving a structured blocker.
+
+The operation:
 
 - is pure and in-memory;
 - performs no lookup;
 - performs no catalog scan;
 - performs no alternative ranking;
 - mutates no input;
-- returns no exception for ordinary invalid engineering input;
-- converts expected validation failures to structured blockers;
+- returns no exception for ordinary invalid engineering or schema input;
 - returns no partial geometry.
 
 Programmer misuse and impossible internal invariants may raise narrow internal
@@ -1543,6 +1686,10 @@ At minimum:
 
 ### 19.2 Schema and raw-type negatives
 
+- non-mapping top-level raw request returns `BLOCKED` with a non-null stable
+  `blocked_result_hash`;
+- custom mapping and mapping-subclass top-level values block without invoking
+  user-defined iteration;
 - unknown fields at every public layer;
 - wrong schema versions;
 - bool supplied as integer;
@@ -1552,7 +1699,11 @@ At minimum:
 - tuple/list shape mismatches;
 - duplicate evidence refs;
 - missing authority objects;
-- malformed hashes.
+- malformed hashes;
+- the public raw mapping is parsed to exactly one immutable
+  `BaffleGeometryRequest` before typed validation;
+- parser failures are converted by the exported `validate_request` operation
+  into structured blockers without leaking `BaffleGeometrySchemaFailure`.
 
 ### 19.3 Upstream binding negatives
 
@@ -1642,7 +1793,14 @@ they are not engineering recommendations.
    distance, and every boundary margin that participates in any predicate
    above is a `Decimal` under the frozen context (`precision=50`,
    `rounding=ROUND_HALF_EVEN`). A `float` value at any of these positions
-   fails the test.
+   fails the test;
+7. a strictly positive primary or physical-tube cut margin below public
+   coordinate resolution may quantize to canonical public zero while retaining
+   its successful `WINDOW` or `CROSSFLOW_REFERENCE` identity;
+8. a positive outer-containment squared margin below public squared resolution
+   may quantize to public zero without emitting the outer-tangency warning;
+9. public zero margin never causes tangency, intersection, containment, or
+   overlap to be reclassified.
 
 ### 19.9 Closed result and failure-projection tests
 
@@ -1667,10 +1825,14 @@ At minimum:
    value;
 8. provenance accepts exactly the closed field set in §15 and rejects one
    missing field or one additional field;
-9. module/build provenance constants require no forbidden I/O;
-10. request, audit, geometry, UUID, provenance, and blocked-result dependency
+9. `Task022ShellAuthorityIdentity` is exact for both
+   `CALLER_SUPPLIED_EXPLICIT` and `APPROVED_CATALOG_SNAPSHOT`, rejects the wrong
+   null/non-null pairing, and changes `geometry_hash` when any selected nested
+   identity field changes;
+10. module/build provenance constants require no forbidden I/O;
+11. request, audit, geometry, UUID, provenance, and blocked-result dependency
     tests prove `HASH_DEPENDENCY_CYCLE_COUNT=0`;
-11. changing an exact physical-audit field, public margin, raw projection tag,
+12. changing an exact physical-audit field, public margin, raw projection tag,
     or provenance field changes the owning hash deterministically.
 
 ## 20. Future implementation acceptance gates
@@ -1730,7 +1892,14 @@ A design reviewer must verify:
 20. blocked-result hashing is total for the frozen raw-value projection and
     performs no executable or host-dependent serialization;
 21. provenance has an exact closed field set and deterministic field sources;
-22. the complete hash dependency graph is acyclic.
+22. the complete hash dependency graph is acyclic;
+23. the exported public operation accepts raw in-memory input, owns strict schema
+    parsing, and converts every contract-defined parser failure into a structured
+    blocked result;
+24. positive unquantized margins may quantize to public zero without changing
+    classification or creating a tangency warning;
+25. `Task022ShellAuthorityIdentity` is an exact mode-dependent closed projection
+    of the actual TASK-022 authority fields.
 
 ## 22. Explicit non-authorization statement
 
