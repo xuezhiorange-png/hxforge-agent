@@ -236,15 +236,29 @@ The core verifies:
 - orientation is one exact existing `Orientation` token;
 - case authority is accepted under the frozen TASK-020/TASK-014 contract.
 
-TASK-024 carries `equipment_orientation` as identity-and-provenance binding only.
-The value is copied from the upstream `ShellBundleGeometry.equipment_orientation`
-field (§5.3) and cross-checked against `ShellAndTubeConfiguration.orientation`
-(§5.1) and `TubeLayout.equipment_orientation` (§5.2). The field does not exist
-on `ShellAndTubeConfiguration`. TASK-024 does not assign gravity, top/bottom
-process meaning, nozzle position, baffle cut orientation, or installation
-adequacy from `equipment_orientation`. The baffle cut orientation is selected
-by the dedicated `BaffleOrientation` input from the caller, never by
-`equipment_orientation`.
+The TASK-024 identity-and-provenance binding for equipment orientation uses
+three upstream fields, all of which must agree:
+
+- `ShellAndTubeConfiguration.orientation`  (the TASK-020 field)
+- `TubeLayout.equipment_orientation`         (the TASK-021 field)
+- `ShellBundleGeometry.equipment_orientation` (the TASK-022 field)
+
+The upstream field literally named `equipment_orientation` exists only on
+`TubeLayout` and `ShellBundleGeometry`; it does NOT exist on
+`ShellAndTubeConfiguration`. The corresponding TASK-020 field is named
+`orientation`. TASK-024 cross-checks that all three values are equal.
+
+The bound `equipment_orientation` value is used **only** for identity
+binding and the provenance mapping. It must never be used to derive:
+
+- gravity semantics (top, bottom, side);
+- nozzle position;
+- baffle cut orientation;
+- installation adequacy.
+
+The baffle cut orientation is selected exclusively by the dedicated
+`BaffleOrientation` input from the caller (the orientation sequence over
+baffles), never by `equipment_orientation`.
 
 ### 5.2 TASK-021 `TubeLayout`
 
@@ -471,7 +485,7 @@ A blocked result must remain deterministic even when the ordinary validated
 non-executable diagnostic projection:
 
 ```text
-RAW_BLOCKED_PROJECTION_VERSION=task024.raw-blocked-projection.v1
+RAW_BLOCKED_PROJECTION_VERSION=task024.raw-blocked-projection.v2
 ```
 
 The projection is used only for `blocked_result_hash`. It never authorizes a raw
@@ -485,7 +499,7 @@ The recursive tagged-value mapping is exact:
 |---|---|
 | `None` | `{"raw_type":"null"}` |
 | `bool` | `{"raw_type":"bool","value":<JSON boolean>}` |
-| `int` excluding bool | `{"raw_type":"int","value":<base-10 string>}` |
+| `int` excluding `bool` (arbitrary magnitude) | `{"raw_type":"int","sign":<0-or-1>,"magnitude_hex":<lowercase hexadecimal digits, no 0x prefix>}` |
 | `str` | `{"raw_type":"str","code_points":[<lowercase hexadecimal ordinals>]}` preserving code-point order |
 | finite `float` | `{"raw_type":"float","value":<lowercase float.hex()>}` |
 | float NaN | `{"raw_type":"float","value":"nan"}` |
@@ -498,9 +512,70 @@ The recursive tagged-value mapping is exact:
 | exact built-in `dict` | `{"raw_type":"mapping","entries":[...]}` under the ordering rule below |
 | exact built-in `set` | `{"raw_type":"set","items":[...]}` under the ordering rule below |
 | exact built-in `frozenset` | `{"raw_type":"frozenset","items":[...]}` under the ordering rule below |
-| enum member | `{"raw_type":"enum","enum_type":<module.qualname>,"member":<exact name>}` |
-| recognized TASK-020/021/022/024 public dataclass | `{"raw_type":"dataclass","dataclass_type":<module.qualname>,"fields":[...]}` in declaration order |
-| every other object | `{"raw_type":"unsupported_object","python_type":<module.qualname>}` |
+| enum member | `{"raw_type":"enum","enum_type":<safe type-identity projection>,"member":<Unicode-code-point projection of the member name>}` |
+| recognized TASK-020/021/022/024 public dataclass | `{"raw_type":"dataclass","dataclass_type":<safe type-identity projection>,"fields":[...]}` in declaration order |
+| every other object | `{"raw_type":"unsupported_object","python_type":<safe type-identity projection>}` |
+| unsupported type identity | `{"raw_type":"type_identity_unavailable"}` |
+
+#### 7.6.1 Integer projection (arbitrary magnitude)
+
+`int` excluding `bool` projects to:
+
+```text
+{
+"raw_type":"int",
+"sign":<0-or-1>,
+"magnitude_hex":<lowercase hexadecimal digits, no 0x prefix>
+}
+```
+
+Canonical rules:
+
+- `value == 0` → `sign=0`, `magnitude_hex="0"`.
+- `value > 0` → `sign=0`, `magnitude_hex = format(value, "x")`.
+- `value < 0` → `sign=1`, `magnitude_hex = format(abs(value), "x")`.
+
+The frozen tokens are:
+
+```text
+RAW_INTEGER_PROJECTION_USES_BASE10_STR=FORBIDDEN
+RAW_INTEGER_PROJECTION_MUTATES_INT_MAX_STR_DIGITS=FORBIDDEN
+RAW_INTEGER_PROJECTION_IS_TOTAL_FOR_ARBITRARY_MAGNITUDE=REQUIRED
+```
+
+Forbidden calls in the projection path: `str(huge_int)`, `repr(huge_int)`,
+`sys.set_int_max_str_digits`, and any reading of `PYTHONINTMAXSTRDIGITS`.
+The magnitude-hex projection is total for arbitrary-magnitude integers
+including those whose base-10 expansion exceeds any interpreter's
+default int-to-str digit limit.
+
+#### 7.6.2 Safe type-identity projection
+
+To preserve totality for `unsupported_object`, `enum`, and recognized
+dataclass type identity under abnormal `Unicode` or mutating metadata,
+the type identity is read with:
+
+```text
+type.__getattribute__(python_type, "__module__")
+type.__getattribute__(python_type, "__qualname__")
+```
+
+only. The result is the safe projection:
+
+```text
+{
+"module_code_points":[<lowercase hexadecimal Unicode ordinals>],
+"qualname_code_points":[<lowercase hexadecimal Unicode ordinals>]
+}
+```
+
+If either read value is not an exact `str`, the projector emits the
+exact token `{"raw_type":"type_identity_unavailable"}` for the type
+slot. The projector never calls `repr(type)`, `str(type)`, or any
+user-defined metaclass `__getattribute__`. Enum member names are
+projected via the same Unicode-code-point rule.
+
+#### 7.6.3 Container and ordering rules
 
 For an exact built-in dict, every entry is represented as:
 
@@ -546,7 +621,7 @@ The complete fallback request projection is:
 
 ```text
 {
-  "projection_version": "task024.raw-blocked-projection.v1",
+  "projection_version": "task024.raw-blocked-projection.v2",
   "request": raw_value_projection(raw_request)
 }
 ```
@@ -555,9 +630,26 @@ This function is total for the public validation boundary without invoking
 user-defined iteration, conversion, representation, or serialization methods.
 Float, NaN, Infinity, live Decimal, bytes, sets, malformed containers, wrong raw
 types, cyclic graphs, surrogate-containing strings, custom mappings, container
-subclasses, and unsupported objects therefore produce a deterministic blocked
-hash rather than a serialization exception. No projected invalid value is
-coerced into a valid engineering input.
+subclasses, unsupported objects, arbitrary-magnitude integers, surrogate or
+non-string type metadata, and user-defined metaclass attributes therefore
+produce a deterministic blocked hash rather than a serialization exception.
+No projected invalid value is coerced into a valid engineering input.
+
+#### 7.6.4 Required test matrix additions
+
+The future test matrix in §19 must cover, at minimum:
+
+1. integer with more than 4300 decimal digits;
+2. negative huge integer;
+3. zero huge-int canonical case;
+4. huge integer nested in `list` / `dict` / `set` / `frozenset`;
+5. non-default interpreter `int_max_str_digits`;
+6. surrogate-containing type metadata;
+7. non-string type metadata;
+8. unsupported object with custom metaclass.
+
+All of the above must produce a deterministic blocked hash and must
+not raise a serialization exception.
 
 ## 8. Exact domain models
 
@@ -1011,44 +1103,91 @@ outer_boundary_margin_squared_m2_unquantized
 (R-r_h)^2-d2
 ```
 
-It is required to be non-negative for `CROSSFLOW_REFERENCE`, is exactly zero in
-the **unquantized** domain for accepted outer tangency, and is `null` for
-`WINDOW`. Its public decimal string is formatted only after containment
-classification, using `squared_coordinate_quantum_m2`. A positive unquantized
-outer margin may also quantize to public zero; the outer-tangency warning is
-emitted only for exact unquantized equality and is never inferred from that
-public zero.
+It is required to be non-negative for **both** `WINDOW` and
+`CROSSFLOW_REFERENCE`, is exactly zero in the **unquantized** domain for
+accepted outer tangency, and is **never `null`** on a successful
+classification. Its public decimal string is formatted only after
+containment classification, using `squared_coordinate_quantum_m2`. A
+positive unquantized outer margin may also quantize to public zero; the
+outer-tangency warning is emitted only for exact unquantized equality and
+is never inferred from that public zero.
+
+The frozen tokens for outer-margin semantics are:
+
+```text
+UNQUANTIZED_OUTER_MARGIN_GTE_ZERO=REQUIRED
+PUBLIC_QUANTIZED_OUTER_MARGIN_GTE_ZERO=REQUIRED
+PUBLIC_ZERO_OUTER_MARGIN_DOES_NOT_IMPLY_TANGENCY=REQUIRED
+```
+
+Every `BafflePlaneGeometry.outer_tangent_position_ids` tuple contains
+the position IDs of every accepted outer tangency on that baffle, across
+both `WINDOW` and `CROSSFLOW_REFERENCE` primary classifications (not
+limited to `CROSSFLOW_REFERENCE`).
 
 No margin is re-derived from a quantized coordinate, radius, signed distance, or
 squared distance. These exact formulas and the unquantized classification
 identity are part of each `classification_audit_hash` projection.
 
-### 9.8 Covered-region outer containment
+### 9.8 Outer-circle containment for every successful primary disk
 
-Only `CROSSFLOW_REFERENCE` positions require a hole through baffle material.
+After primary cut-boundary classification has succeeded (a position has
+been classified as `WINDOW` or `CROSSFLOW_REFERENCE`), every complete
+baffle-hole clearance disk must lie entirely inside the baffle disk. This
+check applies to BOTH successful primary classifications; `WINDOW` disks
+must lie inside the window half-plane *and* inside the baffle circle.
 
-Let:
-
-```text
-d2=x^2+y^2
-available_radius=R-r_h
-```
-
-Required:
+The frozen token is:
 
 ```text
-available_radius>=0
-d2<=available_radius^2
+ALL_SUCCESSFUL_PRIMARY_DISKS_INSIDE_BAFFLE_CIRCLE=REQUIRED
 ```
 
-Equality is outer-circle tangency and is accepted as mathematical containment.
-It emits a warning and makes no manufacturing claim.
+For every successful primary disk (one per `WINDOW` or
+`CROSSFLOW_REFERENCE` classification):
 
-A `WINDOW` position requires no baffle-hole containment check because the
-selected window half-plane removes baffle material there. Its physical tube
-geometry remains governed by TASK-021 and TASK-022.
+```text
+d2 = x^2 + y^2
+available_radius = R - r_h
+available_radius >= 0
+d2 <= available_radius^2
+```
+
+with
+
+- `R` = `baffle_radius_m`
+- `r_h` = `baffle_hole_radius_m`
+
+Result semantics:
+
+```text
+d2 < available_radius^2    -> strictly inside baffle circle (no tangency)
+d2 == available_radius^2   -> accepted mathematical outer tangency
+                              + BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY
+d2 > available_radius^2    -> BLOCKED
+                              + BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK
+```
+
+The classification identity (which primary class the disk belongs to) is
+fixed by the unquantized predicate pass from §9.7; the unquantized
+containment predicate here is evaluated on the same unquantized high-
+precision Decimal derivations. The public `outer_boundary_margin_squared_m2`
+field is formatted only after the containment decision, using
+`squared_coordinate_quantum_m2`.
+
+A `WINDOW` disk is required to lie inside the
+`BAFFLE_DISK_INTERSECTION_WINDOW_HALF_PLANE` (the §9.7 result) and inside
+the baffle circle. A `CROSSFLOW_REFERENCE` disk is required to lie inside
+the `BAFFLE_DISK_MINUS_WINDOW_REGION` and inside the baffle circle.
+
+The previous claim "`WINDOW requires no outer containment check`" is
+removed. Both successful primary classes require this containment.
 
 ### 9.9 Pairwise covered-region hole non-overlap
+
+Pairwise hole non-overlap applies **only** to `CROSSFLOW_REFERENCE`
+positions. `WINDOW` positions do not require a baffle-material hole and
+are explicitly excluded from this pairwise check.
 
 For every ordered pair of `CROSSFLOW_REFERENCE` positions:
 
@@ -1101,6 +1240,120 @@ The last name is permitted only as a classification reference for future tasks.
 None of these values represents shell-side free-flow area, minimum crossflow
 area, hydraulic area, Kern area, or Bell–Delaware area.
 
+### 9.12 Exact VALID result projection equality
+
+When `result.status == VALID`, the projection invariants below MUST all hold
+simultaneously. Any inconsistency is treated as a construction-time canonical
+failure and produces `status=BLOCKED`, `geometry=null`, with
+`BFG_CANONICALIZATION_FAILED`:
+
+- `result.geometry` is not `null`.
+- `result.blocked_result_hash` is `null`.
+- `result.blockers == ()`.
+- `result.geometry.blockers == ()`.
+- `result.blockers == result.geometry.blockers`.
+- `result.warnings == result.geometry.warnings`.
+- `canonical_message_projections(result.warnings)` uses the exact closed
+  message shape and ordering from §13, never a free-form mapping.
+- `canonical_message_projections(result.warnings) == result.geometry.provenance["warnings"]`.
+- `result.deferred_capabilities == result.geometry.deferred_capabilities`.
+- `result.deferred_capabilities == result.geometry.provenance["deferred_capabilities"]`.
+
+The frozen tokens are:
+
+```text
+VALID_RESULT_PROJECTION_EQUALITY=REQUIRED
+VALID_RESULT_BLOCKERS_EMPTY=REQUIRED
+PROVENANCE_WARNING_PROJECTION_EQUALITY=REQUIRED
+PROVENANCE_DEFERRED_CAPABILITY_PROJECTION_EQUALITY=REQUIRED
+```
+
+A `VALID` result must never carry non-empty `blockers` or any
+non-null `blocked_result_hash`. The three warnings/baseline/tangency
+projections (`result.warnings`, `result.geometry.warnings`,
+`result.geometry.provenance["warnings"]`) must be byte-identical under
+`canonical_message_projections`.
+
+When `result.status == BLOCKED`:
+
+- `geometry == null`.
+- `blocked_result_hash` is non-null.
+- The VALID projection invariants above do not apply. There is no
+  `geometry` to cross-check, and `provenance` equality is not required.
+
+### 9.13 Public quantization closure on positive geometry and baffle identity
+
+The blocker `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION` is emitted
+whenever public-output quantization would erase a strictly-positive
+quantity or collapse distinct baffle identities.
+
+The frozen set of strictly-positive public geometry fields is:
+
+```text
+PUBLIC_STRICTLY_POSITIVE_GEOMETRY_FIELDS
+=
+usable_baffle_span_m
+baffle_diameter_m
+baffle_radius_m
+baffle_hole_diameter_m
+baffle_hole_radius_m
+cut_height_m
+chord_half_length_m
+```
+
+Each field above must satisfy, in the unquantized domain AND in the
+public quantized domain:
+
+```text
+unquantized_value > 0
+public_quantized_value > 0
+```
+
+The implementation must not silently emit the canonical empty
+decimal string `"0"` for any of these fields.
+
+The frozen tokens for baffle-center identity are:
+
+```text
+PUBLIC_BAFFLE_CENTER_COORDINATES_STRICTLY_INCREASING=REQUIRED
+PUBLIC_BAFFLE_CENTER_COORDINATES_DISTINCT=REQUIRED
+```
+
+For every `i < i+1`:
+
+```text
+quantized_public_z_i < quantized_public_z_(i+1)
+```
+
+If two distinct center planes quantize to the same public coordinate:
+
+```text
+BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION
+```
+
+The frozen occupancy rules for every baffle are:
+
+```text
+quantized_public_occupied_start_i < quantized_public_occupied_end_i
+quantized_public_occupied_start_i <= quantized_public_center_i <= quantized_public_occupied_end_i
+```
+
+A zero-width public occupied interval is forbidden.
+
+The frozen tokens for unquantized-vs-public gap / tangency semantics are:
+
+```text
+PUBLIC_ZERO_GAP_DOES_NOT_IMPLY_SOLID_TANGENCY=REQUIRED
+```
+
+A positive unquantized gap may quantize to public zero under
+`ROUND_HALF_EVEN`. The solid-tangency warning is emitted **only** by
+exact unquantized equality, never by a quantized zero. The
+`ROUND_HALF_EVEN` quantization is monotonic, so two non-overlapping
+unquantized intervals cannot quantize into overlapping public intervals
+in reverse order, but a positive gap may quantize to public equality
+without producing a tangency warning.
+
 ## 10. Validation stages and no-partial-result behavior
 
 Validation runs in this exact stage order:
@@ -1123,7 +1376,11 @@ Validation runs in this exact stage order:
 15. covered-region outer containment;
 16. pairwise covered-region hole non-overlap;
 17. classification completeness;
-18. canonical serialization, hashes, IDs, provenance, and final result.
+18. public-output quantization positivity, public center distinctness,
+    and public occupied-interval non-collapse (see §9.13); any failure
+    here emits `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION` and blocks
+    before any valid geometry is constructed;
+19. canonical serialization, hashes, IDs, provenance, and final result.
 
 Each stage may accumulate every deterministic blocker in that stage. Later
 geometry stages do not execute when required inputs are invalid.
@@ -1206,9 +1463,11 @@ BFG_CHORD_CALCULATION_FAILED
 
 BFG_BAFFLE_HOLE_DISK_TANGENT_TO_CUT_BOUNDARY
 BFG_BAFFLE_HOLE_DISK_INTERSECTS_CUT_BOUNDARY
-BFG_BAFFLE_HOLE_OUTSIDE_COVERED_REGION
+BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK
 BFG_BAFFLE_HOLE_DISKS_OVERLAP
 BFG_POSITION_CLASSIFICATION_INCOMPLETE
+
+BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION
 
 BFG_CANONICALIZATION_FAILED
 ```
@@ -1239,6 +1498,127 @@ BFG_THERMAL_HYDRAULIC_DEFERRED
 ```
 
 Tangency warnings are emitted only when their exact equality condition occurs.
+
+### 12.1 Exact warning emission contract
+
+All warnings obey:
+
+- **at most one `MessageEntry` per warning code** in any single result;
+- one warning per contact (no per-contact emission);
+- no duplicate warning codes within one result;
+- no implementation-selected aggregation of contacts into multiple warnings;
+- no free-form `details` fields — `details` is constrained per warning
+  code below.
+
+### 12.2 Baseline warnings on every `VALID` result
+
+Every `VALID` v1 result emits each of these five codes exactly once,
+in the order shown:
+
+| Code | `eligibility_stage` | `field_path` | `message_key` | `evidence_refs` | `details` |
+|---|---|---|---|---|---|
+| `BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM` | 8 | `"design_authority"` | `"caller_supplied_no_standard_claim"` | `design_authority.evidence_refs` | `{"authority_mode":"CALLER_SUPPLIED_EXPLICIT","standard_claim_status":"NO_STANDARD_CLAIM"}` |
+| `BFG_GEOMETRY_NOT_FLOW_AREA` | 6 | `null` | `"geometry_not_flow_area"` | `request.evidence_refs` | `{"flow_area_calculation_performed":false}` |
+| `BFG_FIXED_TUBESHEET_ONLY_V1` | 6 | `"configuration.construction_family"` | `"fixed_tubesheet_only_v1"` | `request.evidence_refs` | `{"construction_family":"FIXED_TUBESHEET"}` |
+| `BFG_NOZZLE_POSITION_DEFERRED` | 6 | `null` | `"nozzle_position_deferred"` | `request.evidence_refs` | `{"nozzle_position_inference_performed":false}` |
+| `BFG_THERMAL_HYDRAULIC_DEFERRED` | 6 | `null` | `"thermal_hydraulic_deferred"` | `request.evidence_refs` | `{"thermal_hydraulic_calculation_performed":false}` |
+
+### 12.3 Solid-tangency aggregate warning
+
+`BFG_BAFFLE_SOLID_TANGENCY_NOT_MANUFACTURING_ADEQUACY`:
+
+- `eligibility_stage` = 12
+- `field_path` = `"baffle_planes"`
+- `message_key` = `"baffle_solid_tangency_not_manufacturing_adequacy"`
+- `evidence_refs` = `request.evidence_refs`
+- `details` is exactly:
+
+```text
+{
+"active_span_boundary_contacts":[...],
+"adjacent_baffle_index_pairs":[...]
+}
+```
+
+`active_span_boundary_contacts` is an ordered subset of
+`["FIRST_BAFFLE_START", "LAST_BAFFLE_END"]`, in that order.
+`adjacent_baffle_index_pairs` contains exact two-integer arrays of the
+form `[i, i+1]`, sorted by first index. Both arrays are always present;
+they may be empty. The warning is emitted only when at least one of
+the two arrays is non-empty.
+
+### 12.4 Outer-tangency aggregate warning
+
+`BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY`:
+
+- `eligibility_stage` = 15
+- `field_path` = `"baffle_planes[*].tube_hole_classifications[*].outer_boundary_margin_squared_m2"`
+- `message_key` = `"baffle_hole_outer_tangency_not_manufacturing_adequacy"`
+- `evidence_refs` = `request.evidence_refs`
+- `details` is exactly:
+
+```text
+{
+"contacts":[
+{"baffle_index":<integer>, "position_id":<string>},
+...
+]
+}
+```
+
+Contacts are sorted by `baffle_index` ascending, then `position_id`
+ascending. The contacts cover both `WINDOW` and `CROSSFLOW_REFERENCE`
+outer tangencies (per §9.8). Emitted only when at least one contact is
+present.
+
+### 12.5 Pair-tangency aggregate warning
+
+`BFG_BAFFLE_HOLE_PAIR_TANGENCY_NOT_MANUFACTURING_ADEQUACY`:
+
+- `eligibility_stage` = 16
+- `field_path` = `"baffle_planes[*].pairwise_tangent_position_pairs"`
+- `message_key` = `"baffle_hole_pair_tangency_not_manufacturing_adequacy"`
+- `evidence_refs` = `request.evidence_refs`
+- `details` is exactly:
+
+```text
+{
+"contacts":[
+{"baffle_index":<integer>, "lower_position_id":<string>, "higher_position_id":<string>},
+...
+]
+}
+```
+
+Sorted by `baffle_index`, then `lower_position_id`, then
+`higher_position_id`. Emitted only when at least one contact is present.
+
+### 12.6 Blocked-result warning carry-forward
+
+The frozen token is:
+
+```text
+BLOCKED_RESULT_WARNING_CARRY_FORWARD
+=WARNINGS_FROM_FULLY_COMPLETED_PRIOR_STAGES_ONLY
+```
+
+Rules:
+
+- A warning's `eligibility_stage` must have executed to completion AND
+  that stage must have produced no blocker, in order for the warning to
+  enter the result.
+- If a blocker is produced at stage `s`:
+  - retain all eligible warnings from every fully completed prior stage
+    `t < s`;
+  - do NOT produce any warning whose eligibility stage is `s` or any
+    stage `t > s`.
+
+A `VALID` result therefore carries:
+
+- the five baseline warnings (each exactly once), plus
+- at most one of each tangency warning that actually occurred.
+
+The closed warning set remains exactly **8** codes.
 
 ## 13. Message ordering
 
@@ -1326,7 +1706,7 @@ The blocked-result hash covers exactly:
 
 - `request_identity`, which is the exact validated `request_hash` when
   computable, otherwise the complete
-  `task024.raw-blocked-projection.v1` projection from §7.6;
+  `task024.raw-blocked-projection.v2` projection from §7.6;
 - ordered warnings;
 - ordered blockers;
 - deferred capabilities;
@@ -1835,6 +2215,69 @@ At minimum:
 12. changing an exact physical-audit field, public margin, raw projection tag,
     or provenance field changes the owning hash deterministically.
 
+### 19.10 Round 4 outer-containment, projection-equality, warning-emission, projection-v2, and quantization-closure tests
+
+In addition to the prior test matrix, the future implementation must cover
+at minimum:
+
+1. `WINDOW` disk strictly inside the baffle circle;
+2. `WINDOW` disk accepted outer tangent;
+3. `WINDOW` disk partially outside the baffle circle → `BLOCKED`;
+4. `WINDOW` disk wholly outside the baffle circle → `BLOCKED`;
+5. `CROSSFLOW_REFERENCE` disk outside the baffle circle → `BLOCKED`;
+6. `outer_boundary_margin_squared_m2` is non-null for every successful
+   `WINDOW` and every successful `CROSSFLOW_REFERENCE`;
+7. `outer_tangent_position_ids` covers both `WINDOW` and
+   `CROSSFLOW_REFERENCE` outer tangencies;
+8. VALID result warnings equal `geometry.warnings` and equal
+   `provenance["warnings"]` under `canonical_message_projections`;
+9. VALID result `deferred_capabilities` equals
+   `geometry.deferred_capabilities` and equals
+   `provenance["deferred_capabilities"]`;
+10. VALID result `blockers` is empty at both result and geometry levels;
+11. VALID result projection mismatch yields `BFG_CANONICALIZATION_FAILED`
+    with `status=BLOCKED` and `geometry=null`;
+12. exactly one warning per warning code is emitted;
+13. solid-tangency aggregation merges contacts into one warning with
+    `active_span_boundary_contacts` and `adjacent_baffle_index_pairs`;
+14. outer-tangency aggregation merges contacts into one warning covering
+    `WINDOW` and `CROSSFLOW_REFERENCE`;
+15. pair-tangency aggregation merges contacts into one warning;
+16. blocked warning carry-forward retains only fully completed prior-stage
+    warnings when a stage produces a blocker;
+17. raw blocked projection v2 total for huge integers, negative huge
+    integers, huge-int zero, huge integers nested in collections,
+    non-default interpreter `int_max_str_digits`, surrogate-containing
+    type metadata, non-string type metadata, and unsupported custom-metaclass
+    objects;
+18. safe type-identity projection emits
+    `{"raw_type":"type_identity_unavailable"}` when `__module__` or
+    `__qualname__` is not an exact `str`;
+19. positive unquantized derived field becoming public zero →
+    `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION`;
+20. two distinct center planes colliding after quantization →
+    `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION`;
+21. occupied interval collapsing after quantization →
+    `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION`;
+22. positive unquantized gap becoming public zero does NOT emit a
+    solid-tangency warning.
+
+### 19.11 Raw-blocked projection v2 huge-integer tests
+
+Required by §7.6.4 and frozen here for completeness:
+
+1. integer with more than 4300 decimal digits;
+2. negative huge integer;
+3. zero huge-int canonical case;
+4. huge integer nested in `list` / `dict` / `set` / `frozenset`;
+5. non-default interpreter `int_max_str_digits`;
+6. surrogate-containing type metadata;
+7. non-string type metadata;
+8. unsupported object with custom metaclass.
+
+All of the above must produce a deterministic blocked hash and must
+not raise a serialization exception.
+
 ## 20. Future implementation acceptance gates
 
 A future implementation is acceptable only if:
@@ -1899,7 +2342,21 @@ A design reviewer must verify:
 24. positive unquantized margins may quantize to public zero without changing
     classification or creating a tangency warning;
 25. `Task022ShellAuthorityIdentity` is an exact mode-dependent closed projection
-    of the actual TASK-022 authority fields.
+    of the actual TASK-022 authority fields;
+26. every successful primary disk (both `WINDOW` and `CROSSFLOW_REFERENCE`)
+    is fully inside the baffle circle, with no exception for `WINDOW`;
+27. VALID result, `geometry`, and `provenance` duplicate projections are
+    exact under `canonical_message_projections` for warnings and
+    `deferred_capabilities`, and blockers are empty at both levels;
+28. warning emission and blocked carry-forward are deterministic: at most
+    one `MessageEntry` per warning code, and warnings come only from
+    fully completed prior stages;
+29. raw blocked projection v2 is total for arbitrary-size integers and
+    safe type identities (no `str(huge_int)`, no `repr`, no
+    `set_int_max_str_digits`, no user-defined metaclass attributes);
+30. public quantization cannot erase a strictly-positive geometry value
+    or collapse baffle identity; distinct center planes must remain
+    distinct after quantization.
 
 ## 22. Explicit non-authorization statement
 
