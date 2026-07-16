@@ -485,7 +485,7 @@ A blocked result must remain deterministic even when the ordinary validated
 non-executable diagnostic projection:
 
 ```text
-RAW_BLOCKED_PROJECTION_VERSION=task024.raw-blocked-projection.v2
+RAW_BLOCKED_PROJECTION_VERSION=task024.raw-blocked-projection.v3
 ```
 
 The projection is used only for `blocked_result_hash`. It never authorizes a raw
@@ -499,27 +499,26 @@ The recursive tagged-value mapping is exact:
 |---|---|
 | `None` | `{"raw_type":"null"}` |
 | `bool` | `{"raw_type":"bool","value":<JSON boolean>}` |
-| `int` excluding `bool` (arbitrary magnitude) | `{"raw_type":"int","sign":<0-or-1>,"magnitude_hex":<lowercase hexadecimal digits, no 0x prefix>}` |
-| `str` | `{"raw_type":"str","code_points":[<lowercase hexadecimal ordinals>]}` preserving code-point order |
-| finite `float` | `{"raw_type":"float","value":<lowercase float.hex()>}` |
-| float NaN | `{"raw_type":"float","value":"nan"}` |
-| float positive infinity | `{"raw_type":"float","value":"+infinity"}` |
-| float negative infinity | `{"raw_type":"float","value":"-infinity"}` |
-| `Decimal` | `{"raw_type":"decimal","sign":<0-or-1>,"digits":<digit string>,"exponent":<DecimalTuple exponent string>}` |
-| `bytes` | `{"raw_type":"bytes","hex":<lowercase hex>}` |
+| exact `int` (arbitrary magnitude; `bool` excluded) | `{"raw_type":"int","sign":<0-or-1>,"magnitude_hex":<lowercase hexadecimal digits, no 0x prefix>}` |
+| exact `str` | `{"raw_type":"str","code_points":[<lowercase hexadecimal ordinals>]}` preserving code-point order |
+| exact finite `float` | `{"raw_type":"float","value":<lowercase float.hex()>}` |
+| exact float NaN | `{"raw_type":"float","value":"nan"}` |
+| exact float positive infinity | `{"raw_type":"float","value":"+infinity"}` |
+| exact float negative infinity | `{"raw_type":"float","value":"-infinity"}` |
+| exact `Decimal` | `{"raw_type":"decimal","sign":<0-or-1>,"digits":[<integer digit 0 through 9>,...],"exponent":<closed exponent projection>}` |
+| exact `bytes` | `{"raw_type":"bytes","hex":<lowercase hex>}` |
 | exact built-in `list` | `{"raw_type":"list","items":[...]}` preserving order |
 | exact built-in `tuple` | `{"raw_type":"tuple","items":[...]}` preserving order |
 | exact built-in `dict` | `{"raw_type":"mapping","entries":[...]}` under the ordering rule below |
 | exact built-in `set` | `{"raw_type":"set","items":[...]}` under the ordering rule below |
 | exact built-in `frozenset` | `{"raw_type":"frozenset","items":[...]}` under the ordering rule below |
-| enum member | `{"raw_type":"enum","enum_type":<safe type-identity projection>,"member":<Unicode-code-point projection of the member name>}` |
-| recognized TASK-020/021/022/024 public dataclass | `{"raw_type":"dataclass","dataclass_type":<safe type-identity projection>,"fields":[...]}` in declaration order |
-| every other object | `{"raw_type":"unsupported_object","python_type":<safe type-identity projection>}` |
-| unsupported type identity | `{"raw_type":"type_identity_unavailable"}` |
+| enum member | `{"raw_type":"enum","enum_type_token":<literal static ASCII enum token>,"member_token":<literal static ASCII member token>}` |
+| recognized TASK-020/021/022/024 public dataclass | `{"raw_type":"dataclass","dataclass_type_token":<literal static ASCII dataclass token>,"fields":[...]}` in the static field-table order |
+| every other object | `{"raw_type":"unsupported_object"}` |
 
-#### 7.6.1 Integer projection (arbitrary magnitude)
+### 7.6.1 Integer projection (arbitrary magnitude)
 
-`int` excluding `bool` projects to:
+Only an exact `int` after `type(value) is int` projects to:
 
 ```text
 {
@@ -529,11 +528,11 @@ The recursive tagged-value mapping is exact:
 }
 ```
 
-Canonical rules:
+Canonical rules after that exact-type guard:
 
 - `value == 0` → `sign=0`, `magnitude_hex="0"`.
-- `value > 0` → `sign=0`, `magnitude_hex = format(value, "x")`.
-- `value < 0` → `sign=1`, `magnitude_hex = format(abs(value), "x")`.
+- `value > 0` → `sign=0`, `magnitude_hex = int.__format__(value, "x")`.
+- `value < 0` → `sign=1`, `magnitude_hex = int.__format__(-value, "x")`.
 
 The frozen tokens are:
 
@@ -549,31 +548,179 @@ The magnitude-hex projection is total for arbitrary-magnitude integers
 including those whose base-10 expansion exceeds any interpreter's
 default int-to-str digit limit.
 
-#### 7.6.2 Safe type-identity projection
+#### 7.6.2 Exact-type dispatch and static recognized-type tables
 
-To preserve totality for `unsupported_object`, `enum`, and recognized
-dataclass type identity under abnormal `Unicode` or mutating metadata,
-the type identity is read with:
+The raw projector is fail-closed and may inspect no runtime type metadata or
+execute user code. It first obtains only:
 
 ```text
-type.__getattribute__(python_type, "__module__")
-type.__getattribute__(python_type, "__qualname__")
+value_type = type(value)
 ```
 
-only. The result is the safe projection:
+Every known-type comparison uses exact identity:
+
+```text
+value_type is EXACT_KNOWN_TYPE
+```
+
+The projector must not use `isinstance`, `issubclass`,
+`dataclasses.is_dataclass`, `hasattr`, `getattr` on unsupported objects, `vars`,
+`object.__dict__` inspection, type-object hashing or equality dispatch, runtime
+registry discovery, or runtime type metadata. It must not use an arbitrary
+`value_type` as a dictionary key: a custom metaclass may control type-object hash
+or equality. Static known-type tables are searched only by a bounded identity
+sequence:
+
+```text
+for entry in STATIC_ENTRIES:
+    if value_type is entry.type_object:
+        ...
+```
+
+The exact scalar domain is closed:
+
+```text
+value is None
+or type(value) is bool
+or type(value) is int
+or type(value) is str
+or type(value) is float
+or type(value) is Decimal
+or type(value) is bytes
+```
+
+Scalar subclasses are never entered into scalar projection. `int`, `str`,
+`float`, `bytes`, and `Decimal` subclasses—including subclasses overriding
+`__abs__`, `__format__`, `__str__`, `__repr__`, `hex`, `as_tuple`, iteration,
+or conversion—project directly to `{"raw_type":"unsupported_object"}` and
+none of those methods may be called.
+
+Exact `int` projection uses only the closed semantics below:
+
+```text
+if value == 0:
+    sign = 0
+    magnitude_hex = "0"
+elif value > 0:
+    sign = 0
+    magnitude_hex = int.__format__(value, "x")
+else:
+    sign = 1
+    magnitude_hex = int.__format__(-value, "x")
+```
+
+The `type(value) is int` guard precedes these operations. Base-10 string
+conversion and mutation of `int_max_str_digits` are forbidden; arbitrary
+magnitude is total. Exact `float` uses `float.hex(value)` for finite values and
+signed zero, with fixed tokens for NaN and positive/negative Infinity. Exact
+`str` uses ordered lowercase hexadecimal `ord(value)` code points. Exact
+`bytes` uses `bytes.hex(value)`. These are static built-in operations, never
+instance-dispatch operations.
+
+Exact `Decimal` projection is:
 
 ```text
 {
-"module_code_points":[<lowercase hexadecimal Unicode ordinals>],
-"qualname_code_points":[<lowercase hexadecimal Unicode ordinals>]
+  "raw_type":"decimal",
+  "sign":<0-or-1>,
+  "digits":[<integer digit 0 through 9>, ...],
+  "exponent":<closed exponent projection>
 }
 ```
 
-If either read value is not an exact `str`, the projector emits the
-exact token `{"raw_type":"type_identity_unavailable"}` for the type
-slot. The projector never calls `repr(type)`, `str(type)`, or any
-user-defined metaclass `__getattribute__`. Enum member names are
-projected via the same Unicode-code-point rule.
+It reads only `Decimal.as_tuple(value)`. A finite exponent is:
+
+```text
+{"kind":"integer","sign":<0-or-1>,"magnitude_hex":<lowercase hexadecimal digits>}
+```
+
+A special exponent is one of:
+
+```text
+{"kind":"special","token":"F"|"n"|"N"}
+```
+
+No `str(exponent)`, `repr(exponent)`, `str(value)`, or `repr(value)` is used.
+If the exact `Decimal.as_tuple()` result is outside this closed domain, the
+fixed result is `{"raw_type":"decimal_projection_unavailable"}` and no
+serialization exception escapes.
+
+Only exact built-in `list`, `tuple`, `dict`, `set`, and `frozenset` enter
+container traversal. Container subclasses, custom mappings, and arbitrary
+iterables directly project to `{"raw_type":"unsupported_object"}` without
+iteration. Existing exact built-in ordering and cycle-collapse rules remain,
+but pre-scan uses the same exact-type dispatch.
+
+Recognized enums use a code-internal static table. Each entry contains the
+exact enum type object, a literal ASCII `enum_type_token`, and ordered exact
+member-object identities paired with literal ASCII `member_token` values.
+Matching is only `value_type is entry.type_object`, followed by
+`value is member_entry.member_object`. Output is:
+
+```text
+{
+  "raw_type":"enum",
+  "enum_type_token":<literal static ASCII enum token>,
+  "member_token":<literal static ASCII member token>
+}
+```
+
+Tokens have the frozen form `<owning-task-lowercase>:<literal-public-type-name>`
+(for example `task020:Orientation`, `task021:AxisOrientation`,
+`task022:ShellInsideDiameterAuthorityMode`, and `task024:BaffleOrientation`).
+These are code literals and are never generated from runtime class metadata. If
+a recognized enum instance matches no static member identity, output is:
+
+```text
+{"raw_type":"recognized_enum_unavailable","enum_type_token":<literal static token>}
+```
+
+Recognized dataclasses use a code-internal static table. Each entry contains the
+exact class object, a literal ASCII `dataclass_type_token`, and an exact ordered
+literal field-name tuple. The table is limited to §8 TASK-024 public dataclasses
+and the TASK-020/021/022 complete upstream object graph explicitly named by §5;
+future dataclasses are not discovered automatically. Matching uses only
+`value_type is entry.type_object`. Field reads use only
+`object.__getattribute__(value, literal_field_name)` for names from that static
+table. Output is:
+
+```text
+{
+  "raw_type":"dataclass",
+  "dataclass_type_token":<literal static token>,
+  "fields":[
+    {"name":<literal static field name>,"value":raw_value_projection(field_value)},
+    ...
+  ]
+}
+```
+
+A failed static field read returns
+`{"raw_type":"recognized_dataclass_unavailable","dataclass_type_token":<literal static token>}`
+for the whole dataclass and reads no other fields. Architecture tests prove
+that every recognized field set contains no property, custom data descriptor,
+or custom `__getattribute__` dependency.
+
+All other values collapse to the fixed token
+`{"raw_type":"unsupported_object"}`. Unsupported-object projection does not
+include runtime type identity, state, class metadata, metaclass descriptors,
+custom hash, custom equality, or custom representation. Different unsupported
+types may share this diagnostic identity. This does not affect successful-result
+identity because unsupported values occur only in blocked results.
+
+The frozen dispatch tokens are:
+
+```text
+RAW_PROJECTION_DISPATCH_USES_EXACT_TYPE_IDENTITY=REQUIRED
+RAW_PROJECTION_ISINSTANCE_DISPATCH=FORBIDDEN
+RAW_PROJECTION_RUNTIME_TYPE_METADATA_READ=FORBIDDEN
+RAW_PROJECTION_USER_CODE_EXECUTION=FORBIDDEN
+RAW_SCALAR_DISPATCH_EXACT_BUILTIN_ONLY=REQUIRED
+RAW_SCALAR_SUBCLASS_EXECUTION=FORBIDDEN
+UNSUPPORTED_OBJECT_RUNTIME_TYPE_IDENTITY_INCLUDED=NO
+UNSUPPORTED_OBJECT_STATE_INSPECTION=FORBIDDEN
+UNSUPPORTED_OBJECTS_MAY_SHARE_DIAGNOSTIC_IDENTITY=YES
+```
 
 #### 7.6.3 Container and ordering rules
 
@@ -604,52 +751,44 @@ are never iterated. It never uses `repr`, `str(object)`, memory address, object
 ID, hash randomization, locale, or iteration order of an unordered collection.
 
 A pre-scan traverses only exact supported containers and recognized public
-dataclasses. If a reference cycle exists in that traversed graph, the entire raw
-value component is represented by the exact token:
+dataclass fields from the static table. If a reference cycle exists in that
+traversed graph, the entire raw value component is represented by the exact token:
 
 ```text
 {"raw_type":"cyclic_graph"}
 ```
 
-This deliberate collapse is diagnostic only. Likewise, state inside an
-`unsupported_object` is deliberately not inspected. These projections may group
-different invalid programmer objects into the same diagnostic identity; they do
-not weaken successful-result identity because they can occur only in a blocked
-result.
+This deliberate collapse is diagnostic only. State inside an unsupported object
+is deliberately not inspected. These projections may group different invalid
+programmer objects into the same diagnostic identity; they do not weaken
+successful-result identity because they can occur only in a blocked result.
 
 The complete fallback request projection is:
 
 ```text
 {
-  "projection_version": "task024.raw-blocked-projection.v2",
+  "projection_version": "task024.raw-blocked-projection.v3",
   "request": raw_value_projection(raw_request)
 }
 ```
 
 This function is total for the public validation boundary without invoking
 user-defined iteration, conversion, representation, or serialization methods.
-Float, NaN, Infinity, live Decimal, bytes, sets, malformed containers, wrong raw
-types, cyclic graphs, surrogate-containing strings, custom mappings, container
-subclasses, unsupported objects, arbitrary-magnitude integers, surrogate or
-non-string type metadata, and user-defined metaclass attributes therefore
-produce a deterministic blocked hash rather than a serialization exception.
-No projected invalid value is coerced into a valid engineering input.
+Float, NaN, Infinity, exact Decimal, bytes, exact built-in containers, malformed
+exact containers, wrong raw types, cyclic graphs, surrogate-containing strings,
+custom mappings, container subclasses, scalar subclasses, unsupported objects,
+arbitrary-magnitude integers, custom type metadata, and user-defined metaclass
+attributes therefore produce a deterministic blocked hash rather than a
+serialization exception. No projected invalid value is coerced into a valid
+engineering input.
 
 #### 7.6.4 Required test matrix additions
 
-The future test matrix in §19 must cover, at minimum:
-
-1. integer with more than 4300 decimal digits;
-2. negative huge integer;
-3. zero huge-int canonical case;
-4. huge integer nested in `list` / `dict` / `set` / `frozenset`;
-5. non-default interpreter `int_max_str_digits`;
-6. surrogate-containing type metadata;
-7. non-string type metadata;
-8. unsupported object with custom metaclass.
-
-All of the above must produce a deterministic blocked hash and must
-not raise a serialization exception.
+The future test matrix in §19 must cover every Round 5 exact-dispatch,
+no-user-code, static enum/dataclass, unsupported-collapse, Decimal special-value,
+and process/hash-seed/locale/`int_max_str_digits` stability case frozen in
+§19.11. Every case must produce a deterministic blocked hash without a
+serialization exception.
 
 ## 8. Exact domain models
 
@@ -758,8 +897,41 @@ overrides, or substitutes for the baffle-hole clearance-disk authority.
 | `signed_window_distance_m` | decimal string | `normal·center - offset` |
 | `cut_boundary_margin_m` | decimal string | non-negative public quantized margin; its unquantized source is strictly positive and public zero does not mean tangency |
 | `classification` | enum | `WINDOW` or `CROSSFLOW_REFERENCE` |
-| `outer_boundary_margin_squared_m2` | decimal string or null | required for covered class |
+| `outer_boundary_margin_squared_m2` | decimal string | non-negative canonical squared-metre decimal string; required for every successful `WINDOW` and every successful `CROSSFLOW_REFERENCE` classification; formula `(R-r_h)^2-d2` |
 | `physical_tube_disk_audit` | `PhysicalTubeDiskAudit` | exact closed audit; never classification authority |
+
+The exact field definition is:
+
+```text
+Field:
+outer_boundary_margin_squared_m2
+Type:
+decimal string
+Nullable:
+NO
+Required:
+for every successful WINDOW classification
+and
+for every successful CROSSFLOW_REFERENCE classification
+Formula:
+(R-r_h)^2-d2
+Public domain:
+non-negative canonical squared-metre decimal string
+```
+
+The frozen outer-margin contract is:
+
+```text
+OUTER_BOUNDARY_MARGIN_NULLABLE=NO
+OUTER_BOUNDARY_MARGIN_REQUIRED_FOR_ALL_SUCCESSFUL_PRIMARY_CLASSES=YES
+BLOCKED_REQUEST_NO_PARTIAL_CLASSIFICATION_OBJECT=REQUIRED
+```
+
+
+The `TubeHoleClassification` object is constructed only after the position has
+a successful primary classification (`WINDOW` or `CROSSFLOW_REFERENCE`) and
+has passed outer-circle containment. Any blocked request returns no partial
+classification object.
 
 The complete baffle-hole clearance disk is the primary cut-classification disk.
 The physical tube disk is an audit projection only.
@@ -1477,51 +1649,102 @@ Codes are exact and cannot be aliased.
 ## 12. Closed warning taxonomy
 
 ```text
-BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM
-BFG_GEOMETRY_NOT_FLOW_AREA
 BFG_FIXED_TUBESHEET_ONLY_V1
+BFG_GEOMETRY_NOT_FLOW_AREA
 BFG_NOZZLE_POSITION_DEFERRED
 BFG_THERMAL_HYDRAULIC_DEFERRED
+BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM
 BFG_BAFFLE_SOLID_TANGENCY_NOT_MANUFACTURING_ADEQUACY
 BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY
 BFG_BAFFLE_HOLE_PAIR_TANGENCY_NOT_MANUFACTURING_ADEQUACY
 ```
 
-Required baseline warnings on every valid v1 result:
+Required baseline warnings on every valid v1 result, in the sole §13 global
+message-sort order (validation stage rank ascending, then code ascending):
 
 ```text
-BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM
-BFG_GEOMETRY_NOT_FLOW_AREA
 BFG_FIXED_TUBESHEET_ONLY_V1
+BFG_GEOMETRY_NOT_FLOW_AREA
 BFG_NOZZLE_POSITION_DEFERRED
 BFG_THERMAL_HYDRAULIC_DEFERRED
+BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM
 ```
 
-Tangency warnings are emitted only when their exact equality condition occurs.
+Optional warning order is also derived only by the §13 key:
 
-### 12.1 Exact warning emission contract
+```text
+stage 6:
+BFG_FIXED_TUBESHEET_ONLY_V1
+BFG_GEOMETRY_NOT_FLOW_AREA
+BFG_NOZZLE_POSITION_DEFERRED
+BFG_THERMAL_HYDRAULIC_DEFERRED
+stage 8:
+BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM
+stage 12, only if eligible:
+BFG_BAFFLE_SOLID_TANGENCY_NOT_MANUFACTURING_ADEQUACY
+stage 15, only if eligible:
+BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY
+stage 16, only if eligible:
+BFG_BAFFLE_HOLE_PAIR_TANGENCY_NOT_MANUFACTURING_ADEQUACY
+```
+
+Primary taxonomy display order never overrides this global message order.
+
+### 12.1 Exact warning emission, aggregation, and ordering contract
 
 All warnings obey:
 
 - **at most one `MessageEntry` per warning code** in any single result;
-- one warning per contact (no per-contact emission);
+- one aggregate `MessageEntry` per eligible warning code;
+- no per-contact `MessageEntry` emission;
+- every contact is represented only inside the warning code's exact closed
+  details aggregation;
 - no duplicate warning codes within one result;
 - no implementation-selected aggregation of contacts into multiple warnings;
 - no free-form `details` fields — `details` is constrained per warning
   code below.
 
+The sole global warning ordering key is the §13 tuple:
+
+```text
+(
+  validation_stage_rank,
+  code,
+  field_path_or_empty,
+  message_key,
+  sha256(canonical_details),
+  sha256(canonical_evidence_refs)
+)
+```
+
+All warning output uses this key. The baseline warning order and every local
+warning table must match the same global message sort; a local table's displayed
+order has no independent authority.
+
+The frozen tokens are:
+
+```text
+WARNING_AGGREGATION_ONE_ENTRY_PER_CODE=REQUIRED
+PER_CONTACT_MESSAGE_ENTRY_EMISSION=FORBIDDEN
+DUPLICATE_WARNING_CODE_IN_ONE_RESULT=FORBIDDEN
+ALL_WARNING_OUTPUT_ORDER_USES_SECTION13_SORT=REQUIRED
+BASELINE_WARNING_ORDER_USES_GLOBAL_MESSAGE_SORT=REQUIRED
+LOCAL_TABLE_ORDER_MUST_MATCH_GLOBAL_MESSAGE_SORT=REQUIRED
+```
+
 ### 12.2 Baseline warnings on every `VALID` result
 
-Every `VALID` v1 result emits each of these five codes exactly once,
-in the order shown:
+Every `VALID` v1 result emits each of these five codes exactly once, in the
+§13 global message-sort order. Their stage, field path, message key, evidence
+references, and details remain the frozen Round 4 values.
 
 | Code | `eligibility_stage` | `field_path` | `message_key` | `evidence_refs` | `details` |
 |---|---|---|---|---|---|
-| `BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM` | 8 | `"design_authority"` | `"caller_supplied_no_standard_claim"` | `design_authority.evidence_refs` | `{"authority_mode":"CALLER_SUPPLIED_EXPLICIT","standard_claim_status":"NO_STANDARD_CLAIM"}` |
-| `BFG_GEOMETRY_NOT_FLOW_AREA` | 6 | `null` | `"geometry_not_flow_area"` | `request.evidence_refs` | `{"flow_area_calculation_performed":false}` |
 | `BFG_FIXED_TUBESHEET_ONLY_V1` | 6 | `"configuration.construction_family"` | `"fixed_tubesheet_only_v1"` | `request.evidence_refs` | `{"construction_family":"FIXED_TUBESHEET"}` |
+| `BFG_GEOMETRY_NOT_FLOW_AREA` | 6 | `null` | `"geometry_not_flow_area"` | `request.evidence_refs` | `{"flow_area_calculation_performed":false}` |
 | `BFG_NOZZLE_POSITION_DEFERRED` | 6 | `null` | `"nozzle_position_deferred"` | `request.evidence_refs` | `{"nozzle_position_inference_performed":false}` |
 | `BFG_THERMAL_HYDRAULIC_DEFERRED` | 6 | `null` | `"thermal_hydraulic_deferred"` | `request.evidence_refs` | `{"thermal_hydraulic_calculation_performed":false}` |
+| `BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM` | 8 | `"design_authority"` | `"caller_supplied_no_standard_claim"` | `design_authority.evidence_refs` | `{"authority_mode":"CALLER_SUPPLIED_EXPLICIT","standard_claim_status":"NO_STANDARD_CLAIM"}` |
 
 ### 12.3 Solid-tangency aggregate warning
 
@@ -1632,7 +1855,7 @@ Every message has:
 | `evidence_refs` | tuple[string, ...] |
 | `details` | canonical mapping or null |
 
-Messages sort by:
+Messages sort by the one global key:
 
 ```text
 (
@@ -1646,7 +1869,11 @@ Messages sort by:
 ```
 
 Stage rank is bound to the occurrence when the message is created. It is not
-reconstructed from code alone.
+reconstructed from code alone. `result.warnings`, `geometry.warnings`, and the
+`canonical_message_projections` stored in provenance use the same ordered
+warning tuple produced by this key. `geometry_hash` and `blocked_result_hash`
+consume the §13-sorted result and must never consume local table insertion
+order, discovery order, or contact traversal order.
 
 ## 14. Hashes, UUID identity, and canonical projections
 
@@ -1706,7 +1933,7 @@ The blocked-result hash covers exactly:
 
 - `request_identity`, which is the exact validated `request_hash` when
   computable, otherwise the complete
-  `task024.raw-blocked-projection.v2` projection from §7.6;
+  `task024.raw-blocked-projection.v3` projection from §7.6;
 - ordered warnings;
 - ordered blockers;
 - deferred capabilities;
@@ -2127,7 +2354,9 @@ At minimum:
 - invalid cut fraction;
 - hole disk tangent to cut line;
 - hole disk intersects cut line;
-- covered hole outside baffle disk;
+- successful WINDOW disk outside baffle disk;
+- successful CROSSFLOW_REFERENCE disk outside baffle disk;
+- both produce `BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK`;
 - covered holes overlap;
 - incomplete or duplicate classification.
 
@@ -2190,32 +2419,40 @@ At minimum:
    and always matches the successful primary region classification;
 2. `WINDOW` primary margin equals `s-r_h`, crossflow-reference primary margin
    equals `-r_h-s`, and the physical audit uses the same formulas with `r_t`;
-3. `outer_boundary_margin_squared_m2` is `null` for `WINDOW`, equals
-   `(R-r_h)^2-d2` for covered positions, and is zero at accepted tangency;
-4. margin predicates are evaluated before formatting; metre margins use
+3. `outer_boundary_margin_squared_m2` is non-null for every successful
+   `WINDOW` and every successful `CROSSFLOW_REFERENCE`; it equals the public
+   quantization of the unquantized formula `(R-r_h)^2-d2`; it is public zero
+   at exact accepted outer tangency; a strictly positive unquantized outer
+   margin may also quantize to public zero without emitting a tangency warning;
+4. `WINDOW` exact accepted outer tangency emits public zero;
+5. a positive sub-quantum `WINDOW` outer margin emits public zero without a
+   tangency warning;
+6. no test expects an absent outer-boundary margin for `WINDOW`;
+7. margin predicates are evaluated before formatting; metre margins use
    `coordinate_quantum_m` and squared margins use the exactly derived
    `squared_coordinate_quantum_m2`;
-5. fallback blocked hashing is stable for finite float, signed zero float, NaN,
-   positive/negative Infinity, live Decimal, bytes, surrogate-containing string,
-   exact built-in list, tuple, dict, set, frozenset, enum, recognized dataclass,
-   cyclic graph, custom mapping, container subclass, and unsupported object;
-6. mapping and unordered-collection projections are stable under insertion or
+8. fallback blocked hashing is stable for finite float, signed zero float, NaN,
+   positive/negative Infinity, exact Decimal, bytes, surrogate-containing string,
+   exact built-in list, tuple, dict, set, frozenset, recognized enum, recognized
+   dataclass, cyclic graph, custom mapping, container subclass, and unsupported
+   object;
+9. mapping and unordered-collection projections are stable under insertion or
    iteration-order changes;
-7. raw fallback projection never validates or coerces an invalid engineering
-   value;
-8. provenance accepts exactly the closed field set in §15 and rejects one
-   missing field or one additional field;
-9. `Task022ShellAuthorityIdentity` is exact for both
-   `CALLER_SUPPLIED_EXPLICIT` and `APPROVED_CATALOG_SNAPSHOT`, rejects the wrong
-   null/non-null pairing, and changes `geometry_hash` when any selected nested
-   identity field changes;
-10. module/build provenance constants require no forbidden I/O;
-11. request, audit, geometry, UUID, provenance, and blocked-result dependency
+10. raw fallback projection never validates or coerces an invalid engineering
+    value;
+11. provenance accepts exactly the closed field set in §15 and rejects one
+    missing field or one additional field;
+12. `Task022ShellAuthorityIdentity` is exact for both
+    `CALLER_SUPPLIED_EXPLICIT` and `APPROVED_CATALOG_SNAPSHOT`, rejects the wrong
+    null/non-null pairing, and changes `geometry_hash` when any selected nested
+    identity field changes;
+13. module/build provenance constants require no forbidden I/O;
+14. request, audit, geometry, UUID, provenance, and blocked-result dependency
     tests prove `HASH_DEPENDENCY_CYCLE_COUNT=0`;
-12. changing an exact physical-audit field, public margin, raw projection tag,
+15. changing an exact physical-audit field, public margin, raw projection tag,
     or provenance field changes the owning hash deterministically.
 
-### 19.10 Round 4 outer-containment, projection-equality, warning-emission, projection-v2, and quantization-closure tests
+### 19.10 Round 5 outer-containment, projection-equality, warning-emission, projection-v3, and quantization-closure tests
 
 In addition to the prior test matrix, the future implementation must cover
 at minimum:
@@ -2245,38 +2482,59 @@ at minimum:
 15. pair-tangency aggregation merges contacts into one warning;
 16. blocked warning carry-forward retains only fully completed prior-stage
     warnings when a stage produces a blocker;
-17. raw blocked projection v2 total for huge integers, negative huge
-    integers, huge-int zero, huge integers nested in collections,
-    non-default interpreter `int_max_str_digits`, surrogate-containing
-    type metadata, non-string type metadata, and unsupported custom-metaclass
-    objects;
-18. safe type-identity projection emits
-    `{"raw_type":"type_identity_unavailable"}` when `__module__` or
-    `__qualname__` is not an exact `str`;
-19. positive unquantized derived field becoming public zero →
+17. raw blocked projection v3 total for huge integers, negative huge
+    integers, huge-int zero, huge integers nested in collections, exact
+    scalar and container subclass override traps, custom-metaclass metadata
+    traps, recognized enum/dataclass static tables, Decimal finite/Infinity/
+    qNaN/sNaN, and unsupported-object fixed collapse;
+18. positive unquantized derived field becoming public zero →
     `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION`;
-20. two distinct center planes colliding after quantization →
+19. two distinct center planes colliding after quantization →
     `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION`;
-21. occupied interval collapsing after quantization →
+20. occupied interval collapsing after quantization →
     `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION`;
-22. positive unquantized gap becoming public zero does NOT emit a
-    solid-tangency warning.
+21. positive unquantized gap becoming public zero does NOT emit a
+    solid-tangency warning;
+22. five baseline warnings exactly match the §13 sorted order;
+23. eligible stage-12, stage-15, and stage-16 optional warnings appear after
+    baseline stages in the same §13 order;
+24. local table order and serialized warning order are identical;
+25. each eligible warning code produces one aggregate `MessageEntry` and
+    multiple contacts never create duplicate warning codes;
+26. result, geometry, provenance, `geometry_hash`, and `blocked_result_hash`
+    consume the same §13-sorted warning tuple.
 
-### 19.11 Raw-blocked projection v2 huge-integer tests
+### 19.11 Raw-blocked projection v3 exact-dispatch and no-user-code tests
 
 Required by §7.6.4 and frozen here for completeness:
 
-1. integer with more than 4300 decimal digits;
-2. negative huge integer;
-3. zero huge-int canonical case;
-4. huge integer nested in `list` / `dict` / `set` / `frozenset`;
-5. non-default interpreter `int_max_str_digits`;
-6. surrogate-containing type metadata;
-7. non-string type metadata;
-8. unsupported object with custom metaclass.
+1. exact int with more than 4300 decimal digits;
+2. negative exact huge int;
+3. exact int nested in exact built-in list, tuple, dict, set, and frozenset;
+4. int subclass overriding `__abs__`, `__format__`, `__str__`, and `__repr__`
+   is projected as `{"raw_type":"unsupported_object"}` without method calls;
+5. str subclass overriding iteration/conversion, float subclass overriding
+   hex/representation, bytes subclass overriding conversion, and Decimal
+   subclass overriding `as_tuple`/representation are not executed;
+6. exact built-in scalar paths never execute scalar-subclass methods and all
+   scalar subclasses collapse to `{"raw_type":"unsupported_object"}`;
+7. custom metaclasses that define or raise from `__getattribute__`, `__hash__`,
+   `__eq__`, `__module__`, or `__qualname__` produce the fixed unsupported token
+   with zero user-code call count;
+8. recognized enum uses static type/member tokens and never reads `.name`,
+   `__module__`, or `__qualname__`;
+9. recognized dataclass uses the static field table; a missing field produces
+   `recognized_dataclass_unavailable`; unrecognized dataclasses collapse to
+   `unsupported_object`;
+10. custom mapping/container subclasses are not iterated and runtime type
+    metadata is never read;
+11. finite Decimal, Decimal Infinity, qNaN, and sNaN produce the closed Decimal
+    projection without exception;
+12. projection v3 is stable across process, hash seed, locale,
+    `int_max_str_digits`, and custom type metadata.
 
-All of the above must produce a deterministic blocked hash and must
-not raise a serialization exception.
+All of the above must produce a deterministic blocked hash and must not raise a
+serialization exception.
 
 ## 20. Future implementation acceptance gates
 
@@ -2351,12 +2609,23 @@ A design reviewer must verify:
 28. warning emission and blocked carry-forward are deterministic: at most
     one `MessageEntry` per warning code, and warnings come only from
     fully completed prior stages;
-29. raw blocked projection v2 is total for arbitrary-size integers and
-    safe type identities (no `str(huge_int)`, no `repr`, no
-    `set_int_max_str_digits`, no user-defined metaclass attributes);
+29. raw blocked projection v3 is total for arbitrary-size exact integers and
+    dispatches only by exact type identity; it executes no scalar-subclass,
+    container-subclass, object, metaclass, descriptor, hash, equality,
+    representation, or runtime type-metadata code;
 30. public quantization cannot erase a strictly-positive geometry value
     or collapse baffle identity; distinct center planes must remain
-    distinct after quantization.
+    distinct after quantization;
+31. `outer_boundary_margin_squared_m2` is non-null for every successful
+    `WINDOW` and `CROSSFLOW_REFERENCE` classification in model, formula,
+    provenance-owning projection, and tests;
+32. all warnings use the sole §13 ordering key, and every local warning
+    table is written in that same order;
+33. raw blocked projection v3 dispatches only by exact type identity,
+    executes no scalar-subclass, container-subclass, object, metaclass,
+    descriptor, hash, equality, representation, or runtime type-metadata code;
+34. recognized enum and dataclass identities come only from static closed
+    code tables; all unsupported objects collapse to a fixed diagnostic token.
 
 ## 22. Explicit non-authorization statement
 
