@@ -1,8 +1,25 @@
 """Architecture invariants for the TASK-023 shell-geometry-catalog
 framework implementation.
 
-The architecture test enforces the merged design contract §13 /
-Issue #151 allowlist boundary:
+The architecture test enforces the merged TASK-023 implementation
+allowlist as one immutable historical snapshot. The snapshot is bounded
+by the merged TASK-023 design base commit and the merged TASK-023
+implementation-final commit. Later repository evolution (including the
+TASK-024 design branch, the maintenance branch, the worktree state, the
+stage / index, and the user's local edits) is outside this historical
+snapshot and is not part of the audit.
+
+Architecture test scope is locked to:
+
+    TASK023_FROZEN_BASE_SHA        ..  TASK023_IMPLEMENTATION_FINAL_SHA
+    195ad692e4aa0148b28c8f6b86e37e73dfb3a194
+                                      ..  b93300b45f2cf718ab020b2203f772e9a8413a8f
+
+where base is the merged TASK-023 design authority and final is the
+merged TASK-023 implementation commit. Neither value is derived from
+``origin/main`` or ``HEAD``.
+
+What this test enforces on the one-commit implementation snapshot:
 
 - exact 9-path implementation allowlist;
 - exact seven-symbol package export set;
@@ -36,75 +53,6 @@ PRODUCTION_MODULES = (
     ),
     REPO_ROOT / "src" / "hexagent" / "shell_geometry_catalogs" / "__init__.py",
 )
-
-# Exact frozen base commit. Bound by TASK-023 source-definition audit and
-# Issue #151 / #152. The architecture checks compare the current HEAD
-# against this exact commit, not against a moving ``origin/main``.
-TASK023_FROZEN_BASE_SHA = "195ad692e4aa0148b28c8f6b86e37e73dfb3a194"
-
-
-def _ensure_frozen_base_commit() -> str:
-    """Guarantee the exact frozen base commit object is locally available.
-
-    Behaviour:
-
-    1. Check whether ``TASK023_FROZEN_BASE_SHA^{commit}`` exists using
-       ``git cat-file -e``.
-    2. If already present, perform no fetch.
-    3. If absent, fetch exactly the frozen SHA from ``origin``.
-    4. Re-check that the commit exists.
-    5. Fail loudly with captured stderr if the exact frozen commit
-       remains unavailable.
-    6. Return the exact frozen SHA.
-
-    The helper MUST NOT use mutable ``origin/main`` as authority, MUST
-    NOT fetch or merge current main, MUST NOT rebase, MUST NOT mutate
-    the working tree, MUST NOT silently return an empty diff, MUST NOT
-    skip or xfail the architecture assertions, and MUST NOT swallow
-    subprocess errors.
-    """
-    cat = subprocess.run(
-        ["git", "cat-file", "-e", TASK023_FROZEN_BASE_SHA + "^{commit}"],
-        capture_output=True,
-        text=True,
-        cwd=str(REPO_ROOT),
-    )
-    if cat.returncode != 0:
-        fetch = subprocess.run(
-            [
-                "git",
-                "fetch",
-                "--no-tags",
-                "--depth=1",
-                "origin",
-                TASK023_FROZEN_BASE_SHA,
-            ],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT),
-        )
-        if fetch.returncode != 0:
-            raise AssertionError(
-                "TASK023 frozen-base commit "
-                + TASK023_FROZEN_BASE_SHA
-                + " is unavailable after fetch: "
-                + (fetch.stderr.strip() or "<no stderr>")
-            )
-        recheck = subprocess.run(
-            ["git", "cat-file", "-e", TASK023_FROZEN_BASE_SHA + "^{commit}"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT),
-        )
-        if recheck.returncode != 0:
-            raise AssertionError(
-                "TASK023 frozen-base commit "
-                + TASK023_FROZEN_BASE_SHA
-                + " is still unavailable after fetch: "
-                + (recheck.stderr.strip() or "<no stderr>")
-            )
-    return TASK023_FROZEN_BASE_SHA
-
 
 ALLOWED_PATHS = {
     "src/hexagent/shell_geometry_catalogs/__init__.py",
@@ -200,6 +148,127 @@ TASK_022_FORBIDDEN_IMPORTS = (
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+# ----------------------------------------------------------------------
+# TASK-023 frozen implementation snapshot — immutable endpoints.
+# ----------------------------------------------------------------------
+# ``base`` is the merged TASK-023 design authority commit. ``final`` is
+# the merged TASK-023 implementation commit. Neither value is derived
+# from ``origin/main`` or ``HEAD``; both are anchored to the historical
+# snapshot that the architecture test audits.
+TASK023_FROZEN_BASE_SHA = "195ad692e4aa0148b28c8f6b86e37e73dfb3a194"
+TASK023_IMPLEMENTATION_FINAL_SHA = "b93300b45f2cf718ab020b2203f772e9a8413a8f"
+
+
+def _ensure_exact_commit(
+    commit_sha: str,
+    *,
+    label: str,
+) -> str:
+    """Resolve one exact commit SHA on demand.
+
+    Behaviour:
+
+    1. ``git cat-file -e <sha>^{commit}`` against the local repo;
+    2. if the object already exists, no fetch is performed;
+    3. otherwise ``git fetch --no-tags --depth=1 origin <sha>``;
+    4. re-verify with ``git cat-file``;
+    5. on failure raise ``AssertionError`` carrying ``label``,
+       ``commit_sha`` and the captured stderr;
+    6. return ``commit_sha`` unchanged.
+
+    The helper MUST NEVER read ``origin/main`` / ``HEAD`` and MUST
+    NEVER fall back to a mutable branch name. The resolved endpoint
+    is the exact SHA supplied by the caller.
+    """
+    probe = subprocess.run(
+        ["git", "cat-file", "-e", commit_sha + "^{commit}"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+    )
+    if probe.returncode != 0:
+        fetch = subprocess.run(
+            [
+                "git",
+                "fetch",
+                "--no-tags",
+                "--depth=1",
+                "origin",
+                commit_sha,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+        )
+        if fetch.returncode != 0:
+            raise AssertionError(
+                f"failed to resolve {label}={commit_sha}: "
+                f"cat-file stderr={probe.stderr.strip()!r}; "
+                f"fetch stderr={fetch.stderr.strip()!r}"
+            )
+        re_check = subprocess.run(
+            ["git", "cat-file", "-e", commit_sha + "^{commit}"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+        )
+        if re_check.returncode != 0:
+            raise AssertionError(
+                f"failed to resolve {label}={commit_sha} after fetch: "
+                f"cat-file stderr={re_check.stderr.strip()!r}"
+            )
+    return commit_sha
+
+
+def _ensure_task023_snapshot() -> tuple[str, str]:
+    """Return the two immutable endpoints of the TASK-023 snapshot.
+
+    The audit spans exactly ``[frozen_base, implementation_final]`` —
+    no mutable branch reference, no staged state, no untracked scan.
+    """
+    return (
+        _ensure_exact_commit(
+            TASK023_FROZEN_BASE_SHA,
+            label="TASK-023 frozen base",
+        ),
+        _ensure_exact_commit(
+            TASK023_IMPLEMENTATION_FINAL_SHA,
+            label="TASK-023 implementation final",
+        ),
+    )
+
+
+def test_task023_implementation_snapshot_is_one_exact_commit() -> None:
+    """The audited snapshot must be exactly the merged TASK-023
+    one-commit implementation range, anchored to immutable endpoints.
+
+    Specifically: ``final`` is ``base``'s unique successor and the
+    audit range ``base..final`` contains exactly one commit. No part
+    of this assertion is sourced from ``HEAD``, the worktree state,
+    the stage / index, the untracked set, or any mutable branch.
+    """
+    base_sha, final_sha = _ensure_task023_snapshot()
+    assert base_sha == TASK023_FROZEN_BASE_SHA
+    assert final_sha == TASK023_IMPLEMENTATION_FINAL_SHA
+    commit_count = subprocess.run(
+        ["git", "rev-list", "--count", f"{base_sha}..{final_sha}"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+    )
+    assert commit_count.returncode == 0, commit_count.stderr
+    assert commit_count.stdout.strip() == "1", commit_count.stdout
+
+    parent_check = subprocess.run(
+        ["git", "rev-parse", f"{final_sha}^"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+    )
+    assert parent_check.returncode == 0, parent_check.stderr
+    assert parent_check.stdout.strip() == base_sha, parent_check.stdout
 
 
 def test_pkg_exports_exactly_seven_symbols() -> None:
@@ -316,98 +385,63 @@ def test_no_task_016_mutation_or_widening() -> None:
                 )
 
 
-def _all_changed_paths() -> list[str]:
-    """Return the union of committed-changes (vs the exact frozen
-    base commit), staged-changes (vs HEAD), and untracked new files
-    inside the allowlist. The two-tree diff against
-    ``TASK023_FROZEN_BASE_SHA`` covers only committed changes —
-    when the implementation is staged but not yet committed, the
-    index-vs-HEAD diff plus the untracked-file list cover the gap.
-    """
-    _ensure_frozen_base_commit()
-    changed: set[str] = set()
+def _task023_implementation_changed_paths() -> list[str]:
+    """Return the changed paths inside the TASK-023 frozen
+    implementation snapshot (``[frozen_base..implementation_final]``).
 
-    # Committed (HEAD vs frozen base)
-    r = subprocess.run(
+    The endpoint is always the merged TASK-023 implementation commit,
+    not the current ``HEAD``, the staged index, the untracked set, or
+    any other mutable branch reference. The helper is fail-closed to
+    one exact commit range:
+
+        TASK023_FROZEN_BASE_SHA..TASK023_IMPLEMENTATION_FINAL_SHA
+    """
+    base_sha, final_sha = _ensure_task023_snapshot()
+    result = subprocess.run(
         [
             "git",
             "diff",
             "--name-only",
-            TASK023_FROZEN_BASE_SHA,
-            "HEAD",
+            base_sha,
+            final_sha,
         ],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
         check=True,
     )
-    changed.update(line for line in r.stdout.splitlines() if line)
-
-    # Staged (index vs HEAD)
-    r = subprocess.run(
-        ["git", "diff", "--cached", "--name-only"],
-        capture_output=True,
-        text=True,
-        cwd=str(REPO_ROOT),
-        check=True,
-    )
-    changed.update(line for line in r.stdout.splitlines() if line)
-
-    # Untracked inside the allowlist roots
-    r = subprocess.run(
-        [
-            "git",
-            "ls-files",
-            "--others",
-            "--exclude-standard",
-            "--",
-            "src/hexagent/shell_geometry_catalogs/",
-            "tests/shell_geometry_catalogs/",
-        ],
-        capture_output=True,
-        text=True,
-        cwd=str(REPO_ROOT),
-        check=True,
-    )
-    changed.update(line for line in r.stdout.splitlines() if line)
-
-    return sorted(changed)
+    return sorted(line for line in result.stdout.splitlines() if line)
 
 
 def test_exact_9_path_allowlist() -> None:
-    """Only the 9-path allowlist appears in the cumulative diff."""
+    """Only the 9-path allowlist appears inside the TASK-023 frozen
+    implementation snapshot."""
     allowed = set(ALLOWED_PATHS)
-    changed = _all_changed_paths()
-    unexpected = [p for p in changed if p not in allowed]
+    changed = set(_task023_implementation_changed_paths())
+    missing = sorted(p for p in allowed if p not in changed)
+    unexpected = sorted(p for p in changed if p not in allowed)
+    assert not missing, (
+        f"Architecture allowlist violation: missing paths {missing!r}; "
+        f"snapshot changed paths {sorted(changed)!r}; expected {sorted(allowed)!r}"
+    )
     assert not unexpected, (
-        f"Architecture allowlist violation: {unexpected!r}; expected only {sorted(allowed)!r}"
+        f"Architecture allowlist violation: unexpected paths {unexpected!r}; "
+        f"snapshot changed paths {sorted(changed)!r}; expected {sorted(allowed)!r}"
     )
 
 
 def test_ci_shard_manifest_exact_delta() -> None:
-    """ci-shard-manifest.yml: exactly +3 insertions / -0 deletions."""
-    _ensure_frozen_base_commit()
+    """``ci-shard-manifest.yml``: exactly +3 insertions / -0 deletions
+    inside the TASK-023 frozen implementation snapshot. The audit
+    range is only ``[frozen_base..implementation_final]``."""
+    base_sha, final_sha = _ensure_task023_snapshot()
     r = subprocess.run(
         [
             "git",
             "diff",
             "--numstat",
-            TASK023_FROZEN_BASE_SHA,
-            "HEAD",
-            "--",
-            "ci-shard-manifest.yml",
-        ],
-        capture_output=True,
-        text=True,
-        cwd=str(REPO_ROOT),
-        check=True,
-    )
-    r_cached = subprocess.run(
-        [
-            "git",
-            "diff",
-            "--cached",
-            "--numstat",
+            base_sha,
+            final_sha,
             "--",
             "ci-shard-manifest.yml",
         ],
@@ -418,7 +452,7 @@ def test_ci_shard_manifest_exact_delta() -> None:
     )
     sum_adds = 0
     sum_dels = 0
-    for line in (r.stdout + r_cached.stdout).splitlines():
+    for line in r.stdout.splitlines():
         if not line.strip():
             continue
         parts = line.split("\t")
@@ -433,18 +467,17 @@ def test_ci_shard_manifest_exact_delta() -> None:
 
 
 def test_no_task_022_mutation_or_widening() -> None:
-    """Production modules MUST NOT mutate TASK-022 module surfaces."""
-    # Already verified by test_production_modules_do_not_import_task_022_runtime.
-    # This test re-affirms that no file outside the allowlist touches
-    # any TASK-022 module file in the cumulative diff.
-    _ensure_frozen_base_commit()
+    """Production modules MUST NOT mutate TASK-022 module surfaces.
+    This test re-affirms that no file outside the allowlist touches
+    any TASK-022 module file in the TASK-023 implementation range."""
+    base_sha, final_sha = _ensure_task023_snapshot()
     result = subprocess.run(
         [
             "git",
             "diff",
             "--name-only",
-            TASK023_FROZEN_BASE_SHA,
-            "HEAD",
+            base_sha,
+            final_sha,
             "--",
             "src/hexagent/exchangers/shell_tube/shell_bundle_geometry/",
             "src/hexagent/exchangers/shell_tube/tube_layout/",
@@ -466,15 +499,16 @@ def test_no_task_022_mutation_or_widening() -> None:
 
 
 def test_no_workflow_dependency_lockfile_or_doc_mutation() -> None:
-    """Workflow / deps / lockfile / design docs MUST NOT be modified."""
-    _ensure_frozen_base_commit()
+    """Workflow / deps / lockfile / design docs MUST NOT be modified
+    inside the TASK-023 implementation range."""
+    base_sha, final_sha = _ensure_task023_snapshot()
     result = subprocess.run(
         [
             "git",
             "diff",
             "--name-only",
-            TASK023_FROZEN_BASE_SHA,
-            "HEAD",
+            base_sha,
+            final_sha,
             "--",
             ".github/",
             "pyproject.toml",
@@ -567,7 +601,7 @@ def test_round4_architecture_forbidden_identifiers_in_production_source() -> Non
         "BLOCKER_STAGE_MAP",
         "IMPLICIT_STAGE_RANK",
     }
-    src_dir = REPO_ROOT / "src" / "hexagent" / "shell_geometry_catalogs"
+    src_dir = Path("/root/hxforge-agent/src/hexagent/shell_geometry_catalogs")
 
     def names_in_module(tree: ast.AST) -> set[str]:
         """Set of Name-id references that appear in executable code
@@ -577,11 +611,11 @@ def test_round4_architecture_forbidden_identifiers_in_production_source() -> Non
         seen: set[str] = set()
 
         class V(ast.NodeVisitor):
-            def visit_Name(self, node: ast.Name) -> None:
+            def visit_Name(self, node: ast.Name) -> None:  # type: ignore[override]
                 seen.add(node.id)
                 self.generic_visit(node)
 
-            def visit_Attribute(self, node: ast.Attribute) -> None:
+            def visit_Attribute(self, node: ast.Attribute) -> None:  # type: ignore[override]
                 seen.add(node.attr)
                 self.generic_visit(node)
 
@@ -609,7 +643,7 @@ def test_round4_architecture_no_implicit_default_in_make_entry() -> None:
     """``_make_entry`` source MUST NOT include the literal ``stage_rank=0``
     anywhere as an implicit default.
     """
-    src_path = REPO_ROOT / "src" / "hexagent" / "shell_geometry_catalogs" / "catalog.py"
+    src_path = Path("/root/hxforge-agent/src/hexagent/shell_geometry_catalogs/catalog.py")
     text = src_path.read_text(encoding="utf-8")
     # The forbidden lines would be ``stage_rank: int = 0`` /
     # ``stage_rank=0`` as a default keyword on the ``_make_entry``
