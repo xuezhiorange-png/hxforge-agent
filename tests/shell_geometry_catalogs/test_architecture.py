@@ -601,7 +601,7 @@ def test_round4_architecture_forbidden_identifiers_in_production_source() -> Non
         "BLOCKER_STAGE_MAP",
         "IMPLICIT_STAGE_RANK",
     }
-    src_dir = Path("/root/hxforge-agent/src/hexagent/shell_geometry_catalogs")
+    src_dir = REPO_ROOT / "src" / "hexagent" / "shell_geometry_catalogs"
 
     def names_in_module(tree: ast.AST) -> set[str]:
         """Set of Name-id references that appear in executable code
@@ -611,11 +611,11 @@ def test_round4_architecture_forbidden_identifiers_in_production_source() -> Non
         seen: set[str] = set()
 
         class V(ast.NodeVisitor):
-            def visit_Name(self, node: ast.Name) -> None:  # type: ignore[override]
+            def visit_Name(self, node: ast.Name) -> None:
                 seen.add(node.id)
                 self.generic_visit(node)
 
-            def visit_Attribute(self, node: ast.Attribute) -> None:  # type: ignore[override]
+            def visit_Attribute(self, node: ast.Attribute) -> None:
                 seen.add(node.attr)
                 self.generic_visit(node)
 
@@ -643,7 +643,7 @@ def test_round4_architecture_no_implicit_default_in_make_entry() -> None:
     """``_make_entry`` source MUST NOT include the literal ``stage_rank=0``
     anywhere as an implicit default.
     """
-    src_path = Path("/root/hxforge-agent/src/hexagent/shell_geometry_catalogs/catalog.py")
+    src_path = REPO_ROOT / "src" / "hexagent" / "shell_geometry_catalogs" / "catalog.py"
     text = src_path.read_text(encoding="utf-8")
     # The forbidden lines would be ``stage_rank: int = 0`` /
     # ``stage_rank=0`` as a default keyword on the ``_make_entry``
