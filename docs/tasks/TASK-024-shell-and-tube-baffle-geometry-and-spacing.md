@@ -722,6 +722,816 @@ UNSUPPORTED_OBJECT_STATE_INSPECTION=FORBIDDEN
 UNSUPPORTED_OBJECTS_MAY_SHARE_DIAGNOSTIC_IDENTITY=YES
 ```
 
+##### 7.6.2.1 Static table authority and closure
+
+The static recognized-type tables are **closed**. Any addition, removal,
+or order change is a separate design amendment.
+
+```text
+STATIC_RECOGNIZED_ENUM_TABLE=CLOSED
+STATIC_RECOGNIZED_DATACLASS_TABLE=CLOSED
+ENUM_TYPE_TOKEN_FORMAT=<owning-task-lowercase>:<literal-public-type-name>
+DATACLASS_TYPE_TOKEN_FORMAT=<owning-task-lowercase>:<literal-public-type-name>
+ENUM_MEMBER_TOKEN_SOURCE=EXACT_PUBLIC_ENUM_VALUE_LITERAL
+STATIC_ENUM_TABLE_ORDER=OWNING_TASK_ASCENDING_THEN_ENUM_TYPE_TOKEN_ASCENDING
+STATIC_DATACLASS_TABLE_ORDER=OWNING_TASK_ASCENDING_THEN_DATACLASS_TYPE_TOKEN_ASCENDING
+STATIC_RECOGNIZED_TYPE_TABLE_ADDITION=DESIGN_AMENDMENT_REQUIRED
+STATIC_RECOGNIZED_TYPE_TABLE_REMOVAL=DESIGN_AMENDMENT_REQUIRED
+STATIC_RECOGNIZED_TYPE_TABLE_OMISSION=FORBIDDEN
+RUNTIME_RECOGNIZED_TYPE_DISCOVERY=FORBIDDEN
+```
+
+Every `member_token` is the exact public enum value literal captured at
+table-authoring time. They are **not** generated from `member.name`,
+`str(member)`, `repr(member)`, the qualified name, the module path, or any
+other runtime metadata. Static type lookup remains only
+`value_type is entry.type_object`. Static enum member lookup remains only
+`value is member_entry.member_object`. Field iteration on a recognized
+dataclass is only `object.__getattribute__(value, literal_field_name)` from
+the literal field-name tuple.
+
+Static recognized tables are reachable from one of these three exact roots
+or are themselves TASK-024 §8 / §13 public models:
+
+```text
+TASK-020 root: ShellAndTubeConfiguration
+TASK-021 root: TubeLayout
+TASK-022 root: ShellBundleGeometry
+TASK-024 public dataclasses are bound unconditionally.
+```
+
+These tables must be reached from the successful result of those roots.
+Module `__all__` membership does not auto-include a type. The table
+excludes every type that is not reachable from a successful root, and
+explicitly (without limitation) excludes:
+
+```text
+ShellAndTubeConfigurationRequest
+ConfigurationValidationResult
+RequestedRulePackIdentity
+LoadedRulePackView
+RulePackValidationReport
+TubeLayoutRequest
+TubeLayoutValidationResult
+LatticeIndex
+UTubePair
+UTubePairingPlan
+ProvenancePreHashProjection
+ShellBundleGeometryRequest
+ShellBundleGeometryValidationResult
+every upstream BlockerCode
+every upstream WarningCode
+every upstream ValidationStatus
+```
+
+The TASK-024 `ValidationStatus` enum is included because it is a field
+type of the TASK-024 public `BaffleGeometryValidationResult`, not the
+upstream enum by the same name.
+
+##### 7.6.2.2 Exact recognized enum projection table
+
+Every entry below is binding. Each entry must contain the exact enum
+type object, the literal ASCII `enum_type_token`, and ordered exact
+member-object identities paired with literal ASCII `member_token`
+values. There are exactly 17 bound enum types.
+
+```text
+"task020:AuthorityMode"
+python_type = hexagent.exchangers.shell_tube.models.AuthorityMode
+INTERNAL_GENERIC -> "INTERNAL_GENERIC"
+APPROVED_RULE_PACK -> "APPROVED_RULE_PACK"
+```
+
+```text
+"task020:CaseRevisionStatus"
+python_type = hexagent.exchangers.shell_tube.models.CaseRevisionStatus
+COMMITTED -> "committed"
+SUPERSEDED -> "superseded"
+ARCHIVED -> "archived"
+```
+
+```text
+"task020:ConstructionFamily"
+python_type = hexagent.exchangers.shell_tube.models.ConstructionFamily
+FIXED_TUBESHEET -> "FIXED_TUBESHEET"
+U_TUBE -> "U_TUBE"
+FLOATING_HEAD -> "FLOATING_HEAD"
+```
+
+```text
+"task020:EquipmentFamily"
+python_type = hexagent.exchangers.shell_tube.models.EquipmentFamily
+SHELL_AND_TUBE -> "SHELL_AND_TUBE"
+```
+
+```text
+"task020:Orientation"
+python_type = hexagent.exchangers.shell_tube.models.Orientation
+HORIZONTAL -> "HORIZONTAL"
+VERTICAL -> "VERTICAL"
+UNSPECIFIED -> "UNSPECIFIED"
+```
+
+```text
+"task020:StandardClaimStatus"
+python_type = hexagent.exchangers.shell_tube.models.StandardClaimStatus
+NO_STANDARD_CLAIM -> "NO_STANDARD_CLAIM"
+RULE_PACK_VALIDATED -> "RULE_PACK_VALIDATED"
+```
+
+```text
+"task021:AuthorityMode"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.AuthorityMode
+INTERNAL_GENERIC -> "INTERNAL_GENERIC"
+APPROVED_RULE_PACK -> "APPROVED_RULE_PACK"
+```
+
+```text
+"task021:AxisOrientation"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.AxisOrientation
+PRIMARY_AXIS_X -> "PRIMARY_AXIS_X"
+PRIMARY_AXIS_Y -> "PRIMARY_AXIS_Y"
+```
+
+```text
+"task021:ExclusionZoneType"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.ExclusionZoneType
+AXIS_ALIGNED_RECTANGLE -> "AXIS_ALIGNED_RECTANGLE"
+CIRCLE -> "CIRCLE"
+```
+
+```text
+"task021:OriginMode"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.OriginMode
+CENTER_ON_LATTICE_POINT -> "CENTER_ON_LATTICE_POINT"
+CENTER_ON_PRIMITIVE_CELL -> "CENTER_ON_PRIMITIVE_CELL"
+```
+
+```text
+"task021:PatternFamily"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.PatternFamily
+SQUARE -> "SQUARE"
+TRIANGULAR -> "TRIANGULAR"
+```
+
+```text
+"task022:RuleAuthorityMode"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.RuleAuthorityMode
+INTERNAL_GENERIC -> "INTERNAL_GENERIC"
+APPROVED_RULE_PACK -> "APPROVED_RULE_PACK"
+```
+
+```text
+"task022:ShellInsideDiameterAuthorityMode"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.ShellInsideDiameterAuthorityMode
+CALLER_SUPPLIED_EXPLICIT -> "CALLER_SUPPLIED_EXPLICIT"
+APPROVED_CATALOG_SNAPSHOT -> "APPROVED_CATALOG_SNAPSHOT"
+```
+
+```text
+"task024:BaffleOrientation"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.BaffleOrientation
+TOP -> "TOP"
+BOTTOM -> "BOTTOM"
+LEFT -> "LEFT"
+RIGHT -> "RIGHT"
+```
+
+```text
+"task024:BaffleType"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.BaffleType
+SINGLE_SEGMENTAL -> "SINGLE_SEGMENTAL"
+```
+
+```text
+"task024:TubeRegionClassification"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.TubeRegionClassification
+WINDOW -> "WINDOW"
+CROSSFLOW_REFERENCE -> "CROSSFLOW_REFERENCE"
+```
+
+```text
+"task024:ValidationStatus"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.ValidationStatus
+VALID -> "VALID"
+BLOCKED -> "BLOCKED"
+```
+
+The closed counts and architecture-test invariants are:
+
+```text
+STATIC_RECOGNIZED_ENUM_TYPE_COUNT=17
+STATIC_RECOGNIZED_ENUM_ENTRY_TYPE_TOKEN_UNIQUE=REQUIRED
+STATIC_RECOGNIZED_ENUM_ENTRY_TYPE_OBJECT_UNIQUE=REQUIRED
+STATIC_RECOGNIZED_ENUM_ENTRY_MEMBER_OBJECT_UNIQUE=REQUIRED
+STATIC_RECOGNIZED_ENUM_ENTRY_MEMBER_TOKEN_UNIQUE=REQUIRED
+STATIC_RECOGNIZED_ENUM_MEMBER_SET_EQUALS_BOUND_SOURCE=REQUIRED
+```
+
+##### 7.6.2.3 Exact recognized dataclass projection table
+
+Every entry below is binding. Each entry contains the exact class
+object, the literal ASCII `dataclass_type_token`, and an exact ordered
+literal field-name tuple. There are exactly 34 bound dataclass types.
+
+```text
+"task020:CaseRevisionAuthority"
+python_type = hexagent.exchangers.shell_tube.models.CaseRevisionAuthority
+("revision_id",
+ "payload_hash",
+ "domain_snapshot_hash",
+ "revision_status",
+)
+```
+
+```text
+"task020:ComponentTokens"
+python_type = hexagent.exchangers.shell_tube.models.ComponentTokens
+("front_head",
+ "shell",
+ "rear_head",
+)
+```
+
+```text
+"task020:ConfigurationAuthorityBinding"
+python_type = hexagent.exchangers.shell_tube.models.ConfigurationAuthorityBinding
+("authority_mode",
+ "standard_system_id",
+ "case_authority",
+ "evaluated_rule_pack_authority",
+ "case_authority_evidence_refs",
+)
+```
+
+```text
+"task020:ErrorEntry"
+python_type = hexagent.exchangers.shell_tube.models.ErrorEntry
+("code",
+ "field_path",
+ "message_key",
+ "evidence_refs",
+ "details",
+)
+```
+
+```text
+"task020:EvaluatedRulePackAuthority"
+python_type = hexagent.exchangers.shell_tube.models.EvaluatedRulePackAuthority
+("rule_pack_id",
+ "rule_pack_version",
+ "rule_pack_canonical_hash",
+ "validation_status",
+ "selected_rule_authorities",
+)
+```
+
+```text
+"task020:SelectedRuleAuthority"
+python_type = hexagent.exchangers.shell_tube.models.SelectedRuleAuthority
+("rule_id",
+ "rule_version",
+ "rule_artifact_canonical_hash",
+ "source_class",
+ "license_evidence",
+ "approval_status",
+ "provenance_edge_ids",
+ "evidence_refs",
+)
+```
+
+```text
+"task020:ShellAndTubeConfiguration"
+python_type = hexagent.exchangers.shell_tube.models.ShellAndTubeConfiguration
+("schema_version",
+ "configuration_id",
+ "configuration_hash",
+ "equipment_family",
+ "authority_mode",
+ "standard_claim_status",
+ "construction_family",
+ "orientation",
+ "shell_pass_count",
+ "tube_pass_count",
+ "component_tokens",
+ "authority_binding",
+ "case_authority",
+ "warnings",
+ "blockers",
+ "deferred_capabilities",
+)
+```
+
+```text
+"task021:ApprovedTubeGeometrySnapshot"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.ApprovedTubeGeometrySnapshot
+("geometry_id",
+ "geometry_type",
+ "revision",
+ "approval_state",
+ "outer_diameter_m",
+ "inner_diameter_m",
+ "wall_thickness_m",
+ "record_hash",
+ "snapshot_hash",
+ "source_binding",
+)
+```
+
+```text
+"task021:CircularTubeCenterEnvelope"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.CircularTubeCenterEnvelope
+("schema_version",
+ "tube_center_envelope_diameter_m",
+ "evidence_refs",
+)
+```
+
+```text
+"task021:ExclusionAudit"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.ExclusionAudit
+("zone_id",
+ "rejected_position_count",
+ "reason_code",
+ "evidence_refs",
+)
+```
+
+```text
+"task021:ExclusionZone"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.ExclusionZone
+("zone_id",
+ "zone_type",
+ "center_x_m",
+ "center_y_m",
+ "clearance_m",
+ "reason_code",
+ "evidence_refs",
+ "width_m",
+ "height_m",
+ "radius_m",
+)
+```
+
+```text
+"task021:LayoutRuleAuthoritySnapshot"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.LayoutRuleAuthoritySnapshot
+("profile_id",
+ "authority_mode",
+ "rule_id",
+ "rule_version",
+ "rule_artifact_canonical_hash",
+ "source_class",
+ "license_evidence",
+ "approval_status",
+ "provenance_edge_ids",
+ "evidence_refs",
+ "rule_pack_identity",
+ "pattern_family",
+ "pitch_m",
+ "edge_clearance_m",
+ "allowed_origin_modes",
+ "allowed_axis_orientations",
+ "allowed_exclusion_zone_types",
+ "maximum_candidate_positions",
+ "snapshot_hash",
+)
+```
+
+```text
+"task021:MessageEntry"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.MessageEntry
+("code",
+ "field_path",
+ "message_key",
+ "evidence_refs",
+ "details",
+)
+```
+
+```text
+"task021:RulePackIdentitySnapshot"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.RulePackIdentitySnapshot
+("rule_pack_id",
+ "rule_pack_version",
+ "rule_pack_canonical_hash",
+)
+```
+
+```text
+"task021:SourceBindingSnapshot"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.SourceBindingSnapshot
+("source_id",
+ "source_type",
+ "source_revision",
+ "source_location",
+ "evidence_ref",
+ "approved_by",
+ "approved_at",
+)
+```
+
+```text
+"task021:TubeLayout"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.TubeLayout
+("schema_version",
+ "layout_id",
+ "layout_hash",
+ "request_hash",
+ "task020_configuration_id",
+ "task020_configuration_hash",
+ "case_authority",
+ "construction_family",
+ "equipment_orientation",
+ "shell_pass_count",
+ "tube_pass_count",
+ "tube_geometry",
+ "layout_rule_authority",
+ "placement_envelope",
+ "origin_mode",
+ "axis_orientation",
+ "exclusion_zones",
+ "positions",
+ "tube_hole_count",
+ "physical_tube_count",
+ "boundary_rejection_count",
+ "exclusion_rejection_count",
+ "exclusion_audit",
+ "warnings",
+ "blockers",
+ "deferred_capabilities",
+ "provenance",
+)
+```
+
+```text
+"task021:TubePosition"
+python_type = hexagent.exchangers.shell_tube.tube_layout.models.TubePosition
+("position_id",
+ "u",
+ "v",
+ "x_m",
+ "y_m",
+)
+```
+
+```text
+"task022:ApprovedShellGeometrySnapshot"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.ApprovedShellGeometrySnapshot
+("schema_version",
+ "geometry_id",
+ "geometry_type",
+ "revision",
+ "approval_state",
+ "shell_inside_diameter_m",
+ "record_hash",
+ "source_binding",
+ "snapshot_hash",
+)
+```
+
+```text
+"task022:CallerSuppliedShellInsideDiameter"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.CallerSuppliedShellInsideDiameter
+("schema_version",
+ "shell_inside_diameter_m",
+ "evidence_refs",
+ "authority_hash",
+)
+```
+
+```text
+"task022:MessageEntry"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.MessageEntry
+("code",
+ "field_path",
+ "message_key",
+ "evidence_refs",
+ "details",
+)
+```
+
+```text
+"task022:RulePackIdentitySnapshot"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.RulePackIdentitySnapshot
+("rule_pack_id",
+ "rule_pack_version",
+ "rule_pack_canonical_hash",
+)
+```
+
+```text
+"task022:ShellBundleGeometry"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.ShellBundleGeometry
+("schema_version",
+ "geometry_id",
+ "geometry_hash",
+ "request_hash",
+ "task020_configuration_id",
+ "task020_configuration_hash",
+ "task021_layout_id",
+ "task021_layout_hash",
+ "construction_family",
+ "equipment_orientation",
+ "shell_pass_count",
+ "tube_pass_count",
+ "tube_geometry_snapshot_hash",
+ "geometry_rule_authority",
+ "shell_authority_mode",
+ "caller_supplied_shell",
+ "approved_shell_geometry",
+ "shell_inside_diameter_m",
+ "shell_radius_m",
+ "bare_tube_bundle_radius_m",
+ "bare_tube_bundle_diameter_m",
+ "bundle_peripheral_allowance_m",
+ "bundle_outer_envelope_radius_m",
+ "bundle_outer_envelope_diameter_m",
+ "shell_to_bundle_radial_clearance_m",
+ "shell_to_bundle_diametral_clearance_m",
+ "required_minimum_radial_clearance_m",
+ "radial_clearance_margin_m",
+ "limiting_position_ids",
+ "position_count",
+ "warnings",
+ "blockers",
+ "deferred_capabilities",
+ "provenance",
+)
+```
+
+```text
+"task022:ShellBundleGeometryRuleAuthoritySnapshot"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.ShellBundleGeometryRuleAuthoritySnapshot
+("schema_version",
+ "profile_id",
+ "authority_mode",
+ "rule_id",
+ "rule_version",
+ "rule_artifact_canonical_hash",
+ "source_class",
+ "license_evidence",
+ "approval_status",
+ "provenance_edge_ids",
+ "evidence_refs",
+ "rule_pack_identity",
+ "allowed_shell_authority_modes",
+ "minimum_bundle_peripheral_allowance_m",
+ "minimum_radial_clearance_m",
+ "maximum_position_count",
+ "snapshot_hash",
+)
+```
+
+```text
+"task022:SourceBindingSnapshot"
+python_type = hexagent.exchangers.shell_tube.shell_bundle_geometry.models.SourceBindingSnapshot
+("source_id",
+ "source_type",
+ "source_revision",
+ "source_location",
+ "evidence_ref",
+ "approved_by",
+ "approved_at",
+)
+```
+
+```text
+"task024:BaffleGeometry"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.BaffleGeometry
+("schema_version",
+ "geometry_id",
+ "geometry_hash",
+ "request_hash",
+ "task020_configuration_id",
+ "task020_configuration_hash",
+ "task021_layout_id",
+ "task021_layout_hash",
+ "task022_geometry_id",
+ "task022_geometry_hash",
+ "construction_family",
+ "equipment_orientation",
+ "shell_pass_count",
+ "tube_pass_count",
+ "shell_inside_diameter_m",
+ "tube_outer_diameter_m",
+ "axial_span",
+ "design_authority",
+ "usable_baffle_span_m",
+ "baffle_diameter_m",
+ "baffle_radius_m",
+ "baffle_hole_diameter_m",
+ "baffle_hole_radius_m",
+ "cut_height_m",
+ "chord_offset_from_center_m",
+ "baffle_planes",
+ "position_count",
+ "warnings",
+ "blockers",
+ "deferred_capabilities",
+ "provenance",
+)
+```
+
+```text
+"task024:BaffleGeometryRequest"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.BaffleGeometryRequest
+("schema_version",
+ "configuration",
+ "tube_layout",
+ "shell_bundle_geometry",
+ "axial_span",
+ "design_authority",
+ "evidence_refs",
+)
+```
+
+```text
+"task024:BaffleGeometryValidationResult"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.BaffleGeometryValidationResult
+("status",
+ "geometry",
+ "warnings",
+ "blockers",
+ "deferred_capabilities",
+ "blocked_result_hash",
+)
+```
+
+```text
+"task024:BafflePlaneGeometry"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.BafflePlaneGeometry
+("baffle_index",
+ "center_coordinate_m",
+ "occupied_start_coordinate_m",
+ "occupied_end_coordinate_m",
+ "orientation",
+ "cut_chord",
+ "window_region_semantics",
+ "baffle_covered_region_semantics",
+ "crossflow_reference_region_semantics",
+ "tube_hole_classifications",
+ "window_position_ids",
+ "crossflow_reference_position_ids",
+ "outer_tangent_position_ids",
+ "pairwise_tangent_position_pairs",
+ "classification_audit_hash",
+)
+```
+
+```text
+"task024:CallerSuppliedBaffleAxialSpan"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.CallerSuppliedBaffleAxialSpan
+("schema_version",
+ "axial_start_coordinate_m",
+ "axial_end_coordinate_m",
+ "evidence_refs",
+ "authority_hash",
+)
+```
+
+```text
+"task024:CallerSuppliedBaffleDesignAuthority"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.CallerSuppliedBaffleDesignAuthority
+("schema_version",
+ "baffle_type",
+ "baffle_count",
+ "baffle_thickness_m",
+ "spacing_sequence_m",
+ "baffle_cut_fraction",
+ "orientation_sequence",
+ "shell_to_baffle_diametral_clearance_m",
+ "tube_to_baffle_hole_diametral_clearance_m",
+ "evidence_refs",
+ "authority_hash",
+)
+```
+
+```text
+"task024:CutChordGeometry"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.CutChordGeometry
+("normal_x",
+ "normal_y",
+ "half_plane_offset_m",
+ "chord_half_length_m",
+ "endpoint_a_x_m",
+ "endpoint_a_y_m",
+ "endpoint_b_x_m",
+ "endpoint_b_y_m",
+)
+```
+
+```text
+"task024:MessageEntry"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.MessageEntry
+("code",
+ "field_path",
+ "message_key",
+ "evidence_refs",
+ "details",
+)
+```
+
+```text
+"task024:PhysicalTubeDiskAudit"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.PhysicalTubeDiskAudit
+("physical_tube_radius_m",
+ "signed_window_distance_m",
+ "cut_boundary_margin_m",
+ "classification",
+)
+```
+
+```text
+"task024:TubeHoleClassification"
+python_type = hexagent.exchangers.shell_tube.baffle_geometry.models.TubeHoleClassification
+("position_id",
+ "center_x_m",
+ "center_y_m",
+ "physical_tube_radius_m",
+ "baffle_hole_radius_m",
+ "signed_window_distance_m",
+ "cut_boundary_margin_m",
+ "classification",
+ "outer_boundary_margin_squared_m2",
+ "physical_tube_disk_audit",
+)
+```
+
+The closed count and architecture-test invariants are:
+
+```text
+STATIC_RECOGNIZED_DATACLASS_TYPE_COUNT=34
+STATIC_RECOGNIZED_DATACLASS_TYPE_TOKEN_GLOBAL_UNIQUE=REQUIRED
+STATIC_RECOGNIZED_DATACLASS_CLASS_OBJECT_GLOBAL_UNIQUE=REQUIRED
+STATIC_RECOGNIZED_DATACLASS_FIELD_TUPLE_NON_EMPTY=REQUIRED
+STATIC_RECOGNIZED_DATACLASS_FIELD_NAME_LITERAL_ASCII=REQUIRED
+STATIC_RECOGNIZED_DATACLASS_FIELD_NAME_WITHIN_TUPLE_UNIQUE=REQUIRED
+STATIC_RECOGNIZED_DATACLASS_TUPLE_EQUALS_BOUND_SOURCE_DECLARATION_ORDER=REQUIRED
+```
+
+The recognized dataclass output is exactly:
+
+```text
+{
+  "raw_type":"dataclass",
+  "dataclass_type_token":<literal static ASCII string>,
+  "fields":[
+    {"name":<literal static field name>,
+     "value":raw_value_projection(field value)}
+  ]
+}
+```
+
+Fields are read in the exact literal-tuple order on disk. The
+calculation path **never** discovers fields via `dataclasses.fields()`,
+`object.__dict__`, the runtime class metadata, or any other dynamic
+mechanism. A future architecture test is permitted to read-only compare
+`tuple(field.name for field in dataclasses.fields(bound_type))` to
+`entry.literal_field_names`, but the production code path uses only
+the literal table.
+
+##### 7.6.2.4 Exclusions, evolution, and implementation invariants
+
+```text
+ONLY_LISTED_ENUM_TYPES_ARE_RECOGNIZED=YES
+ONLY_LISTED_DATACLASS_TYPES_ARE_RECOGNIZED=YES
+UNLISTED_ENUM=UNSUPPORTED_OBJECT
+UNLISTED_DATACLASS=UNSUPPORTED_OBJECT
+UPSTREAM_REQUEST_OR_VALIDATION_RESULT_TYPE_AUTO_RECOGNITION=FORBIDDEN
+PUBLIC_MODULE_ALL_EXPORT_AUTO_RECOGNITION=FORBIDDEN
+```
+
+Distinct exact Python type objects that share a public name across
+tasks remain distinct projection identities:
+
+```text
+task020:AuthorityMode        != task021:AuthorityMode
+task021:SourceBindingSnapshot != task022:SourceBindingSnapshot
+task021:RulePackIdentitySnapshot != task022:RulePackIdentitySnapshot
+task021:MessageEntry         != task022:MessageEntry
+task022:MessageEntry         != task024:MessageEntry
+task021:MessageEntry         != task024:MessageEntry
+```
+
+No alias or compatibility projection bridges these types.
+
+```text
+STATIC_ENUM_ENTRY_OUTPUT_USES_LITERAL_TOKENS_ONLY=REQUIRED
+STATIC_DATACLASS_ENTRY_OUTPUT_USES_LITERAL_TOKENS_AND_FIELDS_ONLY=REQUIRED
+STATIC_TABLE_LOOKUP_USES_IDENTITY_COMPARISON_ONLY=REQUIRED
+STATIC_TABLE_LOOKUP_USES_TYPE_HASH_OR_EQUALITY=FORBIDDEN
+STATIC_TABLE_LOOKUP_USES_RUNTIME_METADATA=FORBIDDEN
+STATIC_TABLE_FIELD_DISCOVERY_AT_RUNTIME=FORBIDDEN
+STATIC_TABLE_MEMBER_DISCOVERY_AT_RUNTIME=FORBIDDEN
+STATIC_TABLE_TOKEN_DERIVATION_AT_RUNTIME=FORBIDDEN
+```
+
+Adding, removing, renaming, reordering, or retokenizing a recognized
+enum or dataclass entry requires a separate design amendment and
+produces a deterministic change in the projection bytes and
+consequently in `blocked_result_hash`.
+
 #### 7.6.3 Container and ordering rules
 
 For an exact built-in dict, every entry is represented as:
@@ -2536,6 +3346,71 @@ Required by §7.6.4 and frozen here for completeness:
 All of the above must produce a deterministic blocked hash and must not raise a
 serialization exception.
 
+### 19.12 Round 6 static recognized-type table tests
+
+In addition to the Round 5 no-user-code matrix, the future implementation
+must cover the static recognized-type table contract by passing at minimum:
+
+1. the static recognized enum table has exactly `17` bound type entries;
+2. the static recognized dataclass table has exactly `34` bound type
+   entries;
+3. every bound `enum_type_token` is globally unique across the enum
+   table;
+4. every bound `dataclass_type_token` is globally unique across the
+   dataclass table;
+5. each bound enum entry maps to a unique exact enum type object within
+   that task and the bound enum table overall;
+6. every enum member object appears exactly once in its owning entry;
+7. every enum `member_token` equals the exact public enum value literal
+   for that member, captured at table-authoring time;
+8. `CaseRevisionStatus.COMMITTED → "committed"` (and the rest of the
+   `CaseRevisionStatus` family) remains lowercase;
+9. no enum member name, qualified name, or other runtime metadata is
+   read by the projection;
+10. `TASK-020 AuthorityMode` and `TASK-021 AuthorityMode` produce
+    different `enum_type_token` values when projected;
+11. `TASK-021 SourceBindingSnapshot` and `TASK-022 SourceBindingSnapshot`
+    produce different `dataclass_type_token` values when projected;
+12. `TASK-021 RulePackIdentitySnapshot` and
+    `TASK-022 RulePackIdentitySnapshot` produce different
+    `dataclass_type_token` values when projected;
+13. `TASK-021 MessageEntry`, `TASK-022 MessageEntry`, and
+    `TASK-024 MessageEntry` produce three distinct tokens;
+14. every bound `TASK-020`/`TASK-021`/`TASK-022` field tuple equals the
+    bound source `dataclass` declaration order read directly from the
+    corresponding `models.py` AST;
+15. every bound `TASK-024` field tuple equals the §8/§13 contract order
+    in this document;
+16. changing any static field order changes the diagnostic projection
+    bytes deterministically;
+17. changing any static `enum_type_token` / `dataclass_type_token` /
+    `member_token` changes the diagnostic projection bytes
+    deterministically;
+18. an unlisted enum bound to no static entry projects to
+    `{"raw_type":"unsupported_object"}`;
+19. an unlisted dataclass bound to no static entry projects to
+    `{"raw_type":"unsupported_object"}`;
+20. upstream request / result / helper dataclasses and the explicit
+    §4.2 exclusion list (including `ShellAndTubeConfigurationRequest`,
+    `TubeLayoutRequest`, `ShellBundleGeometryRequest`,
+    `LatticeIndex`, `ProvenancePreHashProjection`, and any future type
+    added to an upstream module) remain `unsupported_object` until a
+    separate design amendment lists them;
+21. adding a future enum or dataclass to an upstream module does NOT
+    automatically recognize it in the projection;
+22. module `__all__` membership changes do NOT change the projection
+    table;
+23. the projection path does NOT read `type.__module__`,
+    `type.__qualname__`, `type.__name__`, `.name`, or
+    `dataclasses.fields(...)` for the bound types;
+24. every one of the 17 enum entries and 34 dataclass entries is
+    exercised at least once in the architecture test matrix;
+25. projection bytes and `blocked_result_hash` remain stable across
+    process and `PYTHONHASHSEED` swaps.
+
+These Round 6 cases must coexist with the Round 5 no-user-code matrix
+without deleting any prior test.
+
 ## 20. Future implementation acceptance gates
 
 A future implementation is acceptable only if:
@@ -2626,6 +3501,19 @@ A design reviewer must verify:
     descriptor, hash, equality, representation, or runtime type-metadata code;
 34. recognized enum and dataclass identities come only from static closed
     code tables; all unsupported objects collapse to a fixed diagnostic token.
+35. raw blocked projection v3 has one exact closed static enum table with
+    17 bound types and literal member tokens equal to public enum values;
+36. raw blocked projection v3 has one exact closed static dataclass
+    table with 34 bound types and literal declaration-order field tuples;
+37. only types reachable from the three successful upstream root objects
+    (`ShellAndTubeConfiguration`, `TubeLayout`, `ShellBundleGeometry`),
+    plus the TASK-024 public models enumerated in §6, are recognized;
+    module exports, upstream request / result / helper types, future
+    types, aliases, and unlisted objects are not discovered
+    automatically;
+38. adding, removing, renaming, reordering, or retokenizing a recognized
+    enum / dataclass entry requires a separate design amendment and is
+    not allowed in an implementation round.
 
 ## 22. Explicit non-authorization statement
 
