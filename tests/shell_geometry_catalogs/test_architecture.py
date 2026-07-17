@@ -262,13 +262,16 @@ def test_task023_implementation_snapshot_is_one_exact_commit() -> None:
     assert commit_count.stdout.strip() == "1", commit_count.stdout
 
     parent_check = subprocess.run(
-        ["git", "rev-parse", f"{final_sha}^"],
+        ["git", "cat-file", "-p", final_sha],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
     )
     assert parent_check.returncode == 0, parent_check.stderr
-    assert parent_check.stdout.strip() == base_sha, parent_check.stdout
+    header, separator, _message = parent_check.stdout.partition("\n\n")
+    assert separator == "\n\n", parent_check.stdout
+    parent_lines = [line for line in header.splitlines() if line.startswith("parent ")]
+    assert parent_lines == [f"parent {base_sha}"], parent_lines
 
 
 def test_pkg_exports_exactly_seven_symbols() -> None:
