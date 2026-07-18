@@ -413,7 +413,7 @@ def test_axial_span_schema_version_constant() -> None:
 
 
 def test_design_authority_schema_version_constant() -> None:
-    assert models.DESIGN_AUTHORITY_SCHEMA_VERSION == "task024.baffle-design-authority.v1"
+    assert models.DESIGN_AUTHORITY_SCHEMA_VERSION == "task024.caller-baffle-design-authority.v1"
 
 
 def test_result_schema_version_constant() -> None:
@@ -459,13 +459,14 @@ def test_schema_failure_not_in_models_module() -> None:
     assert not hasattr(models, "BaffleGeometrySchemaFailure")
 
 
-def test_schema_module_does_not_exist_yet() -> None:
-    # Round 2 does not create schema.py -- this is a future-round scope.
-    # The test asserts the negative: schema.py is not yet created.
-    import importlib.util
-
-    spec = importlib.util.find_spec("hexagent.exchangers.shell_tube.baffle_geometry.schema")
-    assert spec is None, "schema.py must not exist in round 2; its creation belongs to round 3+"
+def test_schema_failure_is_not_owned_by_models() -> None:
+    # Section 6.1 -- the BaffleGeometrySchemaFailure class is owned by
+    # "schema.py", never by "models.py". This invariant replaces the
+    # Round 2 "schema.py must not exist" guard, which is forward-incompatible
+    # with Round 3.
+    assert not hasattr(models, "BaffleGeometrySchemaFailure"), (
+        "BaffleGeometrySchemaFailure must not be owned by models.py"
+    )
 
 
 # ----- Module purity / no I/O / no clock / no subprocess -----

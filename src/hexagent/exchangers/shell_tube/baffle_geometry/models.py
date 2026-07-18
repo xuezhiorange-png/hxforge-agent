@@ -400,45 +400,7 @@ class BaffleGeometryRequest:
 
 REQUEST_SCHEMA_VERSION = "task024.baffle-geometry-request.v1"
 AXIAL_SPAN_SCHEMA_VERSION = "task024.baffle-axial-span.v1"
-# Build the broken-line value via char codes (avoid display-truncation trap)
-_dav_codes = [
-    116,
-    97,
-    115,
-    107,
-    48,
-    50,
-    52,
-    46,
-    98,
-    97,
-    102,
-    102,
-    108,
-    101,
-    45,
-    100,
-    101,
-    115,
-    105,
-    103,
-    110,
-    45,
-    97,
-    117,
-    116,
-    104,
-    111,
-    114,
-    105,
-    116,
-    121,
-    46,
-    118,
-    49,
-]
-DAV_VALUE = "".join(chr(c) for c in _dav_codes)
-DESIGN_AUTHORITY_SCHEMA_VERSION = DAV_VALUE
+DESIGN_AUTHORITY_SCHEMA_VERSION = "task024.caller-baffle-design-authority.v1"
 RESULT_SCHEMA_VERSION = "task024.baffle-geometry.v1"
 PROFILE_ID = "hxforge.shell_tube.baffle_geometry.v1"
 DESIGN_CONTRACT_PATH = "docs/tasks/TASK-024-shell-and-tube-baffle-geometry-and-spacing.md"
