@@ -434,34 +434,12 @@ BAFFLE_COVERED_REGION_SEMANTICS = "BAFFLE_DISK_MINUS_WINDOW_SEGMENT"
 CROSSFLOW_REFERENCE_REGION_SEMANTICS = "CLASSIFICATION_REFERENCE_ONLY_NOT_FLOW_AREA"
 
 ###############################################################################
-# Section 16 - Schema-failure internal exception (NOT exported)
-###############################################################################
-
-
-class BaffleGeometrySchemaFailure(Exception):
-    """Section 16 - Internal failure type raised only by parse_request.
-
-    The exported validate_request catches every instance and converts
-    it into a structured BaffleGeometryValidationResult with
-    status=BLOCKED and geometry=None.
-    """
-
-    def __init__(
-        self,
-        stage_rank: int,
-        blockers: tuple[MessageEntry, ...],
-        raw_component: Any = None,
-        context: dict[str, Any] | None = None,
-    ) -> None:
-        super().__init__("BaffleGeometrySchemaFailure stage=" + str(stage_rank))
-        self.stage_rank = stage_rank
-        self.blockers = blockers
-        self.raw_component = raw_component
-        self.context = context or {}
-
-
-###############################################################################
 # Public exports
+#
+# Note (Section 16): BaffleGeometrySchemaFailure is intentionally NOT defined
+# in this module. Per design contract Section 4.4 + Section 16 + Section 18, that
+# internal exception belongs to schema.py (which is created in a later round).
+# Models.py carries only immutable identity + closed-enum + frozen code-tokens.
 ###############################################################################
 
 
@@ -470,7 +448,6 @@ __all__ = [
     "BAFFLE_COVERED_REGION_SEMANTICS",
     "BaffleGeometry",
     "BaffleGeometryRequest",
-    "BaffleGeometrySchemaFailure",
     "BaffleGeometryValidationResult",
     "BaffleOrientation",
     "BafflePlaneGeometry",
