@@ -389,7 +389,7 @@ def test_all_dataclasses_have_frozen_params_true() -> None:
         models.MessageEntry,
     ):
         assert dataclasses.is_dataclass(cls)
-        params = getattr(cls, "__dataclass_params__")
+        params = cls.__dataclass_params__  # type: ignore[union-attr]
         assert params.frozen is True, f"{cls.__name__} is not declared frozen=True"
 
 
@@ -397,7 +397,7 @@ def test_baffle_geometry_request_frozen() -> None:
     import dataclasses
 
     assert dataclasses.is_dataclass(models.BaffleGeometryRequest)
-    params = getattr(models.BaffleGeometryRequest, "__dataclass_params__")
+    params = models.BaffleGeometryRequest.__dataclass_params__  # type: ignore[attr-defined]
     assert params.frozen is True
 
 
