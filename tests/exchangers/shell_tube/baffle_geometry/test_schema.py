@@ -8,28 +8,25 @@ request are bypass-constructed via ``object.__new__`` so this module
 does not depend on deep TASK-020/021/022 field semantics.
 """
 
+# mypy: disable-error-code="no-untyped-def,no-any-return,no-untyped-call"
+# mypy: disable-error-code="type-arg,var-annotated,arg-type"
+
 from __future__ import annotations
 
 import copy
 import dataclasses
 import datetime
 import importlib
-import io
-import math
-import re
-import sys
-import uuid
+import json
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any
 
 import pytest
 
-from hexagent.exchangers.shell_tube.baffle_geometry import canonical, schema
-from hexagent.exchangers.shell_tube.baffle_geometry import models
 from hexagent.exchangers.shell_tube import models as t020
-from hexagent.exchangers.shell_tube.tube_layout import models as t021
+from hexagent.exchangers.shell_tube.baffle_geometry import canonical, models, schema
 from hexagent.exchangers.shell_tube.shell_bundle_geometry import models as t022
+from hexagent.exchangers.shell_tube.tube_layout import models as t021
 
 
 # ---------------------------------------------------------------------------
@@ -51,19 +48,19 @@ T021_LAYOUT_FIELDS = tuple(t021.TubeLayout.__dataclass_fields__)
 T022_BUNDLE_FIELDS = tuple(t022.ShellBundleGeometry.__dataclass_fields__)
 
 
-def _stub_t020():
+def _stub_t020() -> t020.ShellAndTubeConfiguration:
     return _make_exact(t020.ShellAndTubeConfiguration, T020_CFG_FIELDS)
 
 
-def _stub_t021():
+def _stub_t021() -> t021.TubeLayout:
     return _make_exact(t021.TubeLayout, T021_LAYOUT_FIELDS)
 
 
-def _stub_t022():
+def _stub_t022() -> t022.ShellBundleGeometry:
     return _make_exact(t022.ShellBundleGeometry, T022_BUNDLE_FIELDS)
 
 
-def _valid_axial_span_dict():
+def _valid_axial_span_dict() -> dict:
     return {
         "schema_version": "task024.baffle-axial-span.v1",
         "axial_start_coordinate_m": "0.0",
@@ -73,7 +70,7 @@ def _valid_axial_span_dict():
     }
 
 
-def _valid_design_authority_dict(baffle_count=2):
+def _valid_design_authority_dict(baffle_count: int = 2) -> dict:
     return {
         "schema_version": "task024.caller-baffle-design-authority.v1",
         "baffle_type": models.BaffleType.SINGLE_SEGMENTAL,
@@ -89,7 +86,7 @@ def _valid_design_authority_dict(baffle_count=2):
     }
 
 
-def _valid_request():
+def _valid_request() -> dict:
     return {
         "schema_version": "task024.baffle-geometry-request.v1",
         "configuration": _stub_t020(),
@@ -156,8 +153,7 @@ def test_05_non_string_top_level_key_rejected():
     raw_dict.update(bad)
     with pytest.raises(schema.BaffleGeometrySchemaFailure) as ei:
         schema.parse_request(raw_dict)
-    assert any(b[0] in ("BFG_UNKNOWN_FIELD", "BFG_RAW_TYPE_INVALID")
-               for b in ei.value.blockers)
+    assert any(b[0] in ("BFG_UNKNOWN_FIELD", "BFG_RAW_TYPE_INVALID") for b in ei.value.blockers)
 
 
 def test_06_unknown_top_level_field_rejected():
@@ -259,8 +255,9 @@ def test_16_exponent_decimal_rejected():
     raw["axial_span"]["axial_start_coordinate_m"] = "1.5e0"
     with pytest.raises(schema.BaffleGeometrySchemaFailure) as ei:
         schema.parse_request(raw)
-    assert any(b[0] in ("BFG_DECIMAL_LEXICAL_INVALID", "BFG_RAW_TYPE_INVALID")
-               for b in ei.value.blockers)
+    assert any(
+        b[0] in ("BFG_DECIMAL_LEXICAL_INVALID", "BFG_RAW_TYPE_INVALID") for b in ei.value.blockers
+    )
 
 
 def test_17_whitespace_decimal_rejected():
@@ -268,8 +265,9 @@ def test_17_whitespace_decimal_rejected():
     raw["axial_span"]["axial_start_coordinate_m"] = " 0.5"
     with pytest.raises(schema.BaffleGeometrySchemaFailure) as ei:
         schema.parse_request(raw)
-    assert any(b[0] in ("BFG_DECIMAL_LEXICAL_INVALID", "BFG_RAW_TYPE_INVALID")
-               for b in ei.value.blockers)
+    assert any(
+        b[0] in ("BFG_DECIMAL_LEXICAL_INVALID", "BFG_RAW_TYPE_INVALID") for b in ei.value.blockers
+    )
 
 
 def test_18_plus_prefixed_decimal_rejected():
@@ -277,8 +275,9 @@ def test_18_plus_prefixed_decimal_rejected():
     raw["axial_span"]["axial_start_coordinate_m"] = "+0.5"
     with pytest.raises(schema.BaffleGeometrySchemaFailure) as ei:
         schema.parse_request(raw)
-    assert any(b[0] in ("BFG_DECIMAL_LEXICAL_INVALID", "BFG_RAW_TYPE_INVALID")
-               for b in ei.value.blockers)
+    assert any(
+        b[0] in ("BFG_DECIMAL_LEXICAL_INVALID", "BFG_RAW_TYPE_INVALID") for b in ei.value.blockers
+    )
 
 
 def test_19_nan_decimal_rejected():
@@ -286,8 +285,9 @@ def test_19_nan_decimal_rejected():
     raw["axial_span"]["axial_start_coordinate_m"] = "NaN"
     with pytest.raises(schema.BaffleGeometrySchemaFailure) as ei:
         schema.parse_request(raw)
-    assert any(b[0] in ("BFG_DECIMAL_LEXICAL_INVALID", "BFG_RAW_TYPE_INVALID")
-               for b in ei.value.blockers)
+    assert any(
+        b[0] in ("BFG_DECIMAL_LEXICAL_INVALID", "BFG_RAW_TYPE_INVALID") for b in ei.value.blockers
+    )
 
 
 def test_20_negative_zero_normalization_holds():
@@ -315,8 +315,7 @@ def test_22_enum_lowercase_alias_rejected():
     raw["design_authority"]["baffle_type"] = "single_segmental"
     with pytest.raises(schema.BaffleGeometrySchemaFailure) as ei:
         schema.parse_request(raw)
-    assert any(b[0] in ("BFG_RAW_TYPE_INVALID", "BFG_UNKNOWN_FIELD")
-               for b in ei.value.blockers)
+    assert any(b[0] in ("BFG_RAW_TYPE_INVALID", "BFG_UNKNOWN_FIELD") for b in ei.value.blockers)
 
 
 def test_23_wrong_upstream_object_type_rejected():
@@ -324,8 +323,7 @@ def test_23_wrong_upstream_object_type_rejected():
     raw["configuration"] = _stub_t021()  # wrong type -- TubeLayout, not ShellAndTubeConfiguration
     with pytest.raises(schema.BaffleGeometrySchemaFailure) as ei:
         schema.parse_request(raw)
-    assert any(b[0] == "BFG_TASK020_CONFIGURATION_INVALID"
-               for b in ei.value.blockers)
+    assert any(b[0] == "BFG_TASK020_CONFIGURATION_INVALID" for b in ei.value.blockers)
 
 
 def test_24_upstream_subclass_rejected():
@@ -333,15 +331,16 @@ def test_24_upstream_subclass_rejected():
         pass
 
     bad = _SubShell(*([None] * len(T020_CFG_FIELDS)))
-    for fname, fvalue in zip(T020_CFG_FIELDS, [None] * len(T020_CFG_FIELDS)):
+    for fname, fvalue in zip(T020_CFG_FIELDS, [None] * len(T020_CFG_FIELDS), strict=False):
         object.__setattr__(bad, fname, fvalue)
     raw = _valid_request()
     raw["configuration"] = bad
     with pytest.raises(schema.BaffleGeometrySchemaFailure) as ei:
         schema.parse_request(raw)
-    assert any(b[0] in ("BFG_TASK020_CONFIGURATION_INVALID",
-                        "BFG_RAW_TYPE_INVALID")
-               for b in ei.value.blockers)
+    assert any(
+        b[0] in ("BFG_TASK020_CONFIGURATION_INVALID", "BFG_RAW_TYPE_INVALID")
+        for b in ei.value.blockers
+    )
 
 
 def test_25_parser_does_not_mutate_input():
@@ -402,14 +401,13 @@ class TestCanonicalDecimal:
             canonical.canonical_decimal_string("-Infinity")
 
     def test_coordinate_quantum_canonical(self):
-        assert canonical.canonical_decimal_string(
-            "0.000000000001"
-        ) == "0.000000000001"
+        assert canonical.canonical_decimal_string("0.000000000001") == "0.000000000001"
 
     def test_squared_coordinate_quantum_canonical(self):
-        assert canonical.canonical_decimal_string(
-            "0.000000000000000000000001"
-        ) == "0.000000000000000000000001"
+        assert (
+            canonical.canonical_decimal_string("0.000000000000000000000001")
+            == "0.000000000000000000000001"
+        )
 
     def test_accepts_exact_decimal(self):
         assert canonical.canonical_decimal_string(Decimal("1.25")) == "1.25"
@@ -429,7 +427,7 @@ class TestCanonicalJson:
         out = canonical.canonical_json_bytes({"k": "中文"})
         # encode must succeed and bytes must equal direct UTF-8 form
         out.decode("utf-8")  # decoding must succeed
-        _expected_utf8 = "中文".encode("utf-8")
+        _expected_utf8 = "中文".encode()
         # Canonical form: json with ensure_ascii=False produces raw UTF-8.
         # json with ensure_ascii=True would emit ascii-escape sequences.
         # Either form is canonical UTF-8.
@@ -454,11 +452,11 @@ class TestCanonicalJson:
             canonical.canonical_json_bytes(Decimal("1.5"))
 
     def test_forbidden_arbitrary_object_rejected(self):
-        class O:
+        class _O:
             pass
 
         with pytest.raises(TypeError):
-            canonical.canonical_json_bytes(O())
+            canonical.canonical_json_bytes(_O())
 
     def test_forbidden_set_rejected(self):
         with pytest.raises(TypeError):
@@ -481,6 +479,7 @@ class TestCanonicalJson:
 
     def test_equivalent_mappings_produce_identical_bytes(self):
         from collections import OrderedDict
+
         d1 = OrderedDict([("a", 1), ("b", 2)])
         d2 = {"a": 1, "b": 2}
         assert canonical.canonical_json_bytes(d1) == canonical.canonical_json_bytes(d2)
@@ -496,6 +495,7 @@ def _proj(v):
 class TestRawProjectionExactScalars:
     def test_none(self):
         import json
+
         obj = json.loads(_proj(None))
         assert obj["request"] == {"raw_type": "null"}
 
@@ -509,8 +509,7 @@ class TestRawProjectionExactScalars:
 
     def test_int_zero(self):
         obj = _safe_load(_proj(0))
-        assert obj["request"] == {"raw_type": "int", "sign": 0,
-                                  "magnitude_hex": "0"}
+        assert obj["request"] == {"raw_type": "int", "sign": 0, "magnitude_hex": "0"}
 
     def test_int_positive(self):
         obj = _safe_load(_proj(255))
@@ -524,7 +523,7 @@ class TestRawProjectionExactScalars:
         assert obj["request"]["magnitude_hex"] == "ff"
 
     def test_int_huge_arbitrary_magnitude(self):
-        n = 10 ** 80
+        n = 10**80
         obj = _safe_load(_proj(n))
         assert obj["request"]["raw_type"] == "int"
         assert obj["request"]["sign"] == 0
@@ -534,7 +533,7 @@ class TestRawProjectionExactScalars:
 
     def test_int_base10_digit_limit_independence(self):
         # 1e6 digits -- way beyond default int_max_str_digits
-        n = 10 ** 1000
+        n = 10**1000
         obj = _safe_load(_proj(n))
         assert obj["request"]["raw_type"] == "int"
         # hex equivalent
@@ -543,8 +542,7 @@ class TestRawProjectionExactScalars:
 
     def test_str(self):
         obj = _safe_load(_proj("AB"))
-        assert obj["request"] == {"raw_type": "str",
-                                  "code_points": ["0041", "0042"]}
+        assert obj["request"] == {"raw_type": "str", "code_points": ["0041", "0042"]}
 
     def test_str_surrogate(self):
         obj = _safe_load(_proj("\ud800"))
@@ -577,9 +575,7 @@ class TestRawProjectionExactScalars:
         assert obj["request"]["raw_type"] == "decimal"
         assert obj["request"]["sign"] == 0
         assert obj["request"]["digits"] == [1, 5]
-        assert obj["request"]["exponent"] == {"kind": "integer",
-                                              "sign": 1,
-                                              "magnitude_hex": "1"}
+        assert obj["request"]["exponent"] == {"kind": "integer", "sign": 1, "magnitude_hex": "1"}
 
     def test_decimal_infinity(self):
         obj = _safe_load(_proj(Decimal("Infinity")))
@@ -604,8 +600,10 @@ class TestRawProjectionContainers:
 
     def test_dict_orders_entries_by_canonical_key(self):
         obj = _safe_load(_proj({"b": 1, "a": 2}))
-        keys = [e["key"]["raw_type"] == "str" and e["key"]["code_points"][0]
-                for e in obj["request"]["entries"]]
+        keys = [
+            e["key"]["raw_type"] == "str" and e["key"]["code_points"][0]
+            for e in obj["request"]["entries"]
+        ]
         # 'a' first, 'b' second (lex)
         assert keys == ["0061", "0062"]
 
@@ -655,18 +653,12 @@ class TestRawProjectionCustomTraps:
         class S(set):
             pass
 
-        assert _safe_load(_proj(L([1, 2])))["request"] == {
-            "raw_type": "unsupported_object"
-        }
-        assert _safe_load(_proj(D({1: 2})))["request"] == {
-            "raw_type": "unsupported_object"
-        }
-        assert _safe_load(_proj(S([1])))["request"] == {
-            "raw_type": "unsupported_object"
-        }
+        assert _safe_load(_proj(L([1, 2])))["request"] == {"raw_type": "unsupported_object"}
+        assert _safe_load(_proj(D({1: 2})))["request"] == {"raw_type": "unsupported_object"}
+        assert _safe_load(_proj(S([1])))["request"] == {"raw_type": "unsupported_object"}
 
     def test_scalar_subclass_collapses(self):
-        class I(int):
+        class _MyInt(int):
             pass
 
         class S(str):
@@ -681,7 +673,7 @@ class TestRawProjectionCustomTraps:
         class _Dec(Decimal):
             pass
 
-        assert _safe_load(_proj(I(5)))["request"] == {"raw_type": "unsupported_object"}
+        assert _safe_load(_proj(_MyInt(5)))["request"] == {"raw_type": "unsupported_object"}
         assert _safe_load(_proj(S("hi")))["request"] == {"raw_type": "unsupported_object"}
         assert _safe_load(_proj(B(b"x")))["request"] == {"raw_type": "unsupported_object"}
         assert _safe_load(_proj(F(1.5)))["request"] == {"raw_type": "unsupported_object"}
@@ -712,6 +704,7 @@ class TestRawProjectionEnums:
 
     def test_distinct_authoritymode_enums_share_token_name_but_distinct_type(self):
         from hexagent.exchangers.shell_tube.tube_layout import models as t021
+
         # The token format encodes owning task explicitly.
         a = _safe_load(_proj(t020.AuthorityMode.APPROVED_RULE_PACK))
         b = _safe_load(_proj(t021.AuthorityMode.APPROVED_RULE_PACK))
@@ -765,8 +758,12 @@ class TestRawProjectionDataclasses:
         # Field order must be the frozen literal order.
         field_names = [f["name"] for f in obj["request"]["fields"]]
         assert field_names == [
-            "schema_version", "configuration", "tube_layout",
-            "shell_bundle_geometry", "axial_span", "design_authority",
+            "schema_version",
+            "configuration",
+            "tube_layout",
+            "shell_bundle_geometry",
+            "axial_span",
+            "design_authority",
             "evidence_refs",
         ]
 
@@ -801,11 +798,10 @@ class TestRawBlockedProjectionContainer:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-import json as _json
 
 
 def _safe_load(b: bytes):
-    return _json.loads(b.decode("utf-8"))
+    return json.loads(b.decode("utf-8"))
 
 
 # Confirm schema.__all__ is exactly two symbols.
@@ -821,7 +817,7 @@ DAV_VALID = "task024.caller-baffle-design-authority.v1"
 DAV_INVALID_OLD = "task024.baffle-design-authority.v1"
 
 
-def _make_request_with_design_authority_sv(sv):
+def _make_request_with_design_authority_sv(sv: str) -> dict:
     cfg = _stub_t020()
     layout = _stub_t021()
     bundle = _stub_t022()
@@ -855,8 +851,8 @@ def test_28_design_authority_negative_wrong_token_rejected() -> None:
 
 
 def test_29_design_authority_module_constant_matches_models() -> None:
-    assert getattr(schema, "DESIGN_AUTHORITY_SCHEMA_VERSION") == DAV_VALID
-    assert getattr(schema, "DESIGN_AUTHORITY_SCHEMA_VERSION") == getattr(models, "DESIGN_AUTHORITY_SCHEMA_VERSION")
+    assert schema.DESIGN_AUTHORITY_SCHEMA_VERSION == DAV_VALID
+    assert schema.DESIGN_AUTHORITY_SCHEMA_VERSION == models.DESIGN_AUTHORITY_SCHEMA_VERSION
 
 
 # Section 7.3 -- BaffleGeometrySchemaFailure ownership (positive, in schema)

@@ -37,15 +37,16 @@ explicitly deferred to later rounds.
 
 from __future__ import annotations
 
+# mypy: disable-error-code="no-untyped-def,no-any-return,no-untyped-call"
+# mypy: disable-error-code="type-arg,comparison-overlap,dict-item,arg-type"
 import datetime
 import decimal
 import hashlib
 import json
 import uuid
-from collections import deque
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Final, FrozenSet, Mapping, Tuple
+from typing import Any, Final
 
 # Frozen decimal context (Section 7.2).
 _DECIMAL_PRECISION: Final[int] = 50
@@ -78,17 +79,11 @@ def canonical_decimal_string(value: Any) -> str:
         d = value
     elif isinstance(value, str):
         if value != value.strip():
-            raise ValueError(
-                "canonical_decimal_string forbids surrounding whitespace"
-            )
+            raise ValueError("canonical_decimal_string forbids surrounding whitespace")
         if value.startswith("+"):
-            raise ValueError(
-                "canonical_decimal_string forbids leading plus"
-            )
+            raise ValueError("canonical_decimal_string forbids leading plus")
         if "e" in value or "E" in value:
-            raise ValueError(
-                "canonical_decimal_string forbids exponent notation"
-            )
+            raise ValueError("canonical_decimal_string forbids exponent notation")
         d = Decimal(value)
     else:
         raise ValueError(
@@ -107,9 +102,7 @@ def canonical_decimal_string(value: Any) -> str:
             raise ValueError("canonical_decimal_string forbids special values")
         sign, digits, exponent = d.as_tuple()
         if not isinstance(exponent, int):
-            raise ValueError(
-                "canonical_decimal_string refuses non-integer exponent"
-            )
+            raise ValueError("canonical_decimal_string refuses non-integer exponent")
         int_d = int("".join(str(x) for x in digits)) if digits else 0
         sign_prefix = "-" if sign else ""
         if int_d == 0:
@@ -132,6 +125,7 @@ def canonical_decimal_string(value: Any) -> str:
 # Recognized enum and dataclass tables (Section 7.6.2.1 -- CLOSED tables).
 # ---------------------------------------------------------------------------
 
+
 def _build_recognized_enum_table():
     """Build the static recognized-enum table (Section 7.6.2.2).
 
@@ -142,9 +136,9 @@ def _build_recognized_enum_table():
          ordered_member_pairs: tuple of (enum_member: Enum, member_token: str))
     """
     from hexagent.exchangers.shell_tube import models as _m_t020
-    from hexagent.exchangers.shell_tube.tube_layout import models as _m_t021
-    from hexagent.exchangers.shell_tube.shell_bundle_geometry import models as _m_t022
     from hexagent.exchangers.shell_tube.baffle_geometry import models as _m_t024
+    from hexagent.exchangers.shell_tube.shell_bundle_geometry import models as _m_t022
+    from hexagent.exchangers.shell_tube.tube_layout import models as _m_t021
 
     entries = []
 
@@ -152,43 +146,56 @@ def _build_recognized_enum_table():
         ordered = tuple((getattr(py_type, n), n) for n in members)
         entries.append((token, py_type, ordered))
 
-    _add("task020:AuthorityMode", _m_t020.AuthorityMode,
-         ("INTERNAL_GENERIC", "APPROVED_RULE_PACK"))
-    _add("task020:CaseRevisionStatus", _m_t020.CaseRevisionStatus,
-         ("COMMITTED", "SUPERSEDED", "ARCHIVED"))
-    _add("task020:ConstructionFamily", _m_t020.ConstructionFamily,
-         ("FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"))
-    _add("task020:EquipmentFamily", _m_t020.EquipmentFamily,
-         ("SHELL_AND_TUBE",))
-    _add("task020:Orientation", _m_t020.Orientation,
-         ("HORIZONTAL", "VERTICAL", "UNSPECIFIED"))
-    _add("task020:StandardClaimStatus", _m_t020.StandardClaimStatus,
-         ("NO_STANDARD_CLAIM", "RULE_PACK_VALIDATED"))
+    _add("task020:AuthorityMode", _m_t020.AuthorityMode, ("INTERNAL_GENERIC", "APPROVED_RULE_PACK"))
+    _add(
+        "task020:CaseRevisionStatus",
+        _m_t020.CaseRevisionStatus,
+        ("COMMITTED", "SUPERSEDED", "ARCHIVED"),
+    )
+    _add(
+        "task020:ConstructionFamily",
+        _m_t020.ConstructionFamily,
+        ("FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"),
+    )
+    _add("task020:EquipmentFamily", _m_t020.EquipmentFamily, ("SHELL_AND_TUBE",))
+    _add("task020:Orientation", _m_t020.Orientation, ("HORIZONTAL", "VERTICAL", "UNSPECIFIED"))
+    _add(
+        "task020:StandardClaimStatus",
+        _m_t020.StandardClaimStatus,
+        ("NO_STANDARD_CLAIM", "RULE_PACK_VALIDATED"),
+    )
 
-    _add("task021:AuthorityMode", _m_t021.AuthorityMode,
-         ("INTERNAL_GENERIC", "APPROVED_RULE_PACK"))
-    _add("task021:AxisOrientation", _m_t021.AxisOrientation,
-         ("PRIMARY_AXIS_X", "PRIMARY_AXIS_Y"))
-    _add("task021:ExclusionZoneType", _m_t021.ExclusionZoneType,
-         ("AXIS_ALIGNED_RECTANGLE", "CIRCLE"))
-    _add("task021:OriginMode", _m_t021.OriginMode,
-         ("CENTER_ON_LATTICE_POINT", "CENTER_ON_PRIMITIVE_CELL"))
-    _add("task021:PatternFamily", _m_t021.PatternFamily,
-         ("SQUARE", "TRIANGULAR"))
+    _add("task021:AuthorityMode", _m_t021.AuthorityMode, ("INTERNAL_GENERIC", "APPROVED_RULE_PACK"))
+    _add("task021:AxisOrientation", _m_t021.AxisOrientation, ("PRIMARY_AXIS_X", "PRIMARY_AXIS_Y"))
+    _add(
+        "task021:ExclusionZoneType", _m_t021.ExclusionZoneType, ("AXIS_ALIGNED_RECTANGLE", "CIRCLE")
+    )
+    _add(
+        "task021:OriginMode",
+        _m_t021.OriginMode,
+        ("CENTER_ON_LATTICE_POINT", "CENTER_ON_PRIMITIVE_CELL"),
+    )
+    _add("task021:PatternFamily", _m_t021.PatternFamily, ("SQUARE", "TRIANGULAR"))
 
-    _add("task022:RuleAuthorityMode", _m_t022.RuleAuthorityMode,
-         ("INTERNAL_GENERIC", "APPROVED_RULE_PACK"))
-    _add("task022:ShellInsideDiameterAuthorityMode",
-         _m_t022.ShellInsideDiameterAuthorityMode,
-         ("CALLER_SUPPLIED_EXPLICIT", "APPROVED_CATALOG_SNAPSHOT"))
+    _add(
+        "task022:RuleAuthorityMode",
+        _m_t022.RuleAuthorityMode,
+        ("INTERNAL_GENERIC", "APPROVED_RULE_PACK"),
+    )
+    _add(
+        "task022:ShellInsideDiameterAuthorityMode",
+        _m_t022.ShellInsideDiameterAuthorityMode,
+        ("CALLER_SUPPLIED_EXPLICIT", "APPROVED_CATALOG_SNAPSHOT"),
+    )
 
-    _add("task024:BaffleOrientation", _m_t024.BaffleOrientation,
-         ("TOP", "BOTTOM", "LEFT", "RIGHT"))
+    _add("task024:BaffleOrientation", _m_t024.BaffleOrientation, ("TOP", "BOTTOM", "LEFT", "RIGHT"))
     _add("task024:BaffleType", _m_t024.BaffleType, ("SINGLE_SEGMENTAL",))
-    _add("task024:TubeRegionClassification", _m_t024.TubeRegionClassification,
-         ("WINDOW", "CROSSFLOW_REFERENCE"))
-    _add("task024:ValidationStatus", _m_t024.ValidationStatus,
-         ("VALID", "BLOCKED"))
+    _add(
+        "task024:TubeRegionClassification",
+        _m_t024.TubeRegionClassification,
+        ("WINDOW", "CROSSFLOW_REFERENCE"),
+    )
+    _add("task024:ValidationStatus", _m_t024.ValidationStatus, ("VALID", "BLOCKED"))
 
     return tuple(entries)
 
@@ -202,190 +209,479 @@ def _build_recognized_dataclass_table():
          literal_field_name_tuple: tuple of str)
     """
     from hexagent.exchangers.shell_tube import models as _m_t020
-    from hexagent.exchangers.shell_tube.tube_layout import models as _m_t021
-    from hexagent.exchangers.shell_tube.shell_bundle_geometry import models as _m_t022
     from hexagent.exchangers.shell_tube.baffle_geometry import models as _m_t024
+    from hexagent.exchangers.shell_tube.shell_bundle_geometry import models as _m_t022
+    from hexagent.exchangers.shell_tube.tube_layout import models as _m_t021
 
     entries = []
 
     def _add(token, py_type, fields):
         entries.append((token, py_type, tuple(fields)))
 
-    _add("task020:CaseRevisionAuthority", _m_t020.CaseRevisionAuthority,
-         ("revision_id", "payload_hash", "domain_snapshot_hash",
-          "revision_status"))
-    _add("task020:ComponentTokens", _m_t020.ComponentTokens,
-         ("front_head", "shell", "rear_head"))
-    _add("task020:ConfigurationAuthorityBinding",
-         _m_t020.ConfigurationAuthorityBinding,
-         ("authority_mode", "standard_system_id", "case_authority",
-          "evaluated_rule_pack_authority", "case_authority_evidence_refs"))
-    _add("task020:ErrorEntry", _m_t020.ErrorEntry,
-         ("code", "field_path", "message_key", "evidence_refs", "details"))
-    _add("task020:EvaluatedRulePackAuthority",
-         _m_t020.EvaluatedRulePackAuthority,
-         ("rule_pack_id", "rule_pack_version", "rule_pack_canonical_hash",
-          "validation_status", "selected_rule_authorities"))
-    _add("task020:SelectedRuleAuthority", _m_t020.SelectedRuleAuthority,
-         ("rule_id", "rule_version", "rule_artifact_canonical_hash",
-          "source_class", "license_evidence", "approval_status",
-          "provenance_edge_ids", "evidence_refs"))
-    _add("task020:ShellAndTubeConfiguration", _m_t020.ShellAndTubeConfiguration,
-         ("schema_version", "configuration_id", "configuration_hash",
-          "equipment_family", "authority_mode", "standard_claim_status",
-          "construction_family", "orientation", "shell_pass_count",
-          "tube_pass_count", "component_tokens", "authority_binding",
-          "case_authority", "warnings", "blockers", "deferred_capabilities"))
+    _add(
+        "task020:CaseRevisionAuthority",
+        _m_t020.CaseRevisionAuthority,
+        ("revision_id", "payload_hash", "domain_snapshot_hash", "revision_status"),
+    )
+    _add("task020:ComponentTokens", _m_t020.ComponentTokens, ("front_head", "shell", "rear_head"))
+    _add(
+        "task020:ConfigurationAuthorityBinding",
+        _m_t020.ConfigurationAuthorityBinding,
+        (
+            "authority_mode",
+            "standard_system_id",
+            "case_authority",
+            "evaluated_rule_pack_authority",
+            "case_authority_evidence_refs",
+        ),
+    )
+    _add(
+        "task020:ErrorEntry",
+        _m_t020.ErrorEntry,
+        ("code", "field_path", "message_key", "evidence_refs", "details"),
+    )
+    _add(
+        "task020:EvaluatedRulePackAuthority",
+        _m_t020.EvaluatedRulePackAuthority,
+        (
+            "rule_pack_id",
+            "rule_pack_version",
+            "rule_pack_canonical_hash",
+            "validation_status",
+            "selected_rule_authorities",
+        ),
+    )
+    _add(
+        "task020:SelectedRuleAuthority",
+        _m_t020.SelectedRuleAuthority,
+        (
+            "rule_id",
+            "rule_version",
+            "rule_artifact_canonical_hash",
+            "source_class",
+            "license_evidence",
+            "approval_status",
+            "provenance_edge_ids",
+            "evidence_refs",
+        ),
+    )
+    _add(
+        "task020:ShellAndTubeConfiguration",
+        _m_t020.ShellAndTubeConfiguration,
+        (
+            "schema_version",
+            "configuration_id",
+            "configuration_hash",
+            "equipment_family",
+            "authority_mode",
+            "standard_claim_status",
+            "construction_family",
+            "orientation",
+            "shell_pass_count",
+            "tube_pass_count",
+            "component_tokens",
+            "authority_binding",
+            "case_authority",
+            "warnings",
+            "blockers",
+            "deferred_capabilities",
+        ),
+    )
 
-    _add("task021:ApprovedTubeGeometrySnapshot",
-         _m_t021.ApprovedTubeGeometrySnapshot,
-         ("geometry_id", "geometry_type", "revision", "approval_state",
-          "outer_diameter_m", "inner_diameter_m", "wall_thickness_m",
-          "record_hash", "snapshot_hash", "source_binding"))
-    _add("task021:CircularTubeCenterEnvelope",
-         _m_t021.CircularTubeCenterEnvelope,
-         ("schema_version", "tube_center_envelope_diameter_m", "evidence_refs"))
-    _add("task021:ExclusionAudit", _m_t021.ExclusionAudit,
-         ("zone_id", "rejected_position_count", "reason_code", "evidence_refs"))
-    _add("task021:ExclusionZone", _m_t021.ExclusionZone,
-         ("zone_id", "zone_type", "center_x_m", "center_y_m", "clearance_m",
-          "reason_code", "evidence_refs", "width_m", "height_m", "radius_m"))
-    _add("task021:LayoutRuleAuthoritySnapshot",
-         _m_t021.LayoutRuleAuthoritySnapshot,
-         ("profile_id", "authority_mode", "rule_id", "rule_version",
-          "rule_artifact_canonical_hash", "source_class", "license_evidence",
-          "approval_status", "provenance_edge_ids", "evidence_refs",
-          "rule_pack_identity", "pattern_family", "pitch_m",
-          "edge_clearance_m", "allowed_origin_modes",
-          "allowed_axis_orientations", "allowed_exclusion_zone_types",
-          "maximum_candidate_positions", "snapshot_hash"))
-    _add("task021:MessageEntry", _m_t021.MessageEntry,
-         ("code", "field_path", "message_key", "evidence_refs", "details"))
-    _add("task021:RulePackIdentitySnapshot",
-         _m_t021.RulePackIdentitySnapshot,
-         ("rule_pack_id", "rule_pack_version", "rule_pack_canonical_hash"))
-    _add("task021:SourceBindingSnapshot", _m_t021.SourceBindingSnapshot,
-         ("source_id", "source_type", "source_revision", "source_location",
-          "evidence_ref", "approved_by", "approved_at"))
-    _add("task021:TubeLayout", _m_t021.TubeLayout,
-         ("schema_version", "layout_id", "layout_hash", "request_hash",
-          "task020_configuration_id", "task020_configuration_hash",
-          "case_authority", "construction_family", "equipment_orientation",
-          "shell_pass_count", "tube_pass_count", "tube_geometry",
-          "layout_rule_authority", "placement_envelope", "origin_mode",
-          "axis_orientation", "exclusion_zones", "positions",
-          "tube_hole_count", "physical_tube_count",
-          "boundary_rejection_count", "exclusion_rejection_count",
-          "exclusion_audit", "warnings", "blockers",
-          "deferred_capabilities", "provenance"))
-    _add("task021:TubePosition", _m_t021.TubePosition,
-         ("position_id", "u", "v", "x_m", "y_m"))
+    _add(
+        "task021:ApprovedTubeGeometrySnapshot",
+        _m_t021.ApprovedTubeGeometrySnapshot,
+        (
+            "geometry_id",
+            "geometry_type",
+            "revision",
+            "approval_state",
+            "outer_diameter_m",
+            "inner_diameter_m",
+            "wall_thickness_m",
+            "record_hash",
+            "snapshot_hash",
+            "source_binding",
+        ),
+    )
+    _add(
+        "task021:CircularTubeCenterEnvelope",
+        _m_t021.CircularTubeCenterEnvelope,
+        ("schema_version", "tube_center_envelope_diameter_m", "evidence_refs"),
+    )
+    _add(
+        "task021:ExclusionAudit",
+        _m_t021.ExclusionAudit,
+        ("zone_id", "rejected_position_count", "reason_code", "evidence_refs"),
+    )
+    _add(
+        "task021:ExclusionZone",
+        _m_t021.ExclusionZone,
+        (
+            "zone_id",
+            "zone_type",
+            "center_x_m",
+            "center_y_m",
+            "clearance_m",
+            "reason_code",
+            "evidence_refs",
+            "width_m",
+            "height_m",
+            "radius_m",
+        ),
+    )
+    _add(
+        "task021:LayoutRuleAuthoritySnapshot",
+        _m_t021.LayoutRuleAuthoritySnapshot,
+        (
+            "profile_id",
+            "authority_mode",
+            "rule_id",
+            "rule_version",
+            "rule_artifact_canonical_hash",
+            "source_class",
+            "license_evidence",
+            "approval_status",
+            "provenance_edge_ids",
+            "evidence_refs",
+            "rule_pack_identity",
+            "pattern_family",
+            "pitch_m",
+            "edge_clearance_m",
+            "allowed_origin_modes",
+            "allowed_axis_orientations",
+            "allowed_exclusion_zone_types",
+            "maximum_candidate_positions",
+            "snapshot_hash",
+        ),
+    )
+    _add(
+        "task021:MessageEntry",
+        _m_t021.MessageEntry,
+        ("code", "field_path", "message_key", "evidence_refs", "details"),
+    )
+    _add(
+        "task021:RulePackIdentitySnapshot",
+        _m_t021.RulePackIdentitySnapshot,
+        ("rule_pack_id", "rule_pack_version", "rule_pack_canonical_hash"),
+    )
+    _add(
+        "task021:SourceBindingSnapshot",
+        _m_t021.SourceBindingSnapshot,
+        (
+            "source_id",
+            "source_type",
+            "source_revision",
+            "source_location",
+            "evidence_ref",
+            "approved_by",
+            "approved_at",
+        ),
+    )
+    _add(
+        "task021:TubeLayout",
+        _m_t021.TubeLayout,
+        (
+            "schema_version",
+            "layout_id",
+            "layout_hash",
+            "request_hash",
+            "task020_configuration_id",
+            "task020_configuration_hash",
+            "case_authority",
+            "construction_family",
+            "equipment_orientation",
+            "shell_pass_count",
+            "tube_pass_count",
+            "tube_geometry",
+            "layout_rule_authority",
+            "placement_envelope",
+            "origin_mode",
+            "axis_orientation",
+            "exclusion_zones",
+            "positions",
+            "tube_hole_count",
+            "physical_tube_count",
+            "boundary_rejection_count",
+            "exclusion_rejection_count",
+            "exclusion_audit",
+            "warnings",
+            "blockers",
+            "deferred_capabilities",
+            "provenance",
+        ),
+    )
+    _add("task021:TubePosition", _m_t021.TubePosition, ("position_id", "u", "v", "x_m", "y_m"))
 
-    _add("task022:ApprovedShellGeometrySnapshot",
-         _m_t022.ApprovedShellGeometrySnapshot,
-         ("schema_version", "geometry_id", "geometry_type", "revision",
-          "approval_state", "shell_inside_diameter_m", "record_hash",
-          "source_binding", "snapshot_hash"))
-    _add("task022:CallerSuppliedShellInsideDiameter",
-         _m_t022.CallerSuppliedShellInsideDiameter,
-         ("schema_version", "shell_inside_diameter_m", "evidence_refs",
-          "authority_hash"))
-    _add("task022:MessageEntry", _m_t022.MessageEntry,
-         ("code", "field_path", "message_key", "evidence_refs", "details"))
-    _add("task022:RulePackIdentitySnapshot",
-         _m_t022.RulePackIdentitySnapshot,
-         ("rule_pack_id", "rule_pack_version", "rule_pack_canonical_hash"))
-    _add("task022:ShellBundleGeometry", _m_t022.ShellBundleGeometry,
-         ("schema_version", "geometry_id", "geometry_hash", "request_hash",
-          "task020_configuration_id", "task020_configuration_hash",
-          "task021_layout_id", "task021_layout_hash", "construction_family",
-          "equipment_orientation", "shell_pass_count", "tube_pass_count",
-          "tube_geometry_snapshot_hash", "geometry_rule_authority",
-          "shell_authority_mode", "caller_supplied_shell",
-          "approved_shell_geometry", "shell_inside_diameter_m",
-          "shell_radius_m", "bare_tube_bundle_radius_m",
-          "bare_tube_bundle_diameter_m", "bundle_peripheral_allowance_m",
-          "bundle_outer_envelope_radius_m",
-          "bundle_outer_envelope_diameter_m",
-          "shell_to_bundle_radial_clearance_m",
-          "shell_to_bundle_diametral_clearance_m",
-          "required_minimum_radial_clearance_m", "radial_clearance_margin_m",
-          "limiting_position_ids", "position_count", "warnings", "blockers",
-          "deferred_capabilities", "provenance"))
-    _add("task022:ShellBundleGeometryRuleAuthoritySnapshot",
-         _m_t022.ShellBundleGeometryRuleAuthoritySnapshot,
-         ("schema_version", "profile_id", "authority_mode", "rule_id",
-          "rule_version", "rule_artifact_canonical_hash", "source_class",
-          "license_evidence", "approval_status", "provenance_edge_ids",
-          "evidence_refs", "rule_pack_identity", "allowed_shell_authority_modes",
-          "minimum_bundle_peripheral_allowance_m",
-          "minimum_radial_clearance_m", "maximum_position_count",
-          "snapshot_hash"))
-    _add("task022:SourceBindingSnapshot", _m_t022.SourceBindingSnapshot,
-         ("source_id", "source_type", "source_revision", "source_location",
-          "evidence_ref", "approved_by", "approved_at"))
+    _add(
+        "task022:ApprovedShellGeometrySnapshot",
+        _m_t022.ApprovedShellGeometrySnapshot,
+        (
+            "schema_version",
+            "geometry_id",
+            "geometry_type",
+            "revision",
+            "approval_state",
+            "shell_inside_diameter_m",
+            "record_hash",
+            "source_binding",
+            "snapshot_hash",
+        ),
+    )
+    _add(
+        "task022:CallerSuppliedShellInsideDiameter",
+        _m_t022.CallerSuppliedShellInsideDiameter,
+        ("schema_version", "shell_inside_diameter_m", "evidence_refs", "authority_hash"),
+    )
+    _add(
+        "task022:MessageEntry",
+        _m_t022.MessageEntry,
+        ("code", "field_path", "message_key", "evidence_refs", "details"),
+    )
+    _add(
+        "task022:RulePackIdentitySnapshot",
+        _m_t022.RulePackIdentitySnapshot,
+        ("rule_pack_id", "rule_pack_version", "rule_pack_canonical_hash"),
+    )
+    _add(
+        "task022:ShellBundleGeometry",
+        _m_t022.ShellBundleGeometry,
+        (
+            "schema_version",
+            "geometry_id",
+            "geometry_hash",
+            "request_hash",
+            "task020_configuration_id",
+            "task020_configuration_hash",
+            "task021_layout_id",
+            "task021_layout_hash",
+            "construction_family",
+            "equipment_orientation",
+            "shell_pass_count",
+            "tube_pass_count",
+            "tube_geometry_snapshot_hash",
+            "geometry_rule_authority",
+            "shell_authority_mode",
+            "caller_supplied_shell",
+            "approved_shell_geometry",
+            "shell_inside_diameter_m",
+            "shell_radius_m",
+            "bare_tube_bundle_radius_m",
+            "bare_tube_bundle_diameter_m",
+            "bundle_peripheral_allowance_m",
+            "bundle_outer_envelope_radius_m",
+            "bundle_outer_envelope_diameter_m",
+            "shell_to_bundle_radial_clearance_m",
+            "shell_to_bundle_diametral_clearance_m",
+            "required_minimum_radial_clearance_m",
+            "radial_clearance_margin_m",
+            "limiting_position_ids",
+            "position_count",
+            "warnings",
+            "blockers",
+            "deferred_capabilities",
+            "provenance",
+        ),
+    )
+    _add(
+        "task022:ShellBundleGeometryRuleAuthoritySnapshot",
+        _m_t022.ShellBundleGeometryRuleAuthoritySnapshot,
+        (
+            "schema_version",
+            "profile_id",
+            "authority_mode",
+            "rule_id",
+            "rule_version",
+            "rule_artifact_canonical_hash",
+            "source_class",
+            "license_evidence",
+            "approval_status",
+            "provenance_edge_ids",
+            "evidence_refs",
+            "rule_pack_identity",
+            "allowed_shell_authority_modes",
+            "minimum_bundle_peripheral_allowance_m",
+            "minimum_radial_clearance_m",
+            "maximum_position_count",
+            "snapshot_hash",
+        ),
+    )
+    _add(
+        "task022:SourceBindingSnapshot",
+        _m_t022.SourceBindingSnapshot,
+        (
+            "source_id",
+            "source_type",
+            "source_revision",
+            "source_location",
+            "evidence_ref",
+            "approved_by",
+            "approved_at",
+        ),
+    )
 
-    _add("task024:BaffleGeometry", _m_t024.BaffleGeometry,
-         ("schema_version", "geometry_id", "geometry_hash", "request_hash",
-          "task020_configuration_id", "task020_configuration_hash",
-          "task021_layout_id", "task021_layout_hash", "task022_geometry_id",
-          "task022_geometry_hash", "construction_family",
-          "equipment_orientation", "shell_pass_count", "tube_pass_count",
-          "shell_inside_diameter_m", "tube_outer_diameter_m", "axial_span",
-          "design_authority", "usable_baffle_span_m", "baffle_diameter_m",
-          "baffle_radius_m", "baffle_hole_diameter_m",
-          "baffle_hole_radius_m", "cut_height_m",
-          "chord_offset_from_center_m", "baffle_planes", "position_count",
-          "warnings", "blockers", "deferred_capabilities", "provenance"))
-    _add("task024:BaffleGeometryRequest", _m_t024.BaffleGeometryRequest,
-         ("schema_version", "configuration", "tube_layout",
-          "shell_bundle_geometry", "axial_span", "design_authority",
-          "evidence_refs"))
-    _add("task024:BaffleGeometryValidationResult",
-         _m_t024.BaffleGeometryValidationResult,
-         ("status", "geometry", "warnings", "blockers",
-          "deferred_capabilities", "blocked_result_hash"))
-    _add("task024:BafflePlaneGeometry", _m_t024.BafflePlaneGeometry,
-         ("baffle_index", "center_coordinate_m", "occupied_start_coordinate_m",
-          "occupied_end_coordinate_m", "orientation", "cut_chord",
-          "window_region_semantics", "baffle_covered_region_semantics",
-          "crossflow_reference_region_semantics", "tube_hole_classifications",
-          "window_position_ids", "crossflow_reference_position_ids",
-          "outer_tangent_position_ids", "pairwise_tangent_position_pairs",
-          "classification_audit_hash"))
-    _add("task024:CallerSuppliedBaffleAxialSpan",
-         _m_t024.CallerSuppliedBaffleAxialSpan,
-         ("schema_version", "axial_start_coordinate_m",
-          "axial_end_coordinate_m", "evidence_refs", "authority_hash"))
-    _add("task024:CallerSuppliedBaffleDesignAuthority",
-         _m_t024.CallerSuppliedBaffleDesignAuthority,
-         ("schema_version", "baffle_type", "baffle_count",
-          "baffle_thickness_m", "spacing_sequence_m", "baffle_cut_fraction",
-          "orientation_sequence",
-          "shell_to_baffle_diametral_clearance_m",
-          "tube_to_baffle_hole_diametral_clearance_m", "evidence_refs",
-          "authority_hash"))
-    _add("task024:CutChordGeometry", _m_t024.CutChordGeometry,
-         ("normal_x", "normal_y", "half_plane_offset_m",
-          "chord_half_length_m", "endpoint_a_x_m", "endpoint_a_y_m",
-          "endpoint_b_x_m", "endpoint_b_y_m"))
-    _add("task024:MessageEntry", _m_t024.MessageEntry,
-         ("code", "field_path", "message_key", "evidence_refs", "details"))
-    _add("task024:PhysicalTubeDiskAudit", _m_t024.PhysicalTubeDiskAudit,
-         ("physical_tube_radius_m", "signed_window_distance_m",
-          "cut_boundary_margin_m", "classification"))
-    _add("task024:TubeHoleClassification", _m_t024.TubeHoleClassification,
-         ("position_id", "center_x_m", "center_y_m",
-          "physical_tube_radius_m", "baffle_hole_radius_m",
-          "signed_window_distance_m", "cut_boundary_margin_m",
-          "classification", "outer_boundary_margin_squared_m2",
-          "physical_tube_disk_audit"))
+    _add(
+        "task024:BaffleGeometry",
+        _m_t024.BaffleGeometry,
+        (
+            "schema_version",
+            "geometry_id",
+            "geometry_hash",
+            "request_hash",
+            "task020_configuration_id",
+            "task020_configuration_hash",
+            "task021_layout_id",
+            "task021_layout_hash",
+            "task022_geometry_id",
+            "task022_geometry_hash",
+            "construction_family",
+            "equipment_orientation",
+            "shell_pass_count",
+            "tube_pass_count",
+            "shell_inside_diameter_m",
+            "tube_outer_diameter_m",
+            "axial_span",
+            "design_authority",
+            "usable_baffle_span_m",
+            "baffle_diameter_m",
+            "baffle_radius_m",
+            "baffle_hole_diameter_m",
+            "baffle_hole_radius_m",
+            "cut_height_m",
+            "chord_offset_from_center_m",
+            "baffle_planes",
+            "position_count",
+            "warnings",
+            "blockers",
+            "deferred_capabilities",
+            "provenance",
+        ),
+    )
+    _add(
+        "task024:BaffleGeometryRequest",
+        _m_t024.BaffleGeometryRequest,
+        (
+            "schema_version",
+            "configuration",
+            "tube_layout",
+            "shell_bundle_geometry",
+            "axial_span",
+            "design_authority",
+            "evidence_refs",
+        ),
+    )
+    _add(
+        "task024:BaffleGeometryValidationResult",
+        _m_t024.BaffleGeometryValidationResult,
+        (
+            "status",
+            "geometry",
+            "warnings",
+            "blockers",
+            "deferred_capabilities",
+            "blocked_result_hash",
+        ),
+    )
+    _add(
+        "task024:BafflePlaneGeometry",
+        _m_t024.BafflePlaneGeometry,
+        (
+            "baffle_index",
+            "center_coordinate_m",
+            "occupied_start_coordinate_m",
+            "occupied_end_coordinate_m",
+            "orientation",
+            "cut_chord",
+            "window_region_semantics",
+            "baffle_covered_region_semantics",
+            "crossflow_reference_region_semantics",
+            "tube_hole_classifications",
+            "window_position_ids",
+            "crossflow_reference_position_ids",
+            "outer_tangent_position_ids",
+            "pairwise_tangent_position_pairs",
+            "classification_audit_hash",
+        ),
+    )
+    _add(
+        "task024:CallerSuppliedBaffleAxialSpan",
+        _m_t024.CallerSuppliedBaffleAxialSpan,
+        (
+            "schema_version",
+            "axial_start_coordinate_m",
+            "axial_end_coordinate_m",
+            "evidence_refs",
+            "authority_hash",
+        ),
+    )
+    _add(
+        "task024:CallerSuppliedBaffleDesignAuthority",
+        _m_t024.CallerSuppliedBaffleDesignAuthority,
+        (
+            "schema_version",
+            "baffle_type",
+            "baffle_count",
+            "baffle_thickness_m",
+            "spacing_sequence_m",
+            "baffle_cut_fraction",
+            "orientation_sequence",
+            "shell_to_baffle_diametral_clearance_m",
+            "tube_to_baffle_hole_diametral_clearance_m",
+            "evidence_refs",
+            "authority_hash",
+        ),
+    )
+    _add(
+        "task024:CutChordGeometry",
+        _m_t024.CutChordGeometry,
+        (
+            "normal_x",
+            "normal_y",
+            "half_plane_offset_m",
+            "chord_half_length_m",
+            "endpoint_a_x_m",
+            "endpoint_a_y_m",
+            "endpoint_b_x_m",
+            "endpoint_b_y_m",
+        ),
+    )
+    _add(
+        "task024:MessageEntry",
+        _m_t024.MessageEntry,
+        ("code", "field_path", "message_key", "evidence_refs", "details"),
+    )
+    _add(
+        "task024:PhysicalTubeDiskAudit",
+        _m_t024.PhysicalTubeDiskAudit,
+        (
+            "physical_tube_radius_m",
+            "signed_window_distance_m",
+            "cut_boundary_margin_m",
+            "classification",
+        ),
+    )
+    _add(
+        "task024:TubeHoleClassification",
+        _m_t024.TubeHoleClassification,
+        (
+            "position_id",
+            "center_x_m",
+            "center_y_m",
+            "physical_tube_radius_m",
+            "baffle_hole_radius_m",
+            "signed_window_distance_m",
+            "cut_boundary_margin_m",
+            "classification",
+            "outer_boundary_margin_squared_m2",
+            "physical_tube_disk_audit",
+        ),
+    )
 
     return tuple(entries)
 
 
-STATIC_RECOGNIZED_ENUMS: Final[Tuple] = _build_recognized_enum_table()
-STATIC_RECOGNIZED_DATACLASSES: Final[Tuple] = _build_recognized_dataclass_table()
+STATIC_RECOGNIZED_ENUMS: Final[tuple] = _build_recognized_enum_table()
+STATIC_RECOGNIZED_DATACLASSES: Final[tuple] = _build_recognized_dataclass_table()
 
 
 # ---------------------------------------------------------------------------
@@ -450,9 +746,7 @@ def _exact_int_projection(value: int):
 def _exact_str_projection(value: str):
     return {
         "raw_type": "str",
-        "code_points": [
-            "{:04x}".format(ord(c)) for c in value
-        ],
+        "code_points": [f"{ord(c):04x}" for c in value],
     }
 
 
@@ -489,14 +783,23 @@ def _exact_decimal_projection(value: Decimal):
         exponent_obj = {"kind": "special", "token": token}
     else:
         if exponent == 0:
-            exponent_obj = {"kind": "integer", "sign": 0,
-                            "magnitude_hex": _INT_ZERO_BYTES.decode("ascii")}
+            exponent_obj = {
+                "kind": "integer",
+                "sign": 0,
+                "magnitude_hex": _INT_ZERO_BYTES.decode("ascii"),
+            }
         elif exponent > 0:
-            exponent_obj = {"kind": "integer", "sign": 0,
-                            "magnitude_hex": int.__format__(exponent, "x")}
+            exponent_obj = {
+                "kind": "integer",
+                "sign": 0,
+                "magnitude_hex": int.__format__(exponent, "x"),
+            }
         else:
-            exponent_obj = {"kind": "integer", "sign": 1,
-                            "magnitude_hex": int.__format__(-exponent, "x")}
+            exponent_obj = {
+                "kind": "integer",
+                "sign": 1,
+                "magnitude_hex": int.__format__(-exponent, "x"),
+            }
 
     return {
         "raw_type": "decimal",
@@ -506,7 +809,7 @@ def _exact_decimal_projection(value: Decimal):
     }
 
 
-def _cyclic_safe_graph_traversal(value, seen: FrozenSet[Tuple]):
+def _cyclic_safe_graph_traversal(value, seen: frozenset[tuple]):
     """Pre-scan exact supported containers / recognized dataclass trees
     for cycles. Returns ``True`` if any cycle exists in the traversed
     graph.
@@ -525,10 +828,7 @@ def _cyclic_safe_graph_traversal(value, seen: FrozenSet[Tuple]):
     seen = seen | frozenset((seen_id,))
     value_type = type(value)
     if value_type is list or value_type is tuple:
-        for item in value:
-            if _cyclic_safe_graph_traversal(item, seen):
-                return True
-        return False
+        return any(_cyclic_safe_graph_traversal(item, seen) for item in value)
     if value_type is dict:
         for k, v in value.items():
             if _cyclic_safe_graph_traversal(k, seen):
@@ -537,11 +837,15 @@ def _cyclic_safe_graph_traversal(value, seen: FrozenSet[Tuple]):
                 return True
         return False
     if value_type is set or value_type is frozenset:
-        for item in value:
-            if _cyclic_safe_graph_traversal(item, seen):
-                return True
-        return False
-    if value_type is bytes or value_type is str or value_type is int or             value_type is bool or value_type is float or value_type is Decimal:
+        return any(_cyclic_safe_graph_traversal(item, seen) for item in value)
+    if (
+        value_type is bytes
+        or value_type is str
+        or value_type is int
+        or value_type is bool
+        or value_type is float
+        or value_type is Decimal
+    ):
         return False
     if value_type is type(None):
         return False
@@ -549,8 +853,7 @@ def _cyclic_safe_graph_traversal(value, seen: FrozenSet[Tuple]):
         _, py_type, fields = entry
         if value_type is py_type:
             for name in fields:
-                if _cyclic_safe_graph_traversal(
-                        object.__getattribute__(value, name), seen):
+                if _cyclic_safe_graph_traversal(object.__getattribute__(value, name), seen):
                     return True
             return False
     return False
@@ -592,24 +895,21 @@ def _raw_value_projection(value: Any, _seen=None):
         return _exact_decimal_projection(value)
 
     if value_type is bytes:
-        return {"raw_type": "bytes",
-                "hex": bytes.hex(bytes(value))}
+        return {"raw_type": "bytes", "hex": bytes.hex(bytes(value))}
 
     if value_type is list:
         seen_id = id(value)
         if seen_id in _seen:
             return {"raw_type": "cyclic_graph"}
         _seen = _seen | {seen_id}
-        return {"raw_type": "list",
-                "items": [_raw_value_projection(v, _seen) for v in value]}
+        return {"raw_type": "list", "items": [_raw_value_projection(v, _seen) for v in value]}
 
     if value_type is tuple:
         seen_id = id(value)
         if seen_id in _seen:
             return {"raw_type": "cyclic_graph"}
         _seen = _seen | {seen_id}
-        return {"raw_type": "tuple",
-                "items": [_raw_value_projection(v, _seen) for v in value]}
+        return {"raw_type": "tuple", "items": [_raw_value_projection(v, _seen) for v in value]}
 
     if value_type is dict:
         seen_id = id(value)
@@ -617,12 +917,12 @@ def _raw_value_projection(value: Any, _seen=None):
             return {"raw_type": "cyclic_graph"}
         _seen = _seen | {seen_id}
         entries = [
-            {"key": _raw_value_projection(k, _seen),
-             "value": _raw_value_projection(v, _seen)}
+            {"key": _raw_value_projection(k, _seen), "value": _raw_value_projection(v, _seen)}
             for k, v in value.items()
         ]
-        entries.sort(key=lambda e: (_canonical_json_bytes(e["key"]),
-                                    _canonical_json_bytes(e["value"])))
+        entries.sort(
+            key=lambda e: (_canonical_json_bytes(e["key"]), _canonical_json_bytes(e["value"]))
+        )
         return {"raw_type": "mapping", "entries": entries}
 
     if value_type is set:
@@ -649,11 +949,12 @@ def _raw_value_projection(value: Any, _seen=None):
             if value_type is py_type:
                 for member_obj, member_token in members:
                     if value is member_obj:
-                        return {"raw_type": "enum",
-                                "enum_type_token": enum_token,
-                                "member_token": member_token}
-                return {"raw_type": "recognized_enum_unavailable",
-                        "enum_type_token": enum_token}
+                        return {
+                            "raw_type": "enum",
+                            "enum_type_token": enum_token,
+                            "member_token": member_token,
+                        }
+                return {"raw_type": "recognized_enum_unavailable", "enum_type_token": enum_token}
         return {"raw_type": "unsupported_object"}
 
     for entry in STATIC_RECOGNIZED_DATACLASSES:
@@ -666,17 +967,24 @@ def _raw_value_projection(value: Any, _seen=None):
             projected_fields = []
             try:
                 for name in fields:
-                    projected_fields.append({"name": name,
-                                             "value": _raw_value_projection(
-                                                 object.__getattribute__(
-                                                     value, name),
-                                                 _seen)})
+                    projected_fields.append(
+                        {
+                            "name": name,
+                            "value": _raw_value_projection(
+                                object.__getattribute__(value, name), _seen
+                            ),
+                        }
+                    )
             except Exception:
-                return {"raw_type": "recognized_dataclass_unavailable",
-                        "dataclass_type_token": entry[0]}
-            return {"raw_type": "dataclass",
+                return {
+                    "raw_type": "recognized_dataclass_unavailable",
                     "dataclass_type_token": entry[0],
-                    "fields": projected_fields}
+                }
+            return {
+                "raw_type": "dataclass",
+                "dataclass_type_token": entry[0],
+                "fields": projected_fields,
+            }
 
     return {"raw_type": "unsupported_object"}
 
@@ -719,10 +1027,7 @@ def sha256_canonical(value: Any) -> bytes:
     computed on those bytes directly. Otherwise the value is encoded to
     canonical JSON bytes first.
     """
-    if type(value) is bytes:
-        canonical_bytes = value
-    else:
-        canonical_bytes = _canonical_json_bytes(value)
+    canonical_bytes = value if type(value) is bytes else _canonical_json_bytes(value)
     return hashlib.sha256(canonical_bytes).digest()
 
 

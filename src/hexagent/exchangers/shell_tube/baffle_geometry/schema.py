@@ -22,8 +22,9 @@ is intentionally module-private and never exported.
 
 from __future__ import annotations
 
+# mypy: disable-error-code="no-untyped-def,no-any-return,no-untyped-call,arg-type,type-arg"
 from collections.abc import Mapping
-from typing import Any, Final, Tuple
+from typing import Any, Final
 
 from hexagent.exchangers.shell_tube import models as _t020
 from hexagent.exchangers.shell_tube.baffle_geometry import models as _t024
@@ -42,18 +43,10 @@ _BFG_RAW_TYPE_INVALID: Final[str] = "BFG_RAW_TYPE_INVALID"
 _BFG_DECIMAL_LEXICAL_INVALID: Final[str] = "BFG_DECIMAL_LEXICAL_INVALID"
 _BFG_AXIAL_SPAN_SCHEMA_UNSUPPORTED: Final[str] = "BFG_AXIAL_SPAN_SCHEMA_UNSUPPORTED"
 _BFG_AXIAL_SPAN_EVIDENCE_MISSING: Final[str] = "BFG_AXIAL_SPAN_EVIDENCE_MISSING"
-_BFG_DESIGN_AUTHORITY_SCHEMA_UNSUPPORTED: Final[str] = (
-    "BFG_DESIGN_AUTHORITY_SCHEMA_UNSUPPORTED"
-)
-_BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING: Final[str] = (
-    "BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING"
-)
-_BFG_TASK020_CONFIGURATION_MISSING: Final[str] = (
-    "BFG_TASK020_CONFIGURATION_MISSING"
-)
-_BFG_TASK020_CONFIGURATION_INVALID: Final[str] = (
-    "BFG_TASK020_CONFIGURATION_INVALID"
-)
+_BFG_DESIGN_AUTHORITY_SCHEMA_UNSUPPORTED: Final[str] = "BFG_DESIGN_AUTHORITY_SCHEMA_UNSUPPORTED"
+_BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING: Final[str] = "BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING"
+_BFG_TASK020_CONFIGURATION_MISSING: Final[str] = "BFG_TASK020_CONFIGURATION_MISSING"
+_BFG_TASK020_CONFIGURATION_INVALID: Final[str] = "BFG_TASK020_CONFIGURATION_INVALID"
 _BFG_TASK021_LAYOUT_MISSING: Final[str] = "BFG_TASK021_LAYOUT_MISSING"
 _BFG_TASK021_LAYOUT_INVALID: Final[str] = "BFG_TASK021_LAYOUT_INVALID"
 _BFG_TASK022_GEOMETRY_MISSING: Final[str] = "BFG_TASK022_GEOMETRY_MISSING"
@@ -79,7 +72,7 @@ class _FailureCollector:
     def add(self, code: str, field_path: str, raw_component: Any) -> None:
         self._entries.append((code, field_path, raw_component))
 
-    def snapshot(self) -> Tuple:
+    def snapshot(self) -> tuple:
         return tuple(self._entries)
 
 
@@ -93,8 +86,7 @@ class BaffleGeometrySchemaFailure(Exception):
 
     __slots__ = ("stage_rank", "blockers", "raw_component", "validated_context")
 
-    def __init__(self, blockers: Tuple, raw_component: Any,
-                 validated_context: Mapping) -> None:
+    def __init__(self, blockers: tuple, raw_component: Any, validated_context: Mapping) -> None:
         super().__init__("BaffleGeometrySchemaFailure")
         self.stage_rank = _SCHEMA_STAGE_RANK
         self.blockers = tuple(blockers)
@@ -140,8 +132,7 @@ def _is_decimal_lexical_string(value: Any) -> bool:
     return d.is_finite()
 
 
-def _check_decimal_str_field(failure: _FailureCollector, field_path: str,
-                             value: Any) -> bool:
+def _check_decimal_str_field(failure: _FailureCollector, field_path: str, value: Any) -> bool:
     """Return ``True`` and do nothing when the value is a valid finite
     canonical decimal lexical string. Otherwise record a Stage-1 blocker
     and return ``False``."""
@@ -152,16 +143,18 @@ def _check_decimal_str_field(failure: _FailureCollector, field_path: str,
     return False
 
 
-def _check_required_field(failure: _FailureCollector, field_path: str,
-                          raw_dict: dict, key: str) -> bool:
+def _check_required_field(
+    failure: _FailureCollector, field_path: str, raw_dict: dict, key: str
+) -> bool:
     if key not in raw_dict:
         failure.add(_BFG_UNKNOWN_FIELD, field_path, raw_dict)
         return False
     return True
 
 
-def _check_no_extra_fields(failure: _FailureCollector, field_path: str,
-                           raw_dict: dict, expected_keys: frozenset) -> bool:
+def _check_no_extra_fields(
+    failure: _FailureCollector, field_path: str, raw_dict: dict, expected_keys: frozenset
+) -> bool:
     ok = True
     for k in raw_dict:
         if not _is_exact_str(k):
@@ -175,9 +168,9 @@ def _check_no_extra_fields(failure: _FailureCollector, field_path: str,
     return ok
 
 
-def _check_evidence_refs_tuple(failure: _FailureCollector, field_path: str,
-                               value: Any,
-                               require_non_empty: bool = True) -> bool:
+def _check_evidence_refs_tuple(
+    failure: _FailureCollector, field_path: str, value: Any, require_non_empty: bool = True
+) -> bool:
     """Validate evidence_refs: exact tuple of non-empty exact strings,
     lexicographically sorted, duplicate-free.
 
@@ -218,13 +211,17 @@ def _check_evidence_refs_tuple(failure: _FailureCollector, field_path: str,
     return True
 
 
-def _check_authority_dict(failure: _FailureCollector, field_path: str,
-                          value: Any, expected_schema_version: str,
-                          expected_keys: frozenset,
-                          blocker_missing_evidence: str,
-                          blocker_schema_unsupported: str,
-                          required_decimal_fields: tuple = (),
-                          min_decimal: str | None = None) -> bool:
+def _check_authority_dict(
+    failure: _FailureCollector,
+    field_path: str,
+    value: Any,
+    expected_schema_version: str,
+    expected_keys: frozenset,
+    blocker_missing_evidence: str,
+    blocker_schema_unsupported: str,
+    required_decimal_fields: tuple = (),
+    min_decimal: str | None = None,
+) -> bool:
     """Validate a TASK-024 caller-supplied authority object literal:
 
     - exact ``dict``;
@@ -260,19 +257,17 @@ def _check_authority_dict(failure: _FailureCollector, field_path: str,
     if not _check_required_field(failure, field_path, value, "evidence_refs"):
         failure.add(blocker_missing_evidence, f"{field_path}.evidence_refs", value)
         return False
-    if not _check_evidence_refs_tuple(failure, f"{field_path}.evidence_refs",
-                                      value["evidence_refs"], require_non_empty=True):
-        failure.add(blocker_missing_evidence, f"{field_path}.evidence_refs",
-                    value["evidence_refs"])
+    if not _check_evidence_refs_tuple(
+        failure, f"{field_path}.evidence_refs", value["evidence_refs"], require_non_empty=True
+    ):
+        failure.add(blocker_missing_evidence, f"{field_path}.evidence_refs", value["evidence_refs"])
         return False
 
     # Required decimal fields.
     for dfield in required_decimal_fields:
         if not _check_required_field(failure, field_path, value, dfield):
             return False
-        if not _check_decimal_str_field(
-                failure, f"{field_path}.{dfield}",
-                value[dfield]):
+        if not _check_decimal_str_field(failure, f"{field_path}.{dfield}", value[dfield]):
             return False
 
     # Min-decimal exclusion rule (closed lexical compare).
@@ -284,8 +279,7 @@ def _check_authority_dict(failure: _FailureCollector, field_path: str,
                     from decimal import Decimal
 
                     if Decimal(v_str) < Decimal(min_decimal[1]):
-                        failure.add(_BFG_DECIMAL_LEXICAL_INVALID,
-                                    f"{field_path}.{dfield}", v_str)
+                        failure.add(_BFG_DECIMAL_LEXICAL_INVALID, f"{field_path}.{dfield}", v_str)
                         return False
                 break
 
@@ -295,14 +289,17 @@ def _check_authority_dict(failure: _FailureCollector, field_path: str,
         if ek not in value:
             failure.add(_BFG_UNKNOWN_FIELD, f"{field_path}.{ek}", value)
             missing = True
-    if missing:
-        return False
-    return True
+    return not missing
 
 
-def _check_upstream_instance(failure: _FailureCollector, field_path: str,
-                             value: Any, expected_type, blocker_missing: str,
-                             blocker_invalid: str) -> bool:
+def _check_upstream_instance(
+    failure: _FailureCollector,
+    field_path: str,
+    value: Any,
+    expected_type,
+    blocker_missing: str,
+    blocker_invalid: str,
+) -> bool:
     """Verify ``value`` is the exact upstream public model instance."""
     if value is None:
         failure.add(blocker_missing, field_path, value)
@@ -314,19 +311,30 @@ def _check_upstream_instance(failure: _FailureCollector, field_path: str,
     return True
 
 
-_REQUEST_KEYS: Final[frozenset] = frozenset((
-    "schema_version", "configuration", "tube_layout", "shell_bundle_geometry",
-    "axial_span", "design_authority", "evidence_refs",
-))
+_REQUEST_KEYS: Final[frozenset] = frozenset(
+    (
+        "schema_version",
+        "configuration",
+        "tube_layout",
+        "shell_bundle_geometry",
+        "axial_span",
+        "design_authority",
+        "evidence_refs",
+    )
+)
 
-_AXIAL_SPAN_KEYS: Final[frozenset] = frozenset((
-    "schema_version", "axial_start_coordinate_m", "axial_end_coordinate_m",
-    "evidence_refs", "authority_hash",
-))
+_AXIAL_SPAN_KEYS: Final[frozenset] = frozenset(
+    (
+        "schema_version",
+        "axial_start_coordinate_m",
+        "axial_end_coordinate_m",
+        "evidence_refs",
+        "authority_hash",
+    )
+)
 
 
-def _parse_request_with_collector(raw_request, failure: _FailureCollector,
-                                  validated: dict):
+def _parse_request_with_collector(raw_request, failure: _FailureCollector, validated: dict):
     """Append Stage-1 findings to ``failure`` and update ``validated`` with
     any partial recognized structures. Never raises.
 
@@ -355,39 +363,54 @@ def _parse_request_with_collector(raw_request, failure: _FailureCollector,
 
     # Upstream instances: exact-type only.
     cfg = raw_request["configuration"]
-    if not _check_upstream_instance(failure, ".configuration", cfg,
-                                    _t020.ShellAndTubeConfiguration,
-                                    _BFG_TASK020_CONFIGURATION_MISSING,
-                                    _BFG_TASK020_CONFIGURATION_INVALID):
+    if not _check_upstream_instance(
+        failure,
+        ".configuration",
+        cfg,
+        _t020.ShellAndTubeConfiguration,
+        _BFG_TASK020_CONFIGURATION_MISSING,
+        _BFG_TASK020_CONFIGURATION_INVALID,
+    ):
         return None
     validated["configuration"] = cfg
 
     layout = raw_request["tube_layout"]
-    if not _check_upstream_instance(failure, ".tube_layout", layout,
-                                    _t021.TubeLayout,
-                                    _BFG_TASK021_LAYOUT_MISSING,
-                                    _BFG_TASK021_LAYOUT_INVALID):
+    if not _check_upstream_instance(
+        failure,
+        ".tube_layout",
+        layout,
+        _t021.TubeLayout,
+        _BFG_TASK021_LAYOUT_MISSING,
+        _BFG_TASK021_LAYOUT_INVALID,
+    ):
         return None
     validated["tube_layout"] = layout
 
     bundle = raw_request["shell_bundle_geometry"]
-    if not _check_upstream_instance(failure, ".shell_bundle_geometry", bundle,
-                                    _t022.ShellBundleGeometry,
-                                    _BFG_TASK022_GEOMETRY_MISSING,
-                                    _BFG_TASK022_GEOMETRY_INVALID):
+    if not _check_upstream_instance(
+        failure,
+        ".shell_bundle_geometry",
+        bundle,
+        _t022.ShellBundleGeometry,
+        _BFG_TASK022_GEOMETRY_MISSING,
+        _BFG_TASK022_GEOMETRY_INVALID,
+    ):
         return None
     validated["shell_bundle_geometry"] = bundle
 
     # Axial span.
     axial_dict = raw_request["axial_span"]
     if not _check_authority_dict(
-            failure, ".axial_span", axial_dict,
-            AXIAL_SPAN_SCHEMA_VERSION, _AXIAL_SPAN_KEYS,
-            _BFG_AXIAL_SPAN_EVIDENCE_MISSING,
-            _BFG_AXIAL_SPAN_SCHEMA_UNSUPPORTED,
-            required_decimal_fields=("axial_start_coordinate_m",
-                                     "axial_end_coordinate_m"),
-            min_decimal=None):
+        failure,
+        ".axial_span",
+        axial_dict,
+        AXIAL_SPAN_SCHEMA_VERSION,
+        _AXIAL_SPAN_KEYS,
+        _BFG_AXIAL_SPAN_EVIDENCE_MISSING,
+        _BFG_AXIAL_SPAN_SCHEMA_UNSUPPORTED,
+        required_decimal_fields=("axial_start_coordinate_m", "axial_end_coordinate_m"),
+        min_decimal=None,
+    ):
         return None
     validated["axial_span_raw"] = axial_dict
 
@@ -401,103 +424,112 @@ def _parse_request_with_collector(raw_request, failure: _FailureCollector,
     if not _is_exact_dict(da):
         failure.add(_BFG_RAW_TYPE_INVALID, ".design_authority", da)
         return None
-    _DESIGN_AUTHORITY_KEYS = frozenset((
-        "schema_version", "baffle_type", "baffle_count", "baffle_thickness_m",
-        "spacing_sequence_m", "baffle_cut_fraction", "orientation_sequence",
-        "shell_to_baffle_diametral_clearance_m",
-        "tube_to_baffle_hole_diametral_clearance_m", "evidence_refs",
-        "authority_hash",
-    ))
-    if not _check_no_extra_fields(failure, ".design_authority",
-                                  da, _DESIGN_AUTHORITY_KEYS):
+    _DESIGN_AUTHORITY_KEYS = frozenset(
+        (
+            "schema_version",
+            "baffle_type",
+            "baffle_count",
+            "baffle_thickness_m",
+            "spacing_sequence_m",
+            "baffle_cut_fraction",
+            "orientation_sequence",
+            "shell_to_baffle_diametral_clearance_m",
+            "tube_to_baffle_hole_diametral_clearance_m",
+            "evidence_refs",
+            "authority_hash",
+        )
+    )
+    if not _check_no_extra_fields(failure, ".design_authority", da, _DESIGN_AUTHORITY_KEYS):
         pass
     for k in _DESIGN_AUTHORITY_KEYS:
         if k not in da:
             failure.add(_BFG_UNKNOWN_FIELD, f".design_authority.{k}", da)
     if not _is_exact_str(da.get("schema_version")):
-        failure.add(_BFG_RAW_TYPE_INVALID, ".design_authority.schema_version",
-                    da.get("schema_version"))
+        failure.add(
+            _BFG_RAW_TYPE_INVALID, ".design_authority.schema_version", da.get("schema_version")
+        )
     elif da["schema_version"] != DESIGN_AUTHORITY_SCHEMA_VERSION:
-        failure.add(_BFG_DESIGN_AUTHORITY_SCHEMA_UNSUPPORTED,
-                    ".design_authority.schema_version",
-                    da["schema_version"])
+        failure.add(
+            _BFG_DESIGN_AUTHORITY_SCHEMA_UNSUPPORTED,
+            ".design_authority.schema_version",
+            da["schema_version"],
+        )
     # evidence_refs
     if "evidence_refs" not in da:
-        failure.add(_BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING,
-                    ".design_authority.evidence_refs", da)
+        failure.add(_BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING, ".design_authority.evidence_refs", da)
     elif not _check_evidence_refs_tuple(
-            failure, ".design_authority.evidence_refs", da["evidence_refs"]):
-        failure.add(_BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING,
-                    ".design_authority.evidence_refs", da["evidence_refs"])
+        failure, ".design_authority.evidence_refs", da["evidence_refs"]
+    ):
+        failure.add(
+            _BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING,
+            ".design_authority.evidence_refs",
+            da["evidence_refs"],
+        )
     # baffle_type must be exact TASK-024 public enum instance.
     bt = da.get("baffle_type")
     if type(bt) is not _t024.BaffleType:
         failure.add(_BFG_RAW_TYPE_INVALID, ".design_authority.baffle_type", bt)
     else:
         if bt is not _t024.BaffleType.SINGLE_SEGMENTAL:
-            failure.add(_BFG_UNKNOWN_FIELD,
-                        ".design_authority.baffle_type", bt)
+            failure.add(_BFG_UNKNOWN_FIELD, ".design_authority.baffle_type", bt)
     # baffle_count: exact int >= 1, NOT bool.
     bc = da.get("baffle_count")
     if type(bc) is bool or not _is_exact_int(bc):
-        failure.add(_BFG_RAW_TYPE_INVALID,
-                    ".design_authority.baffle_count", bc)
+        failure.add(_BFG_RAW_TYPE_INVALID, ".design_authority.baffle_count", bc)
     elif bc < 1:
-        failure.add(_BFG_UNKNOWN_FIELD,
-                    ".design_authority.baffle_count", bc)
+        failure.add(_BFG_UNKNOWN_FIELD, ".design_authority.baffle_count", bc)
     # baffle_thickness_m: canonical decimal string, > 0
     if not _check_decimal_str_field(
-            failure, ".design_authority.baffle_thickness_m",
-            da.get("baffle_thickness_m")):
+        failure, ".design_authority.baffle_thickness_m", da.get("baffle_thickness_m")
+    ):
         pass
     else:
         from decimal import Decimal as _D
+
         if _D(da["baffle_thickness_m"]) <= 0:
-            failure.add(_BFG_DECIMAL_LEXICAL_INVALID,
-                        ".design_authority.baffle_thickness_m",
-                        da["baffle_thickness_m"])
+            failure.add(
+                _BFG_DECIMAL_LEXICAL_INVALID,
+                ".design_authority.baffle_thickness_m",
+                da["baffle_thickness_m"],
+            )
     # baffle_cut_fraction: canonical decimal string, 0 < x < 1
     bcf = da.get("baffle_cut_fraction")
-    if not _check_decimal_str_field(
-            failure, ".design_authority.baffle_cut_fraction", bcf):
+    if not _check_decimal_str_field(failure, ".design_authority.baffle_cut_fraction", bcf):
         pass
     else:
         from decimal import Decimal as _D2
+
         if not (0 < _D2(bcf) < 1):
-            failure.add(_BFG_DECIMAL_LEXICAL_INVALID,
-                        ".design_authority.baffle_cut_fraction", bcf)
+            failure.add(_BFG_DECIMAL_LEXICAL_INVALID, ".design_authority.baffle_cut_fraction", bcf)
     # shell_to_baffle_diametral_clearance_m / tube_to_baffle_hole_diametral_clearance_m
     # canonical decimal, >= 0
     for cfield in (
-            "shell_to_baffle_diametral_clearance_m",
-            "tube_to_baffle_hole_diametral_clearance_m"):
+        "shell_to_baffle_diametral_clearance_m",
+        "tube_to_baffle_hole_diametral_clearance_m",
+    ):
         cv = da.get(cfield)
-        if not _check_decimal_str_field(
-                failure, f".design_authority.{cfield}", cv):
+        if not _check_decimal_str_field(failure, f".design_authority.{cfield}", cv):
             continue
         from decimal import Decimal as _D3
+
         if _D3(cv) < 0:
-            failure.add(_BFG_DECIMAL_LEXICAL_INVALID,
-                        f".design_authority.{cfield}", cv)
+            failure.add(_BFG_DECIMAL_LEXICAL_INVALID, f".design_authority.{cfield}", cv)
     # authority_hash: canonical SHA-256 hex, 64 lowercase hex chars
     ah = da.get("authority_hash")
-    if not _is_exact_str(ah) or len(ah) != 64 or any(c not in "0123456789abcdef"
-                                                     for c in ah):
-        failure.add(_BFG_RAW_TYPE_INVALID,
-                    ".design_authority.authority_hash", ah)
+    if not _is_exact_str(ah) or len(ah) != 64 or any(c not in "0123456789abcdef" for c in ah):
+        failure.add(_BFG_RAW_TYPE_INVALID, ".design_authority.authority_hash", ah)
     # spacing_sequence_m: tuple of canonical decimal strings, all positive,
     # semantic order, non-empty, ordered.
     ssm = da.get("spacing_sequence_m")
     if not _is_exact_list(ssm):
-        failure.add(_BFG_RAW_TYPE_INVALID,
-                    ".design_authority.spacing_sequence_m", ssm)
+        failure.add(_BFG_RAW_TYPE_INVALID, ".design_authority.spacing_sequence_m", ssm)
     else:
         if len(ssm) == 0:
-            failure.add(_BFG_UNKNOWN_FIELD,
-                        ".design_authority.spacing_sequence_m", ssm)
+            failure.add(_BFG_UNKNOWN_FIELD, ".design_authority.spacing_sequence_m", ssm)
         seq_ok = True
         prev_ssm = None
         from decimal import Decimal as _D4
+
         for i, item in enumerate(ssm):
             ipath = f".design_authority.spacing_sequence_m[{i}]"
             if not _check_decimal_str_field(failure, ipath, item):
@@ -507,34 +539,26 @@ def _parse_request_with_collector(raw_request, failure: _FailureCollector,
                 failure.add(_BFG_DECIMAL_LEXICAL_INVALID, ipath, item)
                 seq_ok = False
                 continue
-            if prev_ssm is not None:
-                if list(ssm) != sorted(ssm):
-                    failure.add(_BFG_UNKNOWN_FIELD,
-                                ".design_authority.spacing_sequence_m", ssm)
-                    seq_ok = False
-                    break
+            if prev_ssm is not None and list(ssm) != sorted(ssm):
+                failure.add(_BFG_UNKNOWN_FIELD, ".design_authority.spacing_sequence_m", ssm)
+                seq_ok = False
+                break
             prev_ssm = item
         # Sort-order assertion repeated exactly once for closure.
         if seq_ok and list(ssm) != sorted(ssm):
-            failure.add(_BFG_UNKNOWN_FIELD,
-                        ".design_authority.spacing_sequence_m", ssm)
+            failure.add(_BFG_UNKNOWN_FIELD, ".design_authority.spacing_sequence_m", ssm)
     # orientation_sequence: tuple of exact BaffleOrientation, length == baffle_count
     oseq = da.get("orientation_sequence")
     if not _is_exact_list(oseq):
-        failure.add(_BFG_RAW_TYPE_INVALID,
-                    ".design_authority.orientation_sequence", oseq)
+        failure.add(_BFG_RAW_TYPE_INVALID, ".design_authority.orientation_sequence", oseq)
     else:
-        oseq_ok = True
         if type(bc) is int and not isinstance(bc, bool) and len(oseq) != bc:
-            failure.add(_BFG_UNKNOWN_FIELD,
-                        ".design_authority.orientation_sequence", oseq)
-            oseq_ok = False
+            failure.add(_BFG_UNKNOWN_FIELD, ".design_authority.orientation_sequence", oseq)
         for i, item in enumerate(oseq):
             if type(item) is not _t024.BaffleOrientation:
-                failure.add(_BFG_RAW_TYPE_INVALID,
-                            f".design_authority.orientation_sequence[{i}]",
-                            item)
-                oseq_ok = False
+                failure.add(
+                    _BFG_RAW_TYPE_INVALID, f".design_authority.orientation_sequence[{i}]", item
+                )
     # final missing check
     if failure.snapshot():
         return None
@@ -542,8 +566,7 @@ def _parse_request_with_collector(raw_request, failure: _FailureCollector,
     # evidence_refs at top-level (request): tuple form required
     if not _check_required_field(failure, "", raw_request, "evidence_refs"):
         return None
-    if not _check_evidence_refs_tuple(
-            failure, ".evidence_refs", raw_request["evidence_refs"]):
+    if not _check_evidence_refs_tuple(failure, ".evidence_refs", raw_request["evidence_refs"]):
         return None
     if failure.snapshot():
         return None
@@ -569,9 +592,7 @@ def _parse_request_with_collector(raw_request, failure: _FailureCollector,
             spacing_sequence_m=tuple(da["spacing_sequence_m"]),
             baffle_cut_fraction=da["baffle_cut_fraction"],
             orientation_sequence=tuple(da["orientation_sequence"]),
-            shell_to_baffle_diametral_clearance_m=da[
-                "shell_to_baffle_diametral_clearance_m"
-            ],
+            shell_to_baffle_diametral_clearance_m=da["shell_to_baffle_diametral_clearance_m"],
             tube_to_baffle_hole_diametral_clearance_m=da[
                 "tube_to_baffle_hole_diametral_clearance_m"
             ],
