@@ -16,12 +16,11 @@ Type map (referenced from the TASK-024 design sections 6 through 8):
 - Section 8.5 PhysicalTubeDiskAudit (4 fields)
 - Section 8.6 TubeHoleClassification (10 fields + nested audit)
 - Section 8.7 BafflePlaneGeometry (15 fields)
-- Section 8.8 BaffleGeometry (32 fields)
+- Section 8.8 BaffleGeometry (31 fields)
 - Section 8.9 BaffleGeometryValidationResult (6 fields)
 - Section 13 MessageEntry (5 fields)
 - Section 11 BlockerCode (57 codes)
 - Section 12 WarningCode (8 codes)
-
 """
 
 from __future__ import annotations
@@ -29,7 +28,6 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass
 from typing import Any
-
 
 ###############################################################################
 # Section 6.2 - Closed enum: BaffleType
@@ -92,18 +90,22 @@ class BlockerCode(enum.Enum):
     BFG_UNKNOWN_FIELD = "BFG_UNKNOWN_FIELD"
     BFG_RAW_TYPE_INVALID = "BFG_RAW_TYPE_INVALID"
     BFG_DECIMAL_LEXICAL_INVALID = "BFG_DECIMAL_LEXICAL_INVALID"
+
     BFG_TASK020_CONFIGURATION_MISSING = "BFG_TASK020_CONFIGURATION_MISSING"
     BFG_TASK020_CONFIGURATION_INVALID = "BFG_TASK020_CONFIGURATION_INVALID"
     BFG_TASK020_CONFIGURATION_IDENTITY_MISMATCH = "BFG_TASK020_CONFIGURATION_IDENTITY_MISMATCH"
+
     BFG_TASK021_LAYOUT_MISSING = "BFG_TASK021_LAYOUT_MISSING"
     BFG_TASK021_LAYOUT_INVALID = "BFG_TASK021_LAYOUT_INVALID"
     BFG_TASK021_LAYOUT_HAS_BLOCKERS = "BFG_TASK021_LAYOUT_HAS_BLOCKERS"
     BFG_TASK021_LAYOUT_IDENTITY_MISMATCH = "BFG_TASK021_LAYOUT_IDENTITY_MISMATCH"
     BFG_TASK021_LAYOUT_HAS_NO_POSITIONS = "BFG_TASK021_LAYOUT_HAS_NO_POSITIONS"
+
     BFG_TASK022_GEOMETRY_MISSING = "BFG_TASK022_GEOMETRY_MISSING"
     BFG_TASK022_GEOMETRY_INVALID = "BFG_TASK022_GEOMETRY_INVALID"
     BFG_TASK022_GEOMETRY_HAS_BLOCKERS = "BFG_TASK022_GEOMETRY_HAS_BLOCKERS"
     BFG_TASK022_GEOMETRY_IDENTITY_MISMATCH = "BFG_TASK022_GEOMETRY_IDENTITY_MISMATCH"
+
     BFG_UPSTREAM_CONFIGURATION_BINDING_MISMATCH = "BFG_UPSTREAM_CONFIGURATION_BINDING_MISMATCH"
     BFG_UPSTREAM_LAYOUT_BINDING_MISMATCH = "BFG_UPSTREAM_LAYOUT_BINDING_MISMATCH"
     BFG_UPSTREAM_TUBE_GEOMETRY_BINDING_MISMATCH = "BFG_UPSTREAM_TUBE_GEOMETRY_BINDING_MISMATCH"
@@ -111,18 +113,22 @@ class BlockerCode(enum.Enum):
     BFG_UPSTREAM_ORIENTATION_MISMATCH = "BFG_UPSTREAM_ORIENTATION_MISMATCH"
     BFG_UPSTREAM_PASS_COUNT_MISMATCH = "BFG_UPSTREAM_PASS_COUNT_MISMATCH"
     BFG_UPSTREAM_POSITION_COUNT_MISMATCH = "BFG_UPSTREAM_POSITION_COUNT_MISMATCH"
+
     BFG_CONSTRUCTION_FAMILY_UNSUPPORTED = "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED"
     BFG_SHELL_PASS_COUNT_UNSUPPORTED = "BFG_SHELL_PASS_COUNT_UNSUPPORTED"
     BFG_BAFFLE_TYPE_UNSUPPORTED = "BFG_BAFFLE_TYPE_UNSUPPORTED"
+
     BFG_AXIAL_SPAN_MISSING = "BFG_AXIAL_SPAN_MISSING"
     BFG_AXIAL_SPAN_SCHEMA_UNSUPPORTED = "BFG_AXIAL_SPAN_SCHEMA_UNSUPPORTED"
     BFG_AXIAL_SPAN_EVIDENCE_MISSING = "BFG_AXIAL_SPAN_EVIDENCE_MISSING"
     BFG_AXIAL_SPAN_AUTHORITY_HASH_MISMATCH = "BFG_AXIAL_SPAN_AUTHORITY_HASH_MISMATCH"
     BFG_AXIAL_SPAN_INVALID = "BFG_AXIAL_SPAN_INVALID"
+
     BFG_DESIGN_AUTHORITY_MISSING = "BFG_DESIGN_AUTHORITY_MISSING"
     BFG_DESIGN_AUTHORITY_SCHEMA_UNSUPPORTED = "BFG_DESIGN_AUTHORITY_SCHEMA_UNSUPPORTED"
     BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING = "BFG_DESIGN_AUTHORITY_EVIDENCE_MISSING"
     BFG_DESIGN_AUTHORITY_HASH_MISMATCH = "BFG_DESIGN_AUTHORITY_HASH_MISMATCH"
+
     BFG_BAFFLE_COUNT_INVALID = "BFG_BAFFLE_COUNT_INVALID"
     BFG_BAFFLE_THICKNESS_INVALID = "BFG_BAFFLE_THICKNESS_INVALID"
     BFG_SPACING_SEQUENCE_CARDINALITY_MISMATCH = "BFG_SPACING_SEQUENCE_CARDINALITY_MISMATCH"
@@ -133,18 +139,23 @@ class BlockerCode(enum.Enum):
     BFG_BAFFLE_CUT_INVALID = "BFG_BAFFLE_CUT_INVALID"
     BFG_SHELL_TO_BAFFLE_CLEARANCE_INVALID = "BFG_SHELL_TO_BAFFLE_CLEARANCE_INVALID"
     BFG_TUBE_TO_BAFFLE_HOLE_CLEARANCE_INVALID = "BFG_TUBE_TO_BAFFLE_HOLE_CLEARANCE_INVALID"
+
     BFG_BAFFLE_DIAMETER_INVALID = "BFG_BAFFLE_DIAMETER_INVALID"
     BFG_BAFFLE_HOLE_DIAMETER_INVALID = "BFG_BAFFLE_HOLE_DIAMETER_INVALID"
     BFG_BAFFLE_THICKNESS_OUTSIDE_ACTIVE_SPAN = "BFG_BAFFLE_THICKNESS_OUTSIDE_ACTIVE_SPAN"
     BFG_BAFFLE_SOLIDS_OVERLAP = "BFG_BAFFLE_SOLIDS_OVERLAP"
     BFG_CHORD_CALCULATION_FAILED = "BFG_CHORD_CALCULATION_FAILED"
+
     BFG_BAFFLE_HOLE_DISK_TANGENT_TO_CUT_BOUNDARY = "BFG_BAFFLE_HOLE_DISK_TANGENT_TO_CUT_BOUNDARY"
     BFG_BAFFLE_HOLE_DISK_INTERSECTS_CUT_BOUNDARY = "BFG_BAFFLE_HOLE_DISK_INTERSECTS_CUT_BOUNDARY"
     BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK = "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
     BFG_BAFFLE_HOLE_DISKS_OVERLAP = "BFG_BAFFLE_HOLE_DISKS_OVERLAP"
     BFG_POSITION_CLASSIFICATION_INCOMPLETE = "BFG_POSITION_CLASSIFICATION_INCOMPLETE"
+
     BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION = "BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION"
+
     BFG_CANONICALIZATION_FAILED = "BFG_CANONICALIZATION_FAILED"
+
 
 ###############################################################################
 # Section 12 - Closed warning taxonomy (8 codes)
@@ -159,9 +170,16 @@ class WarningCode(enum.Enum):
     BFG_NOZZLE_POSITION_DEFERRED = "BFG_NOZZLE_POSITION_DEFERRED"
     BFG_THERMAL_HYDRAULIC_DEFERRED = "BFG_THERMAL_HYDRAULIC_DEFERRED"
     BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM = "BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM"
-    BFG_BAFFLE_SOLID_TANGENCY_NOT_MANUFACTURING_ADEQUACY = "BFG_BAFFLE_SOLID_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
-    BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY = "BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
-    BFG_BAFFLE_HOLE_PAIR_TANGENCY_NOT_MANUFACTURING_ADEQUACY = "BFG_BAFFLE_HOLE_PAIR_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+    BFG_BAFFLE_SOLID_TANGENCY_NOT_MANUFACTURING_ADEQUACY = (
+        "BFG_BAFFLE_SOLID_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+    )
+    BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY = (
+        "BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+    )
+    BFG_BAFFLE_HOLE_PAIR_TANGENCY_NOT_MANUFACTURING_ADEQUACY = (
+        "BFG_BAFFLE_HOLE_PAIR_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+    )
+
 
 ###############################################################################
 # Section 8.1 - CallerSuppliedBaffleAxialSpan
@@ -177,6 +195,7 @@ class CallerSuppliedBaffleAxialSpan:
     axial_end_coordinate_m: str
     evidence_refs: tuple[str, ...]
     authority_hash: str
+
 
 ###############################################################################
 # Section 8.2 - CallerSuppliedBaffleDesignAuthority
@@ -199,6 +218,7 @@ class CallerSuppliedBaffleDesignAuthority:
     evidence_refs: tuple[str, ...]
     authority_hash: str
 
+
 ###############################################################################
 # Section 8.4 - CutChordGeometry
 ###############################################################################
@@ -217,6 +237,7 @@ class CutChordGeometry:
     endpoint_b_x_m: str
     endpoint_b_y_m: str
 
+
 ###############################################################################
 # Section 8.5 - PhysicalTubeDiskAudit
 ###############################################################################
@@ -230,6 +251,7 @@ class PhysicalTubeDiskAudit:
     signed_window_distance_m: str
     cut_boundary_margin_m: str
     classification: TubeRegionClassification
+
 
 ###############################################################################
 # Section 8.6 - TubeHoleClassification (with nested audit)
@@ -250,6 +272,7 @@ class TubeHoleClassification:
     classification: TubeRegionClassification
     outer_boundary_margin_squared_m2: str
     physical_tube_disk_audit: PhysicalTubeDiskAudit
+
 
 ###############################################################################
 # Section 8.7 - BafflePlaneGeometry
@@ -276,6 +299,7 @@ class BafflePlaneGeometry:
     pairwise_tangent_position_pairs: tuple[tuple[str, str], ...]
     classification_audit_hash: str
 
+
 ###############################################################################
 # Section 13 - MessageEntry (frozen shape)
 ###############################################################################
@@ -291,14 +315,15 @@ class MessageEntry:
     evidence_refs: tuple[str, ...]
     details: tuple[tuple[str, str], ...]
 
+
 ###############################################################################
-# Section 8.8 - BaffleGeometry (32 fields)
+# Section 8.8 - BaffleGeometry (31 fields)
 ###############################################################################
 
 
 @dataclass(frozen=True, eq=True)
 class BaffleGeometry:
-    """Section 8.8 - Frozen complete baffle geometry result (32 fields)."""
+    """Section 8.8 - Frozen complete baffle geometry result (31 fields)."""
 
     schema_version: str
     geometry_id: str
@@ -332,6 +357,7 @@ class BaffleGeometry:
     deferred_capabilities: tuple[str, ...]
     provenance: tuple[tuple[str, Any], ...]
 
+
 ###############################################################################
 # Section 8.9 - BaffleGeometryValidationResult (6 fields)
 ###############################################################################
@@ -347,6 +373,7 @@ class BaffleGeometryValidationResult:
     blockers: tuple[MessageEntry, ...]
     deferred_capabilities: tuple[str, ...]
     blocked_result_hash: str | None
+
 
 ###############################################################################
 # Section 8.3 - BaffleGeometryRequest (in-memory typed)
@@ -365,6 +392,7 @@ class BaffleGeometryRequest:
     design_authority: CallerSuppliedBaffleDesignAuthority
     evidence_refs: tuple[str, ...]
 
+
 ###############################################################################
 # Section 6.1 - Schema constants
 ###############################################################################
@@ -372,9 +400,49 @@ class BaffleGeometryRequest:
 
 REQUEST_SCHEMA_VERSION = "task024.baffle-geometry-request.v1"
 AXIAL_SPAN_SCHEMA_VERSION = "task024.baffle-axial-span.v1"
-DESIGN_AUTHORITY_SCHEMA_VERSION = "task024.baffle-design-authority.v1"
+# Build the broken-line value via char codes (avoid display-truncation trap)
+_dav_codes = [
+    116,
+    97,
+    115,
+    107,
+    48,
+    50,
+    52,
+    46,
+    98,
+    97,
+    102,
+    102,
+    108,
+    101,
+    45,
+    100,
+    101,
+    115,
+    105,
+    103,
+    110,
+    45,
+    97,
+    117,
+    116,
+    104,
+    111,
+    114,
+    105,
+    116,
+    121,
+    46,
+    118,
+    49,
+]
+DAV_VALUE = "".join(chr(c) for c in _dav_codes)
+DESIGN_AUTHORITY_SCHEMA_VERSION = DAV_VALUE
+RESULT_SCHEMA_VERSION = "task024.baffle-geometry.v1"
 PROFILE_ID = "hxforge.shell_tube.baffle_geometry.v1"
 DESIGN_CONTRACT_PATH = "docs/tasks/TASK-024-shell-and-tube-baffle-geometry-and-spacing.md"
+
 
 ###############################################################################
 # Section 7.3 - Strict-precedence discipline tokens (3 frozen booleans)
@@ -385,6 +453,7 @@ CLASSIFICATION_BEFORE_PUBLIC_OUTPUT_QUANTIZATION = True
 BOUNDARY_PREDICATES_USE_UNQUANTIZED_DECIMAL_DERIVATIONS = True
 PUBLIC_OUTPUT_QUANTIZATION_MUST_NOT_CHANGE_CLASSIFICATION = True
 
+
 ###############################################################################
 # Section 3.2 + 3.3 - Closed unsupported and deferred sets
 ###############################################################################
@@ -394,6 +463,7 @@ UNSUPPORTED_FAMILIES: tuple[str, ...] = (
     "FLOATING_HEAD",
     "U_TUBE",
 )
+
 
 DEFERRED_CAPABILITIES: tuple[str, ...] = (
     "CROSSFLOW_FLOW_AREA_NOT_COMPUTABLE",
@@ -424,6 +494,7 @@ DEFERRED_CAPABILITIES: tuple[str, ...] = (
     "GOLDEN_VALIDATION_NOT_COMPUTABLE",
 )
 
+
 ###############################################################################
 # Section 8 - Frozen semantic tokens for region semantics
 ###############################################################################
@@ -433,13 +504,9 @@ WINDOW_REGION_SEMANTICS = "BAFFLE_DISK_INTERSECTION_WINDOW_HALF_PLANE"
 BAFFLE_COVERED_REGION_SEMANTICS = "BAFFLE_DISK_MINUS_WINDOW_SEGMENT"
 CROSSFLOW_REFERENCE_REGION_SEMANTICS = "CLASSIFICATION_REFERENCE_ONLY_NOT_FLOW_AREA"
 
+
 ###############################################################################
 # Public exports
-#
-# Note (Section 16): BaffleGeometrySchemaFailure is intentionally NOT defined
-# in this module. Per design contract Section 4.4 + Section 16 + Section 18, that
-# internal exception belongs to schema.py (which is created in a later round).
-# Models.py carries only immutable identity + closed-enum + frozen code-tokens.
 ###############################################################################
 
 
