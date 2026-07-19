@@ -1218,18 +1218,40 @@ def _process_one_baffle(
     tuple[_RankedMessage, ...],
     tuple[_RankedMessage, ...],
     _BafflePlaneFoundation | None,
+    int,
 ]:
     """Process a single baffle through Stages 13 / 14 / 15 / 16.
 
-    Returns ``(blockers, warnings, plane_or_none)``.
+    Returns ``(blockers, warnings, plane_or_none, last_completed_stage_rank)``.
+
+    The ``last_completed_stage_rank`` is an **explicit tracker**: it starts
+    at 12 (the last fully completed stage before the per-baffle loop
+    started) and is only advanced *after* a per-baffle stage finishes
+    without producing a blocker. When a blocker fires inside this
+    function, the tracker is frozen at the last per-baffle stage that
+    fully completed, and that frozen value is returned. Callers MUST
+    NOT recompute it from blocker rank.
     """
     blockers: list[_RankedMessage] = []
     warnings: list[_RankedMessage] = []
 
+    # Explicit per-baffle tracker. Advances 12 -> 13 -> 14 -> 15 -> 16
+    # only after the corresponding stage fully completes. Frozen when
+    # the first blocker fires; the frozen value is returned as the 4th
+    # tuple element so the orchestrator never has to derive the last
+    # completed stage from blocker metadata.
+    per_baffle_completed: int = _STAGE_12_RANK
+
     chord_blockers, chord = _stage13_chord(derived, orientation)
     if chord_blockers or chord is None:
         blockers.extend(chord_blockers)
-        return tuple(blockers), tuple(warnings), None
+        return (
+            tuple(blockers),
+            tuple(warnings),
+            None,
+            per_baffle_completed,
+        )
+    per_baffle_completed = _STAGE_13_RANK
 
     baffle_radius = derived["baffle_radius"]
     baffle_hole_radius = derived["baffle_hole_radius"]
@@ -1240,9 +1262,26 @@ def _process_one_baffle(
     crossflow_ids: list[str] = []
     outer_tangent_ids: list[str] = []
 
-    # Stage 14 + 15.
+    # Stage 14 + 15: per-position sweep. The explicit tracker
+    # advances 13 -> 14 after Stage 14 succeeds for the current
+    # position, and 14 -> 15 after Stage 15 succeeds for the current
+    # position. To preserve the original "collect all blockers"
+    # semantics, blockers from Stage 14 and Stage 15 do not early-
+    # return; they ``continue`` so the loop can visit every position.
+    # The tracker is **frozen at its value at the first blocker** and
+    # must not advance past that point on subsequent blocker
+    # positions, so that the returned tracker value reflects the
+    # earliest stage at which any blocker fired.
     per_position_state: dict[str, tuple[_t024.TubeRegionClassification, Decimal, Decimal]] = {}
     sorted_positions = sorted(parsed_positions, key=lambda item: item[0])
+
+    # Freeze flag: once any blocker has fired, do not advance the
+    # explicit tracker past the value it had at the first blocker.
+    tracker_frozen: bool = False
+    # Saved value at the first blocker (when tracker_frozen was
+    # set). All subsequent blocker positions leave the tracker at
+    # this saved value.
+    frozen_tracker: int = _STAGE_13_RANK
 
     for position_id, x_m, y_m in sorted_positions:
         (
@@ -1260,9 +1299,21 @@ def _process_one_baffle(
         )
         if pos_blockers:
             blockers.extend(pos_blockers)
+            if not tracker_frozen:
+                frozen_tracker = per_baffle_completed
+                tracker_frozen = True
+            continue
+        if tracker_frozen:
+            # Tracker frozen by an earlier blocker; do not advance.
             continue
         if classification is None:
+            # Stage 14 emitted no classification for this position
+            # (degenerate case). The tracker stays at 13.
             continue
+
+        # Stage 14 succeeded for this position: advance the explicit
+        # tracker to 14 before Stage 15 runs.
+        per_baffle_completed = _STAGE_14_RANK
 
         # Stage 15: outer containment.
         inside_ok, outer_margin_squared = _outer_containment_check(
@@ -1290,6 +1341,9 @@ def _process_one_baffle(
                     ),
                 )
             )
+            if not tracker_frozen:
+                frozen_tracker = per_baffle_completed
+                tracker_frozen = True
             continue
 
         is_outer_tangent = outer_margin_squared == _CANONICAL_ZERO
@@ -1338,8 +1392,21 @@ def _process_one_baffle(
             y_m,
         )
 
+        # Stage 15 succeeded for this position. Advance the explicit
+        # tracker to 15.
+        per_baffle_completed = _STAGE_15_RANK
+
     if blockers:
-        return tuple(blockers), tuple(warnings), None
+        # Per-baffle Stages 14 + 15 produced blockers. The explicit
+        # tracker was frozen at the value it had at the first blocker;
+        # the frozen value reflects the earliest stage at which any
+        # blocker fired. We MUST NOT recompute it from blocker ranks.
+        return (
+            tuple(blockers),
+            tuple(warnings),
+            None,
+            frozen_tracker,
+        )
 
     # Stage 16: covered-region (CROSSFLOW_REFERENCE) pairwise overlap.
     crossflow_sorted = sorted(crossflow_ids)
@@ -1437,7 +1504,18 @@ def _process_one_baffle(
     warnings.extend(tangency_warnings)
 
     if blockers:
-        return tuple(blockers), tuple(warnings), None
+        # Stage 16 produced blockers; the explicit tracker stays at 15
+        # (the value it had after Stages 14 + 15 succeeded).
+        return (
+            tuple(blockers),
+            tuple(warnings),
+            None,
+            per_baffle_completed,
+        )
+
+    # All four per-baffle stages completed without blockers. Advance
+    # the explicit tracker to 16.
+    per_baffle_completed = _STAGE_16_RANK
 
     classifications_tuple = tuple(classifications)
     classification_foundation = _PlaneClassificationFoundation(
@@ -1462,7 +1540,12 @@ def _process_one_baffle(
         crossflow_reference_region_semantics=_CROSSFLOW_REFERENCE_REGION_SEMANTICS,
         classifications=classification_foundation,
     )
-    return tuple(blockers), tuple(warnings), plane
+    return (
+        tuple(blockers),
+        tuple(warnings),
+        plane,
+        per_baffle_completed,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1746,7 +1829,12 @@ def compute_geometry_foundation(
     planes: list[_BafflePlaneFoundation] = []
     orientations = tuple(request.design_authority.orientation_sequence)
     for baffle_index in range(baffle_count):
-        per_baffle_blockers, per_baffle_warnings, plane = _process_one_baffle(
+        (
+            per_baffle_blockers,
+            per_baffle_warnings,
+            plane,
+            per_baffle_completed_stage_rank,
+        ) = _process_one_baffle(
             request,
             baffle_index=baffle_index,
             orientation=orientations[baffle_index],
@@ -1756,20 +1844,16 @@ def compute_geometry_foundation(
         warnings.extend(per_baffle_warnings)
         if per_baffle_blockers or plane is None:
             # ``completed_stage_rank`` carries the rank of the last
-            # fully-completed validation stage. Stages 12 (axial
-            # solids) finished before the per-baffle loop started; if
-            # the loop produced blockers from Stage 13 / 14 / 15 / 16
-            # the per-baffle stage progression was interrupted. The
-            # last *fully completed* per-baffle stage is therefore
-            # ``min(blocker.validation_stage_rank) - 1`` when blockers
-            # exist (e.g. a Stage 15 blocker means Stage 14 was the
-            # last per-baffle stage to complete, so the rank is 14).
-            # If the loop returned ``plane is None`` without blockers
-            # (defensive fallback), the value stays at the Stage 12
-            # rank, which is the last fully-completed gate.
+            # fully-completed validation stage. The per-baffle loop
+            # (Stages 13-16) returns its last-completed rank as an
+            # **explicit tracker** value from ``_process_one_baffle``;
+            # callers MUST NOT recompute it from blocker metadata.
+            # Defensive fallback: if the loop returned ``plane is None``
+            # without blockers, the orchestrator's own explicit tracker
+            # (which still holds the Stage 12 rank from earlier) is the
+            # authoritative last-completed value.
             if per_baffle_blockers:
-                failed_rank = min(rm.validation_stage_rank for rm in per_baffle_blockers)
-                last_completed_rank = failed_rank - 1
+                last_completed_rank = per_baffle_completed_stage_rank
             else:
                 last_completed_rank = completed_stage_rank
             return _GeometryFoundationResult(
