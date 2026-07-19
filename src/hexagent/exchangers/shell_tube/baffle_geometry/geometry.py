@@ -1703,7 +1703,7 @@ def compute_geometry_foundation(
     if stage9_blockers or parsed is None:
         return _GeometryFoundationResult(
             geometry=None,
-            completed_stage_rank=_STAGE_9_RANK,
+            completed_stage_rank=completed_stage_rank,
             warnings=_freeze_warnings(()),
             blockers=_freeze_blockers(stage9_blockers),
         )
@@ -1713,7 +1713,7 @@ def compute_geometry_foundation(
     if stage10_blockers or baffle_count is None or center_planes is None:
         return _GeometryFoundationResult(
             geometry=None,
-            completed_stage_rank=_STAGE_10_RANK,
+            completed_stage_rank=completed_stage_rank,
             warnings=_freeze_warnings(()),
             blockers=_freeze_blockers(stage10_blockers),
         )
@@ -1723,7 +1723,7 @@ def compute_geometry_foundation(
     if stage11_blockers or derived is None:
         return _GeometryFoundationResult(
             geometry=None,
-            completed_stage_rank=_STAGE_11_RANK,
+            completed_stage_rank=completed_stage_rank,
             warnings=_freeze_warnings(()),
             blockers=_freeze_blockers(stage11_blockers),
         )
@@ -1736,7 +1736,7 @@ def compute_geometry_foundation(
     if stage12_blockers or intervals is None:
         return _GeometryFoundationResult(
             geometry=None,
-            completed_stage_rank=_STAGE_12_RANK,
+            completed_stage_rank=completed_stage_rank,
             warnings=_freeze_warnings(warnings),
             blockers=_freeze_blockers(stage12_blockers),
         )
@@ -1755,14 +1755,26 @@ def compute_geometry_foundation(
         )
         warnings.extend(per_baffle_warnings)
         if per_baffle_blockers or plane is None:
-            # Determine the highest stage rank that produced a blocker.
-            highest_rank = _STAGE_13_RANK
-            for rm in per_baffle_blockers:
-                if rm.validation_stage_rank > highest_rank:
-                    highest_rank = rm.validation_stage_rank
+            # ``completed_stage_rank`` carries the rank of the last
+            # fully-completed validation stage. Stages 12 (axial
+            # solids) finished before the per-baffle loop started; if
+            # the loop produced blockers from Stage 13 / 14 / 15 / 16
+            # the per-baffle stage progression was interrupted. The
+            # last *fully completed* per-baffle stage is therefore
+            # ``min(blocker.validation_stage_rank) - 1`` when blockers
+            # exist (e.g. a Stage 15 blocker means Stage 14 was the
+            # last per-baffle stage to complete, so the rank is 14).
+            # If the loop returned ``plane is None`` without blockers
+            # (defensive fallback), the value stays at the Stage 12
+            # rank, which is the last fully-completed gate.
+            if per_baffle_blockers:
+                failed_rank = min(rm.validation_stage_rank for rm in per_baffle_blockers)
+                last_completed_rank = failed_rank - 1
+            else:
+                last_completed_rank = completed_stage_rank
             return _GeometryFoundationResult(
                 geometry=None,
-                completed_stage_rank=highest_rank,
+                completed_stage_rank=last_completed_rank,
                 warnings=_freeze_warnings(warnings),
                 blockers=_freeze_blockers(tuple(per_baffle_blockers)),
             )
@@ -1790,7 +1802,7 @@ def compute_geometry_foundation(
     if stage17_blockers:
         return _GeometryFoundationResult(
             geometry=None,
-            completed_stage_rank=_STAGE_17_RANK,
+            completed_stage_rank=completed_stage_rank,
             warnings=_freeze_warnings(warnings),
             blockers=_freeze_blockers(stage17_blockers),
         )
@@ -1810,7 +1822,7 @@ def compute_geometry_foundation(
     if stage18_blockers:
         return _GeometryFoundationResult(
             geometry=None,
-            completed_stage_rank=_STAGE_18_RANK,
+            completed_stage_rank=completed_stage_rank,
             warnings=_freeze_warnings(warnings),
             blockers=_freeze_blockers(stage18_blockers),
         )

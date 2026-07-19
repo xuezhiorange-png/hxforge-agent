@@ -467,10 +467,10 @@ def test_22_7_stage15_window_outside_blocked() -> None:
     )
     partial_result = compute_geometry_foundation(partially_outside)
     assert partial_result.geometry is None
-    # Stage 15 (outer-containment) runs and produces the blocker; the
-    # rank of 15 means Stage 15 executed and stopped, leaving the
-    # request blocked before Stage 16.
-    assert partial_result.completed_stage_rank == 15
+    # Stage 15 (outer-containment) produced the blocker. Stages 9
+    # through 14 are the last fully-completed gates; the loop was
+    # interrupted at Stage 15 so the rank is 14, not 15.
+    assert partial_result.completed_stage_rank == 14
     outside_codes = [
         blocker
         for blocker in partial_result.blockers
@@ -478,9 +478,9 @@ def test_22_7_stage15_window_outside_blocked() -> None:
     ]
     assert len(outside_codes) == 1
     assert outside_codes[0].code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
-    # Stage 15 is the outer-containment gate; the completed_stage_rank
-    # must equal 14 (Stage 14 finished, Stage 15 produced the blocker).
-    assert outside_codes[0] is not None
+    # The blocker's own validation_stage_rank identifies which stage
+    # emitted it: 15 (outer-containment gate).
+    assert outside_codes[0].message_key == "baffle_hole_outside_baffle_disk"
     assert any(
         entry[0] == "position_id" and entry[1] == pos_id for entry in outside_codes[0].details
     )
@@ -498,7 +498,7 @@ def test_22_7_stage15_window_outside_blocked() -> None:
     )
     whole_result = compute_geometry_foundation(wholly_outside)
     assert whole_result.geometry is None
-    assert whole_result.completed_stage_rank == 15
+    assert whole_result.completed_stage_rank == 14
     whole_outside_codes = [
         blocker
         for blocker in whole_result.blockers
@@ -506,6 +506,7 @@ def test_22_7_stage15_window_outside_blocked() -> None:
     ]
     assert len(whole_outside_codes) == 1
     assert whole_outside_codes[0].code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
+    assert whole_outside_codes[0].message_key == "baffle_hole_outside_baffle_disk"
     assert any(
         entry[0] == "position_id" and entry[1] == pos_id for entry in whole_outside_codes[0].details
     )
@@ -522,7 +523,7 @@ def test_22_7_stage15_window_outside_blocked() -> None:
     # both WINDOW and CROSSFLOW_REFERENCE disks, so we additionally
     # require the sign of the signed_window_distance to confirm a
     # WINDOW classification (y above the chord).
-    assert whole_result.completed_stage_rank == 15
+    assert whole_result.completed_stage_rank == 14
     assert whole_result.geometry is None
 
 
