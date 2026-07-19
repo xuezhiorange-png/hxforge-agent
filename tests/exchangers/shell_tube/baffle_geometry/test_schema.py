@@ -925,3 +925,63 @@ def test_31_baffle_geometry_schema_failure_carries_stage_rank_one() -> None:
     assert len(ei.value.blockers) == 1
     assert isinstance(ei.value.raw_component, dict)
     assert isinstance(ei.value.validated_context, dict)
+
+
+# ---------------------------------------------------------------------------
+# uuid5_from_hash frozen contract test (TASK-024 Round 5 mypy repair).
+# ---------------------------------------------------------------------------
+# Locks the helper's frozen UUID5 name contract: ``name`` is the
+# canonical lowercase hexadecimal string of ``sha256(payload)`` and
+# the namespace is ``uuid.UUID(bytes=bytes.fromhex(namespace_hex))``.
+# The test does NOT monkeypatch ``uuid.uuid5``; the expected UUID is
+# computed by an independent standard-library call so the production
+# helper is checked against an authoritative value.
+def test_22_13_uuid5_from_hash_frozen_name_contract() -> None:
+    import hashlib
+    import uuid as _uuid
+
+    namespace_hex = "0123456789abcdef0123456789abcdef"
+    payload = {
+        "task": "task024",
+        "kind": "frozen-contract-probe",
+        "version": 1,
+    }
+
+    # Spy on ``uuid.uuid5`` to assert the production helper passes
+    # a ``str`` (not ``bytes``) as the name argument. The spy does
+    # not change the returned UUID: it delegates to the real
+    # ``uuid.uuid5`` and only records the observed ``name`` type.
+    captured: dict[str, Any] = {}
+    real_uuid5 = _uuid.uuid5
+
+    def spy_uuid5(namespace: Any, name: Any) -> _uuid.UUID:
+        captured["namespace"] = namespace
+        captured["name_type"] = type(name).__name__
+        captured["name_value"] = name
+        return real_uuid5(namespace, name)
+
+    _uuid.uuid5 = spy_uuid5  # type: ignore[assignment]
+    try:
+        result = canonical.uuid5_from_hash(namespace_hex, payload)
+    finally:
+        _uuid.uuid5 = real_uuid5  # type: ignore[assignment]
+
+    assert captured["name_type"] == "str", (
+        f"uuid5_from_hash must pass a str name; got {captured['name_type']!r}"
+    )
+
+    # Authoritative expected value computed by an independent
+    # standard-library call using the same namespace and the
+    # lowercase hex string of sha256(canonical_json_bytes(payload)).
+    canonical_bytes = canonical.canonical_json_bytes(payload)
+    expected_name = hashlib.sha256(canonical_bytes).hexdigest()
+    expected_uuid = _uuid.uuid5(_uuid.UUID(bytes=bytes.fromhex(namespace_hex)), expected_name)
+    assert result == str(expected_uuid), (
+        f"uuid5_from_hash returned {result!r}, expected {str(expected_uuid)!r} "
+        f"for name={expected_name!r}"
+    )
+    assert captured["name_value"] == expected_name
+
+    # Also verify the helper raises ValueError on a bad namespace.
+    with pytest.raises(ValueError):
+        canonical.uuid5_from_hash("tooshort", payload)

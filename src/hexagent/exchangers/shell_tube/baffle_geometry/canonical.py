@@ -1070,13 +1070,28 @@ def uuid5_from_hash(namespace_hex: str, payload: Any) -> str:
     helper derives an effective namespace from a frozen hex literal so
     that the namespace can be reproduced without code execution
     dependencies.
+
+    The ``name`` argument to ``uuid.uuid5`` is the canonical lowercase
+    hexadecimal representation of the SHA-256 digest of
+    ``canonical_json_bytes(payload)``. Using the hex string (rather
+    than the raw 32-byte digest) satisfies ``uuid.uuid5``'s ``str``
+    name requirement and aligns with the rest of the baffle-geometry
+    module's hex-string conventions (compare
+    ``task022_geometry_id`` and ``task021_position_id``). The UUID
+    namespace is a ``uuid.UUID`` derived from the 32-char hex
+    ``namespace_hex`` literal.
     """
     if len(namespace_hex) != 32:
         raise ValueError("uuid5_from_hash requires a 32-char hex namespace")
     digest = hashlib.sha256(_canonical_json_bytes(payload)).digest()
     namespace_uuid_bytes = bytes.fromhex(namespace_hex)
     ns_uuid = uuid.UUID(bytes=namespace_uuid_bytes)
-    return str(uuid.uuid5(ns_uuid, digest))
+    # ``name`` is the canonical lowercase hex string of the SHA-256
+    # digest. This is the only valid ``str`` form of the hash and
+    # is consistent with how the rest of the baffle-geometry module
+    # expresses SHA-256 hashes.
+    name = digest.hex()
+    return str(uuid.uuid5(ns_uuid, name))
 
 
 DECIMAL_PRECISION: Final[int] = _DECIMAL_PRECISION
