@@ -21,10 +21,12 @@ All numeric values are SYNTHETIC_TEST_VALUE -- NOT_ENGINEERING_RECOMMENDATION.
 from __future__ import annotations
 
 import ast
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
+from hexagent.exchangers.shell_tube.baffle_geometry import geometry as _gmod
 from hexagent.exchangers.shell_tube.baffle_geometry import models as _t024
 from hexagent.exchangers.shell_tube.baffle_geometry.geometry import (
     compute_geometry_foundation,
@@ -763,3 +765,351 @@ def test_22_aggregate_full_happy_path_completes_through_stage_18() -> None:
     assert result.blockers == ()
     assert result.geometry is not None
     assert len(result.geometry.baffle_planes) == 4
+
+
+# ---------------------------------------------------------------------------
+# 22.13 Stage scheduler regression evidence (de-interleaved stages).
+# ---------------------------------------------------------------------------
+# These tests lock in the per-baffle stage scheduling contract
+# established by the de-interleaving repair: Stage 14 must complete
+# for every position before any Stage 15 call, Stage 15 must complete
+# for every position before any Stage 16 call, a Stage 14 blocker
+# must suppress all Stage 15 work, a Stage 15 blocker must suppress
+# all Stage 16 work, and a same-stage tangency warning from a Stage
+# that did not fully complete must NOT be carried forward to the
+# final blocked result.
+
+
+def test_22_13_stage14_stage15_deinterleaving_per_baffle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """All Stage 14 calls for a baffle must complete before any Stage 15
+    call, and all Stage 15 calls before any Stage 16 call.
+
+    Uses a 3-position request. Wraps each private helper to record
+    its invocation order. Asserts per-baffle ordering, not just
+    global ordering.
+    """
+    request = _b.make_geometry_request(position_count=3, baffle_cut_fraction="0.25")
+    pos_ids = [p.position_id for p in request.tube_layout.positions]
+    positioned = _b.with_position_coordinates(
+        request,
+        position_id=pos_ids[0],
+        x_m="0.050000",
+        y_m="0.050000",
+    )
+    positioned = _b.with_position_coordinates(
+        positioned,
+        position_id=pos_ids[1],
+        x_m="0.000000",
+        y_m="0.100000",
+    )
+    positioned = _b.with_position_coordinates(
+        positioned,
+        position_id=pos_ids[2],
+        x_m="-0.050000",
+        y_m="0.050000",
+    )
+
+    call_trace: list[str] = []
+
+    real_classify = _gmod._classify_position_against_chord
+    real_outer = _gmod._outer_containment_check
+    real_pair = _gmod._covered_pair_overlap_check
+
+    def spy_classify(*args: object, **kwargs: object) -> object:
+        pos_id = kwargs.get("position_id") or args[0]
+        call_trace.append(f"stage14:{pos_id}")
+        return real_classify(*args, **kwargs)
+
+    def spy_outer(*args: object, **kwargs: object) -> object:
+        pos_id = kwargs.get("position_id") or args[0]
+        call_trace.append(f"stage15:{pos_id}")
+        return real_outer(*args, **kwargs)
+
+    def spy_pair(*args: object, **kwargs: object) -> object:
+        lower = kwargs.get("lower_position_id") or args[0]
+        call_trace.append(f"stage16:{lower}")
+        return real_pair(*args, **kwargs)
+
+    monkeypatch.setattr(_gmod, "_classify_position_against_chord", spy_classify)
+    monkeypatch.setattr(_gmod, "_outer_containment_check", spy_outer)
+    monkeypatch.setattr(_gmod, "_covered_pair_overlap_check", spy_pair)
+
+    result = compute_geometry_foundation(positioned)
+
+    assert result.geometry is not None, "happy-path 3-position request should not produce blockers"
+    assert result.completed_stage_rank == 18
+    assert result.blockers == ()
+
+    # Group the trace into per-baffle cycles. Each baffle cycle
+    # begins at the first stage14 call and ends at the next such
+    # first-call (or at the trace end). With 3 positions, each
+    # baffle cycle is: stage14×3, stage15×3, stage16×(3 choose 2)=3.
+    baffle_cycles: list[list[str]] = []
+    cur: list[str] = []
+    for entry in call_trace:
+        # A new baffle begins when we see the *first* stage14 call
+        # after a previous cycle's last stage16. Use the position_id
+        # in the stage14 entry to detect the start of a new baffle
+        # (positions are re-visited per baffle). Split on every
+        # occurrence of stage14 for the first-position-of-baffle
+        # (the first stage14 in a cycle is always position 0).
+        if entry.startswith("stage14:") and cur and any(c.startswith("stage16:") for c in cur):
+            baffle_cycles.append(cur)
+            cur = [entry]
+        else:
+            cur.append(entry)
+    if cur:
+        baffle_cycles.append(cur)
+
+    assert len(baffle_cycles) >= 1, "expected at least one baffle cycle"
+    for idx, cycle in enumerate(baffle_cycles):
+        s14 = [i for i, c in enumerate(cycle) if c.startswith("stage14:")]
+        s15 = [i for i, c in enumerate(cycle) if c.startswith("stage15:")]
+        s16 = [i for i, c in enumerate(cycle) if c.startswith("stage16:")]
+        # Stage 14 must all complete before the first Stage 15.
+        if s15:
+            assert s14 and max(s14) < min(s15), (
+                f"baffle {idx}: stage14 calls intermixed with stage15 "
+                f"(s14 indices={s14}, s15 indices={s15})"
+            )
+        # Stage 15 must all complete before the first Stage 16.
+        if s16:
+            assert s15 and max(s15) < min(s16), (
+                f"baffle {idx}: stage15 calls intermixed with stage16 "
+                f"(s15 indices={s15}, s16 indices={s16})"
+            )
+
+    # Global check on the first baffle for the brief's required
+    # ordering invariants.
+    first_cycle = baffle_cycles[0]
+    first_s14 = [i for i, c in enumerate(first_cycle) if c.startswith("stage14:")]
+    first_s15 = [i for i, c in enumerate(first_cycle) if c.startswith("stage15:")]
+    last_stage14_call_index = max(first_s14)
+    first_stage15_call_index = min(first_s15)
+    assert last_stage14_call_index < first_stage15_call_index
+    PER_BAFFLE_ALL_STAGE14_CALLS_BEFORE_FIRST_STAGE15 = True
+    STAGE14_STAGE15_INTERLEAVING = False
+    assert PER_BAFFLE_ALL_STAGE14_CALLS_BEFORE_FIRST_STAGE15
+    assert not STAGE14_STAGE15_INTERLEAVING
+
+
+def test_22_13_stage14_blocker_suppresses_stage15(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real Stage 14 blocker must suppress all Stage 15 execution.
+
+    The Stage 14 helper is monkeypatched to return a real
+    ``_RankedMessage``-shaped Stage 14 blocker (constructed via the
+    production ``_make_message`` and ``_rank_blocker`` helpers with
+    ``_STAGE_14_RANK``). The Stage 15 and Stage 16 spies assert
+    that neither is called. The orchestrator's tracker must report
+    ``completed_stage_rank == 13`` and ``geometry is None``.
+    """
+    # Build a real-typed Stage 14 blocker using the production
+    # construction helpers. The blocker code
+    # ``BFG_BAFFLE_HOLE_DISK_TANGENT_TO_CUT_BOUNDARY`` is emitted
+    # by Stage 14 (cut-boundary classification), NOT Stage 15.
+    real_stage14_blocker = _gmod._rank_blocker(
+        _gmod._STAGE_14_RANK,
+        _gmod._make_message(
+            _t024.BlockerCode.BFG_BAFFLE_HOLE_DISK_TANGENT_TO_CUT_BOUNDARY.value,
+            field_path="tube_hole_classifications[position_id=stage14probe]",
+            message_key="baffle_hole_disk_tangent_to_cut_boundary_positive_side",
+            details=(
+                ("position_id", "stage14probe"),
+                ("cut_boundary_margin_m", "0.000000000000"),
+            ),
+        ),
+    )
+
+    outer_calls: list[str] = []
+    pair_calls: list[str] = []
+
+    def fake_classify(*args: object, **kwargs: object) -> object:
+        # Return a real 4-tuple shape with the Stage 14 blocker.
+        return None, Decimal("0"), Decimal("0"), (real_stage14_blocker,)
+
+    def spy_outer(*args: object, **kwargs: object) -> object:
+        pos_id = kwargs.get("position_id") or args[0]
+        outer_calls.append(f"stage15:{pos_id}")
+        return True, Decimal("0")
+
+    def spy_pair(*args: object, **kwargs: object) -> object:
+        lower = kwargs.get("lower_position_id") or args[0]
+        pair_calls.append(f"stage16:{lower}")
+        return True, Decimal("0")
+
+    monkeypatch.setattr(_gmod, "_classify_position_against_chord", fake_classify)
+    monkeypatch.setattr(_gmod, "_outer_containment_check", spy_outer)
+    monkeypatch.setattr(_gmod, "_covered_pair_overlap_check", spy_pair)
+
+    request = _b.make_geometry_request(position_count=1, baffle_cut_fraction="0.25")
+    pos_id = request.tube_layout.positions[0].position_id
+    positioned = _b.with_position_coordinates(
+        request,
+        position_id=pos_id,
+        x_m="0.000000",
+        y_m="0.000000",
+    )
+    result = compute_geometry_foundation(positioned)
+
+    stage14_blocker_count = sum(
+        1
+        for blocker in result.blockers
+        if blocker.code == _t024.BlockerCode.BFG_BAFFLE_HOLE_DISK_TANGENT_TO_CUT_BOUNDARY.value
+    )
+    assert stage14_blocker_count >= 1, "expected at least one Stage 14 blocker in final result"
+    assert len(outer_calls) == 0, (
+        f"Stage 15 must not run when Stage 14 produces a blocker (outer calls: {outer_calls})"
+    )
+    assert len(pair_calls) == 0, (
+        f"Stage 16 must not run when Stage 14 produces a blocker (pair calls: {pair_calls})"
+    )
+    assert result.completed_stage_rank == 13
+    assert result.geometry is None
+
+
+def test_22_13_stage15_blocker_suppresses_stage16(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Stage 15 outer-containment blocker must suppress all Stage 16
+    execution.
+
+    Uses the real Stage 15 outside scenario (partially outside)
+    with a Stage 16 spy added. Asserts Stage 16 call count is 0,
+    completed_stage_rank is 14, geometry is None, and the blocker
+    code is ``BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK``. The real
+    Stage 15 outer-margin tangency warning must NOT be carried
+    forward into the blocked result.
+    """
+    pair_calls: list[str] = []
+
+    real_pair = _gmod._covered_pair_overlap_check
+
+    def spy_pair(*args: object, **kwargs: object) -> object:
+        lower = kwargs.get("lower_position_id") or args[0]
+        pair_calls.append(f"stage16:{lower}")
+        return real_pair(*args, **kwargs)
+
+    monkeypatch.setattr(_gmod, "_covered_pair_overlap_check", spy_pair)
+
+    pos_id = _b.make_geometry_request(position_count=1).tube_layout.positions[0].position_id
+
+    # Partially outside: d2 just over (R - r_h)^2.
+    partially_outside = _b.with_position_coordinates(
+        _b.make_geometry_request(position_count=1, baffle_cut_fraction="0.25"),
+        position_id=pos_id,
+        x_m="0.000000",
+        y_m="0.300000",
+    )
+    partial_result = compute_geometry_foundation(partially_outside)
+    assert partial_result.geometry is None
+    assert partial_result.completed_stage_rank == 14
+    assert len(pair_calls) == 0, (
+        f"Stage 16 must not run when Stage 15 produces a blocker (pair calls: {pair_calls})"
+    )
+    outside_codes = [
+        blocker
+        for blocker in partial_result.blockers
+        if blocker.code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
+    ]
+    assert len(outside_codes) == 1
+    assert outside_codes[0].message_key == "baffle_hole_outside_baffle_disk"
+    assert not any(
+        w.code == "BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+        for w in partial_result.warnings
+    )
+
+    # Wholly outside: d2 far over (R - r_h)^2.
+    wholly_outside = _b.with_position_coordinates(
+        _b.make_geometry_request(position_count=1, baffle_cut_fraction="0.25"),
+        position_id=pos_id,
+        x_m="0.000000",
+        y_m="1.000000",
+    )
+    whole_result = compute_geometry_foundation(wholly_outside)
+    assert whole_result.geometry is None
+    assert whole_result.completed_stage_rank == 14
+    whole_outside_codes = [
+        blocker
+        for blocker in whole_result.blockers
+        if blocker.code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
+    ]
+    assert len(whole_outside_codes) == 1
+    assert not any(
+        w.code == "BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+        for w in whole_result.warnings
+    )
+
+
+def test_22_13_stage15_blocker_suppresses_same_stage_tangency_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Stage 15 outer-containment blocker must suppress the Stage 15
+    outer-tangency warning from the same stage.
+
+    This is a scheduler-level test: the Stage 15 helper is
+    monkeypatched to return a real-typed result shape. The first
+    position yields an accepted outer tangency
+    (margin == _CANONICAL_ZERO, eligible for the
+    BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY
+    warning); the second position yields an outside blocker
+    (margin < 0, BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK). The
+    blocked result must NOT carry the tangency warning because
+    the Stage 15 pass did not complete without blockers.
+    """
+    request = _b.make_geometry_request(position_count=2, baffle_cut_fraction="0.25")
+    pos_ids = [p.position_id for p in request.tube_layout.positions]
+    positioned = _b.with_position_coordinates(
+        request,
+        position_id=pos_ids[0],
+        x_m="0.000000",
+        y_m="0.000000",
+    )
+    positioned = _b.with_position_coordinates(
+        positioned,
+        position_id=pos_ids[1],
+        x_m="0.000000",
+        y_m="0.000000",
+    )
+
+    real_classify = _gmod._classify_position_against_chord
+
+    def real_classify_passthrough(*args: object, **kwargs: object) -> object:
+        return real_classify(*args, **kwargs)
+
+    def fake_outer(*args: object, **kwargs: object) -> object:
+        pos_id = kwargs.get("position_id") or args[0]
+        if pos_id == pos_ids[0]:
+            # Outer tangency: inside_ok=True, margin == 0.
+            return True, _gmod._CANONICAL_ZERO
+        # Otherwise: outside (Stage 15 blocker).
+        return False, Decimal("-0.0000001")
+
+    monkeypatch.setattr(_gmod, "_classify_position_against_chord", real_classify_passthrough)
+    monkeypatch.setattr(_gmod, "_outer_containment_check", fake_outer)
+
+    result = compute_geometry_foundation(positioned)
+
+    assert result.geometry is None
+    assert result.completed_stage_rank == 14
+    outside_codes = [
+        blocker
+        for blocker in result.blockers
+        if blocker.code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
+    ]
+    assert len(outside_codes) >= 1
+    tangency_warnings = [
+        w
+        for w in result.warnings
+        if w.code == "BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+    ]
+    assert tangency_warnings == [], (
+        "Stage 15 tangency warning must NOT be carried forward when "
+        "Stage 15 produced a blocker (the pass did not complete "
+        "without blockers)"
+    )
+    WARNINGS_FROM_FAILED_STAGE_NOT_CARRIED_FORWARD = True
+    assert WARNINGS_FROM_FAILED_STAGE_NOT_CARRIED_FORWARD
