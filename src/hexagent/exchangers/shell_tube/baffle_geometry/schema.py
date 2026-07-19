@@ -22,7 +22,6 @@ is intentionally module-private and never exported.
 
 from __future__ import annotations
 
-# mypy: disable-error-code="no-untyped-def,no-any-return,no-untyped-call,arg-type,type-arg"
 from collections.abc import Mapping
 from typing import Any, Final
 
@@ -67,12 +66,12 @@ class _FailureCollector:
     __slots__ = ("_entries",)
 
     def __init__(self) -> None:
-        self._entries: list = []
+        self._entries: list[tuple[str, str, Any]] = []
 
     def add(self, code: str, field_path: str, raw_component: Any) -> None:
         self._entries.append((code, field_path, raw_component))
 
-    def snapshot(self) -> tuple:
+    def snapshot(self) -> tuple[tuple[str, str, Any], ...]:
         return tuple(self._entries)
 
 
@@ -86,7 +85,12 @@ class BaffleGeometrySchemaFailure(Exception):
 
     __slots__ = ("stage_rank", "blockers", "raw_component", "validated_context")
 
-    def __init__(self, blockers: tuple, raw_component: Any, validated_context: Mapping) -> None:
+    def __init__(
+        self,
+        blockers: tuple[tuple[str, str, Any], ...],
+        raw_component: Any,
+        validated_context: Mapping[str, Any],
+    ) -> None:
         super().__init__("BaffleGeometrySchemaFailure")
         self.stage_rank = _SCHEMA_STAGE_RANK
         self.blockers = tuple(blockers)
@@ -144,7 +148,7 @@ def _check_decimal_str_field(failure: _FailureCollector, field_path: str, value:
 
 
 def _check_required_field(
-    failure: _FailureCollector, field_path: str, raw_dict: dict, key: str
+    failure: _FailureCollector, field_path: str, raw_dict: dict[str, Any], key: str
 ) -> bool:
     if key not in raw_dict:
         failure.add(_BFG_UNKNOWN_FIELD, field_path, raw_dict)
@@ -153,7 +157,10 @@ def _check_required_field(
 
 
 def _check_no_extra_fields(
-    failure: _FailureCollector, field_path: str, raw_dict: dict, expected_keys: frozenset
+    failure: _FailureCollector,
+    field_path: str,
+    raw_dict: dict[str, Any],
+    expected_keys: frozenset[str],
 ) -> bool:
     ok = True
     for k in raw_dict:
@@ -184,8 +191,8 @@ def _check_evidence_refs_tuple(
     if require_non_empty and len(items) == 0:
         failure.add(_BFG_UNKNOWN_FIELD, field_path, value)
         return False
-    seen: list = []
-    seen_set: set = set()
+    seen: list[str] = []
+    seen_set: set[str] = set()
     ok = True
     for i, item in enumerate(items):
         item_path = f"{field_path}[{i}]"
@@ -216,11 +223,11 @@ def _check_authority_dict(
     field_path: str,
     value: Any,
     expected_schema_version: str,
-    expected_keys: frozenset,
+    expected_keys: frozenset[str],
     blocker_missing_evidence: str,
     blocker_schema_unsupported: str,
-    required_decimal_fields: tuple = (),
-    min_decimal: str | None = None,
+    required_decimal_fields: tuple[str, ...] = (),
+    min_decimal: tuple[str, str] | None = None,
 ) -> bool:
     """Validate a TASK-024 caller-supplied authority object literal:
 
@@ -296,7 +303,7 @@ def _check_upstream_instance(
     failure: _FailureCollector,
     field_path: str,
     value: Any,
-    expected_type,
+    expected_type: type,
     blocker_missing: str,
     blocker_invalid: str,
 ) -> bool:
@@ -311,7 +318,7 @@ def _check_upstream_instance(
     return True
 
 
-_REQUEST_KEYS: Final[frozenset] = frozenset(
+_REQUEST_KEYS: Final[frozenset[str]] = frozenset(
     (
         "schema_version",
         "configuration",
@@ -323,7 +330,7 @@ _REQUEST_KEYS: Final[frozenset] = frozenset(
     )
 )
 
-_AXIAL_SPAN_KEYS: Final[frozenset] = frozenset(
+_AXIAL_SPAN_KEYS: Final[frozenset[str]] = frozenset(
     (
         "schema_version",
         "axial_start_coordinate_m",
@@ -334,7 +341,9 @@ _AXIAL_SPAN_KEYS: Final[frozenset] = frozenset(
 )
 
 
-def _parse_request_with_collector(raw_request, failure: _FailureCollector, validated: dict):
+def _parse_request_with_collector(
+    raw_request: Any, failure: _FailureCollector, validated: dict[str, Any]
+) -> _t024.BaffleGeometryRequest | None:
     """Append Stage-1 findings to ``failure`` and update ``validated`` with
     any partial recognized structures. Never raises.
 
@@ -614,7 +623,7 @@ def parse_request(raw_request: Any) -> _t024.BaffleGeometryRequest:
     leaks through this boundary.
     """
     failure = _FailureCollector()
-    validated: dict = {}
+    validated: dict[str, Any] = {}
     parsed = _parse_request_with_collector(raw_request, failure, validated)
     if parsed is None:
         blockers = failure.snapshot()

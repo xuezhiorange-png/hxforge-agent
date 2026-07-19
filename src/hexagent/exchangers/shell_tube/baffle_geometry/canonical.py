@@ -37,8 +37,6 @@ explicitly deferred to later rounds.
 
 from __future__ import annotations
 
-# mypy: disable-error-code="no-untyped-def,no-any-return,no-untyped-call"
-# mypy: disable-error-code="type-arg,comparison-overlap,dict-item,arg-type"
 import datetime
 import decimal
 import hashlib
@@ -46,7 +44,7 @@ import json
 import uuid
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Final
+from typing import Any, Final, NoReturn, TypeAlias
 
 # Frozen decimal context (Section 7.2).
 _DECIMAL_PRECISION: Final[int] = 50
@@ -55,6 +53,32 @@ _COORDINATE_QUANTUM_M: Final[str] = "0.000000000001"
 _SQUARED_COORDINATE_QUANTUM_M2: Final[str] = "0.000000000000000000000001"
 _CANONICAL_ZERO: Final[str] = "0"
 _RAW_BLOCKED_PROJECTION_VERSION: Final[str] = "task024.raw-blocked-projection.v3"
+
+
+# ---------------------------------------------------------------------------
+# Canonical projection type aliases (Section 7.6, raw blocked projection v3).
+#
+# These aliases describe the closed tagged-projection space. They are used
+# only for mypy narrowing; runtime values are plain dict/list/tuple/str/int
+# instances produced by ``_raw_value_projection``. The contracts require
+# exact identity dispatch (no isinstance) and no user-code execution, so
+# these aliases are non-exhaustive intent documentation; the runtime
+# projection never returns unknown shapes.
+# ---------------------------------------------------------------------------
+
+ProjectionScalar: TypeAlias = dict[str, Any]
+MappingEntry: TypeAlias = dict[str, Any]
+Container: TypeAlias = list[MappingEntry]
+RawValueProjection: TypeAlias = Any
+
+
+# ---------------------------------------------------------------------------
+# Recognized enum and dataclass table type signatures (Section 7.6.2).
+# ---------------------------------------------------------------------------
+
+_EnumMemberPair: TypeAlias = tuple[Enum, str]
+_EnumTableEntry: TypeAlias = tuple[str, type[Enum], tuple[_EnumMemberPair, ...]]
+_DataclassTableEntry: TypeAlias = tuple[str, type, tuple[str, ...]]
 
 
 def _local_decimal_context() -> decimal.Context:
@@ -126,10 +150,10 @@ def canonical_decimal_string(value: Any) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _build_recognized_enum_table():
+def _build_recognized_enum_table() -> tuple[_EnumTableEntry, ...]:
     """Build the static recognized-enum table (Section 7.6.2.2).
 
-    The returned list is ordered by owning-task ascending then enum type
+    The returned tuple is ordered by owning-task ascending then enum type
     token ascending. Each entry is a tuple of::
 
         (enum_type_token: str, python_type: type,
@@ -140,10 +164,10 @@ def _build_recognized_enum_table():
     from hexagent.exchangers.shell_tube.shell_bundle_geometry import models as _m_t022
     from hexagent.exchangers.shell_tube.tube_layout import models as _m_t021
 
-    entries = []
+    entries: list[_EnumTableEntry] = []
 
-    def _add(token: str, py_type, members):
-        ordered = tuple((getattr(py_type, n), n) for n in members)
+    def _add(token: str, py_type: type[Enum], members: tuple[str, ...]) -> None:
+        ordered: tuple[_EnumMemberPair, ...] = tuple((getattr(py_type, n), n) for n in members)
         entries.append((token, py_type, ordered))
 
     _add("task020:AuthorityMode", _m_t020.AuthorityMode, ("INTERNAL_GENERIC", "APPROVED_RULE_PACK"))
@@ -200,7 +224,7 @@ def _build_recognized_enum_table():
     return tuple(entries)
 
 
-def _build_recognized_dataclass_table():
+def _build_recognized_dataclass_table() -> tuple[_DataclassTableEntry, ...]:
     """Build the static recognized-dataclass table (Section 7.6.2.3).
 
     Returns a tuple of::
@@ -213,9 +237,9 @@ def _build_recognized_dataclass_table():
     from hexagent.exchangers.shell_tube.shell_bundle_geometry import models as _m_t022
     from hexagent.exchangers.shell_tube.tube_layout import models as _m_t021
 
-    entries = []
+    entries: list[_DataclassTableEntry] = []
 
-    def _add(token, py_type, fields):
+    def _add(token: str, py_type: type, fields: tuple[str, ...]) -> None:
         entries.append((token, py_type, tuple(fields)))
 
     _add(
@@ -680,8 +704,10 @@ def _build_recognized_dataclass_table():
     return tuple(entries)
 
 
-STATIC_RECOGNIZED_ENUMS: Final[tuple] = _build_recognized_enum_table()
-STATIC_RECOGNIZED_DATACLASSES: Final[tuple] = _build_recognized_dataclass_table()
+STATIC_RECOGNIZED_ENUMS: Final[tuple[_EnumTableEntry, ...]] = _build_recognized_enum_table()
+STATIC_RECOGNIZED_DATACLASSES: Final[tuple[_DataclassTableEntry, ...]] = (
+    _build_recognized_dataclass_table()
+)
 
 
 # ---------------------------------------------------------------------------
@@ -717,7 +743,7 @@ def _canonical_json_bytes(value: Any) -> bytes:
     ).encode("utf-8")
 
 
-def _json_default_forbidden(_value):  # pragma: no cover - never reached
+def _json_default_forbidden(_value: Any) -> NoReturn:  # pragma: no cover - never reached
     raise TypeError("canonical_json_bytes forbids non-canonical default value")
 
 
@@ -727,7 +753,7 @@ def _json_default_forbidden(_value):  # pragma: no cover - never reached
 _INT_ZERO_BYTES: Final[bytes] = b"0"
 
 
-def _exact_int_projection(value: int):
+def _exact_int_projection(value: int) -> dict[str, Any]:
     if value == 0:
         return {"raw_type": "int", "sign": 0, "magnitude_hex": _INT_ZERO_BYTES.decode("ascii")}
     if value > 0:
@@ -743,16 +769,16 @@ def _exact_int_projection(value: int):
     }
 
 
-def _exact_str_projection(value: str):
+def _exact_str_projection(value: str) -> dict[str, Any]:
     return {
         "raw_type": "str",
         "code_points": [f"{ord(c):04x}" for c in value],
     }
 
 
-def _exact_float_projection(value: float):
+def _exact_float_projection(value: float) -> dict[str, Any]:
     if value != value:
-        token = "nan"
+        token: str = "nan"
     elif value == float("inf"):
         token = "+infinity"
     elif value == float("-inf"):
@@ -762,7 +788,7 @@ def _exact_float_projection(value: float):
     return {"raw_type": "float", "value": token}
 
 
-def _exact_decimal_projection(value: Decimal):
+def _exact_decimal_projection(value: Decimal) -> dict[str, Any]:
     try:
         sign, digits, exponent = value.as_tuple()
     except Exception:
@@ -773,14 +799,14 @@ def _exact_decimal_projection(value: Decimal):
 
     if isinstance(exponent, str):
         if exponent == "F":
-            token = "F"
+            token: str = "F"
         elif exponent == "n":
             token = "n"
         elif exponent == "N":
             token = "N"
         else:
             return {"raw_type": "decimal_projection_unavailable"}
-        exponent_obj = {"kind": "special", "token": token}
+        exponent_obj: dict[str, Any] = {"kind": "special", "token": token}
     else:
         if exponent == 0:
             exponent_obj = {
@@ -809,7 +835,7 @@ def _exact_decimal_projection(value: Decimal):
     }
 
 
-def _cyclic_safe_graph_traversal(value, seen: frozenset[tuple]):
+def _cyclic_safe_graph_traversal(value: Any, seen: frozenset[int]) -> bool:
     """Pre-scan exact supported containers / recognized dataclass trees
     for cycles. Returns ``True`` if any cycle exists in the traversed
     graph.
@@ -825,19 +851,19 @@ def _cyclic_safe_graph_traversal(value, seen: frozenset[tuple]):
     seen_id = id(value)
     if seen_id in seen:
         return True
-    seen = seen | frozenset((seen_id,))
+    new_seen: frozenset[int] = seen | frozenset({seen_id})
     value_type = type(value)
     if value_type is list or value_type is tuple:
-        return any(_cyclic_safe_graph_traversal(item, seen) for item in value)
+        return any(_cyclic_safe_graph_traversal(item, new_seen) for item in value)
     if value_type is dict:
         for k, v in value.items():
-            if _cyclic_safe_graph_traversal(k, seen):
+            if _cyclic_safe_graph_traversal(k, new_seen):
                 return True
-            if _cyclic_safe_graph_traversal(v, seen):
+            if _cyclic_safe_graph_traversal(v, new_seen):
                 return True
         return False
     if value_type is set or value_type is frozenset:
-        return any(_cyclic_safe_graph_traversal(item, seen) for item in value)
+        return any(_cyclic_safe_graph_traversal(item, new_seen) for item in value)
     if (
         value_type is bytes
         or value_type is str
@@ -853,13 +879,13 @@ def _cyclic_safe_graph_traversal(value, seen: frozenset[tuple]):
         _, py_type, fields = entry
         if value_type is py_type:
             for name in fields:
-                if _cyclic_safe_graph_traversal(object.__getattribute__(value, name), seen):
+                if _cyclic_safe_graph_traversal(object.__getattribute__(value, name), new_seen):
                     return True
             return False
     return False
 
 
-def _raw_value_projection(value: Any, _seen=None):
+def _raw_value_projection(value: Any, _seen: frozenset[int] | None = None) -> dict[str, Any]:
     """Total raw-value projection (Section 7.6).
 
     Uses only exact identity ``type(value)`` comparisons and never
@@ -872,7 +898,7 @@ def _raw_value_projection(value: Any, _seen=None):
     if _seen is None:
         if _cyclic_safe_graph_traversal(value, frozenset()):
             return {"raw_type": "cyclic_graph"}
-        _seen = set()
+        _seen = frozenset[int]()
 
     if value is None:
         return {"raw_type": "null"}
@@ -901,23 +927,26 @@ def _raw_value_projection(value: Any, _seen=None):
         seen_id = id(value)
         if seen_id in _seen:
             return {"raw_type": "cyclic_graph"}
-        _seen = _seen | {seen_id}
-        return {"raw_type": "list", "items": [_raw_value_projection(v, _seen) for v in value]}
+        list_seen: frozenset[int] = _seen | frozenset({seen_id})
+        return {"raw_type": "list", "items": [_raw_value_projection(v, list_seen) for v in value]}
 
     if value_type is tuple:
         seen_id = id(value)
         if seen_id in _seen:
             return {"raw_type": "cyclic_graph"}
-        _seen = _seen | {seen_id}
-        return {"raw_type": "tuple", "items": [_raw_value_projection(v, _seen) for v in value]}
+        tuple_seen: frozenset[int] = _seen | frozenset({seen_id})
+        return {"raw_type": "tuple", "items": [_raw_value_projection(v, tuple_seen) for v in value]}
 
     if value_type is dict:
         seen_id = id(value)
         if seen_id in _seen:
             return {"raw_type": "cyclic_graph"}
-        _seen = _seen | {seen_id}
-        entries = [
-            {"key": _raw_value_projection(k, _seen), "value": _raw_value_projection(v, _seen)}
+        dict_seen: frozenset[int] = _seen | frozenset({seen_id})
+        entries: list[dict[str, Any]] = [
+            {
+                "key": _raw_value_projection(k, dict_seen),
+                "value": _raw_value_projection(v, dict_seen),
+            }
             for k, v in value.items()
         ]
         entries.sort(
@@ -929,8 +958,8 @@ def _raw_value_projection(value: Any, _seen=None):
         seen_id = id(value)
         if seen_id in _seen:
             return {"raw_type": "cyclic_graph"}
-        _seen = _seen | {seen_id}
-        items = [_raw_value_projection(v, _seen) for v in value]
+        set_seen: frozenset[int] = _seen | frozenset({seen_id})
+        items: list[dict[str, Any]] = [_raw_value_projection(v, set_seen) for v in value]
         items.sort(key=_canonical_json_bytes)
         return {"raw_type": "set", "items": items}
 
@@ -938,10 +967,10 @@ def _raw_value_projection(value: Any, _seen=None):
         seen_id = id(value)
         if seen_id in _seen:
             return {"raw_type": "cyclic_graph"}
-        _seen = _seen | {seen_id}
-        items = [_raw_value_projection(v, _seen) for v in value]
-        items.sort(key=_canonical_json_bytes)
-        return {"raw_type": "frozenset", "items": items}
+        fset_seen: frozenset[int] = _seen | frozenset({seen_id})
+        fset_items: list[dict[str, Any]] = [_raw_value_projection(v, fset_seen) for v in value]
+        fset_items.sort(key=_canonical_json_bytes)
+        return {"raw_type": "frozenset", "items": fset_items}
 
     if isinstance(value, Enum):
         for entry in STATIC_RECOGNIZED_ENUMS:
@@ -957,32 +986,33 @@ def _raw_value_projection(value: Any, _seen=None):
                 return {"raw_type": "recognized_enum_unavailable", "enum_type_token": enum_token}
         return {"raw_type": "unsupported_object"}
 
-    for entry in STATIC_RECOGNIZED_DATACLASSES:
-        _, py_type, fields = entry
+    dc_entry: _DataclassTableEntry
+    for dc_entry in STATIC_RECOGNIZED_DATACLASSES:
+        _, py_type, fields = dc_entry
         if value_type is py_type:
             seen_id = id(value)
             if seen_id in _seen:
                 return {"raw_type": "cyclic_graph"}
-            _seen = _seen | {seen_id}
-            projected_fields = []
+            dc_seen: frozenset[int] = _seen | frozenset({seen_id})
+            projected_fields: list[dict[str, Any]] = []
             try:
                 for name in fields:
                     projected_fields.append(
                         {
                             "name": name,
                             "value": _raw_value_projection(
-                                object.__getattribute__(value, name), _seen
+                                object.__getattribute__(value, name), dc_seen
                             ),
                         }
                     )
             except Exception:
                 return {
                     "raw_type": "recognized_dataclass_unavailable",
-                    "dataclass_type_token": entry[0],
+                    "dataclass_type_token": dc_entry[0],
                 }
             return {
                 "raw_type": "dataclass",
-                "dataclass_type_token": entry[0],
+                "dataclass_type_token": dc_entry[0],
                 "fields": projected_fields,
             }
 
