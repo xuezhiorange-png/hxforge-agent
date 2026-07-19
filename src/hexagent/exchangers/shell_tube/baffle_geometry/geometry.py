@@ -57,7 +57,7 @@ from __future__ import annotations
 import decimal
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Final, cast
+from typing import Any, Final, NamedTuple, cast
 
 from hexagent.exchangers.shell_tube.baffle_geometry import (
     canonical as _t024_canonical,
@@ -99,6 +99,33 @@ _ORIENTATION_NORMAL_TOP: Final[tuple[int, int]] = (0, 1)
 _ORIENTATION_NORMAL_BOTTOM: Final[tuple[int, int]] = (0, -1)
 _ORIENTATION_NORMAL_RIGHT: Final[tuple[int, int]] = (1, 0)
 _ORIENTATION_NORMAL_LEFT: Final[tuple[int, int]] = (-1, 0)
+
+
+# Private per-baffle intermediate types. These are intentionally
+# **not** exported, **not** part of the public API, and **not**
+# persisted. They are used only inside ``_process_one_baffle`` to
+# hand Stage 14 results to Stage 15 / 16 without re-classifying or
+# re-quantizing. Their fields are deliberately unquantized Decimal
+# values so downstream stages do not need to recover them from the
+# public quantized projection.
+class _Stage14Intermediate(NamedTuple):
+    position_id: str
+    x_m: Decimal
+    y_m: Decimal
+    classification: _t024.TubeRegionClassification
+    signed_window_distance: Decimal
+    cut_boundary_margin: Decimal
+
+
+class _Stage15Intermediate(NamedTuple):
+    position_id: str
+    classification: _t024.TubeRegionClassification
+    signed_window_distance: Decimal
+    cut_boundary_margin: Decimal
+    x_m: Decimal
+    y_m: Decimal
+    outer_margin_squared: Decimal
+    is_outer_tangent: bool
 
 
 def _local_decimal_context() -> decimal.Context:
@@ -1262,26 +1289,16 @@ def _process_one_baffle(
     crossflow_ids: list[str] = []
     outer_tangent_ids: list[str] = []
 
-    # Stage 14 + 15: per-position sweep. The explicit tracker
-    # advances 13 -> 14 after Stage 14 succeeds for the current
-    # position, and 14 -> 15 after Stage 15 succeeds for the current
-    # position. To preserve the original "collect all blockers"
-    # semantics, blockers from Stage 14 and Stage 15 do not early-
-    # return; they ``continue`` so the loop can visit every position.
-    # The tracker is **frozen at its value at the first blocker** and
-    # must not advance past that point on subsequent blocker
-    # positions, so that the returned tracker value reflects the
-    # earliest stage at which any blocker fired.
-    per_position_state: dict[str, tuple[_t024.TubeRegionClassification, Decimal, Decimal]] = {}
-    sorted_positions = sorted(parsed_positions, key=lambda item: item[0])
+    # ------------------------------------------------------------------
+    # Stage 14: per-baffle cut classification (complete pass).
+    # ------------------------------------------------------------------
+    # For every position, run only the primary cut-boundary
+    # classification helper. Do NOT run outer containment, outer
+    # tangency collection, pairwise overlap, or any Stage 15 / 16
+    # work in this pass.
+    stage14_intermediates: dict[str, _Stage14Intermediate] = {}
 
-    # Freeze flag: once any blocker has fired, do not advance the
-    # explicit tracker past the value it had at the first blocker.
-    tracker_frozen: bool = False
-    # Saved value at the first blocker (when tracker_frozen was
-    # set). All subsequent blocker positions leave the tracker at
-    # this saved value.
-    frozen_tracker: int = _STAGE_13_RANK
+    sorted_positions = sorted(parsed_positions, key=lambda item: item[0])
 
     for position_id, x_m, y_m in sorted_positions:
         (
@@ -1299,27 +1316,54 @@ def _process_one_baffle(
         )
         if pos_blockers:
             blockers.extend(pos_blockers)
-            if not tracker_frozen:
-                frozen_tracker = per_baffle_completed
-                tracker_frozen = True
-            continue
-        if tracker_frozen:
-            # Tracker frozen by an earlier blocker; do not advance.
             continue
         if classification is None:
             # Stage 14 emitted no classification for this position
-            # (degenerate case). The tracker stays at 13.
+            # (degenerate case: not in any region). Treat as a
+            # no-op for Stage 14; skip Stage 15 for this position
+            # as well.
             continue
-
-        # Stage 14 succeeded for this position: advance the explicit
-        # tracker to 14 before Stage 15 runs.
-        per_baffle_completed = _STAGE_14_RANK
-
-        # Stage 15: outer containment.
-        inside_ok, outer_margin_squared = _outer_containment_check(
+        # Stage 14 succeeded for this position: store the
+        # unquantized intermediate state so Stage 15 can reuse it.
+        stage14_intermediates[position_id] = _Stage14Intermediate(
             position_id=position_id,
             x_m=x_m,
             y_m=y_m,
+            classification=classification,
+            signed_window_distance=signed_window_distance,
+            cut_boundary_margin=cut_boundary_margin,
+        )
+
+    if blockers:
+        # Stage 14 produced blockers; do NOT execute any Stage 15
+        # items. The explicit tracker stays at 13 (the value it
+        # had after Stage 13 succeeded).
+        return (
+            tuple(blockers),
+            tuple(warnings),
+            None,
+            per_baffle_completed,
+        )
+
+    # All Stage 14 items completed without blockers. Advance the
+    # explicit tracker to 14.
+    per_baffle_completed = _STAGE_14_RANK
+
+    # ------------------------------------------------------------------
+    # Stage 15: covered-region outer containment (complete pass).
+    # ------------------------------------------------------------------
+    # Only executed after the entire Stage 14 pass succeeded.
+    # For every Stage 14 intermediate, run the outer-containment
+    # check. Collect all Stage 15 blockers and the outer-tangency
+    # contacts (used to emit the Stage 15 tangency warning at the
+    # end of this pass — but only if the entire pass succeeds).
+    stage15_intermediates: list[_Stage15Intermediate] = []
+
+    for stage14 in stage14_intermediates.values():
+        inside_ok, outer_margin_squared = _outer_containment_check(
+            position_id=stage14.position_id,
+            x_m=stage14.x_m,
+            y_m=stage14.y_m,
             baffle_hole_radius=baffle_hole_radius,
             baffle_radius=baffle_radius,
         )
@@ -1329,10 +1373,12 @@ def _process_one_baffle(
                     _STAGE_15_RANK,
                     _make_message(
                         _t024.BlockerCode.BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK.value,
-                        field_path=f"tube_hole_classifications[position_id={position_id}]",
+                        field_path=(
+                            f"tube_hole_classifications[position_id={stage14.position_id}]"
+                        ),
                         message_key="baffle_hole_outside_baffle_disk",
                         details=(
-                            ("position_id", position_id),
+                            ("position_id", stage14.position_id),
                             (
                                 "outer_boundary_margin_squared_m2",
                                 _t024_canonical.canonical_decimal_string(outer_margin_squared),
@@ -1341,85 +1387,131 @@ def _process_one_baffle(
                     ),
                 )
             )
-            if not tracker_frozen:
-                frozen_tracker = per_baffle_completed
-                tracker_frozen = True
+            # Stage 15 produced a blocker for this position; the
+            # per-baffle Stage 15 pass has not completed. The
+            # tangency-contact list is NOT carried forward; do not
+            # emit the Stage 15 tangency warning even if some
+            # earlier positions in this pass had outer tangency.
             continue
-
         is_outer_tangent = outer_margin_squared == _CANONICAL_ZERO
+        stage15_intermediates.append(
+            _Stage15Intermediate(
+                position_id=stage14.position_id,
+                classification=stage14.classification,
+                signed_window_distance=stage14.signed_window_distance,
+                cut_boundary_margin=stage14.cut_boundary_margin,
+                x_m=stage14.x_m,
+                y_m=stage14.y_m,
+                outer_margin_squared=outer_margin_squared,
+                is_outer_tangent=is_outer_tangent,
+            )
+        )
 
+    if blockers:
+        # Stage 15 produced blockers; do NOT execute any Stage 16
+        # items and do NOT emit the Stage 15 tangency warning
+        # (the Stage 15 pass did not complete). The explicit
+        # tracker stays at 14 (the value it had after Stage 14
+        # succeeded).
+        return (
+            tuple(blockers),
+            tuple(warnings),
+            None,
+            per_baffle_completed,
+        )
+
+    # All Stage 15 items completed without blockers. Advance the
+    # explicit tracker to 15, and emit the Stage 15 tangency
+    # warning if any outer-tangency contacts were collected in
+    # this pass.
+    per_baffle_completed = _STAGE_15_RANK
+    outer_tangent_ids = [
+        item.position_id for item in stage15_intermediates if item.is_outer_tangent
+    ]
+
+    # Build classifications, window_ids, crossflow_ids from the
+    # Stage 15 intermediates. These are needed by Stage 16 and by
+    # the final plane foundation.
+    for item in stage15_intermediates:
         audit = _t024.PhysicalTubeDiskAudit(
             physical_tube_radius_m=_t024_canonical.canonical_decimal_string(physical_tube_radius),
             signed_window_distance_m=_t024_canonical.canonical_decimal_string(
-                signed_window_distance
+                item.signed_window_distance
             ),
-            cut_boundary_margin_m=_t024_canonical.canonical_decimal_string(cut_boundary_margin),
-            classification=classification,
+            cut_boundary_margin_m=_t024_canonical.canonical_decimal_string(
+                item.cut_boundary_margin
+            ),
+            classification=item.classification,
         )
-
         classifications.append(
             _t024.TubeHoleClassification(
-                position_id=position_id,
-                center_x_m=_t024_canonical.canonical_decimal_string(x_m),
-                center_y_m=_t024_canonical.canonical_decimal_string(y_m),
+                position_id=item.position_id,
+                center_x_m=_t024_canonical.canonical_decimal_string(item.x_m),
+                center_y_m=_t024_canonical.canonical_decimal_string(item.y_m),
                 physical_tube_radius_m=_t024_canonical.canonical_decimal_string(
                     physical_tube_radius
                 ),
                 baffle_hole_radius_m=_t024_canonical.canonical_decimal_string(baffle_hole_radius),
                 signed_window_distance_m=_t024_canonical.canonical_decimal_string(
-                    signed_window_distance
+                    item.signed_window_distance
                 ),
-                cut_boundary_margin_m=_t024_canonical.canonical_decimal_string(cut_boundary_margin),
-                classification=classification,
+                cut_boundary_margin_m=_t024_canonical.canonical_decimal_string(
+                    item.cut_boundary_margin
+                ),
+                classification=item.classification,
                 outer_boundary_margin_squared_m2=_t024_canonical.canonical_decimal_string(
-                    outer_margin_squared
+                    item.outer_margin_squared
                 ),
                 physical_tube_disk_audit=audit,
             )
         )
-
-        if is_outer_tangent:
-            outer_tangent_ids.append(position_id)
-
-        if classification is _t024.TubeRegionClassification.WINDOW:
-            window_ids.append(position_id)
+        if item.classification is _t024.TubeRegionClassification.WINDOW:
+            window_ids.append(item.position_id)
         else:
-            crossflow_ids.append(position_id)
+            crossflow_ids.append(item.position_id)
 
-        per_position_state[position_id] = (
-            classification,
-            x_m,
-            y_m,
+    if outer_tangent_ids:
+        warnings.append(
+            _rank_warning(
+                _STAGE_15_RANK,
+                _make_message(
+                    _t024.WarningCode.BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY.value,
+                    field_path="tube_hole_classifications[*].outer_boundary_margin_squared_m2",
+                    message_key="baffle_hole_outer_tangency_not_manufacturing_adequacy",
+                    evidence_refs=request.evidence_refs,
+                    details=(
+                        (
+                            "contacts",
+                            "|".join(
+                                f"({baffle_index},{pid})" for pid in sorted(outer_tangent_ids)
+                            ),
+                        ),
+                    ),
+                ),
+            )
         )
 
-        # Stage 15 succeeded for this position. Advance the explicit
-        # tracker to 15.
-        per_baffle_completed = _STAGE_15_RANK
-
-    if blockers:
-        # Per-baffle Stages 14 + 15 produced blockers. The explicit
-        # tracker was frozen at the value it had at the first blocker;
-        # the frozen value reflects the earliest stage at which any
-        # blocker fired. We MUST NOT recompute it from blocker ranks.
-        return (
-            tuple(blockers),
-            tuple(warnings),
-            None,
-            frozen_tracker,
-        )
-
+    # ------------------------------------------------------------------
     # Stage 16: covered-region (CROSSFLOW_REFERENCE) pairwise overlap.
+    # ------------------------------------------------------------------
+    # Only executed after the entire Stage 15 pass succeeded.
     crossflow_sorted = sorted(crossflow_ids)
     pairwise_tangent_pairs: list[tuple[str, str]] = []
     overlap_blockers: list[_RankedMessage] = []
     tangency_warnings: list[_RankedMessage] = []
 
+    # Look up per-position x/y by position_id from the Stage 15
+    # intermediates (no need to recompute from a separate dict).
+    position_xy: dict[str, tuple[Decimal, Decimal]] = {
+        item.position_id: (item.x_m, item.y_m) for item in stage15_intermediates
+    }
+
     for i in range(len(crossflow_sorted)):
         for j in range(i + 1, len(crossflow_sorted)):
             lower_id = crossflow_sorted[i]
             higher_id = crossflow_sorted[j]
-            _, lower_x, lower_y = per_position_state[lower_id]
-            _, higher_x, higher_y = per_position_state[higher_id]
+            lower_x, lower_y = position_xy[lower_id]
+            higher_x, higher_y = position_xy[higher_id]
             separable, _d2 = _covered_pair_overlap_check(
                 lower_position_id=lower_id,
                 lower_x=lower_x,
@@ -1457,9 +1549,27 @@ def _process_one_baffle(
 
     if overlap_blockers:
         blockers.extend(overlap_blockers)
+        warnings.extend(tangency_warnings)
 
+    if blockers:
+        # Stage 16 produced blockers; the explicit tracker stays at 15
+        # (the value it had after Stage 15 succeeded).
+        return (
+            tuple(blockers),
+            tuple(warnings),
+            None,
+            per_baffle_completed,
+        )
+
+    # All four per-baffle stages completed without blockers. Advance
+    # the explicit tracker to 16.
+    per_baffle_completed = _STAGE_16_RANK
+
+    # Emit the Stage 16 pair-tangency warning, if any. This warning
+    # is only emitted if Stage 16 succeeded without blockers (per
+    # §8 warning carry-forward).
     if pairwise_tangent_pairs:
-        tangency_warnings.append(
+        warnings.append(
             _rank_warning(
                 _STAGE_16_RANK,
                 _make_message(
@@ -1479,43 +1589,6 @@ def _process_one_baffle(
                 ),
             )
         )
-
-    if outer_tangent_ids:
-        tangency_warnings.append(
-            _rank_warning(
-                _STAGE_15_RANK,
-                _make_message(
-                    _t024.WarningCode.BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY.value,
-                    field_path="tube_hole_classifications[*].outer_boundary_margin_squared_m2",
-                    message_key="baffle_hole_outer_tangency_not_manufacturing_adequacy",
-                    evidence_refs=request.evidence_refs,
-                    details=(
-                        (
-                            "contacts",
-                            "|".join(
-                                f"({baffle_index},{pid})" for pid in sorted(outer_tangent_ids)
-                            ),
-                        ),
-                    ),
-                ),
-            )
-        )
-
-    warnings.extend(tangency_warnings)
-
-    if blockers:
-        # Stage 16 produced blockers; the explicit tracker stays at 15
-        # (the value it had after Stages 14 + 15 succeeded).
-        return (
-            tuple(blockers),
-            tuple(warnings),
-            None,
-            per_baffle_completed,
-        )
-
-    # All four per-baffle stages completed without blockers. Advance
-    # the explicit tracker to 16.
-    per_baffle_completed = _STAGE_16_RANK
 
     classifications_tuple = tuple(classifications)
     classification_foundation = _PlaneClassificationFoundation(
