@@ -658,9 +658,15 @@ def test_22_11_no_duplicate_warning_codes() -> None:
 # ---------------------------------------------------------------------------
 
 
-GEOMETRY_SRC = Path(
-    "/tmp/task024-impl-isolated-wt/src/hexagent/exchangers/shell_tube/baffle_geometry/geometry.py"
-)
+# Read the currently-imported production ``geometry`` module's source
+# file. Resolving through ``_gmod.__file__`` makes the architecture
+# guard tests independent of the worktree / checkout path (they
+# work both in the local development worktree under
+# ``/tmp/task024-impl-isolated-wt`` and in GitHub Actions, where the
+# repository is checked out at a different absolute path).
+_geometry_module_file = _gmod.__file__
+assert _geometry_module_file is not None
+GEOMETRY_SRC = Path(_geometry_module_file).resolve()
 
 
 def test_22_12_geometry_source_does_not_use_float_for_arithmetic() -> None:
