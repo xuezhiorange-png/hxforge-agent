@@ -1090,4 +1090,113 @@ __all__ = [
     "replace_design_authority",
     "replace_evidence_refs",
     "make_geometry_request",
+    "with_position_coordinates",
 ]
+
+
+def with_position_coordinates(
+    request: _t024.BaffleGeometryRequest,
+    *,
+    position_id: str,
+    x_m: str,
+    y_m: str,
+) -> _t024.BaffleGeometryRequest:
+    """Return a new request with one position's coordinates overridden.
+
+    The replacement is immutable: the input ``request`` and its
+    ``tube_layout`` are not mutated. All other positions, the
+    ``position_id`` of the targeted position, ``u``/``v`` indices,
+    and every other field of the request are preserved. The
+    ``layout_hash`` and ``layout_id`` are recomputed via the same
+    upstream canonical pipeline used by ``make_tube_layout``, so the
+    returned request remains a fully valid typed request whose
+    stored hashes are byte-equivalent to the recomputed values.
+
+    Values are SYNTHETIC_TEST_VALUE -- NOT_ENGINEERING_RECOMMENDATION.
+    """
+    original_layout = request.tube_layout
+    target_position: TubePosition | None = None
+    new_positions: list[TubePosition] = []
+    for position in original_layout.positions:
+        if position.position_id == position_id:
+            target_position = position
+            new_positions.append(
+                TubePosition(
+                    position_id=position.position_id,
+                    u=position.u,
+                    v=position.v,
+                    x_m=x_m,
+                    y_m=y_m,
+                )
+            )
+        else:
+            new_positions.append(position)
+    if target_position is None:
+        raise AssertionError(f"position_id {position_id!r} not found in tube_layout")
+    new_positions_tuple = tuple(new_positions)
+    configuration = request.configuration
+    tube_geometry = original_layout.tube_geometry
+    rule_snapshot = original_layout.layout_rule_authority
+    request_hash = _make_request_hash(configuration.configuration_id, tube_geometry.snapshot_hash)
+    layout_provenance_pre_hash = _make_layout_provenance_pre_hash(
+        configuration, tube_geometry, rule_snapshot, request_hash
+    )
+    layout_hash_payload: dict[str, Any] = {
+        "schema_version": "task021.tube-layout.v1",
+        "request_hash": request_hash,
+        "positions": [
+            {
+                "position_id": p.position_id,
+                "u": p.u,
+                "v": p.v,
+                "x_m": p.x_m,
+                "y_m": p.y_m,
+            }
+            for p in new_positions_tuple
+        ],
+        "tube_hole_count": original_layout.tube_hole_count,
+        "physical_tube_count": original_layout.physical_tube_count,
+        "boundary_rejection_count": original_layout.boundary_rejection_count,
+        "exclusion_rejection_count": original_layout.exclusion_rejection_count,
+        "exclusion_audit": [],
+        "warnings": [],
+        "blockers": [],
+        "deferred_capabilities": [],
+        "provenance_pre_hash": layout_provenance_pre_hash,
+    }
+    new_layout_hash = _task021_sha256_hex(layout_hash_payload)
+    new_layout_id = _task021_layout_id_for(new_layout_hash)
+    new_provenance = force_frozen_canonical(layout_provenance_pre_hash)
+    new_case_authority = force_frozen_canonical(
+        _task020_case_authority_primitive(configuration.case_authority)
+    )
+    new_tube_layout = TubeLayout(
+        schema_version=original_layout.schema_version,
+        layout_id=new_layout_id,
+        layout_hash=new_layout_hash,
+        request_hash=request_hash,
+        task020_configuration_id=original_layout.task020_configuration_id,
+        task020_configuration_hash=original_layout.task020_configuration_hash,
+        case_authority=new_case_authority,
+        construction_family=original_layout.construction_family,
+        equipment_orientation=original_layout.equipment_orientation,
+        shell_pass_count=original_layout.shell_pass_count,
+        tube_pass_count=original_layout.tube_pass_count,
+        tube_geometry=tube_geometry,
+        layout_rule_authority=rule_snapshot,
+        placement_envelope=original_layout.placement_envelope,
+        origin_mode=original_layout.origin_mode,
+        axis_orientation=original_layout.axis_orientation,
+        exclusion_zones=original_layout.exclusion_zones,
+        positions=new_positions_tuple,
+        tube_hole_count=original_layout.tube_hole_count,
+        physical_tube_count=original_layout.physical_tube_count,
+        boundary_rejection_count=original_layout.boundary_rejection_count,
+        exclusion_rejection_count=original_layout.exclusion_rejection_count,
+        exclusion_audit=original_layout.exclusion_audit,
+        warnings=original_layout.warnings,
+        blockers=original_layout.blockers,
+        deferred_capabilities=original_layout.deferred_capabilities,
+        provenance=new_provenance,
+    )
+    return replace_layout(request, tube_layout=new_tube_layout)

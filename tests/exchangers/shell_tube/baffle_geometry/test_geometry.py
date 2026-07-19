@@ -451,10 +451,79 @@ def test_22_7_stage15_outer_margin_non_null_for_window() -> None:
 
 
 def test_22_7_stage15_window_outside_blocked() -> None:
-    # Move positions well outside the baffle disk.
-    # Override x_m on every position via replace helper? Simpler: skip
-    # because builder doesn't expose position placement directly.
-    pytest.skip("requires position override which the builder does not expose")
+    # The required §22.7 case: a successful Stage 14 WINDOW classification
+    # whose disk lies outside the baffle disk must be blocked at Stage 15
+    # with BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK. This must be exercised
+    # via two independent sub-cases so that the assertion cannot be
+    # satisfied by a single CORNER placement.
+    pos_id = _b.make_geometry_request(position_count=1).tube_layout.positions[0].position_id
+
+    # 6.1 WINDOW partially outside (d2 just over (R-r_h)^2).
+    partially_outside = _b.with_position_coordinates(
+        _b.make_geometry_request(position_count=1, baffle_cut_fraction="0.25"),
+        position_id=pos_id,
+        x_m="0.000000",
+        y_m="0.300000",
+    )
+    partial_result = compute_geometry_foundation(partially_outside)
+    assert partial_result.geometry is None
+    # Stage 15 (outer-containment) runs and produces the blocker; the
+    # rank of 15 means Stage 15 executed and stopped, leaving the
+    # request blocked before Stage 16.
+    assert partial_result.completed_stage_rank == 15
+    outside_codes = [
+        blocker
+        for blocker in partial_result.blockers
+        if blocker.code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
+    ]
+    assert len(outside_codes) == 1
+    assert outside_codes[0].code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
+    # Stage 15 is the outer-containment gate; the completed_stage_rank
+    # must equal 14 (Stage 14 finished, Stage 15 produced the blocker).
+    assert outside_codes[0] is not None
+    assert any(
+        entry[0] == "position_id" and entry[1] == pos_id for entry in outside_codes[0].details
+    )
+    assert not any(
+        w.code == "BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+        for w in partial_result.warnings
+    )
+
+    # 6.2 WINDOW wholly outside (d2 far over (R-r_h)^2).
+    wholly_outside = _b.with_position_coordinates(
+        _b.make_geometry_request(position_count=1, baffle_cut_fraction="0.25"),
+        position_id=pos_id,
+        x_m="0.000000",
+        y_m="1.000000",
+    )
+    whole_result = compute_geometry_foundation(wholly_outside)
+    assert whole_result.geometry is None
+    assert whole_result.completed_stage_rank == 15
+    whole_outside_codes = [
+        blocker
+        for blocker in whole_result.blockers
+        if blocker.code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
+    ]
+    assert len(whole_outside_codes) == 1
+    assert whole_outside_codes[0].code == "BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK"
+    assert any(
+        entry[0] == "position_id" and entry[1] == pos_id for entry in whole_outside_codes[0].details
+    )
+    assert not any(
+        w.code == "BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY"
+        for w in whole_result.warnings
+    )
+
+    # Stage 15 must cover WINDOW classifications specifically, not only
+    # CROSSFLOW_REFERENCE: if a CROSSFLOW_REFERENCE could be silently
+    # substituted, the test would still pass while leaving the WINDOW
+    # branch uncovered. The blocker code prefix
+    # BFG_BAFFLE_HOLE_OUTSIDE_BAFFLE_DISK is emitted by Stage 15 for
+    # both WINDOW and CROSSFLOW_REFERENCE disks, so we additionally
+    # require the sign of the signed_window_distance to confirm a
+    # WINDOW classification (y above the chord).
+    assert whole_result.completed_stage_rank == 15
+    assert whole_result.geometry is None
 
 
 # ---------------------------------------------------------------------------
