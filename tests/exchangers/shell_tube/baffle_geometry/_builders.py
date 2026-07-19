@@ -1006,6 +1006,76 @@ def replace_evidence_refs(
     )
 
 
+# ---------------------------------------------------------------------------
+# Round 5 geometry-oriented builders (synthetic values only).
+#
+# SYNTHETIC_TEST_VALUE -- NOT_ENGINEERING_RECOMMENDATION.
+# ---------------------------------------------------------------------------
+
+
+def make_geometry_request(
+    *,
+    baffle_count: int = 4,
+    baffle_thickness_m: str = "0.01",
+    spacing_value_m: str = "0.2",
+    baffle_cut_fraction: str = "0.25",
+    orientation: _t024.BaffleOrientation = _t024.BaffleOrientation.TOP,
+    shell_to_baffle_diametral_clearance_m: str = "0.001",
+    tube_to_baffle_hole_diametral_clearance_m: str = "0.001",
+    axial_start_coordinate_m: str = "0.0",
+    position_count: int = 4,
+    evidence_refs: tuple[str, ...] = ("task024-round5-evidence",),
+) -> _t024.BaffleGeometryRequest:
+    """Build a geometry-valid :class:`BaffleGeometryRequest`.
+
+    Computes ``spacing_sequence_m`` so that ``sum(spacing) ==
+    axial_end - axial_start``. With ``baffle_count=4`` and
+    ``axial_start=0.0`` the default is five equal spacings of
+    ``0.2`` summing to ``1.0``. Positions are taken from the
+    existing ``make_tube_layout`` (linear ``x_m = 0.01*(i+1)``,
+    ``y_m = 0``).
+    """
+    if axial_start_coordinate_m == "0.0":
+        # Maintain closure: axial_end = axial_start + (baffle_count + 1) * spacing.
+        # Use Decimal to avoid binary-float drift in str(float) conversions.
+        from decimal import Decimal as _Dec
+
+        axial_end_coordinate_m = str(_Dec(baffle_count + 1) * _Dec(spacing_value_m))
+    else:
+        from decimal import Decimal as _Dec
+
+        axial_end_coordinate_m = str(
+            _Dec(axial_start_coordinate_m) + _Dec(baffle_count + 1) * _Dec(spacing_value_m)
+        )
+    spacing_sequence = tuple(spacing_value_m for _ in range(baffle_count + 1))
+
+    configuration = make_shell_and_tube_configuration()
+    tube_layout = make_tube_layout(configuration, position_count=position_count)
+    geometry = make_shell_bundle_geometry(configuration, tube_layout)
+    axial_span = make_axial_span(
+        axial_start_coordinate_m=axial_start_coordinate_m,
+        axial_end_coordinate_m=axial_end_coordinate_m,
+    )
+    design_authority = make_design_authority(
+        baffle_count=baffle_count,
+        baffle_thickness_m=baffle_thickness_m,
+        spacing_sequence_m=spacing_sequence,
+        baffle_cut_fraction=baffle_cut_fraction,
+        orientation_sequence=tuple(orientation for _ in range(baffle_count)),
+        shell_to_baffle_diametral_clearance_m=shell_to_baffle_diametral_clearance_m,
+        tube_to_baffle_hole_diametral_clearance_m=tube_to_baffle_hole_diametral_clearance_m,
+    )
+    return _t024.BaffleGeometryRequest(
+        schema_version=_t024.REQUEST_SCHEMA_VERSION,
+        configuration=configuration,
+        tube_layout=tube_layout,
+        shell_bundle_geometry=geometry,
+        axial_span=axial_span,
+        design_authority=design_authority,
+        evidence_refs=tuple(sorted(set(evidence_refs))),
+    )
+
+
 __all__ = [
     "make_request",
     "make_shell_and_tube_configuration",
@@ -1019,4 +1089,5 @@ __all__ = [
     "replace_axial_span",
     "replace_design_authority",
     "replace_evidence_refs",
+    "make_geometry_request",
 ]
