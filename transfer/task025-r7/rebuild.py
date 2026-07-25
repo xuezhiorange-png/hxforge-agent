@@ -3,8 +3,8 @@ import base64
 import hashlib
 
 parts = sorted(Path('.').glob('part-*-of-*.b64'))
-if len(parts) != 8:
-    raise SystemExit(f'expected 8 parts, found {len(parts)}')
+if len(parts) != 16:
+    raise SystemExit(f'expected 16 parts, found {len(parts)}')
 
 payload = ''.join(p.read_text(encoding='ascii').strip() for p in parts)
 data = base64.b64decode(payload, validate=True)
