@@ -1,0 +1,10 @@
+# A08 dag mutation isolation snapshot
+# Stub snapshot used for snapshot-isolation tests; the bytes below are
+# stable content recorded once at the time of test fixture creation and
+# are NOT used to recompute any production hash.
+
+A08_DAG_LEAF_COUNT=12
+A08_DAG_NODE_COUNT=8
+A08_DAG_PRODUCT_LEAF=warning_set
+A08_DAG_LEAF_VALUE=()
+A08_DAG_MUTATION_ISOLATION_RESULT=PASS

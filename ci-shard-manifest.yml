@@ -69,6 +69,21 @@ shards:
       - tests/exchangers/shell_tube/test_task020_rule_pack_hash_integration.py
       - tests/exchangers/shell_tube/test_task020_rule_profile_adapter.py
       - tests/exchangers/shell_tube/test_task020_schema.py
+      - tests/exchangers/shell_tube/tube_side/test_a01_upstream_closure.py
+      - tests/exchangers/shell_tube/tube_side/test_a02_task025_enums.py
+      - tests/exchangers/shell_tube/tube_side/test_a03_raw_projection.py
+      - tests/exchangers/shell_tube/tube_side/test_a04_decimal_identity.py
+      - tests/exchangers/shell_tube/tube_side/test_a05_dual_length_isolation.py
+      - tests/exchangers/shell_tube/tube_side/test_a06_reference_planes.py
+      - tests/exchangers/shell_tube/tube_side/test_a07_blocker_registry.py
+      - tests/exchangers/shell_tube/tube_side/test_a08_dag_mutation_isolation.py
+      - tests/exchangers/shell_tube/tube_side/test_a09_scheduler.py
+      - tests/exchangers/shell_tube/tube_side/test_a10_valid_result.py
+      - tests/exchangers/shell_tube/tube_side/test_a11_to_a14_dispositions.py
+      - tests/exchangers/shell_tube/tube_side/test_hydraulic_geometry.py
+      - tests/exchangers/shell_tube/tube_side/test_hydraulic_participation_authority.py
+      - tests/exchangers/shell_tube/tube_side/test_blocked_result_from_raw_invalid.py
+      - tests/exchangers/shell_tube/tube_side/test_software_version_provenance.py
       - tests/exchangers/shell_tube/tube_layout/test_models.py
       - tests/exchangers/shell_tube/tube_layout/test_schema.py
       - tests/exchangers/shell_tube/tube_layout/test_authority.py
