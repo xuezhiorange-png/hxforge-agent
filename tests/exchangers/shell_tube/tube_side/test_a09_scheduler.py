@@ -956,3 +956,168 @@ def test_prevalidated_evidence_refs_are_used_at_stage6() -> None:
                     "evidence_refs_entry_empty",
                 }
             )
+
+
+# ---------------------------------------------------------------------------
+# Round-5 §7-§9 — Top-level dict key scan must not execute caller
+# controlled ``__hash__`` / ``__eq__`` methods after dict construction.
+# ---------------------------------------------------------------------------
+
+
+def test_top_level_evil_key_eq_is_not_executed() -> None:
+    """Round-5 §7 — ``__eq__`` on a malicious top-level key must not run."""
+
+    class EvilKey:
+        def __init__(self) -> None:
+            self.armed = False
+            self.hash_calls = 0
+            self.eq_calls = 0
+
+        def __hash__(self) -> int:
+            self.hash_calls += 1
+            if self.armed:
+                raise AssertionError("__hash__ must not execute after dict construction")
+            return hash("evidence_refs")
+
+        def __eq__(self, other: object) -> bool:
+            self.eq_calls += 1
+            raise AssertionError("__eq__ must not execute")
+
+        def __ne__(self, other: object) -> bool:
+            raise AssertionError("__ne__ must not execute")
+
+    key = EvilKey()
+    raw_input = {key: object()}  # type: ignore[dict-item]
+    key.armed = True
+    result = ts.evaluate_task025(raw_input)  # type: ignore[arg-type]
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+    assert key.eq_calls == 0
+    assert key.hash_calls == 1  # only the dict-construction call
+
+
+def test_top_level_evil_key_hash_is_not_reinvoked() -> None:
+    """``__hash__`` must not be re-invoked after dict construction."""
+
+    class CountingKey:
+        def __init__(self) -> None:
+            self.armed = False
+            self.hash_calls = 0
+
+        def __hash__(self) -> int:
+            self.hash_calls += 1
+            if self.armed:
+                raise AssertionError("__hash__ must not execute after dict construction")
+            return hash("evidence_refs")
+
+    key = CountingKey()
+    raw_input = {key: object()}  # type: ignore[dict-item]
+    key.armed = True
+    result = ts.evaluate_task025(raw_input)  # type: ignore[arg-type]
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+    assert key.hash_calls == 1
+
+
+def test_top_level_non_string_key_returns_bl019() -> None:
+    """An int / object top-level key must not be classified as BL_003."""
+
+    raw_input: dict[object, object] = {
+        1: "unsupported",
+        "evidence_refs": (1,),
+    }
+    result = ts.evaluate_task025(raw_input)  # type: ignore[arg-type]
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    codes = {b.code for b in result.blockers}
+    # Non-string top-level key wins; evidence_refs cannot be classified
+    # as BL_003 because the request key domain is not yet established.
+    assert ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+    assert ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED not in codes
+
+
+def test_top_level_str_subclass_key_returns_bl019() -> None:
+    """A non-exact ``str`` subclass key must also be rejected as BL_019."""
+
+    class StrSubclass(str):  # type: ignore[misc]
+        def __hash__(self) -> int:
+            return super().__hash__()
+
+    raw_input: dict[object, object] = {
+        StrSubclass("evidence_refs"): ("fixture",),
+    }
+    result = ts.evaluate_task025(raw_input)  # type: ignore[arg-type]
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+
+
+def test_evidence_refs_prevalidation_occurs_after_safe_key_scan() -> None:
+    """Safe scan must precede evidence_refs validation."""
+
+    class StrSubclass(str):  # type: ignore[misc]
+        def __hash__(self) -> int:
+            return super().__hash__()
+
+    raw_input: dict[object, object] = {
+        StrSubclass("evidence_refs"): (1,),  # would be BL_003 if key were exact
+    }
+    result = ts.evaluate_task025(raw_input)  # type: ignore[arg-type]
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    codes = {b.code for b in result.blockers}
+    # The non-exact key wins before the evidence_refs contract is checked.
+    assert ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+
+
+def test_valid_evidence_refs_still_reaches_normal_scheduler() -> None:
+    """Valid ``evidence_refs`` plus a string-only key domain remains valid."""
+
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = ("fixture-1", "fixture-2")
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, (ts.Task025ValidResult, ts.Task025BlockedResult))
+    if isinstance(result, ts.Task025BlockedResult):
+        # Stage 1 evidence_refs contract is satisfied, so any block must
+        # come from a later stage.
+        assert all(
+            not (
+                b.code is ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED
+                and b.field_path == "raw_input.evidence_refs"
+            )
+            for b in result.blockers
+        )
+
+
+def test_top_level_evil_key_with_valid_evidence_refs_returns_bl019() -> None:
+    """Mixed malicious key + valid evidence_refs must still resolve to BL_019."""
+
+    class EvilKey:
+        def __init__(self) -> None:
+            self.armed = False
+            self.eq_calls = 0
+
+        def __hash__(self) -> int:
+            if self.armed:
+                raise AssertionError("__hash__ must not run after construction")
+            return hash("ignored")
+
+        def __eq__(self, other: object) -> bool:
+            self.eq_calls += 1
+            raise AssertionError("__eq__ must not execute")
+
+    key = EvilKey()
+    raw_input: dict[object, object] = {
+        key: object(),  # type: ignore[dict-item]
+        "evidence_refs": ("fixture",),
+    }
+    key.armed = True
+    result = ts.evaluate_task025(raw_input)  # type: ignore[arg-type]
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+    assert key.eq_calls == 0

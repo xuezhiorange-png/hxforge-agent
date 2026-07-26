@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import decimal
 from decimal import Decimal
-from typing import Any, Final
+from typing import Any, Final, cast
 
 from hexagent.exchangers.shell_tube.models import (
     AuthorityMode,
@@ -252,6 +252,18 @@ def schedule(raw_input: Any) -> Task025ValidResult | Task025BlockedResult:
 
 def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025BlockedResult:
     # §4.2 — raw_request_projection + raw_profile_id_projection must always exist.
+    # Round-5 §4 — safe top-level key scan. Any membership, indexing, or
+    # ``.get()`` on ``raw_input`` before this point would invoke the
+    # caller-controlled ``__hash__`` / ``__eq__`` on untrusted keys, which
+    # would leak the malicious exception before the raw projection has
+    # a chance to reject the input. We iterate via ``dict.items(...)``
+    # only and check ``type(key) is str`` before any string equality.
+    try:
+        evidence_refs_value, evidence_refs_present = _scan_top_level_request(
+            cast(dict[object, object], raw_input)
+        )
+    except _TopLevelKeyScanError:
+        return _build_raw_projection_blocked()
     # Round-4 §8.2 — evidence_refs, when present, must pass the full
     # v1 contract: exact tuple of non-empty, non-surrogate, UTF-8
     # encodable str. We validate the entire tuple before the raw
@@ -259,9 +271,9 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
     # ``BL_003_BLOCKED_INPUT_REJECTED`` Stage 1 blocked result with a
     # precise message key.
     prevalidated_evidence_refs: tuple[str, ...] | None = None
-    if "evidence_refs" in raw_input:
+    if evidence_refs_present:
         try:
-            prevalidated_evidence_refs = _validate_evidence_refs(raw_input["evidence_refs"])
+            prevalidated_evidence_refs = _validate_evidence_refs(evidence_refs_value)
         except _EvidenceRefsError as exc:
             return _build_evidence_refs_blocked(exc.message_key)
     try:
@@ -1453,6 +1465,43 @@ class _EvidenceRefsError(Exception):
     def __init__(self, message_key: str) -> None:
         super().__init__(message_key)
         self.message_key = message_key
+
+
+class _TopLevelKeyScanError(Exception):
+    """Round-5 §4 — internal helper signal.
+
+    Raised by :func:`_scan_top_level_request` when the top-level dict
+    contains a key whose ``type(...) is not str``. The caller converts
+    this into a stable ``BL_019_RAW_PROJECTION_UNSUPPORTED`` Stage 1
+    blocked result via ``_build_raw_projection_blocked``.
+    """
+
+    __slots__ = ()
+
+
+def _scan_top_level_request(
+    raw_input: dict[object, object],
+) -> tuple[object | None, bool]:
+    """Round-5 §4 — safe top-level key scan.
+
+    Iterates ``raw_input`` via ``dict.items(raw_input)`` so any subclass
+    ``items`` override is bypassed. The ``type(raw_input) is dict`` gate
+    is enforced upstream by ``schedule()`` before this helper is called.
+
+    Only keys with ``type(key) is str`` are observed; ``__hash__`` and
+    ``__eq__`` on any other key are not invoked. The recognised key
+    ``"evidence_refs"`` is matched by direct string equality against
+    the iterated key, never via dict membership / ``get`` / indexing.
+    """
+    evidence_refs_value: object | None = None
+    evidence_refs_present = False
+    for key, value in dict.items(raw_input):
+        if type(key) is not str:
+            raise _TopLevelKeyScanError
+        if key == "evidence_refs":
+            evidence_refs_present = True
+            evidence_refs_value = value
+    return evidence_refs_value, evidence_refs_present
 
 
 def _validate_evidence_refs(value: Any) -> tuple[str, ...]:
