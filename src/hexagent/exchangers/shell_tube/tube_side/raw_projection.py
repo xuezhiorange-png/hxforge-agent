@@ -119,6 +119,15 @@ def _atom(kind: bytes, payload: bytes) -> bytes:
     return _frame(kind, payload)
 
 
+def _utf8(value: str) -> bytes:
+    if type(value) is not str:
+        raise RawProjectionError("invalid UTF-8 string type")
+    try:
+        return value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise RawProjectionError("invalid UTF-8 string") from exc
+
+
 def _ascii_decimal(value: Decimal) -> bytes:
     try:
         return str(value).encode("ascii")
@@ -150,7 +159,7 @@ def _project_atom(value: Any) -> bytes:
     if value_type is str:
         if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
             raise RawProjectionError("surrogate-containing string")
-        return _atom(b"STRING", value.encode("utf-8"))
+        return _atom(b"STRING", _utf8(value))
     if value_type is bytes:
         return _atom(b"BYTES", bytes(value))
     if value_type is Decimal:
@@ -223,9 +232,7 @@ def _project(value: Any, depth: int, active_container_ids: frozenset[int]) -> by
 def _project_dict(value: dict[Any, Any], depth: int, active: frozenset[int]) -> bytes:
     entries: list[tuple[bytes, bytes]] = []
     for key, child in value.items():
-        if type(key) is not str:
-            raise RawProjectionError("dict key is not exact str")
-        key_bytes = key.encode("utf-8")
+        key_bytes = _utf8(key)
         entries.append((key_bytes, _project(child, depth, active)))
     entries.sort(key=lambda pair: pair[0])
     payload = _u32_be(len(entries))
@@ -417,7 +424,7 @@ def _project_frozen_array(value: FrozenJsonArray, depth: int, active: frozenset[
 def _project_frozen_object(value: FrozenJsonObject, depth: int, active: frozenset[int]) -> bytes:
     entries: list[tuple[bytes, bytes]] = []
     for key, child in value.items_mapping.items():
-        key_bytes = key.encode("utf-8")
+        key_bytes = _utf8(key)
         child_bytes = _project(child, depth, active)
         entries.append((key_bytes, child_bytes))
     entries.sort(key=lambda pair: pair[0])
