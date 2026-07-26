@@ -16,16 +16,25 @@ from hexagent.exchangers.shell_tube.models import (
     AuthorityMode,
     ConstructionFamily,
     Orientation,
+    ShellAndTubeConfiguration,
 )
 from hexagent.exchangers.shell_tube.tube_layout.models import (
     ApprovedTubeGeometrySnapshot,
     TubeLayout,
+    TubePosition,
 )
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
     FrozenJsonArray,
     FrozenJsonObject,
     PIWrapper,
     sha256_hex_from_framed_bytes,
+)
+from hexagent.exchangers.shell_tube.tube_side.hydraulic_participation_authority import (
+    Task025HydraulicParticipationAuthority,
+)
+from hexagent.exchangers.shell_tube.tube_side.length_authorities import (
+    HeatTransferLengthAuthority,
+    InternalFlowLengthAuthority,
 )
 from hexagent.exchangers.shell_tube.tube_side.owned_enums import (
     HydraulicAuthorityMode,
@@ -48,6 +57,21 @@ RECOGNIZED_ENUM_CLASSES: Final[tuple[type[_enum.Enum], ...]] = (
     AuthorityMode,
     ConstructionFamily,
     Orientation,
+)
+
+# Exact concrete type table for TASK-025 known objects. Used by both the
+# raw projection dispatch (project_raw_value) and the public
+# unsafe_object_signal check. Identity comparison must use type(...) and
+# never isinstance, class name, MRO, or duck typing.
+KNOWN_TASK025_CONCRETE_TYPES: Final[frozenset[type[Any]]] = frozenset(
+    {
+        ShellAndTubeConfiguration,
+        TubeLayout,
+        InternalFlowLengthAuthority,
+        HeatTransferLengthAuthority,
+        Task025HydraulicParticipationAuthority,
+        ReferencePlanePair,
+    }
 )
 
 MAX_DEPTH: Final[int] = 64
@@ -178,31 +202,22 @@ def _project(value: Any, depth: int, active_container_ids: frozenset[int]) -> by
     if (
         value is None
         or value_type in (bool, int, str, bytes, Decimal)
-        or type(value) in RECOGNIZED_ENUM_CLASSES
+        or value_type in RECOGNIZED_ENUM_CLASSES
         or value_type is PIWrapper
     ):
         return _project_atom(value)
 
-    from hexagent.exchangers.shell_tube.models import ShellAndTubeConfiguration
-    from hexagent.exchangers.shell_tube.tube_side.hydraulic_participation_authority import (
-        Task025HydraulicParticipationAuthority,
-    )
-    from hexagent.exchangers.shell_tube.tube_side.length_authorities import (
-        HeatTransferLengthAuthority,
-        InternalFlowLengthAuthority,
-    )
-
-    if type(value) is ShellAndTubeConfiguration:
+    if value_type is ShellAndTubeConfiguration:
         return _project_shell_tube_configuration(value, depth, active_container_ids)
-    if type(value) is TubeLayout:
+    if value_type is TubeLayout:
         return _project_tube_layout(value, depth, active_container_ids)
-    if type(value) is InternalFlowLengthAuthority:
+    if value_type is InternalFlowLengthAuthority:
         return _project_length_authority(value, _NS_INTERNAL_FLOW_LENGTH)
-    if type(value) is HeatTransferLengthAuthority:
+    if value_type is HeatTransferLengthAuthority:
         return _project_length_authority(value, _NS_HEAT_TRANSFER_LENGTH)
-    if type(value) is Task025HydraulicParticipationAuthority:
+    if value_type is Task025HydraulicParticipationAuthority:
         return _project_participation(value, depth, active_container_ids)
-    if type(value) is ReferencePlanePair:
+    if value_type is ReferencePlanePair:
         return _project_reference_plane_pair(value)
     if value_type is FrozenJsonArray:
         object_id = id(value)
@@ -316,7 +331,10 @@ def _layout_field(value: TubeLayout, field_name: str) -> Any:
 def _project_shell_tube_configuration(value: Any, depth: int, active: frozenset[int]) -> bytes:
     fields: list[tuple[str, bytes, bytes]] = []
     for field_name in _SHELL_TUBE_CONFIGURATION_FIELDS:
-        field_value = _configuration_field(value, field_name)
+        try:
+            field_value = _configuration_field(value, field_name)
+        except (AttributeError, ValueError, TypeError) as exc:
+            raise RawProjectionError(f"configuration field {field_name!r} inaccessible") from exc
         if field_name in ("authority_mode", "construction_family", "orientation"):
             if not isinstance(field_value, _enum.Enum):
                 raise RawProjectionError("configuration enum field type")
@@ -333,31 +351,61 @@ def _project_shell_tube_configuration(value: Any, depth: int, active: frozenset[
 def _project_tube_layout(value: TubeLayout, depth: int, active: frozenset[int]) -> bytes:
     fields: list[tuple[str, bytes, bytes]] = []
     for field_name in _TUBE_LAYOUT_FIELDS:
-        field_value = _layout_field(value, field_name)
+        try:
+            field_value = _layout_field(value, field_name)
+        except (AttributeError, ValueError, TypeError) as exc:
+            raise RawProjectionError(f"layout field {field_name!r} inaccessible") from exc
         if field_name in ("construction_family", "equipment_orientation"):
             if field_name == "construction_family":
                 if type(field_value) is not str:
                     raise RawProjectionError("layout construction family type")
                 fields.append((field_name, b"STRING", field_value.encode("utf-8")))
             else:
-                orientation: Orientation = value.equipment_orientation
-                fields.append((field_name, b"ENUM", _enum_bytes(orientation)))
+                if type(field_value) is not Orientation:
+                    raise RawProjectionError("layout orientation type")
+                fields.append((field_name, b"ENUM", _enum_bytes(field_value)))
         elif field_name == "positions":
             if type(field_value) is not tuple:
                 raise RawProjectionError("layout positions are not exact tuple")
             position_payload = _u32_be(len(field_value))
             for position in field_value:
-                if type(position.position_id) is not str:
-                    raise RawProjectionError("position id type")
-                child = _project_atom(position.position_id)
+                if type(position) is not TubePosition:
+                    raise RawProjectionError("layout position not exact TubePosition")
+                position_id: Any = None
+                try:
+                    position_id = position.position_id
+                except (AttributeError, ValueError, TypeError) as exc:
+                    raise RawProjectionError("layout position_id inaccessible") from exc
+                if type(position_id) is not str:
+                    raise RawProjectionError("layout position_id not exact str")
+                child = _project_atom(position_id)
                 position_payload += _u64_be(len(child)) + child
             fields.append((field_name, b"TUPLE", position_payload))
         elif field_name == "tube_geometry":
+            if type(field_value) is not ApprovedTubeGeometrySnapshot:
+                raise RawProjectionError(
+                    "layout tube_geometry not exact ApprovedTubeGeometrySnapshot"
+                )
             geometry: ApprovedTubeGeometrySnapshot = field_value
+            geometry_id: Any = None
+            record_hash: Any = None
+            snapshot_hash: Any = None
+            try:
+                geometry_id = geometry.geometry_id
+                record_hash = geometry.record_hash
+                snapshot_hash = geometry.snapshot_hash
+            except (AttributeError, ValueError, TypeError) as exc:
+                raise RawProjectionError("layout geometry field inaccessible") from exc
+            if type(geometry_id) is not str:
+                raise RawProjectionError("layout geometry_id not exact str")
+            if type(record_hash) is not str:
+                raise RawProjectionError("layout record_hash not exact str")
+            if type(snapshot_hash) is not str:
+                raise RawProjectionError("layout snapshot_hash not exact str")
             subfields = (
-                ("geometry_id", b"STRING", geometry.geometry_id.encode("utf-8")),
-                ("record_hash", b"STRING", geometry.record_hash.encode("ascii")),
-                ("snapshot_hash", b"STRING", geometry.snapshot_hash.encode("ascii")),
+                ("geometry_id", b"STRING", geometry_id.encode("utf-8")),
+                ("record_hash", b"STRING", record_hash.encode("ascii")),
+                ("snapshot_hash", b"STRING", snapshot_hash.encode("ascii")),
             )
             fields.append(
                 (field_name, b"KNOWN_RECORD", _record(b"task025.tube-geometry.v1", subfields))
@@ -372,33 +420,51 @@ def _project_tube_layout(value: TubeLayout, depth: int, active: frozenset[int]) 
 
 
 def _project_length_authority(value: Any, namespace: bytes) -> bytes:
+    try:
+        length_id = value.length_id
+        length_m = value.length_m
+        start_plane = value.start_plane
+        end_plane = value.end_plane
+        authority_mode = value.authority_mode
+        length_hash = value.length_hash
+    except (AttributeError, ValueError, TypeError) as exc:
+        raise RawProjectionError("length authority field inaccessible") from exc
     fields = (
-        ("length_id", b"STRING", value.length_id.encode("utf-8")),
-        ("length_m", b"DECIMAL", _ascii_decimal(value.length_m)),
-        ("start_plane", b"KNOWN_RECORD", _project_reference_plane_pair(value.start_plane)),
-        ("end_plane", b"KNOWN_RECORD", _project_reference_plane_pair(value.end_plane)),
-        ("authority_mode", b"ENUM", _enum_bytes(value.authority_mode)),
-        ("length_hash", b"STRING", value.length_hash.encode("ascii")),
+        ("length_id", b"STRING", length_id.encode("utf-8")),
+        ("length_m", b"DECIMAL", _ascii_decimal(length_m)),
+        ("start_plane", b"KNOWN_RECORD", _project_reference_plane_pair(start_plane)),
+        ("end_plane", b"KNOWN_RECORD", _project_reference_plane_pair(end_plane)),
+        ("authority_mode", b"ENUM", _enum_bytes(authority_mode)),
+        ("length_hash", b"STRING", length_hash.encode("ascii")),
     )
     return _atom(b"KNOWN_RECORD", _record(namespace, fields))
 
 
 def _project_participation(value: Any, depth: int, active: frozenset[int]) -> bytes:
+    try:
+        all_layout = value.all_layout_position_ids
+        active_ids = value.active_position_ids
+        inactive_ids = value.inactive_position_ids
+        authority_mode = value.authority_mode
+        evidence_refs = value.evidence_refs
+        hydraulic_authority_hash = value.hydraulic_authority_hash
+    except (AttributeError, ValueError, TypeError) as exc:
+        raise RawProjectionError("participation authority field inaccessible") from exc
     fields = (
         (
             "all_layout_position_ids",
             b"TUPLE",
-            _project_tuple(value.all_layout_position_ids, depth, active),
+            _project_tuple(all_layout, depth, active),
         ),
-        ("active_position_ids", b"TUPLE", _project_tuple(value.active_position_ids, depth, active)),
+        ("active_position_ids", b"TUPLE", _project_tuple(active_ids, depth, active)),
         (
             "inactive_position_ids",
             b"TUPLE",
-            _project_tuple(value.inactive_position_ids, depth, active),
+            _project_tuple(inactive_ids, depth, active),
         ),
-        ("authority_mode", b"ENUM", _enum_bytes(value.authority_mode)),
-        ("evidence_refs", b"TUPLE", _project_tuple(value.evidence_refs, depth, active)),
-        ("hydraulic_authority_hash", b"STRING", value.hydraulic_authority_hash.encode("ascii")),
+        ("authority_mode", b"ENUM", _enum_bytes(authority_mode)),
+        ("evidence_refs", b"TUPLE", _project_tuple(evidence_refs, depth, active)),
+        ("hydraulic_authority_hash", b"STRING", hydraulic_authority_hash.encode("ascii")),
     )
     return _atom(b"KNOWN_RECORD", _record(_NS_HYDRAULIC_PARTICIPATION, fields))
 
@@ -453,28 +519,26 @@ def raw_projection_hex(framed_bytes: bytes) -> str:
 
 
 def unsafe_object_signal(value: Any) -> bool:
+    """Return True if ``value`` is not in the supported raw boundary.
+
+    Uses an exact concrete-type table only — never class names, MRO,
+    ``isinstance`` for known types, or duck typing.
+    """
     value_type = type(value)
     if value is None or value_type in (bool, int, str, bytes, Decimal):
         return False
-    if type(value) in RECOGNIZED_ENUM_CLASSES or value_type is PIWrapper:
+    if value_type in RECOGNIZED_ENUM_CLASSES or value_type is PIWrapper:
         return False
     if value_type in (dict, tuple, frozenset, FrozenJsonArray, FrozenJsonObject):
         return False
-    known_type_names = {
-        "ShellAndTubeConfiguration",
-        "TubeLayout",
-        "InternalFlowLengthAuthority",
-        "HeatTransferLengthAuthority",
-        "Task025HydraulicParticipationAuthority",
-        "ReferencePlanePair",
-    }
-    return value_type.__name__ not in known_type_names
+    return value_type not in KNOWN_TASK025_CONCRETE_TYPES
 
 
 __all__ = [
     "RawProjectionError",
     "MAX_DEPTH",
     "RECOGNIZED_ENUM_CLASSES",
+    "KNOWN_TASK025_CONCRETE_TYPES",
     "project_raw_value",
     "project_raw_dict",
     "raw_projection_hex",

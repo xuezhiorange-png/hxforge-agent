@@ -663,6 +663,29 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
         )
 
     # §12 — Stage 6 — deterministic request projection + request_hash.
+    raw_evidence_refs = raw_input["evidence_refs"]
+    try:
+        evidence_refs_final = _validate_evidence_refs(raw_evidence_refs)
+    except _EvidenceRefsError as exc:
+        stage6_blockers: list[Task025BlockerEntry] = [
+            emit_blocker(
+                BlockerCode.BL_003_BLOCKED_INPUT_REJECTED,
+                "raw_input.evidence_refs",
+                exc.message_key,
+                (),
+            )
+        ]
+        return _finalize_blocked(
+            raw_request_projection,
+            raw_profile_id_projection,
+            resolved_profile_id,
+            request_hash_value=None,
+            blockers=stage6_blockers,
+            stage_rank=6,
+            evidence_refs=(),
+            upstream_hashes=(config.configuration_hash, layout.layout_hash),
+        )
+
     request = Task025Request(
         schema_version=schema_version,
         profile_id=resolved_profile_id or "",
@@ -673,10 +696,9 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
         hydraulic_participation_authority=participation_auth,
         flow_path_mode=flow_path_mode,
         hydraulic_authority_mode=hydraulic_mode,
-        evidence_refs=tuple(raw_input["evidence_refs"]),
+        evidence_refs=evidence_refs_final,
     )
 
-    evidence_refs_final = tuple(raw_input["evidence_refs"])
     try:
         req_hash = request_hash(request)
     except (ValueError, TypeError):
@@ -1041,6 +1063,15 @@ def _validate_task020(raw: Any) -> tuple[Any, list[Task025BlockerEntry]]:
                 (),
             )
         )
+    if raw.blockers:
+        blockers.append(
+            emit_blocker(
+                BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION,
+                "raw_input.task020_configuration.blockers",
+                "task020_upstream_blockers_non_empty",
+                (),
+            )
+        )
     return raw, blockers
 
 
@@ -1066,7 +1097,7 @@ def _validate_task021(raw: Any) -> tuple[TubeLayout | None, list[Task025BlockerE
                 (),
             )
         )
-    if raw.construction_family is not ConstructionFamily.FIXED_TUBESHEET:
+    if raw.construction_family != ConstructionFamily.FIXED_TUBESHEET.value:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_014_INVALID_TASK021_LAYOUT,
@@ -1173,6 +1204,27 @@ def _is_64hex(value: Any) -> bool:
     return (
         isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
     )
+
+
+class _EvidenceRefsError(Exception):
+    __slots__ = ("message_key",)
+
+    def __init__(self, message_key: str) -> None:
+        super().__init__(message_key)
+        self.message_key = message_key
+
+
+def _validate_evidence_refs(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, (tuple, list)):
+        raise _EvidenceRefsError("evidence_refs_not_frozen_container")
+    items: list[Any] = []
+    for item in value:
+        if type(item) is not str:
+            raise _EvidenceRefsError("evidence_refs_entry_not_exact_str")
+        if not item:
+            raise _EvidenceRefsError("evidence_refs_entry_empty")
+        items.append(item)
+    return tuple(items)
 
 
 # -----------------------------------------------------------------------

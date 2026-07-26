@@ -196,4 +196,119 @@ def test_public_entry_never_leaks_raw_input_exception() -> None:
     assert isinstance(result, ts.Task025BlockedResult)
 
 
+def test_invalid_evidence_ref_type_returns_blocked() -> None:
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = (1,)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED in codes
+
+
+def test_empty_evidence_ref_returns_blocked() -> None:
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = ("",)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED in codes
+
+
+def test_request_construction_failure_does_not_escape() -> None:
+    class StrSubclass(str):
+        pass
+
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = (StrSubclass("x"),)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    # Must not be a Python builtin error.
+    assert result.stage_rank == 1
+
+
+def test_task020_configuration_with_blockers_is_stage2_blocked() -> None:
+    from hexagent.exchangers.shell_tube.models import ErrorEntry
+
+    config = config_a()
+    contaminated = replace(
+        config, blockers=(ErrorEntry(code="X", field_path=None, message_key="k"),)
+    )
+    raw = _request_input(contaminated, layout_a())
+    # Ensure layout still cross-binds to contaminated config id+hash.
+    contaminated_layout = replace(
+        layout_a(),
+        task020_configuration_id=contaminated.configuration_id,
+        task020_configuration_hash=contaminated.configuration_hash,
+    )
+    raw["task020_configuration"] = contaminated
+    raw["task021_layout"] = contaminated_layout
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION in codes
+
+
+def test_layout_with_non_tube_position_returns_blocked() -> None:
+    class NotTubePosition:
+        def __init__(self) -> None:
+            self.position_id = "p0"
+
+    raw = _request_input(config_a(), layout_a())
+    contaminated = replace(layout_a(), positions=(NotTubePosition(),))
+    raw["task021_layout"] = contaminated
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_layout_position_property_is_not_executed() -> None:
+    class ExplodingPosition:
+        @property
+        def position_id(self) -> str:
+            raise AssertionError("property must not execute")
+
+    raw = _request_input(config_a(), layout_a())
+    contaminated = replace(layout_a(), positions=(ExplodingPosition(),))
+    raw["task021_layout"] = contaminated
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+
+
+def test_layout_with_invalid_geometry_returns_blocked() -> None:
+    class NotGeometry:
+        def __init__(self) -> None:
+            self.geometry_id = "g"
+            self.record_hash = "r" * 64
+            self.snapshot_hash = "s" * 64
+
+    raw = _request_input(config_a(), layout_a())
+    contaminated = replace(layout_a(), tube_geometry=NotGeometry())
+    raw["task021_layout"] = contaminated
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_layout_geometry_property_is_not_executed() -> None:
+    class ExplodingGeometry:
+        @property
+        def geometry_id(self) -> str:
+            raise AssertionError("geometry_id property must not execute")
+
+        @property
+        def record_hash(self) -> str:
+            raise AssertionError("record_hash property must not execute")
+
+        @property
+        def snapshot_hash(self) -> str:
+            raise AssertionError("snapshot_hash property must not execute")
+
+    raw = _request_input(config_a(), layout_a())
+    contaminated = replace(layout_a(), tube_geometry=ExplodingGeometry())
+    raw["task021_layout"] = contaminated
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+
+
 # ruff: noqa: E501
