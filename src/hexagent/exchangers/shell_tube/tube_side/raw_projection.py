@@ -8,8 +8,10 @@ length, so projection is injective for the supported domain.
 
 from __future__ import annotations
 
+import decimal as _decimal
 import enum as _enum
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Any, Final
 
 from hexagent.exchangers.shell_tube.models import (
@@ -24,6 +26,7 @@ from hexagent.exchangers.shell_tube.tube_layout.models import (
     TubePosition,
 )
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
+    PI_DECIMAL_LEXEME,
     FrozenJsonArray,
     FrozenJsonObject,
     PIWrapper,
@@ -143,6 +146,51 @@ def _atom(kind: bytes, payload: bytes) -> bytes:
     return _frame(kind, payload)
 
 
+_MAPPING_PROXY_TYPE: Final[type[Any]] = type(MappingProxyType({}))
+"""§4.6 — exact frozen backing-store type used by FrozenJsonObject."""
+
+
+def _read_owned_attr(value: object, name: str, owner_name: str) -> object:
+    """Read an implementation-owned attribute from an exact known type.
+
+    Round-4 §4.2 — used only by the raw projection to read internal
+    backing slots on objects whose concrete type is in
+    ``KNOWN_TASK025_CONCRETE_TYPES`` or is otherwise a recognised
+    TASK-025 value type. ``name`` MUST be a fixed implementation-owned
+    identifier; this helper must never be called with arbitrary
+    user-supplied strings.
+
+    The implementation is total: any missing or inaccessible attribute
+    is converted to a stable :class:`RawProjectionError`. No fallback
+    to ``getattr``, ``hasattr``, ``repr``, ``str``, or descriptor
+    protocols is performed.
+    """
+    try:
+        return object.__getattribute__(value, name)
+    except (AttributeError, TypeError) as exc:
+        raise RawProjectionError(f"{owner_name}.{name} is missing or inaccessible") from exc
+
+
+def _validate_exact_non_empty_str_tuple(value: object, field_path: str) -> tuple[str, ...]:
+    """Validate an exact tuple of non-empty, UTF-8-encodable strings.
+
+    Round-4 §6.2 — every member must satisfy ``type(item) is str``,
+    non-empty, no surrogate, and successful UTF-8 encoding. Any
+    violation is converted to :class:`RawProjectionError` so the
+    public boundary never leaks ``TypeError`` (unhashable), ``KeyError``
+    or ``UnicodeEncodeError`` to the caller.
+    """
+    if type(value) is not tuple:
+        raise RawProjectionError(f"{field_path} must be exact tuple")
+    for item in value:
+        if type(item) is not str:
+            raise RawProjectionError(f"{field_path} member must be exact str")
+        if not item:
+            raise RawProjectionError(f"{field_path} member must be non-empty")
+        _utf8_exact(item, field_path)
+    return value
+
+
 def _utf8(value: str) -> bytes:
     return _utf8_exact(value, "raw_input.string")
 
@@ -202,7 +250,10 @@ def _enum_bytes(value: _enum.Enum) -> bytes:
 
 
 def _project_atom(value: Any) -> bytes:
-    value_type = type(value)
+    try:
+        value_type = type(value)
+    except TypeError as exc:
+        raise RawProjectionError("unsupported atom type probe") from exc
     if value is None:
         return _atom(b"NONE", b"")
     if value_type is bool:
@@ -217,17 +268,20 @@ def _project_atom(value: Any) -> bytes:
         return _atom(b"BYTES", bytes(value))
     if value_type is Decimal:
         return _atom(b"DECIMAL", _ascii_decimal(value))
-    if type(value) in RECOGNIZED_ENUM_CLASSES:
+    if value_type in RECOGNIZED_ENUM_CLASSES:
         return _atom(b"ENUM", _enum_bytes(value))
-    if type(value) is PIWrapper:
-        return _atom(b"KNOWN_PI", value.canonical_utf8_bytes)
+    if value_type is PIWrapper:
+        return _project_pi_wrapper(value)
     raise RawProjectionError("unsupported atom")
 
 
 def _project(value: Any, depth: int, active_container_ids: frozenset[int]) -> bytes:
     if depth > MAX_DEPTH:
         raise RawProjectionError("raw projection depth limit")
-    value_type = type(value)
+    try:
+        value_type = type(value)
+    except TypeError as exc:
+        raise RawProjectionError("unsupported raw type probe") from exc
     if (
         value is None
         or value_type in (bool, int, str, bytes, Decimal)
@@ -542,14 +596,22 @@ def _project_participation(value: Any, depth: int, active: frozenset[int]) -> by
         hydraulic_authority_hash = value.hydraulic_authority_hash
     except (AttributeError, ValueError, TypeError) as exc:
         raise RawProjectionError("participation authority field inaccessible") from exc
-    if type(all_layout) is not tuple:
-        raise RawProjectionError("all_layout_position_ids must be exact tuple")
-    if type(active_ids) is not tuple:
-        raise RawProjectionError("active_position_ids must be exact tuple")
-    if type(inactive_ids) is not tuple:
-        raise RawProjectionError("inactive_position_ids must be exact tuple")
-    if type(evidence_refs) is not tuple:
-        raise RawProjectionError("participation evidence_refs must be exact tuple")
+    # Round-4 §6.2 — every member of the position-id tuples and the
+    # participation evidence_refs tuple must be an exact non-empty str.
+    # This guarantees Stage 5 ``set(...)`` operations are safe: no
+    # unhashable members, no member ``__hash__`` or ``__eq__`` is invoked.
+    all_layout = _validate_exact_non_empty_str_tuple(
+        all_layout, "participation.all_layout_position_ids"
+    )
+    active_ids = _validate_exact_non_empty_str_tuple(
+        active_ids, "participation.active_position_ids"
+    )
+    inactive_ids = _validate_exact_non_empty_str_tuple(
+        inactive_ids, "participation.inactive_position_ids"
+    )
+    evidence_refs = _validate_exact_non_empty_str_tuple(
+        evidence_refs, "participation.evidence_refs"
+    )
     if type(authority_mode) not in RECOGNIZED_ENUM_CLASSES:
         raise RawProjectionError("participation authority_mode not owned enum")
     fields = (
@@ -576,8 +638,15 @@ def _project_participation(value: Any, depth: int, active: frozenset[int]) -> by
 
 
 def _project_reference_plane_pair(value: ReferencePlanePair) -> bytes:
-    start = value.start
-    end = value.end
+    start = _read_owned_attr(value, "_start", "ReferencePlanePair")
+    end = _read_owned_attr(value, "_end", "ReferencePlanePair")
+    if type(start) is not ReferencePlaneToken:
+        raise RawProjectionError("ReferencePlanePair._start is not exact token")
+    if type(end) is not ReferencePlaneToken:
+        raise RawProjectionError("ReferencePlanePair._end is not exact token")
+    pair = (start, end)
+    if pair not in _ALLOWED_REFERENCE_PAIRS:
+        raise RawProjectionError(f"ReferencePlanePair {pair!r} is not an allowed ordered pair")
     fields = (
         ("start", b"ENUM", _enum_bytes(start)),
         ("end", b"ENUM", _enum_bytes(end)),
@@ -585,17 +654,78 @@ def _project_reference_plane_pair(value: ReferencePlanePair) -> bytes:
     return _record(_NS_REFERENCE_PLANE_PAIR, fields)
 
 
+def _project_pi_wrapper(value: Any) -> bytes:
+    """Round-4 §4.3 — fail-closed projection for ``PIWrapper``.
+
+    The only legal state is an instance whose ``_lexeme`` is the exact
+    ``PI_DECIMAL_LEXEME`` bytes. We never read the public ``canonical_utf8_bytes``
+    property, never call ``repr``/``str``, and never invoke
+    ``__getattribute__`` on anything except the fixed ``_lexeme`` slot.
+    """
+    lexeme = _read_owned_attr(value, "_lexeme", "PIWrapper")
+    if type(lexeme) is not bytes:
+        raise RawProjectionError("PIWrapper._lexeme must be exact bytes")
+    expected = PI_DECIMAL_LEXEME
+    if lexeme != expected:
+        raise RawProjectionError("PIWrapper._lexeme value mismatch")
+    return _atom(b"KNOWN_PI", lexeme)
+
+
+_ALLOWED_REFERENCE_PAIRS: Final[frozenset[tuple[Any, Any]]] = frozenset(
+    {
+        (
+            ReferencePlaneToken.TUBE_INTERNAL_FLOW_START_PLANE,
+            ReferencePlaneToken.TUBE_INTERNAL_FLOW_END_PLANE,
+        ),
+        (
+            ReferencePlaneToken.TUBE_HEAT_TRANSFER_START_PLANE,
+            ReferencePlaneToken.TUBE_HEAT_TRANSFER_END_PLANE,
+        ),
+    }
+)
+
+
 def _project_frozen_array(value: FrozenJsonArray, depth: int, active: frozenset[int]) -> bytes:
-    payload = _u32_be(len(value))
-    for child in value:
+    """Round-4 §4.5 — fail-closed projection for ``FrozenJsonArray``.
+
+    We only read implementation-owned ``_items`` (exact tuple) and
+    ``_frozen`` (True). The owned tuple is iterated as an exact
+    sequence; no ``__len__``, ``__iter__``, ``__getitem__``, or
+    ``__hash__`` on the container is invoked.
+    """
+    items = _read_owned_attr(value, "_items", "FrozenJsonArray")
+    frozen_flag = _read_owned_attr(value, "_frozen", "FrozenJsonArray")
+    if type(items) is not tuple:
+        raise RawProjectionError("FrozenJsonArray._items must be exact tuple")
+    if type(frozen_flag) is not bool or frozen_flag is not True:
+        raise RawProjectionError("FrozenJsonArray._frozen must be True")
+    payload = _u32_be(len(items))
+    for child in items:
         child_bytes = _project(child, depth, active)
         payload += _u64_be(len(child_bytes)) + child_bytes
     return _atom(b"FROZEN_JSON_ARRAY", payload)
 
 
 def _project_frozen_object(value: FrozenJsonObject, depth: int, active: frozenset[int]) -> bytes:
+    """Round-4 §4.6 — fail-closed projection for ``FrozenJsonObject``.
+
+    We only read implementation-owned ``_items`` (exact ``MappingProxyType``)
+    and ``_frozen`` (True). The mapping-proxy is iterated via its owned
+    ``items()`` only after the exact-type check passes; no public
+    ``items_mapping``, ``values``, ``__len__``, or ``__iter__`` on the
+    container is invoked.
+    """
+    items = _read_owned_attr(value, "_items", "FrozenJsonObject")
+    frozen_flag = _read_owned_attr(value, "_frozen", "FrozenJsonObject")
+    if type(items) is not _MAPPING_PROXY_TYPE:
+        raise RawProjectionError("FrozenJsonObject._items must be exact MappingProxyType")
+    if type(frozen_flag) is not bool or frozen_flag is not True:
+        raise RawProjectionError("FrozenJsonObject._frozen must be True")
+    proxy_items = object.__getattribute__(items, "items")
     entries: list[tuple[bytes, bytes]] = []
-    for key, child in value.items_mapping.items():
+    for key, child in proxy_items():
+        if type(key) is not str:
+            raise RawProjectionError("FrozenJsonObject key must be exact str")
         key_bytes = _utf8(key)
         child_bytes = _project(child, depth, active)
         entries.append((key_bytes, child_bytes))
@@ -609,8 +739,30 @@ def _project_frozen_object(value: FrozenJsonObject, depth: int, active: frozense
 def project_raw_value(
     value: Any, *, depth: int = 0, active_container_ids: frozenset[int] = frozenset()
 ) -> bytes:
-    """Project a supported value; raise only :class:`RawProjectionError`."""
-    out = _project(value, depth, active_container_ids)
+    """Project a supported value; raise only :class:`RawProjectionError`.
+
+    Round-4 §4.7 — the contract guarantees that *only*
+    :class:`RawProjectionError` (a :class:`ValueError` subclass) escapes
+    this entry point. All other internal exceptions from the projectors
+    are converted to :class:`RawProjectionError` so the public boundary
+    never leaks ``AttributeError`` / ``TypeError`` / ``UnicodeError`` /
+    ``decimal.InvalidOperation`` etc. ``AssertionError``,
+    ``KeyboardInterrupt``, ``SystemExit`` and ``BaseException`` are
+    intentionally NOT caught — they are programmer / runtime signals.
+    """
+    try:
+        out = _project(value, depth, active_container_ids)
+    except RawProjectionError:
+        raise
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        UnicodeError,
+        OverflowError,
+        _decimal.InvalidOperation,
+    ) as exc:
+        raise RawProjectionError("raw projection failure") from exc
     return out
 
 

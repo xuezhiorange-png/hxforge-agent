@@ -18,7 +18,10 @@ from hexagent.exchangers.shell_tube.models import (
     ConstructionFamily,
     EquipmentFamily,
 )
-from hexagent.exchangers.shell_tube.tube_layout.models import TubeLayout
+from hexagent.exchangers.shell_tube.tube_layout.models import (
+    ApprovedTubeGeometrySnapshot,
+    TubeLayout,
+)
 from hexagent.exchangers.shell_tube.tube_side.blocked_result import (
     Task025BlockedResult,
 )
@@ -203,12 +206,18 @@ def _build_raw_projection_blocked() -> Task025BlockedResult:
     )
 
 
-def _build_evidence_refs_blocked() -> Task025BlockedResult:
-    """Round-3 §7 — public surface for evidence_refs contract violations.
+def _build_evidence_refs_blocked(
+    message_key: str = "evidence_refs_not_frozen_container",
+) -> Task025BlockedResult:
+    """Round-3/4 — public surface for evidence_refs contract violations.
 
     Always reports a stable ``BL_003_BLOCKED_INPUT_REJECTED`` blocker so
     consumers can match on the public contract regardless of whether the
     violation was detected before or after the raw projection boundary.
+
+    Round-4 §8.4 — the message key distinguishes the failure mode
+    (container / entry-type / entry-empty / surrogate / UTF-8) so the
+    public surface is fully introspectable.
     """
     token = b"task025.raw-projection-unsupported.v1"
     raw_request = _raw_projection("raw_request_projection_unsupported", token)
@@ -217,7 +226,7 @@ def _build_evidence_refs_blocked() -> Task025BlockedResult:
         emit_blocker(
             BlockerCode.BL_003_BLOCKED_INPUT_REJECTED,
             "raw_input.evidence_refs",
-            "evidence_refs_not_frozen_container",
+            message_key,
             (),
         )
     ]
@@ -243,13 +252,18 @@ def schedule(raw_input: Any) -> Task025ValidResult | Task025BlockedResult:
 
 def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025BlockedResult:
     # §4.2 — raw_request_projection + raw_profile_id_projection must always exist.
-    # Round-3 §7: evidence_refs, when present, must be an exact tuple of
-    # non-empty str. When the key is absent, the Stage 1 missing-field
-    # check handles it. We validate only the container type here so a
-    # list / byte / str-subclass value never reaches the raw projection
-    # boundary.
-    if "evidence_refs" in raw_input and type(raw_input["evidence_refs"]) is not tuple:
-        return _build_evidence_refs_blocked()
+    # Round-4 §8.2 — evidence_refs, when present, must pass the full
+    # v1 contract: exact tuple of non-empty, non-surrogate, UTF-8
+    # encodable str. We validate the entire tuple before the raw
+    # projection so any violation produces a stable
+    # ``BL_003_BLOCKED_INPUT_REJECTED`` Stage 1 blocked result with a
+    # precise message key.
+    prevalidated_evidence_refs: tuple[str, ...] | None = None
+    if "evidence_refs" in raw_input:
+        try:
+            prevalidated_evidence_refs = _validate_evidence_refs(raw_input["evidence_refs"])
+        except _EvidenceRefsError as exc:
+            return _build_evidence_refs_blocked(exc.message_key)
     try:
         raw_request_bytes = project_raw_dict(raw_input)
     except RawProjectionError:
@@ -712,28 +726,29 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
         )
 
     # §12 — Stage 6 — deterministic request projection + request_hash.
-    raw_evidence_refs = raw_input["evidence_refs"]
-    try:
-        evidence_refs_final = _validate_evidence_refs(raw_evidence_refs)
-    except _EvidenceRefsError as exc:
-        stage6_blockers: list[Task025BlockerEntry] = [
-            emit_blocker(
-                BlockerCode.BL_003_BLOCKED_INPUT_REJECTED,
-                "raw_input.evidence_refs",
-                exc.message_key,
-                (),
-            )
-        ]
+    # Round-4 §8.3 — Stage 6 reuses the prevalidated tuple. The full
+    # contract was already enforced in ``_schedule_dict`` and rejected
+    # with a Stage 1 ``BL_003_BLOCKED_INPUT_REJECTED`` if violated, so a
+    # non-None prevalidated tuple is guaranteed here.
+    if prevalidated_evidence_refs is None:
         return _finalize_blocked(
             raw_request_projection,
             raw_profile_id_projection,
             resolved_profile_id,
             request_hash_value=None,
-            blockers=stage6_blockers,
+            blockers=[
+                emit_blocker(
+                    BlockerCode.BL_003_BLOCKED_INPUT_REJECTED,
+                    "raw_input.evidence_refs",
+                    "evidence_refs_not_frozen_container",
+                    (),
+                )
+            ],
             stage_rank=6,
             evidence_refs=(),
             upstream_hashes=(config.configuration_hash, layout.layout_hash),
         )
+    evidence_refs_final = prevalidated_evidence_refs
 
     request = Task025Request(
         schema_version=schema_version,
@@ -870,27 +885,53 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
             upstream_hashes=(config.configuration_hash, layout.layout_hash),
         )
 
-    # Stage 8 — tube geometry and Decimal preconditions.
-    inner_diameter_m_raw: Any = layout.tube_geometry.inner_diameter_m
+    # Round-4 §7 — Stage 8 geometry attribute reads must be controlled.
+    # Any missing / inaccessible field or non-exact concrete type is
+    # converted to a stable BL_026_TUBE_GEOMETRY_MISSING Stage 8 blocked
+    # result with a precise message key. The raw projection already
+    # validated the geometry, but the scheduler cannot depend on that
+    # and must re-validate with ``object.__getattribute__``.
     try:
-        inner_diameter = _parse_inner_diameter_m(inner_diameter_m_raw)
-    except _InnerDiameterParseError as exc:
-        return _finalize_blocked(
+        geometry_snapshot = object.__getattribute__(layout, "tube_geometry")
+    except (AttributeError, TypeError):
+        return _stage8_blocked(
             raw_request_projection,
             raw_profile_id_projection,
             resolved_profile_id,
-            request_hash_value=req_hash,
-            blockers=(
-                emit_blocker(
-                    BlockerCode.BL_026_TUBE_GEOMETRY_MISSING,
-                    "task021_layout.tube_geometry.inner_diameter_m",
-                    exc.message_key,
-                    (),
-                ),
-            ),
-            stage_rank=8,
-            evidence_refs=evidence_refs_final,
-            upstream_hashes=(config.configuration_hash, layout.layout_hash),
+            req_hash,
+            (config.configuration_hash, layout.layout_hash),
+            "tube_geometry_missing_or_inaccessible",
+        )
+    if type(geometry_snapshot) is not ApprovedTubeGeometrySnapshot:
+        return _stage8_blocked(
+            raw_request_projection,
+            raw_profile_id_projection,
+            resolved_profile_id,
+            req_hash,
+            (config.configuration_hash, layout.layout_hash),
+            "tube_geometry_not_exact_snapshot",
+        )
+    try:
+        inner_diameter_m_raw = object.__getattribute__(geometry_snapshot, "inner_diameter_m")
+    except (AttributeError, TypeError):
+        return _stage8_blocked(
+            raw_request_projection,
+            raw_profile_id_projection,
+            resolved_profile_id,
+            req_hash,
+            (config.configuration_hash, layout.layout_hash),
+            "inner_diameter_missing_or_inaccessible",
+        )
+    try:
+        inner_diameter = _parse_inner_diameter_m(inner_diameter_m_raw)
+    except _InnerDiameterParseError as exc:
+        return _stage8_blocked(
+            raw_request_projection,
+            raw_profile_id_projection,
+            resolved_profile_id,
+            req_hash,
+            (config.configuration_hash, layout.layout_hash),
+            exc.message_key,
         )
 
     active_count = len(participation_auth.active_position_ids)
@@ -967,6 +1008,41 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
 # -----------------------------------------------------------------------
 
 
+def _stage8_blocked(
+    raw_request_projection: FrozenRawProjection,
+    raw_profile_id_projection: FrozenRawProjection,
+    resolved_profile_id: str | None,
+    req_hash: str | None,
+    upstream_hashes: tuple[str, ...],
+    message_key: str,
+) -> Task025BlockedResult:
+    """Round-4 §7 — Stage 8 blocked-result helper.
+
+    Centralises the BL_026_TUBE_GEOMETRY_MISSING emission for every
+    Stage 8 geometry read failure so the message key can be selected
+    precisely without leaking the underlying exception.
+    """
+    return _finalize_blocked(
+        raw_request_projection,
+        raw_profile_id_projection,
+        resolved_profile_id,
+        request_hash_value=req_hash,
+        blockers=list(
+            (
+                emit_blocker(
+                    BlockerCode.BL_026_TUBE_GEOMETRY_MISSING,
+                    "task021_layout.tube_geometry.inner_diameter_m",
+                    message_key,
+                    (),
+                ),
+            )
+        ),
+        stage_rank=8,
+        evidence_refs=(),
+        upstream_hashes=upstream_hashes,
+    )
+
+
 def finalize_blocked(
     *,
     raw_request_projection: FrozenRawProjection,
@@ -1031,7 +1107,7 @@ def _validate_task020(raw: Any) -> tuple[Any, list[Task025BlockerEntry]]:
     from hexagent.exchangers.shell_tube.models import ShellAndTubeConfiguration
 
     blockers: list[Task025BlockerEntry] = []
-    if not isinstance(raw, ShellAndTubeConfiguration):
+    if type(raw) is not ShellAndTubeConfiguration:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION,
@@ -1114,7 +1190,21 @@ def _validate_task020(raw: Any) -> tuple[Any, list[Task025BlockerEntry]]:
                 (),
             )
         )
-    blockers_value: Any = raw.blockers
+    # Round-4 §5.2 — read ``blockers`` defensively so a missing attribute
+    # or a non-str subclass is converted to a stable blocked result
+    # rather than leaking ``AttributeError``.
+    try:
+        blockers_value = object.__getattribute__(raw, "blockers")
+    except (AttributeError, TypeError):
+        blockers.append(
+            emit_blocker(
+                BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION,
+                "raw_input.task020_configuration.blockers",
+                "task020_blockers_missing_or_inaccessible",
+                (),
+            )
+        )
+        return raw, blockers
     if type(blockers_value) is not tuple:
         blockers.append(
             emit_blocker(
@@ -1138,7 +1228,7 @@ def _validate_task020(raw: Any) -> tuple[Any, list[Task025BlockerEntry]]:
 
 def _validate_task021(raw: Any) -> tuple[TubeLayout | None, list[Task025BlockerEntry]]:
     blockers: list[Task025BlockerEntry] = []
-    if not isinstance(raw, TubeLayout):
+    if type(raw) is not TubeLayout:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_014_INVALID_TASK021_LAYOUT,
@@ -1185,7 +1275,20 @@ def _validate_task021(raw: Any) -> tuple[TubeLayout | None, list[Task025BlockerE
                 (),
             )
         )
-    layout_blockers_value: Any = raw.blockers
+    # Round-4 §5.3 — same defensive pattern as TASK-020: a missing
+    # ``blockers`` attribute is converted to a stable BL_014 blocker.
+    try:
+        layout_blockers_value = object.__getattribute__(raw, "blockers")
+    except (AttributeError, TypeError):
+        blockers.append(
+            emit_blocker(
+                BlockerCode.BL_014_INVALID_TASK021_LAYOUT,
+                "raw_input.task021_layout.blockers",
+                "task021_blockers_missing_or_inaccessible",
+                (),
+            )
+        )
+        return raw, blockers
     if type(layout_blockers_value) is not tuple:
         blockers.append(
             emit_blocker(
@@ -1220,7 +1323,7 @@ def _validate_internal_flow_length(
     raw: Any,
 ) -> tuple[InternalFlowLengthAuthority | None, list[Task025BlockerEntry]]:
     blockers: list[Task025BlockerEntry] = []
-    if not isinstance(raw, InternalFlowLengthAuthority):
+    if type(raw) is not InternalFlowLengthAuthority:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_009_FLOW_LENGTH_NON_DETERMINISTIC,
@@ -1237,7 +1340,7 @@ def _validate_heat_transfer_length(
     raw: Any,
 ) -> tuple[HeatTransferLengthAuthority | None, list[Task025BlockerEntry]]:
     blockers: list[Task025BlockerEntry] = []
-    if not isinstance(raw, HeatTransferLengthAuthority):
+    if type(raw) is not HeatTransferLengthAuthority:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_010_HEAT_LENGTH_NON_DETERMINISTIC,
@@ -1258,7 +1361,7 @@ def _validate_participation(
     )
 
     blockers: list[Task025BlockerEntry] = []
-    if not isinstance(raw, Task025HydraulicParticipationAuthority):
+    if type(raw) is not Task025HydraulicParticipationAuthority:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING,
@@ -1267,6 +1370,73 @@ def _validate_participation(
                 (),
             )
         )
+        return None, blockers
+    # Round-4 §6.3 — defensive closure of the four tuple fields, the
+    # authority_mode, and the hydraulic_authority_hash. The raw
+    # projection already validated the value, but a race between
+    # projection and the scheduler could still mutate the object; this
+    # block re-reads with ``object.__getattribute__`` and converts any
+    # attribute failure to a stable BL_001 blocked result.
+    field_paths = {
+        "all_layout_position_ids": "participation.all_layout_position_ids",
+        "active_position_ids": "participation.active_position_ids",
+        "inactive_position_ids": "participation.inactive_position_ids",
+        "evidence_refs": "participation.evidence_refs",
+    }
+    for attr_name, _ in field_paths.items():
+        try:
+            field_value = object.__getattribute__(raw, attr_name)
+        except (AttributeError, TypeError):
+            blockers.append(
+                emit_blocker(
+                    BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING,
+                    f"raw_input.hydraulic_participation_authority.{attr_name}",
+                    "participation_member_missing_or_inaccessible",
+                    (),
+                )
+            )
+            return None, blockers
+        if type(field_value) is not tuple:
+            blockers.append(
+                emit_blocker(
+                    BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING,
+                    f"raw_input.hydraulic_participation_authority.{attr_name}",
+                    "participation_member_not_exact_tuple",
+                    (),
+                )
+            )
+    try:
+        authority_mode = object.__getattribute__(raw, "authority_mode")
+        hydraulic_authority_hash = object.__getattribute__(raw, "hydraulic_authority_hash")
+    except (AttributeError, TypeError):
+        blockers.append(
+            emit_blocker(
+                BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING,
+                "raw_input.hydraulic_participation_authority",
+                "participation_field_missing_or_inaccessible",
+                (),
+            )
+        )
+        return None, blockers
+    if type(authority_mode) is not HydraulicAuthorityMode:
+        blockers.append(
+            emit_blocker(
+                BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING,
+                "raw_input.hydraulic_participation_authority.authority_mode",
+                "participation_authority_mode_not_exact_enum",
+                (),
+            )
+        )
+    if type(hydraulic_authority_hash) is not str or len(hydraulic_authority_hash) != 64:
+        blockers.append(
+            emit_blocker(
+                BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING,
+                "raw_input.hydraulic_participation_authority.hydraulic_authority_hash",
+                "participation_hydraulic_authority_hash_invalid",
+                (),
+            )
+        )
+    if blockers:
         return None, blockers
     return raw, blockers
 
@@ -1291,15 +1461,27 @@ def _validate_evidence_refs(value: Any) -> tuple[str, ...]:
     Lists, byte strings, and str subclasses are explicitly rejected. No
     implicit conversion is performed; the round-3 v1 contract is exactly
     tuple-of-non-empty-str.
+
+    Round-4 §8.2 — surrogate / non-UTF-8 checks are also performed here
+    so the raw projection boundary never sees a malformed entry. The
+    helper raises ``_EvidenceRefsError`` for every violation; the
+    scheduler converts that into ``BL_003_BLOCKED_INPUT_REJECTED`` with
+    a stable per-violation message key.
     """
     if type(value) is not tuple:
         raise _EvidenceRefsError("evidence_refs_not_frozen_container")
-    items: list[Any] = []
+    items: list[str] = []
     for item in value:
         if type(item) is not str:
             raise _EvidenceRefsError("evidence_refs_entry_not_exact_str")
         if not item:
             raise _EvidenceRefsError("evidence_refs_entry_empty")
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in item):
+            raise _EvidenceRefsError("evidence_refs_entry_surrogate")
+        try:
+            item.encode("utf-8")
+        except UnicodeEncodeError as exc:  # pragma: no cover - guard
+            raise _EvidenceRefsError("evidence_refs_entry_not_utf8") from exc
         items.append(item)
     return tuple(items)
 

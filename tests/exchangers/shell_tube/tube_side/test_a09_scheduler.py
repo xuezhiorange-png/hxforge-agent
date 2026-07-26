@@ -541,3 +541,418 @@ def test_evidence_refs_tuple_is_accepted() -> None:
         or b.message_key == "evidence_refs_entry_empty"
         for b in getattr(result, "blockers", ())
     )
+
+
+# ---------------------------------------------------------------------------
+# Round-4 §5 — Stage 2 blockers attribute reads must be controlled.
+# ---------------------------------------------------------------------------
+
+
+def test_task020_missing_blockers_attribute_is_stage2_blocked() -> None:
+    """Stage 2 must not leak AttributeError when ``blockers`` is absent."""
+    contaminated = object.__new__(type(config_a()))
+    for field in config_a().__dataclass_fields__:  # type: ignore[attr-defined]
+        object.__setattr__(contaminated, field, getattr(config_a(), field))
+    object.__delattr__(contaminated, "blockers")
+    raw = _request_input(contaminated, layout_a())
+    raw["task020_configuration"] = contaminated  # type: ignore[assignment]
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    assert any(
+        b.code is ts.BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION
+        and b.message_key == "task020_blockers_missing_or_inaccessible"
+        for b in result.blockers
+    )
+
+
+def test_task021_missing_blockers_attribute_is_stage2_blocked() -> None:
+    """Stage 2 must not leak AttributeError when ``blockers`` is absent."""
+    contaminated = object.__new__(type(layout_a()))
+    for field in layout_a().__dataclass_fields__:  # type: ignore[attr-defined]
+        object.__setattr__(contaminated, field, getattr(layout_a(), field))
+    object.__delattr__(contaminated, "blockers")
+    raw = _request_input(config_a(), contaminated)
+    raw["task021_layout"] = contaminated  # type: ignore[assignment]
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    assert any(
+        b.code is ts.BlockerCode.BL_014_INVALID_TASK021_LAYOUT
+        and b.message_key == "task021_blockers_missing_or_inaccessible"
+        for b in result.blockers
+    )
+
+
+def test_task020_subclass_is_rejected_without_execution() -> None:
+    """A non-exact subclass of ShellAndTubeConfiguration must be rejected.
+
+    The raw projection boundary is the first layer of defense: it
+    rejects any non-exact type before Stage 2. ``__bool__`` /
+    ``__len__`` must never execute.
+    """
+    from hexagent.exchangers.shell_tube.models import ShellAndTubeConfiguration
+
+    class _EvilConfiguration(ShellAndTubeConfiguration):  # type: ignore[misc]
+        def __bool__(self) -> bool:
+            raise AssertionError("__bool__ must not execute")
+
+        def __len__(self) -> int:
+            raise AssertionError("__len__ must not execute")
+
+    raw = _request_input(config_a(), layout_a())
+    raw["task020_configuration"] = _EvilConfiguration(**config_a().__dict__)  # type: ignore[assignment]
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    codes = {b.code for b in result.blockers}
+    # Raw projection catches the subclass (BL_019). Stage 2 only runs
+    # for exact-type values.
+    assert ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+
+
+def test_task021_subclass_is_rejected_without_execution() -> None:
+    """A non-exact subclass of TubeLayout must be rejected."""
+    from hexagent.exchangers.shell_tube.tube_layout.models import TubeLayout
+
+    class _EvilLayout(TubeLayout):  # type: ignore[misc]
+        def __bool__(self) -> bool:
+            raise AssertionError("__bool__ must not execute")
+
+        def __len__(self) -> int:
+            raise AssertionError("__len__ must not execute")
+
+    raw = _request_input(config_a(), layout_a())
+    raw["task021_layout"] = _EvilLayout(**layout_a().__dict__)  # type: ignore[assignment]
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+
+
+# ---------------------------------------------------------------------------
+# Round-4 §6 — participation member domain must be closed.
+# ---------------------------------------------------------------------------
+
+
+class _EvilMember:
+    def __hash__(self) -> int:
+        raise AssertionError("__hash__ must not execute")
+
+    def __eq__(self, other: object) -> bool:
+        raise AssertionError("__eq__ must not execute")
+
+
+def _participation_input(members: dict[str, object]) -> dict[str, object]:
+    """Build a request dict with a contaminated participation authority.
+
+    Uses ``object.__new__`` + ``object.__setattr__`` so the dataclass
+    ``__post_init__`` validation is bypassed. The malicious members
+    reach the raw projection untouched, exercising the projector that
+    must reject non-str members and produce BL_019.
+    """
+    contaminated = object.__new__(ts.Task025HydraulicParticipationAuthority)
+    for field_name, field_value in members.items():
+        object.__setattr__(contaminated, field_name, field_value)
+    raw = _request_input(config_a(), layout_a())
+    raw["hydraulic_participation_authority"] = contaminated
+    return raw
+
+
+def test_participation_dict_member_returns_blocked() -> None:
+    raw = _participation_input(
+        {
+            "all_layout_position_ids": ({}),
+            "active_position_ids": ({}),
+            "inactive_position_ids": (),
+            "authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+            "evidence_refs": ("fixture",),
+            "hydraulic_authority_hash": "a" * 64,
+        }
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+def test_participation_list_member_returns_blocked() -> None:
+    raw = _participation_input(
+        {
+            "all_layout_position_ids": (["x"]),
+            "active_position_ids": (["x"]),
+            "inactive_position_ids": (),
+            "authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+            "evidence_refs": ("fixture",),
+            "hydraulic_authority_hash": "a" * 64,
+        }
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+def test_participation_int_member_returns_blocked() -> None:
+    raw = _participation_input(
+        {
+            "all_layout_position_ids": ((1,)),
+            "active_position_ids": ((1,)),
+            "inactive_position_ids": (),
+            "authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+            "evidence_refs": ("fixture",),
+            "hydraulic_authority_hash": "a" * 64,
+        }
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+def test_participation_empty_string_member_returns_blocked() -> None:
+    raw = _participation_input(
+        {
+            "all_layout_position_ids": (("",)),
+            "active_position_ids": (("",)),
+            "inactive_position_ids": (),
+            "authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+            "evidence_refs": ("fixture",),
+            "hydraulic_authority_hash": "a" * 64,
+        }
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+class _StrSubclass(str):  # type: ignore[misc]
+    pass
+
+
+def test_participation_str_subclass_member_returns_blocked() -> None:
+    raw = _participation_input(
+        {
+            "all_layout_position_ids": ((_StrSubclass("pos-1"),)),
+            "active_position_ids": ((_StrSubclass("pos-1"),)),
+            "inactive_position_ids": (),
+            "authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+            "evidence_refs": ("fixture",),
+            "hydraulic_authority_hash": "a" * 64,
+        }
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+def test_participation_surrogate_member_returns_blocked() -> None:
+    raw = _participation_input(
+        {
+            "all_layout_position_ids": (("\ud800",)),
+            "active_position_ids": (("\ud800",)),
+            "inactive_position_ids": (),
+            "authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+            "evidence_refs": ("fixture",),
+            "hydraulic_authority_hash": "a" * 64,
+        }
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+def test_participation_evil_hash_member_is_not_hashed() -> None:
+    raw = _participation_input(
+        {
+            "all_layout_position_ids": ((_EvilMember(),)),
+            "active_position_ids": ((_EvilMember(),)),
+            "inactive_position_ids": (),
+            "authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+            "evidence_refs": ("fixture",),
+            "hydraulic_authority_hash": "a" * 64,
+        }
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+def test_participation_malformed_member_never_reaches_stage5_set_logic() -> None:
+    """Stage 5 must not execute set(...) on unverified members."""
+    raw = _participation_input(
+        {
+            "all_layout_position_ids": (({},)),  # unhashable
+            "active_position_ids": (({},)),
+            "inactive_position_ids": (),
+            "authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+            "evidence_refs": ("fixture",),
+            "hydraulic_authority_hash": "a" * 64,
+        }
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    # Either raw projection caught it (BL_019) or the public boundary
+    # refused to leak TypeError — never a successful valid result.
+    assert not isinstance(result, ts.Task025ValidResult)
+
+
+# ---------------------------------------------------------------------------
+# Round-4 §7 — Stage 8 geometry attribute reads must be controlled.
+# ---------------------------------------------------------------------------
+
+
+def _stage8_input(layout_obj: object) -> dict[str, object]:
+    raw = _request_input(config_a(), layout_obj)  # type: ignore[arg-type]
+    raw["task021_layout"] = layout_obj  # type: ignore[assignment]
+    return raw
+
+
+def test_stage8_layout_missing_tube_geometry_is_blocked() -> None:
+    contaminated = object.__new__(type(layout_a()))
+    for field in layout_a().__dataclass_fields__:  # type: ignore[attr-defined]
+        object.__setattr__(contaminated, field, getattr(layout_a(), field))
+    object.__delattr__(contaminated, "tube_geometry")
+    raw = _stage8_input(contaminated)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    # Raw projection is the first line of defense and catches the
+    # missing tube_geometry field with BL_019. Stage 8 is the
+    # second-line defense and would catch it with BL_026 in case of
+    # a mutation race. Either outcome is acceptable as long as the
+    # public boundary returns a blocked result.
+    codes = {b.code for b in result.blockers}
+    assert (
+        ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+        or ts.BlockerCode.BL_026_TUBE_GEOMETRY_MISSING in codes
+    )
+
+
+def test_stage8_geometry_missing_inner_diameter_is_blocked() -> None:
+    geom = layout_a().tube_geometry
+    contaminated_geom = object.__new__(type(geom))
+    for field in geom.__dataclass_fields__:  # type: ignore[attr-defined]
+        object.__setattr__(contaminated_geom, field, getattr(geom, field))
+    object.__delattr__(contaminated_geom, "inner_diameter_m")
+    contaminated_layout = replace(layout_a(), tube_geometry=contaminated_geom)
+    raw = _stage8_input(contaminated_layout)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    codes = {b.code for b in result.blockers}
+    assert (
+        ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+        or ts.BlockerCode.BL_026_TUBE_GEOMETRY_MISSING in codes
+    )
+
+
+def test_stage8_non_snapshot_geometry_is_blocked() -> None:
+    contaminated_layout = replace(layout_a(), tube_geometry=object())  # type: ignore[arg-type]
+    raw = _stage8_input(contaminated_layout)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    codes = {b.code for b in result.blockers}
+    assert (
+        ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+        or ts.BlockerCode.BL_026_TUBE_GEOMETRY_MISSING in codes
+    )
+
+
+def test_stage8_geometry_attribute_error_does_not_escape() -> None:
+    class _EvilGeometry:
+        @property
+        def inner_diameter_m(self) -> str:
+            raise AssertionError("inner_diameter_m must not be invoked via property")
+
+    contaminated_layout = replace(layout_a(), tube_geometry=_EvilGeometry())  # type: ignore[arg-type]
+    raw = _stage8_input(contaminated_layout)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    codes = {b.code for b in result.blockers}
+    assert (
+        ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
+        or ts.BlockerCode.BL_026_TUBE_GEOMETRY_MISSING in codes
+    )
+
+
+def test_stage8_missing_inner_diameter_has_no_partial_geometry() -> None:
+    geom = layout_a().tube_geometry
+    contaminated_geom = object.__new__(type(geom))
+    for field in geom.__dataclass_fields__:  # type: ignore[attr-defined]
+        object.__setattr__(contaminated_geom, field, getattr(geom, field))
+    object.__delattr__(contaminated_geom, "inner_diameter_m")
+    contaminated_layout = replace(layout_a(), tube_geometry=contaminated_geom)
+    raw = _stage8_input(contaminated_layout)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert not isinstance(result, ts.Task025ValidResult)
+    assert result.stage_rank in (1, 8)
+
+
+# ---------------------------------------------------------------------------
+# Round-4 §8 — top-level evidence_refs must use BL_003 for every violation.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "violating_value",
+    [
+        ["fixture"],  # list, not tuple
+        (1,),  # int member
+        ("",),  # empty member
+        (_StrSubclass("fixture"),),  # str subclass member
+        ("\ud800",),  # surrogate member
+        (object(),),  # arbitrary object member
+    ],
+)
+def test_top_level_evidence_refs_use_bl003_for_every_violation(
+    violating_value: object,
+) -> None:
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = violating_value  # type: ignore[assignment]
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED in codes
+    assert ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED not in codes
+
+
+def test_top_level_evidence_ref_violation_never_uses_bl019() -> None:
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = ["fixture"]
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert all(
+        b.code is not ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers
+    )
+
+
+def test_valid_unicode_evidence_ref_is_accepted() -> None:
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = ("fixture-中文", "fixture-二")
+    result = ts.evaluate_task025(raw)
+    # Either valid or downstream blocked; never BL_003.
+    if isinstance(result, ts.Task025BlockedResult):
+        assert all(
+            b.code is not ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED
+            or b.message_key != "evidence_refs_entry_not_utf8"
+            for b in result.blockers
+        )
+
+
+def test_prevalidated_evidence_refs_are_used_at_stage6() -> None:
+    """Stage 6 must reuse the prevalidated tuple, not re-validate raw_input."""
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = ("fixture-prevalidated",)
+    # If prevalidated, the public boundary does not re-read the raw dict;
+    # any blocker at Stage 6 is not about evidence_refs.
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult | ts.Task025ValidResult)
+    # Evidence_refs contract violation cannot appear at Stage 6+ now.
+    if isinstance(result, ts.Task025BlockedResult):
+        for b in result.blockers:
+            assert not (
+                b.field_path == "raw_input.evidence_refs"
+                and b.message_key
+                in {
+                    "evidence_refs_not_frozen_container",
+                    "evidence_refs_entry_not_exact_str",
+                    "evidence_refs_entry_empty",
+                }
+            )

@@ -8,6 +8,7 @@ from decimal import Decimal
 import pytest
 
 import hexagent.exchangers.shell_tube.tube_side as ts
+from hexagent.exchangers.shell_tube.tube_side.canonical import PIWrapper as _PIWrapper
 from tests.fixtures.shell_and_tube.tube_side.task020_configurations import config_a
 from tests.fixtures.shell_and_tube.tube_side.task021_layouts import layout_a
 
@@ -369,3 +370,167 @@ def _request_input(config: object, layout: object) -> dict[str, object]:
         heat_hash,
     )
     return _request_input_with_authorities(config, layout, flow, heat)
+
+
+# ---------------------------------------------------------------------------
+# Round-4 §4 — malformed exact known object state must fail-closed.
+# ---------------------------------------------------------------------------
+
+
+class _EvilContainer:
+    """Container whose dunders raise; must never be invoked."""
+
+    def __iter__(self):  # type: ignore[no-untyped-def]
+        raise AssertionError("__iter__ must not execute")
+
+    def __len__(self) -> int:
+        raise AssertionError("__len__ must not execute")
+
+    def items(self):  # type: ignore[no-untyped-def]
+        raise AssertionError("items must not execute")
+
+    def keys(self):  # type: ignore[no-untyped-def]
+        raise AssertionError("keys must not execute")
+
+    def values(self):  # type: ignore[no-untyped-def]
+        raise AssertionError("values must not execute")
+
+    def __getitem__(self, key):  # type: ignore[no-untyped-def,override]
+        raise AssertionError("__getitem__ must not execute")
+
+
+def _build_request_with_known_object(known_object: object) -> dict[str, object]:
+    """Build a request dict with an injected known object under a private key.
+
+    The extra key is processed by the raw projection before Stage 1
+    unknown-field rejection, so any ``RawProjectionError`` raised while
+    framing ``known_object`` is converted to a Stage 1 blocked result
+    (code ``BL_019``). This lets us exercise the per-known-object
+    projectors without depending on any frozen container's domain.
+    """
+    base = _request_input(config_a(), layout_a())
+    base["_task025_test_known_object"] = known_object  # type: ignore[assignment]
+    return base
+
+
+def test_uninitialized_pi_wrapper_returns_blocked() -> None:
+    """PIWrapper instance with no backing slot returns blocked."""
+    bad = object.__new__(_PIWrapper)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+def test_pi_wrapper_wrong_lexeme_type_returns_blocked() -> None:
+    """PIWrapper._lexeme of wrong type (bytearray) returns blocked."""
+    bad = object.__new__(_PIWrapper)
+    object.__setattr__(bad, "_value", None)
+    object.__setattr__(bad, "_lexeme", bytearray(b"3.14159265358979323846"))
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_pi_wrapper_wrong_lexeme_value_returns_blocked() -> None:
+    """PIWrapper._lexeme with the wrong bytes returns blocked."""
+    bad = object.__new__(_PIWrapper)
+    object.__setattr__(bad, "_value", None)
+    object.__setattr__(bad, "_lexeme", b"3.14")
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_uninitialized_reference_plane_pair_returns_blocked() -> None:
+    """ReferencePlanePair instance with no backing slots returns blocked."""
+    bad = object.__new__(ts.ReferencePlanePair)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    assert any(b.code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED for b in result.blockers)
+
+
+def test_reference_plane_pair_missing_start_returns_blocked() -> None:
+    """ReferencePlanePair with only ``_end`` set returns blocked."""
+    bad = object.__new__(ts.ReferencePlanePair)
+    object.__setattr__(bad, "_end", ts.ReferencePlaneToken.TUBE_INTERNAL_FLOW_END_PLANE)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_reference_plane_pair_invalid_ordered_pair_returns_blocked() -> None:
+    """ReferencePlanePair with an unordered pair returns blocked."""
+    bad = object.__new__(ts.ReferencePlanePair)
+    object.__setattr__(bad, "_start", ts.ReferencePlaneToken.TUBE_INTERNAL_FLOW_END_PLANE)
+    object.__setattr__(bad, "_end", ts.ReferencePlaneToken.TUBE_INTERNAL_FLOW_START_PLANE)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_uninitialized_frozen_json_array_returns_blocked() -> None:
+    """FrozenJsonArray instance with no backing slot returns blocked."""
+    bad = object.__new__(ts.FrozenJsonArray)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_frozen_json_array_missing_items_returns_blocked() -> None:
+    """FrozenJsonArray with only ``_frozen`` set returns blocked."""
+    bad = object.__new__(ts.FrozenJsonArray)
+    object.__setattr__(bad, "_frozen", True)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_frozen_json_array_evil_items_object_is_not_executed() -> None:
+    """FrozenJsonArray._items backed by an EvilContainer returns blocked."""
+    bad = object.__new__(ts.FrozenJsonArray)
+    object.__setattr__(bad, "_items", _EvilContainer())
+    object.__setattr__(bad, "_frozen", True)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_uninitialized_frozen_json_object_returns_blocked() -> None:
+    """FrozenJsonObject instance with no backing slot returns blocked."""
+    bad = object.__new__(ts.FrozenJsonObject)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_frozen_json_object_missing_items_returns_blocked() -> None:
+    """FrozenJsonObject with only ``_frozen`` set returns blocked."""
+    bad = object.__new__(ts.FrozenJsonObject)
+    object.__setattr__(bad, "_frozen", True)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_frozen_json_object_evil_items_object_is_not_executed() -> None:
+    """FrozenJsonObject._items backed by an EvilContainer returns blocked."""
+    bad = object.__new__(ts.FrozenJsonObject)
+    object.__setattr__(bad, "_items", _EvilContainer())
+    object.__setattr__(bad, "_frozen", True)
+    raw = _build_request_with_known_object(bad)
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
