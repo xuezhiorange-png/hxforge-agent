@@ -2,23 +2,24 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 import hexagent.exchangers.shell_tube.tube_side as ts
 
 
 def test_a03_atom_none() -> None:
-    assert ts.project_raw_value(None) == b""
+    assert ts.project_raw_value(None) != ts.project_raw_value(True)
 
 
 def test_a03_atom_bool() -> None:
-    assert ts.project_raw_value(True) == b""
-    assert ts.project_raw_value(False) == b""
+    assert ts.project_raw_value(True) != ts.project_raw_value(False)
 
 
 def test_a03_atom_int() -> None:
-    assert ts.project_raw_value(0) == b"0"
-    assert ts.project_raw_value(42) == b"42"
+    assert ts.project_raw_value(0) != ts.project_raw_value("0")
+    assert ts.project_raw_value(42) != ts.project_raw_value("42")
 
 
 def test_a03_atom_str_surrogate_rejected() -> None:
@@ -56,3 +57,42 @@ def test_a03_unsupported_class_rejected() -> None:
 
     with pytest.raises(ValueError):
         ts.project_raw_value(Weird())
+
+
+def test_raw_projection_atom_kinds_are_pairwise_distinct() -> None:
+    values = (None, True, False, 0, 1, "", "1", b"", b"1", Decimal("0"), Decimal("1"))
+    projections = [ts.project_raw_value(value) for value in values]
+    assert len(set(projections)) == len(values)
+
+
+def test_raw_projection_rejects_int_subclass() -> None:
+    class IntSubclass(int):
+        pass
+
+    with pytest.raises(ValueError):
+        ts.project_raw_value(IntSubclass(1))
+
+
+def test_raw_projection_rejects_str_subclass_without_calling_encode() -> None:
+    class StrSubclass(str):
+        def encode(self, *args: object, **kwargs: object) -> bytes:
+            raise AssertionError("caller encode must not run")
+
+    with pytest.raises(ValueError):
+        ts.project_raw_value(StrSubclass("x"))
+
+
+def test_raw_projection_rejects_bytes_subclass() -> None:
+    class BytesSubclass(bytes):
+        pass
+
+    with pytest.raises(ValueError):
+        ts.project_raw_value(BytesSubclass(b"x"))
+
+
+def test_raw_projection_rejects_decimal_subclass() -> None:
+    class DecimalSubclass(Decimal):
+        pass
+
+    with pytest.raises(ValueError):
+        ts.project_raw_value(DecimalSubclass("1"))

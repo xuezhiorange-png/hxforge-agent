@@ -46,9 +46,30 @@ class Task025HydraulicParticipationAuthority:
     hydraulic_authority_hash: str
 
     def __post_init__(self) -> None:
-        self._validate_all_layout_position_ids()
-        self._validate_active_position_ids()
-        self._validate_inactive_position_ids()
+        object.__setattr__(
+            self,
+            "all_layout_position_ids",
+            _validate_non_empty_string_tuple(
+                self.all_layout_position_ids,
+                "hydraulic_participation_authority.all_layout_position_ids",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "active_position_ids",
+            _validate_non_empty_string_tuple(
+                self.active_position_ids,
+                "hydraulic_participation_authority.active_position_ids",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "inactive_position_ids",
+            _validate_non_empty_string_tuple(
+                self.inactive_position_ids,
+                "hydraulic_participation_authority.inactive_position_ids",
+            ),
+        )
         if not isinstance(self.authority_mode, HydraulicAuthorityMode):
             raise ValueError(
                 "hydraulic_participation_authority.authority_mode must be "

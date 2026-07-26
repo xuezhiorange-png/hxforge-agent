@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from decimal import Decimal
+
 import hexagent.exchangers.shell_tube.tube_side as ts
+from tests.fixtures.shell_and_tube.tube_side.task020_configurations import config_a, config_b
+from tests.fixtures.shell_and_tube.tube_side.task021_layouts import layout_a
 
 
 def test_a09_stage_ranks_constant() -> None:
@@ -41,6 +46,153 @@ def test_a09_blocked_result_has_stable_hash() -> None:
     assert len(result2.blocked_result_hash) == 64
     assert all(c in "0123456789abcdef" for c in result1.blocked_result_hash)
     assert all(c in "0123456789abcdef" for c in result2.blocked_result_hash)
+
+
+def _request_input(config: object, layout: object) -> dict[str, object]:
+    position_ids = tuple(position.position_id for position in layout.positions)  # type: ignore[union-attr]
+    participation = ts.Task025HydraulicParticipationAuthority(
+        all_layout_position_ids=position_ids,
+        active_position_ids=position_ids,
+        inactive_position_ids=(),
+        authority_mode=ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+        evidence_refs=("fixture",),
+        hydraulic_authority_hash="0" * 64,
+    )
+    flow_hash = ts.internal_flow_authority_length_hash(
+        Decimal("4.85"),
+        ts.canonical_internal_flow_pair(),
+        ts.canonical_internal_flow_pair(),
+        ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+    )
+    heat_hash = ts.heat_transfer_authority_length_hash(
+        Decimal("4.85"),
+        ts.canonical_heat_transfer_pair(),
+        ts.canonical_heat_transfer_pair(),
+        ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+    )
+    flow = ts.InternalFlowLengthAuthority(
+        "flow",
+        Decimal("4.85"),
+        ts.canonical_internal_flow_pair(),
+        ts.canonical_internal_flow_pair(),
+        ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+        flow_hash,
+    )
+    heat = ts.HeatTransferLengthAuthority(
+        "heat",
+        Decimal("4.85"),
+        ts.canonical_heat_transfer_pair(),
+        ts.canonical_heat_transfer_pair(),
+        ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+        heat_hash,
+    )
+    return {
+        "schema_version": "task025.request.v1",
+        "profile_id": "profile-001",
+        "task020_configuration": config,
+        "task021_layout": layout,
+        "internal_flow_authority": flow,
+        "heat_transfer_authority": heat,
+        "hydraulic_participation_authority": participation,
+        "flow_path_mode": ts.FlowPathMode.STRAIGHT_TUBE_PARALLEL_FLOW,
+        "hydraulic_authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+        "evidence_refs": ("fixture",),
+    }
+
+
+def test_mixed_task020_task021_fixture_is_blocked() -> None:
+    result = ts.evaluate_task025(
+        _request_input(config_a(), replace(layout_a(), task020_configuration_id="config-b-002"))
+    )
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    assert ts.BlockerCode.BL_024_TASK020_IDENTITY_MISMATCH in {b.code for b in result.blockers}
+
+
+def test_task020_configuration_id_mismatch_is_blocked() -> None:
+    result = ts.evaluate_task025(
+        _request_input(config_a(), replace(layout_a(), task020_configuration_id="wrong"))
+    )
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    assert ts.BlockerCode.BL_024_TASK020_IDENTITY_MISMATCH in {b.code for b in result.blockers}
+
+
+def test_task020_configuration_hash_mismatch_is_blocked() -> None:
+    result = ts.evaluate_task025(
+        _request_input(config_a(), replace(layout_a(), task020_configuration_hash="f" * 64))
+    )
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    assert ts.BlockerCode.BL_025_TASK021_IDENTITY_MISMATCH in {b.code for b in result.blockers}
+
+
+def test_upstream_orientation_mismatch_is_blocked() -> None:
+    result = ts.evaluate_task025(_request_input(config_b(), layout_a()))
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+
+
+def test_every_missing_required_field_returns_stage1_blocked() -> None:
+    base = _request_input(config_a(), layout_a())
+    for field in ts.TASK025_REQUEST_FIELDS:
+        candidate = dict(base)
+        candidate.pop(field)
+        result = ts.evaluate_task025(candidate)
+        assert isinstance(result, ts.Task025BlockedResult)
+        assert result.stage_rank == 1
+        assert any(f"missing_field:{field}" in entry.evidence_refs for entry in result.blockers)
+
+
+def test_unknown_and_missing_fields_are_deterministic() -> None:
+    base = _request_input(config_a(), layout_a())
+    first = dict(base)
+    first.pop("evidence_refs")
+    first["unknown"] = None
+    second = {
+        "unknown": None,
+        **{key: value for key, value in base.items() if key != "evidence_refs"},
+    }
+    first_result = ts.evaluate_task025(first)
+    second_result = ts.evaluate_task025(second)
+    assert isinstance(first_result, ts.Task025BlockedResult)
+    assert isinstance(second_result, ts.Task025BlockedResult)
+    assert first_result.blocked_result_hash == second_result.blocked_result_hash
+
+
+def test_raw_projection_cycle_returns_blocked() -> None:
+    cyclic: dict[str, object] = {}
+    cyclic["self"] = cyclic
+    result = ts.evaluate_task025(cyclic)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+    assert result.blockers[0].code is ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED
+
+
+def test_raw_projection_indirect_cycle_returns_blocked() -> None:
+    cyclic: dict[str, object] = {}
+    cyclic["link"] = (cyclic,)
+    result = ts.evaluate_task025(cyclic)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_raw_projection_depth_limit_returns_blocked() -> None:
+    value: object = None
+    for _ in range(65):
+        value = (value,)
+    result = ts.evaluate_task025(value)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 1
+
+
+def test_public_entry_never_leaks_raw_input_exception() -> None:
+    class Evil:
+        def __repr__(self) -> str:
+            raise AssertionError("repr must not run")
+
+    result = ts.evaluate_task025({"evil": Evil()})
+    assert isinstance(result, ts.Task025BlockedResult)
 
 
 # ruff: noqa: E501
