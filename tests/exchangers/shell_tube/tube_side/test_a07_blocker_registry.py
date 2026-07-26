@@ -10,7 +10,10 @@ def test_a07_blocker_registry_member_count() -> None:
 
 
 def test_a07_bl001_name_canonical() -> None:
-    assert ts.BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING.value == "BL_001_ACTIVE_PARTICIPATION_MISSING"
+    assert (
+        ts.BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING.value
+        == "BL_001_ACTIVE_PARTICIPATION_MISSING"
+    )
 
 
 def test_a07_bl030_name_canonical() -> None:
@@ -65,5 +68,6 @@ def test_a07_emit_blocker_evidence_tuple_preserved() -> None:
         ("c", "a", "b"),
     )
     assert entry.evidence_refs == ("c", "a", "b")
+
 
 # ruff: noqa: E501

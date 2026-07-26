@@ -84,8 +84,7 @@ class Task025Request:
             )
         if not isinstance(self.task021_layout, TubeLayout):
             raise ValueError(
-                "task021_layout must be TubeLayout; "
-                f"got {type(self.task021_layout).__name__}"
+                f"task021_layout must be TubeLayout; got {type(self.task021_layout).__name__}"
             )
         if not isinstance(self.internal_flow_authority, InternalFlowLengthAuthority):
             raise ValueError(
@@ -108,8 +107,7 @@ class Task025Request:
             )
         if not isinstance(self.flow_path_mode, FlowPathMode):
             raise ValueError(
-                "flow_path_mode must be FlowPathMode; "
-                f"got {type(self.flow_path_mode).__name__}"
+                f"flow_path_mode must be FlowPathMode; got {type(self.flow_path_mode).__name__}"
             )
         if not isinstance(self.hydraulic_authority_mode, HydraulicAuthorityMode):
             raise ValueError(

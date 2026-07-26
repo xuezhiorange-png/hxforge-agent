@@ -48,6 +48,10 @@ def test_a02_reference_plane_pair_non_token_rejected() -> None:
 
 
 def test_a02_canonical_bytes_stable() -> None:
-    assert ts.FlowPathMode.STRAIGHT_TUBE_PARALLEL_FLOW.canonical_utf8_bytes == b"STRAIGHT_TUBE_PARALLEL_FLOW"
+    assert (
+        ts.FlowPathMode.STRAIGHT_TUBE_PARALLEL_FLOW.canonical_utf8_bytes
+        == b"STRAIGHT_TUBE_PARALLEL_FLOW"
+    )
+
 
 # ruff: noqa: E501

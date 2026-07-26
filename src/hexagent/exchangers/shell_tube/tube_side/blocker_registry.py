@@ -13,6 +13,7 @@ from typing import Any, Final
 
 # §13.1 — Closed 30-code BlockerCode registry.
 
+
 class BlockerCode(enum.StrEnum):
     """§13.1 — Closed 30-code registry.
 
@@ -58,13 +59,14 @@ class BlockerCode(enum.StrEnum):
 
 # §13.1 — Exact member count must remain 30.
 _BLOCKER_CODE_COUNT: Final[int] = 30
-assert (
-    len(BlockerCode.__members__) == _BLOCKER_CODE_COUNT
-), f"BlockerCode must have exactly {_BLOCKER_CODE_COUNT} members"
+assert len(BlockerCode.__members__) == _BLOCKER_CODE_COUNT, (
+    f"BlockerCode must have exactly {_BLOCKER_CODE_COUNT} members"
+)
 
 
 # §13 — Task025BlockerEntry is a (code, field_path, message_key, evidence_refs)
 # record. It is the unique blocker entry shape carried in blocked results.
+
 
 @dataclass(frozen=True)
 class Task025BlockerEntry:
@@ -102,9 +104,7 @@ def emit_blocker(
     else:
         raise TypeError(f"evidence_refs must be tuple/list of str: {type(evidence_refs).__name__}")
     if not all(isinstance(r, str) and r for r in evidence_refs_tuple):
-        raise ValueError(
-            f"evidence_refs entries must be non-empty str: {evidence_refs_tuple!r}"
-        )
+        raise ValueError(f"evidence_refs entries must be non-empty str: {evidence_refs_tuple!r}")
     if not isinstance(code, BlockerCode):
         return Task025BlockerEntry(
             code=BlockerCode.BL_027_UNREGISTERED_BLOCKER_CODE,

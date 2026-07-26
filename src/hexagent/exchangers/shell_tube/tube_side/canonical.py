@@ -63,7 +63,9 @@ def frame_value(kind_tag_ascii: bytes, payload_bytes: bytes) -> bytes:
       || PAYLOAD_LENGTH_U64_BE
       || PAYLOAD_BYTES
     """
-    kind_tag = kind_tag_ascii if isinstance(kind_tag_ascii, bytes) else kind_tag_ascii.encode("ascii")
+    kind_tag = (
+        kind_tag_ascii if isinstance(kind_tag_ascii, bytes) else kind_tag_ascii.encode("ascii")
+    )
     payload = payload_bytes if isinstance(payload_bytes, bytes) else payload_bytes.encode("ascii")
     return _u32_be(len(kind_tag)) + kind_tag + _u64_be(len(payload)) + payload
 
@@ -98,7 +100,11 @@ def frame_record(node_namespace: str, fields: Sequence[tuple[str, bytes, bytes]]
     ns = node_namespace.encode("utf-8")
     out = _u32_be(len(ns)) + ns + _u32_be(len(fields))
     for field_name, field_kind_tag, field_payload in fields:
-        out += _u32_be(len(field_name)) + field_name.encode("utf-8") + frame_value(field_kind_tag, field_payload)
+        out += (
+            _u32_be(len(field_name))
+            + field_name.encode("utf-8")
+            + frame_value(field_kind_tag, field_payload)
+        )
     return out
 
 
@@ -112,10 +118,9 @@ PI_DECIMAL_LEXEME: Final[bytes] = (
 # PI_DECIMAL_CANONICAL_UTF8_SHA256 verified by §16 audit block:
 #   aa6eee625a838a2af84f7d591e8c677bdd9c1b07c44380e2fee8fc738f9234f0
 _PI_DIGEST: Final[bytes] = hashlib.sha256(PI_DECIMAL_LEXEME).digest()
-assert (
-    _PI_DIGEST.hex()
-    == "aa6eee625a838a2af84f7d591e8c677bdd9c1b07c44380e2fee8fc738f9234f0"
-), "PI authority canonical UTF-8 SHA-256 mismatch"
+assert _PI_DIGEST.hex() == "aa6eee625a838a2af84f7d591e8c677bdd9c1b07c44380e2fee8fc738f9234f0", (
+    "PI authority canonical UTF-8 SHA-256 mismatch"
+)
 
 
 def pi_decimal() -> PIWrapper:
@@ -124,6 +129,7 @@ def pi_decimal() -> PIWrapper:
     The wrapper exposes the canonical UTF-8 lexeme bytes for hashing.
     """
     from decimal import Decimal as _Decimal  # local import to avoid module-load cost
+
     return PIWrapper(_Decimal(PI_DECIMAL_LEXEME.decode("ascii")))
 
 
@@ -249,6 +255,7 @@ def _validate_frozen_json_item(item: Any) -> None:
     # Lazy import to keep module-load cost low.
     import enum as _enum
     from decimal import Decimal
+
     if isinstance(item, (Decimal, PIWrapper, FrozenJsonArray, FrozenJsonObject)):
         return
     if isinstance(item, _enum.Enum):

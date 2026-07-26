@@ -27,9 +27,7 @@ def _to_decimal_str(value: str | Decimal) -> Decimal:
         return validate_finite_decimal(value, "tube_inner_diameter_m")
     if isinstance(value, str):
         return validate_finite_decimal(Decimal(value), "tube_inner_diameter_m")
-    raise TypeError(
-        f"tube_inner_diameter_m must be Decimal or str; got {type(value).__name__}"
-    )
+    raise TypeError(f"tube_inner_diameter_m must be Decimal or str; got {type(value).__name__}")
 
 
 @dataclass(frozen=True)
@@ -80,7 +78,7 @@ def compute_hydraulic_geometry(
 
     with _decimal.localcontext(ctx):
         # §9.1 — unquantized formulas.
-        unquantized_single_tube_flow_area_m2 = pi * tube_inner_diameter ** 2 / Decimal(4)
+        unquantized_single_tube_flow_area_m2 = pi * tube_inner_diameter**2 / Decimal(4)
         unquantized_total_parallel_flow_area_m2 = unquantized_single_tube_flow_area_m2 * n
 
         unquantized_flow_cross_section_wetted_perimeter_m = pi * tube_inner_diameter
@@ -88,9 +86,7 @@ def compute_hydraulic_geometry(
             unquantized_flow_cross_section_wetted_perimeter_m * n
         )
 
-        unquantized_internal_volume_m3 = (
-            unquantized_single_tube_flow_area_m2 * flow_length * n
-        )
+        unquantized_internal_volume_m3 = unquantized_single_tube_flow_area_m2 * flow_length * n
         unquantized_internal_heat_transfer_surface_area_m2 = (
             unquantized_flow_cross_section_wetted_perimeter_m * heat_length * n
         )
@@ -98,7 +94,8 @@ def compute_hydraulic_geometry(
         # §9.2 — hydraulic diameter before quantization equals tube_inner_diameter_m.
         # Validate the identity; quantize tube_inner_diameter directly.
         hydraulic_diameter_m_unquantized = (
-            4 * unquantized_total_parallel_flow_area_m2
+            4
+            * unquantized_total_parallel_flow_area_m2
             / unquantized_total_flow_cross_section_wetted_perimeter_m
         )
 

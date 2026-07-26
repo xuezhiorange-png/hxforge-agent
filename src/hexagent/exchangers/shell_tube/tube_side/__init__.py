@@ -136,12 +136,8 @@ RECOGNIZED_ENUM_CLASSES = _raw_projection.RECOGNIZED_ENUM_CLASSES
 
 
 # §10 — hash DAG
-internal_flow_authority_length_hash = (
-    _hash_dag.internal_flow_authority_length_hash
-)
-heat_transfer_authority_length_hash = (
-    _hash_dag.heat_transfer_authority_length_hash
-)
+internal_flow_authority_length_hash = _hash_dag.internal_flow_authority_length_hash
+heat_transfer_authority_length_hash = _hash_dag.heat_transfer_authority_length_hash
 layout_hash_passthrough = _hash_dag.layout_hash_passthrough
 hydraulic_authority_hash = _hash_dag.hydraulic_authority_hash
 request_hash = _hash_dag.request_hash

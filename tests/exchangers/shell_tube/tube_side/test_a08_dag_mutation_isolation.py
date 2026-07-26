@@ -6,11 +6,7 @@ from pathlib import Path
 
 import hexagent.exchangers.shell_tube.tube_side as ts
 
-SNAPSHOT_PATH = (
-    Path(__file__).parent
-    / "__snapshots__"
-    / "test_a08_dag_mutation_isolation.txt"
-)
+SNAPSHOT_PATH = Path(__file__).parent / "__snapshots__" / "test_a08_dag_mutation_isolation.txt"
 
 
 def test_a08_snapshot_present() -> None:

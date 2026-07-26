@@ -35,6 +35,7 @@ def test_a01_sha256_hex_lowercase_64() -> None:
 def test_a01_no_upstream_repo_external_import() -> None:
     """§14.3 — A01 does not import from /tmp or repo-external."""
     import importlib
+
     module = importlib.import_module("hexagent.exchangers.shell_tube.tube_side")
     src_module = module.__file__ or ""
     assert "/tmp" not in src_module

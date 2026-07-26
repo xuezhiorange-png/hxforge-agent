@@ -7,9 +7,6 @@
 §7.5 — Unknown-object safety.
 """
 
-
-
-
 from __future__ import annotations
 
 import enum as _enum
@@ -163,9 +160,12 @@ def project_raw_value(value: Any) -> bytes:
         if type(value) is enum_cls:
             return _project_atom_enum(value)  # type: ignore[arg-type]
     # §7.4 — exact-type known-object projector table.
-    if type(value) is __import__(
-        "hexagent.exchangers.shell_tube.models", fromlist=["ShellAndTubeConfiguration"]
-    ).ShellAndTubeConfiguration:
+    if (
+        type(value)
+        is __import__(
+            "hexagent.exchangers.shell_tube.models", fromlist=["ShellAndTubeConfiguration"]
+        ).ShellAndTubeConfiguration
+    ):
         return _project_shell_tube_configuration(value)
     if type(value) is TubeLayout:
         return _project_tube_layout(value)
@@ -173,6 +173,7 @@ def project_raw_value(value: Any) -> bytes:
         HeatTransferLengthAuthority,
         InternalFlowLengthAuthority,
     )
+
     if type(value) is InternalFlowLengthAuthority:
         return _project_internal_flow_length_authority(value)
     if type(value) is HeatTransferLengthAuthority:
@@ -180,6 +181,7 @@ def project_raw_value(value: Any) -> bytes:
     from hexagent.exchangers.shell_tube.tube_side.hydraulic_participation_authority import (
         Task025HydraulicParticipationAuthority,
     )
+
     if type(value) is Task025HydraulicParticipationAuthority:
         return _project_hydraulic_participation_authority(value)
     if type(value) is ReferencePlanePair:
@@ -196,9 +198,7 @@ def project_raw_value(value: Any) -> bytes:
     if type(value) is frozenset:
         return _project_frozenset(value)
     # §7.1 — otherwise fail-closed.
-    raise ValueError(
-        f"project_raw_value: unsupported type {type(value).__name__!r}"
-    )
+    raise ValueError(f"project_raw_value: unsupported type {type(value).__name__!r}")
 
 
 # §7.3 — Container projection.
@@ -215,7 +215,12 @@ def _project_dict(value: dict[str, Any]) -> bytes:
     out = b""
     for key in sorted_keys:
         v_bytes = project_raw_value(value[key])
-        out += _u32_be(len(key.encode("utf-8"))) + key.encode("utf-8") + _u64_be(len(v_bytes)) + v_bytes
+        out += (
+            _u32_be(len(key.encode("utf-8")))
+            + key.encode("utf-8")
+            + _u64_be(len(v_bytes))
+            + v_bytes
+        )
     return out
 
 
@@ -366,7 +371,12 @@ def _project_frozen_json_object(value: FrozenJsonObject) -> bytes:
     out = _u32_be(len(sorted_keys))
     for key in sorted_keys:
         v_bytes = project_raw_value(value[key])
-        out += _u32_be(len(key.encode("utf-8"))) + key.encode("utf-8") + _u64_be(len(v_bytes)) + v_bytes
+        out += (
+            _u32_be(len(key.encode("utf-8")))
+            + key.encode("utf-8")
+            + _u64_be(len(v_bytes))
+            + v_bytes
+        )
     return out
 
 

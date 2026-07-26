@@ -7,9 +7,6 @@
 §6.3 / §6.4 — Blocked result finalization.
 """
 
-
-
-
 from __future__ import annotations
 
 import decimal
@@ -808,9 +805,7 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
     # §10.8 — compute result_hash from the populated result, then patch it back.
     rhash = result_hash(valid)
     rid = result_id(rhash)
-    valid = Task025ValidResult(
-        **{**valid.__dict__, "result_hash": rhash, "result_id": rid}
-    )  # type: ignore[call-arg]
+    valid = Task025ValidResult(**{**valid.__dict__, "result_hash": rhash, "result_id": rid})  # type: ignore[call-arg]
     return valid
 
 
@@ -871,9 +866,7 @@ def _finalize_blocked(
         provenance=_build_provenance(evidence_refs, upstream_hashes),
     )
     bh = blocked_result_hash(provisional)
-    return Task025BlockedResult(
-        **{**provisional.__dict__, "blocked_result_hash": bh}
-    )  # type: ignore[call-arg]
+    return Task025BlockedResult(**{**provisional.__dict__, "blocked_result_hash": bh})  # type: ignore[call-arg]
 
 
 # -----------------------------------------------------------------------
@@ -1098,9 +1091,7 @@ def _validate_participation(
 
 def _is_64hex(value: Any) -> bool:
     return (
-        isinstance(value, str)
-        and len(value) == 64
-        and all(c in "0123456789abcdef" for c in value)
+        isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
     )
 
 

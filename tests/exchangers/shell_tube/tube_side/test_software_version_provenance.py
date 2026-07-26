@@ -19,7 +19,9 @@ def test_task_id_constant() -> None:
 
 
 def test_design_contract_path_constant() -> None:
-    assert DESIGN_CONTRACT_PATH == "docs/tasks/TASK-025-shell-and-tube-tube-side-hydraulic-geometry.md"
+    assert (
+        DESIGN_CONTRACT_PATH == "docs/tasks/TASK-025-shell-and-tube-tube-side-hydraulic-geometry.md"
+    )
 
 
 def test_blocked_result_software_version_constant() -> None:
@@ -38,5 +40,6 @@ def test_software_version_no_caller_supply() -> None:
     # supply software_version through evaluate_task025. This test verifies
     # the implementation-owned contract is exposed.
     assert ts.IMPLEMENTATION_SOFTWARE_VERSION == "0.1.0"
+
 
 # ruff: noqa: E501

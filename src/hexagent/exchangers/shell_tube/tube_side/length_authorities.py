@@ -42,8 +42,7 @@ def _validate_reference_plane_pair_for_kind(
     """Validate that ``pair.kind`` matches the expected length kind."""
     if pair.kind != kind:
         raise ValueError(
-            f"{field_path} has ReferencePlanePair.kind={pair.kind!r}, "
-            f"expected {kind!r}"
+            f"{field_path} has ReferencePlanePair.kind={pair.kind!r}, expected {kind!r}"
         )
     return pair
 

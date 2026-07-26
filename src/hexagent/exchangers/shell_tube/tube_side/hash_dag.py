@@ -6,9 +6,6 @@
 §10.2 — Frozen topological order.
 """
 
-
-
-
 from __future__ import annotations
 
 import uuid
@@ -326,10 +323,10 @@ def _project_for_result_field(field_name: str, field_value: Any) -> tuple[bytes,
 
 
 def result_id(result_hash_hex: str) -> str:
-    """§10.9 — UUIDv5 with the frozen namespace and lowercase-hex name bytes."""
+    """§10.9 — UUIDv5 with the frozen namespace and lowercase-hex name."""
     _validate_64hex(result_hash_hex, "result_hash")
     ns_uuid = uuid.UUID(_RESULT_ID_NAMESPACE)
-    return str(uuid.uuid5(ns_uuid, result_hash_hex.lower().encode("utf-8")))
+    return str(uuid.uuid5(ns_uuid, result_hash_hex.lower()))
 
 
 # -----------------------------------------------------------------------

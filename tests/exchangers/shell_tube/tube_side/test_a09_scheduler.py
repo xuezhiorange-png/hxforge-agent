@@ -14,7 +14,9 @@ def test_a09_top_level_non_dict_returns_blocked() -> None:
     result = ts.evaluate_task025("not-a-dict")
     assert isinstance(result, ts.Task025BlockedResult)
     assert result.stage_rank == 1
-    assert result.blockers and result.blockers[0].code is ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED
+    assert (
+        result.blockers and result.blockers[0].code is ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED
+    )
 
 
 def test_a09_top_level_none_returns_blocked() -> None:
@@ -39,5 +41,6 @@ def test_a09_blocked_result_has_stable_hash() -> None:
     assert len(result2.blocked_result_hash) == 64
     assert all(c in "0123456789abcdef" for c in result1.blocked_result_hash)
     assert all(c in "0123456789abcdef" for c in result2.blocked_result_hash)
+
 
 # ruff: noqa: E501

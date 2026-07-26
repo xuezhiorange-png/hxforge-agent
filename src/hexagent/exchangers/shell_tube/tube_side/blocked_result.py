@@ -82,7 +82,10 @@ class Task025BlockedResult:
     provenance: FrozenProvenance
 
     def __post_init__(self) -> None:
-        if not isinstance(self.schema_version, str) or self.schema_version != "task025.blocked-result.v1":
+        if (
+            not isinstance(self.schema_version, str)
+            or self.schema_version != "task025.blocked-result.v1"
+        ):
             raise ValueError(
                 f"schema_version must be 'task025.blocked-result.v1'; got {self.schema_version!r}"
             )

@@ -26,7 +26,10 @@ def test_a04_quantize_trap_rejects_nan() -> None:
 
 def test_a04_pi_canonical_bytes() -> None:
     assert len(ts.PI_DECIMAL_LEXEME) > 50
-    assert ts.sha256_hex(ts.PI_DECIMAL_LEXEME) == "aa6eee625a838a2af84f7d591e8c677bdd9c1b07c44380e2fee8fc738f9234f0"
+    assert (
+        ts.sha256_hex(ts.PI_DECIMAL_LEXEME)
+        == "aa6eee625a838a2af84f7d591e8c677bdd9c1b07c44380e2fee8fc738f9234f0"
+    )
 
 
 def test_a04_canonical_decimal_lexeme() -> None:
@@ -36,5 +39,6 @@ def test_a04_canonical_decimal_lexeme() -> None:
 def test_a04_validate_positive_rejects_zero() -> None:
     with pytest.raises(ValueError):
         ts.validate_positive_finite_decimal(Decimal("0"), "test")
+
 
 # ruff: noqa: E501

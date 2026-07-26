@@ -81,7 +81,9 @@ class FrozenProvenance:
         items: list[str] = []
         for item in self.input_evidence_refs:
             if not isinstance(item, str) or not item:
-                raise ValueError("FrozenProvenance.input_evidence_refs entries must be non-empty str")
+                raise ValueError(
+                    "FrozenProvenance.input_evidence_refs entries must be non-empty str"
+                )
             items.append(item)
         object.__setattr__(self, "input_evidence_refs", tuple(items))
         if not isinstance(self.upstream_identity_hashes, (tuple, list)):
