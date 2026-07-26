@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 from decimal import Decimal
 
+import pytest
+
 import hexagent.exchangers.shell_tube.tube_side as ts
 from hexagent.exchangers.shell_tube.models import Orientation
 from tests.fixtures.shell_and_tube.tube_side.task020_configurations import config_a
@@ -51,41 +53,49 @@ def test_a09_blocked_result_has_stable_hash() -> None:
 
 def _request_input(config: object, layout: object) -> dict[str, object]:
     position_ids = tuple(position.position_id for position in layout.positions)  # type: ignore[union-attr]
-    participation = ts.Task025HydraulicParticipationAuthority(
-        all_layout_position_ids=position_ids,
-        active_position_ids=position_ids,
-        inactive_position_ids=(),
-        authority_mode=ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
-        evidence_refs=("fixture",),
-        hydraulic_authority_hash="0" * 64,
-    )
-    flow_hash = ts.internal_flow_authority_length_hash(
-        Decimal("4.85"),
-        ts.canonical_internal_flow_pair(),
-        ts.canonical_internal_flow_pair(),
-        ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
-    )
-    heat_hash = ts.heat_transfer_authority_length_hash(
-        Decimal("4.85"),
-        ts.canonical_heat_transfer_pair(),
-        ts.canonical_heat_transfer_pair(),
-        ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
-    )
+    flow_pair = ts.canonical_internal_flow_pair()
+    heat_pair = ts.canonical_heat_transfer_pair()
+    authority_mode = ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH
     flow = ts.InternalFlowLengthAuthority(
         "flow",
         Decimal("4.85"),
-        ts.canonical_internal_flow_pair(),
-        ts.canonical_internal_flow_pair(),
-        ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
-        flow_hash,
+        flow_pair,
+        flow_pair,
+        authority_mode,
+        ts.internal_flow_authority_length_hash(
+            Decimal("4.85"), flow_pair, flow_pair, authority_mode
+        ),
     )
     heat = ts.HeatTransferLengthAuthority(
         "heat",
         Decimal("4.85"),
-        ts.canonical_heat_transfer_pair(),
-        ts.canonical_heat_transfer_pair(),
-        ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
-        heat_hash,
+        heat_pair,
+        heat_pair,
+        authority_mode,
+        ts.heat_transfer_authority_length_hash(
+            Decimal("4.85"), heat_pair, heat_pair, authority_mode
+        ),
+    )
+    ifa_hash = flow.length_hash
+    hta_hash = heat.length_hash
+    pya_hash = ts.hydraulic_authority_hash(
+        task020_configuration_id=getattr(config, "configuration_id", "config-a-001"),
+        task021_layout_id=getattr(layout, "layout_id", "layout-a-001"),
+        internal_flow_length_hash_value=ifa_hash,
+        heat_transfer_length_hash_value=hta_hash,
+        all_layout_position_ids=position_ids,
+        active_position_ids=position_ids,
+        inactive_position_ids=(),
+        hydraulic_authority_mode=authority_mode,
+        participation_evidence_refs=("fixture",),
+    )
+    participation = ts.Task025HydraulicParticipationAuthority(
+        all_layout_position_ids=position_ids,
+        active_position_ids=position_ids,
+        inactive_position_ids=(),
+        authority_mode=authority_mode,
+        evidence_refs=("fixture",),
+        hydraulic_authority_hash=pya_hash,
     )
     return {
         "schema_version": "task025.request.v1",
@@ -96,7 +106,7 @@ def _request_input(config: object, layout: object) -> dict[str, object]:
         "heat_transfer_authority": heat,
         "hydraulic_participation_authority": participation,
         "flow_path_mode": ts.FlowPathMode.STRAIGHT_TUBE_PARALLEL_FLOW,
-        "hydraulic_authority_mode": ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+        "hydraulic_authority_mode": authority_mode,
         "evidence_refs": ("fixture",),
     }
 
@@ -312,3 +322,222 @@ def test_layout_geometry_property_is_not_executed() -> None:
 
 
 # ruff: noqa: E501
+
+
+# ---------------------------------------------------------------------------
+# Round-3 §5 — upstream blockers truthiness must not be executed.
+# ---------------------------------------------------------------------------
+
+
+class _EvilTruthiness:
+    def __bool__(self) -> bool:
+        raise AssertionError("__bool__ must not execute")
+
+    def __len__(self) -> int:
+        raise AssertionError("__len__ must not execute")
+
+
+def test_task020_blockers_evil_bool_is_not_executed() -> None:
+    contaminated = replace(config_a(), blockers=_EvilTruthiness())  # type: ignore[arg-type]
+    raw = _request_input(contaminated, layout_a())
+    raw["task020_configuration"] = contaminated
+    raw["task021_layout"] = replace(
+        layout_a(),
+        task020_configuration_id=contaminated.configuration_id,
+        task020_configuration_hash=contaminated.configuration_hash,
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION in codes
+
+
+def test_task021_blockers_evil_bool_is_not_executed() -> None:
+    contaminated = replace(layout_a(), blockers=_EvilTruthiness())  # type: ignore[arg-type]
+    raw = _request_input(config_a(), contaminated)
+    raw["task021_layout"] = contaminated
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_014_INVALID_TASK021_LAYOUT in codes
+
+
+def test_task020_blockers_list_is_stage2_blocked() -> None:
+    contaminated = replace(config_a(), blockers=[])  # type: ignore[arg-type]
+    raw = _request_input(contaminated, layout_a())
+    raw["task020_configuration"] = contaminated
+    raw["task021_layout"] = replace(
+        layout_a(),
+        task020_configuration_id=contaminated.configuration_id,
+        task020_configuration_hash=contaminated.configuration_hash,
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION in codes
+
+
+def test_task021_blockers_list_is_stage2_blocked() -> None:
+    contaminated = replace(layout_a(), blockers=[])  # type: ignore[arg-type]
+    raw = _request_input(config_a(), contaminated)
+    raw["task021_layout"] = contaminated
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_014_INVALID_TASK021_LAYOUT in codes
+
+
+def test_task020_non_empty_tuple_is_stage2_blocked() -> None:
+    from hexagent.exchangers.shell_tube.models import ErrorEntry
+
+    contaminated = replace(
+        config_a(), blockers=(ErrorEntry(code="X", field_path=None, message_key="k"),)
+    )
+    raw = _request_input(contaminated, layout_a())
+    raw["task020_configuration"] = contaminated
+    raw["task021_layout"] = replace(
+        layout_a(),
+        task020_configuration_id=contaminated.configuration_id,
+        task020_configuration_hash=contaminated.configuration_hash,
+    )
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION in codes
+
+
+def test_task021_non_empty_tuple_is_stage2_blocked() -> None:
+    from hexagent.exchangers.shell_tube.models import ErrorEntry
+
+    contaminated = replace(
+        layout_a(), blockers=(ErrorEntry(code="X", field_path=None, message_key="k"),)
+    )
+    raw = _request_input(config_a(), contaminated)
+    raw["task021_layout"] = contaminated
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 2
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_014_INVALID_TASK021_LAYOUT in codes
+
+
+# ---------------------------------------------------------------------------
+# Round-3 §6 — Stage 8 Decimal parse must be total.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "bad_value",
+    [
+        "",
+        "not-a-decimal",
+        "NaN",
+        "sNaN",
+        "Infinity",
+        "-Infinity",
+        "0",
+        "-0.01",
+        "\ud800",
+    ],
+)
+def test_inner_diameter_malformed_string_is_stage8_blocked(bad_value: str) -> None:
+    geometry = layout_a().tube_geometry
+    contaminated_geom = replace(geometry, inner_diameter_m=bad_value)
+    contaminated_layout = replace(layout_a(), tube_geometry=contaminated_geom)
+    raw = _request_input(config_a(), contaminated_layout)
+    raw["task021_layout"] = contaminated_layout
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 8
+    assert result.request_hash is not None
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_026_TUBE_GEOMETRY_MISSING in codes
+
+
+def test_inner_diameter_str_subclass_is_stage8_blocked() -> None:
+    class StrSubclass(str):
+        pass
+
+    geometry = layout_a().tube_geometry
+    contaminated_geom = replace(geometry, inner_diameter_m=StrSubclass("0.016"))
+    contaminated_layout = replace(layout_a(), tube_geometry=contaminated_geom)
+    raw = _request_input(config_a(), contaminated_layout)
+    raw["task021_layout"] = contaminated_layout
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 8
+    assert result.request_hash is not None
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_026_TUBE_GEOMETRY_MISSING in codes
+
+
+def test_inner_diameter_evil_object_is_not_executed() -> None:
+    class EvilInnerDiameter:
+        def __str__(self) -> str:
+            raise AssertionError("str must not run")
+
+        def __repr__(self) -> str:
+            raise AssertionError("repr must not run")
+
+        def __bool__(self) -> bool:
+            raise AssertionError("bool must not run")
+
+    geometry = layout_a().tube_geometry
+    contaminated_geom = replace(geometry, inner_diameter_m=EvilInnerDiameter())  # type: ignore[arg-type]
+    contaminated_layout = replace(layout_a(), tube_geometry=contaminated_geom)
+    raw = _request_input(config_a(), contaminated_layout)
+    raw["task021_layout"] = contaminated_layout
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    assert result.stage_rank == 8
+
+
+def test_invalid_inner_diameter_never_reaches_geometry_compute() -> None:
+    """No partial geometry outputs on malformed inner diameter."""
+
+    geometry = layout_a().tube_geometry
+    contaminated_geom = replace(geometry, inner_diameter_m="not-a-decimal")
+    contaminated_layout = replace(layout_a(), tube_geometry=contaminated_geom)
+    raw = _request_input(config_a(), contaminated_layout)
+    raw["task021_layout"] = contaminated_layout
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    # A blocked result must not carry the geometry fields that belong to
+    # Task025ValidResult. The blocked-result dataclass intentionally has no
+    # such attributes, so any attempt to read them via setattr-style is
+    # rejected.
+    assert not hasattr(result, "single_tube_flow_area_m2")
+    assert not hasattr(result, "hydraulic_diameter_m")
+
+
+# ---------------------------------------------------------------------------
+# Round-3 §7 — evidence_refs contract unified to exact tuple.
+# ---------------------------------------------------------------------------
+
+
+def test_evidence_refs_list_is_blocked() -> None:
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = ["fixture"]
+    result = ts.evaluate_task025(raw)
+    assert isinstance(result, ts.Task025BlockedResult)
+    codes = {b.code for b in result.blockers}
+    assert ts.BlockerCode.BL_003_BLOCKED_INPUT_REJECTED in codes
+
+
+def test_evidence_refs_tuple_is_accepted() -> None:
+    raw = _request_input(config_a(), layout_a())
+    raw["evidence_refs"] = ("fixture-a", "fixture-b")
+    result = ts.evaluate_task025(raw)
+    # Either valid result or a downstream unrelated blocker, but never
+    # an evidence_refs contract rejection.
+    assert not any(
+        b.message_key == "evidence_refs_not_frozen_container"
+        or b.message_key == "evidence_refs_entry_not_exact_str"
+        or b.message_key == "evidence_refs_entry_empty"
+        for b in getattr(result, "blockers", ())
+    )

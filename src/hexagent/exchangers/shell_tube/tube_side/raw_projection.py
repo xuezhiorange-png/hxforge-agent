@@ -144,12 +144,41 @@ def _atom(kind: bytes, payload: bytes) -> bytes:
 
 
 def _utf8(value: str) -> bytes:
+    return _utf8_exact(value, "raw_input.string")
+
+
+def _utf8_exact(value: object, field_path: str) -> bytes:
+    """Encode ``value`` as UTF-8 with strict total discipline.
+
+    The caller must already be inside the raw projection boundary; this
+    helper enforces an exact ``str`` type and rejects surrogates or any
+    non-encodable Unicode. Any failure is converted to
+    :class:`RawProjectionError` so the public entry point never leaks
+    ``UnicodeEncodeError`` to its caller.
+    """
     if type(value) is not str:
-        raise RawProjectionError("invalid UTF-8 string type")
+        raise RawProjectionError(f"{field_path} must be exact str")
+    if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+        raise RawProjectionError(f"{field_path} contains a surrogate")
     try:
         return value.encode("utf-8")
     except UnicodeEncodeError as exc:
-        raise RawProjectionError("invalid UTF-8 string") from exc
+        raise RawProjectionError(f"{field_path} UTF-8 encoding failed") from exc
+
+
+def _ascii_exact(value: object, field_path: str) -> bytes:
+    """Encode ``value`` as ASCII with strict total discipline.
+
+    The caller must already be inside the raw projection boundary; this
+    helper enforces an exact ``str`` type and rejects non-ASCII bytes.
+    Any failure is converted to :class:`RawProjectionError`.
+    """
+    if type(value) is not str:
+        raise RawProjectionError(f"{field_path} must be exact str")
+    try:
+        return value.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise RawProjectionError(f"{field_path} ASCII encoding failed") from exc
 
 
 def _ascii_decimal(value: Decimal) -> bytes:
@@ -336,11 +365,27 @@ def _project_shell_tube_configuration(value: Any, depth: int, active: frozenset[
         except (AttributeError, ValueError, TypeError) as exc:
             raise RawProjectionError(f"configuration field {field_name!r} inaccessible") from exc
         if field_name in ("authority_mode", "construction_family", "orientation"):
-            if not isinstance(field_value, _enum.Enum):
+            if type(field_value) not in RECOGNIZED_ENUM_CLASSES:
                 raise RawProjectionError("configuration enum field type")
             fields.append((field_name, b"ENUM", _enum_bytes(field_value)))
+        elif field_name == "configuration_hash":
+            if type(field_value) is not str:
+                raise RawProjectionError("configuration_hash not exact str")
+            fields.append(
+                (
+                    field_name,
+                    b"STRING",
+                    _ascii_exact(field_value, "task020.configuration_hash"),
+                )
+            )
         elif type(field_value) is str:
-            fields.append((field_name, b"STRING", field_value.encode("utf-8")))
+            fields.append(
+                (
+                    field_name,
+                    b"STRING",
+                    _utf8_exact(field_value, f"task020.{field_name}"),
+                )
+            )
         elif type(field_value) is int:
             fields.append((field_name, b"INT", str(field_value).encode("ascii")))
         else:
@@ -350,6 +395,12 @@ def _project_shell_tube_configuration(value: Any, depth: int, active: frozenset[
 
 def _project_tube_layout(value: TubeLayout, depth: int, active: frozenset[int]) -> bytes:
     fields: list[tuple[str, bytes, bytes]] = []
+    hash_field_names = {
+        "layout_hash",
+        "task020_configuration_hash",
+        "record_hash",
+        "snapshot_hash",
+    }
     for field_name in _TUBE_LAYOUT_FIELDS:
         try:
             field_value = _layout_field(value, field_name)
@@ -359,7 +410,13 @@ def _project_tube_layout(value: TubeLayout, depth: int, active: frozenset[int]) 
             if field_name == "construction_family":
                 if type(field_value) is not str:
                     raise RawProjectionError("layout construction family type")
-                fields.append((field_name, b"STRING", field_value.encode("utf-8")))
+                fields.append(
+                    (
+                        field_name,
+                        b"STRING",
+                        _utf8_exact(field_value, f"task021.{field_name}"),
+                    )
+                )
             else:
                 if type(field_value) is not Orientation:
                     raise RawProjectionError("layout orientation type")
@@ -403,15 +460,42 @@ def _project_tube_layout(value: TubeLayout, depth: int, active: frozenset[int]) 
             if type(snapshot_hash) is not str:
                 raise RawProjectionError("layout snapshot_hash not exact str")
             subfields = (
-                ("geometry_id", b"STRING", geometry_id.encode("utf-8")),
-                ("record_hash", b"STRING", record_hash.encode("ascii")),
-                ("snapshot_hash", b"STRING", snapshot_hash.encode("ascii")),
+                (
+                    "geometry_id",
+                    b"STRING",
+                    _utf8_exact(geometry_id, "task021.geometry_id"),
+                ),
+                (
+                    "record_hash",
+                    b"STRING",
+                    _ascii_exact(record_hash, "task021.geometry.record_hash"),
+                ),
+                (
+                    "snapshot_hash",
+                    b"STRING",
+                    _ascii_exact(snapshot_hash, "task021.geometry.snapshot_hash"),
+                ),
             )
             fields.append(
                 (field_name, b"KNOWN_RECORD", _record(b"task025.tube-geometry.v1", subfields))
             )
         elif type(field_value) is str:
-            fields.append((field_name, b"STRING", field_value.encode("utf-8")))
+            if field_name in hash_field_names:
+                fields.append(
+                    (
+                        field_name,
+                        b"STRING",
+                        _ascii_exact(field_value, f"task021.{field_name}"),
+                    )
+                )
+            else:
+                fields.append(
+                    (
+                        field_name,
+                        b"STRING",
+                        _utf8_exact(field_value, f"task021.{field_name}"),
+                    )
+                )
         elif type(field_value) is int:
             fields.append((field_name, b"INT", str(field_value).encode("ascii")))
         else:
@@ -429,13 +513,21 @@ def _project_length_authority(value: Any, namespace: bytes) -> bytes:
         length_hash = value.length_hash
     except (AttributeError, ValueError, TypeError) as exc:
         raise RawProjectionError("length authority field inaccessible") from exc
+    if type(length_m) is not Decimal:
+        raise RawProjectionError("length_m must be exact Decimal")
+    if type(start_plane) is not ReferencePlanePair:
+        raise RawProjectionError("start_plane must be exact ReferencePlanePair")
+    if type(end_plane) is not ReferencePlanePair:
+        raise RawProjectionError("end_plane must be exact ReferencePlanePair")
+    if type(authority_mode) not in RECOGNIZED_ENUM_CLASSES:
+        raise RawProjectionError("length authority_mode not owned enum")
     fields = (
-        ("length_id", b"STRING", length_id.encode("utf-8")),
+        ("length_id", b"STRING", _utf8_exact(length_id, "length.length_id")),
         ("length_m", b"DECIMAL", _ascii_decimal(length_m)),
         ("start_plane", b"KNOWN_RECORD", _project_reference_plane_pair(start_plane)),
         ("end_plane", b"KNOWN_RECORD", _project_reference_plane_pair(end_plane)),
         ("authority_mode", b"ENUM", _enum_bytes(authority_mode)),
-        ("length_hash", b"STRING", length_hash.encode("ascii")),
+        ("length_hash", b"STRING", _ascii_exact(length_hash, "length.length_hash")),
     )
     return _atom(b"KNOWN_RECORD", _record(namespace, fields))
 
@@ -450,6 +542,16 @@ def _project_participation(value: Any, depth: int, active: frozenset[int]) -> by
         hydraulic_authority_hash = value.hydraulic_authority_hash
     except (AttributeError, ValueError, TypeError) as exc:
         raise RawProjectionError("participation authority field inaccessible") from exc
+    if type(all_layout) is not tuple:
+        raise RawProjectionError("all_layout_position_ids must be exact tuple")
+    if type(active_ids) is not tuple:
+        raise RawProjectionError("active_position_ids must be exact tuple")
+    if type(inactive_ids) is not tuple:
+        raise RawProjectionError("inactive_position_ids must be exact tuple")
+    if type(evidence_refs) is not tuple:
+        raise RawProjectionError("participation evidence_refs must be exact tuple")
+    if type(authority_mode) not in RECOGNIZED_ENUM_CLASSES:
+        raise RawProjectionError("participation authority_mode not owned enum")
     fields = (
         (
             "all_layout_position_ids",
@@ -464,7 +566,11 @@ def _project_participation(value: Any, depth: int, active: frozenset[int]) -> by
         ),
         ("authority_mode", b"ENUM", _enum_bytes(authority_mode)),
         ("evidence_refs", b"TUPLE", _project_tuple(evidence_refs, depth, active)),
-        ("hydraulic_authority_hash", b"STRING", hydraulic_authority_hash.encode("ascii")),
+        (
+            "hydraulic_authority_hash",
+            b"STRING",
+            _ascii_exact(hydraulic_authority_hash, "participation.hydraulic_authority_hash"),
+        ),
     )
     return _atom(b"KNOWN_RECORD", _record(_NS_HYDRAULIC_PARTICIPATION, fields))
 

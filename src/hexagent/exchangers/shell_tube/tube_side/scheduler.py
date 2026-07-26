@@ -203,6 +203,34 @@ def _build_raw_projection_blocked() -> Task025BlockedResult:
     )
 
 
+def _build_evidence_refs_blocked() -> Task025BlockedResult:
+    """Round-3 §7 — public surface for evidence_refs contract violations.
+
+    Always reports a stable ``BL_003_BLOCKED_INPUT_REJECTED`` blocker so
+    consumers can match on the public contract regardless of whether the
+    violation was detected before or after the raw projection boundary.
+    """
+    token = b"task025.raw-projection-unsupported.v1"
+    raw_request = _raw_projection("raw_request_projection_unsupported", token)
+    raw_profile = _raw_projection("raw_profile_projection_unsupported", token)
+    blockers = [
+        emit_blocker(
+            BlockerCode.BL_003_BLOCKED_INPUT_REJECTED,
+            "raw_input.evidence_refs",
+            "evidence_refs_not_frozen_container",
+            (),
+        )
+    ]
+    return _finalize_blocked(
+        raw_request,
+        raw_profile,
+        None,
+        request_hash_value=None,
+        blockers=blockers,
+        stage_rank=1,
+    )
+
+
 def schedule(raw_input: Any) -> Task025ValidResult | Task025BlockedResult:
     """§4.2 — Top-level entry: dispatch non-dict / dict branches."""
     if type(raw_input) is not dict:
@@ -215,6 +243,13 @@ def schedule(raw_input: Any) -> Task025ValidResult | Task025BlockedResult:
 
 def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025BlockedResult:
     # §4.2 — raw_request_projection + raw_profile_id_projection must always exist.
+    # Round-3 §7: evidence_refs, when present, must be an exact tuple of
+    # non-empty str. When the key is absent, the Stage 1 missing-field
+    # check handles it. We validate only the container type here so a
+    # list / byte / str-subclass value never reaches the raw projection
+    # boundary.
+    if "evidence_refs" in raw_input and type(raw_input["evidence_refs"]) is not tuple:
+        return _build_evidence_refs_blocked()
     try:
         raw_request_bytes = project_raw_dict(raw_input)
     except RawProjectionError:
@@ -291,6 +326,20 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
                 BlockerCode.BL_028_UNSUPPORTED_PROFILE,
                 "raw_input.profile_id",
                 "profile_id_missing_or_unsupported",
+                (),
+            )
+        )
+
+    # Round-3 §7 — evidence_refs must be an exact tuple of non-empty str.
+    # v1 contract rejects list / byte / str-subclass at Stage 1 so the raw
+    # projection boundary never sees the malformed value.
+    raw_evidence_refs_value: Any = raw_input.get("evidence_refs")
+    if type(raw_evidence_refs_value) is not tuple:
+        stage1_blockers.append(
+            emit_blocker(
+                BlockerCode.BL_003_BLOCKED_INPUT_REJECTED,
+                "raw_input.evidence_refs",
+                "evidence_refs_not_frozen_container",
                 (),
             )
         )
@@ -822,8 +871,10 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
         )
 
     # Stage 8 — tube geometry and Decimal preconditions.
-    inner_diameter = Decimal(layout.tube_geometry.inner_diameter_m)
-    if inner_diameter <= Decimal(0):
+    inner_diameter_m_raw: Any = layout.tube_geometry.inner_diameter_m
+    try:
+        inner_diameter = _parse_inner_diameter_m(inner_diameter_m_raw)
+    except _InnerDiameterParseError as exc:
         return _finalize_blocked(
             raw_request_projection,
             raw_profile_id_projection,
@@ -833,7 +884,7 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
                 emit_blocker(
                     BlockerCode.BL_026_TUBE_GEOMETRY_MISSING,
                     "task021_layout.tube_geometry.inner_diameter_m",
-                    "inner_diameter_non_positive",
+                    exc.message_key,
                     (),
                 ),
             ),
@@ -1063,7 +1114,17 @@ def _validate_task020(raw: Any) -> tuple[Any, list[Task025BlockerEntry]]:
                 (),
             )
         )
-    if raw.blockers:
+    blockers_value: Any = raw.blockers
+    if type(blockers_value) is not tuple:
+        blockers.append(
+            emit_blocker(
+                BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION,
+                "raw_input.task020_configuration.blockers",
+                "task020_blockers_not_exact_tuple",
+                (),
+            )
+        )
+    elif len(blockers_value) != 0:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION,
@@ -1124,7 +1185,17 @@ def _validate_task021(raw: Any) -> tuple[TubeLayout | None, list[Task025BlockerE
                 (),
             )
         )
-    if raw.blockers:
+    layout_blockers_value: Any = raw.blockers
+    if type(layout_blockers_value) is not tuple:
+        blockers.append(
+            emit_blocker(
+                BlockerCode.BL_014_INVALID_TASK021_LAYOUT,
+                "raw_input.task021_layout.blockers",
+                "task021_blockers_not_exact_tuple",
+                (),
+            )
+        )
+    elif len(layout_blockers_value) != 0:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_014_INVALID_TASK021_LAYOUT,
@@ -1215,7 +1286,13 @@ class _EvidenceRefsError(Exception):
 
 
 def _validate_evidence_refs(value: Any) -> tuple[str, ...]:
-    if not isinstance(value, (tuple, list)):
+    """v1 contract: ``evidence_refs`` must be an exact tuple of non-empty str.
+
+    Lists, byte strings, and str subclasses are explicitly rejected. No
+    implicit conversion is performed; the round-3 v1 contract is exactly
+    tuple-of-non-empty-str.
+    """
+    if type(value) is not tuple:
         raise _EvidenceRefsError("evidence_refs_not_frozen_container")
     items: list[Any] = []
     for item in value:
@@ -1225,6 +1302,44 @@ def _validate_evidence_refs(value: Any) -> tuple[str, ...]:
             raise _EvidenceRefsError("evidence_refs_entry_empty")
         items.append(item)
     return tuple(items)
+
+
+class _InnerDiameterParseError(Exception):
+    __slots__ = ("message_key",)
+
+    def __init__(self, message_key: str) -> None:
+        super().__init__(message_key)
+        self.message_key = message_key
+
+
+def _parse_inner_diameter_m(value: Any) -> Decimal:
+    """Total Decimal parser for the Stage 8 inner diameter.
+
+    The contract is:
+      * ``type(value) is str`` — no subclasses, no implicit conversion.
+      * The string is non-empty, contains no surrogate code points, and
+        parses as a finite, strictly-positive :class:`Decimal`.
+      * ``NaN``, ``sNaN``, ``Infinity``, ``-Infinity``, ``0`` and any
+        non-positive value are rejected.
+    Every failure path emits a stable ``_InnerDiameterParseError`` with
+    a known ``message_key`` so the caller can produce a Stage 8 blocked
+    result without leaking Python builtin exceptions.
+    """
+    if type(value) is not str:
+        raise _InnerDiameterParseError("inner_diameter_not_exact_str")
+    if not value:
+        raise _InnerDiameterParseError("inner_diameter_empty")
+    if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+        raise _InnerDiameterParseError("inner_diameter_surrogate")
+    try:
+        parsed = Decimal(value)
+    except (decimal.InvalidOperation, ValueError, UnicodeError) as exc:
+        raise _InnerDiameterParseError("inner_diameter_not_parseable") from exc
+    if not parsed.is_finite():
+        raise _InnerDiameterParseError("inner_diameter_not_finite")
+    if parsed <= Decimal(0):
+        raise _InnerDiameterParseError("inner_diameter_non_positive")
+    return parsed
 
 
 # -----------------------------------------------------------------------
