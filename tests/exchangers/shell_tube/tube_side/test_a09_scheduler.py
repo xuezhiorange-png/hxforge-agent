@@ -6,8 +6,9 @@ from dataclasses import replace
 from decimal import Decimal
 
 import hexagent.exchangers.shell_tube.tube_side as ts
-from tests.fixtures.shell_and_tube.tube_side.task020_configurations import config_a, config_b
-from tests.fixtures.shell_and_tube.tube_side.task021_layouts import layout_a
+from hexagent.exchangers.shell_tube.models import Orientation
+from tests.fixtures.shell_and_tube.tube_side.task020_configurations import config_a
+from tests.fixtures.shell_and_tube.tube_side.task021_layouts import layout_a, layout_b
 
 
 def test_a09_stage_ranks_constant() -> None:
@@ -101,9 +102,7 @@ def _request_input(config: object, layout: object) -> dict[str, object]:
 
 
 def test_mixed_task020_task021_fixture_is_blocked() -> None:
-    result = ts.evaluate_task025(
-        _request_input(config_a(), replace(layout_a(), task020_configuration_id="config-b-002"))
-    )
+    result = ts.evaluate_task025(_request_input(config_a(), layout_b()))
     assert isinstance(result, ts.Task025BlockedResult)
     assert result.stage_rank == 2
     assert ts.BlockerCode.BL_024_TASK020_IDENTITY_MISMATCH in {b.code for b in result.blockers}
@@ -128,7 +127,9 @@ def test_task020_configuration_hash_mismatch_is_blocked() -> None:
 
 
 def test_upstream_orientation_mismatch_is_blocked() -> None:
-    result = ts.evaluate_task025(_request_input(config_b(), layout_a()))
+    config = config_a()
+    layout = replace(layout_a(), equipment_orientation=Orientation.VERTICAL)
+    result = ts.evaluate_task025(_request_input(config, layout))
     assert isinstance(result, ts.Task025BlockedResult)
     assert result.stage_rank == 2
 
