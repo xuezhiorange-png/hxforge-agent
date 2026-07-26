@@ -113,6 +113,7 @@ class Task025BlockedResult:
             raise ValueError("v1 blocked result warnings must be ()")
         if not isinstance(self.deferred_capabilities, tuple):
             raise ValueError("deferred_capabilities must be tuple of str")
+        object.__setattr__(self, "deferred_capabilities", tuple(self.deferred_capabilities))
         if not isinstance(self.stage_rank, int):
             raise ValueError("stage_rank must be int")
         if not isinstance(self.task020_identity, (FrozenIdentity, type(None))):

@@ -138,6 +138,8 @@ class Task025ValidResult:
             raise ValueError("active_position_ids must be tuple/list of str")
         if not isinstance(self.inactive_position_ids, (tuple, list)):
             raise ValueError("inactive_position_ids must be tuple/list of str")
+        object.__setattr__(self, "active_position_ids", tuple(self.active_position_ids))
+        object.__setattr__(self, "inactive_position_ids", tuple(self.inactive_position_ids))
         if not isinstance(self.warnings, tuple):
             raise ValueError("warnings must be a tuple (use ())")
         if self.warnings != ():
@@ -148,6 +150,7 @@ class Task025ValidResult:
             raise ValueError("valid result blockers must be ()")
         if not isinstance(self.deferred_capabilities, tuple):
             raise ValueError("deferred_capabilities must be tuple of str")
+        object.__setattr__(self, "deferred_capabilities", tuple(self.deferred_capabilities))
         if not isinstance(self.stage_rank, int) or self.stage_rank != 9:
             raise ValueError(f"stage_rank must be 9; got {self.stage_rank!r}")
         if not isinstance(self.task020_identity, FrozenIdentity):
