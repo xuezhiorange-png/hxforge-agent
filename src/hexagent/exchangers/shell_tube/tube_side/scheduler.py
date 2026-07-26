@@ -61,11 +61,13 @@ from hexagent.exchangers.shell_tube.tube_side.provenance import (
     FrozenRawProjection,
 )
 from hexagent.exchangers.shell_tube.tube_side.raw_projection import (
+    RawProjectionError,
     project_raw_dict,
     project_raw_value,
 )
 from hexagent.exchangers.shell_tube.tube_side.request import (
     SUPPORTED_PROFILE_IDS,
+    TASK025_REQUEST_FIELDS,
     Task025Request,
 )
 from hexagent.exchangers.shell_tube.tube_side.valid_result import (
@@ -179,21 +181,44 @@ def _build_non_dict_blocked(evidence_refs: tuple[str, ...] = ()) -> Task025Block
     )
 
 
-# -----------------------------------------------------------------------
-# §4.2 — Dict branch: schedule a raw dict through the 9-stage scheduler.
-# -----------------------------------------------------------------------
+def _build_raw_projection_blocked() -> Task025BlockedResult:
+    token = b"task025.raw-projection-unsupported.v1"
+    raw_request = _raw_projection("raw_request_projection_unsupported", token)
+    raw_profile = _raw_projection("raw_profile_projection_unsupported", token)
+    blockers = [
+        emit_blocker(
+            BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED,
+            "raw_input",
+            "raw_projection_unsupported",
+            (),
+        )
+    ]
+    return _finalize_blocked(
+        raw_request,
+        raw_profile,
+        None,
+        request_hash_value=None,
+        blockers=blockers,
+        stage_rank=1,
+    )
 
 
 def schedule(raw_input: Any) -> Task025ValidResult | Task025BlockedResult:
     """§4.2 — Top-level entry: dispatch non-dict / dict branches."""
     if type(raw_input) is not dict:
         return _build_non_dict_blocked()
-    return _schedule_dict(raw_input)
+    try:
+        return _schedule_dict(raw_input)
+    except RawProjectionError:
+        return _build_raw_projection_blocked()
 
 
 def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025BlockedResult:
     # §4.2 — raw_request_projection + raw_profile_id_projection must always exist.
-    raw_request_bytes = project_raw_dict(raw_input)
+    try:
+        raw_request_bytes = project_raw_dict(raw_input)
+    except RawProjectionError:
+        return _build_raw_projection_blocked()
     raw_request_projection = _raw_projection("raw_request_dict", raw_request_bytes)
 
     # raw_profile_id_projection from the dict.
@@ -237,19 +262,10 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
             )
         )
 
-    expected_fields = (
-        "schema_version",
-        "profile_id",
-        "task020_configuration",
-        "task021_layout",
-        "internal_flow_authority",
-        "heat_transfer_authority",
-        "hydraulic_participation_authority",
-        "flow_path_mode",
-        "hydraulic_authority_mode",
-        "evidence_refs",
-    )
-    unknown_fields = [k for k in raw_input if k not in expected_fields]
+    actual_fields = frozenset(raw_input)
+    expected_fields = frozenset(TASK025_REQUEST_FIELDS)
+    missing_fields = expected_fields - actual_fields
+    unknown_fields = actual_fields - expected_fields
     if unknown_fields:
         stage1_blockers.append(
             emit_blocker(
@@ -257,6 +273,15 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
                 "raw_input",
                 "raw_input_unknown_field",
                 tuple(sorted(unknown_fields)),
+            )
+        )
+    if missing_fields:
+        stage1_blockers.append(
+            emit_blocker(
+                BlockerCode.BL_003_BLOCKED_INPUT_REJECTED,
+                "raw_input",
+                "raw_input_missing_field",
+                tuple(f"missing_field:{field_name}" for field_name in sorted(missing_fields)),
             )
         )
 
@@ -291,6 +316,61 @@ def _schedule_dict(raw_input: dict[str, Any]) -> Task025ValidResult | Task025Blo
     layout, layout_blockers = _validate_task021(layout_raw)
     stage2_blockers.extend(config_blockers)
     stage2_blockers.extend(layout_blockers)
+    if config is not None and layout is not None:
+        if layout.task020_configuration_id != config.configuration_id:
+            stage2_blockers.append(
+                emit_blocker(
+                    BlockerCode.BL_024_TASK020_IDENTITY_MISMATCH,
+                    "raw_input.task021_layout.task020_configuration_id",
+                    "task020_configuration_id_mismatch",
+                    (),
+                )
+            )
+        if layout.task020_configuration_hash != config.configuration_hash:
+            stage2_blockers.append(
+                emit_blocker(
+                    BlockerCode.BL_025_TASK021_IDENTITY_MISMATCH,
+                    "raw_input.task021_layout.task020_configuration_hash",
+                    "task020_configuration_hash_mismatch",
+                    (),
+                )
+            )
+        if layout.construction_family != config.construction_family.value:
+            stage2_blockers.append(
+                emit_blocker(
+                    BlockerCode.BL_025_TASK021_IDENTITY_MISMATCH,
+                    "raw_input.task021_layout.construction_family",
+                    "construction_family_mismatch",
+                    (),
+                )
+            )
+        if layout.shell_pass_count != config.shell_pass_count:
+            stage2_blockers.append(
+                emit_blocker(
+                    BlockerCode.BL_025_TASK021_IDENTITY_MISMATCH,
+                    "raw_input.task021_layout.shell_pass_count",
+                    "shell_pass_count_mismatch",
+                    (),
+                )
+            )
+        if layout.tube_pass_count != config.tube_pass_count:
+            stage2_blockers.append(
+                emit_blocker(
+                    BlockerCode.BL_025_TASK021_IDENTITY_MISMATCH,
+                    "raw_input.task021_layout.tube_pass_count",
+                    "tube_pass_count_mismatch",
+                    (),
+                )
+            )
+        if layout.equipment_orientation is not config.orientation:
+            stage2_blockers.append(
+                emit_blocker(
+                    BlockerCode.BL_025_TASK021_IDENTITY_MISMATCH,
+                    "raw_input.task021_layout.equipment_orientation",
+                    "orientation_mismatch",
+                    (),
+                )
+            )
 
     if stage2_blockers:
         return _finalize_blocked(

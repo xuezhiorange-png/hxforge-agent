@@ -40,3 +40,11 @@ def test_a06_unknown_token_rejected() -> None:
     # The construction rejects any non-ReferencePlaneToken inputs.
     with pytest.raises(ValueError):
         ts.ReferencePlanePair("start", "end")  # type: ignore[arg-type]
+
+
+def test_reference_plane_pair_is_immutable() -> None:
+    pair = ts.canonical_internal_flow_pair()
+    with pytest.raises(AttributeError):
+        pair.start = ts.ReferencePlaneToken.TUBE_INTERNAL_FLOW_END_PLANE  # type: ignore[misc]
+    with pytest.raises(AttributeError):
+        pair.end = ts.ReferencePlaneToken.TUBE_INTERNAL_FLOW_START_PLANE  # type: ignore[misc]

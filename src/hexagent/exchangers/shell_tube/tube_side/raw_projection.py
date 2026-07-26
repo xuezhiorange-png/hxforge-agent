@@ -1,10 +1,9 @@
 """TASK-025 raw projection.
 
-§7 — Raw projection closure.
-§7.1 — Exact atom dispatch.
-§7.3 — Exact built-in envelope containers.
-§7.4 — Known-object projector table.
-§7.5 — Unknown-object safety.
+The public raw boundary is deliberately strict: only exact built-ins,
+registered enum classes, and the frozen TASK-025 known-object table are
+accepted.  Every recursive value is framed with an explicit kind tag and
+length, so projection is injective for the supported domain.
 """
 
 from __future__ import annotations
@@ -21,7 +20,6 @@ from hexagent.exchangers.shell_tube.models import (
 from hexagent.exchangers.shell_tube.tube_layout.models import (
     ApprovedTubeGeometrySnapshot,
     TubeLayout,
-    TubePosition,
 )
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
     FrozenJsonArray,
@@ -35,25 +33,26 @@ from hexagent.exchangers.shell_tube.tube_side.owned_enums import (
     ReferencePlaneToken,
 )
 
-# §7.2 — RECOGNIZED_ENUM_CLASSES (7 concrete enum classes).
-RECOGNIZED_ENUM_CLASSES: Final[tuple[type, ...]] = (
-    FlowPathMode := __import__(
-        "hexagent.exchangers.shell_tube.tube_side.owned_enums",
-        fromlist=["FlowPathMode"],
-    ).FlowPathMode,
+FlowPathMode = __import__(
+    "hexagent.exchangers.shell_tube.tube_side.owned_enums", fromlist=["FlowPathMode"]
+).FlowPathMode
+BlockerCode = __import__(
+    "hexagent.exchangers.shell_tube.tube_side.blocker_registry", fromlist=["BlockerCode"]
+).BlockerCode
+
+RECOGNIZED_ENUM_CLASSES: Final[tuple[type[_enum.Enum], ...]] = (
+    FlowPathMode,
     HydraulicAuthorityMode,
     ReferencePlaneToken,
-    BlockerCode := __import__(
-        "hexagent.exchangers.shell_tube.tube_side.blocker_registry",
-        fromlist=["BlockerCode"],
-    ).BlockerCode,
+    BlockerCode,
     AuthorityMode,
     ConstructionFamily,
     Orientation,
 )
 
+MAX_DEPTH: Final[int] = 64
+_DEPTH_LIMIT: Final[int] = MAX_DEPTH
 
-# §7.4.1 — ShellAndTubeConfiguration ordered projection.
 _SHELL_TUBE_CONFIGURATION_FIELDS: Final[tuple[str, ...]] = (
     "schema_version",
     "configuration_id",
@@ -64,9 +63,6 @@ _SHELL_TUBE_CONFIGURATION_FIELDS: Final[tuple[str, ...]] = (
     "shell_pass_count",
     "tube_pass_count",
 )
-
-
-# §7.4.2 — TubeLayout ordered projection.
 _TUBE_LAYOUT_FIELDS: Final[tuple[str, ...]] = (
     "schema_version",
     "layout_id",
@@ -83,9 +79,6 @@ _TUBE_LAYOUT_FIELDS: Final[tuple[str, ...]] = (
     "positions",
     "tube_geometry",
 )
-
-
-# §10.1 — Universal labeled-record framing node namespaces for known objects.
 _NS_SHELL_TUBE_CONFIGURATION: Final[bytes] = b"hexagent.shell-tube.configuration.v1"
 _NS_TUBE_LAYOUT: Final[bytes] = b"hexagent.tube-layout.layout.v1"
 _NS_INTERNAL_FLOW_LENGTH: Final[bytes] = b"task025.internal-flow-length-authority.v1"
@@ -94,367 +87,102 @@ _NS_HYDRAULIC_PARTICIPATION: Final[bytes] = b"task025.hydraulic-participation-au
 _NS_REFERENCE_PLANE_PAIR: Final[bytes] = b"task025.reference-plane-pair.v1"
 
 
-# -----------------------------------------------------------------------
-# §7.1 — Atom projectors.
-# -----------------------------------------------------------------------
-
-
-def _project_atom_none(value: None) -> bytes:
-    return b""
-
-
-def _project_atom_bool(value: bool) -> bytes:
-    return b""
-
-
-def _project_atom_int(value: int) -> bytes:
-    return str(value).encode("ascii")
-
-
-def _project_atom_str(value: str) -> bytes:
-    return value.encode("utf-8")
-
-
-def _project_atom_bytes(value: bytes) -> bytes:
-    return value
-
-
-def _project_atom_decimal(value: Decimal) -> bytes:
-    return str(value).encode("ascii")
-
-
-def _project_atom_enum(value: _enum.Enum) -> bytes:
-    return value.name.encode("ascii") if hasattr(value, "name") else str(value).encode("ascii")
-
-
-def _project_pi_wrapper(value: PIWrapper) -> bytes:
-    return value.canonical_utf8_bytes
-
-
-# §7.1 — project_raw_value dispatch.
-def project_raw_value(value: Any) -> bytes:
-    """§7.1 — Apply the ordered exact atom + container dispatch.
-
-    Returned bytes are the canonical projection bytes.  No recursion
-    uses user methods, descriptors, MRO, slots, or arbitrary metadata.
-    """
-    if value is None:
-        return _project_atom_none(value)
-    if isinstance(value, bool):
-        return _project_atom_bool(value)
-    if isinstance(value, int):
-        return _project_atom_int(value)
-    if isinstance(value, str):
-        # §7.1 step 4 — surrogate rejection.
-        if any(0xD800 <= ord(c) <= 0xDFFF for c in value):
-            raise ValueError("project_raw_value: surrogate-containing string rejected")
-        return _project_atom_str(value)
-    if isinstance(value, bytes):
-        return _project_atom_bytes(value)
-    if isinstance(value, Decimal):
-        return _project_atom_decimal(value)
-    if isinstance(value, PIWrapper):
-        return _project_pi_wrapper(value)
-    # §7.2 — concrete enum dispatch.
-    for enum_cls in RECOGNIZED_ENUM_CLASSES:
-        if type(value) is enum_cls:
-            return _project_atom_enum(value)  # type: ignore[arg-type]
-    # §7.4 — exact-type known-object projector table.
-    if (
-        type(value)
-        is __import__(
-            "hexagent.exchangers.shell_tube.models", fromlist=["ShellAndTubeConfiguration"]
-        ).ShellAndTubeConfiguration
-    ):
-        return _project_shell_tube_configuration(value)
-    if type(value) is TubeLayout:
-        return _project_tube_layout(value)
-    from hexagent.exchangers.shell_tube.tube_side.length_authorities import (
-        HeatTransferLengthAuthority,
-        InternalFlowLengthAuthority,
-    )
-
-    if type(value) is InternalFlowLengthAuthority:
-        return _project_internal_flow_length_authority(value)
-    if type(value) is HeatTransferLengthAuthority:
-        return _project_heat_transfer_length_authority(value)
-    from hexagent.exchangers.shell_tube.tube_side.hydraulic_participation_authority import (
-        Task025HydraulicParticipationAuthority,
-    )
-
-    if type(value) is Task025HydraulicParticipationAuthority:
-        return _project_hydraulic_participation_authority(value)
-    if type(value) is ReferencePlanePair:
-        return _project_reference_plane_pair(value)
-    if isinstance(value, FrozenJsonArray):
-        return _project_frozen_json_array(value)
-    if isinstance(value, FrozenJsonObject):
-        return _project_frozen_json_object(value)
-    # §7.3 — built-in envelope containers.
-    if type(value) is dict:
-        return _project_dict(value)
-    if type(value) is tuple:
-        return _project_tuple(value)
-    if type(value) is frozenset:
-        return _project_frozenset(value)
-    # §7.1 — otherwise fail-closed.
-    raise ValueError(f"project_raw_value: unsupported type {type(value).__name__!r}")
-
-
-# §7.3 — Container projection.
-
-
-_DEPTH_LIMIT: Final[int] = 64
-
-
-def _project_dict(value: dict[str, Any]) -> bytes:
-    # §7.3 — exact str keys, sorted by canonical UTF-8 bytes.
-    if any(not isinstance(k, str) for k in value):
-        raise ValueError("project_raw_dict: dict keys must be exact str")
-    sorted_keys = sorted(value.keys())
-    out = b""
-    for key in sorted_keys:
-        v_bytes = project_raw_value(value[key])
-        out += (
-            _u32_be(len(key.encode("utf-8")))
-            + key.encode("utf-8")
-            + _u64_be(len(v_bytes))
-            + v_bytes
-        )
-    return out
-
-
-def _project_tuple(value: tuple[Any, ...]) -> bytes:
-    out = _u32_be(len(value))
-    for item in value:
-        item_bytes = project_raw_value(item)
-        out += _u32_be(len(item_bytes)) + item_bytes
-    return out
-
-
-def _project_frozenset(value: frozenset[Any]) -> bytes:
-    projected_items = [project_raw_value(item) for item in value]
-    if len(set(projected_items)) != len(projected_items):
-        raise ValueError("project_raw_value: frozenset projected duplicates")
-    sorted_items = sorted(projected_items)
-    out = _u32_be(len(sorted_items))
-    for item in sorted_items:
-        out += _u32_be(len(item)) + item
-    return out
-
-
-# §7.4 — Known-object projectors.
-
-
-def _project_shell_tube_configuration(value: Any) -> bytes:
-    fields = []
-    for field_name in _SHELL_TUBE_CONFIGURATION_FIELDS:
-        field_value = getattr(value, field_name)
-        # enum fields projected as enum.
-        if field_name == "authority_mode":
-            enum_value: Any = field_value
-            enum_bytes = _project_atom_enum(enum_value)
-            fields.append((field_name, b"ENUM", enum_bytes))
-        elif field_name == "construction_family" or field_name == "orientation":
-            enum_bytes = _project_atom_enum(field_value)
-            fields.append((field_name, b"ENUM", enum_bytes))
-        else:
-            # Validate atomic types: str / int.
-            if not isinstance(field_value, (str, int)):
-                raise ValueError(
-                    f"project_raw: ShellAndTubeConfiguration.{field_name} "
-                    f"must be str or int; got {type(field_value).__name__}"
-                )
-            if isinstance(field_value, str):
-                fields.append((field_name, b"STRING", field_value.encode("utf-8")))
-            else:
-                fields.append((field_name, b"INT", str(field_value).encode("ascii")))
-    # §7.4.1 — CANONICAL_SERIALIZATION uses labeled record framing.
-    return _canonicalize_kv_to_record(_NS_SHELL_TUBE_CONFIGURATION, tuple(fields))
-
-
-def _project_tube_layout(value: TubeLayout) -> bytes:
-    fields = []
-    for field_name in _TUBE_LAYOUT_FIELDS:
-        if field_name == "construction_family" or field_name == "equipment_orientation":
-            enum_bytes = _project_atom_enum(getattr(value, field_name))
-            fields.append((field_name, b"ENUM", enum_bytes))
-        elif field_name == "positions":
-            # tuple of position_id strings in upstream order.
-            position_ids = tuple(p.position_id for p in value.positions)
-            position_bytes = _project_tuple(position_ids)
-            fields.append((field_name, b"TUPLE", position_bytes))
-        elif field_name == "tube_geometry":
-            geom: ApprovedTubeGeometrySnapshot = value.tube_geometry
-            # §7.4.2 — exact three geometry identity fields only.
-            sub = (
-                (b"STRING", geom.geometry_id.encode("utf-8")),
-                (b"STRING", geom.record_hash.encode("utf-8")),
-                (b"STRING", geom.snapshot_hash.encode("utf-8")),
-            )
-            inner = _u32_be(len(sub))
-            for kind_tag, payload in sub:
-                inner += _u32_be(len(kind_tag)) + kind_tag + _u64_be(len(payload)) + payload
-            fields.append((field_name, b"RECORD", inner))
-        elif field_name in (
-            "schema_version",
-            "layout_id",
-            "layout_hash",
-            "request_hash",
-            "task020_configuration_id",
-            "task020_configuration_hash",
-        ):
-            v = getattr(value, field_name)
-            fields.append((field_name, b"STRING", v.encode("utf-8")))
-        else:
-            # int fields: shell_pass_count, tube_pass_count, tube_hole_count, physical_tube_count.
-            v = getattr(value, field_name)
-            fields.append((field_name, b"INT", str(v).encode("ascii")))
-    return _canonicalize_kv_to_record(_NS_TUBE_LAYOUT, tuple(fields))
-
-
-def _project_internal_flow_length_authority(value: Any) -> bytes:
-    fields = (
-        ("length_id", b"STRING", value.length_id.encode("utf-8")),
-        ("length_m", b"DECIMAL", str(value.length_m).encode("ascii")),
-        ("start_plane", b"RECORD", _project_reference_plane_pair(value.start_plane)),
-        ("end_plane", b"RECORD", _project_reference_plane_pair(value.end_plane)),
-        ("authority_mode", b"ENUM", _project_atom_enum(value.authority_mode)),
-    )
-    return _canonicalize_kv_to_record(_NS_INTERNAL_FLOW_LENGTH, fields)
-
-
-def _project_heat_transfer_length_authority(value: Any) -> bytes:
-    fields = (
-        ("length_id", b"STRING", value.length_id.encode("utf-8")),
-        ("length_m", b"DECIMAL", str(value.length_m).encode("ascii")),
-        ("start_plane", b"RECORD", _project_reference_plane_pair(value.start_plane)),
-        ("end_plane", b"RECORD", _project_reference_plane_pair(value.end_plane)),
-        ("authority_mode", b"ENUM", _project_atom_enum(value.authority_mode)),
-    )
-    return _canonicalize_kv_to_record(_NS_HEAT_TRANSFER_LENGTH, fields)
-
-
-def _project_hydraulic_participation_authority(value: Any) -> bytes:
-    all_ids = value.all_layout_position_ids
-    active_ids = value.active_position_ids
-    inactive_ids = value.inactive_position_ids
-    evidence = value.evidence_refs
-    fields = (
-        ("all_layout_position_ids", b"TUPLE", _project_tuple(all_ids)),
-        ("active_position_ids", b"TUPLE", _project_tuple(active_ids)),
-        ("inactive_position_ids", b"TUPLE", _project_tuple(inactive_ids)),
-        ("authority_mode", b"ENUM", _project_atom_enum(value.authority_mode)),
-        ("evidence_refs", b"TUPLE", _project_tuple(evidence)),
-    )
-    return _canonicalize_kv_to_record(_NS_HYDRAULIC_PARTICIPATION, fields)
-
-
-def _project_reference_plane_pair(value: ReferencePlanePair) -> bytes:
-    fields = (
-        ("start", b"ENUM", _project_atom_enum(value.start)),
-        ("end", b"ENUM", _project_atom_enum(value.end)),
-    )
-    return _canonicalize_kv_to_record(_NS_REFERENCE_PLANE_PAIR, fields)
-
-
-def _project_frozen_json_array(value: FrozenJsonArray) -> bytes:
-    out = _u32_be(len(value))
-    for item in value:
-        item_bytes = project_raw_value(item)
-        out += _u32_be(len(item_bytes)) + item_bytes
-    return out
-
-
-def _project_frozen_json_object(value: FrozenJsonObject) -> bytes:
-    sorted_keys = sorted(value.keys())
-    out = _u32_be(len(sorted_keys))
-    for key in sorted_keys:
-        v_bytes = project_raw_value(value[key])
-        out += (
-            _u32_be(len(key.encode("utf-8")))
-            + key.encode("utf-8")
-            + _u64_be(len(v_bytes))
-            + v_bytes
-        )
-    return out
-
-
-# -----------------------------------------------------------------------
-# Internal canonical serialization helpers.
-# -----------------------------------------------------------------------
+class RawProjectionError(ValueError):
+    """Controlled failure from the raw projection boundary."""
 
 
 def _u32_be(n: int) -> bytes:
     if n < 0 or n > 0xFFFFFFFF:
-        raise ValueError("u32_be out of range")
-    return n.to_bytes(4, "big", signed=False)
+        raise RawProjectionError("u32 framing range")
+    return n.to_bytes(4, "big")
 
 
 def _u64_be(n: int) -> bytes:
     if n < 0 or n > 0xFFFFFFFFFFFFFFFF:
-        raise ValueError("u64_be out of range")
-    return n.to_bytes(8, "big", signed=False)
+        raise RawProjectionError("u64 framing range")
+    return n.to_bytes(8, "big")
 
 
-def _canonicalize_kv_to_record(
-    namespace: bytes, fields: tuple[tuple[str, bytes, bytes], ...]
-) -> bytes:
-    """Wrap a list of ``(name, kind_tag, payload)`` triples into the §10.1 frame.
+def _frame(kind: bytes, payload: bytes) -> bytes:
+    return _u32_be(len(kind)) + kind + _u64_be(len(payload)) + payload
 
-    Frame is ``(node_namespace_len: u32, namespace, field_count: u32, fields...)``.
-    Each field is ``(name_len: u32, name_utf8, payload_len: u64, payload_bytes)``.
-    """
+
+def _record(namespace: bytes, fields: tuple[tuple[str, bytes, bytes], ...]) -> bytes:
     out = _u32_be(len(namespace)) + namespace + _u32_be(len(fields))
-    for name, kind_tag, payload in fields:
-        out += _u32_be(len(name)) + name.encode("utf-8")
-        out += _u32_be(len(kind_tag)) + kind_tag
-        out += _u64_be(len(payload)) + payload
+    for name, kind, payload in fields:
+        name_bytes = name.encode("utf-8")
+        out += _u32_be(len(name_bytes)) + name_bytes + _frame(kind, payload)
     return out
 
 
-# -----------------------------------------------------------------------
-# §4.2 / §A07 — project_raw_dict (top-level dict).
-# -----------------------------------------------------------------------
+def _atom(kind: bytes, payload: bytes) -> bytes:
+    return _frame(kind, payload)
 
 
-def project_raw_dict(value: dict[str, Any]) -> bytes:
-    """§4.2 / §7.3 — Top-level dict projection."""
-    if type(value) is not dict:
-        raise ValueError("project_raw_dict: top-level must be exact dict")
-    return _project_dict(value)
+def _utf8(value: str) -> bytes:
+    if type(value) is not str:
+        raise RawProjectionError("invalid UTF-8 string type")
+    try:
+        return value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise RawProjectionError("invalid UTF-8 string") from exc
 
 
-# -----------------------------------------------------------------------
-# §6.1 — FrozenRawProjection hash computation.
-# -----------------------------------------------------------------------
+def _ascii_decimal(value: Decimal) -> bytes:
+    try:
+        return str(value).encode("ascii")
+    except (UnicodeEncodeError, ValueError) as exc:
+        raise RawProjectionError("decimal lexical encoding failed") from exc
 
 
-def raw_projection_hex(framed_bytes: bytes) -> str:
-    """Return the lowercase-hex SHA-256 of the framed bytes."""
-    return sha256_hex_from_framed_bytes(framed_bytes)
+def _enum_bytes(value: _enum.Enum) -> bytes:
+    if type(value) not in RECOGNIZED_ENUM_CLASSES:
+        raise RawProjectionError("unrecognized enum class")
+    # Registered StrEnum classes expose an implementation-owned .value.
+    raw_value = value.value
+    if type(raw_value) is not str:
+        raise RawProjectionError("enum value is not exact str")
+    try:
+        return raw_value.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise RawProjectionError("enum value is not ASCII") from exc
 
 
-# -----------------------------------------------------------------------
-# §7.5 — Unknown-object safety: kill-swtich helpers for the scheduler.
-# -----------------------------------------------------------------------
-
-
-def unsafe_object_signal(value: Any) -> bool:
-    """Return ``True`` if ``value`` is in a class that triggers unknown-object safety."""
-    if value is None or isinstance(value, (bool, int, str, bytes, Decimal)):
-        return False
-    if isinstance(value, PIWrapper):
-        return False
-    if isinstance(value, _enum.Enum):
-        return False
-    if isinstance(value, FrozenJsonArray):
-        return False
-    if isinstance(value, FrozenJsonObject):
-        return False
+def _project_atom(value: Any) -> bytes:
+    value_type = type(value)
+    if value is None:
+        return _atom(b"NONE", b"")
+    if value_type is bool:
+        return _atom(b"BOOL_TRUE" if value else b"BOOL_FALSE", b"")
+    if value_type is int:
+        return _atom(b"INT", str(value).encode("ascii"))
+    if value_type is str:
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+            raise RawProjectionError("surrogate-containing string")
+        return _atom(b"STRING", _utf8(value))
+    if value_type is bytes:
+        return _atom(b"BYTES", bytes(value))
+    if value_type is Decimal:
+        return _atom(b"DECIMAL", _ascii_decimal(value))
     if type(value) in RECOGNIZED_ENUM_CLASSES:
-        return False
-    # Known typed objects — accept.
+        return _atom(b"ENUM", _enum_bytes(value))
+    if type(value) is PIWrapper:
+        return _atom(b"KNOWN_PI", value.canonical_utf8_bytes)
+    raise RawProjectionError("unsupported atom")
+
+
+def _project(value: Any, depth: int, active_container_ids: frozenset[int]) -> bytes:
+    if depth > MAX_DEPTH:
+        raise RawProjectionError("raw projection depth limit")
+    value_type = type(value)
+    if (
+        value is None
+        or value_type in (bool, int, str, bytes, Decimal)
+        or type(value) in RECOGNIZED_ENUM_CLASSES
+        or value_type is PIWrapper
+    ):
+        return _project_atom(value)
+
     from hexagent.exchangers.shell_tube.models import ShellAndTubeConfiguration
     from hexagent.exchangers.shell_tube.tube_side.hydraulic_participation_authority import (
         Task025HydraulicParticipationAuthority,
@@ -464,25 +192,291 @@ def unsafe_object_signal(value: Any) -> bool:
         InternalFlowLengthAuthority,
     )
 
-    if type(value) in (
-        ShellAndTubeConfiguration,
-        TubeLayout,
-        TubePosition,
-        InternalFlowLengthAuthority,
-        HeatTransferLengthAuthority,
-        Task025HydraulicParticipationAuthority,
-        ReferencePlanePair,
-    ):
+    if type(value) is ShellAndTubeConfiguration:
+        return _project_shell_tube_configuration(value, depth, active_container_ids)
+    if type(value) is TubeLayout:
+        return _project_tube_layout(value, depth, active_container_ids)
+    if type(value) is InternalFlowLengthAuthority:
+        return _project_length_authority(value, _NS_INTERNAL_FLOW_LENGTH)
+    if type(value) is HeatTransferLengthAuthority:
+        return _project_length_authority(value, _NS_HEAT_TRANSFER_LENGTH)
+    if type(value) is Task025HydraulicParticipationAuthority:
+        return _project_participation(value, depth, active_container_ids)
+    if type(value) is ReferencePlanePair:
+        return _project_reference_plane_pair(value)
+    if value_type is FrozenJsonArray:
+        object_id = id(value)
+        if object_id in active_container_ids:
+            raise RawProjectionError("raw projection cycle")
+        return _project_frozen_array(value, depth + 1, active_container_ids | {object_id})
+    if value_type is FrozenJsonObject:
+        object_id = id(value)
+        if object_id in active_container_ids:
+            raise RawProjectionError("raw projection cycle")
+        return _project_frozen_object(value, depth + 1, active_container_ids | {object_id})
+
+    if value_type in (dict, tuple, frozenset):
+        object_id = id(value)
+        if object_id in active_container_ids:
+            raise RawProjectionError("raw projection cycle")
+        next_active = active_container_ids | {object_id}
+        if value_type is dict:
+            return _project_dict(value, depth + 1, next_active)
+        if value_type is tuple:
+            return _project_tuple(value, depth + 1, next_active)
+        return _project_frozenset(value, depth + 1, next_active)
+
+    raise RawProjectionError("unsupported raw object")
+
+
+def _project_dict(value: dict[Any, Any], depth: int, active: frozenset[int]) -> bytes:
+    entries: list[tuple[bytes, bytes]] = []
+    for key, child in value.items():
+        key_bytes = _utf8(key)
+        entries.append((key_bytes, _project(child, depth, active)))
+    entries.sort(key=lambda pair: pair[0])
+    payload = _u32_be(len(entries))
+    for key_bytes, child_bytes in entries:
+        payload += _u32_be(len(key_bytes)) + key_bytes + _u64_be(len(child_bytes)) + child_bytes
+    return _atom(b"DICT", payload)
+
+
+def _project_tuple(value: tuple[Any, ...], depth: int, active: frozenset[int]) -> bytes:
+    payload = _u32_be(len(value))
+    for child in value:
+        child_bytes = _project(child, depth, active)
+        payload += _u64_be(len(child_bytes)) + child_bytes
+    return _atom(b"TUPLE", payload)
+
+
+def _project_frozenset(value: frozenset[Any], depth: int, active: frozenset[int]) -> bytes:
+    # Only exact supported atoms / frozen values are allowed; projection itself
+    # never invokes member __hash__, __eq__, or ordering methods.
+    projected = [_project(item, depth, active) for item in value]
+    if len(set(projected)) != len(projected):
+        raise RawProjectionError("frozenset projected duplicate")
+    payload = _u32_be(len(projected))
+    for child_bytes in sorted(projected):
+        payload += _u64_be(len(child_bytes)) + child_bytes
+    return _atom(b"FROZENSET", payload)
+
+
+def _configuration_field(value: Any, field_name: str) -> Any:
+    if field_name == "schema_version":
+        return value.schema_version
+    if field_name == "configuration_id":
+        return value.configuration_id
+    if field_name == "configuration_hash":
+        return value.configuration_hash
+    if field_name == "authority_mode":
+        return value.authority_mode
+    if field_name == "construction_family":
+        return value.construction_family
+    if field_name == "orientation":
+        return value.orientation
+    if field_name == "shell_pass_count":
+        return value.shell_pass_count
+    if field_name == "tube_pass_count":
+        return value.tube_pass_count
+    raise RawProjectionError("unknown configuration field")
+
+
+def _layout_field(value: TubeLayout, field_name: str) -> Any:
+    if field_name == "schema_version":
+        return value.schema_version
+    if field_name == "layout_id":
+        return value.layout_id
+    if field_name == "layout_hash":
+        return value.layout_hash
+    if field_name == "request_hash":
+        return value.request_hash
+    if field_name == "task020_configuration_id":
+        return value.task020_configuration_id
+    if field_name == "task020_configuration_hash":
+        return value.task020_configuration_hash
+    if field_name == "construction_family":
+        return value.construction_family
+    if field_name == "equipment_orientation":
+        return value.equipment_orientation
+    if field_name == "shell_pass_count":
+        return value.shell_pass_count
+    if field_name == "tube_pass_count":
+        return value.tube_pass_count
+    if field_name == "tube_hole_count":
+        return value.tube_hole_count
+    if field_name == "physical_tube_count":
+        return value.physical_tube_count
+    if field_name == "positions":
+        return value.positions
+    if field_name == "tube_geometry":
+        return value.tube_geometry
+    raise RawProjectionError("unknown layout field")
+
+
+def _project_shell_tube_configuration(value: Any, depth: int, active: frozenset[int]) -> bytes:
+    fields: list[tuple[str, bytes, bytes]] = []
+    for field_name in _SHELL_TUBE_CONFIGURATION_FIELDS:
+        field_value = _configuration_field(value, field_name)
+        if field_name in ("authority_mode", "construction_family", "orientation"):
+            if not isinstance(field_value, _enum.Enum):
+                raise RawProjectionError("configuration enum field type")
+            fields.append((field_name, b"ENUM", _enum_bytes(field_value)))
+        elif type(field_value) is str:
+            fields.append((field_name, b"STRING", field_value.encode("utf-8")))
+        elif type(field_value) is int:
+            fields.append((field_name, b"INT", str(field_value).encode("ascii")))
+        else:
+            raise RawProjectionError("configuration field type")
+    return _atom(b"KNOWN_RECORD", _record(_NS_SHELL_TUBE_CONFIGURATION, tuple(fields)))
+
+
+def _project_tube_layout(value: TubeLayout, depth: int, active: frozenset[int]) -> bytes:
+    fields: list[tuple[str, bytes, bytes]] = []
+    for field_name in _TUBE_LAYOUT_FIELDS:
+        field_value = _layout_field(value, field_name)
+        if field_name in ("construction_family", "equipment_orientation"):
+            if field_name == "construction_family":
+                if type(field_value) is not str:
+                    raise RawProjectionError("layout construction family type")
+                fields.append((field_name, b"STRING", field_value.encode("utf-8")))
+            else:
+                orientation: Orientation = value.equipment_orientation
+                fields.append((field_name, b"ENUM", _enum_bytes(orientation)))
+        elif field_name == "positions":
+            if type(field_value) is not tuple:
+                raise RawProjectionError("layout positions are not exact tuple")
+            position_payload = _u32_be(len(field_value))
+            for position in field_value:
+                if type(position.position_id) is not str:
+                    raise RawProjectionError("position id type")
+                child = _project_atom(position.position_id)
+                position_payload += _u64_be(len(child)) + child
+            fields.append((field_name, b"TUPLE", position_payload))
+        elif field_name == "tube_geometry":
+            geometry: ApprovedTubeGeometrySnapshot = field_value
+            subfields = (
+                ("geometry_id", b"STRING", geometry.geometry_id.encode("utf-8")),
+                ("record_hash", b"STRING", geometry.record_hash.encode("ascii")),
+                ("snapshot_hash", b"STRING", geometry.snapshot_hash.encode("ascii")),
+            )
+            fields.append(
+                (field_name, b"KNOWN_RECORD", _record(b"task025.tube-geometry.v1", subfields))
+            )
+        elif type(field_value) is str:
+            fields.append((field_name, b"STRING", field_value.encode("utf-8")))
+        elif type(field_value) is int:
+            fields.append((field_name, b"INT", str(field_value).encode("ascii")))
+        else:
+            raise RawProjectionError("layout field type")
+    return _atom(b"KNOWN_RECORD", _record(_NS_TUBE_LAYOUT, tuple(fields)))
+
+
+def _project_length_authority(value: Any, namespace: bytes) -> bytes:
+    fields = (
+        ("length_id", b"STRING", value.length_id.encode("utf-8")),
+        ("length_m", b"DECIMAL", _ascii_decimal(value.length_m)),
+        ("start_plane", b"KNOWN_RECORD", _project_reference_plane_pair(value.start_plane)),
+        ("end_plane", b"KNOWN_RECORD", _project_reference_plane_pair(value.end_plane)),
+        ("authority_mode", b"ENUM", _enum_bytes(value.authority_mode)),
+        ("length_hash", b"STRING", value.length_hash.encode("ascii")),
+    )
+    return _atom(b"KNOWN_RECORD", _record(namespace, fields))
+
+
+def _project_participation(value: Any, depth: int, active: frozenset[int]) -> bytes:
+    fields = (
+        (
+            "all_layout_position_ids",
+            b"TUPLE",
+            _project_tuple(value.all_layout_position_ids, depth, active),
+        ),
+        ("active_position_ids", b"TUPLE", _project_tuple(value.active_position_ids, depth, active)),
+        (
+            "inactive_position_ids",
+            b"TUPLE",
+            _project_tuple(value.inactive_position_ids, depth, active),
+        ),
+        ("authority_mode", b"ENUM", _enum_bytes(value.authority_mode)),
+        ("evidence_refs", b"TUPLE", _project_tuple(value.evidence_refs, depth, active)),
+        ("hydraulic_authority_hash", b"STRING", value.hydraulic_authority_hash.encode("ascii")),
+    )
+    return _atom(b"KNOWN_RECORD", _record(_NS_HYDRAULIC_PARTICIPATION, fields))
+
+
+def _project_reference_plane_pair(value: ReferencePlanePair) -> bytes:
+    start = value.start
+    end = value.end
+    fields = (
+        ("start", b"ENUM", _enum_bytes(start)),
+        ("end", b"ENUM", _enum_bytes(end)),
+    )
+    return _record(_NS_REFERENCE_PLANE_PAIR, fields)
+
+
+def _project_frozen_array(value: FrozenJsonArray, depth: int, active: frozenset[int]) -> bytes:
+    payload = _u32_be(len(value))
+    for child in value:
+        child_bytes = _project(child, depth, active)
+        payload += _u64_be(len(child_bytes)) + child_bytes
+    return _atom(b"FROZEN_JSON_ARRAY", payload)
+
+
+def _project_frozen_object(value: FrozenJsonObject, depth: int, active: frozenset[int]) -> bytes:
+    entries: list[tuple[bytes, bytes]] = []
+    for key, child in value.items_mapping.items():
+        key_bytes = _utf8(key)
+        child_bytes = _project(child, depth, active)
+        entries.append((key_bytes, child_bytes))
+    entries.sort(key=lambda pair: pair[0])
+    payload = _u32_be(len(entries))
+    for key_bytes, child_bytes in entries:
+        payload += _u32_be(len(key_bytes)) + key_bytes + _u64_be(len(child_bytes)) + child_bytes
+    return _atom(b"KNOWN_RECORD", payload)
+
+
+def project_raw_value(
+    value: Any, *, depth: int = 0, active_container_ids: frozenset[int] = frozenset()
+) -> bytes:
+    """Project a supported value; raise only :class:`RawProjectionError`."""
+    out = _project(value, depth, active_container_ids)
+    return out
+
+
+def project_raw_dict(value: dict[str, Any]) -> bytes:
+    if type(value) is not dict:
+        raise RawProjectionError("top-level is not exact dict")
+    return project_raw_value(value)
+
+
+def raw_projection_hex(framed_bytes: bytes) -> str:
+    return sha256_hex_from_framed_bytes(framed_bytes)
+
+
+def unsafe_object_signal(value: Any) -> bool:
+    value_type = type(value)
+    if value is None or value_type in (bool, int, str, bytes, Decimal):
         return False
-    return not (type(value) is tuple or type(value) is dict or type(value) is frozenset)
+    if type(value) in RECOGNIZED_ENUM_CLASSES or value_type is PIWrapper:
+        return False
+    if value_type in (dict, tuple, frozenset, FrozenJsonArray, FrozenJsonObject):
+        return False
+    known_type_names = {
+        "ShellAndTubeConfiguration",
+        "TubeLayout",
+        "InternalFlowLengthAuthority",
+        "HeatTransferLengthAuthority",
+        "Task025HydraulicParticipationAuthority",
+        "ReferencePlanePair",
+    }
+    return value_type.__name__ not in known_type_names
 
 
 __all__ = [
+    "RawProjectionError",
+    "MAX_DEPTH",
     "RECOGNIZED_ENUM_CLASSES",
     "project_raw_value",
     "project_raw_dict",
     "raw_projection_hex",
     "unsafe_object_signal",
 ]
-
-# ruff: noqa: E501

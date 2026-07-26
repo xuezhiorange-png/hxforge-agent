@@ -26,6 +26,15 @@ def test_a01_frozen_json_object_rejects_non_string_keys() -> None:
         ts.FrozenJsonObject({1: "x"})  # type: ignore[dict-item]
 
 
+def test_frozen_json_object_copies_input_mapping() -> None:
+    source = {"a": 1}
+    frozen = ts.FrozenJsonObject(source)
+    source["a"] = 2
+    assert frozen["a"] == 1
+    with pytest.raises(TypeError):
+        frozen.items_mapping["b"] = 3  # type: ignore[index]
+
+
 def test_a01_sha256_hex_lowercase_64() -> None:
     out = ts.sha256_hex(b"")
     assert len(out) == 64

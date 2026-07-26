@@ -1,27 +1,12 @@
-"""TASK-025 owned enums and ReferencePlanePair value object.
-
-§2.2 — TASK-025-owned enum classes:
-    FlowPathMode, HydraulicAuthorityMode, ReferencePlaneToken.
-§2.2.1 — Canonical UTF-8 byte encoding for every member.
-§2.6 — ReferencePlaneToken closed set; ReferencePlanePair is a frozen
-       value object with the exact two ordered pairs.
-"""
+"""TASK-025 owned enums and immutable ReferencePlanePair value object."""
 
 from __future__ import annotations
 
 import enum
 from typing import Final
 
-# §2.2.1 — Exact owned-enum public surface.
-
 
 class FlowPathMode(enum.StrEnum):
-    """§2.2.1 — FlowPathMode canonical set.
-
-    Canonical UTF-8 lexeme bytes are deterministic. The two U-tube
-    members exist for membership testing but are blocked by §5 / §13.
-    """
-
     STRAIGHT_TUBE_PARALLEL_FLOW = "STRAIGHT_TUBE_PARALLEL_FLOW"
     STRAIGHT_TUBE_COUNTER_FLOW = "STRAIGHT_TUBE_COUNTER_FLOW"
     U_TUBE_PARALLEL_FLOW = "U_TUBE_PARALLEL_FLOW"
@@ -33,11 +18,6 @@ class FlowPathMode(enum.StrEnum):
 
 
 class HydraulicAuthorityMode(enum.StrEnum):
-    """§2.2.1 — HydraulicAuthorityMode canonical set.
-
-    Only ``INTERNAL_ARITHMETIC_FROM_LENGTH`` is accepted by v1.
-    """
-
     INTERNAL_ARITHMETIC_FROM_LENGTH = "INTERNAL_ARITHMETIC_FROM_LENGTH"
     INTERNAL_ARITHMETIC_FROM_FROZEN_PAYLOAD = "INTERNAL_ARITHMETIC_FROM_FROZEN_PAYLOAD"
     APPROVED_RULE_PACK_FROZEN_PAYLOAD = "APPROVED_RULE_PACK_FROZEN_PAYLOAD"
@@ -48,8 +28,6 @@ class HydraulicAuthorityMode(enum.StrEnum):
 
 
 class ReferencePlaneToken(enum.StrEnum):
-    """§2.2.1 / §2.6 — ReferencePlaneToken canonical set."""
-
     TUBE_INTERNAL_FLOW_START_PLANE = "TUBE_INTERNAL_FLOW_START_PLANE"
     TUBE_INTERNAL_FLOW_END_PLANE = "TUBE_INTERNAL_FLOW_END_PLANE"
     TUBE_HEAT_TRANSFER_START_PLANE = "TUBE_HEAT_TRANSFER_START_PLANE"
@@ -59,9 +37,6 @@ class ReferencePlaneToken(enum.StrEnum):
     def canonical_utf8_bytes(self) -> bytes:
         return self.value.encode("ascii")
 
-
-# §2.2 — ReferencePlanePair is a frozen value object, not an enum.
-# §2.6 — Allowed ordered pairs are exactly two.
 
 _INTERNAL_FLOW_PAIR: Final[tuple[ReferencePlaneToken, ReferencePlaneToken]] = (
     ReferencePlaneToken.TUBE_INTERNAL_FLOW_START_PLANE,
@@ -77,58 +52,61 @@ _ALLOWED_PAIRS: Final[frozenset[tuple[ReferencePlaneToken, ReferencePlaneToken]]
 
 
 class ReferencePlanePair:
-    """§2.2 — Frozen value object with exact fields ``(start, end)``.
+    """Immutable value object with exactly one of two ordered token pairs."""
 
-    Allowed ordered pairs are exactly the internal-flow start/end and the
-    heat-transfer start/end. Cross-pair, swapped, alias, case-variant,
-    whitespace-variant, and unrecognized token inputs are rejected.
-    """
-
-    __slots__ = ("start", "end")
+    _start: ReferencePlaneToken
+    _end: ReferencePlaneToken
+    __slots__ = ("_start", "_end")
 
     def __init__(self, start: ReferencePlaneToken, end: ReferencePlaneToken) -> None:
-        if not isinstance(start, ReferencePlaneToken):
+        if type(start) is not ReferencePlaneToken:
             raise ValueError(
                 f"ReferencePlanePair.start must be ReferencePlaneToken, got {type(start).__name__}"
             )
-        if not isinstance(end, ReferencePlaneToken):
+        if type(end) is not ReferencePlaneToken:
             raise ValueError(
                 f"ReferencePlanePair.end must be ReferencePlaneToken, got {type(end).__name__}"
             )
         pair = (start, end)
         if pair not in _ALLOWED_PAIRS:
-            raise ValueError(
-                f"ReferencePlanePair {pair!r} is not one of the two "
-                f"allowed ordered pairs (internal-flow / heat-transfer)"
-            )
-        self.start = start
-        self.end = end
+            raise ValueError(f"ReferencePlanePair {pair!r} is not an allowed ordered pair")
+        object.__setattr__(self, "_start", start)
+        object.__setattr__(self, "_end", end)
+
+    @property
+    def start(self) -> ReferencePlaneToken:
+        return self._start
+
+    @property
+    def end(self) -> ReferencePlaneToken:
+        return self._end
 
     @property
     def kind(self) -> str:
-        if (self.start, self.end) == _INTERNAL_FLOW_PAIR:
+        if (self._start, self._end) == _INTERNAL_FLOW_PAIR:
             return "internal_flow"
         return "heat_transfer"
 
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("ReferencePlanePair is immutable")
+
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, ReferencePlanePair):
+        if type(other) is not ReferencePlanePair:
             return NotImplemented
-        return self.start == other.start and self.end == other.end
+        return self._start == other._start and self._end == other._end
 
     def __hash__(self) -> int:
-        return hash((self.start, self.end))
+        return hash((self._start, self._end))
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"ReferencePlanePair(start={self.start.name}, end={self.end.name})"
+        return f"ReferencePlanePair(start={self._start.name}, end={self._end.name})"
 
 
 def canonical_internal_flow_pair() -> ReferencePlanePair:
-    """§10.3 / §10.4 — Return the internal-flow start/end pair."""
     return ReferencePlanePair(*_INTERNAL_FLOW_PAIR)
 
 
 def canonical_heat_transfer_pair() -> ReferencePlanePair:
-    """§10.3 / §10.4 — Return the heat-transfer start/end pair."""
     return ReferencePlanePair(*_HEAT_TRANSFER_PAIR)
 
 

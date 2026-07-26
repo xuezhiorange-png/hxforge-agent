@@ -53,3 +53,26 @@ def test_participation_authority_non_owned_mode_rejected() -> None:
             evidence_refs=("ref",),
             hydraulic_authority_hash="0" * 64,
         )
+
+
+def test_participation_input_lists_are_copied_or_rejected() -> None:
+    all_ids = ["P000", "P001"]
+    active_ids = ["P000"]
+    inactive_ids = ["P001"]
+    evidence_refs = ["ref"]
+    pa = ts.Task025HydraulicParticipationAuthority(
+        all_layout_position_ids=all_ids,
+        active_position_ids=active_ids,
+        inactive_position_ids=inactive_ids,
+        authority_mode=ts.HydraulicAuthorityMode.INTERNAL_ARITHMETIC_FROM_LENGTH,
+        evidence_refs=evidence_refs,
+        hydraulic_authority_hash="0" * 64,
+    )
+    all_ids.append("P002")
+    active_ids.clear()
+    inactive_ids.clear()
+    evidence_refs.append("late")
+    assert pa.all_layout_position_ids == ("P000", "P001")
+    assert pa.active_position_ids == ("P000",)
+    assert pa.inactive_position_ids == ("P001",)
+    assert pa.evidence_refs == ("ref",)

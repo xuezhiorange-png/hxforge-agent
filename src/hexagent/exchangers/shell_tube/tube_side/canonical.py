@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import struct
 from collections.abc import Mapping, Sequence
+from types import MappingProxyType
 from typing import Any, Final
 
 # -----------------------------------------------------------------------
@@ -218,7 +219,7 @@ class FrozenJsonObject(Mapping[str, Any]):
                 raise TypeError(f"FrozenJsonObject keys must be str, got {type(key).__name__}")
             _validate_frozen_json_item(value)
             items_dict[key] = value
-        self._items = items_dict
+        self._items = MappingProxyType(items_dict)
 
     def __len__(self) -> int:
         return len(self._items)
@@ -242,6 +243,11 @@ class FrozenJsonObject(Mapping[str, Any]):
 
     @property
     def items_mapping(self) -> Mapping[str, Any]:
+        return self._items
+
+    @property
+    def values(self) -> Mapping[str, Any]:
+        """Read-only owned mapping used by internal canonical consumers."""
         return self._items
 
     def __repr__(self) -> str:  # pragma: no cover
