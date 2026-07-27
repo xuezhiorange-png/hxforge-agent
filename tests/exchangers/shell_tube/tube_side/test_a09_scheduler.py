@@ -1121,3 +1121,88 @@ def test_top_level_evil_key_with_valid_evidence_refs_returns_bl019() -> None:
     codes = {b.code for b in result.blockers}
     assert ts.BlockerCode.BL_019_RAW_PROJECTION_UNSUPPORTED in codes
     assert key.eq_calls == 0
+
+
+# ---------------------------------------------------------------------------
+# v0.1 B02 / B03 — release closeout: production test mapping for scenarios
+# that were NOT_PROVEN in the Round 4 final release evidence package
+# (F06_TEN_BOUNDARY_SCENARIO_TEST_MAPPING=PARTIAL).
+# ---------------------------------------------------------------------------
+
+
+def test_b02_active_position_not_in_layout_is_stage5_blocked() -> None:
+    raw = _request_input(config_a(), layout_a())
+    participation = raw["hydraulic_participation_authority"]
+    assert isinstance(participation, ts.Task025HydraulicParticipationAuthority)
+    raw["hydraulic_participation_authority"] = replace(
+        participation,
+        active_position_ids=(*participation.active_position_ids, "P999"),
+    )
+    first = ts.evaluate_task025(raw)
+    second = ts.evaluate_task025(raw)
+    assert isinstance(first, ts.Task025BlockedResult)
+    assert isinstance(second, ts.Task025BlockedResult)
+    assert first.stage_rank == 5
+    assert first.request_hash is None
+    assert len(first.blockers) == 1
+    blocker = first.blockers[0]
+    assert blocker.code is ts.BlockerCode.BL_001_ACTIVE_PARTICIPATION_MISSING
+    assert blocker.field_path == (
+        "raw_input.hydraulic_participation_authority.active_position_ids",
+    )
+    assert blocker.message_key == "active_ids_not_subset"
+    assert first.blocked_result_hash == second.blocked_result_hash
+    assert first.blockers == second.blockers
+    for field_name in (
+        "single_tube_flow_area_m2",
+        "total_parallel_flow_area_m2",
+        "single_tube_wetted_perimeter_m",
+        "total_flow_cross_section_wetted_perimeter_m",
+        "hydraulic_diameter_m",
+        "total_internal_volume_m3",
+        "total_internal_heat_transfer_area_m2",
+    ):
+        assert not hasattr(first, field_name)
+
+
+def test_b03_missing_length_authorities_are_stage3_blocked() -> None:
+    cases = (
+        (
+            "internal_flow_authority",
+            ts.BlockerCode.BL_009_FLOW_LENGTH_NON_DETERMINISTIC,
+            ("raw_input.internal_flow_authority",),
+            "internal_flow_length_type_mismatch",
+        ),
+        (
+            "heat_transfer_authority",
+            ts.BlockerCode.BL_010_HEAT_LENGTH_NON_DETERMINISTIC,
+            ("raw_input.heat_transfer_authority",),
+            "heat_transfer_length_type_mismatch",
+        ),
+    )
+    for field_name, expected_code, expected_path, expected_message in cases:
+        raw = _request_input(config_a(), layout_a())
+        raw[field_name] = None
+        first = ts.evaluate_task025(raw)
+        second = ts.evaluate_task025(raw)
+        assert isinstance(first, ts.Task025BlockedResult)
+        assert isinstance(second, ts.Task025BlockedResult)
+        assert first.stage_rank == 3
+        assert first.request_hash is None
+        assert len(first.blockers) == 1
+        blocker = first.blockers[0]
+        assert blocker.code is expected_code
+        assert blocker.field_path == expected_path
+        assert blocker.message_key == expected_message
+        assert first.blocked_result_hash == second.blocked_result_hash
+        assert first.blockers == second.blockers
+        for geometry_field in (
+            "single_tube_flow_area_m2",
+            "total_parallel_flow_area_m2",
+            "single_tube_wetted_perimeter_m",
+            "total_flow_cross_section_wetted_perimeter_m",
+            "hydraulic_diameter_m",
+            "total_internal_volume_m3",
+            "total_internal_heat_transfer_area_m2",
+        ):
+            assert not hasattr(first, geometry_field)
