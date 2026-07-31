@@ -18,8 +18,9 @@ Public entry points (R6-R7 §2):
 from __future__ import annotations
 
 import enum as _enum
-from typing import Final as _Final, TYPE_CHECKING, Sequence, cast
-
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
+from typing import Final as _Final
 
 # ---------------------------------------------------------------------------
 # Frozen enums (R6-R7 §3.5 + §6 + §8.1).
@@ -98,7 +99,6 @@ ACCEPTED_THERMAL_BOUNDARY_CONDITIONS: _Final[tuple[ThermalBoundaryCondition, ...
 if TYPE_CHECKING:
     from typing import Protocol
 
-
     class _Task025ValidResultProtocol(Protocol):
         schema_version: str
         implementation_software_version: str
@@ -126,13 +126,17 @@ if TYPE_CHECKING:
         provenance: object | None
 
 
-# ---------------------------------------------------------------------------
 # Production module imports (all 14 in-scope paths).
+# These imports are intentionally placed AFTER enum/protocol declarations so
+# that submodule modules importing names from `hexagent...tube_side_thermal`
+# (notably the StrEnum classes and the structural Protocols) can resolve
+# those names without triggering a circular import. Ruff E402 is therefore
+# suppressed per-line for this deferred-import section only.
 # ---------------------------------------------------------------------------
 
-from decimal import Decimal
+from decimal import Decimal  # noqa: E402
 
-from hexagent.exchangers.shell_tube.tube_side_thermal.blocker_registry import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.blocker_registry import (  # noqa: E402
     DEFENSIVE_COUNT,
     DEFENSIVE_UNREACHABLE_CODE,
     REACHABLE_COUNT,
@@ -146,7 +150,7 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.blocker_registry import (
     BlockerCode,
     BlockerEntry,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.canonical import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.canonical import (  # noqa: E402
     ABSENT_OPTIONAL_KIND,
     ABSENT_OPTIONAL_PAYLOAD,
     KIND_BYTES,
@@ -159,7 +163,7 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.canonical import (
     KIND_STRING,
     KIND_TUPLE,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_primitives import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_primitives import (  # noqa: E402
     GOLDEN_VECTORS,
     NOMINAL_DECIMAL_PRECISION,
     WORKING_DECIMAL_PRECISION,
@@ -171,7 +175,7 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_primitives import 
     task026_decimal_context_160,
     task026_decimal_context_200,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_quantization import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_quantization import (  # noqa: E402
     HI_QUANTUM_POLICY,
     QUANTIZATION_FIELD_COUNT,
     QUANTIZATION_MAP,
@@ -180,12 +184,12 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_quantization impor
     field_for,
     quantize_half_even,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.nusselt_selector import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.nusselt_selector import (  # noqa: E402
     GNIELINSKI_CONST_0790,
-    GNIELINSKI_CONST_127,
-    GNIELINSKI_CONST_1000,
-    GNIELINSKI_CONST_164,
     GNIELINSKI_CONST_8,
+    GNIELINSKI_CONST_127,
+    GNIELINSKI_CONST_164,
+    GNIELINSKI_CONST_1000,
     LAMINAR_CHF_NU,
     LAMINAR_CWT_NU,
     ApplicabilityResult,
@@ -195,7 +199,7 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.nusselt_selector import (
     select_laminar_correlation,
     select_regime,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import (  # noqa: E402
     PROPERTY_SNAPSHOT_FIELDS,
     PROPERTY_SNAPSHOT_HASH_FIELDS,
     PROPERTY_SNAPSHOT_HASH_KIND_TAGS,
@@ -204,7 +208,7 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import (
     PropertySnapshot,
     recompute_property_snapshot_hash,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.provenance import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.provenance import (  # noqa: E402
     INPUT_EVIDENCE_REF_COUNT,
     INPUT_EVIDENCE_REFS_V1,
     PROVENANCE_FIELDS,
@@ -212,18 +216,18 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.provenance import (
     PROVENANCE_NAMESPACE,
     FrozenProvenance,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.raw_projection import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.raw_projection import (  # noqa: E402
     RAW_PROJECTION_NAMESPACE,
     FrozenRawProjection,
     frame_raw_projection_field,
     zero_optional,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.request import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.request import (  # noqa: E402
     DEFERRED_CAPABILITIES_V1,
     DEFERRED_CAPABILITY_COUNT,
     IMPLEMENTATION_SOFTWARE_VERSION,
-    REQUEST_FIELDS,
     REQUEST_FIELD_COUNT,
+    REQUEST_FIELDS,
     REQUEST_HASH_FIELDS,
     REQUEST_HASH_KIND_TAGS,
     REQUEST_HASH_NAMESPACE,
@@ -231,7 +235,7 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.request import (
     TASK026_VERSION,
     TubeSideThermalRequest,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.result import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.result import (  # noqa: E402
     BLOCKED_FIELD_COUNT,
     BLOCKED_RESULT_FIELDS,
     BLOCKED_RESULT_HASH_FIELDS,
@@ -240,25 +244,25 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.result import (
     RAW_BOUNDARY_BLOCKED_RESULT_HASH_FIELDS,
     RAW_BOUNDARY_BLOCKED_RESULT_HASH_KIND_TAGS,
     RAW_BOUNDARY_BLOCKED_RESULT_HASH_NAMESPACE,
-    RawBoundaryBlockedResult,
     SUCCESS_FIELD_COUNT,
     SUCCESS_RESULT_FIELDS,
     SUCCESS_RESULT_HASH_FIELDS,
     SUCCESS_RESULT_HASH_KIND_TAGS,
     SUCCESS_RESULT_HASH_NAMESPACE,
+    RawBoundaryBlockedResult,
     TubeSideBlockedResult,
     TubeSideThermalResult,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.single_phase import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.single_phase import (  # noqa: E402
     SinglePhaseOutputs,
     compute_single_phase,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.stage_pipeline import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.stage_pipeline import (  # noqa: E402
     HYDRAULIC_GEOMETRY_HASH_FIELDS,
     HYDRAULIC_GEOMETRY_KIND_TAGS,
     HYDRAULIC_GEOMETRY_NAMESPACE,
-    RESULT_ID_NAMESPACE,
     RESULT_ID_NAME_PREFIX,
+    RESULT_ID_NAMESPACE,
     STAGES,
     TASK026_T025_FORBIDDEN_FIELDS,
     TASK026_T025_UPSTREAM_READ_SET,
@@ -269,13 +273,12 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.stage_pipeline import (
     stage_name,
     stage_names,
 )
-from hexagent.exchangers.shell_tube.tube_side_thermal.warning_registry import (
+from hexagent.exchangers.shell_tube.tube_side_thermal.warning_registry import (  # noqa: E402
     TASK026_WARNING_CODE_COUNT,
     TASK026_WARNING_REGISTRY,
     WARNING_ENTRY_HASH_FIELDS,
     WarningEntry,
 )
-
 
 __all__ = [
     # Public entry points

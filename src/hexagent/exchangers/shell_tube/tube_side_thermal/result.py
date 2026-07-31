@@ -14,13 +14,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from hexagent.exchangers.shell_tube.tube_side_thermal.blocker_registry import (
-    BlockerEntry,
-)
 from hexagent.exchangers.shell_tube.tube_side_thermal import (
     FlowRegime,
     PhaseAssertion,
     ThermalBoundaryCondition,
+)
+from hexagent.exchangers.shell_tube.tube_side_thermal.blocker_registry import (
+    BlockerEntry,
 )
 from hexagent.exchangers.shell_tube.tube_side_thermal.provenance import (
     FrozenProvenance,
@@ -191,9 +191,7 @@ RAW_BOUNDARY_BLOCKED_RESULT_HASH_FIELDS: tuple[str, ...] = (
     "implementation_software_version",
 )
 
-RAW_BOUNDARY_BLOCKED_RESULT_HASH_NAMESPACE: str = (
-    "task026.raw-boundary-blocked-result.v1"
-)
+RAW_BOUNDARY_BLOCKED_RESULT_HASH_NAMESPACE: str = "task026.raw-boundary-blocked-result.v1"
 
 RAW_BOUNDARY_BLOCKED_RESULT_HASH_KIND_TAGS: tuple[bytes, ...] = (
     # KIND_RAW_PROJECTION, KIND_TUPLE, KIND_TUPLE, KIND_TUPLE, KIND_STRING,

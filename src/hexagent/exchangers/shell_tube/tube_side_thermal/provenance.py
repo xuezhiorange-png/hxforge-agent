@@ -73,7 +73,10 @@ class FrozenProvenance:
             raise ValueError("task_id must be non-empty str")
         if not isinstance(self.design_contract_path, str) or not self.design_contract_path:
             raise ValueError("design_contract_path must be non-empty str")
-        if not isinstance(self.implementation_software_version, str) or not self.implementation_software_version:
+        if (
+            not isinstance(self.implementation_software_version, str)
+            or not self.implementation_software_version
+        ):
             raise ValueError("implementation_software_version must be non-empty str")
         if not isinstance(self.input_evidence_refs, tuple):
             raise ValueError("input_evidence_refs must be tuple")
@@ -87,9 +90,7 @@ class FrozenProvenance:
                 raise ValueError("input_evidence_refs entries must be non-empty str")
         # Verify frozen 6-tuple identity.
         if self.input_evidence_refs != INPUT_EVIDENCE_REFS_V1:
-            raise ValueError(
-                "input_evidence_refs must be the frozen 6-tuple from R6-R7 §17.2"
-            )
+            raise ValueError("input_evidence_refs must be the frozen 6-tuple from R6-R7 §17.2")
         if not isinstance(self.upstream_identity_hashes, tuple):
             raise ValueError("upstream_identity_hashes must be tuple")
         if len(self.upstream_identity_hashes) == 0:

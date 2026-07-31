@@ -120,10 +120,11 @@ class TubeSideThermalRequest:
                 f"implementation_software_version must be {IMPLEMENTATION_SOFTWARE_VERSION!r}; "
                 f"got {self.implementation_software_version!r}"
             )
-        if not isinstance(self.property_snapshot_hash, str) or len(self.property_snapshot_hash) != 64:
-            raise ValueError(
-                "property_snapshot_hash must be 64-hex string"
-            )
+        if (
+            not isinstance(self.property_snapshot_hash, str)
+            or len(self.property_snapshot_hash) != 64
+        ):
+            raise ValueError("property_snapshot_hash must be 64-hex string")
         if any(c not in "0123456789abcdef" for c in self.property_snapshot_hash):
             raise ValueError("property_snapshot_hash must be lowercase hex")
         if self.phase_assertion not in ACCEPTED_PHASE_ASSERTIONS:
@@ -147,9 +148,7 @@ class TubeSideThermalRequest:
         if not isinstance(self.deferred_capabilities, tuple):
             raise ValueError("deferred_capabilities must be tuple")
         if self.deferred_capabilities != DEFERRED_CAPABILITIES_V1:
-            raise ValueError(
-                "deferred_capabilities must be the frozen 17-tuple from R6-R7 §1.3"
-            )
+            raise ValueError("deferred_capabilities must be the frozen 17-tuple from R6-R7 §1.3")
         # R6-R7 §3.4 — phase_assertion must equal phase_region.
         if self.phase_assertion.value != self.property_snapshot.phase_region.value:
             raise ValueError(

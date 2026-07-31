@@ -21,6 +21,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from hexagent.exchangers.shell_tube.tube_side_thermal import (
+    FlowRegime,
+    ThermalBoundaryCondition,
+)
 from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_quantization import (
     field_for,
     quantize_half_even,
@@ -29,10 +33,6 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.nusselt_selector import (
     compute_gnielinski_nusselt,
     select_laminar_correlation,
     select_regime,
-)
-from hexagent.exchangers.shell_tube.tube_side_thermal import (
-    FlowRegime,
-    ThermalBoundaryCondition,
 )
 
 
@@ -54,9 +54,7 @@ def _compute_bulk_velocity(m_dot: Decimal, rho: Decimal, a_total: Decimal) -> De
     return m_dot / (rho * a_total)
 
 
-def _compute_reynolds(
-    rho: Decimal, v: Decimal, d_h: Decimal, mu: Decimal
-) -> Decimal:
+def _compute_reynolds(rho: Decimal, v: Decimal, d_h: Decimal, mu: Decimal) -> Decimal:
     return (rho * v * d_h) / mu
 
 
@@ -84,13 +82,9 @@ def compute_single_phase(
     R6-R7 §7.2.
     """
     # S06 — bulk velocity
-    v = _compute_bulk_velocity(
-        mass_flow_rate_kg_s, density_kg_m3, total_parallel_flow_area_m2
-    )
+    v = _compute_bulk_velocity(mass_flow_rate_kg_s, density_kg_m3, total_parallel_flow_area_m2)
     # S07 — Reynolds
-    re = _compute_reynolds(
-        density_kg_m3, v, hydraulic_diameter_m, dynamic_viscosity_pa_s
-    )
+    re = _compute_reynolds(density_kg_m3, v, hydraulic_diameter_m, dynamic_viscosity_pa_s)
     # S08 — Prandtl
     pr = _compute_prandtl(
         dynamic_viscosity_pa_s, specific_heat_capacity_j_kg_k, thermal_conductivity_w_m_k

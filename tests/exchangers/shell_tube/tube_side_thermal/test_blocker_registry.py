@@ -38,29 +38,30 @@ def test_registry_size_is_14() -> None:
 def test_severity_is_hard_for_every_entry() -> None:
     """T1-R2 22 — All entries have severity 'hard'."""
     for code in TASK026_BLOCKER_REGISTRY:
-        assert TASK026_BLOCKER_SEVERITY[code] == 'hard'
+        assert TASK026_BLOCKER_SEVERITY[code] == "hard"
 
 
 def test_BL_NON_CONVERGENCE_not_emitted() -> None:
     """T1-R2 23 — BL_NON_CONVERGENCE is NOT in the registry."""
-    assert 'BL_NON_CONVERGENCE' not in TASK026_BLOCKER_REGISTRY
-    assert RESERVED_NOT_EMITTED == 'BL_NON_CONVERGENCE'
+    assert "BL_NON_CONVERGENCE" not in TASK026_BLOCKER_REGISTRY
+    assert RESERVED_NOT_EMITTED == "BL_NON_CONVERGENCE"
     # Constructing a BlockerEntry with this code should fail.
     import pytest
+
     with pytest.raises(ValueError):
         BlockerEntry(
-            code='BL_NON_CONVERGENCE',
-            severity='hard',
-            stage='S09',
+            code="BL_NON_CONVERGENCE",
+            severity="hard",
+            stage="S09",
             payload=(),
-            message_template='should not be emitted',
+            message_template="should not be emitted",
         )
 
 
 def test_BL_PARTIAL_RESULT_FORBIDDEN_is_defensive_unreachable() -> None:
     """T1-R2 24 — BL_PARTIAL_RESULT_FORBIDDEN is defensive, not reachable."""
-    assert DEFENSIVE_UNREACHABLE_CODE == 'BL_PARTIAL_RESULT_FORBIDDEN'
-    assert 'BL_PARTIAL_RESULT_FORBIDDEN' in TASK026_DEFENSIVE_BLOCKERS
-    assert 'BL_PARTIAL_RESULT_FORBIDDEN' not in TASK026_REACHABLE_BLOCKERS
+    assert DEFENSIVE_UNREACHABLE_CODE == "BL_PARTIAL_RESULT_FORBIDDEN"
+    assert "BL_PARTIAL_RESULT_FORBIDDEN" in TASK026_DEFENSIVE_BLOCKERS
+    assert "BL_PARTIAL_RESULT_FORBIDDEN" not in TASK026_REACHABLE_BLOCKERS
     assert DEFENSIVE_COUNT == 1
     assert REACHABLE_COUNT == 13

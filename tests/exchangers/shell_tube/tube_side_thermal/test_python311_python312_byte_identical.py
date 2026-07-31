@@ -46,39 +46,44 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_primitives import 
 
 
 def _build_request() -> TubeSideThermalRequest:
-    mu = Decimal('0.001')
-    D_h = Decimal('0.01')
-    k = Decimal('0.5984')
-    A_total = Decimal('0.01')
-    c_p = Decimal('4190.35584')
-    rho = Decimal('499.0020') * mu / (Decimal('0.0500898') * D_h)
-    m_dot = Decimal('0.0500898') * rho * A_total
+    mu = Decimal("0.001")
+    D_h = Decimal("0.01")
+    k = Decimal("0.5984")
+    A_total = Decimal("0.01")
+    c_p = Decimal("4190.35584")
+    rho = Decimal("499.0020") * mu / (Decimal("0.0500898") * D_h)
+    m_dot = Decimal("0.0500898") * rho * A_total
     ps = PropertySnapshot(
         density_kg_m3=rho,
         dynamic_viscosity_pa_s=mu,
         thermal_conductivity_w_m_k=k,
         specific_heat_capacity_j_kg_k=c_p,
-        bulk_temperature_k=Decimal('293.15'),
-        bulk_pressure_pa=Decimal('101325'),
+        bulk_temperature_k=Decimal("293.15"),
+        bulk_pressure_pa=Decimal("101325"),
         phase_region=PhaseRegion.SINGLE_PHASE_LIQUID,
-        property_source_id='CoolProp-6.6',
-        property_source_version='1.0.0',
-        property_snapshot_hash='0' * 64,
+        property_source_id="CoolProp-6.6",
+        property_source_version="1.0.0",
+        property_snapshot_hash="0" * 64,
     )
     h = recompute_property_snapshot_hash(ps)
     ps2 = PropertySnapshot(
-        density_kg_m3=rho, dynamic_viscosity_pa_s=mu,
-        thermal_conductivity_w_m_k=k, specific_heat_capacity_j_kg_k=c_p,
-        bulk_temperature_k=ps.bulk_temperature_k, bulk_pressure_pa=ps.bulk_pressure_pa,
-        phase_region=ps.phase_region, property_source_id=ps.property_source_id,
-        property_source_version=ps.property_source_version, property_snapshot_hash=h,
+        density_kg_m3=rho,
+        dynamic_viscosity_pa_s=mu,
+        thermal_conductivity_w_m_k=k,
+        specific_heat_capacity_j_kg_k=c_p,
+        bulk_temperature_k=ps.bulk_temperature_k,
+        bulk_pressure_pa=ps.bulk_pressure_pa,
+        phase_region=ps.phase_region,
+        property_source_id=ps.property_source_id,
+        property_source_version=ps.property_source_version,
+        property_snapshot_hash=h,
     )
     prov = FrozenProvenance(
-        task_id='TASK-026',
-        design_contract_path='/tmp/TASK-026-DESIGN-CONTRACT-DRAFT-R6-R7.md',
+        task_id="TASK-026",
+        design_contract_path="/tmp/TASK-026-DESIGN-CONTRACT-DRAFT-R6-R7.md",
         implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
         input_evidence_refs=INPUT_EVIDENCE_REFS_V1,
-        upstream_identity_hashes=('a' * 64,),
+        upstream_identity_hashes=("a" * 64,),
     )
     return TubeSideThermalRequest(
         schema_version=SCHEMA_VERSION,
@@ -98,13 +103,13 @@ class Task025ValidResult:
     def __init__(self, A_total: Decimal, D_h: Decimal) -> None:
         self.single_tube_flow_area_m2 = A_total
         self.total_parallel_flow_area_m2 = A_total
-        self.flow_cross_section_wetted_perimeter_m = Decimal('0.0314159265358979')
-        self.total_flow_cross_section_wetted_perimeter_m = Decimal('0.0314159265358979')
+        self.flow_cross_section_wetted_perimeter_m = Decimal("0.0314159265358979")
+        self.total_flow_cross_section_wetted_perimeter_m = Decimal("0.0314159265358979")
         self.hydraulic_diameter_m = D_h
-        self.internal_volume_m3 = Decimal('0.0001')
-        self.internal_heat_transfer_surface_area_m2 = Decimal('0.01')
-        self.result_hash = 'a' * 64
-        self.hydraulic_authority_hash = 'b' * 64
+        self.internal_volume_m3 = Decimal("0.0001")
+        self.internal_heat_transfer_surface_area_m2 = Decimal("0.01")
+        self.result_hash = "a" * 64
+        self.hydraulic_authority_hash = "b" * 64
 
 
 def _canonical_bytes_for_request(req: TubeSideThermalRequest) -> bytes:
@@ -131,10 +136,10 @@ def _canonical_bytes_for_request(req: TubeSideThermalRequest) -> bytes:
 def test_full_compute_pipeline_byte_identical() -> None:
     """T1-R2 37 — Full pipeline produces same result_hash across runs."""
     req = _build_request()
-    upstream = Task025ValidResult(Decimal('0.01'), Decimal('0.01'))
+    upstream = Task025ValidResult(Decimal("0.01"), Decimal("0.01"))
     r1 = compute_tube_side_heat_transfer_coefficient(req, upstream)
     r2 = compute_tube_side_heat_transfer_coefficient(req, upstream)
-    assert hasattr(r1, 'flow_regime') and hasattr(r2, 'flow_regime')
+    assert hasattr(r1, "flow_regime") and hasattr(r2, "flow_regime")
     assert r1.result_hash == r2.result_hash
     assert r1.result_id == r2.result_id
     # Also verify the canonical request bytes are deterministic.
@@ -146,18 +151,21 @@ def test_full_compute_pipeline_byte_identical() -> None:
 def test_decimal_primitive_byte_identical() -> None:
     """T1-R2 38 — Decimal primitive outputs are byte-identical across runs."""
     inputs = [
-        (decimal_ln, Decimal('2')),
-        (decimal_ln, Decimal('10')),
-        (decimal_sqrt, Decimal('2')),
-        (decimal_pow_2_3, Decimal('8')),
-        (decimal_pow_2_3, Decimal('27')),
-        (decimal_pow_2_3, Decimal('0.125')),
+        (decimal_ln, Decimal("2")),
+        (decimal_ln, Decimal("10")),
+        (decimal_sqrt, Decimal("2")),
+        (decimal_pow_2_3, Decimal("8")),
+        (decimal_pow_2_3, Decimal("27")),
+        (decimal_pow_2_3, Decimal("0.125")),
     ]
     for fn, x in inputs:
         a = fn(x)
         b = fn(x)
         assert str(a) == str(b)
-        assert hashlib.sha256(str(a).encode("ascii")).hexdigest() == hashlib.sha256(str(b).encode("ascii")).hexdigest()
+        assert (
+            hashlib.sha256(str(a).encode("ascii")).hexdigest()
+            == hashlib.sha256(str(b).encode("ascii")).hexdigest()
+        )
 
 
 def test_task026_decimal_context_200_python_3_11_probe() -> None:
@@ -168,8 +176,9 @@ def test_task026_decimal_context_200_python_3_11_probe() -> None:
     assert ctx.prec == 200
     # Smoke: ln(2) inside this context produces a 200-digit Decimal.
     import decimal as _decimal
+
     with _decimal.localcontext(ctx):
-        v = Decimal('2').ln()
+        v = Decimal("2").ln()
     assert len(str(v)) >= 200  # at least 200 digits
 
 
@@ -181,6 +190,7 @@ def test_task026_decimal_context_200_python_3_12_probe() -> None:
     assert ctx.prec == 200
     # Smoke: ln(2) inside this context produces a 200-digit Decimal.
     import decimal as _decimal
+
     with _decimal.localcontext(ctx):
-        v = Decimal('2').ln()
+        v = Decimal("2").ln()
     assert len(str(v)) >= 200

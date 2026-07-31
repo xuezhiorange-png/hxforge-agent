@@ -28,8 +28,8 @@ All entries have severity "hard" (R6-R7 §13.4).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final
 from enum import StrEnum
+from typing import Final
 
 # R6-R7 §13.1 — 14-code registry (exact tuple order).
 TASK026_BLOCKER_REGISTRY: tuple[str, ...] = (
@@ -99,9 +99,6 @@ TASK026_BLOCKER_EARLIEST_STAGE: dict[str, str] = {
 TASK026_BLOCKER_SEVERITY: dict[str, str] = {code: "hard" for code in TASK026_BLOCKER_REGISTRY}
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # Frozen hash field tuples (R6-R7 §11.5).
 # These are the SHA-256 input fields for each record type.
@@ -151,29 +148,30 @@ class BlockerEntry:
 
     def __post_init__(self) -> None:
         if self.code not in TASK026_BLOCKER_REGISTRY:
-            raise ValueError(
-                f"code must be one of {TASK026_BLOCKER_REGISTRY!r}; got {self.code!r}"
-            )
+            raise ValueError(f"code must be one of {TASK026_BLOCKER_REGISTRY!r}; got {self.code!r}")
         if self.severity != "hard":
             raise ValueError(f"severity must be 'hard'; got {self.severity!r}")
-        if self.stage not in {s for s, _ in (
-            ("S00", "raw_input_boundary"),
-            ("S01", "task025_envelope_validation"),
-            ("S02", "property_snapshot_schema_validation"),
-            ("S03", "hash_and_authority_validation"),
-            ("S04", "phase_validation"),
-            ("S05", "mass_flow_validation"),
-            ("S06", "bulk_velocity_computation"),
-            ("S07", "reynolds_computation"),
-            ("S08", "prandtl_computation"),
-            ("S09", "applicability_selection"),
-            ("S10", "nusselt_computation"),
-            ("S11", "hi_computation"),
-            ("S12", "quantization"),
-            ("S13", "warnings_and_blockers_finalization"),
-            ("S14", "canonical_serialization"),
-            ("S15", "hash_uuid_provenance"),
-        )}:
+        if self.stage not in {
+            s
+            for s, _ in (
+                ("S00", "raw_input_boundary"),
+                ("S01", "task025_envelope_validation"),
+                ("S02", "property_snapshot_schema_validation"),
+                ("S03", "hash_and_authority_validation"),
+                ("S04", "phase_validation"),
+                ("S05", "mass_flow_validation"),
+                ("S06", "bulk_velocity_computation"),
+                ("S07", "reynolds_computation"),
+                ("S08", "prandtl_computation"),
+                ("S09", "applicability_selection"),
+                ("S10", "nusselt_computation"),
+                ("S11", "hi_computation"),
+                ("S12", "quantization"),
+                ("S13", "warnings_and_blockers_finalization"),
+                ("S14", "canonical_serialization"),
+                ("S15", "hash_uuid_provenance"),
+            )
+        }:
             raise ValueError(f"stage must be a valid S00..S15; got {self.stage!r}")
         if not isinstance(self.payload, tuple):
             raise ValueError("payload must be tuple")

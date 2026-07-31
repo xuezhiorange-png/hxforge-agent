@@ -34,9 +34,18 @@ def test_provenance_shape_and_six_input_evidence_refs() -> None:
     assert len(INPUT_EVIDENCE_REFS_V1) == 6
     assert INPUT_EVIDENCE_REF_COUNT == 6
     # Last 3 are deployment-shape: A2, T1-R2, H1-R1
-    assert INPUT_EVIDENCE_REFS_V1[0] == "e152c803452972989ec7bfe4d5045e0dcd24eff6a6102d40cfc90b46d3b42efa"
-    assert INPUT_EVIDENCE_REFS_V1[1] == "b763b1a4768c596523f51d6dbc1a3d8df04c20f4c28c8007fcc19212c1a1970f"
-    assert INPUT_EVIDENCE_REFS_V1[2] == "f9dbe86b89d3b88a0679adf108aee93468e57344178ebefae54a9e5907656a68"
+    assert (
+        INPUT_EVIDENCE_REFS_V1[0]
+        == "e152c803452972989ec7bfe4d5045e0dcd24eff6a6102d40cfc90b46d3b42efa"
+    )
+    assert (
+        INPUT_EVIDENCE_REFS_V1[1]
+        == "b763b1a4768c596523f51d6dbc1a3d8df04c20f4c28c8007fcc19212c1a1970f"
+    )
+    assert (
+        INPUT_EVIDENCE_REFS_V1[2]
+        == "f9dbe86b89d3b88a0679adf108aee93468e57344178ebefae54a9e5907656a68"
+    )
     # Construct a valid provenance.
     p = FrozenProvenance(
         task_id="TASK-026",

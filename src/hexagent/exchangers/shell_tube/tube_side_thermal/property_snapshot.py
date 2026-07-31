@@ -22,6 +22,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from hexagent.exchangers.shell_tube.tube_side_thermal import (
+    ACCEPTED_PHASE_REGIONS,
+    PhaseRegion,
+)
 from hexagent.exchangers.shell_tube.tube_side_thermal.canonical import (
     KIND_DECIMAL,
     KIND_ENUM,
@@ -30,10 +34,6 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.canonical import (
     decimal_payload,
     enum_payload,
     string_payload,
-)
-from hexagent.exchangers.shell_tube.tube_side_thermal import (
-    ACCEPTED_PHASE_REGIONS,
-    PhaseRegion,
 )
 
 # R6-R7 §3.2 — exactly 10 fields:
@@ -180,8 +180,14 @@ def _field_payload(name: str, snapshot: PropertySnapshot) -> bytes:
 
 def _kind_tag_for(name: str) -> bytes:
     """Return the canonical KIND_* tag for the given field name."""
-    if name in ("density_kg_m3", "dynamic_viscosity_pa_s", "thermal_conductivity_w_m_k",
-                "specific_heat_capacity_j_kg_k", "bulk_temperature_k", "bulk_pressure_pa"):
+    if name in (
+        "density_kg_m3",
+        "dynamic_viscosity_pa_s",
+        "thermal_conductivity_w_m_k",
+        "specific_heat_capacity_j_kg_k",
+        "bulk_temperature_k",
+        "bulk_pressure_pa",
+    ):
         return KIND_DECIMAL
     if name == "phase_region":
         return KIND_ENUM

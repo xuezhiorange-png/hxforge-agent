@@ -22,7 +22,9 @@ R8 implementation. This module orchestrates the full pipeline. The
 
 The public entry points are:
 
-  build_raw_tube_side_request_envelope(raw: object) -> TubeSideThermalRequest | RawBoundaryBlockedResult
+  build_raw_tube_side_request_envelope(
+      raw: object,
+  ) -> TubeSideThermalRequest | RawBoundaryBlockedResult
   compute_tube_side_heat_transfer_coefficient(
       request: TubeSideThermalRequest,
       upstream: Task025ValidResult | Task025BlockedResult,
@@ -45,10 +47,10 @@ upstream, (upstream.blocked_result_hash,) for blocked upstream.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Sequence, cast  # noqa: E402
-
 import uuid
+from collections.abc import Sequence  # noqa: E402
 from decimal import Decimal
+from typing import TYPE_CHECKING, cast
 
 from hexagent.exchangers.shell_tube.tube_side_thermal.blocker_registry import (
     TASK026_BLOCKER_EARLIEST_STAGE,
@@ -84,7 +86,6 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_primitives import 
 if TYPE_CHECKING:
     from typing import Protocol
 
-
     class _Task025ValidResultProtocol(Protocol):
         schema_version: str
         implementation_software_version: str
@@ -112,9 +113,6 @@ if TYPE_CHECKING:
         provenance: object | None
 
 
-from hexagent.exchangers.shell_tube.tube_side_thermal.nusselt_selector import (
-    check_pr_envelope,
-)
 from hexagent.exchangers.shell_tube.tube_side_thermal import (
     ACCEPTED_PHASE_ASSERTIONS,
     ACCEPTED_PHASE_REGIONS,
@@ -123,6 +121,9 @@ from hexagent.exchangers.shell_tube.tube_side_thermal import (
     PhaseAssertion,
     PhaseRegion,
     ThermalBoundaryCondition,
+)
+from hexagent.exchangers.shell_tube.tube_side_thermal.nusselt_selector import (
+    check_pr_envelope,
 )
 from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import (
     PROPERTY_SNAPSHOT_NAMESPACE,
@@ -241,8 +242,9 @@ def _to_phase_region(value: object) -> PhaseRegion:
         return value
     if isinstance(value, str) and value in {p.value for p in ACCEPTED_PHASE_REGIONS}:
         return PhaseRegion(value)
-    raise ValueError(f"phase_region must be one of "
-                     f"{[p.value for p in ACCEPTED_PHASE_REGIONS]}; got {value!r}")
+    raise ValueError(
+        f"phase_region must be one of {[p.value for p in ACCEPTED_PHASE_REGIONS]}; got {value!r}"
+    )
 
 
 def _to_phase_assertion(value: object) -> PhaseAssertion:
@@ -250,8 +252,10 @@ def _to_phase_assertion(value: object) -> PhaseAssertion:
         return value
     if isinstance(value, str) and value in {p.value for p in ACCEPTED_PHASE_ASSERTIONS}:
         return PhaseAssertion(value)
-    raise ValueError(f"phase_assertion must be one of "
-                     f"{[p.value for p in ACCEPTED_PHASE_ASSERTIONS]}; got {value!r}")
+    raise ValueError(
+        f"phase_assertion must be one of "
+        f"{[p.value for p in ACCEPTED_PHASE_ASSERTIONS]}; got {value!r}"
+    )
 
 
 def _to_thermal_boundary(value: object) -> ThermalBoundaryCondition:
@@ -259,8 +263,10 @@ def _to_thermal_boundary(value: object) -> ThermalBoundaryCondition:
         return value
     if isinstance(value, str) and value in {c.value for c in ACCEPTED_THERMAL_BOUNDARY_CONDITIONS}:
         return ThermalBoundaryCondition(value)
-    raise ValueError(f"thermal_boundary_condition must be one of "
-                     f"{[c.value for c in ACCEPTED_THERMAL_BOUNDARY_CONDITIONS]}; got {value!r}")
+    raise ValueError(
+        f"thermal_boundary_condition must be one of "
+        f"{[c.value for c in ACCEPTED_THERMAL_BOUNDARY_CONDITIONS]}; got {value!r}"
+    )
 
 
 def _to_decimal(value: object, field_name: str) -> Decimal:
@@ -270,7 +276,7 @@ def _to_decimal(value: object, field_name: str) -> Decimal:
         try:
             return Decimal(value)
         except Exception as exc:
-            raise ValueError(f"{field_name} cannot parse Decimal: {exc!s}")
+            raise ValueError(f"{field_name} cannot parse Decimal: {exc!s}") from exc
     raise ValueError(f"{field_name} must be Decimal or str; got {type(value).__name__}")
 
 
@@ -282,7 +288,9 @@ def _to_hex_hash(value: object, field_name: str) -> str:
     return value
 
 
-def _new_blocker(code: str, stage: str, payload: tuple[str, ...], message_template: str) -> BlockerEntry:
+def _new_blocker(
+    code: str, stage: str, payload: tuple[str, ...], message_template: str
+) -> BlockerEntry:
     if code not in TASK026_BLOCKER_REGISTRY:
         raise ValueError(f"unknown blocker code: {code!r}")
     # TASK026_BLOCKER_EARLIEST_STAGE is {code: stage}; check the stage is one of the values.
@@ -399,20 +407,30 @@ def build_raw_tube_side_request_envelope(
         # PropertySnapshot only — no semantics yet.
         prop_snapshot = PropertySnapshot(
             density_kg_m3=_to_decimal(snap_dict["density_kg_m3"], "density_kg_m3"),
-            dynamic_viscosity_pa_s=_to_decimal(snap_dict["dynamic_viscosity_pa_s"], "dynamic_viscosity_pa_s"),
-            thermal_conductivity_w_m_k=_to_decimal(snap_dict["thermal_conductivity_w_m_k"], "thermal_conductivity_w_m_k"),
-            specific_heat_capacity_j_kg_k=_to_decimal(snap_dict["specific_heat_capacity_j_kg_k"], "specific_heat_capacity_j_kg_k"),
+            dynamic_viscosity_pa_s=_to_decimal(
+                snap_dict["dynamic_viscosity_pa_s"], "dynamic_viscosity_pa_s"
+            ),
+            thermal_conductivity_w_m_k=_to_decimal(
+                snap_dict["thermal_conductivity_w_m_k"], "thermal_conductivity_w_m_k"
+            ),
+            specific_heat_capacity_j_kg_k=_to_decimal(
+                snap_dict["specific_heat_capacity_j_kg_k"], "specific_heat_capacity_j_kg_k"
+            ),
             bulk_temperature_k=_to_decimal(snap_dict["bulk_temperature_k"], "bulk_temperature_k"),
             bulk_pressure_pa=_to_decimal(snap_dict["bulk_pressure_pa"], "bulk_pressure_pa"),
             phase_region=_to_phase_region(snap_dict["phase_region"]),
             property_source_id=str(snap_dict["property_source_id"]),
             property_source_version=str(snap_dict["property_source_version"]),
-            property_snapshot_hash=_to_hex_hash(snap_dict["property_snapshot_hash"], "property_snapshot_hash"),
+            property_snapshot_hash=_to_hex_hash(
+                snap_dict["property_snapshot_hash"], "property_snapshot_hash"
+            ),
         )
         phase_assertion = _to_phase_assertion(raw["phase_assertion"])
         thermal_boundary = _to_thermal_boundary(raw["thermal_boundary_condition"])
         mass_flow = _to_decimal(raw["mass_flow_rate_kg_s"], "mass_flow_rate_kg_s")
-        property_snapshot_hash = _to_hex_hash(raw["property_snapshot_hash"], "property_snapshot_hash")
+        property_snapshot_hash = _to_hex_hash(
+            raw["property_snapshot_hash"], "property_snapshot_hash"
+        )
 
         # Build a placeholder provenance at S00 (no upstream yet).
         # Runtime provenance is rebuilt at S15.
@@ -590,7 +608,10 @@ def compute_tube_side_heat_transfer_coefficient(
                     "BL_UPSTREAM_BLOCKED",
                     "S01",
                     (upstream_type_name,),
-                    "upstream must be Task025ValidResult or Task025BlockedResult; got {actual_type}",
+                    (
+                        "upstream must be Task025ValidResult or "
+                        "Task025BlockedResult; got {actual_type}"
+                    ),
                 ),
             ),
             warnings=(),
@@ -630,7 +651,10 @@ def _compute_s02_s15(
     # Property authority presence check (R6-R7 §3.2 requires
     # property_source_id and property_source_version; both are
     # non-empty str at construction).
-    if not request.property_snapshot.property_source_id or not request.property_snapshot.property_source_version:
+    if (
+        not request.property_snapshot.property_source_id
+        or not request.property_snapshot.property_source_version
+    ):
         return _blocked_result(
             request=request,
             upstream_geometry_hash=upstream_geometry_hash,
@@ -826,7 +850,9 @@ def _blocked_result(
     actual_upstream_identity = (
         upstream_identity_hash
         if upstream_identity_hash
-        else getattr(upstream, "blocked_result_hash", None) or getattr(upstream, "result_hash", None) or "0" * 64
+        else getattr(upstream, "blocked_result_hash", None)
+        or getattr(upstream, "result_hash", None)
+        or "0" * 64
     )
     request_hash = _compute_request_hash(request)
 
@@ -944,18 +970,20 @@ def _request_field_payload(name: str, request: TubeSideThermalRequest) -> bytes:
 def _property_snapshot_subrecord_bytes(snapshot: PropertySnapshot) -> bytes:
     """R6-R7 §9.7.1 — 10-field sub-record bytes (H1-R1 closure)."""
     fields = []
-    for i, name in enumerate((
-        "density_kg_m3",
-        "dynamic_viscosity_pa_s",
-        "thermal_conductivity_w_m_k",
-        "specific_heat_capacity_j_kg_k",
-        "bulk_temperature_k",
-        "bulk_pressure_pa",
-        "phase_region",
-        "property_source_id",
-        "property_source_version",
-        "property_snapshot_hash",
-    )):
+    for i, name in enumerate(
+        (
+            "density_kg_m3",
+            "dynamic_viscosity_pa_s",
+            "thermal_conductivity_w_m_k",
+            "specific_heat_capacity_j_kg_k",
+            "bulk_temperature_k",
+            "bulk_pressure_pa",
+            "phase_region",
+            "property_source_id",
+            "property_source_version",
+            "property_snapshot_hash",
+        )
+    ):
         kind = PROPERTY_SNAPSHOT_SUBRECORD_KIND_TAGS[i]
         if name == "density_kg_m3":
             payload = decimal_payload(snapshot.density_kg_m3)
@@ -988,9 +1016,17 @@ def _provenance_subrecord_bytes(prov: FrozenProvenance) -> bytes:
     fields = [
         ("task_id", KIND_STRING, string_payload(prov.task_id)),
         ("design_contract_path", KIND_STRING, string_payload(prov.design_contract_path)),
-        ("implementation_software_version", KIND_STRING, string_payload(prov.implementation_software_version)),
+        (
+            "implementation_software_version",
+            KIND_STRING,
+            string_payload(prov.implementation_software_version),
+        ),
         ("input_evidence_refs", KIND_TUPLE, _tuple_payload_of_strings(prov.input_evidence_refs)),
-        ("upstream_identity_hashes", KIND_TUPLE, _tuple_payload_of_strings(prov.upstream_identity_hashes)),
+        (
+            "upstream_identity_hashes",
+            KIND_TUPLE,
+            _tuple_payload_of_strings(prov.upstream_identity_hashes),
+        ),
     ]
     return frame_record("task026.provenance.v1", fields)
 
@@ -1108,8 +1144,14 @@ def _compute_blocked_result_hash(
     for i, name in enumerate(BLOCKED_RESULT_HASH_FIELDS):
         kind = BLOCKED_RESULT_HASH_KIND_TAGS[i]
         payload = _blocked_field_payload(
-            name, request_hash, upstream_geometry_hash, request,
-            raw_req_projection, raw_upstream_projection, blockers, provenance,
+            name,
+            request_hash,
+            upstream_geometry_hash,
+            request,
+            raw_req_projection,
+            raw_upstream_projection,
+            blockers,
+            provenance,
         )
         fields.append((name, kind, payload))
     return composite_hash(BLOCKED_RESULT_HASH_NAMESPACE, fields)

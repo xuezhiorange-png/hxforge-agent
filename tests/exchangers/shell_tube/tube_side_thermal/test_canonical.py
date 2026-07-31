@@ -36,30 +36,30 @@ def test_canonical_key_order_matches_frozen_tuple() -> None:
     assert len(PROPERTY_SNAPSHOT_HASH_FIELDS) == 9
     # Indexed kind tags: 6 decimal + 1 enum + 2 string.
     assert PROPERTY_SNAPSHOT_HASH_KIND_TAGS[0] == KIND_DECIMAL
-    assert PROPERTY_SNAPSHOT_HASH_KIND_TAGS[6] == b'ENUM'
+    assert PROPERTY_SNAPSHOT_HASH_KIND_TAGS[6] == b"ENUM"
     assert PROPERTY_SNAPSHOT_HASH_KIND_TAGS[7] == KIND_STRING
     # Success result hash projection: 21 fields, no self-reference.
-    assert SUCCESS_RESULT_HASH_FIELDS[0] == 'schema_version'
-    assert SUCCESS_RESULT_HASH_FIELDS[-1] == 'provenance'
-    assert 'result_hash' not in SUCCESS_RESULT_HASH_FIELDS
-    assert 'result_id' not in SUCCESS_RESULT_HASH_FIELDS
+    assert SUCCESS_RESULT_HASH_FIELDS[0] == "schema_version"
+    assert SUCCESS_RESULT_HASH_FIELDS[-1] == "provenance"
+    assert "result_hash" not in SUCCESS_RESULT_HASH_FIELDS
+    assert "result_id" not in SUCCESS_RESULT_HASH_FIELDS
     # Blocked result hash projection: 15 fields, no self-reference.
-    assert BLOCKED_RESULT_HASH_FIELDS[0] == 'schema_version'
-    assert BLOCKED_RESULT_HASH_FIELDS[-1] == 'provenance'
-    assert 'result_hash' not in BLOCKED_RESULT_HASH_FIELDS
-    assert 'result_id' not in BLOCKED_RESULT_HASH_FIELDS
+    assert BLOCKED_RESULT_HASH_FIELDS[0] == "schema_version"
+    assert BLOCKED_RESULT_HASH_FIELDS[-1] == "provenance"
+    assert "result_hash" not in BLOCKED_RESULT_HASH_FIELDS
+    assert "result_id" not in BLOCKED_RESULT_HASH_FIELDS
 
 
 def test_decimal_string_form_preserves_sign_and_trailing_zeros() -> None:
     """T1-R2 32 — Decimal payload preserves sign and trailing zeros."""
     # Negative
-    assert decimal_payload(Decimal('-3.14')) == b'-3.14'
+    assert decimal_payload(Decimal("-3.14")) == b"-3.14"
     # Positive
-    assert decimal_payload(Decimal('0.0001')) == b'0.0001'
+    assert decimal_payload(Decimal("0.0001")) == b"0.0001"
     # Integer-like
-    assert decimal_payload(Decimal('10')) == b'10'
+    assert decimal_payload(Decimal("10")) == b"10"
     # Zero
-    assert decimal_payload(Decimal('0')) == b'0'
+    assert decimal_payload(Decimal("0")) == b"0"
 
 
 def test_blocked_envelope_serialization_round_trip() -> None:

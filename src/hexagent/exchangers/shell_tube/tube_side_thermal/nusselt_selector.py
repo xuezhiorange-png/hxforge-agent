@@ -26,14 +26,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from hexagent.exchangers.shell_tube.tube_side_thermal import (
+    FlowRegime,
+    ThermalBoundaryCondition,
+)
 from hexagent.exchangers.shell_tube.tube_side_thermal.decimal_primitives import (
     decimal_ln,
     decimal_pow_2_3,
     decimal_sqrt,
-)
-from hexagent.exchangers.shell_tube.tube_side_thermal import (
-    FlowRegime,
-    ThermalBoundaryCondition,
 )
 
 # R6-R7 §5.2 — LAMINAR constants.
@@ -105,9 +105,7 @@ def select_laminar_correlation(
         return "tube_laminar_cwt", "1.0.0", LAMINAR_CWT_NU
     if thermal_boundary == ThermalBoundaryCondition.CHF:
         return "tube_laminar_chf", "1.0.0", LAMINAR_CHF_NU
-    raise ValueError(
-        f"thermal_boundary must be CWT or CHF; got {thermal_boundary!r}"
-    )
+    raise ValueError(f"thermal_boundary must be CWT or CHF; got {thermal_boundary!r}")
 
 
 def compute_gnielinski_nusselt(
@@ -128,7 +126,7 @@ def compute_gnielinski_nusselt(
     if not isinstance(prandtl, Decimal):
         raise ValueError("prandtl must be Decimal")
     ln_re = decimal_ln(reynolds)
-    f_raw = (GNIELINSKI_CONST_0790 * ln_re - GNIELINSKI_CONST_164)
+    f_raw = GNIELINSKI_CONST_0790 * ln_re - GNIELINSKI_CONST_164
     # Exponent -2 (mandatory). No reciprocal afterwards.
     f = f_raw ** Decimal("-2")
     f8 = f / GNIELINSKI_CONST_8
@@ -148,9 +146,7 @@ def compute_laminar_nusselt(thermal_boundary: ThermalBoundaryCondition) -> Decim
         return LAMINAR_CWT_NU
     if thermal_boundary == ThermalBoundaryCondition.CHF:
         return LAMINAR_CHF_NU
-    raise ValueError(
-        f"thermal_boundary must be CWT or CHF; got {thermal_boundary!r}"
-    )
+    raise ValueError(f"thermal_boundary must be CWT or CHF; got {thermal_boundary!r}")
 
 
 __all__ = [
