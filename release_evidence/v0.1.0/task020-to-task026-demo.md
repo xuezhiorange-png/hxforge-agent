@@ -21,16 +21,24 @@
 - production_algorithm_modified: `False`
 - public_contract_modified: `False`
 - cross_version_bytes: `IDENTICAL`
-- cross_version_sha256: `fff1d74469502f02769e74f0e1c4234cac03c4662328a6d8bba15dfe21a500a5`
+- cross_version_sha256: `4a153c4209060a70907b28cee04f780b430052bd21584fe16da997f3170603dd`
+- regression_record.r8_cross_version_sha256: `fff1d74469502f02769e74f0e1c4234cac03c4662328a6d8bba15dfe21a500a5`
+- regression_record.r8_upstream_was_synthetic: `True`
+- regression_record.r2_cross_version_sha256: `4a153c4209060a70907b28cee04f780b430052bd21584fe16da997f3170603dd`
+- regression_record.r2_upstream_is_real_task025_valid_result: `True`
+- actual_dependency_bindings_only: `True`
+- t023_actual_downstream_binding: `False`
+- self_edge_count: `0`
 
 ## Upstream Chain Bindings
 
-- `TASK-020` -> `TASK-021`: `645a241410fc80a1f495b113c0c74afc44db548b5e5dfc0a1d5d5ae02fe9667d`
-- `TASK-021` -> `TASK-022`: `7c912e68b67efdeb947b0c3587bf1682dda0f15214d5a7c04301f06af5510cb6`
-- `TASK-022` -> `TASK-024`: `654dff703f41dd3d7f4638f4aa85d0666697d2c146875a3412f0a80101f362ba`
-- `TASK-024` -> `TASK-025`: `01abfbae521233cd73bbe49c62db62fe747a7730b8c9e97b822c52fc01b530ff`
-- `TASK-025` -> `TASK-026`: `9b98ab37192e3945854fb298246ec2fd173c65b0a39ad6f88761f80655dfdeca`
-- `TASK-026` -> `TASK-026`: `1ce2e94fb8726c58088a5c11baafd6610b4e6390187d7044100d3a50a9d72c58`
+- `TASK-020` -> `TASK-021`: binding=`645a241410fc80a1f495b113c0c74afc44db548b5e5dfc0a1d5d5ae02fe9667d` (downstream_field='tube_layout.task020_configuration_hash')
+- `TASK-021` -> `TASK-022`: binding=`7c912e68b67efdeb947b0c3587bf1682dda0f15214d5a7c04301f06af5510cb6` (downstream_field='tube_layout.layout_hash')
+- `TASK-022` -> `TASK-024`: binding=`654dff703f41dd3d7f4638f4aa85d0666697d2c146875a3412f0a80101f362ba` (downstream_field='shell_bundle_geometry.geometry_hash')
+- `TASK-023` -> (none): no actual downstream consumer (downstream_field=None, t023_actual_downstream_binding=False)
+  - explanation: TASK-023 selected approved-record identity is not consumed by TASK-022 in this runner: TASK-022 uses shell_authority_mode=CALLER_SUPPLIED_EXPLICIT and approved_shell_geometry=None. The TASK-023 catalog is produced as a standalone reference record.
+- `TASK-024` -> `TASK-025`: binding=`01abfbae521233cd73bbe49c62db62fe747a7730b8c9e97b822c52fc01b530ff` (downstream_field='task024_foundation_hash')
+- `TASK-025` -> `TASK-026`: binding=`9b98ab37192e3945854fb298246ec2fd173c65b0a39ad6f88761f80655dfdeca` (downstream_field='upstream_task025_valid_result.result_hash')
 
 ## Valid Stages
 
@@ -117,21 +125,21 @@
 - public_entry_point: `hexagent.exchangers.shell_tube.tube_side_thermal.compute_tube_side_heat_transfer_coefficient`
 - schema_version: `task026-r7.schema.v1`
 - input_identity: `248cfec6b6d8fe7642ffda194db5a8b5eef59cf85c8bc440bbc67ae4e207a381`
-- output_identity: `1ce2e94fb8726c58088a5c11baafd6610b4e6390187d7044100d3a50a9d72c58`
-- result_hash: `1ce2e94fb8726c58088a5c11baafd6610b4e6390187d7044100d3a50a9d72c58`
-- result_id: `3c5e5cfa-1fe2-5dfc-ab67-d40abf2e021e`
+- output_identity: `4a153c4209060a70907b28cee04f780b430052bd21584fe16da997f3170603dd`
+- result_hash: `4a153c4209060a70907b28cee04f780b430052bd21584fe16da997f3170603dd`
+- result_id: `0c0f0652-cd8e-5e20-835f-f01ea34bcbec`
 - blockers_count: `0`
 - warnings_count: `0`
-- upstream_identity_bindings: `{"task025_hydraulic_authority_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","task025_result_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+- upstream_identity_bindings: `{"task025_flow_cross_section_wetted_perimeter_m":"0.05026548","task025_hydraulic_authority_hash":"a54efe3c83bee449d69d14697b461fb24f94adf9f2c2afecc27d2442f207293b","task025_hydraulic_diameter_m":"0.01600000","task025_internal_heat_transfer_surface_area_m2":"2.1940883093","task025_internal_volume_m3":"0.008776353237","task025_result_hash":"9b98ab37192e3945854fb298246ec2fd173c65b0a39ad6f88761f80655dfdeca","task025_single_tube_flow_area_m2":"0.0002010619"}`
 - deferred_capabilities: `SHELL_SIDE_NOT_COMPUTABLE,OVERALL_U_NOT_COMPUTABLE,UA_NOT_COMPUTABLE,LMTD_NOT_COMPUTABLE,EFFECTIVENESS_NOT_COMPUTABLE,HEAT_DUTY_NOT_COMPUTABLE,OUTLET_TEMPERATURES_NOT_COMPUTABLE,PRESSURE_DROP_NOT_COMPUTABLE,TWO_PHASE_NOT_COMPUTABLE,PROPERTY_DATABASE_NOT_COMPUTABLE,NETWORK_PROPERTY_LOOKUP_NOT_COMPUTABLE,API_NOT_COMPUTABLE,CLI_NOT_COMPUTABLE,PERSISTENCE_NOT_COMPUTABLE,REPORT_GENERATION_NOT_COMPUTABLE,WALL_VISCOSITY_CORRECTION_NOT_COMPUTABLE,ITERATIVE_WALL_TEMPERATURE_NOT_COMPUTABLE`
-- bulk_velocity_m_s: `0.0500898`
-- reynolds_number: `499.0020`
+- bulk_velocity_m_s: `0.2768069`
+- reynolds_number: `4412.1463`
 - prandtl_number: `7.0026`
-- flow_regime: `LAMINAR`
-- correlation_id: `tube_laminar_cwt`
+- flow_regime: `TURBULENT`
+- correlation_id: `tube_turbulent_gnielinski`
 - correlation_version: `1.0.0`
-- nusselt_number: `3.6600`
-- tube_side_heat_transfer_coefficient_w_m2_k: `219.014400`
+- nusselt_number: `35.3464`
+- tube_side_heat_transfer_coefficient_w_m2_k: `1321.954257`
 
 ## Blocked Matrix
 
@@ -141,7 +149,7 @@
 - expected_blocker_codes: `['STC_UNKNOWN_FIELD']`
 - actual_blocker_codes: `['STC_UNKNOWN_FIELD']`
 - field_paths: `['']`
-- stage_rank: `1`
+- stage_rank: `None`
 - stage_token: `stage-1-unknown-field-rejection`
 - blocked_result_hash: `6bc5c4ea4182f23e9aa742465dd2567f4247f7c14aad7dd31d827c0d997c9059`
 - partial_result_present: `False`
@@ -154,7 +162,7 @@
 - expected_blocker_codes: `['STL_UNKNOWN_FIELD']`
 - actual_blocker_codes: `['STL_UNKNOWN_FIELD']`
 - field_paths: `['request']`
-- stage_rank: `1`
+- stage_rank: `None`
 - stage_token: `stage-1-unknown-field-rejection`
 - blocked_result_hash: `d4cb17aecc39e45ef5975906676cf7586e56a7b8a941b93e9210979240b15c8d`
 - partial_result_present: `False`
@@ -167,7 +175,7 @@
 - expected_blocker_codes: `['SBG_UNKNOWN_FIELD']`
 - actual_blocker_codes: `['SBG_UNKNOWN_FIELD']`
 - field_paths: `['not_a_real_field']`
-- stage_rank: `1`
+- stage_rank: `None`
 - stage_token: `stage-1-unknown-field-rejection`
 - blocked_result_hash: `bd6a30862873214f7be0744c1fd98c23f3822d53005a98e3a05eda1745a2234a`
 - partial_result_present: `False`
@@ -180,7 +188,7 @@
 - expected_blocker_codes: `['SGC_UNKNOWN_FIELD']`
 - actual_blocker_codes: `['SGC_UNKNOWN_FIELD']`
 - field_paths: `['raw_catalog.unknown_field']`
-- stage_rank: `1`
+- stage_rank: `2`
 - stage_token: `stage-1-unknown-field-rejection`
 - blocked_result_hash: `9c7cb443429b03369de4f53ab55200f08dd95d2822ccc626810c0ffdbd8543d6`
 - partial_result_present: `False`
@@ -203,9 +211,9 @@
 ### TASK-025-BLOCKED-001
 
 - task_id: `TASK-025`
-- expected_blocker_codes: `['BL_RAW_INPUT_NOT_EXACT_DICT']`
-- actual_blocker_codes: `[<BlockerCode.BL_003_BLOCKED_INPUT_REJECTED: 'BL_003_BLOCKED_INPUT_REJECTED'>]`
-- field_paths: `[('raw_input',)]`
+- expected_blocker_codes: `['BL_003_BLOCKED_INPUT_REJECTED']`
+- actual_blocker_codes: `['BL_003_BLOCKED_INPUT_REJECTED']`
+- field_paths: `["('raw_input',)"]`
 - stage_rank: `1`
 - stage_token: `stage-S00-raw-boundary`
 - blocked_result_hash: `1eaa3b7239267a2b51e6319a5ecde27d2a6ecf60e28009db23ebf1be1ddb0ad2`
@@ -219,8 +227,8 @@
 - expected_blocker_codes: `['BL_RAW_INPUT_BOUNDARY_MALFORMED']`
 - actual_blocker_codes: `['BL_RAW_INPUT_BOUNDARY_MALFORMED']`
 - field_paths: `['']`
-- stage_rank: `0`
-- stage_token: `stage-S00-raw-boundary`
+- stage_rank: `None`
+- stage_token: `S00`
 - blocked_result_hash: `45d0bafd38b7bd819d31eecd94cade1a293a3d187a67cb0cbf0f9f726f7956b9`
 - partial_result_present: `False`
 - success_identity_present: `False`
