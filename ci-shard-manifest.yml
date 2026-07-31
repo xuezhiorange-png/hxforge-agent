@@ -117,6 +117,16 @@ shards:
       - tests/shell_geometry_catalogs/test_models.py
       - tests/shell_geometry_catalogs/test_catalog.py
       - tests/shell_geometry_catalogs/test_architecture.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_blocker_registry.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_canonical.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_decimal_primitives.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_determinism.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_nusselt_selector.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_property_snapshot.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_provenance.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_python311_python312_byte_identical.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_request.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_single_phase.py
     timeout: 300
 
   - name: ci-acceptance
