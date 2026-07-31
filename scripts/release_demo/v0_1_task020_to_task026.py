@@ -1596,25 +1596,25 @@ def _stage_t026_valid(
 ) -> tuple[dict[str, Any], str, str]:
     """Run TASK-026 valid stage with the real TASK-025 upstream.
 
-``upstream_task025_valid_result`` is a live ``Task025ValidResult``
-instance produced by ``_stage_t025_valid`` in this same runner —
-not a synthetic stand-in. Its public fields flow into TASK-026's
-binding map:
+    ``upstream_task025_valid_result`` is a live ``Task025ValidResult``
+    instance produced by ``_stage_t025_valid`` in this same runner —
+    not a synthetic stand-in. Its public fields flow into TASK-026's
+    binding map:
 
-- upstream.result_hash -> task025_result_hash
-- upstream.hydraulic_authority_hash -> task025_hydraulic_authority_hash
-- upstream.single_tube_flow_area_m2 -> task025_single_tube_flow_area_m2
-- upstream.hydraulic_diameter_m -> task025_hydraulic_diameter_m
-- upstream.flow_cross_section_wetted_perimeter_m
-    -> task025_flow_cross_section_wetted_perimeter_m
-- upstream.internal_volume_m3 -> task025_internal_volume_m3
-- upstream.internal_heat_transfer_surface_area_m2
-    -> task025_internal_heat_transfer_surface_area_m2
+    - upstream.result_hash -> task025_result_hash
+    - upstream.hydraulic_authority_hash -> task025_hydraulic_authority_hash
+    - upstream.single_tube_flow_area_m2 -> task025_single_tube_flow_area_m2
+    - upstream.hydraulic_diameter_m -> task025_hydraulic_diameter_m
+    - upstream.flow_cross_section_wetted_perimeter_m
+        -> task025_flow_cross_section_wetted_perimeter_m
+    - upstream.internal_volume_m3 -> task025_internal_volume_m3
+    - upstream.internal_heat_transfer_surface_area_m2
+        -> task025_internal_heat_transfer_surface_area_m2
 
-The chain_bindings DAG entry ``(TASK-025, TASK-026, task025_result_hash)``
-is then enforced in ``build_release_evidence`` so the binding equals
-``valid_case["TASK-025"]["output_identity"]``.
-"""
+    The chain_bindings DAG entry ``(TASK-025, TASK-026, task025_result_hash)``
+    is then enforced in ``build_release_evidence`` so the binding equals
+    ``valid_case["TASK-025"]["output_identity"]``.
+    """
     from hexagent.exchangers.shell_tube.tube_side_thermal import (
         compute_tube_side_heat_transfer_coefficient,
     )
@@ -1913,9 +1913,7 @@ def build_release_evidence() -> dict[str, object]:
     t026_record, _t026_in_id, t026_out_id = _stage_t026_valid(t025_typed_result, upstream_out)
     valid["TASK-026"] = t026_record
     # Defensive invariant: TASK-026 binding must equal TASK-025 output.
-    t026_bindings = cast(
-        "dict[str, str]", valid["TASK-026"]["upstream_identity_bindings"]
-    )
+    t026_bindings = cast("dict[str, str]", valid["TASK-026"]["upstream_identity_bindings"])
     t025_record = valid["TASK-025"]
     assert t026_bindings["task025_result_hash"] == t025_record["output_identity"], (
         t026_bindings["task025_result_hash"],
