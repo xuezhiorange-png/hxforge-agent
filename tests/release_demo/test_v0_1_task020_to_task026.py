@@ -15,19 +15,25 @@ Asserts:
 - Source-level assertion that runner does NOT modify production code
   (snapshot git status before/after).
 - Cross-version SHA of TASK-026 input matches the documented probe SHA
-  on both Python 3.11 and 3.12 (parametrised).
+  on both Python 3.11 and 3.12 (parametrised via uv).
 - TASK-026 consumes the REAL TASK-025 valid result (no synthetic
   stand-in); upstream_identity_bindings values are bound from the live
   Task025ValidResult object.
+- TASK-023 -> TASK-022 is a real downstream binding (R3): the selected
+  approved-record identity is adapted into a real
+  ``ApprovedShellGeometrySnapshot`` and consumed by TASK-022 as its
+  shell authority (shell_authority_mode=APPROVED_CATALOG_SNAPSHOT).
+  TASK-022's ``upstream_identity_bindings`` includes
+  ``task023_record_hash``.
 - chain_bindings entries carry ``downstream_field`` naming the actual
-  downstream input attribute; no self-edge exists; TASK-023 is bound
-  to null with documented explanation when no actual downstream consumer.
+  downstream input attribute; no self-edge exists.
 - Blocked matrix: expected_blocker_codes equals actual_blocker_codes
-  exactly; stage_rank / stage_token are real (or null) values, never
-  a hardcoded 0 placeholder.
-- TASK-023's selected approved-record identity does NOT flow into any
-  TASK-022 downstream field in the current DAG; the binding is null
-  with ``t023_actual_downstream_binding: False``.
+  exactly; expected_field_paths equals actual_field_paths exactly
+  (canonical structured form e.g. ``[["raw_input"]]``); expected_stage_rank
+  equals actual_stage_rank exactly; expected_stage_token equals
+  actual_stage_token exactly.
+- Frozen-artifact byte equality: bytes emitted by the runner match the
+  bytes on disk in release_evidence/v0.1.0/.
 """
 
 from __future__ import annotations
@@ -42,6 +48,11 @@ RUNNER_PATH = REPO_ROOT / "scripts" / "release_demo" / "v0_1_task020_to_task026.
 
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "release_demo"))
 from v0_1_task020_to_task026 import (  # noqa: E402
+    _build_approved_shell_snapshot,
+    _build_sgc_catalog_and_bundle,
+    _build_t020_request,
+    _build_t021_request,
+    _build_t022_request,
     _build_t026_request,
     build_release_evidence,
     render_json_bytes,
@@ -105,7 +116,9 @@ def _run_with_version(python_executable: str) -> str:
     )
     assert proc.returncode == 0, (proc.returncode, proc.stdout, proc.stderr)
     payload = json.loads(proc.stdout)
-    return payload["summary"]["cross_version_sha256"]
+    sha_value = payload["summary"]["cross_version_sha256"]
+    assert isinstance(sha_value, str)
+    return sha_value
 
 
 # ---------------------------------------------------------------------------
@@ -137,9 +150,9 @@ def test_seven_valid_stages_all_pass() -> None:
 def test_chain_binding_each_stage_binds_to_previous() -> None:
     """Verify the explicit chain_bindings list declared in the summary.
 
-    TASK-023 is documented as having no actual downstream consumer in
-    this runner (its binding is null with an explanation). The
-    upstream-bound chain is TASK-020 -> 021 -> 022 -> 024 -> 025 -> 026.
+    R3 DAG: TASK-020 -> TASK-021 -> TASK-022 -> TASK-024 -> TASK-025 -> TASK-026,
+    with TASK-023 -> TASK-022 as a side-binding (TASK-023 supplies the
+    approved shell geometry that TASK-022 consumes).
 
     For TASK-025 -> TASK-026 specifically, the binding value MUST
     equal TASK-025's output_identity (which is the live Task025ValidResult
@@ -153,6 +166,7 @@ def test_chain_binding_each_stage_binds_to_previous() -> None:
     expected = [
         ("TASK-020", "TASK-021"),
         ("TASK-021", "TASK-022"),
+        ("TASK-023", "TASK-022"),
         ("TASK-022", "TASK-024"),
         ("TASK-024", "TASK-025"),
         ("TASK-025", "TASK-026"),
@@ -317,9 +331,9 @@ def test_summary_fields_populated() -> None:
     assert s["cross_version_bytes"] == "IDENTICAL"
     assert s["cross_version_sha256"] == EXPECTED_T026_SHA
     assert s["chain_bindings"]
-    # R2 markers
+    # R3 markers
     assert s["actual_dependency_bindings_only"] is True
-    assert s["t023_actual_downstream_binding"] is False
+    assert s["t023_actual_downstream_binding"] is True
     assert s["self_edge_count"] == 0
     rr = s["regression_record"]
     assert rr["r8_cross_version_sha256"] == R8_REGRESSION_SHA
@@ -429,24 +443,111 @@ def test_no_self_edge_in_chain_bindings() -> None:
     assert evidence["summary"]["self_edge_count"] == 0
 
 
-def test_t023_actual_downstream_binding_is_null_with_explanation() -> None:
-    """TASK-023 selected approved-record identity has no actual downstream
-    consumer in this runner (TASK-022 uses CALLER_SUPPLIED_EXPLICIT
-    shell authority and ignores approved_shell_geometry). The chain
-    binding MUST be null with an explanation string."""
+def test_t023_actual_downstream_binding_is_real_edge() -> None:
+    """R3: TASK-023 → TASK-022 is now a real downstream binding.
+
+    TASK-023's selected approved-record identity is adapted into a real
+    ``ApprovedShellGeometrySnapshot`` and consumed by TASK-022 as its
+    shell authority (shell_authority_mode=APPROVED_CATALOG_SNAPSHOT).
+    The chain binding MUST point to TASK-022 with the actual
+    record_hash; ``t023_actual_downstream_binding`` MUST be True.
+    """
     evidence = build_release_evidence()
     bindings = evidence["summary"]["chain_bindings"]
     t023_entries = [b for b in bindings if b["from"] == "TASK-023"]
     assert len(t023_entries) == 1, f"expected 1 TASK-023 binding, got {len(t023_entries)}"
     t023 = t023_entries[0]
-    assert t023["to"] is None, f"TASK-023 binding.to is not null: {t023!r}"
-    assert t023["binding"] is None, f"TASK-023 binding.binding is not null: {t023!r}"
-    assert t023["downstream_field"] is None, (
-        f"TASK-023 binding.downstream_field is not null: {t023!r}"
+    assert t023["to"] == "TASK-022", f"TASK-023 binding.to is not TASK-022: {t023!r}"
+    assert t023["binding"] == evidence["valid_case"]["TASK-023"]["output_identity"], (
+        f"TASK-023 binding does not equal selected record identity: {t023!r}"
     )
-    assert t023["t023_actual_downstream_binding"] is False
-    assert t023["explanation"], "TASK-023 binding.explanation must be a non-empty string"
-    assert evidence["summary"]["t023_actual_downstream_binding"] is False
+    assert t023["downstream_field"], f"TASK-023 binding.downstream_field is empty: {t023!r}"
+    assert t023["t023_actual_downstream_binding"] is True
+    assert "explanation" not in t023, (
+        "TASK-023 binding MUST NOT carry an explanation (R3 makes it a real binding)"
+    )
+    # Summary-level marker.
+    assert evidence["summary"]["t023_actual_downstream_binding"] is True
+
+
+def test_t022_upstream_includes_task023_record_hash() -> None:
+    """TASK-022's ``upstream_identity_bindings`` MUST include the
+    TASK-023 selected approved-record identity (not a synthetic
+    stand-in, not the legacy "null with explanation" shape). The
+    binding MUST equal ``valid_case[TASK-023]["output_identity"]``.
+    """
+    evidence = build_release_evidence()
+    valid = evidence["valid_case"]
+    t022 = valid["TASK-022"]
+    t023_out_id = valid["TASK-023"]["output_identity"]
+    t022_bindings = t022["upstream_identity_bindings"]
+    assert "task023_record_hash" in t022_bindings, (
+        f"TASK-022 upstream_identity_bindings missing task023_record_hash: {t022_bindings!r}"
+    )
+    assert t022_bindings["task023_record_hash"] == t023_out_id, (
+        t022_bindings["task023_record_hash"],
+        t023_out_id,
+    )
+    # TASK-021 binding is still required.
+    assert "task021_layout_hash" in t022_bindings
+
+
+def test_t022_uses_approved_catalog_snapshot_authority_mode() -> None:
+    """TASK-022 must NOT use ``ShellInsideDiameterAuthorityMode.CALLER_SUPPLIED_EXPLICIT``
+    in the R3 binding (TASK-023 supplies the real shell authority).
+
+    The check inspects the actual validated ``ShellBundleGeometry``
+    result: ``shell_authority_mode`` MUST be
+    ``APPROVED_CATALOG_SNAPSHOT`` and ``approved_shell_geometry`` MUST
+    be a real ``ApprovedShellGeometrySnapshot`` instance (not None).
+    """
+    from hexagent.exchangers.shell_tube import validate_request as t020_validate
+    from hexagent.exchangers.shell_tube.shell_bundle_geometry import (
+        models as _t022_models,
+    )
+    from hexagent.exchangers.shell_tube.shell_bundle_geometry import (
+        validate_request as t022_validate,
+    )
+    from hexagent.exchangers.shell_tube.tube_layout import validate_request as t021_validate
+    from hexagent.shell_geometry_catalogs import parse_shell_geometry_catalog
+
+    t020_res = t020_validate(_build_t020_request())
+    assert t020_res.status.value == "VALID"
+    config = t020_res.configuration
+    t021_payload = _build_t021_request(config)
+    t021_res = t021_validate(
+        t021_payload,
+        software_version="v0.1.0-demo",
+        git_commit="b11a7d46ac6a726c2bbdff85166c78e6753289a0",
+    )
+    assert t021_res.status.value == "VALID"
+    layout = t021_res.layout
+
+    catalog, bundle = _build_sgc_catalog_and_bundle()
+    cat = parse_shell_geometry_catalog(raw_catalog=catalog, evidence_bundle=bundle)
+    selected = cat.records[0]
+    approved = _build_approved_shell_snapshot(selected)
+
+    payload = _build_t022_request(layout, config=config, approved_shell_geometry=approved)
+    res = t022_validate(
+        payload,
+        software_version="v0.1.0-demo",
+        git_commit="b11a7d46ac6a726c2bbdff85166c78e6753289a0",
+    )
+    assert res.status.value == "VALID"
+    geometry = res.geometry
+    assert isinstance(geometry, _t022_models.ShellBundleGeometry), type(geometry).__name__
+    assert geometry.shell_authority_mode is (
+        _t022_models.ShellInsideDiameterAuthorityMode.APPROVED_CATALOG_SNAPSHOT
+    ), geometry.shell_authority_mode
+    assert geometry.approved_shell_geometry is not None, (
+        "TASK-022 geometry.approved_shell_geometry must not be None in R3"
+    )
+    assert geometry.caller_supplied_shell is None, (
+        "TASK-022 geometry.caller_supplied_shell must be None in R3 (catalog authority)"
+    )
+    # The record_hash MUST equal the TASK-023 selected record's record_hash.
+    assert geometry.approved_shell_geometry.record_hash == selected.record_hash
 
 
 def test_chain_bindings_have_downstream_field_for_real_edges() -> None:
@@ -473,6 +574,85 @@ def test_blocked_expected_equals_actual_codes_exactly() -> None:
             f"{entry['case_id']}: expected={entry['expected_blocker_codes']!r}, "
             f"actual={entry['actual_blocker_codes']!r}"
         )
+
+
+def test_blocked_expected_equals_actual_field_paths_exactly() -> None:
+    """For every blocked case, ``expected_field_paths`` MUST equal
+    ``actual_field_paths`` exactly. Field paths are emitted in the
+    canonical structured form: a list of paths where each path is a
+    list of non-empty string segments (e.g. ``[["raw_input"]]``).
+    No stringified tuples (``"('raw_input',)"``), no exception text,
+    no ``repr()``.
+    """
+    evidence = build_release_evidence()
+    for entry in evidence["blocked_matrix"]:
+        efp = entry["expected_field_paths"]
+        afp = entry["actual_field_paths"]
+        assert efp == afp, (
+            f"{entry['case_id']}: expected_field_paths={efp!r}, actual_field_paths={afp!r}"
+        )
+        # Defensive: assert canonical structured form. Each element is
+        # itself a list of strings.
+        assert isinstance(afp, list), (
+            f"{entry['case_id']}: actual_field_paths is not a list: {afp!r}"
+        )
+        for path in afp:
+            assert isinstance(path, list), (
+                f"{entry['case_id']}: each path must be a list, got {path!r}"
+            )
+            for segment in path:
+                assert isinstance(segment, str) and segment, (
+                    f"{entry['case_id']}: path segment not non-empty str: {segment!r}"
+                )
+                # No tuple repr / no exception text leaking in.
+                assert not segment.startswith("("), (
+                    f"{entry['case_id']}: path segment is stringified tuple: {segment!r}"
+                )
+
+
+def test_blocked_expected_equals_actual_stage_rank_exactly() -> None:
+    """For every blocked case, ``expected_stage_rank`` MUST equal
+    ``actual_stage_rank`` exactly. ``stage_rank`` is either a real int
+    from the blocker entry (TASK-024 legitimately has stage_rank=0;
+    TASK-023 has stage_rank=2; TASK-025 has stage_rank=1) or null.
+    No hardcoded placeholders.
+    """
+    evidence = build_release_evidence()
+    for entry in evidence["blocked_matrix"]:
+        esr = entry["expected_stage_rank"]
+        asr = entry["actual_stage_rank"]
+        assert esr == asr, (
+            f"{entry['case_id']}: expected_stage_rank={esr!r}, actual_stage_rank={asr!r}"
+        )
+        assert asr is None or isinstance(asr, int), (
+            f"{entry['case_id']}: actual_stage_rank not None or int: {asr!r}"
+        )
+        # 0 only allowed when the actual blocker carries 0 (TASK-024).
+        if entry["task_id"] != "TASK-024" and asr is not None:
+            assert asr != 0, f"{entry['case_id']}: 0 is only permitted for TASK-024, got {asr!r}"
+
+
+def test_blocked_expected_equals_actual_stage_token_exactly() -> None:
+    """For every blocked case, ``expected_stage_token`` MUST equal
+    ``actual_stage_token`` exactly. ``stage_token`` is either a real
+    blocker stage token (e.g. "S00" from TASK-026; "stage-1-unknown-"
+    "field-rejection" from TASK-020/021/022/023) or null; never an
+    empty string or fake placeholder.
+    """
+    evidence = build_release_evidence()
+    for entry in evidence["blocked_matrix"]:
+        est = entry["expected_stage_token"]
+        ast = entry["actual_stage_token"]
+        assert est == ast, (
+            f"{entry['case_id']}: expected_stage_token={est!r}, actual_stage_token={ast!r}"
+        )
+        assert isinstance(ast, str) and ast, (
+            f"{entry['case_id']}: actual_stage_token not non-empty str: {ast!r}"
+        )
+        if entry["task_id"] == "TASK-026":
+            assert ast == "S00", (
+                f"{entry['case_id']}: TASK-026 stage_token must be 'S00', got {ast!r}"
+            )
 
 
 def test_blocked_stage_rank_and_token_are_real_or_null() -> None:
@@ -518,6 +698,9 @@ def test_t026_blocked_stage_token_uses_blocker_stage_attribute() -> None:
     # And field_paths/stage_token match exactly what the actual blocker
     # entry carries.
     assert t026_blocked["expected_blocker_codes"] == t026_blocked["actual_blocker_codes"]
+    assert t026_blocked["expected_field_paths"] == t026_blocked["actual_field_paths"]
+    assert t026_blocked["expected_stage_rank"] == t026_blocked["actual_stage_rank"]
+    assert t026_blocked["expected_stage_token"] == t026_blocked["actual_stage_token"]
 
 
 def test_regression_record_preserves_r8_sha() -> None:
@@ -540,39 +723,199 @@ def test_regression_record_preserves_r8_sha() -> None:
 
 def test_t026_cross_version_sha_emitted_under_py311_and_py312() -> None:
     """The runner's ``cross_version_sha256`` must match the documented
-    R2 SHA under BOTH Python 3.11 and 3.12. We invoke the runner as
-    a subprocess under each interpreter and compare."""
+    R3 SHA under BOTH Python 3.11 and 3.12. We invoke the runner as
+    a subprocess under each interpreter via ``uv run --locked --isolated
+    --python <version>`` (no hardcoded interpreter absolute paths)."""
     import os
+    import shutil
 
-    py311 = "/usr/bin/python3.11"
-    py312_exe = None
-    for cand in (
-        ".venv/bin/python3",
-        "/root/.local/bin/python3.12",
-        "/usr/bin/python3.12",
-    ):
-        if Path(cand).exists():
-            py312_exe = cand
-            break
-    assert py312_exe, "no Python 3.12 interpreter available"
+    uv_path = shutil.which("uv")
+    assert uv_path, (
+        "uv not on PATH; cannot satisfy R3 cross-version isolation "
+        "(must be available as `uv` for `uv run --locked --isolated`)"
+    )
+
+    py311_json_bytes: bytes | None = None
+    py311_md_bytes: bytes | None = None
+    py312_json_bytes: bytes | None = None
+    py312_md_bytes: bytes | None = None
+    py311_sha: str | None = None
+    py312_sha: str | None = None
+    py311_json_sha: str | None = None
+    py311_md_sha: str | None = None
+    py312_json_sha: str | None = None
+    py312_md_sha: str | None = None
+
     env_overrides = {
         "PYTHONPATH": f"{REPO_ROOT / 'src'}:{REPO_ROOT / 'scripts' / 'release_demo'}",
     }
-    for label, exe in (("3.11", py311), ("3.12", py312_exe)):
-        proc = subprocess.run(
-            [exe, str(RUNNER_PATH), "--format", "json"],
+    for label, py_version in (("3.11", "3.11"), ("3.12", "3.12")):
+        proc_json = subprocess.run(
+            [
+                uv_path,
+                "run",
+                "--locked",
+                "--isolated",
+                "--python",
+                py_version,
+                str(RUNNER_PATH),
+                "--format",
+                "json",
+            ],
             cwd=REPO_ROOT,
             env={**os.environ, **env_overrides},
             capture_output=True,
-            text=True,
             check=False,
         )
-        assert proc.returncode == 0, (label, proc.returncode, proc.stdout, proc.stderr)
+        assert proc_json.returncode == 0, (
+            label,
+            proc_json.returncode,
+            proc_json.stdout,
+            proc_json.stderr,
+        )
+        proc_md = subprocess.run(
+            [
+                uv_path,
+                "run",
+                "--locked",
+                "--isolated",
+                "--python",
+                py_version,
+                str(RUNNER_PATH),
+                "--format",
+                "markdown",
+            ],
+            cwd=REPO_ROOT,
+            env={**os.environ, **env_overrides},
+            capture_output=True,
+            check=False,
+        )
+        assert proc_md.returncode == 0, (
+            label,
+            proc_md.returncode,
+            proc_md.stdout,
+            proc_md.stderr,
+        )
+        json_bytes = proc_json.stdout
+        md_bytes = proc_md.stdout
         import json as _json
 
-        payload = _json.loads(proc.stdout)
+        payload = _json.loads(json_bytes)
         sha = payload["summary"]["cross_version_sha256"]
-        assert sha == EXPECTED_T026_SHA, (
-            f"Python {label} cross-version SHA mismatch: got {sha!r}, "
-            f"expected {EXPECTED_T026_SHA!r}"
-        )
+        import hashlib
+
+        json_sha = hashlib.sha256(json_bytes).hexdigest()
+        md_sha = hashlib.sha256(md_bytes).hexdigest()
+        if label == "3.11":
+            py311_json_bytes = json_bytes
+            py311_md_bytes = md_bytes
+            py311_sha = sha
+            py311_json_sha = json_sha
+            py311_md_sha = md_sha
+        else:
+            py312_json_bytes = json_bytes
+            py312_md_bytes = md_bytes
+            py312_sha = sha
+            py312_json_sha = json_sha
+            py312_md_sha = md_sha
+
+    # Each interpreter's run must produce the documented R3 SHA.
+    assert py311_sha == EXPECTED_T026_SHA, (
+        f"Python 3.11 cross-version SHA mismatch: got {py311_sha!r}, expected {EXPECTED_T026_SHA!r}"
+    )
+    assert py312_sha == EXPECTED_T026_SHA, (
+        f"Python 3.12 cross-version SHA mismatch: got {py312_sha!r}, expected {EXPECTED_T026_SHA!r}"
+    )
+
+    # Cross-version byte identity — JSON and Markdown must be
+    # byte-identical between the two uv-spawned interpreters.
+    assert py311_json_bytes == py312_json_bytes, (
+        f"PY311_JSON_BYTES != PY312_JSON_BYTES: "
+        f"py311_len={len(py311_json_bytes or b'')}, "
+        f"py312_len={len(py312_json_bytes or b'')}"
+    )
+    assert py311_md_bytes == py312_md_bytes, (
+        f"PY311_MARKDOWN_BYTES != PY312_MARKDOWN_BYTES: "
+        f"py311_len={len(py311_md_bytes or b'')}, "
+        f"py312_len={len(py312_md_bytes or b'')}"
+    )
+
+    # Per-file SHA-256 recorded for the JSON and Markdown artifacts.
+    # TASK-026's result_hash MUST be recorded separately (not under the
+    # JSON/Markdown cross-version SHA key).
+    assert py311_json_sha == py312_json_sha
+    assert py311_md_sha == py312_md_sha
+    # Confirm SHA-256 of the file content is non-trivial and matches
+    # the python 3.11 capture.
+    assert py311_json_sha is not None and len(py311_json_sha) == 64
+    assert py311_md_sha is not None and len(py311_md_sha) == 64
+
+
+def test_frozen_json_artifact_matches_generated_bytes() -> None:
+    """The frozen ``release_evidence/v0.1.0/task020-to-task026-demo.json``
+    file MUST be byte-equal to the bytes the runner produces.
+
+    Compares raw bytes, not parsed objects — this is the byte-for-byte
+    contract required by the brief §10 evidence freeze rule.
+    """
+    generated_json = render_json_bytes(build_release_evidence())
+    frozen_json = (
+        REPO_ROOT / "release_evidence" / "v0.1.0" / "task020-to-task026-demo.json"
+    ).read_bytes()
+    assert generated_json == frozen_json, (
+        f"frozen JSON byte mismatch: generated={generated_json!r}, frozen={frozen_json!r}"
+    )
+
+
+def test_frozen_markdown_artifact_matches_generated_bytes() -> None:
+    """The frozen ``release_evidence/v0.1.0/task020-to-task026-demo.md``
+    file MUST be byte-equal to the bytes the runner produces."""
+    generated_markdown = render_markdown_bytes(build_release_evidence())
+    frozen_markdown = (
+        REPO_ROOT / "release_evidence" / "v0.1.0" / "task020-to-task026-demo.md"
+    ).read_bytes()
+    assert generated_markdown == frozen_markdown, (
+        f"frozen Markdown byte mismatch: "
+        f"generated={generated_markdown!r}, frozen={frozen_markdown!r}"
+    )
+
+
+def test_r3_verification_flags_in_summary() -> None:
+    """R3 introduces a set of explicit verification flags on the summary
+    that pin the cross-version isolation, frozen-artifact equality, and
+    TASK-023 -> TASK-022 binding contracts.
+
+    The flags are recorded as a separate ``r3_verification_flags`` dict
+    on ``summary`` and as inline keys where they are reachable by
+    existing test assertions. This test pins the full set.
+    """
+    evidence = build_release_evidence()
+    s = evidence["summary"]
+    expected_inline = {
+        "valid_stage_count": 7,
+        "actual_dependency_bindings_only": True,
+        "t023_actual_downstream_binding": True,
+        "self_edge_count": 0,
+    }
+    for key, value in expected_inline.items():
+        assert s[key] == value, f"summary[{key!r}] = {s[key]!r}, expected {value!r}"
+    # New R3 markers — recorded under a separate namespace so they can
+    # be evolved independently.
+    r3 = s.get("r3_verification_flags", {})
+    assert r3.get("BLOCKED_EXPECTED_ACTUAL_EXACT_EQUAL") is True, (
+        f"BLOCKED_EXPECTED_ACTUAL_EXACT_EQUAL not asserted True: {r3!r}"
+    )
+    assert r3.get("BLOCKED_FIELD_PATH_EXACT_EQUAL") is True, (
+        f"BLOCKED_FIELD_PATH_EXACT_EQUAL not asserted True: {r3!r}"
+    )
+    assert r3.get("BLOCKED_STAGE_EXACT_EQUAL") is True, (
+        f"BLOCKED_STAGE_EXACT_EQUAL not asserted True: {r3!r}"
+    )
+    assert r3.get("TASK026_CONSUMES_ACTUAL_TASK025_RESULT") is True
+    # The cross-version and frozen-artifact byte equality markers are
+    # exercised by the subprocess tests above; here we just pin that the
+    # boolean flags exist and are True.
+    assert r3.get("JSON_CROSS_VERSION_BYTE_IDENTICAL") is True
+    assert r3.get("MARKDOWN_CROSS_VERSION_BYTE_IDENTICAL") is True
+    assert r3.get("FROZEN_JSON_MATCH") is True
+    assert r3.get("FROZEN_MARKDOWN_MATCH") is True
