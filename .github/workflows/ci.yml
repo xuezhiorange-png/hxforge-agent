@@ -247,7 +247,7 @@ jobs:
 
   # ── Merge-ref shard jobs ──────────────────────────────────────────────────
   shard-merge-ref:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.resolve-authority.outputs.merge-sha != ''
     needs: [parse-manifest, resolve-authority]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -574,7 +574,7 @@ jobs:
 
   # ── Global collection: Merge-ref ──────────────────────────────────────────
   collect-global-merge-ref:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.resolve-authority.outputs.merge-sha != ''
     needs: [resolve-authority]
     runs-on: ubuntu-latest
     timeout-minutes: 15
