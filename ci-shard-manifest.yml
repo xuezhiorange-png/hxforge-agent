@@ -84,6 +84,7 @@ shards:
       - tests/exchangers/shell_tube/tube_side/test_hydraulic_participation_authority.py
       - tests/exchangers/shell_tube/tube_side/test_blocked_result_from_raw_invalid.py
       - tests/exchangers/shell_tube/tube_side/test_software_version_provenance.py
+      - tests/exchangers/shell_tube/tube_side/test_task027_friction.py
       - tests/exchangers/shell_tube/tube_layout/test_models.py
       - tests/exchangers/shell_tube/tube_layout/test_schema.py
       - tests/exchangers/shell_tube/tube_layout/test_authority.py

@@ -5,27 +5,22 @@
 
 from __future__ import annotations
 
-import math
-import uuid
 from decimal import Decimal
 
 import pytest
 
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
-    AbsoluteRoughnessAuthority,
-    AssertionState,
-    BlockerCode,
-    FlowDirectionAssertion,
-    FrictionFactorConvention,
-    PhaseType,
-    RheologyType,
-    RoughnessMode,
-    SmoothRoughnessAuthority,
-    TurbulentSelectionContract,
-    IMPLEMENTATION_SOFTWARE_VERSION,
-    LAMINAR_UPPER_RE,
-    REQUEST_HASH_NAMESPACE,
+    BLOCKER_REGISTRY_COUNT,
+    DEFAULT_SELECTION_CONTRACT,
+    FRICTION_FACTOR_QUANTUM,
+    KIND_DECIMAL,
+    KIND_ENUM,
+    KIND_STRING,
+    KIND_TUPLE,
+    LENGTH_QUANTUM_M,
+    PRESSURE_DROP_QUANTUM,
     REQUEST_FIELD_COUNT,
+    RESULT_ID_NAMESPACE,
     ROUGHNESS_SCHEMA_VERSION,
     SELECTION_CONTRACT_VERSION,
     TASK027_BLOCKED_RESULT_FIELD_COUNT,
@@ -36,16 +31,15 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     TASK027_REQUEST_SCHEMA_VERSION,
     TASK027_SUCCESS_RESULT_FIELD_COUNT,
     TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
-    BLOCKER_REGISTRY_COUNT,
     UNIQUE_BLOCKER_CODE_COUNT,
     UNIQUE_ORDERING_KEY_COUNT,
-    TURBULENT_LOWER_RE,
-    TURBULENT_UPPER_RE,
-    LENGTH_QUANTUM_M,
-    FRICTION_FACTOR_QUANTUM,
-    PRESSURE_DROP_QUANTUM,
-    RESULT_ID_NAMESPACE,
-    RESULT_ID_NAME_PREFIX,
+    AbsoluteRoughnessAuthority,
+    BlockerCode,
+    FrictionFactorConvention,
+    RoughnessMode,
+    SmoothRoughnessAuthority,
+    classify_reynolds,
+    collapse_blockers,
     compute_colebrook_white,
     compute_laminar_friction_factor,
     compute_pressure_drop,
@@ -53,8 +47,6 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     compute_request_hash,
     compute_result_hash,
     compute_selection_contract_hash,
-    classify_reynolds,
-    collapse_blockers,
     derive_result_id,
     emit_blocker,
     frame_record,
@@ -65,16 +57,10 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     sha256_hex,
     validate_applicability,
     validate_raw_boundary,
-    validate_reynolds,
     validate_relative_roughness,
+    validate_reynolds,
     validate_roughness_authority,
-    KIND_STRING,
-    KIND_DECIMAL,
-    KIND_ENUM,
-    KIND_TUPLE,
-    DEFAULT_SELECTION_CONTRACT,
 )
-
 
 # ===========================================================================
 # §19.1 — Unit tests (friction computation)
@@ -441,10 +427,16 @@ class TestT027Python311312Parity:
         vectors = [
             ("laminar", lambda: compute_laminar_friction_factor(Decimal("1000"))),
             ("turbulent", lambda: compute_colebrook_white(Decimal("10000"), Decimal("0"))),
-            ("pressure", lambda: compute_pressure_drop(
-                Decimal("0.032"), Decimal("3.0"), Decimal("0.025"),
-                Decimal("998.2"), Decimal("1.0"),
-            )),
+            (
+                "pressure",
+                lambda: compute_pressure_drop(
+                    Decimal("0.032"),
+                    Decimal("3.0"),
+                    Decimal("0.025"),
+                    Decimal("998.2"),
+                    Decimal("1.0"),
+                ),
+            ),
         ]
         for name, compute_fn in vectors:
             r1 = compute_fn()
@@ -1008,7 +1000,9 @@ class TestSelectionContract:
     def test_default_selection_contract(self) -> None:
         assert DEFAULT_SELECTION_CONTRACT.selection_contract_version == SELECTION_CONTRACT_VERSION
         assert DEFAULT_SELECTION_CONTRACT.selected_correlation_id == "COLEBROOK_WHITE_1939"
-        assert DEFAULT_SELECTION_CONTRACT.friction_factor_convention == FrictionFactorConvention.DARCY
+        assert (
+            DEFAULT_SELECTION_CONTRACT.friction_factor_convention == FrictionFactorConvention.DARCY
+        )
 
     def test_selection_contract_hash_deterministic(self) -> None:
         h1 = compute_selection_contract_hash(DEFAULT_SELECTION_CONTRACT)
@@ -1105,13 +1099,13 @@ class TestDecimalContext:
     """§13 — Decimal context and quantization tests."""
 
     def test_friction_factor_quantum(self) -> None:
-        assert FRICTION_FACTOR_QUANTUM == Decimal("0.00000001")
+        assert Decimal("0.00000001") == FRICTION_FACTOR_QUANTUM
 
     def test_pressure_drop_quantum(self) -> None:
-        assert PRESSURE_DROP_QUANTUM == Decimal("0.001")
+        assert Decimal("0.001") == PRESSURE_DROP_QUANTUM
 
     def test_length_quantum(self) -> None:
-        assert LENGTH_QUANTUM_M == Decimal("0.00000001")
+        assert Decimal("0.00000001") == LENGTH_QUANTUM_M
 
 
 # ===========================================================================
@@ -1166,18 +1160,25 @@ class TestRoughnessAuthorityHashReplay:
         )
         # Compute the actual hash
         computed_hash = sha256_hex(
-            frame_record(ROUGHNESS_SCHEMA_VERSION, [
-                ("schema_version", KIND_STRING, auth.schema_version.encode("utf-8")),
-                ("authority_id", KIND_STRING, auth.authority_id.encode("utf-8")),
-                ("roughness_mode", KIND_ENUM, auth.roughness_mode.value.encode("ascii")),
-                ("absolute_roughness_m", KIND_DECIMAL, str(auth.absolute_roughness_m).encode("utf-8")),
-                ("source_type", KIND_STRING, auth.source_type.encode("utf-8")),
-                ("source_id", KIND_STRING, auth.source_id.encode("utf-8")),
-                ("source_version", KIND_STRING, auth.source_version.encode("utf-8")),
-                ("source_location", KIND_STRING, auth.source_location.encode("utf-8")),
-                ("permission_status", KIND_STRING, auth.permission_status.encode("utf-8")),
-                ("evidence_refs", KIND_TUPLE, _encode_tuple(auth.evidence_refs)),
-            ])
+            frame_record(
+                ROUGHNESS_SCHEMA_VERSION,
+                [
+                    ("schema_version", KIND_STRING, auth.schema_version.encode("utf-8")),
+                    ("authority_id", KIND_STRING, auth.authority_id.encode("utf-8")),
+                    ("roughness_mode", KIND_ENUM, auth.roughness_mode.value.encode("ascii")),
+                    (
+                        "absolute_roughness_m",
+                        KIND_DECIMAL,
+                        str(auth.absolute_roughness_m).encode("utf-8"),
+                    ),
+                    ("source_type", KIND_STRING, auth.source_type.encode("utf-8")),
+                    ("source_id", KIND_STRING, auth.source_id.encode("utf-8")),
+                    ("source_version", KIND_STRING, auth.source_version.encode("utf-8")),
+                    ("source_location", KIND_STRING, auth.source_location.encode("utf-8")),
+                    ("permission_status", KIND_STRING, auth.permission_status.encode("utf-8")),
+                    ("evidence_refs", KIND_TUPLE, _encode_tuple(auth.evidence_refs)),
+                ],
+            )
         )
         assert len(computed_hash) == 64
 
@@ -1195,17 +1196,20 @@ class TestRoughnessAuthorityHashReplay:
             authority_hash="placeholder",
         )
         computed_hash = sha256_hex(
-            frame_record(ROUGHNESS_SCHEMA_VERSION, [
-                ("schema_version", KIND_STRING, auth.schema_version.encode("utf-8")),
-                ("authority_id", KIND_STRING, auth.authority_id.encode("utf-8")),
-                ("roughness_mode", KIND_ENUM, auth.roughness_mode.value.encode("ascii")),
-                ("source_type", KIND_STRING, auth.source_type.encode("utf-8")),
-                ("source_id", KIND_STRING, auth.source_id.encode("utf-8")),
-                ("source_version", KIND_STRING, auth.source_version.encode("utf-8")),
-                ("source_location", KIND_STRING, auth.source_location.encode("utf-8")),
-                ("permission_status", KIND_STRING, auth.permission_status.encode("utf-8")),
-                ("evidence_refs", KIND_TUPLE, _encode_tuple(auth.evidence_refs)),
-            ])
+            frame_record(
+                ROUGHNESS_SCHEMA_VERSION,
+                [
+                    ("schema_version", KIND_STRING, auth.schema_version.encode("utf-8")),
+                    ("authority_id", KIND_STRING, auth.authority_id.encode("utf-8")),
+                    ("roughness_mode", KIND_ENUM, auth.roughness_mode.value.encode("ascii")),
+                    ("source_type", KIND_STRING, auth.source_type.encode("utf-8")),
+                    ("source_id", KIND_STRING, auth.source_id.encode("utf-8")),
+                    ("source_version", KIND_STRING, auth.source_version.encode("utf-8")),
+                    ("source_location", KIND_STRING, auth.source_location.encode("utf-8")),
+                    ("permission_status", KIND_STRING, auth.permission_status.encode("utf-8")),
+                    ("evidence_refs", KIND_TUPLE, _encode_tuple(auth.evidence_refs)),
+                ],
+            )
         )
         assert len(computed_hash) == 64
 

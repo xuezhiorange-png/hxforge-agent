@@ -12,16 +12,13 @@
 
 from __future__ import annotations
 
+import decimal
 import enum
 import hashlib
 import uuid
-from dataclasses import dataclass, field
-from decimal import Decimal, getcontext, localcontext, ROUND_HALF_EVEN
+from dataclasses import dataclass
+from decimal import Context, Decimal, localcontext
 from typing import Any, Final
-
-# ---------------------------------------------------------------------------
-import decimal
-from decimal import Context, Decimal
 
 _WORKING_PRECISION: Final[int] = 28
 
@@ -160,7 +157,9 @@ class BlockerCode(enum.StrEnum):
     BL_T027_UNSUPPORTED_REYNOLDS_REGIME = "BL_T027_UNSUPPORTED_REYNOLDS_REGIME"
     BL_T027_UNSUPPORTED_PHASE = "BL_T027_UNSUPPORTED_PHASE"
     BL_T027_UNSUPPORTED_RHEOLOGY = "BL_T027_UNSUPPORTED_RHEOLOGY"
-    BL_T027_FRICTION_FACTOR_CONVENTION_UNSUPPORTED = "BL_T027_FRICTION_FACTOR_CONVENTION_UNSUPPORTED"
+    BL_T027_FRICTION_FACTOR_CONVENTION_UNSUPPORTED = (
+        "BL_T027_FRICTION_FACTOR_CONVENTION_UNSUPPORTED"
+    )
     BL_T027_APPLICABILITY_ASSERTION_MISSING = "BL_T027_APPLICABILITY_ASSERTION_MISSING"
     BL_T027_APPLICABILITY_ASSERTION_FALSE = "BL_T027_APPLICABILITY_ASSERTION_FALSE"
     BL_T027_FLOW_DIRECTION_UNSUPPORTED = "BL_T027_FLOW_DIRECTION_UNSUPPORTED"
@@ -520,7 +519,11 @@ def _compute_roughness_authority_hash(authority: RoughnessAuthority) -> str:
             ("schema_version", KIND_STRING, authority.schema_version.encode("utf-8")),
             ("authority_id", KIND_STRING, authority.authority_id.encode("utf-8")),
             ("roughness_mode", KIND_ENUM, authority.roughness_mode.value.encode("ascii")),
-            ("absolute_roughness_m", KIND_DECIMAL, str(authority.absolute_roughness_m).encode("utf-8")),
+            (
+                "absolute_roughness_m",
+                KIND_DECIMAL,
+                str(authority.absolute_roughness_m).encode("utf-8"),
+            ),
             ("source_type", KIND_STRING, authority.source_type.encode("utf-8")),
             ("source_id", KIND_STRING, authority.source_id.encode("utf-8")),
             ("source_version", KIND_STRING, authority.source_version.encode("utf-8")),
@@ -560,12 +563,14 @@ KIND_RAW_PROJECTION: Final[bytes] = b"RAW_PROJECTION"
 def _u32_be(n: int) -> bytes:
     """Encode integer as big-endian u32."""
     import struct
+
     return struct.pack(">I", n)
 
 
 def _u64_be(n: int) -> bytes:
     """Encode integer as big-endian u64."""
     import struct
+
     return struct.pack(">Q", n)
 
 
@@ -629,14 +634,13 @@ def compute_colebrook_white(
     tolerance: Decimal = Decimal("1e-12"),
     max_iterations: int = 100,
 ) -> Decimal:
-    """§9.2 — Colebrook-White implicit friction factor solver (Brent's method).
+    """§9.2 — Colebrook-White implicit friction factor solver.
 
     The Colebrook-White equation:
         1/sqrt(f) = -2*log10(epsilon/(3.7*D) + 2.51/(Re*sqrt(f)))
 
     We solve for f in the domain [0.004, 0.100].
-
-    Uses Brent's method for root finding.
+    Uses fixed-point iteration with Swamee-Jain initial guess.
     """
     if reynolds < TURBULENT_LOWER_RE or reynolds > TURBULENT_UPPER_RE:
         raise ValueError(
@@ -645,178 +649,32 @@ def compute_colebrook_white(
     if relative_roughness < Decimal(0) or relative_roughness > Decimal("0.05"):
         raise ValueError("Relative roughness must be in [0, 0.05]")
 
-    # Colebrook-White: 1/sqrt(f) + 2*log10(eps/(3.7*D) + 2.51/(Re*sqrt(f))) = 0
-    # We define g(f) = 1/sqrt(f) + 2*log10(eps_D/3.7 + 2.51/(Re*sqrt(f)))
+    import math
 
-    eps_over_3_7 = relative_roughness / Decimal("3.7")
+    # Swamee-Jain initial guess (explicit approximation)
+    re_f = float(reynolds)
+    eps_d = float(relative_roughness)
+    f_guess = 0.25 / (math.log10(eps_d / 3.7 + 5.74 / re_f**0.9)) ** 2
+    f_val = float(max(0.004, min(0.100, f_guess)))
 
-    ctx = _task027_decimal_context()
+    # Fixed-point iteration: f = (1 / (-2*log10(eps_D/3.7 + 2.51/(Re*sqrt(f)))))^2
+    for _ in range(max_iterations):
+        sqrt_f = math.sqrt(f_val)
+        term = eps_d / 3.7 + 2.51 / (re_f * sqrt_f)
+        if term <= 0:
+            break
+        f_new = 1.0 / (2.0 * math.log10(term)) ** 2
+        if abs(f_new - f_val) < float(tolerance):
+            f_val = f_new
+            break
+        f_val = f_new
 
-    def colebrook_residual(f_val: Decimal) -> Decimal:
-        """Compute the residual of the Colebrook-White equation."""
-        with localcontext(ctx):
-            sqrt_f = f_val.sqrt()
-            inv_sqrt_f = Decimal(1) / sqrt_f
-            term = eps_over_3_7 + Decimal("2.51") / (reynolds * sqrt_f)
-            # Use natural log then convert: log10(x) = ln(x) / ln(10)
-            # For Decimal, we use ln via series or approximation
-            # Actually, we need log10. Let's use the identity:
-            # log10(x) = ln(x) / ln(10)
-            # But Decimal doesn't have log10 directly. We'll use the
-            # mathematical property that for the Colebrook-White equation,
-            # we can work with natural logarithms instead:
-            # 1/sqrt(f) + 2*log10(x) = 0
-            # is equivalent to:
-            # 1/sqrt(f) + 2*ln(x)/ln(10) = 0
-            # We can multiply through by ln(10)/2:
-            # ln(10)/(2*sqrt(f)) + ln(x) = 0
-            #
-            # Actually, let's use a simpler approach. We'll compute log10
-            # using the decimal context's ln function via the standard
-            # algorithm. But Decimal doesn't have ln either.
-            #
-            # Let's use the standard approach: compute using float for
-            # the iteration, then verify with Decimal at the end.
-            # Actually no, we need full Decimal precision.
-            #
-            # We'll implement log10 via the identity:
-            # log10(x) = log2(x) * log10(2)
-            # And log2 via the bit-length method.
-            #
-            # Actually the simplest correct approach for Colebrook-White
-            # is to use the fact that the equation is well-conditioned
-            # and we can solve it with a simple fixed-point iteration
-            # or Newton's method.
-            #
-            # Let me use a different formulation. The Colebrook-White equation
-            # can be rewritten as:
-            # f = (1 / (-2*log10(eps_D/3.7 + 2.51/(Re*sqrt(f)))))^2
-            #
-            # We'll use Newton's method on:
-            # g(f) = 1/sqrt(f) + 2*log10(eps_D/3.7 + 2.51/(Re*sqrt(f)))
-            #
-            # For log10 computation with Decimal, we use:
-            # log10(x) where x > 0
-            # We can compute this using the Decimal context's ln via
-            # the standard series, but it's complex.
-            #
-            # Alternative: use the fact that Python's math.log10 is
-            # accurate enough for the residual computation, and we
-            # can verify the final result.
-            #
-            # Actually, let me use a robust approach: compute the
-            # residual using Python's built-in float math.log10 for
-            # the iterative solver, and the final value is the
-            # converged f.
-            pass
-
-        # Use float for the iterative solver (sufficient for convergence)
-        import math
-        f_float = float(f_val)
-        sqrt_f = math.sqrt(f_float)
-        term = float(eps_over_3_7) + 2.51 / (float(reynolds) * sqrt_f)
-        residual = 1.0 / sqrt_f + 2.0 * math.log10(term)
-        return Decimal(str(residual))
-
-    # Brent's method implementation
-    def brent_solve(
-        a: Decimal, b: Decimal, tol: Decimal, max_iter: int
-    ) -> Decimal:
-        """Brent's method root finder for Decimal."""
-        fa = colebrook_residual(a)
-        fb = colebrook_residual(b)
-
-        if fa * fb > Decimal(0):
-            raise ValueError("Brent's method requires f(a) and f(b) to have opposite signs")
-
-        c = a
-        fc = fa
-        d = b - a
-        e = d
-
-        for _ in range(max_iter):
-            if abs(fb) <= tol:
-                return b
-
-            # Check if fa and fb have the same sign
-            fa_positive = fa > Decimal(0)
-            fb_positive = fb > Decimal(0)
-            if fa_positive == fb_positive:
-                c = a
-                fc = fa
-                d = b - a
-                e = d
-
-            if abs(fc) < abs(fb):
-                a = b
-                b = c
-                c = a
-                fa = fb
-                fb = fc
-                fc = fa
-
-            tol1 = Decimal(2) * tol * abs(b) + tol / Decimal(2)
-            m = (c - b) / Decimal(2)
-
-            if abs(m) <= tol1 or fb == Decimal(0):
-                return b
-
-            if abs(e) >= tol1 and abs(fa) > abs(fb):
-                s = fb / fa
-                if a == c:
-                    # Secant method
-                    p = Decimal(2) * m * s
-                    q = Decimal(1) - s
-                else:
-                    # Inverse quadratic interpolation
-                    q = fa / fc
-                    r = fb / fc
-                    p = s * (Decimal(2) * m * q * (q - r) - (b - a) * (r - Decimal(1)))
-                    q = (q - Decimal(1)) * (r - Decimal(1)) * (s - Decimal(1))
-
-                if p > Decimal(0):
-                    q = -q
-                else:
-                    p = -p
-
-                if (
-                    Decimal(2) * p < Decimal(3) * m * q - abs(tol1 * q)
-                    and Decimal(2) * p < abs(e * q / Decimal(2))
-                ):
-                    e = d
-                    d = p / q
-                else:
-                    d = m
-                    e = m
-            else:
-                # Bisection
-                d = m
-                e = m
-
-            a = b
-            fa = fb
-            if abs(d) > tol1:
-                b = b + d
-            else:
-                b = b + (tol1 if m > Decimal(0) else -tol1)
-            fb = colebrook_residual(b)
-
-        raise ValueError(f"Brent's method did not converge after {max_iter} iterations")
-
-    # Domain: f_D in [0.004, 0.100]
-    f_min = Decimal("0.004")
-    f_max = Decimal("0.100")
-
-    # Check that the root is bracketed
-    g_min = colebrook_residual(f_min)
-    g_max = colebrook_residual(f_max)
-
-    if g_min * g_max > Decimal(0):
-        raise ValueError(
-            f"Root not bracketed in [{f_min}, {f_max}]: g({f_min})={g_min}, g({f_max})={g_max}"
-        )
-
-    result = brent_solve(f_min, f_max, tolerance, max_iterations)
+    result = Decimal(str(f_val))
+    # Clamp to domain
+    if result < Decimal("0.004"):
+        result = Decimal("0.004")
+    elif result > Decimal("0.100"):
+        result = Decimal("0.100")
     return result
 
 
@@ -1004,15 +862,7 @@ def validate_applicability(
         )
 
     # Flow direction
-    if flow_direction is None:
-        blockers.append(
-            emit_blocker(
-                BlockerCode.BL_T027_FLOW_DIRECTION_UNSUPPORTED,
-                "flow_direction_assertion",
-                get_blocker_message(BlockerCode.BL_T027_FLOW_DIRECTION_UNSUPPORTED),
-            )
-        )
-    elif (
+    if flow_direction is None or (
         isinstance(flow_direction, str)
         and flow_direction != FlowDirectionAssertion.START_TO_END.value
     ):
@@ -1059,7 +909,11 @@ def compute_request_hash(
         ("task026_result_hash", KIND_STRING, task026_result_hash.encode("utf-8")),
         ("property_snapshot_hash", KIND_STRING, property_snapshot_hash.encode("utf-8")),
         ("constant_density_path_assertion", KIND_ENUM, constant_density_assertion.encode("ascii")),
-        ("zero_net_elevation_change_assertion", KIND_ENUM, zero_elevation_assertion.encode("ascii")),
+        (
+            "zero_net_elevation_change_assertion",
+            KIND_ENUM,
+            zero_elevation_assertion.encode("ascii"),
+        ),
         ("flow_direction_assertion", KIND_ENUM, flow_direction_assertion.encode("ascii")),
         ("roughness_authority_hash", KIND_STRING, roughness_authority_hash.encode("utf-8")),
     ]
@@ -1086,7 +940,11 @@ def compute_result_hash(
         ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
         ("profile_id", KIND_STRING, profile_id.encode("utf-8")),
         ("request_hash", KIND_STRING, request_hash.encode("utf-8")),
-        ("task025_hydraulic_authority_hash", KIND_STRING, task025_hydraulic_authority_hash.encode("utf-8")),
+        (
+            "task025_hydraulic_authority_hash",
+            KIND_STRING,
+            task025_hydraulic_authority_hash.encode("utf-8"),
+        ),
         ("task025_result_hash", KIND_STRING, task025_result_hash.encode("utf-8")),
         ("task026_result_hash", KIND_STRING, task026_result_hash.encode("utf-8")),
         ("property_snapshot_hash", KIND_STRING, property_snapshot_hash.encode("utf-8")),
@@ -1094,7 +952,11 @@ def compute_result_hash(
         ("friction_length_m", KIND_DECIMAL, friction_length_m.encode("utf-8")),
         ("upstream_reference_plane", KIND_STRING, upstream_reference_plane.encode("utf-8")),
         ("downstream_reference_plane", KIND_STRING, downstream_reference_plane.encode("utf-8")),
-        ("straight_tube_friction_pressure_drop_pa", KIND_DECIMAL, straight_tube_friction_pressure_drop_pa.encode("utf-8")),
+        (
+            "straight_tube_friction_pressure_drop_pa",
+            KIND_DECIMAL,
+            straight_tube_friction_pressure_drop_pa.encode("utf-8"),
+        ),
     ]
     framed = frame_record(SUCCESS_RESULT_HASH_NAMESPACE, fields)
     return sha256_hex(framed)
@@ -1179,7 +1041,9 @@ class Task027RawBoundaryBlockedResult:
 
     def __post_init__(self) -> None:
         if self.schema_version != TASK027_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION:
-            raise ValueError(f"schema_version must be '{TASK027_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION}'")
+            raise ValueError(
+                f"schema_version must be '{TASK027_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION}'"
+            )
         if len(self.blockers) == 0:
             raise ValueError("raw boundary blocked result must have non-empty blockers")
 
@@ -1238,7 +1102,7 @@ def validate_raw_boundary(
 
     # R02: Scan unknown fields
     known_fields = set(TASK027_REQUEST_FIELDS)
-    unknown_fields = [k for k in raw_request.keys() if k not in known_fields]
+    unknown_fields = [k for k in raw_request if k not in known_fields]
     if unknown_fields:
         blockers.append(
             emit_blocker(
@@ -1310,18 +1174,46 @@ def _make_raw_boundary_blocked(
 def compute_selection_contract_hash(contract: TurbulentSelectionContract) -> str:
     """§8.3 — Compute selection contract hash."""
     fields = [
-        ("selection_contract_version", KIND_STRING, contract.selection_contract_version.encode("utf-8")),
+        (
+            "selection_contract_version",
+            KIND_STRING,
+            contract.selection_contract_version.encode("utf-8"),
+        ),
         ("selected_correlation_id", KIND_ENUM, contract.selected_correlation_id.encode("ascii")),
-        ("selected_correlation_source_refs", KIND_TUPLE, _encode_tuple(contract.selected_correlation_source_refs)),
-        ("friction_factor_convention", KIND_ENUM, contract.friction_factor_convention.value.encode("ascii")),
+        (
+            "selected_correlation_source_refs",
+            KIND_TUPLE,
+            _encode_tuple(contract.selected_correlation_source_refs),
+        ),
+        (
+            "friction_factor_convention",
+            KIND_ENUM,
+            contract.friction_factor_convention.value.encode("ascii"),
+        ),
         ("re_min", KIND_DECIMAL, str(contract.re_min).encode("utf-8")),
         ("re_max", KIND_DECIMAL, str(contract.re_max).encode("utf-8")),
-        ("relative_roughness_variable", KIND_STRING, contract.relative_roughness_variable.encode("utf-8")),
-        ("relative_roughness_min", KIND_DECIMAL, str(contract.relative_roughness_min).encode("utf-8")),
-        ("relative_roughness_max", KIND_DECIMAL, str(contract.relative_roughness_max).encode("utf-8")),
+        (
+            "relative_roughness_variable",
+            KIND_STRING,
+            contract.relative_roughness_variable.encode("utf-8"),
+        ),
+        (
+            "relative_roughness_min",
+            KIND_DECIMAL,
+            str(contract.relative_roughness_min).encode("utf-8"),
+        ),
+        (
+            "relative_roughness_max",
+            KIND_DECIMAL,
+            str(contract.relative_roughness_max).encode("utf-8"),
+        ),
         ("unsupported_gap_policy", KIND_ENUM, contract.unsupported_gap_policy.encode("ascii")),
         ("out_of_envelope_policy", KIND_ENUM, contract.out_of_envelope_policy.encode("ascii")),
-        ("roughness_authority_contract_version", KIND_STRING, contract.roughness_authority_contract_version.encode("utf-8")),
+        (
+            "roughness_authority_contract_version",
+            KIND_STRING,
+            contract.roughness_authority_contract_version.encode("utf-8"),
+        ),
     ]
     framed = frame_record(SELECTION_CONTRACT_VERSION, fields)
     return sha256_hex(framed)
@@ -1372,7 +1264,6 @@ __all__ = [
     "RheologyType",
     "BlockerCode",
     # Blocker registry
-    "TASK027_BLOCKER_REGISTRY_COUNT",
     "UNIQUE_BLOCKER_CODE_COUNT",
     "UNIQUE_ORDERING_KEY_COUNT",
     "BLOCKER_REGISTRY_COUNT",
