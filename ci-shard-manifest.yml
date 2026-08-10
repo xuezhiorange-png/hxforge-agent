@@ -80,11 +80,11 @@ shards:
       - tests/exchangers/shell_tube/tube_side/test_a09_scheduler.py
       - tests/exchangers/shell_tube/tube_side/test_a10_valid_result.py
       - tests/exchangers/shell_tube/tube_side/test_a11_to_a14_dispositions.py
+      - tests/exchangers/shell_tube/tube_side/test_task027_friction.py
       - tests/exchangers/shell_tube/tube_side/test_hydraulic_geometry.py
       - tests/exchangers/shell_tube/tube_side/test_hydraulic_participation_authority.py
       - tests/exchangers/shell_tube/tube_side/test_blocked_result_from_raw_invalid.py
       - tests/exchangers/shell_tube/tube_side/test_software_version_provenance.py
-      - tests/exchangers/shell_tube/tube_side/test_task027_friction.py
       - tests/exchangers/shell_tube/tube_layout/test_models.py
       - tests/exchangers/shell_tube/tube_layout/test_schema.py
       - tests/exchangers/shell_tube/tube_layout/test_authority.py
@@ -118,6 +118,17 @@ shards:
       - tests/shell_geometry_catalogs/test_models.py
       - tests/shell_geometry_catalogs/test_catalog.py
       - tests/shell_geometry_catalogs/test_architecture.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_blocker_registry.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_canonical.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_decimal_primitives.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_determinism.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_nusselt_selector.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_property_snapshot.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_provenance.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_python311_python312_byte_identical.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_request.py
+      - tests/exchangers/shell_tube/tube_side_thermal/test_single_phase.py
+      - tests/release_demo/test_v0_1_task020_to_task026.py
     timeout: 300
 
   - name: ci-acceptance

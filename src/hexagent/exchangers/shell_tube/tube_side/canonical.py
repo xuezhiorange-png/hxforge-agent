@@ -171,13 +171,19 @@ class FrozenJsonArray(Sequence[Any]):
     FrozenJsonObject.
     """
 
-    __slots__ = ("_items",)
+    __slots__ = ("_items", "_frozen")
 
     def __init__(self, items: Sequence[Any]) -> None:
         items_tuple = tuple(items)
         for item in items_tuple:
             _validate_frozen_json_item(item)
-        self._items = items_tuple
+        object.__setattr__(self, "_items", items_tuple)
+        object.__setattr__(self, "_frozen", True)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if getattr(self, "_frozen", False):
+            raise AttributeError(f"FrozenJsonArray is immutable; cannot rebind attribute {name!r}")
+        object.__setattr__(self, name, value)
 
     def __len__(self) -> int:
         return len(self._items)
@@ -210,7 +216,7 @@ class FrozenJsonObject(Mapping[str, Any]):
     Hashing uses the universal labeled record framing.
     """
 
-    __slots__ = ("_items",)
+    __slots__ = ("_items", "_frozen")
 
     def __init__(self, items: Mapping[str, Any]) -> None:
         items_dict: dict[str, Any] = {}
@@ -219,7 +225,13 @@ class FrozenJsonObject(Mapping[str, Any]):
                 raise TypeError(f"FrozenJsonObject keys must be str, got {type(key).__name__}")
             _validate_frozen_json_item(value)
             items_dict[key] = value
-        self._items = MappingProxyType(items_dict)
+        object.__setattr__(self, "_items", MappingProxyType(items_dict))
+        object.__setattr__(self, "_frozen", True)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if getattr(self, "_frozen", False):
+            raise AttributeError(f"FrozenJsonObject is immutable; cannot rebind attribute {name!r}")
+        object.__setattr__(self, name, value)
 
     def __len__(self) -> int:
         return len(self._items)

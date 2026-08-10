@@ -35,6 +35,18 @@ def test_frozen_json_object_copies_input_mapping() -> None:
         frozen.items_mapping["b"] = 3  # type: ignore[index]
 
 
+def test_frozen_json_array_items_cannot_be_rebound() -> None:
+    array = ts.FrozenJsonArray([1, 2, 3])
+    with pytest.raises((AttributeError, TypeError)):
+        array._items = (4, 5, 6)  # type: ignore[misc]
+
+
+def test_frozen_json_object_items_cannot_be_rebound() -> None:
+    obj = ts.FrozenJsonObject({"a": 1})
+    with pytest.raises((AttributeError, TypeError)):
+        obj._items = {"b": 2}  # type: ignore[misc]
+
+
 def test_a01_sha256_hex_lowercase_64() -> None:
     out = ts.sha256_hex(b"")
     assert len(out) == 64
