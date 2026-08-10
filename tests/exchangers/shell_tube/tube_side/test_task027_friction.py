@@ -735,8 +735,8 @@ class TestT027RoughnessInvalidHashBlocked:
         assert BlockerCode.BL_T027_ROUGHNESS_AUTHORITY_HASH_MISMATCH in codes
 
 
-class TestT027TurbulentSolverFailureFailClosed:
-    """T027_TURBULENT_SOLVER_FAILURE_FAIL_CLOSED — solver does not converge."""
+class TestT027TurbulentSolverFailurePrimitive:
+    """Primitive solver non-convergence tests (canonical test in test_task027_canonical.py)."""
 
     def test_solver_failure_primitive(self) -> None:
         """Primitive-level: non-convergence triggers ColebrookWhiteConvergenceError."""

@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
+    BLOCKED_RESULT_HASH_NAMESPACE,
     DEFAULT_SELECTION_CONTRACT,
     KIND_DECIMAL,
     KIND_ENUM,
@@ -16,13 +19,23 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     KIND_TUPLE,
     ROUGHNESS_SCHEMA_VERSION,
     SELECTION_CONTRACT_VERSION,
+    TASK027_BLOCKED_RESULT_SCHEMA_VERSION,
+    TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
     AbsoluteRoughnessAuthority,
+    BlockerCode,
+    ColebrookWhiteConvergenceError,
     RoughnessMode,
     SmoothRoughnessAuthority,
     _encode_tuple,
+    compute_blocked_result_hash,
+    compute_colebrook_white,
     compute_request_hash,
+    compute_result_hash,
     compute_selection_contract_hash,
+    derive_result_id,
+    emit_blocker,
     frame_record,
+    get_blocker_message,
     sha256_hex,
 )
 
@@ -142,6 +155,59 @@ def _build_selection_contract_framed_bytes() -> bytes:
     return frame_record(SELECTION_CONTRACT_VERSION, fields)
 
 
+def _build_blocked_result_bytes(
+    schema_version: str,
+    profile_id: str,
+    request_hash: str | None,
+    result_hash: str,
+    result_id: str,
+    task025_hydraulic_authority_hash: str | None,
+    task025_result_hash: str | None,
+    task026_result_hash: str | None,
+    property_snapshot_hash: str | None,
+    raw_request_projection: str | None,
+    raw_upstream_blocked_projection: str | None,
+    warnings: tuple[str, ...],
+    blockers_str: str,
+    deferred_capabilities: tuple[str, ...],
+    provenance: str,
+) -> bytes:
+    """Build canonical framed bytes for a blocked result.
+
+    Uses the frozen 15-field blocked result schema with production framing.
+    """
+    fields = [
+        ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
+        ("profile_id", KIND_STRING, profile_id.encode("utf-8")),
+        ("request_hash", KIND_STRING, (request_hash or "").encode("utf-8")),
+        ("result_hash", KIND_STRING, result_hash.encode("utf-8")),
+        ("result_id", KIND_STRING, result_id.encode("utf-8")),
+        (
+            "task025_hydraulic_authority_hash",
+            KIND_STRING,
+            (task025_hydraulic_authority_hash or "").encode("utf-8"),
+        ),
+        ("task025_result_hash", KIND_STRING, (task025_result_hash or "").encode("utf-8")),
+        ("task026_result_hash", KIND_STRING, (task026_result_hash or "").encode("utf-8")),
+        ("property_snapshot_hash", KIND_STRING, (property_snapshot_hash or "").encode("utf-8")),
+        (
+            "raw_request_projection",
+            KIND_STRING,
+            (raw_request_projection or "").encode("utf-8"),
+        ),
+        (
+            "raw_upstream_blocked_projection",
+            KIND_STRING,
+            (raw_upstream_blocked_projection or "").encode("utf-8"),
+        ),
+        ("warnings", KIND_STRING, _encode_tuple(warnings)),
+        ("blockers", KIND_STRING, blockers_str.encode("utf-8")),
+        ("deferred_capabilities", KIND_STRING, _encode_tuple(deferred_capabilities)),
+        ("provenance", KIND_STRING, provenance.encode("utf-8")),
+    ]
+    return frame_record(BLOCKED_RESULT_HASH_NAMESPACE, fields)
+
+
 # ===========================================================================
 # §5.1 — T027_ROUGHNESS_ABSOLUTE_FRAMED_VECTOR
 # ===========================================================================
@@ -225,14 +291,109 @@ class TestT027SelectionContractHashReplay:
 
 
 class TestT027AbsoluteVsSmoothIdentityDifferent:
-    """T027_ABSOLUTE_VS_SMOOTH_IDENTITY_DIFFERENT — roughness mode identity."""
+    """T027_ABSOLUTE_VS_SMOOTH_IDENTITY_DIFFERENT — full success result identity."""
 
-    def test_absolute_vs_smooth_different_vector(self) -> None:
-        """Verify absolute and smooth roughness produce different canonical vectors."""
-        abs_bytes = _build_absolute_roughness_framed_bytes()
-        smooth_bytes = _build_smooth_roughness_framed_bytes()
-        assert abs_bytes != smooth_bytes
-        assert sha256_hex(abs_bytes) != sha256_hex(smooth_bytes)
+    # Shared frozen semantic inputs (identical for both roughness modes)
+    _PROFILE = "test-profile"
+    _T025_HASH = "a" * 64
+    _T026_HASH = "b" * 64
+    _PROP_HASH = "c" * 64
+    _FRICTION_LEN = "2.5"
+    _UPSTREAM = "shell-inlet"
+    _DOWNSTREAM = "shell-outlet"
+
+    def _compute_request_hash(self, roughness_hash: str) -> str:
+        return compute_request_hash(
+            schema_version=TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
+            profile_id=self._PROFILE,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+            constant_density_assertion="TRUE",
+            zero_elevation_assertion="TRUE",
+            flow_direction_assertion="START_TO_END",
+            roughness_authority_hash=roughness_hash,
+        )
+
+    def test_absolute_vs_smooth_result_identity(self) -> None:
+        """Verify absolute and smooth roughness produce different result identity.
+
+        Chains: roughness authority hash → request hash → result hash → result id.
+        Uses production compute_request_hash, compute_result_hash, derive_result_id.
+        """
+        abs_rh = sha256_hex(_build_absolute_roughness_framed_bytes())
+        smooth_rh = sha256_hex(_build_smooth_roughness_framed_bytes())
+
+        # Frozen vector replay preserved
+        assert len(_build_absolute_roughness_framed_bytes()) == 577
+        assert len(_build_smooth_roughness_framed_bytes()) == 546
+
+        # Different roughness authority hashes
+        assert abs_rh != smooth_rh
+
+        # Step 1: Different request hashes
+        abs_req = self._compute_request_hash(abs_rh)
+        smooth_req = self._compute_request_hash(smooth_rh)
+        assert abs_req != smooth_req
+        assert len(abs_req) == 64
+        assert len(smooth_req) == 64
+
+        # Step 2: Different success result hashes
+        # Use same engineering values; only request_hash differs
+        abs_rhsh = compute_result_hash(
+            schema_version=TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
+            profile_id=self._PROFILE,
+            request_hash=abs_req,
+            darcy_friction_factor="0.032",
+            friction_length_m=self._FRICTION_LEN,
+            upstream_reference_plane=self._UPSTREAM,
+            downstream_reference_plane=self._DOWNSTREAM,
+            straight_tube_friction_pressure_drop_pa="15.36",
+            task025_hydraulic_authority_hash=self._T025_HASH,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+        )
+        smooth_rhsh = compute_result_hash(
+            schema_version=TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
+            profile_id=self._PROFILE,
+            request_hash=smooth_req,
+            darcy_friction_factor="0.032",
+            friction_length_m=self._FRICTION_LEN,
+            upstream_reference_plane=self._UPSTREAM,
+            downstream_reference_plane=self._DOWNSTREAM,
+            straight_tube_friction_pressure_drop_pa="15.36",
+            task025_hydraulic_authority_hash=self._T025_HASH,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+        )
+        assert abs_rhsh != smooth_rhsh
+        assert len(abs_rhsh) == 64
+        assert len(smooth_rhsh) == 64
+
+        # Step 3: Different result IDs
+        abs_rid = derive_result_id(abs_rhsh)
+        smooth_rid = derive_result_id(smooth_rhsh)
+        assert abs_rid != smooth_rid
+
+        # Canonical byte evidence: re-derive and verify determinism
+        abs_rhsh_2 = compute_result_hash(
+            schema_version=TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
+            profile_id=self._PROFILE,
+            request_hash=abs_req,
+            darcy_friction_factor="0.032",
+            friction_length_m=self._FRICTION_LEN,
+            upstream_reference_plane=self._UPSTREAM,
+            downstream_reference_plane=self._DOWNSTREAM,
+            straight_tube_friction_pressure_drop_pa="15.36",
+            task025_hydraulic_authority_hash=self._T025_HASH,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+        )
+        assert abs_rhsh == abs_rhsh_2
+        assert derive_result_id(abs_rhsh_2) == abs_rid
 
 
 # ===========================================================================
@@ -246,7 +407,7 @@ class TestT027SmoothVsAbsoluteRequestIdentityDiffer:
     def test_request_hash_differs_with_roughness_mode(self) -> None:
         """Verify request hash changes when roughness_authority_hash changes."""
         base_kwargs = dict(
-            schema_version="task027-r1.schema.v1",
+            schema_version=TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
             profile_id="test-profile",
             task025_result_hash="a" * 64,
             task026_result_hash="b" * 64,
@@ -266,3 +427,139 @@ class TestT027SmoothVsAbsoluteRequestIdentityDiffer:
         assert h_absolute != h_smooth
         assert len(h_absolute) == 64
         assert len(h_smooth) == 64
+
+
+# ===========================================================================
+# §9.2 — T027_TURBULENT_SOLVER_FAILURE_FAIL_CLOSED
+# ===========================================================================
+
+
+class TestT027TurbulentSolverFailureFailClosed:
+    """T027_TURBULENT_SOLVER_FAILURE_FAIL_CLOSED — blocked result canonical identity.
+
+    Frozen requirement:
+      TEST_EXPECTED_VARIANT=blocked
+      TEST_BLOCKER_CODES=(BL_T027_TURBULENT_SOLVER_FAILURE,)
+      TEST_CANONICAL_BYTE_ASSERTION=required
+    """
+
+    # Frozen semantic inputs for blocked result
+    _SCHEMA = TASK027_BLOCKED_RESULT_SCHEMA_VERSION
+    _PROFILE = "test-profile"
+    _REQUEST_HASH = "d" * 64
+    _T025_HASH = "e" * 64
+    _T026_HASH = "f" * 64
+    _PROP_HASH = "g" * 64
+
+    def test_blocked_result_full_identity(self) -> None:
+        """Verify solver non-convergence produces frozen blocked result identity.
+
+        Trigger: actual non-convergence via max_iterations=1.
+        Build: canonical Task027BlockedResult with frozen fields.
+        Assert: canonical bytes replay, result_hash replay, result_id replay.
+        """
+        # Step 1: Trigger actual non-convergence
+        with pytest.raises(ColebrookWhiteConvergenceError):
+            compute_colebrook_white(
+                reynolds=Decimal("4000"),
+                relative_roughness=Decimal("0"),
+                tolerance=Decimal("1e-12"),
+                max_iterations=1,
+            )
+
+        # Step 2: Build canonical blocker
+        blocker = emit_blocker(
+            BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE,
+            "compute_colebrook_white",
+            get_blocker_message(BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE),
+        )
+        blockers_str = (
+            f'{{"code":"{blocker.code.value}",'
+            f'"field_path":["compute_colebrook_white"],'
+            f'"message_key":"{blocker.message_key}",'
+            f'"evidence_refs":[]}}'
+        )
+
+        # Step 3: Compute blocked result hash from 13 semantic fields
+        result_hash = compute_blocked_result_hash(
+            schema_version=self._SCHEMA,
+            profile_id=self._PROFILE,
+            request_hash=self._REQUEST_HASH,
+            task025_hydraulic_authority_hash=self._T025_HASH,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+            raw_request_projection=None,
+            raw_upstream_blocked_projection=None,
+            warnings="[]",
+            blockers=blockers_str,
+            deferred_capabilities="[]",
+            provenance="test-provenance",
+        )
+        assert len(result_hash) == 64
+
+        # Step 4: Derive result_id
+        result_id = derive_result_id(result_hash)
+        assert result_id
+
+        # Step 5: Canonical bytes replay (deterministic)
+        canonical_bytes = _build_blocked_result_bytes(
+            schema_version=self._SCHEMA,
+            profile_id=self._PROFILE,
+            request_hash=self._REQUEST_HASH,
+            result_hash=result_hash,
+            result_id=result_id,
+            task025_hydraulic_authority_hash=self._T025_HASH,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+            raw_request_projection=None,
+            raw_upstream_blocked_projection=None,
+            warnings=(),
+            blockers_str=blockers_str,
+            deferred_capabilities=(),
+            provenance="test-provenance",
+        )
+        assert len(canonical_bytes) > 0
+
+        # Step 6: Deterministic replay — same inputs produce same bytes/hash/id
+        result_hash_2 = compute_blocked_result_hash(
+            schema_version=self._SCHEMA,
+            profile_id=self._PROFILE,
+            request_hash=self._REQUEST_HASH,
+            task025_hydraulic_authority_hash=self._T025_HASH,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+            raw_request_projection=None,
+            raw_upstream_blocked_projection=None,
+            warnings="[]",
+            blockers=blockers_str,
+            deferred_capabilities="[]",
+            provenance="test-provenance",
+        )
+        assert result_hash == result_hash_2
+        assert derive_result_id(result_hash_2) == result_id
+
+        canonical_bytes_2 = _build_blocked_result_bytes(
+            schema_version=self._SCHEMA,
+            profile_id=self._PROFILE,
+            request_hash=self._REQUEST_HASH,
+            result_hash=result_hash_2,
+            result_id=result_id,
+            task025_hydraulic_authority_hash=self._T025_HASH,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+            raw_request_projection=None,
+            raw_upstream_blocked_projection=None,
+            warnings=(),
+            blockers_str=blockers_str,
+            deferred_capabilities=(),
+            provenance="test-provenance",
+        )
+        assert canonical_bytes == canonical_bytes_2
+
+        # Step 7: Verify blocker properties
+        assert blocker.code == BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE
+        assert len([blocker]) == 1

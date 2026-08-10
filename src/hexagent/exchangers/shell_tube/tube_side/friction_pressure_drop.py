@@ -1013,6 +1013,57 @@ def compute_result_hash(
     return sha256_hex(framed)
 
 
+def compute_blocked_result_hash(
+    schema_version: str,
+    profile_id: str,
+    request_hash: str | None,
+    task025_hydraulic_authority_hash: str | None,
+    task025_result_hash: str | None,
+    task026_result_hash: str | None,
+    property_snapshot_hash: str | None,
+    raw_request_projection: str | None,
+    raw_upstream_blocked_projection: str | None,
+    warnings: str,
+    blockers: str,
+    deferred_capabilities: str,
+    provenance: str,
+) -> str:
+    """§15.4 — Compute blocked result hash from the 13 semantic fields.
+
+    Self-excludes result_hash and result_id (derived from this hash).
+    Uses BLOCKED_RESULT_HASH_NAMESPACE.
+    """
+    fields = [
+        ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
+        ("profile_id", KIND_STRING, profile_id.encode("utf-8")),
+        ("request_hash", KIND_STRING, (request_hash or "").encode("utf-8")),
+        (
+            "task025_hydraulic_authority_hash",
+            KIND_STRING,
+            (task025_hydraulic_authority_hash or "").encode("utf-8"),
+        ),
+        ("task025_result_hash", KIND_STRING, (task025_result_hash or "").encode("utf-8")),
+        ("task026_result_hash", KIND_STRING, (task026_result_hash or "").encode("utf-8")),
+        ("property_snapshot_hash", KIND_STRING, (property_snapshot_hash or "").encode("utf-8")),
+        (
+            "raw_request_projection",
+            KIND_STRING,
+            (raw_request_projection or "").encode("utf-8"),
+        ),
+        (
+            "raw_upstream_blocked_projection",
+            KIND_STRING,
+            (raw_upstream_blocked_projection or "").encode("utf-8"),
+        ),
+        ("warnings", KIND_STRING, warnings.encode("utf-8")),
+        ("blockers", KIND_STRING, blockers.encode("utf-8")),
+        ("deferred_capabilities", KIND_STRING, deferred_capabilities.encode("utf-8")),
+        ("provenance", KIND_STRING, provenance.encode("utf-8")),
+    ]
+    framed = frame_record(BLOCKED_RESULT_HASH_NAMESPACE, fields)
+    return sha256_hex(framed)
+
+
 # ---------------------------------------------------------------------------
 # §14.2 — Success result schema
 # ---------------------------------------------------------------------------
@@ -1355,6 +1406,7 @@ __all__ = [
     # Hash
     "compute_request_hash",
     "compute_result_hash",
+    "compute_blocked_result_hash",
     "derive_result_id",
     # Constants
     "TASK027_REQUEST_SCHEMA_VERSION",
