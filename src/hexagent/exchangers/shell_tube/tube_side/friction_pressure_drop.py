@@ -628,6 +628,14 @@ def compute_laminar_friction_factor(reynolds: Decimal) -> Decimal:
     return f_d
 
 
+class ColebrookWhiteConvergenceError(Exception):
+    """Raised when the Colebrook-White solver fails to converge.
+
+    This is an internal deterministic failure signal. Callers must convert
+    this into BL_T027_TURBULENT_SOLVER_FAILURE and return a blocked result.
+    """
+
+
 def compute_colebrook_white(
     reynolds: Decimal,
     relative_roughness: Decimal,
@@ -641,6 +649,9 @@ def compute_colebrook_white(
 
     We solve for f in the domain [0.004, 0.100].
     Uses fixed-point iteration with Swamee-Jain initial guess.
+
+    Raises ColebrookWhiteConvergenceError on non-convergence (fail-closed).
+    No partial result is ever returned.
     """
     if reynolds < TURBULENT_LOWER_RE or reynolds > TURBULENT_UPPER_RE:
         raise ValueError(
@@ -657,17 +668,27 @@ def compute_colebrook_white(
     f_guess = 0.25 / (math.log10(eps_d / 3.7 + 5.74 / re_f**0.9)) ** 2
     f_val = float(max(0.004, min(0.100, f_guess)))
 
+    converged = False
     # Fixed-point iteration: f = (1 / (-2*log10(eps_D/3.7 + 2.51/(Re*sqrt(f)))))^2
     for _ in range(max_iterations):
         sqrt_f = math.sqrt(f_val)
         term = eps_d / 3.7 + 2.51 / (re_f * sqrt_f)
-        if term <= 0:
+        if term <= 0 or not math.isfinite(term):
             break
         f_new = 1.0 / (2.0 * math.log10(term)) ** 2
+        if not math.isfinite(f_new):
+            break
         if abs(f_new - f_val) < float(tolerance):
             f_val = f_new
+            converged = True
             break
         f_val = f_new
+
+    if not converged:
+        raise ColebrookWhiteConvergenceError(
+            f"Colebrook-White solver did not converge within {max_iterations} iterations "
+            f"for Re={reynolds}, epsilon/D={relative_roughness}"
+        )
 
     result = Decimal(str(f_val))
     # Clamp to domain
@@ -1281,6 +1302,7 @@ __all__ = [
     "compute_relative_roughness",
     "validate_relative_roughness",
     # Friction factor
+    "ColebrookWhiteConvergenceError",
     "compute_laminar_friction_factor",
     "compute_colebrook_white",
     "compute_pressure_drop",

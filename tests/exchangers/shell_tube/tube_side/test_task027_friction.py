@@ -35,6 +35,7 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     UNIQUE_ORDERING_KEY_COUNT,
     AbsoluteRoughnessAuthority,
     BlockerCode,
+    ColebrookWhiteConvergenceError,
     FrictionFactorConvention,
     RoughnessMode,
     SmoothRoughnessAuthority,
@@ -737,12 +738,18 @@ class TestT027TurbulentSolverFailureFailClosed:
     """T027_TURBULENT_SOLVER_FAILURE_FAIL_CLOSED — solver does not converge."""
 
     def test_solver_failure(self) -> None:
-        entry = emit_blocker(
-            BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE,
-            "solver",
-            get_blocker_message(BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE),
-        )
-        assert entry.code == BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE
+        """Actual non-convergence triggers ColebrookWhiteConvergenceError.
+
+        max_iterations=1 forces non-convergence. The solver must raise
+        rather than return a partial friction factor.
+        """
+        with pytest.raises(ColebrookWhiteConvergenceError):
+            compute_colebrook_white(
+                reynolds=Decimal("4000"),
+                relative_roughness=Decimal("0"),
+                tolerance=Decimal("1e-12"),
+                max_iterations=1,
+            )
 
 
 # ===========================================================================
@@ -925,6 +932,7 @@ class TestRawBoundaryValidation:
     """§16.5 — Raw boundary validation pipeline tests."""
 
     def test_non_dict_input(self) -> None:
+        """T027_RAW_INPUT_BOUNDARY_MALFORMED — non-mapping top-level input."""
         result = validate_raw_boundary("not a dict")
         assert result is not None
         assert len(result.blockers) > 0
@@ -932,6 +940,7 @@ class TestRawBoundaryValidation:
         assert BlockerCode.BL_T027_RAW_INPUT_BOUNDARY_MALFORMED in codes
 
     def test_unknown_field(self) -> None:
+        """T027_REQUEST_UNKNOWN_FIELD_BLOCKED — unknown field in raw request."""
         raw = {
             "schema_version": "task027-r1.schema.v1",
             "profile_id": "profile-001",
@@ -1050,6 +1059,7 @@ class TestHashContracts:
     """§15 — Hash contract tests."""
 
     def test_request_hash_changes_with_roughness(self) -> None:
+        """T027_REQUEST_HASH_CHANGES_WITH_ROUGHNESS — request hash sensitivity to roughness."""
         h1 = compute_request_hash(
             schema_version=TASK027_REQUEST_SCHEMA_VERSION,
             profile_id="profile-001",
@@ -1142,7 +1152,7 @@ class TestReynoldsClassification:
 
 
 class TestRoughnessAuthorityHashReplay:
-    """§8 — Roughness authority hash replay tests."""
+    """T027_ROUGHNESS_AUTHORITY_HASH_REPLAY — §8 roughness authority hash replay tests."""
 
     def test_absolute_roughness_hash_replay(self) -> None:
         auth = AbsoluteRoughnessAuthority(
