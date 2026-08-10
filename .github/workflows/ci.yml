@@ -112,11 +112,15 @@ jobs:
           echo "pr-head-sha=${PR_HEAD}" >> "$GITHUB_OUTPUT"
           echo "PR head SHA: ${PR_HEAD}"
 
-          # Fetch the exact merge ref
-          git fetch origin "refs/pull/${PR_NUMBER}/merge"
-          MERGE_SHA="$(git rev-parse FETCH_HEAD)"
-          echo "merge-sha=${MERGE_SHA}" >> "$GITHUB_OUTPUT"
-          echo "Frozen merge-ref SHA: ${MERGE_SHA}"
+          # Fetch the exact merge ref (may not exist if PR has conflicts)
+          if git fetch origin "refs/pull/${PR_NUMBER}/merge" 2>/dev/null; then
+            MERGE_SHA="$(git rev-parse FETCH_HEAD)"
+            echo "merge-sha=${MERGE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "Frozen merge-ref SHA: ${MERGE_SHA}"
+          else
+            echo "WARNING: merge ref not available (PR may have conflicts)"
+            echo "merge-sha=" >> "$GITHUB_OUTPUT"
+          fi
 
   # ── PR-head shard jobs ────────────────────────────────────────────────────
   shard:
@@ -1359,6 +1363,10 @@ jobs:
               echo "SKIP: $name = $result (not required for ${{ github.event_name }})"
               return
             fi
+            if [ "$required" = "skip-if-skipped" ] && [ "$result" = "skipped" ]; then
+              echo "SKIP: $name = skipped (merge ref unavailable)"
+              return
+            fi
             if [ "$result" != "success" ]; then
               echo "FAIL: $name = $result" >&2
               FAILED=1
@@ -1367,6 +1375,13 @@ jobs:
             fi
           }
 
+          # Determine if merge-ref jobs should be required or optional
+          MERGE_REF_REQUIRED="yes"
+          if [ -z "${{ needs.resolve-authority.outputs.merge-sha }}" ]; then
+            MERGE_REF_REQUIRED="skip-if-skipped"
+            echo "WARNING: merge-sha is empty, merge-ref jobs will be optional"
+          fi
+
           if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # PR-head + merge-ref required; main-track skipped
             check "lint" "${{ needs.lint.result }}" "yes"
@@ -1374,19 +1389,19 @@ jobs:
             check "verify-manifest" "${{ needs.verify-manifest.result }}" "yes"
             check "resolve-authority" "${{ needs.resolve-authority.result }}" "yes"
             check "shard" "${{ needs.shard.result }}" "yes"
-            check "shard-merge-ref" "${{ needs.shard-merge-ref.result }}" "yes"
+            check "shard-merge-ref" "${{ needs.shard-merge-ref.result }}" "${MERGE_REF_REQUIRED}"
             check "shard-main" "${{ needs.shard-main.result }}" "no"
             check "collect-global" "${{ needs.collect-global.result }}" "yes"
-            check "collect-global-merge-ref" "${{ needs.collect-global-merge-ref.result }}" "yes"
+            check "collect-global-merge-ref" "${{ needs.collect-global-merge-ref.result }}" "${MERGE_REF_REQUIRED}"
             check "collect-global-main" "${{ needs.collect-global-main.result }}" "no"
             check "verify-completeness" "${{ needs.verify-completeness.result }}" "yes"
-            check "verify-completeness-merge-ref" "${{ needs.verify-completeness-merge-ref.result }}" "yes"
+            check "verify-completeness-merge-ref" "${{ needs.verify-completeness-merge-ref.result }}" "${MERGE_REF_REQUIRED}"
             check "verify-completeness-main" "${{ needs.verify-completeness-main.result }}" "no"
             check "verify-golden-benchmark" "${{ needs.verify-golden-benchmark.result }}" "yes"
-            check "verify-golden-benchmark-merge-ref" "${{ needs.verify-golden-benchmark-merge-ref.result }}" "yes"
+            check "verify-golden-benchmark-merge-ref" "${{ needs.verify-golden-benchmark-merge-ref.result }}" "${MERGE_REF_REQUIRED}"
             check "verify-golden-benchmark-main" "${{ needs.verify-golden-benchmark-main.result }}" "no"
             check "aggregate" "${{ needs.aggregate.result }}" "yes"
-            check "merge-ref-aggregate" "${{ needs.merge-ref-aggregate.result }}" "yes"
+            check "merge-ref-aggregate" "${{ needs.merge-ref-aggregate.result }}" "${MERGE_REF_REQUIRED}"
             check "main-aggregate" "${{ needs.main-aggregate.result }}" "no"
           elif [ "${{ github.event_name }}" = "push" ]; then
             # push to main: main-track required; PR-head + merge-ref skipped
