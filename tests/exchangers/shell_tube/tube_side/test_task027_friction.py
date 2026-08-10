@@ -48,6 +48,7 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     compute_request_hash,
     compute_result_hash,
     compute_selection_contract_hash,
+    compute_turbulent_friction_factor_safe,
     derive_result_id,
     emit_blocker,
     frame_record,
@@ -737,12 +738,8 @@ class TestT027RoughnessInvalidHashBlocked:
 class TestT027TurbulentSolverFailureFailClosed:
     """T027_TURBULENT_SOLVER_FAILURE_FAIL_CLOSED — solver does not converge."""
 
-    def test_solver_failure(self) -> None:
-        """Actual non-convergence triggers ColebrookWhiteConvergenceError.
-
-        max_iterations=1 forces non-convergence. The solver must raise
-        rather than return a partial friction factor.
-        """
+    def test_solver_failure_primitive(self) -> None:
+        """Primitive-level: non-convergence triggers ColebrookWhiteConvergenceError."""
         with pytest.raises(ColebrookWhiteConvergenceError):
             compute_colebrook_white(
                 reynolds=Decimal("4000"),
@@ -750,6 +747,23 @@ class TestT027TurbulentSolverFailureFailClosed:
                 tolerance=Decimal("1e-12"),
                 max_iterations=1,
             )
+
+    def test_solver_failure_production_propagation(self) -> None:
+        """Production-level: non-convergence → blocked result via safe wrapper."""
+        f, blockers = compute_turbulent_friction_factor_safe(
+            reynolds=Decimal("4000"),
+            relative_roughness=Decimal("0"),
+            tolerance=Decimal("1e-12"),
+            max_iterations=1,
+        )
+        # Must not return partial friction factor
+        assert f is None
+        # Must emit exactly one blocker
+        assert len(blockers) == 1
+        assert blockers[0].code == BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE
+        # No partial result
+        codes = [b.code for b in blockers]
+        assert BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE in codes
 
 
 # ===========================================================================

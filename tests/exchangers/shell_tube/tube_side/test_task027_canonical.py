@@ -31,7 +31,8 @@ def _build_absolute_roughness_framed_bytes() -> bytes:
     """Build canonical framed bytes for absolute roughness authority.
 
     Uses frozen field values from source definition §8.1.3 and production
-    framing primitives.
+    framing primitives. The production _compute_roughness_authority_hash
+    excludes authority_hash from hash input; this helper mirrors that.
     """
     auth = AbsoluteRoughnessAuthority(
         schema_version=ROUGHNESS_SCHEMA_VERSION,
@@ -55,7 +56,7 @@ def _build_absolute_roughness_framed_bytes() -> bytes:
             KIND_DECIMAL,
             str(auth.absolute_roughness_m).encode("utf-8"),
         ),
-        ("source_type", KIND_STRING, auth.source_type.encode("utf-8")),
+        ("source_type", KIND_ENUM, auth.source_type.encode("ascii")),
         ("source_id", KIND_STRING, auth.source_id.encode("utf-8")),
         ("source_version", KIND_STRING, auth.source_version.encode("utf-8")),
         ("source_location", KIND_STRING, auth.source_location.encode("utf-8")),
@@ -87,7 +88,7 @@ def _build_smooth_roughness_framed_bytes() -> bytes:
         ("schema_version", KIND_STRING, auth.schema_version.encode("utf-8")),
         ("authority_id", KIND_STRING, auth.authority_id.encode("utf-8")),
         ("roughness_mode", KIND_ENUM, auth.roughness_mode.value.encode("ascii")),
-        ("source_type", KIND_STRING, auth.source_type.encode("utf-8")),
+        ("source_type", KIND_ENUM, auth.source_type.encode("ascii")),
         ("source_id", KIND_STRING, auth.source_id.encode("utf-8")),
         ("source_version", KIND_STRING, auth.source_version.encode("utf-8")),
         ("source_location", KIND_STRING, auth.source_location.encode("utf-8")),
@@ -155,14 +156,12 @@ class TestT027RoughnessAbsoluteFramedVector:
         Uses production frame_record + _encode_tuple with frozen field values.
         """
         canonical_bytes = _build_absolute_roughness_framed_bytes()
-        assert isinstance(canonical_bytes, bytes)
-        assert len(canonical_bytes) > 0
-        computed_hash = sha256_hex(canonical_bytes)
-        assert len(computed_hash) == 64
-        # Deterministic: same inputs produce same bytes
-        canonical_bytes_2 = _build_absolute_roughness_framed_bytes()
-        assert canonical_bytes == canonical_bytes_2
-        assert sha256_hex(canonical_bytes_2) == computed_hash
+        assert len(canonical_bytes) == 577
+        assert sha256_hex(canonical_bytes) == (
+            "81e659672789ceac03478491068df95dbb7df3c59ab911ae3d198083810b6b0d"
+        )
+        # Deterministic replay
+        assert _build_absolute_roughness_framed_bytes() == canonical_bytes
 
 
 # ===========================================================================
@@ -174,19 +173,13 @@ class TestT027RoughnessSmoothFramedVector:
     """T027_ROUGHNESS_SMOOTH_FRAMED_VECTOR — smooth pipe vector replay identity."""
 
     def test_smooth_roughness_vector_replay(self) -> None:
-        """Verify canonical framed bytes for smooth roughness authority.
-
-        Uses production frame_record + _encode_tuple with frozen field values.
-        """
+        """Verify canonical framed bytes for smooth roughness authority."""
         canonical_bytes = _build_smooth_roughness_framed_bytes()
-        assert isinstance(canonical_bytes, bytes)
-        assert len(canonical_bytes) > 0
-        computed_hash = sha256_hex(canonical_bytes)
-        assert len(computed_hash) == 64
-        # Deterministic: same inputs produce same bytes
-        canonical_bytes_2 = _build_smooth_roughness_framed_bytes()
-        assert canonical_bytes == canonical_bytes_2
-        assert sha256_hex(canonical_bytes_2) == computed_hash
+        assert len(canonical_bytes) == 546
+        assert sha256_hex(canonical_bytes) == (
+            "a76c13e932cb3a41c9fe6d650e598357c9cbcb9a66107182d667d99473115b5a"
+        )
+        assert _build_smooth_roughness_framed_bytes() == canonical_bytes
 
 
 # ===========================================================================
@@ -198,19 +191,13 @@ class TestT027SelectionContractFramedVector:
     """T027_SELECTION_CONTRACT_FRAMED_VECTOR — selection vector replay identity."""
 
     def test_selection_contract_vector_replay(self) -> None:
-        """Verify canonical framed bytes for selection contract.
-
-        Uses production frame_record + _encode_tuple with frozen field values.
-        """
+        """Verify canonical framed bytes for selection contract."""
         canonical_bytes = _build_selection_contract_framed_bytes()
-        assert isinstance(canonical_bytes, bytes)
-        assert len(canonical_bytes) > 0
-        computed_hash = sha256_hex(canonical_bytes)
-        assert len(computed_hash) == 64
-        # Deterministic: same inputs produce same bytes
-        canonical_bytes_2 = _build_selection_contract_framed_bytes()
-        assert canonical_bytes == canonical_bytes_2
-        assert sha256_hex(canonical_bytes_2) == computed_hash
+        assert len(canonical_bytes) == 769
+        assert sha256_hex(canonical_bytes) == (
+            "514ca93b716c37504d8a3196354d245f03b44bf93636495ea8ae358fe9b6f05b"
+        )
+        assert _build_selection_contract_framed_bytes() == canonical_bytes
 
 
 # ===========================================================================
@@ -222,15 +209,14 @@ class TestT027SelectionContractHashReplay:
     """T027_SELECTION_CONTRACT_HASH_REPLAY — selection contract hash replay."""
 
     def test_selection_contract_hash_replay(self) -> None:
-        """Verify selection contract hash is deterministic and reproducible.
-
-        Uses production compute_selection_contract_hash with DEFAULT_SELECTION_CONTRACT.
-        """
+        """Verify selection contract hash is deterministic and matches frozen identity."""
         h1 = compute_selection_contract_hash(DEFAULT_SELECTION_CONTRACT)
         h2 = compute_selection_contract_hash(DEFAULT_SELECTION_CONTRACT)
         assert h1 == h2
         assert len(h1) == 64
-        assert all(c in "0123456789abcdef" for c in h1)
+        # The selection contract hash equals the framed-vector SHA256
+        # (same framing, same fields)
+        assert h1 == sha256_hex(_build_selection_contract_framed_bytes())
 
 
 # ===========================================================================
@@ -242,12 +228,7 @@ class TestT027AbsoluteVsSmoothIdentityDifferent:
     """T027_ABSOLUTE_VS_SMOOTH_IDENTITY_DIFFERENT — roughness mode identity."""
 
     def test_absolute_vs_smooth_different_vector(self) -> None:
-        """Verify absolute and smooth roughness produce different canonical vectors.
-
-        The two roughness modes have different field sets (absolute includes
-        absolute_roughness_m, smooth does not), so their canonical bytes
-        and SHA256 hashes must differ.
-        """
+        """Verify absolute and smooth roughness produce different canonical vectors."""
         abs_bytes = _build_absolute_roughness_framed_bytes()
         smooth_bytes = _build_smooth_roughness_framed_bytes()
         assert abs_bytes != smooth_bytes
@@ -263,12 +244,7 @@ class TestT027SmoothVsAbsoluteRequestIdentityDiffer:
     """T027_SMOOTH_VS_ABSOLUTE_REQUEST_IDENTITY_DIFFER — request hash roughness sensitivity."""
 
     def test_request_hash_differs_with_roughness_mode(self) -> None:
-        """Verify request hash changes when roughness_authority_hash changes.
-
-        Two requests identical except for roughness_authority_hash must
-        produce different request hashes, confirming the roughness authority
-        is part of the request identity.
-        """
+        """Verify request hash changes when roughness_authority_hash changes."""
         base_kwargs = dict(
             schema_version="task027-r1.schema.v1",
             profile_id="test-profile",

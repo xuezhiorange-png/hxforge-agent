@@ -524,11 +524,11 @@ def _compute_roughness_authority_hash(authority: RoughnessAuthority) -> str:
                 KIND_DECIMAL,
                 str(authority.absolute_roughness_m).encode("utf-8"),
             ),
-            ("source_type", KIND_STRING, authority.source_type.encode("utf-8")),
+            ("source_type", KIND_ENUM, authority.source_type.encode("ascii")),
             ("source_id", KIND_STRING, authority.source_id.encode("utf-8")),
             ("source_version", KIND_STRING, authority.source_version.encode("utf-8")),
             ("source_location", KIND_STRING, authority.source_location.encode("utf-8")),
-            ("permission_status", KIND_STRING, authority.permission_status.encode("utf-8")),
+            ("permission_status", KIND_ENUM, authority.permission_status.encode("ascii")),
             ("evidence_refs", KIND_TUPLE, _encode_tuple(authority.evidence_refs)),
         ]
     else:
@@ -536,11 +536,11 @@ def _compute_roughness_authority_hash(authority: RoughnessAuthority) -> str:
             ("schema_version", KIND_STRING, authority.schema_version.encode("utf-8")),
             ("authority_id", KIND_STRING, authority.authority_id.encode("utf-8")),
             ("roughness_mode", KIND_ENUM, authority.roughness_mode.value.encode("ascii")),
-            ("source_type", KIND_STRING, authority.source_type.encode("utf-8")),
+            ("source_type", KIND_ENUM, authority.source_type.encode("ascii")),
             ("source_id", KIND_STRING, authority.source_id.encode("utf-8")),
             ("source_version", KIND_STRING, authority.source_version.encode("utf-8")),
             ("source_location", KIND_STRING, authority.source_location.encode("utf-8")),
-            ("permission_status", KIND_STRING, authority.permission_status.encode("utf-8")),
+            ("permission_status", KIND_ENUM, authority.permission_status.encode("ascii")),
             ("evidence_refs", KIND_TUPLE, _encode_tuple(authority.evidence_refs)),
         ]
 
@@ -597,10 +597,14 @@ def frame_record(node_namespace: str, fields: list[tuple[str, bytes, bytes]]) ->
 
 
 def _encode_tuple(items: tuple[str, ...]) -> bytes:
-    """Encode a tuple of strings using TUPLE framing."""
+    """Encode a tuple of strings using frozen TUPLE framing.
+
+    Frozen encoding: _u32_be(count) + for each item: _u32_be(len) + item_bytes.
+    No per-item kind tags, u32 length prefix.
+    """
     out = _u32_be(len(items))
     for item in items:
-        out += frame_value(KIND_STRING, item.encode("utf-8"))
+        out += _u32_be(len(item)) + item.encode("utf-8")
     return out
 
 
@@ -697,6 +701,32 @@ def compute_colebrook_white(
     elif result > Decimal("0.100"):
         result = Decimal("0.100")
     return result
+
+
+def compute_turbulent_friction_factor_safe(
+    reynolds: Decimal,
+    relative_roughness: Decimal,
+    tolerance: Decimal = Decimal("1e-12"),
+    max_iterations: int = 100,
+) -> tuple[Decimal | None, list[Task027BlockerEntry]]:
+    """§9.2 safe wrapper — Colebrook-White with fail-closed propagation.
+
+    Returns (friction_factor, blockers). On convergence, friction_factor is
+    set and blockers is empty. On non-convergence, friction_factor is None
+    and blockers contains BL_T027_TURBULENT_SOLVER_FAILURE.
+
+    This is the frozen-authorized propagation boundary for solver failure.
+    """
+    try:
+        f = compute_colebrook_white(reynolds, relative_roughness, tolerance, max_iterations)
+        return f, []
+    except ColebrookWhiteConvergenceError:
+        blocker = emit_blocker(
+            BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE,
+            "compute_colebrook_white",
+            get_blocker_message(BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE),
+        )
+        return None, [blocker]
 
 
 # ---------------------------------------------------------------------------
@@ -1305,6 +1335,7 @@ __all__ = [
     "ColebrookWhiteConvergenceError",
     "compute_laminar_friction_factor",
     "compute_colebrook_white",
+    "compute_turbulent_friction_factor_safe",
     "compute_pressure_drop",
     "classify_reynolds",
     "validate_reynolds",
