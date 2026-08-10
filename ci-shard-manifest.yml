@@ -80,6 +80,8 @@ shards:
       - tests/exchangers/shell_tube/tube_side/test_a09_scheduler.py
       - tests/exchangers/shell_tube/tube_side/test_a10_valid_result.py
       - tests/exchangers/shell_tube/tube_side/test_a11_to_a14_dispositions.py
+      - tests/exchangers/shell_tube/tube_side/test_task027_friction.py
+      - tests/exchangers/shell_tube/tube_side/test_task027_canonical.py
       - tests/exchangers/shell_tube/tube_side/test_hydraulic_geometry.py
       - tests/exchangers/shell_tube/tube_side/test_hydraulic_participation_authority.py
       - tests/exchangers/shell_tube/tube_side/test_blocked_result_from_raw_invalid.py
