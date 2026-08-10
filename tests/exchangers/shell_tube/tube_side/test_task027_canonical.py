@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
-
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     BLOCKED_RESULT_HASH_NAMESPACE,
     DEFAULT_SELECTION_CONTRACT,
@@ -23,19 +21,18 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
     AbsoluteRoughnessAuthority,
     BlockerCode,
-    ColebrookWhiteConvergenceError,
     RoughnessMode,
     SmoothRoughnessAuthority,
+    Task027BlockedResult,
     _encode_tuple,
+    _frame_blocked_result_semantics,
     compute_blocked_result_hash,
-    compute_colebrook_white,
     compute_request_hash,
     compute_result_hash,
     compute_selection_contract_hash,
     derive_result_id,
-    emit_blocker,
+    finalize_turbulent_solver_failure,
     frame_record,
-    get_blocker_message,
     sha256_hex,
 )
 
@@ -444,7 +441,6 @@ class TestT027TurbulentSolverFailureFailClosed:
     """
 
     # Frozen semantic inputs for blocked result
-    _SCHEMA = TASK027_BLOCKED_RESULT_SCHEMA_VERSION
     _PROFILE = "test-profile"
     _REQUEST_HASH = "d" * 64
     _T025_HASH = "e" * 64
@@ -454,61 +450,16 @@ class TestT027TurbulentSolverFailureFailClosed:
     def test_blocked_result_full_identity(self) -> None:
         """Verify solver non-convergence produces frozen blocked result identity.
 
-        Trigger: actual non-convergence via max_iterations=1.
-        Build: canonical Task027BlockedResult with frozen fields.
-        Assert: canonical bytes replay, result_hash replay, result_id replay.
+        Uses production finalize_turbulent_solver_failure() which:
+          1. Calls compute_turbulent_friction_factor_safe (actual non-convergence)
+          2. Builds canonical Task027BlockedResult via build_task027_blocked_result
+          3. Computes result_hash via compute_blocked_result_hash
+          4. Derives result_id via derive_result_id
         """
-        # Step 1: Trigger actual non-convergence
-        with pytest.raises(ColebrookWhiteConvergenceError):
-            compute_colebrook_white(
-                reynolds=Decimal("4000"),
-                relative_roughness=Decimal("0"),
-                tolerance=Decimal("1e-12"),
-                max_iterations=1,
-            )
-
-        # Step 2: Build canonical blocker
-        blocker = emit_blocker(
-            BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE,
-            "compute_colebrook_white",
-            get_blocker_message(BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE),
-        )
-        blockers_str = (
-            f'{{"code":"{blocker.code.value}",'
-            f'"field_path":["compute_colebrook_white"],'
-            f'"message_key":"{blocker.message_key}",'
-            f'"evidence_refs":[]}}'
-        )
-
-        # Step 3: Compute blocked result hash from 13 semantic fields
-        result_hash = compute_blocked_result_hash(
-            schema_version=self._SCHEMA,
+        # Step 1: Invoke production finalization with deterministic non-convergence seam
+        result = finalize_turbulent_solver_failure(
             profile_id=self._PROFILE,
             request_hash=self._REQUEST_HASH,
-            task025_hydraulic_authority_hash=self._T025_HASH,
-            task025_result_hash=self._T025_HASH,
-            task026_result_hash=self._T026_HASH,
-            property_snapshot_hash=self._PROP_HASH,
-            raw_request_projection=None,
-            raw_upstream_blocked_projection=None,
-            warnings="[]",
-            blockers=blockers_str,
-            deferred_capabilities="[]",
-            provenance="test-provenance",
-        )
-        assert len(result_hash) == 64
-
-        # Step 4: Derive result_id
-        result_id = derive_result_id(result_hash)
-        assert result_id
-
-        # Step 5: Canonical bytes replay (deterministic)
-        canonical_bytes = _build_blocked_result_bytes(
-            schema_version=self._SCHEMA,
-            profile_id=self._PROFILE,
-            request_hash=self._REQUEST_HASH,
-            result_hash=result_hash,
-            result_id=result_id,
             task025_hydraulic_authority_hash=self._T025_HASH,
             task025_result_hash=self._T025_HASH,
             task026_result_hash=self._T026_HASH,
@@ -516,37 +467,68 @@ class TestT027TurbulentSolverFailureFailClosed:
             raw_request_projection=None,
             raw_upstream_blocked_projection=None,
             warnings=(),
-            blockers_str=blockers_str,
             deferred_capabilities=(),
-            provenance="test-provenance",
+            provenance=None,
+            reynolds=Decimal("4000"),
+            relative_roughness=Decimal("0"),
+            tolerance=Decimal("1e-12"),
+            max_iterations=1,
+        )
+
+        # Step 2: Verify production returned a real Task027BlockedResult
+        assert isinstance(result, Task027BlockedResult)
+        assert result.schema_version == TASK027_BLOCKED_RESULT_SCHEMA_VERSION
+
+        # Step 3: Verify blocker properties
+        assert len(result.blockers) == 1
+        assert result.blockers[0].code == BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE
+
+        # Step 4: Verify result_hash is canonical production hash
+        assert len(result.result_hash) == 64
+        # Replay: same inputs → same hash
+        result_hash_replay = compute_blocked_result_hash(
+            schema_version=result.schema_version,
+            profile_id=result.profile_id,
+            request_hash=result.request_hash,
+            task025_hydraulic_authority_hash=result.task025_hydraulic_authority_hash,
+            task025_result_hash=result.task025_result_hash,
+            task026_result_hash=result.task026_result_hash,
+            property_snapshot_hash=result.property_snapshot_hash,
+            raw_request_projection=result.raw_request_projection,
+            raw_upstream_blocked_projection=result.raw_upstream_blocked_projection,
+            warnings=result.warnings,
+            blockers=result.blockers,
+            deferred_capabilities=result.deferred_capabilities,
+            provenance=result.provenance,
+        )
+        assert result.result_hash == result_hash_replay
+
+        # Step 5: Verify result_id matches derive_result_id(result_hash)
+        assert result.result_id == derive_result_id(result.result_hash)
+
+        # Step 6: Canonical bytes replay via production framing
+        canonical_bytes = _frame_blocked_result_semantics(
+            schema_version=result.schema_version,
+            profile_id=result.profile_id,
+            request_hash=result.request_hash,
+            task025_hydraulic_authority_hash=result.task025_hydraulic_authority_hash,
+            task025_result_hash=result.task025_result_hash,
+            task026_result_hash=result.task026_result_hash,
+            property_snapshot_hash=result.property_snapshot_hash,
+            raw_request_projection=result.raw_request_projection,
+            raw_upstream_blocked_projection=result.raw_upstream_blocked_projection,
+            warnings=result.warnings,
+            blockers=result.blockers,
+            deferred_capabilities=result.deferred_capabilities,
+            provenance=result.provenance,
         )
         assert len(canonical_bytes) > 0
+        assert sha256_hex(canonical_bytes) == result.result_hash
 
-        # Step 6: Deterministic replay — same inputs produce same bytes/hash/id
-        result_hash_2 = compute_blocked_result_hash(
-            schema_version=self._SCHEMA,
+        # Step 7: Deterministic replay — second execution produces identical result
+        result2 = finalize_turbulent_solver_failure(
             profile_id=self._PROFILE,
             request_hash=self._REQUEST_HASH,
-            task025_hydraulic_authority_hash=self._T025_HASH,
-            task025_result_hash=self._T025_HASH,
-            task026_result_hash=self._T026_HASH,
-            property_snapshot_hash=self._PROP_HASH,
-            raw_request_projection=None,
-            raw_upstream_blocked_projection=None,
-            warnings="[]",
-            blockers=blockers_str,
-            deferred_capabilities="[]",
-            provenance="test-provenance",
-        )
-        assert result_hash == result_hash_2
-        assert derive_result_id(result_hash_2) == result_id
-
-        canonical_bytes_2 = _build_blocked_result_bytes(
-            schema_version=self._SCHEMA,
-            profile_id=self._PROFILE,
-            request_hash=self._REQUEST_HASH,
-            result_hash=result_hash_2,
-            result_id=result_id,
             task025_hydraulic_authority_hash=self._T025_HASH,
             task025_result_hash=self._T025_HASH,
             task026_result_hash=self._T026_HASH,
@@ -554,12 +536,17 @@ class TestT027TurbulentSolverFailureFailClosed:
             raw_request_projection=None,
             raw_upstream_blocked_projection=None,
             warnings=(),
-            blockers_str=blockers_str,
             deferred_capabilities=(),
-            provenance="test-provenance",
+            provenance=None,
+            reynolds=Decimal("4000"),
+            relative_roughness=Decimal("0"),
+            tolerance=Decimal("1e-12"),
+            max_iterations=1,
         )
-        assert canonical_bytes == canonical_bytes_2
+        assert result.result_hash == result2.result_hash
+        assert result.result_id == result2.result_id
+        assert [b.code for b in result.blockers] == [b.code for b in result2.blockers]
 
-        # Step 7: Verify blocker properties
-        assert blocker.code == BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE
-        assert len([blocker]) == 1
+        # Step 8: Verify no partial engineering output
+        # Task027BlockedResult does not carry darcy_friction_factor or pressure_drop
+        # (those fields don't exist on the blocked schema)

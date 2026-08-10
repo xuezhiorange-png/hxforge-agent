@@ -608,6 +608,43 @@ def _encode_tuple(items: tuple[str, ...]) -> bytes:
     return out
 
 
+def _encode_blocker_entry(entry: Task027BlockerEntry) -> bytes:
+    """Frame a single Task027BlockerEntry as a canonical RECORD.
+
+    Frozen blocker entry fields (in order):
+      code (STRING), field_path (TUPLE), message_key (STRING), evidence_refs (TUPLE)
+    """
+    fields = [
+        ("code", KIND_STRING, entry.code.value.encode("utf-8")),
+        ("field_path", KIND_TUPLE, _encode_tuple(entry.field_path)),
+        ("message_key", KIND_STRING, entry.message_key.encode("utf-8")),
+        ("evidence_refs", KIND_TUPLE, _encode_tuple(entry.evidence_refs)),
+    ]
+    return frame_record("task027.blocker-entry.v1", fields)
+
+
+def _encode_raw_projection_or_none(projection: Any) -> bytes:
+    """Frame a raw projection or canonical NONE.
+
+    When projection is None, emits KIND_RAW_PROJECTION with empty payload.
+    Otherwise emits KIND_RAW_PROJECTION with the projection's string form.
+    """
+    if projection is None:
+        return frame_value(KIND_RAW_PROJECTION, b"")
+    return frame_value(KIND_RAW_PROJECTION, str(projection).encode("utf-8"))
+
+
+def _encode_provenance_or_none(provenance: Any) -> bytes:
+    """Frame provenance or canonical NONE.
+
+    When provenance is None, emits KIND_RECORD with empty payload.
+    Otherwise emits KIND_RECORD with the provenance's string form.
+    """
+    if provenance is None:
+        return frame_value(KIND_RECORD, b"")
+    return frame_value(KIND_RECORD, str(provenance).encode("utf-8"))
+
+
 def sha256_hex(framed_bytes: bytes) -> str:
     """Return the 64-lowercase-hex SHA-256 of the framed bytes."""
     return hashlib.sha256(framed_bytes).hexdigest()
@@ -1013,7 +1050,7 @@ def compute_result_hash(
     return sha256_hex(framed)
 
 
-def compute_blocked_result_hash(
+def _frame_blocked_result_semantics(
     schema_version: str,
     profile_id: str,
     request_hash: str | None,
@@ -1021,19 +1058,27 @@ def compute_blocked_result_hash(
     task025_result_hash: str | None,
     task026_result_hash: str | None,
     property_snapshot_hash: str | None,
-    raw_request_projection: str | None,
-    raw_upstream_blocked_projection: str | None,
-    warnings: str,
-    blockers: str,
-    deferred_capabilities: str,
-    provenance: str,
-) -> str:
-    """§15.4 — Compute blocked result hash from the 13 semantic fields.
+    raw_request_projection: Any,
+    raw_upstream_blocked_projection: Any,
+    warnings: tuple[str, ...],
+    blockers: tuple[Task027BlockerEntry, ...],
+    deferred_capabilities: tuple[str, ...],
+    provenance: Any,
+) -> bytes:
+    """§15.4 — Frame blocked result semantic fields with frozen typed framing.
 
-    Self-excludes result_hash and result_id (derived from this hash).
-    Uses BLOCKED_RESULT_HASH_NAMESPACE.
+    Frozen field order and kind tags:
+      1-7: STRING (schema_version, profile_id, request_hash, t025/026 hashes, property_snapshot)
+      8:   RAW_PROJECTION (raw_request_projection)
+      9:   RAW_PROJECTION (raw_upstream_blocked_projection)
+      10:  TUPLE (warnings)
+      11:  TUPLE (blockers — each blocker entry framed as RECORD)
+      12:  TUPLE (deferred_capabilities)
+      13:  RECORD (provenance)
+    Self-excludes result_hash and result_id.
     """
-    fields = [
+    blocker_bytes = b"".join(_encode_blocker_entry(b) for b in blockers)
+    fields: list[tuple[str, bytes, bytes]] = [
         ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
         ("profile_id", KIND_STRING, profile_id.encode("utf-8")),
         ("request_hash", KIND_STRING, (request_hash or "").encode("utf-8")),
@@ -1045,22 +1090,54 @@ def compute_blocked_result_hash(
         ("task025_result_hash", KIND_STRING, (task025_result_hash or "").encode("utf-8")),
         ("task026_result_hash", KIND_STRING, (task026_result_hash or "").encode("utf-8")),
         ("property_snapshot_hash", KIND_STRING, (property_snapshot_hash or "").encode("utf-8")),
-        (
-            "raw_request_projection",
-            KIND_STRING,
-            (raw_request_projection or "").encode("utf-8"),
-        ),
-        (
-            "raw_upstream_blocked_projection",
-            KIND_STRING,
-            (raw_upstream_blocked_projection or "").encode("utf-8"),
-        ),
-        ("warnings", KIND_STRING, warnings.encode("utf-8")),
-        ("blockers", KIND_STRING, blockers.encode("utf-8")),
-        ("deferred_capabilities", KIND_STRING, deferred_capabilities.encode("utf-8")),
-        ("provenance", KIND_STRING, provenance.encode("utf-8")),
     ]
+    # Fields 8-13 use typed framing — appended as raw bytes, not via frame_record fields
     framed = frame_record(BLOCKED_RESULT_HASH_NAMESPACE, fields)
+    # Append typed fields directly (they carry their own frame_value wrappers)
+    framed += _encode_raw_projection_or_none(raw_request_projection)
+    framed += _encode_raw_projection_or_none(raw_upstream_blocked_projection)
+    framed += frame_value(KIND_TUPLE, _encode_tuple(warnings))
+    framed += frame_value(KIND_TUPLE, blocker_bytes)
+    framed += frame_value(KIND_TUPLE, _encode_tuple(deferred_capabilities))
+    framed += _encode_provenance_or_none(provenance)
+    return framed
+
+
+def compute_blocked_result_hash(
+    schema_version: str,
+    profile_id: str,
+    request_hash: str | None,
+    task025_hydraulic_authority_hash: str | None,
+    task025_result_hash: str | None,
+    task026_result_hash: str | None,
+    property_snapshot_hash: str | None,
+    raw_request_projection: Any,
+    raw_upstream_blocked_projection: Any,
+    warnings: tuple[str, ...],
+    blockers: tuple[Task027BlockerEntry, ...],
+    deferred_capabilities: tuple[str, ...],
+    provenance: Any,
+) -> str:
+    """§15.4 — Compute blocked result hash from 13 semantic fields.
+
+    Self-excludes result_hash and result_id (derived from this hash).
+    Uses BLOCKED_RESULT_HASH_NAMESPACE with frozen typed framing.
+    """
+    framed = _frame_blocked_result_semantics(
+        schema_version,
+        profile_id,
+        request_hash,
+        task025_hydraulic_authority_hash,
+        task025_result_hash,
+        task026_result_hash,
+        property_snapshot_hash,
+        raw_request_projection,
+        raw_upstream_blocked_projection,
+        warnings,
+        blockers,
+        deferred_capabilities,
+        provenance,
+    )
     return sha256_hex(framed)
 
 
@@ -1125,6 +1202,106 @@ class Task027BlockedResult:
             raise ValueError(f"schema_version must be '{TASK027_BLOCKED_RESULT_SCHEMA_VERSION}'")
         if len(self.blockers) == 0:
             raise ValueError("blocked result must have non-empty blockers")
+
+
+def build_task027_blocked_result(
+    profile_id: str,
+    request_hash: str | None,
+    task025_hydraulic_authority_hash: str | None,
+    task025_result_hash: str | None,
+    task026_result_hash: str | None,
+    property_snapshot_hash: str | None,
+    raw_request_projection: Any,
+    raw_upstream_blocked_projection: Any,
+    warnings: tuple[str, ...],
+    blockers: tuple[Task027BlockerEntry, ...],
+    deferred_capabilities: tuple[str, ...],
+    provenance: Any,
+) -> Task027BlockedResult:
+    """§14.3 builder — Construct frozen Task027BlockedResult with canonical hash/id.
+
+    Uses collapse_blockers for deterministic ordering.
+    Computes result_hash via compute_blocked_result_hash.
+    Derives result_id via derive_result_id.
+    """
+    collapsed = collapse_blockers(list(blockers))
+    result_hash = compute_blocked_result_hash(
+        schema_version=TASK027_BLOCKED_RESULT_SCHEMA_VERSION,
+        profile_id=profile_id,
+        request_hash=request_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        raw_request_projection=raw_request_projection,
+        raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        warnings=warnings,
+        blockers=collapsed,
+        deferred_capabilities=deferred_capabilities,
+        provenance=provenance,
+    )
+    result_id = derive_result_id(result_hash)
+    return Task027BlockedResult(
+        schema_version=TASK027_BLOCKED_RESULT_SCHEMA_VERSION,
+        profile_id=profile_id,
+        request_hash=request_hash,
+        result_hash=result_hash,
+        result_id=result_id,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        raw_request_projection=raw_request_projection,
+        raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        warnings=warnings,
+        blockers=collapsed,
+        deferred_capabilities=deferred_capabilities,
+        provenance=provenance,
+    )
+
+
+def finalize_turbulent_solver_failure(
+    profile_id: str,
+    request_hash: str | None,
+    task025_hydraulic_authority_hash: str | None,
+    task025_result_hash: str | None,
+    task026_result_hash: str | None,
+    property_snapshot_hash: str | None,
+    raw_request_projection: Any,
+    raw_upstream_blocked_projection: Any,
+    warnings: tuple[str, ...],
+    deferred_capabilities: tuple[str, ...],
+    provenance: Any,
+    reynolds: Decimal,
+    relative_roughness: Decimal,
+    tolerance: Decimal = Decimal("1e-12"),
+    max_iterations: int = 100,
+) -> Task027BlockedResult:
+    """§9.2 finalizer — Run turbulent solver with fail-closed propagation.
+
+    Calls compute_turbulent_friction_factor_safe to trigger actual non-convergence,
+    then builds and returns a canonical Task027BlockedResult.
+    """
+    _f, solver_blockers = compute_turbulent_friction_factor_safe(
+        reynolds=reynolds,
+        relative_roughness=relative_roughness,
+        tolerance=tolerance,
+        max_iterations=max_iterations,
+    )
+    return build_task027_blocked_result(
+        profile_id=profile_id,
+        request_hash=request_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        raw_request_projection=raw_request_projection,
+        raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        warnings=warnings,
+        blockers=tuple(solver_blockers),
+        deferred_capabilities=deferred_capabilities,
+        provenance=provenance,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1407,6 +1584,8 @@ __all__ = [
     "compute_request_hash",
     "compute_result_hash",
     "compute_blocked_result_hash",
+    "build_task027_blocked_result",
+    "finalize_turbulent_solver_failure",
     "derive_result_id",
     # Constants
     "TASK027_REQUEST_SCHEMA_VERSION",
