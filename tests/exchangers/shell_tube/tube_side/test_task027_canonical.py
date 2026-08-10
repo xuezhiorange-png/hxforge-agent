@@ -26,7 +26,6 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     Task027BlockedResult,
     _encode_tuple,
     _frame_blocked_result_semantics,
-    compute_blocked_result_hash,
     compute_request_hash,
     compute_result_hash,
     compute_selection_contract_hash,
@@ -447,6 +446,97 @@ class TestT027TurbulentSolverFailureFailClosed:
     _T026_HASH = "f" * 64
     _PROP_HASH = "g" * 64
 
+    def _build_independent_canonical_bytes(
+        self,
+        schema_version: str,
+        profile_id: str,
+        request_hash: str | None,
+        t025_hash: str | None,
+        t025_result_hash: str | None,
+        t026_result_hash: str | None,
+        prop_hash: str | None,
+        raw_req_proj_none: bool,
+        raw_upstream_proj_none: bool,
+        warnings: tuple[str, ...],
+        blocker_code_value: str,
+        blocker_field_path: tuple[str, ...],
+        blocker_message_key: str,
+        blocker_evidence_refs: tuple[str, ...],
+        deferred_capabilities: tuple[str, ...],
+        provenance_none: bool,
+    ) -> bytes:
+        """Build canonical bytes independently from production hash helper.
+
+        This reconstructs the frozen 13-field named record using raw framing
+        primitives, proving the canonical byte assertion is not circular.
+        """
+        import struct as _struct
+
+        def _u32(n: int) -> bytes:
+            return _struct.pack(">I", n)
+
+        def _u64(n: int) -> bytes:
+            return _struct.pack(">Q", n)
+
+        def _fv(kind: bytes, payload: bytes) -> bytes:
+            return _u32(len(kind)) + kind + _u64(len(payload)) + payload
+
+        def _fr(ns: str, fields: list[tuple[str, bytes, bytes]]) -> bytes:
+            ns_b = ns.encode("utf-8")
+            out = _u32(len(ns_b)) + ns_b + _u32(len(fields))
+            for name, kind, payload in fields:
+                out += _u32(len(name)) + name.encode("utf-8") + _fv(kind, payload)
+            return out
+
+        def _encode_tuple(items: tuple[str, ...]) -> bytes:
+            out = _u32(len(items))
+            for item in items:
+                out += _u32(len(item)) + item.encode("utf-8")
+            return out
+
+        def _encode_blocker_entry(
+            code_val: str,
+            field_path: tuple[str, ...],
+            msg_key: str,
+            evidence: tuple[str, ...],
+        ) -> bytes:
+            fields = [
+                ("code", b"STRING", code_val.encode("utf-8")),
+                ("field_path", b"TUPLE", _encode_tuple(field_path)),
+                ("message_key", b"STRING", msg_key.encode("utf-8")),
+                ("evidence_refs", b"TUPLE", _encode_tuple(evidence)),
+            ]
+            return _fr("task027.blocker-entry.v1", fields)
+
+        # Build the 13-field record
+        req_proj_kind = b"NONE" if raw_req_proj_none else b"RAW_PROJECTION"
+        upstream_kind = b"NONE" if raw_upstream_proj_none else b"RAW_PROJECTION"
+        prov_kind = b"NONE" if provenance_none else b"RECORD"
+
+        blocker_payload = _encode_blocker_entry(
+            blocker_code_value,
+            blocker_field_path,
+            blocker_message_key,
+            blocker_evidence_refs,
+        )
+
+        fields: list[tuple[str, bytes, bytes]] = [
+            ("schema_version", b"STRING", schema_version.encode("utf-8")),
+            ("profile_id", b"STRING", profile_id.encode("utf-8")),
+            ("request_hash", b"STRING", (request_hash or "").encode("utf-8")),
+            ("task025_hydraulic_authority_hash", b"STRING", (t025_hash or "").encode("utf-8")),
+            ("task025_result_hash", b"STRING", (t025_result_hash or "").encode("utf-8")),
+            ("task026_result_hash", b"STRING", (t026_result_hash or "").encode("utf-8")),
+            ("property_snapshot_hash", b"STRING", (prop_hash or "").encode("utf-8")),
+            ("raw_request_projection", req_proj_kind, b""),
+            ("raw_upstream_blocked_projection", upstream_kind, b""),
+            ("warnings", b"TUPLE", _encode_tuple(warnings)),
+            ("blockers", b"TUPLE", blocker_payload),
+            ("deferred_capabilities", b"TUPLE", _encode_tuple(deferred_capabilities)),
+            ("provenance", prov_kind, b""),
+        ]
+        return _fr("task027.blocked-result.v1", fields)
+
     def test_blocked_result_full_identity(self) -> None:
         """Verify solver non-convergence produces frozen blocked result identity.
 
@@ -483,31 +573,49 @@ class TestT027TurbulentSolverFailureFailClosed:
         assert len(result.blockers) == 1
         assert result.blockers[0].code == BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE
 
-        # Step 4: Verify result_hash is canonical production hash
+        # Step 4: Verify result_hash is 64-char hex
         assert len(result.result_hash) == 64
-        # Replay: same inputs → same hash
-        result_hash_replay = compute_blocked_result_hash(
-            schema_version=result.schema_version,
-            profile_id=result.profile_id,
-            request_hash=result.request_hash,
-            task025_hydraulic_authority_hash=result.task025_hydraulic_authority_hash,
-            task025_result_hash=result.task025_result_hash,
-            task026_result_hash=result.task026_result_hash,
-            property_snapshot_hash=result.property_snapshot_hash,
-            raw_request_projection=result.raw_request_projection,
-            raw_upstream_blocked_projection=result.raw_upstream_blocked_projection,
-            warnings=result.warnings,
-            blockers=result.blockers,
-            deferred_capabilities=result.deferred_capabilities,
-            provenance=result.provenance,
-        )
-        assert result.result_hash == result_hash_replay
 
         # Step 5: Verify result_id matches derive_result_id(result_hash)
         assert result.result_id == derive_result_id(result.result_hash)
 
-        # Step 6: Canonical bytes replay via production framing
-        canonical_bytes = _frame_blocked_result_semantics(
+        # Step 6: Independent canonical bytes replay (NOT using production helper)
+        blocker = result.blockers[0]
+        independent_bytes = self._build_independent_canonical_bytes(
+            schema_version=result.schema_version,
+            profile_id=result.profile_id,
+            request_hash=result.request_hash,
+            t025_hash=result.task025_hydraulic_authority_hash,
+            t025_result_hash=result.task025_result_hash,
+            t026_result_hash=result.task026_result_hash,
+            prop_hash=result.property_snapshot_hash,
+            raw_req_proj_none=result.raw_request_projection is None,
+            raw_upstream_proj_none=result.raw_upstream_blocked_projection is None,
+            warnings=result.warnings,
+            blocker_code_value=blocker.code.value,
+            blocker_field_path=tuple(blocker.field_path),
+            blocker_message_key=blocker.message_key,
+            blocker_evidence_refs=tuple(blocker.evidence_refs),
+            deferred_capabilities=result.deferred_capabilities,
+            provenance_none=result.provenance is None,
+        )
+        assert len(independent_bytes) > 0
+
+        # Verify: single named record with 13 fields (no anonymous suffix)
+        import struct as _struct
+
+        ns_len = _struct.unpack(">I", independent_bytes[:4])[0]
+        field_count = _struct.unpack(">I", independent_bytes[4 + ns_len : 8 + ns_len])[0]
+        assert field_count == 13, f"Expected 13 fields, got {field_count}"
+
+        # Verify: independent hash matches production result_hash
+        assert sha256_hex(independent_bytes) == result.result_hash, (
+            f"Independent canonical bytes hash {sha256_hex(independent_bytes)} "
+            f"!= production result_hash {result.result_hash}"
+        )
+
+        # Step 7: Canonical bytes via production framing also match
+        canonical_bytes_prod = _frame_blocked_result_semantics(
             schema_version=result.schema_version,
             profile_id=result.profile_id,
             request_hash=result.request_hash,
@@ -522,10 +630,9 @@ class TestT027TurbulentSolverFailureFailClosed:
             deferred_capabilities=result.deferred_capabilities,
             provenance=result.provenance,
         )
-        assert len(canonical_bytes) > 0
-        assert sha256_hex(canonical_bytes) == result.result_hash
+        assert canonical_bytes_prod == independent_bytes
 
-        # Step 7: Deterministic replay — second execution produces identical result
+        # Step 8: Deterministic replay — second execution produces identical result
         result2 = finalize_turbulent_solver_failure(
             profile_id=self._PROFILE,
             request_hash=self._REQUEST_HASH,
@@ -547,6 +654,64 @@ class TestT027TurbulentSolverFailureFailClosed:
         assert result.result_id == result2.result_id
         assert [b.code for b in result.blockers] == [b.code for b in result2.blockers]
 
-        # Step 8: Verify no partial engineering output
+        # Step 9: Verify no partial engineering output
         # Task027BlockedResult does not carry darcy_friction_factor or pressure_drop
         # (those fields don't exist on the blocked schema)
+        assert not hasattr(result, "darcy_friction_factor")
+        assert not hasattr(result, "straight_tube_friction_pressure_drop_pa")
+
+    def test_raw_upstream_projection_none_encoding(self) -> None:
+        """Verify raw_upstream_blocked_projection absent uses KIND_NONE encoding."""
+        import struct as _struct
+
+        result = finalize_turbulent_solver_failure(
+            profile_id=self._PROFILE,
+            request_hash=self._REQUEST_HASH,
+            task025_hydraulic_authority_hash=self._T025_HASH,
+            task025_result_hash=self._T025_HASH,
+            task026_result_hash=self._T026_HASH,
+            property_snapshot_hash=self._PROP_HASH,
+            raw_request_projection=None,
+            raw_upstream_blocked_projection=None,
+            warnings=(),
+            deferred_capabilities=(),
+            provenance=None,
+            reynolds=Decimal("4000"),
+            relative_roughness=Decimal("0"),
+            tolerance=Decimal("1e-12"),
+            max_iterations=1,
+        )
+        # Verify raw_upstream_blocked_projection is None
+        assert result.raw_upstream_blocked_projection is None
+
+        # Verify canonical bytes use KIND_NONE for field 9
+        canonical = _frame_blocked_result_semantics(
+            schema_version=result.schema_version,
+            profile_id=result.profile_id,
+            request_hash=result.request_hash,
+            task025_hydraulic_authority_hash=result.task025_hydraulic_authority_hash,
+            task025_result_hash=result.task025_result_hash,
+            task026_result_hash=result.task026_result_hash,
+            property_snapshot_hash=result.property_snapshot_hash,
+            raw_request_projection=result.raw_request_projection,
+            raw_upstream_blocked_projection=result.raw_upstream_blocked_projection,
+            warnings=result.warnings,
+            blockers=result.blockers,
+            deferred_capabilities=result.deferred_capabilities,
+            provenance=result.provenance,
+        )
+        # Parse to find field 9 kind tag
+        ns_len = _struct.unpack(">I", canonical[:4])[0]
+        offset = 4 + ns_len + 4  # skip namespace + field_count
+        for i in range(13):
+            name_len = _struct.unpack(">I", canonical[offset : offset + 4])[0]
+            offset += 4 + name_len  # skip name
+            # Skip frame_value: kind_len(u32) + kind + payload_len(u64) + payload
+            kind_len = _struct.unpack(">I", canonical[offset : offset + 4])[0]
+            kind_tag = canonical[offset + 4 : offset + 4 + kind_len]
+            offset += 4 + kind_len
+            payload_len = _struct.unpack(">Q", canonical[offset : offset + 8])[0]
+            offset += 8 + payload_len
+            if i == 8:  # field 9 (0-indexed)
+                assert kind_tag == b"NONE", f"Field 9 kind={kind_tag}, expected NONE"
+                assert payload_len == 0, f"Field 9 payload_len={payload_len}, expected 0"

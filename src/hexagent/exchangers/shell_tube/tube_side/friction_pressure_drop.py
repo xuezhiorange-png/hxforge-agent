@@ -623,26 +623,67 @@ def _encode_blocker_entry(entry: Task027BlockerEntry) -> bytes:
     return frame_record("task027.blocker-entry.v1", fields)
 
 
-def _encode_raw_projection_or_none(projection: Any) -> bytes:
-    """Frame a raw projection or canonical NONE.
+def _encode_raw_projection_canonical(projection: Any) -> bytes:
+    """Encode a raw projection as frozen canonical nested record.
 
-    When projection is None, emits KIND_RAW_PROJECTION with empty payload.
-    Otherwise emits KIND_RAW_PROJECTION with the projection's string form.
+    Frozen raw projection fields (in order):
+      projection_kind (STRING), canonical_bytes_hex (STRING)
+    Namespace: task027.raw-projection.v1
     """
     if projection is None:
-        return frame_value(KIND_RAW_PROJECTION, b"")
-    return frame_value(KIND_RAW_PROJECTION, str(projection).encode("utf-8"))
+        return b""
+    # Canonical: frame as a nested record with projection_kind + canonical_bytes_hex
+    if hasattr(projection, "projection_kind") and hasattr(projection, "canonical_bytes_hex"):
+        fields = [
+            ("projection_kind", KIND_STRING, projection.projection_kind.encode("utf-8")),
+            ("canonical_bytes_hex", KIND_STRING, projection.canonical_bytes_hex.encode("utf-8")),
+        ]
+    else:
+        # Fallback: treat as string projection
+        fields = [
+            ("projection_kind", KIND_STRING, b"unknown"),
+            ("canonical_bytes_hex", KIND_STRING, str(projection).encode("utf-8")),
+        ]
+    return frame_record("task027.raw-projection.v1", fields)
 
 
-def _encode_provenance_or_none(provenance: Any) -> bytes:
-    """Frame provenance or canonical NONE.
+def _encode_provenance_canonical(provenance: Any) -> bytes:
+    """Encode provenance as frozen canonical nested record.
 
-    When provenance is None, emits KIND_RECORD with empty payload.
-    Otherwise emits KIND_RECORD with the provenance's string form.
+    Frozen provenance fields (in order):
+      task_id (STRING), design_contract_path (STRING),
+      implementation_software_version (STRING),
+      input_evidence_refs (TUPLE), upstream_identity_hashes (TUPLE)
+    Namespace: task027.provenance.v1
     """
     if provenance is None:
-        return frame_value(KIND_RECORD, b"")
-    return frame_value(KIND_RECORD, str(provenance).encode("utf-8"))
+        return b""
+    if hasattr(provenance, "task_id"):
+        fields = [
+            ("task_id", KIND_STRING, provenance.task_id.encode("utf-8")),
+            ("design_contract_path", KIND_STRING, provenance.design_contract_path.encode("utf-8")),
+            (
+                "implementation_software_version",
+                KIND_STRING,
+                provenance.implementation_software_version.encode("utf-8"),
+            ),
+            ("input_evidence_refs", KIND_TUPLE, _encode_tuple(provenance.input_evidence_refs)),
+            (
+                "upstream_identity_hashes",
+                KIND_TUPLE,
+                _encode_tuple(provenance.upstream_identity_hashes),
+            ),
+        ]
+    else:
+        # Fallback: treat as string provenance
+        fields = [
+            ("task_id", KIND_STRING, b"unknown"),
+            ("design_contract_path", KIND_STRING, b"unknown"),
+            ("implementation_software_version", KIND_STRING, b"unknown"),
+            ("input_evidence_refs", KIND_TUPLE, _encode_tuple(())),
+            ("upstream_identity_hashes", KIND_TUPLE, _encode_tuple(())),
+        ]
+    return frame_record(PROVENANCE_NAMESPACE, fields)
 
 
 def sha256_hex(framed_bytes: bytes) -> str:
@@ -1065,19 +1106,26 @@ def _frame_blocked_result_semantics(
     deferred_capabilities: tuple[str, ...],
     provenance: Any,
 ) -> bytes:
-    """§15.4 — Frame blocked result semantic fields with frozen typed framing.
+    """§15.4 — Frame blocked result as a single 13-field named canonical record.
 
-    Frozen field order and kind tags:
-      1-7: STRING (schema_version, profile_id, request_hash, t025/026 hashes, property_snapshot)
-      8:   RAW_PROJECTION (raw_request_projection)
-      9:   RAW_PROJECTION (raw_upstream_blocked_projection)
-      10:  TUPLE (warnings)
-      11:  TUPLE (blockers — each blocker entry framed as RECORD)
-      12:  TUPLE (deferred_capabilities)
-      13:  RECORD (provenance)
+    Frozen field order and kind tags (ALL fields named, no anonymous suffix):
+      1:  schema_version           STRING
+      2:  profile_id               STRING
+      3:  request_hash             STRING
+      4:  task025_hydraulic_authority_hash  STRING
+      5:  task025_result_hash      STRING
+      6:  task026_result_hash      STRING
+      7:  property_snapshot_hash   STRING
+      8:  raw_request_projection   RAW_PROJECTION (or NONE if absent)
+      9:  raw_upstream_blocked_projection  RAW_PROJECTION (or NONE if absent)
+      10: warnings                 TUPLE
+      11: blockers                 TUPLE (each blocker entry framed as RECORD)
+      12: deferred_capabilities    TUPLE
+      13: provenance               RECORD (or NONE if absent)
+
     Self-excludes result_hash and result_id.
     """
-    blocker_bytes = b"".join(_encode_blocker_entry(b) for b in blockers)
+    blocker_payload = b"".join(_encode_blocker_entry(b) for b in blockers)
     fields: list[tuple[str, bytes, bytes]] = [
         ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
         ("profile_id", KIND_STRING, profile_id.encode("utf-8")),
@@ -1090,17 +1138,36 @@ def _frame_blocked_result_semantics(
         ("task025_result_hash", KIND_STRING, (task025_result_hash or "").encode("utf-8")),
         ("task026_result_hash", KIND_STRING, (task026_result_hash or "").encode("utf-8")),
         ("property_snapshot_hash", KIND_STRING, (property_snapshot_hash or "").encode("utf-8")),
+        # Field 8: raw_request_projection — NONE when absent
+        (
+            "raw_request_projection",
+            KIND_NONE if raw_request_projection is None else KIND_RAW_PROJECTION,
+            b""
+            if raw_request_projection is None
+            else _encode_raw_projection_canonical(raw_request_projection),
+        ),
+        # Field 9: raw_upstream_blocked_projection — NONE when absent
+        (
+            "raw_upstream_blocked_projection",
+            KIND_NONE if raw_upstream_blocked_projection is None else KIND_RAW_PROJECTION,
+            b""
+            if raw_upstream_blocked_projection is None
+            else _encode_raw_projection_canonical(raw_upstream_blocked_projection),
+        ),
+        # Field 10: warnings
+        ("warnings", KIND_TUPLE, _encode_tuple(warnings)),
+        # Field 11: blockers
+        ("blockers", KIND_TUPLE, blocker_payload),
+        # Field 12: deferred_capabilities
+        ("deferred_capabilities", KIND_TUPLE, _encode_tuple(deferred_capabilities)),
+        # Field 13: provenance — NONE when absent
+        (
+            "provenance",
+            KIND_NONE if provenance is None else KIND_RECORD,
+            b"" if provenance is None else _encode_provenance_canonical(provenance),
+        ),
     ]
-    # Fields 8-13 use typed framing — appended as raw bytes, not via frame_record fields
-    framed = frame_record(BLOCKED_RESULT_HASH_NAMESPACE, fields)
-    # Append typed fields directly (they carry their own frame_value wrappers)
-    framed += _encode_raw_projection_or_none(raw_request_projection)
-    framed += _encode_raw_projection_or_none(raw_upstream_blocked_projection)
-    framed += frame_value(KIND_TUPLE, _encode_tuple(warnings))
-    framed += frame_value(KIND_TUPLE, blocker_bytes)
-    framed += frame_value(KIND_TUPLE, _encode_tuple(deferred_capabilities))
-    framed += _encode_provenance_or_none(provenance)
-    return framed
+    return frame_record(BLOCKED_RESULT_HASH_NAMESPACE, fields)
 
 
 def compute_blocked_result_hash(
