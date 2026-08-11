@@ -306,6 +306,20 @@ def _validate_component_record(
         )
         return None
 
+    # path_sequence_index (CR-06: defaults to array index for raw input)
+    psi = comp.get("path_sequence_index", index)
+    if not isinstance(psi, int) or isinstance(psi, bool):
+        pending_blockers.append(
+            emit_blocker(
+                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
+                f"{prefix}.path_sequence_index",
+                "The TASK-028 raw input boundary is malformed.",
+                component_id_tiebreaker=tiebreaker,
+            )
+        )
+        return None
+    typed["path_sequence_index"] = psi
+
     # flow_direction_assertion
     fda = comp.get("flow_direction_assertion", "")
     if not isinstance(fda, str) or fda not in ("START_TO_END", "END_TO_START"):
@@ -517,26 +531,6 @@ def _validate_component_record(
         )
         return None
     typed["coefficient_permission_status"] = CoefficientPermissionStatus(cps)
-
-    # coefficient_source_evidence_refs
-    cser = comp.get("coefficient_source_evidence_refs", ())
-    if not isinstance(cser, (list, tuple)):
-        pending_blockers.append(
-            emit_blocker(
-                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
-                f"{prefix}.coefficient_source_evidence_refs",
-                "The TASK-028 raw input boundary is malformed.",
-                component_id_tiebreaker=tiebreaker,
-            )
-        )
-        return None
-    typed["coefficient_source_evidence_refs"] = tuple(cser)
-
-    # caller_supplied_authority_hash (optional)
-    csah = comp.get("caller_supplied_authority_hash", "")
-    if not isinstance(csah, str):
-        csah = ""
-    typed["caller_supplied_authority_hash"] = csah
 
     return typed
 

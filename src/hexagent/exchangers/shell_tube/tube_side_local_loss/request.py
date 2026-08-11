@@ -6,8 +6,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
+from hexagent.exchangers.shell_tube.tube_side.valid_result import Task025ValidResult
 from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
     SUPPORTED_PROFILE_IDS,
     TASK028_REQUEST_SCHEMA_VERSION,
@@ -19,6 +19,8 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.enums import (
 from hexagent.exchangers.shell_tube.tube_side_local_loss.models import (
     TubeSideLocalLossComponentAuthority,
 )
+from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import PropertySnapshot
+from hexagent.exchangers.shell_tube.tube_side_thermal.result import TubeSideThermalResult
 
 
 @dataclass(frozen=True)
@@ -27,9 +29,9 @@ class Task028Request:
 
     schema_version: str
     profile_id: str
-    task025_valid_result: Any  # Task025ValidResult
-    task026_success_result: Any  # TubeSideThermalResult
-    property_snapshot: Any  # PropertySnapshot
+    task025_valid_result: Task025ValidResult
+    task026_success_result: TubeSideThermalResult
+    property_snapshot: PropertySnapshot
     property_snapshot_hash: str
     constant_density_path_assertion: Task028ApplicabilityAssertion
     zero_net_elevation_change_assertion: Task028ApplicabilityAssertion
@@ -47,9 +49,9 @@ class Task028Request:
 def build_task028_request(
     *,
     profile_id: str,
-    task025_valid_result: Any,
-    task026_success_result: Any,
-    property_snapshot: Any,
+    task025_valid_result: Task025ValidResult,
+    task026_success_result: TubeSideThermalResult,
+    property_snapshot: PropertySnapshot,
     property_snapshot_hash: str,
     constant_density_path_assertion: Task028ApplicabilityAssertion,
     zero_net_elevation_change_assertion: Task028ApplicabilityAssertion,

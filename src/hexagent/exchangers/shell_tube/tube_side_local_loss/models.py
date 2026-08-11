@@ -60,24 +60,25 @@ class TubeSideLocalLossComponentAuthority:
     """§5 — Immutable 17-field component authority record.
 
     Ordered fields exactly match the canonical hash projection.
+    Fields 1–16 are included in the authority_hash computation (field 17).
     """
 
+    schema_version: str
     component_id: str
     component_type: Task028ComponentType
+    path_sequence_index: int
+    upstream_reference_plane: str
+    downstream_reference_plane: str
     flow_direction_assertion: Task028ComponentFlowDirectionAssertion
     loss_coefficient: Decimal
     loss_coefficient_convention: LossCoefficientConvention
     reference_flow_area_m2: Decimal
     multiplicity: int
-    upstream_reference_plane: str
-    downstream_reference_plane: str
     geometry_evidence_refs: tuple[str, ...]
     coefficient_source_id: str
     coefficient_source_version: str
     coefficient_source_location: str
     coefficient_permission_status: CoefficientPermissionStatus
-    coefficient_source_evidence_refs: tuple[str, ...]
-    caller_supplied_authority_hash: str  # "" if not supplied
     authority_hash: str
 
 
@@ -87,18 +88,18 @@ class TubeSideLocalLossComponentResult:
 
     component_id: str
     component_type: Task028ComponentType
-    flow_direction_assertion: Task028ComponentFlowDirectionAssertion
-    loss_coefficient: Decimal
-    loss_coefficient_convention: LossCoefficientConvention
-    reference_flow_area_m2: Decimal
-    multiplicity: int
+    path_sequence_index: int
     upstream_reference_plane: str
     downstream_reference_plane: str
+    flow_direction_assertion: Task028ComponentFlowDirectionAssertion
+    authority_hash: str
+    reference_flow_area_m2: Decimal
     reference_velocity_m_s: Decimal
+    loss_coefficient: Decimal
+    loss_coefficient_convention: LossCoefficientConvention
+    multiplicity: int
     single_occurrence_irreversible_pressure_loss_pa: Decimal
     component_irreversible_pressure_loss_pa: Decimal
-    authority_hash: str
-    component_result_hash: str
 
 
 __all__ = [

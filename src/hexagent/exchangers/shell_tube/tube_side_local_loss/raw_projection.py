@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, cast
@@ -105,7 +104,7 @@ def canonicalize_raw_value(value: Any) -> bytes:
 def encode_raw_projection(projection_kind: str, raw_input: Any) -> Task028RawProjection:
     """Encode a raw input into a Task028RawProjection."""
     canonical_bytes = canonicalize_raw_value(raw_input)
-    canonical_bytes_hex = hashlib.sha256(canonical_bytes).hexdigest()
+    canonical_bytes_hex = canonical_bytes.hex()
     return Task028RawProjection(
         projection_kind=projection_kind,
         canonical_bytes_hex=canonical_bytes_hex,

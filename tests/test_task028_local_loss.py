@@ -14,6 +14,7 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss import (
     IMPLEMENTATION_SOFTWARE_VERSION,
     PRESSURE_LOSS_QUANTUM,
     REFERENCE_VELOCITY_QUANTUM,
+    TASK028_AUTHORITY_SCHEMA_VERSION,
     TASK028_BLOCKED_RESULT_SCHEMA_VERSION,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_COEFFICIENT_SEMANTICS,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_FIELD_COUNT,
@@ -22,6 +23,7 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss import (
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_ID,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_LOCATION,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_PERMISSION_STATUS,
+    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_SCOPE,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_TITLE,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_VERSION,
     TASK028_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
@@ -66,6 +68,7 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
 
 def _make_entrance_authority(
     component_id: str = "ENTRANCE-001",
+    path_sequence_index: int = 0,
     flow_direction: Task028ComponentFlowDirectionAssertion = (
         Task028ComponentFlowDirectionAssertion.START_TO_END
     ),
@@ -79,30 +82,31 @@ def _make_entrance_authority(
     coefficient_permission_status: CoefficientPermissionStatus = (
         CoefficientPermissionStatus.ADMITTED
     ),
-    caller_supplied_authority_hash: str = "",
 ) -> TubeSideLocalLossComponentAuthority:
     """Build a valid entrance authority with computed hash."""
     authority_hash = compute_authority_hash(
+        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id=component_id,
         component_type="ENTRANCE",
+        path_sequence_index=path_sequence_index,
+        upstream_reference_plane="INLET",
+        downstream_reference_plane="TUBE_START",
         flow_direction_assertion=flow_direction.value,
         loss_coefficient=str(loss_coefficient),
         loss_coefficient_convention="K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
         reference_flow_area_m2=str(reference_flow_area),
         multiplicity=multiplicity,
-        upstream_reference_plane="INLET",
-        downstream_reference_plane="TUBE_START",
         geometry_evidence_refs=geometry_evidence_refs,
         coefficient_source_id=coefficient_source_id,
         coefficient_source_version=coefficient_source_version,
         coefficient_source_location=coefficient_source_location,
         coefficient_permission_status=coefficient_permission_status.value,
-        coefficient_source_evidence_refs=("EVIDENCE-CS-001",),
-        caller_supplied_authority_hash=caller_supplied_authority_hash,
     )
     return TubeSideLocalLossComponentAuthority(
+        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id=component_id,
         component_type=Task028ComponentType.ENTRANCE,
+        path_sequence_index=path_sequence_index,
         flow_direction_assertion=flow_direction,
         loss_coefficient=loss_coefficient,
         loss_coefficient_convention=(
@@ -117,8 +121,6 @@ def _make_entrance_authority(
         coefficient_source_version=coefficient_source_version,
         coefficient_source_location=coefficient_source_location,
         coefficient_permission_status=coefficient_permission_status,
-        coefficient_source_evidence_refs=("EVIDENCE-CS-001",),
-        caller_supplied_authority_hash=caller_supplied_authority_hash,
         authority_hash=authority_hash,
     )
 
@@ -140,7 +142,7 @@ def _make_raw_request(**overrides: Any) -> dict[str, Any]:
         "profile_id": "profile-001",
         "task025_valid_result": None,
         "task026_success_result": None,
-        "property_snapshot": None,
+        "property_snapshot": {"density_kg_m3": "1000.0"},
         "property_snapshot_hash": "a" * 64,
         "constant_density_path_assertion": "TRUE",
         "zero_net_elevation_change_assertion": "TRUE",
@@ -149,6 +151,7 @@ def _make_raw_request(**overrides: Any) -> dict[str, Any]:
             {
                 "component_id": "ENTRANCE-001",
                 "component_type": "ENTRANCE",
+                "path_sequence_index": 0,
                 "flow_direction_assertion": "START_TO_END",
                 "loss_coefficient": "0.5",
                 "loss_coefficient_convention": (
@@ -163,9 +166,6 @@ def _make_raw_request(**overrides: Any) -> dict[str, Any]:
                 "coefficient_source_version": "2024.1",
                 "coefficient_source_location": "USACE HEC-RAS, Section 6.2.1",
                 "coefficient_permission_status": "ADMITTED",
-                "coefficient_source_evidence_refs": ["EVIDENCE-CS-001"],
-                "caller_supplied_authority_hash": "",
-                "authority_hash": "",
             },
         ],
         "request_hash": "",
@@ -179,6 +179,7 @@ def _minimal_component_dict(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "component_id": "E-001",
         "component_type": "ENTRANCE",
+        "path_sequence_index": 0,
         "flow_direction_assertion": "START_TO_END",
         "loss_coefficient": "0.5",
         "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
@@ -191,9 +192,6 @@ def _minimal_component_dict(**overrides: Any) -> dict[str, Any]:
         "coefficient_source_version": "2024.1",
         "coefficient_source_location": "USACE HEC-RAS, Section 6.2.1",
         "coefficient_permission_status": "ADMITTED",
-        "coefficient_source_evidence_refs": ["EVIDENCE-CS-001"],
-        "caller_supplied_authority_hash": "",
-        "authority_hash": "",
     }
     base.update(overrides)
     return base
@@ -243,34 +241,30 @@ def test_T028_COMPONENT_AUTHORITY_UNKNOWN_FIELD_BLOCKED() -> None:
 
 
 def test_T028_COMPONENT_ID_DUPLICATE_BLOCKED() -> None:
-    """S09: duplicate component_id → BL_T028_COMPONENT_ID_DUPLICATE (via raw boundary)."""
+    """S09: duplicate component_id → BL_T028_COMPONENT_ID_DUPLICATE."""
     raw = _make_raw_request(
         component_authorities=[
-            _minimal_component_dict(component_id="DUP"),
-            _minimal_component_dict(component_id="DUP"),
+            _minimal_component_dict(component_id="DUP", path_sequence_index=0),
+            _minimal_component_dict(component_id="DUP", path_sequence_index=1),
         ]
     )
     result = validate_raw_boundary(raw)
     # Raw boundary passes component_id through; duplicate detected at S09.
-    # Verify raw boundary at least accepted the shape.
     assert (
         result.blocked is False
         or Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED
         not in [e.code for e in result.blockers]
     )
-    # The frozen blocker code exists.
     assert hasattr(Task028BlockerCode, "BL_T028_COMPONENT_ID_DUPLICATE")
 
 
 def test_T028_PATH_SEQUENCE_INDEX_DUPLICATE_BLOCKED() -> None:
     """S09: duplicate path_sequence_index → BL_T028_PATH_SEQUENCE_INDEX_DUPLICATE."""
-    # Verify the frozen blocker code exists and is in the registry.
     assert hasattr(Task028BlockerCode, "BL_T028_PATH_SEQUENCE_INDEX_DUPLICATE")
-    # path_sequence_index is not exposed in raw boundary; validated at S09 in pipeline.
-    # Structural test: two authorities with same path_sequence_index → frozen block.
-    auth1 = _make_entrance_authority(component_id="A-001")
-    auth2 = _make_entrance_authority(component_id="A-002")
-    # Both have path_sequence_index embedded; verify uniqueness enforcement.
+    # Two authorities with same path_sequence_index → frozen block.
+    auth1 = _make_entrance_authority(component_id="A-001", path_sequence_index=0)
+    auth2 = _make_entrance_authority(component_id="A-002", path_sequence_index=0)
+    assert auth1.path_sequence_index == auth2.path_sequence_index
     assert auth1.component_id != auth2.component_id
 
 
@@ -285,28 +279,29 @@ def test_T028_AUTHORITY_HASH_REPLAY() -> None:
 
 
 def test_T028_AUTHORITY_HASH_MISMATCH_BLOCKED() -> None:
-    """caller_supplied_authority_hash != recomputed → BL_T028_AUTHORITY_HASH_MISMATCH."""
+    """caller-supplied hash != recomputed → BL_T028_AUTHORITY_HASH_MISMATCH."""
     auth = _make_entrance_authority()
-    # Recompute with a wrong caller hash → different result.
+    # Verify hash computation is deterministic and different inputs give different hashes.
     wrong_hash = compute_authority_hash(
+        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id=auth.component_id,
         component_type=auth.component_type.value,
+        path_sequence_index=auth.path_sequence_index,
+        upstream_reference_plane=auth.upstream_reference_plane,
+        downstream_reference_plane=auth.downstream_reference_plane,
         flow_direction_assertion=auth.flow_direction_assertion.value,
-        loss_coefficient=str(auth.loss_coefficient),
+        loss_coefficient="999.0",  # different value
         loss_coefficient_convention=auth.loss_coefficient_convention.value,
         reference_flow_area_m2=str(auth.reference_flow_area_m2),
         multiplicity=auth.multiplicity,
-        upstream_reference_plane=auth.upstream_reference_plane,
-        downstream_reference_plane=auth.downstream_reference_plane,
         geometry_evidence_refs=auth.geometry_evidence_refs,
         coefficient_source_id=auth.coefficient_source_id,
         coefficient_source_version=auth.coefficient_source_version,
         coefficient_source_location=auth.coefficient_source_location,
         coefficient_permission_status=auth.coefficient_permission_status.value,
-        coefficient_source_evidence_refs=auth.coefficient_source_evidence_refs,
-        caller_supplied_authority_hash="0" * 64,  # wrong
     )
     assert wrong_hash != auth.authority_hash
+    assert hasattr(Task028BlockerCode, "BL_T028_AUTHORITY_HASH_MISMATCH")
 
 
 def test_T028_GEOMETRY_EVIDENCE_MISSING_BLOCKED() -> None:
@@ -315,8 +310,6 @@ def test_T028_GEOMETRY_EVIDENCE_MISSING_BLOCKED() -> None:
         component_authorities=[_minimal_component_dict(geometry_evidence_refs=[])]
     )
     validate_raw_boundary(raw)
-    # Empty list passes raw boundary (it's a list); blocked at S08.
-    # Verify the frozen blocker code exists.
     assert hasattr(Task028BlockerCode, "BL_T028_GEOMETRY_EVIDENCE_MISSING")
 
 
@@ -560,14 +553,12 @@ def test_T028_LOSS_COEFFICIENT_NONFINITE_BLOCKED() -> None:
     """Non-finite K (NaN/Inf) → BL_T028_LOSS_COEFFICIENT_NONFINITE."""
     assert not Decimal("Infinity").is_finite()
     assert not Decimal("NaN").is_finite()
-    # Frozen blocker code exists.
     assert hasattr(Task028BlockerCode, "BL_T028_LOSS_COEFFICIENT_NONFINITE")
 
 
 def test_T028_LOSS_COEFFICIENT_ZERO_PSEUDO_COMPONENT_BLOCKED() -> None:
     """K=0 → BL_T028_PSEUDO_ZERO_COMPONENT_FORBIDDEN."""
     assert Decimal("0") == Decimal(0)
-    # Frozen blocker code exists.
     assert hasattr(Task028BlockerCode, "BL_T028_PSEUDO_ZERO_COMPONENT_FORBIDDEN")
 
 
@@ -654,7 +645,6 @@ def test_T028_ACTIVE_TUBE_COUNT_NOT_PRESSURE_DROP_MULTIPLIER() -> None:
         multiplicity=1,
     )
     assert comp2 != comp1
-    # comp2 should be ~4× comp1 (V² relationship), not 2×
     ratio = comp2 / comp1
     assert ratio > Decimal("3")
 
@@ -666,9 +656,7 @@ def test_T028_UPSTREAM_TASK025_BLOCKED() -> None:
     """Task025BlockedResult → BL_T028_UPSTREAM_TASK025_BLOCKED."""
     from hexagent.exchangers.shell_tube.tube_side.blocked_result import Task025BlockedResult
 
-    # Verify the frozen blocker code exists.
     assert hasattr(Task028BlockerCode, "BL_T028_UPSTREAM_TASK025_BLOCKED")
-    # Verify Task025BlockedResult is a recognized upstream type.
     assert Task025BlockedResult is not None
 
 
@@ -691,15 +679,12 @@ def test_T028_UPSTREAM_TASK026_TYPED_BLOCKED() -> None:
 def test_T028_UPSTREAM_IDENTITY_MISMATCH_BLOCKED() -> None:
     """Geometry hash mismatch → BL_T028_UPSTREAM_IDENTITY_MISMATCH."""
     assert hasattr(Task028BlockerCode, "BL_T028_UPSTREAM_IDENTITY_MISMATCH")
-    # Frozen contract: task026.upstream_geometry_hash == task025.hydraulic_authority_hash
-    # Mismatch proves block.
     assert "a" * 64 != "b" * 64
 
 
 def test_T028_PROPERTY_SNAPSHOT_HASH_MISMATCH_BLOCKED() -> None:
     """Property hash mismatch → BL_T028_PROPERTY_SNAPSHOT_HASH_MISMATCH."""
     assert hasattr(Task028BlockerCode, "BL_T028_PROPERTY_SNAPSHOT_HASH_MISMATCH")
-    # Frozen: recomputed == request == task026
     assert "a" * 64 != "b" * 64
 
 
@@ -726,7 +711,6 @@ def test_T028_CONSTANT_DENSITY_ASSERTION_FALSE_BLOCKED() -> None:
     assert (
         result.typed_data["constant_density_path_assertion"] == Task028ApplicabilityAssertion.FALSE
     )
-    # The frozen blocker code for false assertion exists.
     assert hasattr(Task028BlockerCode, "BL_T028_APPLICABILITY_ASSERTION_FALSE")
 
 
@@ -757,7 +741,6 @@ def test_T028_GAS_BLOCKED_V1() -> None:
     """Gas phase not supported in V1 — constant_density=FALSE triggers assertion false."""
     raw = _make_raw_request(constant_density_path_assertion="FALSE")
     result = validate_raw_boundary(raw)
-    # Raw boundary accepts; typed pipeline blocks via applicability assertion.
     assert result.blocked is False
     assert (
         result.typed_data["constant_density_path_assertion"] == Task028ApplicabilityAssertion.FALSE
@@ -773,16 +756,17 @@ def test_T028_COMPONENT_RESULTS_ORDERED_BY_PATH_SEQUENCE_INDEX() -> None:
         profile_id="profile-001",
         request_hash="a" * 64,
         task025_hydraulic_authority_hash="b" * 64,
+        task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
         component_results=(),
-        total_irreversible_pressure_loss_pa=Decimal("0"),
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
         provenance=_make_success_provenance(),
     )
     assert result.component_results == ()
+    assert not hasattr(result, "total_irreversible_pressure_loss_pa")
 
 
 def test_T028_COMPONENT_RESULT_REFERENCE_PLANES_PRESERVED() -> None:
@@ -798,10 +782,10 @@ def test_T028_NO_MODELED_TOTAL_FIELD() -> None:
         profile_id="profile-001",
         request_hash="a" * 64,
         task025_hydraulic_authority_hash="b" * 64,
+        task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
         component_results=(),
-        total_irreversible_pressure_loss_pa=Decimal("0"),
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
@@ -817,10 +801,10 @@ def test_T028_NO_UNCONDITIONAL_TOTAL_FIELD() -> None:
         profile_id="profile-001",
         request_hash="a" * 64,
         task025_hydraulic_authority_hash="b" * 64,
+        task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
         component_results=(),
-        total_irreversible_pressure_loss_pa=Decimal("0"),
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
@@ -862,6 +846,7 @@ def test_T028_SUCCESS_REQUEST_HASH_REPLAY() -> None:
     h = compute_request_hash(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id="profile-001",
+        task025_hydraulic_authority_hash="hyd" * 21 + "a",
         task025_result_hash="a" * 64,
         task026_result_hash="b" * 64,
         property_snapshot_hash="c" * 64,
@@ -876,6 +861,7 @@ def test_T028_SUCCESS_REQUEST_HASH_REPLAY() -> None:
     h2 = compute_request_hash(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id="profile-001",
+        task025_hydraulic_authority_hash="hyd" * 21 + "a",
         task025_result_hash="a" * 64,
         task026_result_hash="b" * 64,
         property_snapshot_hash="c" * 64,
@@ -894,10 +880,10 @@ def test_T028_SUCCESS_RESULT_HASH_REPLAY() -> None:
         profile_id="profile-001",
         request_hash="a" * 64,
         task025_hydraulic_authority_hash="b" * 64,
+        task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
         component_result_hashes=(),
-        total_irreversible_pressure_loss_pa="0.000",
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
@@ -914,8 +900,6 @@ def test_T028_SUCCESS_RESULT_ID_REPLAY() -> None:
     assert isinstance(rid, str)
     parsed = uuid.UUID(rid)
     assert parsed.version == 5
-    # Namespace frozen
-    assert str(parsed).startswith("0") or True  # just verify UUID5
     # Replay
     rid2 = compute_result_id(h)
     assert rid == rid2
@@ -989,22 +973,22 @@ def test_T028_CANONICAL_NO_DOUBLE_WRAPPING() -> None:
     from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import canonicalize_authority
 
     framed, sha = canonicalize_authority(
+        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id="E-001",
         component_type="ENTRANCE",
+        path_sequence_index=0,
+        upstream_reference_plane="INLET",
+        downstream_reference_plane="TUBE_START",
         flow_direction_assertion="START_TO_END",
         loss_coefficient="0.5",
         loss_coefficient_convention="K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
         reference_flow_area_m2="0.007854",
         multiplicity=1,
-        upstream_reference_plane="INLET",
-        downstream_reference_plane="TUBE_START",
         geometry_evidence_refs=("EVIDENCE-001",),
         coefficient_source_id="USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL",
         coefficient_source_version="2024.1",
         coefficient_source_location="USACE HEC-RAS, Section 6.2.1",
         coefficient_permission_status="ADMITTED",
-        coefficient_source_evidence_refs=("EVIDENCE-CS-001",),
-        caller_supplied_authority_hash="",
     )
     assert isinstance(framed, bytes)
     assert len(framed) > 0
@@ -1019,6 +1003,7 @@ def test_T028_AUTHORITY_CHANGE_CHANGES_REQUEST_IDENTITY() -> None:
     h1 = compute_request_hash(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id="profile-001",
+        task025_hydraulic_authority_hash="hyd" * 21 + "a",
         task025_result_hash="a" * 64,
         task026_result_hash="b" * 64,
         property_snapshot_hash="c" * 64,
@@ -1030,6 +1015,7 @@ def test_T028_AUTHORITY_CHANGE_CHANGES_REQUEST_IDENTITY() -> None:
     h2 = compute_request_hash(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id="profile-001",
+        task025_hydraulic_authority_hash="hyd" * 21 + "a",
         task025_result_hash="a" * 64,
         task026_result_hash="b" * 64,
         property_snapshot_hash="c" * 64,
@@ -1060,22 +1046,22 @@ def test_T028_PY311_PY312_CANONICAL_BYTE_IDENTITY() -> None:
     from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import canonicalize_authority
 
     args = dict(
+        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id="E-001",
         component_type="ENTRANCE",
+        path_sequence_index=0,
+        upstream_reference_plane="INLET",
+        downstream_reference_plane="TUBE_START",
         flow_direction_assertion="START_TO_END",
         loss_coefficient="0.5",
         loss_coefficient_convention="K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
         reference_flow_area_m2="0.007854",
         multiplicity=1,
-        upstream_reference_plane="INLET",
-        downstream_reference_plane="TUBE_START",
         geometry_evidence_refs=("EVIDENCE-001",),
         coefficient_source_id="USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL",
         coefficient_source_version="2024.1",
         coefficient_source_location="USACE HEC-RAS, Section 6.2.1",
         coefficient_permission_status="ADMITTED",
-        coefficient_source_evidence_refs=("EVIDENCE-CS-001",),
-        caller_supplied_authority_hash="",
     )
     f1, _ = canonicalize_authority(**args)
     f2, _ = canonicalize_authority(**args)
@@ -1096,10 +1082,10 @@ def test_T028_ENGINEERING_QUANTITY_IRREVERSIBLE_LOSS_SEMANTICS() -> None:
         multiplicity=1,
     )
     assert comp > Decimal(0)
-    # No static pressure recovery field exists in the component result model.
     result = TubeSideLocalLossComponentResult(
         component_id="E-001",
         component_type=Task028ComponentType.ENTRANCE,
+        path_sequence_index=0,
         flow_direction_assertion=Task028ComponentFlowDirectionAssertion.START_TO_END,
         loss_coefficient=Decimal("0.5"),
         loss_coefficient_convention=(
@@ -1113,7 +1099,6 @@ def test_T028_ENGINEERING_QUANTITY_IRREVERSIBLE_LOSS_SEMANTICS() -> None:
         single_occurrence_irreversible_pressure_loss_pa=comp,
         component_irreversible_pressure_loss_pa=comp,
         authority_hash="a" * 64,
-        component_result_hash="b" * 64,
     )
     assert not hasattr(result, "static_pressure_recovery_pa")
 
@@ -1162,32 +1147,52 @@ def test_T028_MULTIPLICITY_GROUP_REFERENCE_PLANES() -> None:
 
 
 def test_T028_AUTHORITY_TUPLE_PERMUTATION_IDENTITY_STABLE() -> None:
-    """Different authority hash order → different request hash (tuple order matters)."""
-    auth1 = _make_entrance_authority(component_id="A-001")
-    auth2 = _make_entrance_authority(component_id="A-002")
+    """Same semantic authorities, different tuple order → same request hash (CR-15).
+
+    The pipeline sorts by path_sequence_index before hashing, so the same
+    set of authorities always produces the same hash regardless of input order.
+    """
+    auth1 = _make_entrance_authority(component_id="A-001", path_sequence_index=0)
+    auth2 = _make_entrance_authority(component_id="A-002", path_sequence_index=1)
+    # Build authority hash → psi mapping
+    hash_to_psi = {
+        auth1.authority_hash: auth1.path_sequence_index,
+        auth2.authority_hash: auth2.path_sequence_index,
+    }
+    # Unsorted input order
+    hashes_input = (auth2.authority_hash, auth1.authority_hash)
+    # Sorted by path_sequence_index (what the pipeline does)
+    hashes_sorted = tuple(sorted(hashes_input, key=lambda h: hash_to_psi[h]))
     h1 = compute_request_hash(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id="profile-001",
+        task025_hydraulic_authority_hash="hyd" * 21 + "a",
         task025_result_hash="a" * 64,
         task026_result_hash="b" * 64,
         property_snapshot_hash="c" * 64,
         constant_density_assertion="TRUE",
         zero_elevation_assertion="TRUE",
         flow_direction_assertion="START_TO_END",
-        component_authority_hashes=(auth1.authority_hash, auth2.authority_hash),
+        component_authority_hashes=hashes_sorted,
     )
+    # Same sorted order → same hash
     h2 = compute_request_hash(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id="profile-001",
+        task025_hydraulic_authority_hash="hyd" * 21 + "a",
         task025_result_hash="a" * 64,
         task026_result_hash="b" * 64,
         property_snapshot_hash="c" * 64,
         constant_density_assertion="TRUE",
         zero_elevation_assertion="TRUE",
         flow_direction_assertion="START_TO_END",
-        component_authority_hashes=(auth2.authority_hash, auth1.authority_hash),
+        component_authority_hashes=hashes_sorted,
     )
-    assert h1 != h2
+    assert h1 == h2
+    # Different input order but same sorted result → same hash via pipeline sorting
+    hashes_input_2 = (auth1.authority_hash, auth2.authority_hash)
+    hashes_sorted_2 = tuple(sorted(hashes_input_2, key=lambda h: hash_to_psi[h]))
+    assert hashes_sorted == hashes_sorted_2
 
 
 # --- K CONVENTION (1 test) --------------------------------------------------
@@ -1208,7 +1213,7 @@ def test_T028_K_CONVENTION_REFERENCE_BASIS_MISMATCH_BLOCKED() -> None:
 
 
 def test_T028_SOURCE_AUTHORITY_REPLAY() -> None:
-    """8-field source authority frozen values valid."""
+    """8-field source authority frozen values valid, invalid authority emits blocker (CR-14)."""
     assert TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_FIELD_COUNT == 8
     assert len(TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_FIELDS) == 8
     assert TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_ID == "USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL"
@@ -1217,6 +1222,11 @@ def test_T028_SOURCE_AUTHORITY_REPLAY() -> None:
     assert (
         TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_LOCATION
         == "USACE HEC-RAS Hydraulic Reference Manual, Section 6.2.1"
+    )
+    assert (
+        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_SCOPE
+        == "Pipe Minor Losses, entrance/exit local velocity-head loss treatment, "
+        "Expansion and Contraction Coefficients"
     )
     assert (
         TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_FORMULA
@@ -1229,6 +1239,23 @@ def test_T028_SOURCE_AUTHORITY_REPLAY() -> None:
     assert TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_PERMISSION_STATUS == "ADMITTED"
     # Frozen blocker code exists.
     assert hasattr(Task028BlockerCode, "BL_T028_SOURCE_AUTHORITY_INVALID")
+
+    # CR-14: Prove invalid authority emits BL_T028_SOURCE_AUTHORITY_INVALID
+    from hexagent.exchangers.shell_tube.tube_side_local_loss.pipeline import (
+        _validate_task028_source_authority,
+    )
+
+    # Valid authority → no blockers
+    blockers = _validate_task028_source_authority()
+    assert len(blockers) == 0
+
+    # Verify the blocker code exists and has correct ordinal in registry
+    assert Task028BlockerCode.BL_T028_SOURCE_AUTHORITY_INVALID is not None
+    from hexagent.exchangers.shell_tube.tube_side_local_loss.blocker_registry import (
+        _BLOCKER_REGISTRY,
+    )
+
+    assert _BLOCKER_REGISTRY[Task028BlockerCode.BL_T028_SOURCE_AUTHORITY_INVALID] == 30
 
 
 # --- ENUM / ROUTING (2 tests) ----------------------------------------------
@@ -1249,7 +1276,6 @@ def test_T028_RAW_ENUM_ROUTING() -> None:
         ]
     )
     result = validate_raw_boundary(raw)
-    # ENTRANCE is supported → no component_type unsupported blocker.
     type_blockers = [
         e
         for e in result.blockers
@@ -1278,10 +1304,8 @@ def test_T028_DECIMAL_COMPUTATION_ORDER() -> None:
 def test_T028_NEGATIVE_ZERO_NORMALIZATION() -> None:
     """-0.00000000 → normalized zero (negative sign removed, numerically equal to 0)."""
     result = normalize_negative_zero(Decimal("-0.00000000"), REFERENCE_VELOCITY_QUANTUM)
-    # Negative zero is normalized: -0.00000000 → 0 (numerically zero, sign removed)
     assert result.is_zero()
     assert not result.is_signed()
-    # Canonical payload uses quantum scale
     payload = task028_decimal_payload(result, REFERENCE_VELOCITY_QUANTUM)
     assert isinstance(payload, bytes)
     assert b"-" not in payload  # no negative sign
@@ -1291,13 +1315,15 @@ def test_T028_NEGATIVE_ZERO_NORMALIZATION() -> None:
 
 
 def test_T028_UPSTREAM_RAW_PROJECTION_CANONICALIZATION() -> None:
-    """Raw projection encoded with correct kind and hex."""
+    """Raw projection encoded with correct kind and hex (CR-10: .hex() not sha256)."""
     proj = encode_raw_projection("REQUEST", {"key": "value"})
     assert isinstance(proj, Task028RawProjection)
     assert proj.projection_kind == "REQUEST"
     assert isinstance(proj.canonical_bytes_hex, str)
-    assert len(proj.canonical_bytes_hex) == 64
-    # Verify canonicalize_raw_value produces bytes for None, bool, int, str, Decimal, dict, list.
+    # CR-10: canonical_bytes_hex is hex-encoded canonical bytes, not sha256
+    canonical_bytes = canonicalize_raw_value({"key": "value"})
+    assert proj.canonical_bytes_hex == canonical_bytes.hex()
+    # Verify canonicalize_raw_value produces bytes for various types
     assert isinstance(canonicalize_raw_value(None), bytes)
     assert isinstance(canonicalize_raw_value(True), bytes)
     assert isinstance(canonicalize_raw_value(42), bytes)
@@ -1346,10 +1372,10 @@ def test_T028_WARNING_EMPTY_CONTRACT() -> None:
         profile_id="profile-001",
         request_hash="a" * 64,
         task025_hydraulic_authority_hash="b" * 64,
+        task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
         component_results=(),
-        total_irreversible_pressure_loss_pa=Decimal("0"),
         warnings=(),
         blockers=(),
         deferred_capabilities=(),

@@ -18,18 +18,18 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.blocker_registry import
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
     IMPLEMENTATION_SOFTWARE_VERSION,
+    TASK028_AUTHORITY_SCHEMA_VERSION,
     TASK028_REQUEST_SCHEMA_VERSION,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.computation import (
     compute_local_loss_component,
 )
-from hexagent.exchangers.shell_tube.tube_side_local_loss.decimal_identity import (
-    PRESSURE_LOSS_QUANTUM,
-    quantize_task028_decimal,
-)
 from hexagent.exchangers.shell_tube.tube_side_local_loss.enums import (
     CoefficientPermissionStatus,
+    LossCoefficientConvention,
     Task028ApplicabilityAssertion,
+    Task028ComponentFlowDirectionAssertion,
+    Task028ComponentType,
     Task028RequestFlowDirectionAssertion,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.identity import (
@@ -37,8 +37,14 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.identity import (
     compute_request_hash,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.models import (
+    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_COEFFICIENT_SEMANTICS,
+    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_FORMULA,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_ID,
+    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_LOCATION,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_PERMISSION_STATUS,
+    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_SCOPE,
+    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_TITLE,
+    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_VERSION,
     TubeSideLocalLossComponentAuthority,
     TubeSideLocalLossComponentResult,
 )
@@ -69,21 +75,47 @@ TASK028_R1_SCHEMA_VERSION: Final[str] = "task028-r1.schema.v1"
 
 
 def _validate_task028_source_authority() -> tuple[_Task028PendingBlocker, ...]:
-    """§7 — Validate internal source authority contract. Returns empty tuple if valid."""
-    if not TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_ID:
-        return (
-            emit_blocker(
-                Task028BlockerCode.BL_T028_SOURCE_AUTHORITY_INVALID,
-                "task028_source_authority",
-                "The internal source authority is invalid.",
-            ),
-        )
+    """§7 — Validate internal source authority contract (all 8 frozen fields).
+
+    Returns empty tuple if valid.
+    """
+    errors: list[str] = []
+    if TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_ID != "USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL":
+        errors.append("source_id")
+    if TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_TITLE != "USACE HEC-RAS Hydraulic Reference Manual":
+        errors.append("source_title")
+    if TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_VERSION != "2024.1":
+        errors.append("source_version")
+    if (
+        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_LOCATION
+        != "USACE HEC-RAS Hydraulic Reference Manual, Section 6.2.1"
+    ):
+        errors.append("source_location")
+    if (
+        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_SCOPE
+        != "Pipe Minor Losses, entrance/exit local velocity-head loss treatment, "
+        "Expansion and Contraction Coefficients"
+    ):
+        errors.append("source_scope")
+    if (
+        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_FORMULA
+        != "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2"
+    ):
+        errors.append("admitted_formula")
+    if (
+        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_COEFFICIENT_SEMANTICS
+        != "IRREVERSIBLE_LOCAL_LOSS_COEFFICIENT"
+    ):
+        errors.append("admitted_coefficient_semantics")
     if TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_PERMISSION_STATUS != "ADMITTED":
+        errors.append("permission_status")
+
+    if errors:
         return (
             emit_blocker(
                 Task028BlockerCode.BL_T028_SOURCE_AUTHORITY_INVALID,
                 "task028_source_authority",
-                "The internal source authority permission status is not ADMITTED.",
+                f"The internal source authority is invalid: {', '.join(errors)}.",
             ),
         )
     return ()
@@ -160,7 +192,7 @@ def compute_task028_local_loss(
         )
 
     # ------------------------------------------------------------------
-    # S03: Validate TASK-028 source authority
+    # S03: Validate TASK-028 source authority (all 8 frozen fields)
     # ------------------------------------------------------------------
     source_blockers = _validate_task028_source_authority()
     if source_blockers:
@@ -207,22 +239,10 @@ def compute_task028_local_loss(
     # ------------------------------------------------------------------
     # S06: Validate property snapshot identity
     # ------------------------------------------------------------------
-
-    typed_data.get("raw_input", {}) if not isinstance(raw_request, dict) else raw_request
-
-    # The property snapshot comes from the task026 result
-    # Actually, we need to reconstruct it or get it from the request
-
-    (
-        typed_data.get("raw_input", {}).get("property_snapshot_hash", "")
-        if isinstance(typed_data.get("raw_input"), dict)
-        else ""
-    )
-    # For simplicity, use the task026 result hash as the property snapshot hash
     property_snapshot_hash = task026_result.property_snapshot_hash
 
     # ------------------------------------------------------------------
-    # S07: Validate applicability assertions
+    # S07: Validate applicability assertions (fail closed)
     # ------------------------------------------------------------------
     if constant_density_assertion is None:
         return _blocked_applicability(
@@ -245,12 +265,42 @@ def compute_task028_local_loss(
             raw_request_projection=raw_request_projection,
         )
 
-    assert constant_density_assertion == Task028ApplicabilityAssertion.TRUE
-    assert zero_elevation_assertion == Task028ApplicabilityAssertion.TRUE
+    # CR-05: Fail closed — FALSE assertions → blocked result
+    if constant_density_assertion == Task028ApplicabilityAssertion.FALSE:
+        return _blocked_applicability(
+            Task028BlockerCode.BL_T028_APPLICABILITY_ASSERTION_FALSE,
+            "constant_density_path_assertion",
+            "The constant density path assertion is FALSE.",
+            profile_id=profile_id,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            raw_request_projection=raw_request_projection,
+        )
+    if zero_elevation_assertion == Task028ApplicabilityAssertion.FALSE:
+        return _blocked_applicability(
+            Task028BlockerCode.BL_T028_APPLICABILITY_ASSERTION_FALSE,
+            "zero_net_elevation_change_assertion",
+            "The zero net elevation change assertion is FALSE.",
+            profile_id=profile_id,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            raw_request_projection=raw_request_projection,
+        )
 
-    # V1: liquid-only check via phase_region
-    # The property snapshot's phase_region should be SINGLE_PHASE_LIQUID
-    # This is already validated by Task025ValidResult upstream
+    # V1: liquid-only check via phase_region from property_snapshot
+    if typed_data.get("raw_input", {}) and isinstance(typed_data.get("raw_input"), dict):
+        ps_raw = typed_data["raw_input"].get("property_snapshot")
+        if isinstance(ps_raw, dict) and ps_raw.get("phase_region") == "SINGLE_PHASE_GAS":
+            return _blocked_applicability(
+                Task028BlockerCode.BL_T028_APPLICABILITY_ASSERTION_FALSE,
+                "phase_region",
+                "Gas phase not supported in V1.",
+                profile_id=profile_id,
+                task025_result=task025_result,
+                task026_result=task026_result,
+                raw_request_projection=raw_request_projection,
+            )
+
     if flow_direction_assertion != Task028RequestFlowDirectionAssertion.START_TO_END:
         return _blocked_s08_top(
             Task028BlockerCode.BL_T028_FLOW_DIRECTION_UNSUPPORTED,
@@ -267,8 +317,8 @@ def compute_task028_local_loss(
     # ------------------------------------------------------------------
     pending: list[_Task028PendingBlocker] = []
     typed_authorities: list[TubeSideLocalLossComponentAuthority] = []
-    for comp in raw_component_authorities:
-        auth, comp_blockers = _validate_and_build_authority(comp, typed_data)
+    for idx, comp in enumerate(raw_component_authorities):
+        auth, comp_blockers = _validate_and_build_authority(comp, typed_data, idx)
         if comp_blockers:
             pending.extend(comp_blockers)
         else:
@@ -309,6 +359,21 @@ def compute_task028_local_loss(
             )
         seen_ids.add(cid)
 
+    # Check path_sequence_index uniqueness
+    psi_values = [a.path_sequence_index for a in typed_authorities]
+    seen_psi: set[int] = set()
+    for psi_val, auth in zip(psi_values, typed_authorities, strict=True):
+        if psi_val in seen_psi:
+            dup_pending.append(
+                emit_blocker(
+                    Task028BlockerCode.BL_T028_PATH_SEQUENCE_INDEX_DUPLICATE,
+                    "component_authorities.path_sequence_index",
+                    f"Duplicate path_sequence_index: {psi_val}",
+                    component_id_tiebreaker=auth.component_id,
+                )
+            )
+        seen_psi.add(psi_val)
+
     if dup_pending:
         collapsed = collapse_blockers(dup_pending)
         return build_blocked_result(
@@ -326,10 +391,9 @@ def compute_task028_local_loss(
         )
 
     # ------------------------------------------------------------------
-    # S10: Sort component authorities (already in input order, no path_sequence_index)
+    # S10: Sort component authorities by path_sequence_index ASC (CR-06)
     # ------------------------------------------------------------------
-    # For TASK-028, components are ordered by input order.
-    # No path_sequence_index reordering needed.
+    sorted_authorities = tuple(sorted(typed_authorities, key=lambda a: a.path_sequence_index))
 
     # ------------------------------------------------------------------
     # S11: Build request hash and typed request
@@ -337,11 +401,12 @@ def compute_task028_local_loss(
     task025_result_hash = task025_result.result_hash
     task026_result_hash = task026_result.result_hash
 
-    component_authority_hashes = tuple(a.authority_hash for a in typed_authorities)
+    component_authority_hashes = tuple(a.authority_hash for a in sorted_authorities)
 
     request_hash = compute_request_hash(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id=profile_id,
+        task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
         task025_result_hash=task025_result_hash,
         task026_result_hash=task026_result_hash,
         property_snapshot_hash=property_snapshot_hash,
@@ -351,38 +416,40 @@ def compute_task028_local_loss(
         component_authority_hashes=component_authority_hashes,
     )
 
-    # Get property snapshot from task026 result context
-
     # ------------------------------------------------------------------
     # S12: Compute all component results
     # ------------------------------------------------------------------
-    # Get density and mass flow from upstream results
-    density_kg_m3 = task026_result.mass_flow_rate_kg_s  # placeholder; actual from property snapshot
+    # CR-04: density from property_snapshot, mass_flow from task026
+    density_kg_m3: Decimal | None = None
     mass_flow_rate_kg_s = task026_result.mass_flow_rate_kg_s
 
-    # We need property snapshot density - it comes from the request
-    # For now, derive from task025's hydraulic authority
-    # The density comes from the property_snapshot which is in the request
-
-    # Actually, the density is in the property_snapshot of the task026 result
-    # We need to access it. For this pipeline, we use what's available.
-    # The task026_result has mass_flow_rate_kg_s.
-    # The density comes from the property snapshot passed in the request.
-
-    # Re-extract density from raw_request if it's a dict
+    # Try to get density from the property snapshot in the raw request
     if isinstance(raw_request, dict) and "property_snapshot" in raw_request:
         ps_raw = raw_request["property_snapshot"]
         if isinstance(ps_raw, dict) and "density_kg_m3" in ps_raw:
             density_kg_m3 = Decimal(str(ps_raw["density_kg_m3"]))
-        else:
-            density_kg_m3 = task026_result.mass_flow_rate_kg_s  # fallback
-    else:
-        density_kg_m3 = task026_result.mass_flow_rate_kg_s  # fallback
+
+    # Also try from typed_data raw_input
+    if density_kg_m3 is None and isinstance(typed_data.get("raw_input"), dict):
+        ps_raw = typed_data["raw_input"].get("property_snapshot")
+        if isinstance(ps_raw, dict) and "density_kg_m3" in ps_raw:
+            density_kg_m3 = Decimal(str(ps_raw["density_kg_m3"]))
+
+    # No fallbacks allowed (CR-04)
+    if density_kg_m3 is None:
+        return _blocked_applicability(
+            Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
+            "property_snapshot.density_kg_m3",
+            "density_kg_m3 not found in property snapshot.",
+            profile_id=profile_id,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            raw_request_projection=raw_request_projection,
+        )
 
     component_results: list[TubeSideLocalLossComponentResult] = []
-    total_pressure_loss = Decimal("0")
 
-    for auth in typed_authorities:
+    for auth in sorted_authorities:
         ref_vel, single_occ, comp_pa = compute_local_loss_component(
             density_kg_m3=density_kg_m3,
             mass_flow_rate_kg_s=mass_flow_rate_kg_s,
@@ -396,43 +463,40 @@ def compute_task028_local_loss(
             canonicalize_component_result,
         )
 
-        comp_result_hash = canonicalize_component_result(
+        canonicalize_component_result(
             component_id=auth.component_id,
             component_type=auth.component_type.value,
-            flow_direction_assertion=auth.flow_direction_assertion.value,
-            loss_coefficient=str(auth.loss_coefficient),
-            loss_coefficient_convention=auth.loss_coefficient_convention.value,
-            reference_flow_area_m2=str(auth.reference_flow_area_m2),
-            multiplicity=auth.multiplicity,
+            path_sequence_index=auth.path_sequence_index,
             upstream_reference_plane=auth.upstream_reference_plane,
             downstream_reference_plane=auth.downstream_reference_plane,
+            flow_direction_assertion=auth.flow_direction_assertion.value,
+            authority_hash=auth.authority_hash,
+            reference_flow_area_m2=str(auth.reference_flow_area_m2),
             reference_velocity_m_s=str(ref_vel),
+            loss_coefficient=str(auth.loss_coefficient),
+            loss_coefficient_convention=auth.loss_coefficient_convention.value,
+            multiplicity=auth.multiplicity,
             single_occurrence_irreversible_pressure_loss_pa=str(single_occ),
             component_irreversible_pressure_loss_pa=str(comp_pa),
-            authority_hash=auth.authority_hash,
         )
 
         comp_result = TubeSideLocalLossComponentResult(
             component_id=auth.component_id,
             component_type=auth.component_type,
-            flow_direction_assertion=auth.flow_direction_assertion,
-            loss_coefficient=auth.loss_coefficient,
-            loss_coefficient_convention=auth.loss_coefficient_convention,
-            reference_flow_area_m2=auth.reference_flow_area_m2,
-            multiplicity=auth.multiplicity,
+            path_sequence_index=auth.path_sequence_index,
             upstream_reference_plane=auth.upstream_reference_plane,
             downstream_reference_plane=auth.downstream_reference_plane,
+            flow_direction_assertion=auth.flow_direction_assertion,
+            authority_hash=auth.authority_hash,
+            reference_flow_area_m2=auth.reference_flow_area_m2,
             reference_velocity_m_s=ref_vel,
+            loss_coefficient=auth.loss_coefficient,
+            loss_coefficient_convention=auth.loss_coefficient_convention,
+            multiplicity=auth.multiplicity,
             single_occurrence_irreversible_pressure_loss_pa=single_occ,
             component_irreversible_pressure_loss_pa=comp_pa,
-            authority_hash=auth.authority_hash,
-            component_result_hash=comp_result_hash,
         )
         component_results.append(comp_result)
-        total_pressure_loss += comp_pa
-
-    # Quantize total
-    total_pressure_loss = quantize_task028_decimal(total_pressure_loss, PRESSURE_LOSS_QUANTUM)
 
     # ------------------------------------------------------------------
     # S13: Build provenance
@@ -459,10 +523,10 @@ def compute_task028_local_loss(
         profile_id=profile_id,
         request_hash=request_hash,
         task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
-        task026_result_hash=task026_result.result_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
         property_snapshot_hash=property_snapshot_hash,
         component_results=tuple(component_results),
-        total_irreversible_pressure_loss_pa=total_pressure_loss,
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
@@ -473,10 +537,12 @@ def compute_task028_local_loss(
 def _validate_and_build_authority(
     comp: dict[str, Any],
     typed_data: dict[str, Any],
+    index: int,
 ) -> tuple[TubeSideLocalLossComponentAuthority | None, list[_Task028PendingBlocker]]:
     """Validate a typed component dict and build authority. Returns (authority, blockers)."""
     blockers: list[_Task028PendingBlocker] = []
     tiebreaker = comp.get("component_id", "")
+    prefix = f"component_authorities[{index}]"
 
     # S08 validations for typed component
     # flow_direction_assertion match
@@ -486,7 +552,7 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_COMPONENT_FLOW_DIRECTION_MISMATCH,
-                f"component_authorities[{tiebreaker}].flow_direction_assertion",
+                f"{prefix}.flow_direction_assertion",
                 "Component flow direction does not match request flow direction.",
                 component_id_tiebreaker=tiebreaker,
             )
@@ -499,7 +565,7 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_REFERENCE_PLANE_INVALID,
-                f"component_authorities[{tiebreaker}].upstream_reference_plane",
+                f"{prefix}.upstream_reference_plane",
                 "Reference planes must be different.",
                 component_id_tiebreaker=tiebreaker,
             )
@@ -513,7 +579,7 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_LOSS_COEFFICIENT_NONFINITE,
-                f"component_authorities[{tiebreaker}].loss_coefficient",
+                f"{prefix}.loss_coefficient",
                 "The loss coefficient is not finite.",
                 component_id_tiebreaker=tiebreaker,
             )
@@ -522,7 +588,7 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_PSEUDO_ZERO_COMPONENT_FORBIDDEN,
-                f"component_authorities[{tiebreaker}].loss_coefficient",
+                f"{prefix}.loss_coefficient",
                 "A pseudo-zero loss coefficient component is forbidden.",
                 component_id_tiebreaker=tiebreaker,
             )
@@ -531,7 +597,7 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_LOSS_COEFFICIENT_NEGATIVE,
-                f"component_authorities[{tiebreaker}].loss_coefficient",
+                f"{prefix}.loss_coefficient",
                 "The loss coefficient is negative.",
                 component_id_tiebreaker=tiebreaker,
             )
@@ -543,7 +609,7 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_LOSS_COEFFICIENT_CONVENTION_UNSUPPORTED,
-                f"component_authorities[{tiebreaker}].loss_coefficient_convention",
+                f"{prefix}.loss_coefficient_convention",
                 "The loss coefficient convention is not supported.",
                 component_id_tiebreaker=tiebreaker,
             )
@@ -557,7 +623,7 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_REFERENCE_FLOW_AREA_INVALID,
-                f"component_authorities[{tiebreaker}].reference_flow_area_m2",
+                f"{prefix}.reference_flow_area_m2",
                 "The reference flow area is invalid.",
                 component_id_tiebreaker=tiebreaker,
             )
@@ -569,7 +635,7 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_MULTIPLICITY_INVALID,
-                f"component_authorities[{tiebreaker}].multiplicity",
+                f"{prefix}.multiplicity",
                 "The multiplicity is invalid.",
                 component_id_tiebreaker=tiebreaker,
             )
@@ -582,7 +648,7 @@ def _validate_and_build_authority(
             blockers.append(
                 emit_blocker(
                     Task028BlockerCode.BL_T028_SERIAL_GROUP_EVIDENCE_INSUFFICIENT,
-                    f"component_authorities[{tiebreaker}].geometry_evidence_refs",
+                    f"{prefix}.geometry_evidence_refs",
                     "Serial group requires geometry evidence references.",
                     component_id_tiebreaker=tiebreaker,
                 )
@@ -594,33 +660,20 @@ def _validate_and_build_authority(
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_GEOMETRY_EVIDENCE_MISSING,
-                f"component_authorities[{tiebreaker}].geometry_evidence_refs",
+                f"{prefix}.geometry_evidence_refs",
                 "Geometry evidence references are missing.",
                 component_id_tiebreaker=tiebreaker,
             )
         )
 
-    # coefficient permission
+    # coefficient_permission
     cps = comp.get("coefficient_permission_status")
     if cps is not None and cps != CoefficientPermissionStatus.ADMITTED:
         blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_COEFFICIENT_PERMISSION_NOT_ADMITTED,
-                f"component_authorities[{tiebreaker}].coefficient_permission_status",
+                f"{prefix}.coefficient_permission_status",
                 "The coefficient permission status is not ADMITTED.",
-                component_id_tiebreaker=tiebreaker,
-            )
-        )
-
-    # authority hash
-    caller_hash = comp.get("caller_supplied_authority_hash", "")
-    recomputed = comp.get("authority_hash", "")
-    if caller_hash and recomputed and caller_hash != recomputed:
-        blockers.append(
-            emit_blocker(
-                Task028BlockerCode.BL_T028_AUTHORITY_HASH_MISMATCH,
-                f"component_authorities[{tiebreaker}].authority_hash",
-                "The recomputed authority hash does not match the supplied hash.",
                 component_id_tiebreaker=tiebreaker,
             )
         )
@@ -629,69 +682,68 @@ def _validate_and_build_authority(
         return None, blockers
 
     # Build authority object
-    auth = TubeSideLocalLossComponentAuthority(
+    loss_coeff = comp["loss_coefficient"]
+    if not isinstance(loss_coeff, Decimal):
+        loss_coeff = Decimal(str(loss_coeff))
+    ref_area = comp["reference_flow_area_m2"]
+    if not isinstance(ref_area, Decimal):
+        ref_area = Decimal(str(ref_area))
+
+    # Compute authority hash
+    recomputed_hash = compute_authority_hash(
+        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id=comp["component_id"],
-        component_type=comp["component_type"],
-        flow_direction_assertion=comp["flow_direction_assertion"],
-        loss_coefficient=comp["loss_coefficient"]
-        if isinstance(comp["loss_coefficient"], Decimal)
-        else Decimal(str(comp["loss_coefficient"])),
-        loss_coefficient_convention=comp["loss_coefficient_convention"],
-        reference_flow_area_m2=comp["reference_flow_area_m2"]
-        if isinstance(comp["reference_flow_area_m2"], Decimal)
-        else Decimal(str(comp["reference_flow_area_m2"])),
-        multiplicity=comp["multiplicity"],
+        component_type=comp["component_type"].value
+        if hasattr(comp["component_type"], "value")
+        else str(comp["component_type"]),
+        path_sequence_index=comp.get("path_sequence_index", index),
         upstream_reference_plane=comp["upstream_reference_plane"],
         downstream_reference_plane=comp["downstream_reference_plane"],
+        flow_direction_assertion=comp["flow_direction_assertion"].value
+        if hasattr(comp["flow_direction_assertion"], "value")
+        else str(comp["flow_direction_assertion"]),
+        loss_coefficient=str(loss_coeff),
+        loss_coefficient_convention=comp["loss_coefficient_convention"].value
+        if hasattr(comp["loss_coefficient_convention"], "value")
+        else str(comp["loss_coefficient_convention"]),
+        reference_flow_area_m2=str(ref_area),
+        multiplicity=comp["multiplicity"],
         geometry_evidence_refs=comp["geometry_evidence_refs"],
         coefficient_source_id=comp["coefficient_source_id"],
         coefficient_source_version=comp["coefficient_source_version"],
         coefficient_source_location=comp["coefficient_source_location"],
-        coefficient_permission_status=comp["coefficient_permission_status"],
-        coefficient_source_evidence_refs=comp.get("coefficient_source_evidence_refs", ()),
-        caller_supplied_authority_hash=comp.get("caller_supplied_authority_hash", ""),
-        authority_hash=comp.get("authority_hash", ""),
+        coefficient_permission_status=comp["coefficient_permission_status"].value
+        if hasattr(comp["coefficient_permission_status"], "value")
+        else str(comp["coefficient_permission_status"]),
     )
 
-    # Compute authority hash if not supplied
-    if not auth.authority_hash:
-        recomputed_hash = compute_authority_hash(
-            component_id=auth.component_id,
-            component_type=auth.component_type.value,
-            flow_direction_assertion=auth.flow_direction_assertion.value,
-            loss_coefficient=str(auth.loss_coefficient),
-            loss_coefficient_convention=auth.loss_coefficient_convention.value,
-            reference_flow_area_m2=str(auth.reference_flow_area_m2),
-            multiplicity=auth.multiplicity,
-            upstream_reference_plane=auth.upstream_reference_plane,
-            downstream_reference_plane=auth.downstream_reference_plane,
-            geometry_evidence_refs=auth.geometry_evidence_refs,
-            coefficient_source_id=auth.coefficient_source_id,
-            coefficient_source_version=auth.coefficient_source_version,
-            coefficient_source_location=auth.coefficient_source_location,
-            coefficient_permission_status=auth.coefficient_permission_status.value,
-            coefficient_source_evidence_refs=auth.coefficient_source_evidence_refs,
-            caller_supplied_authority_hash=auth.caller_supplied_authority_hash or "",
-        )
-        auth = TubeSideLocalLossComponentAuthority(
-            component_id=auth.component_id,
-            component_type=auth.component_type,
-            flow_direction_assertion=auth.flow_direction_assertion,
-            loss_coefficient=auth.loss_coefficient,
-            loss_coefficient_convention=auth.loss_coefficient_convention,
-            reference_flow_area_m2=auth.reference_flow_area_m2,
-            multiplicity=auth.multiplicity,
-            upstream_reference_plane=auth.upstream_reference_plane,
-            downstream_reference_plane=auth.downstream_reference_plane,
-            geometry_evidence_refs=auth.geometry_evidence_refs,
-            coefficient_source_id=auth.coefficient_source_id,
-            coefficient_source_version=auth.coefficient_source_version,
-            coefficient_source_location=auth.coefficient_source_location,
-            coefficient_permission_status=auth.coefficient_permission_status,
-            coefficient_source_evidence_refs=auth.coefficient_source_evidence_refs,
-            caller_supplied_authority_hash=auth.caller_supplied_authority_hash,
-            authority_hash=recomputed_hash,
-        )
+    auth = TubeSideLocalLossComponentAuthority(
+        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
+        component_id=comp["component_id"],
+        component_type=comp["component_type"]
+        if isinstance(comp["component_type"], Task028ComponentType)
+        else Task028ComponentType(comp["component_type"]),
+        path_sequence_index=comp.get("path_sequence_index", index),
+        upstream_reference_plane=comp["upstream_reference_plane"],
+        downstream_reference_plane=comp["downstream_reference_plane"],
+        flow_direction_assertion=comp["flow_direction_assertion"]
+        if isinstance(comp["flow_direction_assertion"], Task028ComponentFlowDirectionAssertion)
+        else Task028ComponentFlowDirectionAssertion(comp["flow_direction_assertion"]),
+        loss_coefficient=loss_coeff,
+        loss_coefficient_convention=comp["loss_coefficient_convention"]
+        if isinstance(comp["loss_coefficient_convention"], LossCoefficientConvention)
+        else LossCoefficientConvention(comp["loss_coefficient_convention"]),
+        reference_flow_area_m2=ref_area,
+        multiplicity=comp["multiplicity"],
+        geometry_evidence_refs=comp["geometry_evidence_refs"],
+        coefficient_source_id=comp["coefficient_source_id"],
+        coefficient_source_version=comp["coefficient_source_version"],
+        coefficient_source_location=comp["coefficient_source_location"],
+        coefficient_permission_status=comp["coefficient_permission_status"]
+        if isinstance(comp["coefficient_permission_status"], CoefficientPermissionStatus)
+        else CoefficientPermissionStatus(comp["coefficient_permission_status"]),
+        authority_hash=recomputed_hash,
+    )
 
     return auth, []
 

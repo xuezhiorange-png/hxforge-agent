@@ -55,10 +55,10 @@ class Task028SuccessResult:
     result_hash: str
     result_id: str
     task025_hydraulic_authority_hash: str
+    task025_result_hash: str
     task026_result_hash: str
     property_snapshot_hash: str
     component_results: tuple[Any, ...]  # TubeSideLocalLossComponentResult
-    total_irreversible_pressure_loss_pa: Any  # Decimal
     warnings: tuple[str, ...]
     blockers: tuple[Task028BlockerEntry, ...]
     deferred_capabilities: tuple[str, ...]
@@ -125,10 +125,10 @@ def build_success_result(
     profile_id: str,
     request_hash: str,
     task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
     task026_result_hash: str,
     property_snapshot_hash: str,
     component_results: tuple[Any, ...],
-    total_irreversible_pressure_loss_pa: Any,
     warnings: tuple[str, ...],
     blockers: tuple[Task028BlockerEntry, ...],
     deferred_capabilities: tuple[str, ...],
@@ -136,18 +136,20 @@ def build_success_result(
 ) -> Task028SuccessResult:
     """Build a frozen Task028SuccessResult with computed hash and ID."""
     # §15 — Canonical component result hashes
-    component_result_hashes = tuple(cr.component_result_hash for cr in component_results)
-    total_pa_str = str(total_irreversible_pressure_loss_pa)
+    component_result_hashes = tuple(
+        cr.component_result_hash if hasattr(cr, "component_result_hash") else ""
+        for cr in component_results
+    )
 
     result_hash = compute_success_result_hash(
         schema_version=TASK028_SUCCESS_RESULT_SCHEMA_VERSION,
         profile_id=profile_id,
         request_hash=request_hash,
         task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
         task026_result_hash=task026_result_hash,
         property_snapshot_hash=property_snapshot_hash,
         component_result_hashes=component_result_hashes,
-        total_irreversible_pressure_loss_pa=total_pa_str,
         warnings=warnings,
         blockers=blockers,
         deferred_capabilities=deferred_capabilities,
@@ -161,10 +163,10 @@ def build_success_result(
         result_hash=result_hash,
         result_id=result_id,
         task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
         task026_result_hash=task026_result_hash,
         property_snapshot_hash=property_snapshot_hash,
         component_results=component_results,
-        total_irreversible_pressure_loss_pa=total_irreversible_pressure_loss_pa,
         warnings=warnings,
         blockers=blockers,
         deferred_capabilities=deferred_capabilities,
