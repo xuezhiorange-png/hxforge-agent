@@ -17,6 +17,7 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
     TASK028_BLOCKED_RESULT_SCHEMA_VERSION,
     TASK028_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
     TASK028_SUCCESS_RESULT_SCHEMA_VERSION,
+    canonicalize_component_result,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.identity import (
     compute_blocked_result_hash,
@@ -135,9 +136,32 @@ def build_success_result(
     provenance: Task028Provenance,
 ) -> Task028SuccessResult:
     """Build a frozen Task028SuccessResult with computed hash and ID."""
-    # §15 — Canonical component result hashes
+    # §15 — Canonical component result hashes (computed directly from each record)
     component_result_hashes = tuple(
-        cr.component_result_hash if hasattr(cr, "component_result_hash") else ""
+        canonicalize_component_result(
+            component_id=cr.component_id,
+            component_type=cr.component_type.value
+            if hasattr(cr.component_type, "value")
+            else str(cr.component_type),
+            path_sequence_index=cr.path_sequence_index,
+            upstream_reference_plane=cr.upstream_reference_plane,
+            downstream_reference_plane=cr.downstream_reference_plane,
+            flow_direction_assertion=cr.flow_direction_assertion.value
+            if hasattr(cr.flow_direction_assertion, "value")
+            else str(cr.flow_direction_assertion),
+            authority_hash=cr.authority_hash,
+            reference_flow_area_m2=str(cr.reference_flow_area_m2),
+            reference_velocity_m_s=str(cr.reference_velocity_m_s),
+            loss_coefficient=str(cr.loss_coefficient),
+            loss_coefficient_convention=cr.loss_coefficient_convention.value
+            if hasattr(cr.loss_coefficient_convention, "value")
+            else str(cr.loss_coefficient_convention),
+            multiplicity=cr.multiplicity,
+            single_occurrence_irreversible_pressure_loss_pa=str(
+                cr.single_occurrence_irreversible_pressure_loss_pa
+            ),
+            component_irreversible_pressure_loss_pa=str(cr.component_irreversible_pressure_loss_pa),
+        )
         for cr in component_results
     )
 

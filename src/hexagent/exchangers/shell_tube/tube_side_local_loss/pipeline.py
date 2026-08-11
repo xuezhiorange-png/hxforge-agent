@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Final
+from typing import Any
 
 from hexagent.exchangers.shell_tube.tube_side.blocked_result import Task025BlockedResult
 from hexagent.exchangers.shell_tube.tube_side.valid_result import Task025ValidResult
@@ -37,14 +37,8 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.identity import (
     compute_request_hash,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.models import (
-    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_COEFFICIENT_SEMANTICS,
-    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_FORMULA,
-    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_ID,
-    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_LOCATION,
-    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_PERMISSION_STATUS,
-    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_SCOPE,
-    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_TITLE,
-    TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_VERSION,
+    _TASK028_LOCAL_LOSS_SOURCE_AUTHORITY,
+    Task028LocalLossSourceAuthority,
     TubeSideLocalLossComponentAuthority,
     TubeSideLocalLossComponentResult,
 )
@@ -55,6 +49,9 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.raw_projection import (
     Task028RawProjection,
     encode_raw_projection,
 )
+from hexagent.exchangers.shell_tube.tube_side_local_loss.request import (
+    build_task028_request,
+)
 from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
     Task028BlockedResult,
     Task028Provenance,
@@ -64,50 +61,44 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
     build_raw_boundary_blocked_result,
     build_success_result,
 )
+from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import (
+    PropertySnapshot,
+    recompute_property_snapshot_hash,
+)
 from hexagent.exchangers.shell_tube.tube_side_thermal.result import (
     RawBoundaryBlockedResult,
     TubeSideBlockedResult,
     TubeSideThermalResult,
 )
 
-# §20 — Frozen schema and constants
-TASK028_R1_SCHEMA_VERSION: Final[str] = "task028-r1.schema.v1"
 
-
-def _validate_task028_source_authority() -> tuple[_Task028PendingBlocker, ...]:
+def _validate_task028_source_authority(
+    authority: Task028LocalLossSourceAuthority,
+) -> tuple[_Task028PendingBlocker, ...]:
     """§7 — Validate internal source authority contract (all 8 frozen fields).
 
     Returns empty tuple if valid.
     """
     errors: list[str] = []
-    if TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_ID != "USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL":
+    if authority.source_id != "USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL":
         errors.append("source_id")
-    if TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_TITLE != "USACE HEC-RAS Hydraulic Reference Manual":
+    if authority.source_title != "USACE HEC-RAS Hydraulic Reference Manual":
         errors.append("source_title")
-    if TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_VERSION != "2024.1":
+    if authority.source_version != "2024.1":
         errors.append("source_version")
-    if (
-        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_LOCATION
-        != "USACE HEC-RAS Hydraulic Reference Manual, Section 6.2.1"
-    ):
+    if authority.source_location != "USACE HEC-RAS Hydraulic Reference Manual, Section 6.2.1":
         errors.append("source_location")
     if (
-        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_SCOPE
+        authority.source_scope
         != "Pipe Minor Losses, entrance/exit local velocity-head loss treatment, "
         "Expansion and Contraction Coefficients"
     ):
         errors.append("source_scope")
-    if (
-        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_FORMULA
-        != "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2"
-    ):
+    if authority.admitted_formula != "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2":
         errors.append("admitted_formula")
-    if (
-        TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_COEFFICIENT_SEMANTICS
-        != "IRREVERSIBLE_LOCAL_LOSS_COEFFICIENT"
-    ):
+    if authority.admitted_coefficient_semantics != "IRREVERSIBLE_LOCAL_LOSS_COEFFICIENT":
         errors.append("admitted_coefficient_semantics")
-    if TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_PERMISSION_STATUS != "ADMITTED":
+    if authority.permission_status != "ADMITTED":
         errors.append("permission_status")
 
     if errors:
@@ -194,7 +185,7 @@ def compute_task028_local_loss(
     # ------------------------------------------------------------------
     # S03: Validate TASK-028 source authority (all 8 frozen fields)
     # ------------------------------------------------------------------
-    source_blockers = _validate_task028_source_authority()
+    source_blockers = _validate_task028_source_authority(_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY)
     if source_blockers:
         collapsed = collapse_blockers(list(source_blockers))
         return build_blocked_result(
@@ -237,9 +228,70 @@ def compute_task028_local_loss(
         )
 
     # ------------------------------------------------------------------
-    # S06: Validate property snapshot identity
+    # S06: Validate property snapshot identity (three-way replay)
     # ------------------------------------------------------------------
-    property_snapshot_hash = task026_result.property_snapshot_hash
+    supplied_property_snapshot_hash = typed_data.get("raw_input", {}).get(
+        "property_snapshot_hash", ""
+    )
+    if not isinstance(supplied_property_snapshot_hash, str):
+        supplied_property_snapshot_hash = ""
+
+    # Extract property_snapshot dict and convert to typed dataclass
+    ps_raw = typed_data.get("raw_input", {}).get("property_snapshot")
+    if not isinstance(ps_raw, dict):
+        return _blocked_applicability(
+            Task028BlockerCode.BL_T028_PROPERTY_SNAPSHOT_HASH_MISMATCH,
+            "property_snapshot",
+            "Property snapshot is missing or malformed.",
+            profile_id=profile_id,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            raw_request_projection=raw_request_projection,
+        )
+
+    try:
+        property_snapshot = PropertySnapshot(
+            density_kg_m3=Decimal(str(ps_raw["density_kg_m3"])),
+            dynamic_viscosity_pa_s=Decimal(str(ps_raw.get("dynamic_viscosity_pa_s", "0.001"))),
+            thermal_conductivity_w_m_k=Decimal(
+                str(ps_raw.get("thermal_conductivity_w_m_k", "0.6"))
+            ),
+            specific_heat_capacity_j_kg_k=Decimal(
+                str(ps_raw.get("specific_heat_capacity_j_kg_k", "4186"))
+            ),
+            bulk_temperature_k=Decimal(str(ps_raw.get("bulk_temperature_k", "293.15"))),
+            bulk_pressure_pa=Decimal(str(ps_raw.get("bulk_pressure_pa", "101325"))),
+            phase_region=ps_raw.get("phase_region", "SINGLE_PHASE_LIQUID"),
+            property_source_id=ps_raw.get("property_source_id", "default"),
+            property_source_version=ps_raw.get("property_source_version", "1.0"),
+            property_snapshot_hash=supplied_property_snapshot_hash,
+        )
+    except (KeyError, ValueError, TypeError):
+        return _blocked_applicability(
+            Task028BlockerCode.BL_T028_PROPERTY_SNAPSHOT_HASH_MISMATCH,
+            "property_snapshot",
+            "Property snapshot cannot be reconstructed as typed record.",
+            profile_id=profile_id,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            raw_request_projection=raw_request_projection,
+        )
+
+    # Three-way compare: recomputed == supplied == task026
+    recomputed_hash = recompute_property_snapshot_hash(property_snapshot)
+    task026_psh = task026_result.property_snapshot_hash
+    if not (recomputed_hash == supplied_property_snapshot_hash == task026_psh):
+        return _blocked_applicability(
+            Task028BlockerCode.BL_T028_PROPERTY_SNAPSHOT_HASH_MISMATCH,
+            "property_snapshot_hash",
+            "Property snapshot hash three-way identity mismatch.",
+            profile_id=profile_id,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            raw_request_projection=raw_request_projection,
+        )
+
+    property_snapshot_hash = task026_psh
 
     # ------------------------------------------------------------------
     # S07: Validate applicability assertions (fail closed)
@@ -286,20 +338,6 @@ def compute_task028_local_loss(
             task026_result=task026_result,
             raw_request_projection=raw_request_projection,
         )
-
-    # V1: liquid-only check via phase_region from property_snapshot
-    if typed_data.get("raw_input", {}) and isinstance(typed_data.get("raw_input"), dict):
-        ps_raw = typed_data["raw_input"].get("property_snapshot")
-        if isinstance(ps_raw, dict) and ps_raw.get("phase_region") == "SINGLE_PHASE_GAS":
-            return _blocked_applicability(
-                Task028BlockerCode.BL_T028_APPLICABILITY_ASSERTION_FALSE,
-                "phase_region",
-                "Gas phase not supported in V1.",
-                profile_id=profile_id,
-                task025_result=task025_result,
-                task026_result=task026_result,
-                raw_request_projection=raw_request_projection,
-            )
 
     if flow_direction_assertion != Task028RequestFlowDirectionAssertion.START_TO_END:
         return _blocked_s08_top(
@@ -416,31 +454,32 @@ def compute_task028_local_loss(
         component_authority_hashes=component_authority_hashes,
     )
 
+    request = build_task028_request(
+        profile_id=profile_id,
+        task025_valid_result=task025_result,
+        task026_success_result=task026_result,
+        property_snapshot=property_snapshot,
+        property_snapshot_hash=property_snapshot_hash,
+        constant_density_path_assertion=constant_density_assertion,
+        zero_net_elevation_change_assertion=zero_elevation_assertion,
+        flow_direction_assertion=flow_direction_assertion,
+        component_authorities=sorted_authorities,
+        request_hash=request_hash,
+    )
+
     # ------------------------------------------------------------------
     # S12: Compute all component results
     # ------------------------------------------------------------------
-    # CR-04: density from property_snapshot, mass_flow from task026
-    density_kg_m3: Decimal | None = None
-    mass_flow_rate_kg_s = task026_result.mass_flow_rate_kg_s
+    # CR-04: density from typed request property_snapshot, mass_flow from typed task026
+    density_kg_m3 = request.property_snapshot.density_kg_m3
+    mass_flow_rate_kg_s = request.task026_success_result.mass_flow_rate_kg_s
 
-    # Try to get density from the property snapshot in the raw request
-    if isinstance(raw_request, dict) and "property_snapshot" in raw_request:
-        ps_raw = raw_request["property_snapshot"]
-        if isinstance(ps_raw, dict) and "density_kg_m3" in ps_raw:
-            density_kg_m3 = Decimal(str(ps_raw["density_kg_m3"]))
-
-    # Also try from typed_data raw_input
-    if density_kg_m3 is None and isinstance(typed_data.get("raw_input"), dict):
-        ps_raw = typed_data["raw_input"].get("property_snapshot")
-        if isinstance(ps_raw, dict) and "density_kg_m3" in ps_raw:
-            density_kg_m3 = Decimal(str(ps_raw["density_kg_m3"]))
-
-    # No fallbacks allowed (CR-04)
-    if density_kg_m3 is None:
+    # R2-04/05: Phase region from typed request (fail closed for gas)
+    if request.property_snapshot.phase_region.value == "SINGLE_PHASE_GAS":
         return _blocked_applicability(
-            Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
-            "property_snapshot.density_kg_m3",
-            "density_kg_m3 not found in property snapshot.",
+            Task028BlockerCode.BL_T028_APPLICABILITY_ASSERTION_FALSE,
+            "constant_density_path_assertion",
+            "Gas phase not supported in V1.",
             profile_id=profile_id,
             task025_result=task025_result,
             task026_result=task026_result,

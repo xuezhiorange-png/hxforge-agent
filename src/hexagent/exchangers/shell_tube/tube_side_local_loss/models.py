@@ -56,6 +56,35 @@ TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_PERMISSION_STATUS: Final[str] = "ADMITTED"
 
 
 @dataclass(frozen=True)
+class Task028LocalLossSourceAuthority:
+    """§7 — Frozen source authority as a typed dataclass for injectable test seam."""
+
+    source_id: str
+    source_title: str
+    source_version: str
+    source_location: str
+    source_scope: str
+    admitted_formula: str
+    admitted_coefficient_semantics: str
+    permission_status: str
+
+
+_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY = Task028LocalLossSourceAuthority(
+    source_id="USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL",
+    source_title="USACE HEC-RAS Hydraulic Reference Manual",
+    source_version="2024.1",
+    source_location="USACE HEC-RAS Hydraulic Reference Manual, Section 6.2.1",
+    source_scope=(
+        "Pipe Minor Losses, entrance/exit local velocity-head loss treatment, "
+        "Expansion and Contraction Coefficients"
+    ),
+    admitted_formula="K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+    admitted_coefficient_semantics="IRREVERSIBLE_LOCAL_LOSS_COEFFICIENT",
+    permission_status="ADMITTED",
+)
+
+
+@dataclass(frozen=True)
 class TubeSideLocalLossComponentAuthority:
     """§5 — Immutable 17-field component authority record.
 
@@ -117,4 +146,6 @@ __all__ = [
     "TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_PERMISSION_STATUS",
     "TubeSideLocalLossComponentAuthority",
     "TubeSideLocalLossComponentResult",
+    "Task028LocalLossSourceAuthority",
+    "_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY",
 ]

@@ -1241,12 +1241,16 @@ def test_T028_SOURCE_AUTHORITY_REPLAY() -> None:
     assert hasattr(Task028BlockerCode, "BL_T028_SOURCE_AUTHORITY_INVALID")
 
     # CR-14: Prove invalid authority emits BL_T028_SOURCE_AUTHORITY_INVALID
+    from hexagent.exchangers.shell_tube.tube_side_local_loss.models import (
+        _TASK028_LOCAL_LOSS_SOURCE_AUTHORITY,
+        Task028LocalLossSourceAuthority,
+    )
     from hexagent.exchangers.shell_tube.tube_side_local_loss.pipeline import (
         _validate_task028_source_authority,
     )
 
-    # Valid authority → no blockers
-    blockers = _validate_task028_source_authority()
+    # Valid authority -> no blockers
+    blockers = _validate_task028_source_authority(_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY)
     assert len(blockers) == 0
 
     # Verify the blocker code exists and has correct ordinal in registry
@@ -1256,6 +1260,36 @@ def test_T028_SOURCE_AUTHORITY_REPLAY() -> None:
     )
 
     assert _BLOCKER_REGISTRY[Task028BlockerCode.BL_T028_SOURCE_AUTHORITY_INVALID] == 30
+
+    # Mutated fixture: wrong source_id -> BL_T028_SOURCE_AUTHORITY_INVALID
+    bad_id = Task028LocalLossSourceAuthority(
+        source_id="WRONG",
+        source_title=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_title,
+        source_version=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_version,
+        source_location=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_location,
+        source_scope=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_scope,
+        admitted_formula=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.admitted_formula,
+        admitted_coefficient_semantics=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.admitted_coefficient_semantics,
+        permission_status=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.permission_status,
+    )
+    bad_blockers = _validate_task028_source_authority(bad_id)
+    assert len(bad_blockers) == 1
+    assert bad_blockers[0].entry.code == Task028BlockerCode.BL_T028_SOURCE_AUTHORITY_INVALID
+
+    # Mutated fixture: wrong permission_status -> BL_T028_SOURCE_AUTHORITY_INVALID
+    bad_perm = Task028LocalLossSourceAuthority(
+        source_id=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_id,
+        source_title=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_title,
+        source_version=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_version,
+        source_location=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_location,
+        source_scope=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.source_scope,
+        admitted_formula=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.admitted_formula,
+        admitted_coefficient_semantics=_TASK028_LOCAL_LOSS_SOURCE_AUTHORITY.admitted_coefficient_semantics,
+        permission_status="PENDING",
+    )
+    bad_perm_blockers = _validate_task028_source_authority(bad_perm)
+    assert len(bad_perm_blockers) == 1
+    assert bad_perm_blockers[0].entry.code == Task028BlockerCode.BL_T028_SOURCE_AUTHORITY_INVALID
 
 
 # --- ENUM / ROUTING (2 tests) ----------------------------------------------

@@ -67,10 +67,10 @@ RESULT_ID_NAMESPACE: Final[str] = "a0280000-0000-5000-8000-000000000001"
 RESULT_ID_NAME_PREFIX: Final[str] = "task028-result-v1::"
 
 # §11 — Schema and software version
-TASK028_REQUEST_SCHEMA_VERSION: Final[str] = "task028-r1.schema.v1"
-TASK028_SUCCESS_RESULT_SCHEMA_VERSION: Final[str] = "task028-r1.schema.v1"
-TASK028_BLOCKED_RESULT_SCHEMA_VERSION: Final[str] = "task028-r1.schema.v1"
-TASK028_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION: Final[str] = "task028-r1.schema.v1"
+TASK028_REQUEST_SCHEMA_VERSION: Final[str] = "task028.request.v1"
+TASK028_SUCCESS_RESULT_SCHEMA_VERSION: Final[str] = "task028.success-result.v1"
+TASK028_BLOCKED_RESULT_SCHEMA_VERSION: Final[str] = "task028.blocked-result.v1"
+TASK028_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION: Final[str] = "task028.raw-boundary-blocked-result.v1"
 TASK028_AUTHORITY_SCHEMA_VERSION: Final[str] = "task028.local-loss-component-authority.v1"
 IMPLEMENTATION_SOFTWARE_VERSION: Final[str] = "0.1.0"
 SUPPORTED_PROFILE_IDS: Final[tuple[str, ...]] = ("profile-001",)
@@ -90,16 +90,18 @@ TASK028_REQUEST_FIELDS: Final[tuple[str, ...]] = (
     "request_hash",
 )
 
+REQUEST_HASH_FIELD_COUNT: Final[int] = 10
+
 
 def _encode_tuple(items: tuple[str, ...] | tuple[bytes, ...]) -> bytes:
-    """Encode a tuple of strings/bytes using frozen TUPLE framing."""
+    """Encode a tuple of strings/bytes using frozen TUPLE framing with U64 child-lengths."""
     out = _u32_be(len(items))
     for item in items:
         if isinstance(item, bytes):
-            out += _u32_be(len(item)) + item
+            out += _u64_be(len(item)) + item
         else:
             b = item.encode("utf-8")
-            out += _u32_be(len(b)) + b
+            out += _u64_be(len(b)) + b
     return out
 
 

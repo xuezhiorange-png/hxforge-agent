@@ -306,14 +306,34 @@ def _validate_component_record(
         )
         return None
 
-    # path_sequence_index (CR-06: defaults to array index for raw input)
-    psi = comp.get("path_sequence_index", index)
+    # path_sequence_index (CR-06: MUST be explicit — never falls back to array index)
+    psi = comp.get("path_sequence_index")
+    if psi is None:
+        pending_blockers.append(
+            emit_blocker(
+                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
+                f"{prefix}.path_sequence_index",
+                "path_sequence_index is required and must not be inferred from array position.",
+                component_id_tiebreaker=tiebreaker,
+            )
+        )
+        return None
     if not isinstance(psi, int) or isinstance(psi, bool):
         pending_blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
                 f"{prefix}.path_sequence_index",
-                "The TASK-028 raw input boundary is malformed.",
+                "path_sequence_index must be a non-negative integer.",
+                component_id_tiebreaker=tiebreaker,
+            )
+        )
+        return None
+    if psi < 0:
+        pending_blockers.append(
+            emit_blocker(
+                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
+                f"{prefix}.path_sequence_index",
+                "path_sequence_index must be a non-negative integer.",
                 component_id_tiebreaker=tiebreaker,
             )
         )
@@ -338,18 +358,29 @@ def _validate_component_record(
     lc = comp.get("loss_coefficient")
     from decimal import Decimal, InvalidOperation
 
-    if not isinstance(lc, (int, float, str, Decimal)):
+    if isinstance(lc, (int, float)):
         pending_blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
                 f"{prefix}.loss_coefficient",
-                "The TASK-028 raw input boundary is malformed.",
+                "loss_coefficient must be str or Decimal; "
+                "float/int implicit conversion is forbidden.",
+                component_id_tiebreaker=tiebreaker,
+            )
+        )
+        return None
+    if not isinstance(lc, (str, Decimal)):
+        pending_blockers.append(
+            emit_blocker(
+                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
+                f"{prefix}.loss_coefficient",
+                "loss_coefficient must be str or Decimal.",
                 component_id_tiebreaker=tiebreaker,
             )
         )
         return None
     try:
-        typed["loss_coefficient"] = Decimal(str(lc))
+        typed["loss_coefficient"] = Decimal(lc) if isinstance(lc, str) else lc
     except (InvalidOperation, ValueError):
         pending_blockers.append(
             emit_blocker(
@@ -387,18 +418,29 @@ def _validate_component_record(
 
     # reference_flow_area_m2
     rfa = comp.get("reference_flow_area_m2")
-    if not isinstance(rfa, (int, float, str, Decimal)):
+    if isinstance(rfa, (int, float)):
         pending_blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
                 f"{prefix}.reference_flow_area_m2",
-                "The TASK-028 raw input boundary is malformed.",
+                "reference_flow_area_m2 must be str or Decimal; "
+                "float/int implicit conversion is forbidden.",
+                component_id_tiebreaker=tiebreaker,
+            )
+        )
+        return None
+    if not isinstance(rfa, (str, Decimal)):
+        pending_blockers.append(
+            emit_blocker(
+                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
+                f"{prefix}.reference_flow_area_m2",
+                "reference_flow_area_m2 must be str or Decimal.",
                 component_id_tiebreaker=tiebreaker,
             )
         )
         return None
     try:
-        typed["reference_flow_area_m2"] = Decimal(str(rfa))
+        typed["reference_flow_area_m2"] = Decimal(rfa) if isinstance(rfa, str) else rfa
     except (InvalidOperation, ValueError):
         pending_blockers.append(
             emit_blocker(

@@ -26,6 +26,7 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
     PROVENANCE_NAMESPACE,
     RAW_BOUNDARY_BLOCKED_HASH_NAMESPACE,
     RAW_PROJECTION_NAMESPACE,
+    REQUEST_HASH_FIELD_COUNT,
     REQUEST_HASH_NAMESPACE,
     RESULT_ID_NAME_PREFIX,
     RESULT_ID_NAMESPACE,
@@ -82,6 +83,7 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.models import (
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_SCOPE,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_TITLE,
     TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_VERSION,
+    Task028LocalLossSourceAuthority,
     TubeSideLocalLossComponentAuthority,
     TubeSideLocalLossComponentResult,
 )
@@ -128,6 +130,7 @@ __all__ = [
     # Models
     "TubeSideLocalLossComponentAuthority",
     "TubeSideLocalLossComponentResult",
+    "Task028LocalLossSourceAuthority",
     "AUTHORITY_FIELD_COUNT",
     "COMPONENT_RESULT_FIELD_COUNT",
     # Blocker
@@ -156,6 +159,7 @@ __all__ = [
     "KIND_RECORD",
     "KIND_RAW_PROJECTION",
     "task028_tuple_payload",
+    "REQUEST_HASH_FIELD_COUNT",
     # Raw projection
     "Task028RawProjection",
     "canonicalize_raw_value",
