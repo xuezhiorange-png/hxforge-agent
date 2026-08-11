@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any, Final
 
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
@@ -14,6 +15,14 @@ from hexagent.exchangers.shell_tube.tube_side.canonical import (
     frame_record,
     frame_value,
     sha256_hex_from_framed_bytes,
+)
+from hexagent.exchangers.shell_tube.tube_side_local_loss.decimal_identity import (
+    LOSS_COEFFICIENT_QUANTUM,
+    PRESSURE_LOSS_QUANTUM,
+    REFERENCE_FLOW_AREA_QUANTUM,
+    REFERENCE_VELOCITY_QUANTUM,
+    quantize_task028_decimal,
+    task028_decimal_payload,
 )
 
 # -----------------------------------------------------------------------
@@ -76,6 +85,13 @@ TASK028_AUTHORITY_SCHEMA_VERSION: Final[str] = "task028.local-loss-component-aut
 IMPLEMENTATION_SOFTWARE_VERSION: Final[str] = "0.1.0"
 SUPPORTED_PROFILE_IDS: Final[tuple[str, ...]] = ("profile-001",)
 
+# §5.3 — Fixed deferred capabilities
+TASK028_DEFERRED_CAPABILITIES_V1: Final[tuple[str, ...]] = (
+    "MODELED_TOTAL_PRESSURE_DROP_NOT_COMPUTED",
+    "REFERENCE_PLANE_CONTINUITY_NOT_VALIDATED",
+    "PRESSURE_PATH_COMPLETENESS_NOT_VALIDATED",
+)
+
 # §11 — Request fields
 TASK028_REQUEST_FIELDS: Final[tuple[str, ...]] = (
     "schema_version",
@@ -119,16 +135,10 @@ def _encode_raw_projection_canonical(projection: Any) -> bytes:
     """Encode a raw projection as frozen canonical nested record."""
     if projection is None:
         return b""
-    if hasattr(projection, "projection_kind") and hasattr(projection, "canonical_bytes_hex"):
-        fields = [
-            ("projection_kind", KIND_STRING, projection.projection_kind.encode("utf-8")),
-            ("canonical_bytes_hex", KIND_STRING, projection.canonical_bytes_hex.encode("utf-8")),
-        ]
-    else:
-        fields = [
-            ("projection_kind", KIND_STRING, b"unknown"),
-            ("canonical_bytes_hex", KIND_STRING, str(projection).encode("utf-8")),
-        ]
+    fields = [
+        ("projection_kind", KIND_STRING, projection.projection_kind.encode("utf-8")),
+        ("canonical_bytes_hex", KIND_STRING, projection.canonical_bytes_hex.encode("utf-8")),
+    ]
     return frame_record(RAW_PROJECTION_NAMESPACE, fields)
 
 
@@ -136,34 +146,25 @@ def _encode_provenance_canonical(provenance: Any) -> bytes:
     """Encode provenance as frozen canonical nested record."""
     if provenance is None:
         return b""
-    if hasattr(provenance, "task_id"):
-        fields = [
-            ("task_id", KIND_STRING, provenance.task_id.encode("utf-8")),
-            ("design_contract_path", KIND_STRING, provenance.design_contract_path.encode("utf-8")),
-            (
-                "implementation_software_version",
-                KIND_STRING,
-                provenance.implementation_software_version.encode("utf-8"),
-            ),
-            (
-                "input_evidence_refs",
-                KIND_TUPLE,
-                _encode_string_tuple(provenance.input_evidence_refs),
-            ),
-            (
-                "upstream_identity_hashes",
-                KIND_TUPLE,
-                _encode_string_tuple(provenance.upstream_identity_hashes),
-            ),
-        ]
-    else:
-        fields = [
-            ("task_id", KIND_STRING, b"unknown"),
-            ("design_contract_path", KIND_STRING, b"unknown"),
-            ("implementation_software_version", KIND_STRING, b"unknown"),
-            ("input_evidence_refs", KIND_TUPLE, _encode_string_tuple(())),
-            ("upstream_identity_hashes", KIND_TUPLE, _encode_string_tuple(())),
-        ]
+    fields = [
+        ("task_id", KIND_STRING, provenance.task_id.encode("utf-8")),
+        ("design_contract_path", KIND_STRING, provenance.design_contract_path.encode("utf-8")),
+        (
+            "implementation_software_version",
+            KIND_STRING,
+            provenance.implementation_software_version.encode("utf-8"),
+        ),
+        (
+            "input_evidence_refs",
+            KIND_TUPLE,
+            _encode_string_tuple(provenance.input_evidence_refs),
+        ),
+        (
+            "upstream_identity_hashes",
+            KIND_TUPLE,
+            _encode_string_tuple(provenance.upstream_identity_hashes),
+        ),
+    ]
     return frame_record(PROVENANCE_NAMESPACE, fields)
 
 
@@ -175,9 +176,9 @@ def canonicalize_authority(
     upstream_reference_plane: str,
     downstream_reference_plane: str,
     flow_direction_assertion: str,
-    loss_coefficient: str,
+    loss_coefficient: Decimal,
     loss_coefficient_convention: str,
-    reference_flow_area_m2: str,
+    reference_flow_area_m2: Decimal,
     multiplicity: int,
     geometry_evidence_refs: tuple[str, ...],
     coefficient_source_id: str,
@@ -188,7 +189,11 @@ def canonicalize_authority(
     """§24 — Canonical 16-field authority framing → (framed_bytes, sha256_hex).
 
     Fields 1–16 of the 17-field authority (excludes authority_hash itself).
+    loss_coefficient and reference_flow_area_m2 are Decimal, quantized before encoding.
     """
+    q_lc = quantize_task028_decimal(loss_coefficient, LOSS_COEFFICIENT_QUANTUM)
+    q_rfa = quantize_task028_decimal(reference_flow_area_m2, REFERENCE_FLOW_AREA_QUANTUM)
+
     fields = [
         ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
         ("component_id", KIND_STRING, component_id.encode("utf-8")),
@@ -197,9 +202,13 @@ def canonicalize_authority(
         ("upstream_reference_plane", KIND_STRING, upstream_reference_plane.encode("utf-8")),
         ("downstream_reference_plane", KIND_STRING, downstream_reference_plane.encode("utf-8")),
         ("flow_direction_assertion", KIND_ENUM, flow_direction_assertion.encode("ascii")),
-        ("loss_coefficient", KIND_DECIMAL, loss_coefficient.encode("utf-8")),
+        ("loss_coefficient", KIND_DECIMAL, task028_decimal_payload(q_lc, LOSS_COEFFICIENT_QUANTUM)),
         ("loss_coefficient_convention", KIND_ENUM, loss_coefficient_convention.encode("ascii")),
-        ("reference_flow_area_m2", KIND_DECIMAL, reference_flow_area_m2.encode("utf-8")),
+        (
+            "reference_flow_area_m2",
+            KIND_DECIMAL,
+            task028_decimal_payload(q_rfa, REFERENCE_FLOW_AREA_QUANTUM),
+        ),
         ("multiplicity", KIND_INTEGER, str(multiplicity).encode("utf-8")),
         ("geometry_evidence_refs", KIND_TUPLE, _encode_string_tuple(geometry_evidence_refs)),
         ("coefficient_source_id", KIND_STRING, coefficient_source_id.encode("utf-8")),
@@ -252,6 +261,11 @@ def canonicalize_request_hash(
     return sha256_hex_from_framed_bytes(framed)
 
 
+def _canonical_component_result_record(record_bytes: bytes) -> bytes:
+    """Wrap a canonical component result record in KIND_RECORD framing."""
+    return frame_value(KIND_RECORD, record_bytes)
+
+
 def canonicalize_component_result(
     component_id: str,
     component_type: str,
@@ -260,15 +274,28 @@ def canonicalize_component_result(
     downstream_reference_plane: str,
     flow_direction_assertion: str,
     authority_hash: str,
-    reference_flow_area_m2: str,
-    reference_velocity_m_s: str,
-    loss_coefficient: str,
+    reference_flow_area_m2: Decimal,
+    reference_velocity_m_s: Decimal,
+    loss_coefficient: Decimal,
     loss_coefficient_convention: str,
     multiplicity: int,
-    single_occurrence_irreversible_pressure_loss_pa: str,
-    component_irreversible_pressure_loss_pa: str,
-) -> str:
-    """§24 — Canonical component result hash (13 fields, excludes component_result_hash)."""
+    single_occurrence_irreversible_pressure_loss_pa: Decimal,
+    component_irreversible_pressure_loss_pa: Decimal,
+) -> tuple[bytes, str]:
+    """§24 — Canonical component result hash (14 fields, excludes component_result_hash).
+
+    Returns (record_bytes, sha256_hex). Decimal fields are quantized before encoding.
+    """
+    q_rfa = quantize_task028_decimal(reference_flow_area_m2, REFERENCE_FLOW_AREA_QUANTUM)
+    q_vref = quantize_task028_decimal(reference_velocity_m_s, REFERENCE_VELOCITY_QUANTUM)
+    q_lc = quantize_task028_decimal(loss_coefficient, LOSS_COEFFICIENT_QUANTUM)
+    q_single = quantize_task028_decimal(
+        single_occurrence_irreversible_pressure_loss_pa, PRESSURE_LOSS_QUANTUM
+    )
+    q_comp = quantize_task028_decimal(
+        component_irreversible_pressure_loss_pa, PRESSURE_LOSS_QUANTUM
+    )
+
     fields = [
         ("component_id", KIND_STRING, component_id.encode("utf-8")),
         ("component_type", KIND_ENUM, component_type.encode("ascii")),
@@ -277,24 +304,32 @@ def canonicalize_component_result(
         ("downstream_reference_plane", KIND_STRING, downstream_reference_plane.encode("utf-8")),
         ("flow_direction_assertion", KIND_ENUM, flow_direction_assertion.encode("ascii")),
         ("authority_hash", KIND_STRING, authority_hash.encode("utf-8")),
-        ("reference_flow_area_m2", KIND_DECIMAL, reference_flow_area_m2.encode("utf-8")),
-        ("reference_velocity_m_s", KIND_DECIMAL, reference_velocity_m_s.encode("utf-8")),
-        ("loss_coefficient", KIND_DECIMAL, loss_coefficient.encode("utf-8")),
+        (
+            "reference_flow_area_m2",
+            KIND_DECIMAL,
+            task028_decimal_payload(q_rfa, REFERENCE_FLOW_AREA_QUANTUM),
+        ),
+        (
+            "reference_velocity_m_s",
+            KIND_DECIMAL,
+            task028_decimal_payload(q_vref, REFERENCE_VELOCITY_QUANTUM),
+        ),
+        ("loss_coefficient", KIND_DECIMAL, task028_decimal_payload(q_lc, LOSS_COEFFICIENT_QUANTUM)),
         ("loss_coefficient_convention", KIND_ENUM, loss_coefficient_convention.encode("ascii")),
         ("multiplicity", KIND_INTEGER, str(multiplicity).encode("utf-8")),
         (
             "single_occurrence_irreversible_pressure_loss_pa",
             KIND_DECIMAL,
-            single_occurrence_irreversible_pressure_loss_pa.encode("utf-8"),
+            task028_decimal_payload(q_single, PRESSURE_LOSS_QUANTUM),
         ),
         (
             "component_irreversible_pressure_loss_pa",
             KIND_DECIMAL,
-            component_irreversible_pressure_loss_pa.encode("utf-8"),
+            task028_decimal_payload(q_comp, PRESSURE_LOSS_QUANTUM),
         ),
     ]
     framed = frame_record(COMPONENT_RESULT_HASH_NAMESPACE, fields)
-    return sha256_hex_from_framed_bytes(framed)
+    return framed, sha256_hex_from_framed_bytes(framed)
 
 
 def canonicalize_success_result_hash(
@@ -305,7 +340,7 @@ def canonicalize_success_result_hash(
     task025_result_hash: str,
     task026_result_hash: str,
     property_snapshot_hash: str,
-    component_result_hashes: tuple[str, ...],
+    component_result_records: tuple[bytes, ...],
     warnings: tuple[str, ...],
     blockers: tuple[Any, ...],
     deferred_capabilities: tuple[str, ...],
@@ -314,11 +349,12 @@ def canonicalize_success_result_hash(
     """§15 — Canonical success result hash (self-excludes result_hash, result_id).
 
     14-field success result → hash projection excludes result_hash and result_id.
+    component_result_records are the canonical record bytes for each component.
     """
-    # Component results: each child is a framed RECORD wrapping the canonical hash bytes
+    # Component results: each child is a framed RECORD wrapping the canonical record bytes
     component_child_frames = (
-        [frame_value(KIND_RECORD, bytes.fromhex(h)) for h in component_result_hashes]
-        if component_result_hashes
+        [_canonical_component_result_record(rec) for rec in component_result_records]
+        if component_result_records
         else []
     )
     component_results_payload = task028_tuple_payload(component_child_frames)
@@ -356,6 +392,7 @@ def canonicalize_blocked_result_hash(
     profile_id: str,
     request_hash: str,
     task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
     task026_result_hash: str,
     property_snapshot_hash: str,
     raw_request_projection: Any,
@@ -378,6 +415,7 @@ def canonicalize_blocked_result_hash(
             KIND_STRING,
             (task025_hydraulic_authority_hash or "").encode("utf-8"),
         ),
+        ("task025_result_hash", KIND_STRING, (task025_result_hash or "").encode("utf-8")),
         ("task026_result_hash", KIND_STRING, (task026_result_hash or "").encode("utf-8")),
         ("property_snapshot_hash", KIND_STRING, (property_snapshot_hash or "").encode("utf-8")),
         (
@@ -455,6 +493,7 @@ __all__ = [
     "canonicalize_success_result_hash",
     "canonicalize_blocked_result_hash",
     "canonicalize_raw_boundary_blocked_hash",
+    "_canonical_component_result_record",
     "REQUEST_HASH_NAMESPACE",
     "SUCCESS_RESULT_HASH_NAMESPACE",
     "BLOCKED_RESULT_HASH_NAMESPACE",
@@ -471,6 +510,7 @@ __all__ = [
     "TASK028_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION",
     "TASK028_AUTHORITY_SCHEMA_VERSION",
     "IMPLEMENTATION_SOFTWARE_VERSION",
+    "TASK028_DEFERRED_CAPABILITIES_V1",
     "SUPPORTED_PROFILE_IDS",
     "TASK028_REQUEST_FIELDS",
     "_encode_string_tuple",

@@ -13,7 +13,6 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.blocker_registry import
     Task028BlockerEntry,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
-    IMPLEMENTATION_SOFTWARE_VERSION,
     TASK028_BLOCKED_RESULT_SCHEMA_VERSION,
     TASK028_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
     TASK028_SUCCESS_RESULT_SCHEMA_VERSION,
@@ -79,11 +78,11 @@ class Task028BlockedResult:
 
     schema_version: str
     profile_id: str
-    implementation_software_version: str
     request_hash: str
     result_hash: str
     result_id: str
     task025_hydraulic_authority_hash: str | None
+    task025_result_hash: str | None
     task026_result_hash: str | None
     property_snapshot_hash: str | None
     raw_request_projection: Any  # Task028RawProjection | None
@@ -137,33 +136,26 @@ def build_success_result(
 ) -> Task028SuccessResult:
     """Build a frozen Task028SuccessResult with computed hash and ID."""
     # §15 — Canonical component result hashes (computed directly from each record)
-    component_result_hashes = tuple(
+    component_result_pairs = [
         canonicalize_component_result(
             component_id=cr.component_id,
-            component_type=cr.component_type.value
-            if hasattr(cr.component_type, "value")
-            else str(cr.component_type),
+            component_type=cr.component_type.value,
             path_sequence_index=cr.path_sequence_index,
             upstream_reference_plane=cr.upstream_reference_plane,
             downstream_reference_plane=cr.downstream_reference_plane,
-            flow_direction_assertion=cr.flow_direction_assertion.value
-            if hasattr(cr.flow_direction_assertion, "value")
-            else str(cr.flow_direction_assertion),
+            flow_direction_assertion=cr.flow_direction_assertion.value,
             authority_hash=cr.authority_hash,
-            reference_flow_area_m2=str(cr.reference_flow_area_m2),
-            reference_velocity_m_s=str(cr.reference_velocity_m_s),
-            loss_coefficient=str(cr.loss_coefficient),
-            loss_coefficient_convention=cr.loss_coefficient_convention.value
-            if hasattr(cr.loss_coefficient_convention, "value")
-            else str(cr.loss_coefficient_convention),
+            reference_flow_area_m2=cr.reference_flow_area_m2,
+            reference_velocity_m_s=cr.reference_velocity_m_s,
+            loss_coefficient=cr.loss_coefficient,
+            loss_coefficient_convention=cr.loss_coefficient_convention.value,
             multiplicity=cr.multiplicity,
-            single_occurrence_irreversible_pressure_loss_pa=str(
-                cr.single_occurrence_irreversible_pressure_loss_pa
-            ),
-            component_irreversible_pressure_loss_pa=str(cr.component_irreversible_pressure_loss_pa),
+            single_occurrence_irreversible_pressure_loss_pa=cr.single_occurrence_irreversible_pressure_loss_pa,
+            component_irreversible_pressure_loss_pa=cr.component_irreversible_pressure_loss_pa,
         )
         for cr in component_results
-    )
+    ]
+    component_result_records = tuple(pair[0] for pair in component_result_pairs)
 
     result_hash = compute_success_result_hash(
         schema_version=TASK028_SUCCESS_RESULT_SCHEMA_VERSION,
@@ -173,7 +165,7 @@ def build_success_result(
         task025_result_hash=task025_result_hash,
         task026_result_hash=task026_result_hash,
         property_snapshot_hash=property_snapshot_hash,
-        component_result_hashes=component_result_hashes,
+        component_result_records=component_result_records,
         warnings=warnings,
         blockers=blockers,
         deferred_capabilities=deferred_capabilities,
@@ -203,6 +195,7 @@ def build_blocked_result(
     profile_id: str,
     request_hash: str | None,
     task025_hydraulic_authority_hash: str | None,
+    task025_result_hash: str | None,
     task026_result_hash: str | None,
     property_snapshot_hash: str | None,
     raw_request_projection: Any,
@@ -218,6 +211,7 @@ def build_blocked_result(
         profile_id=profile_id,
         request_hash=request_hash or "",
         task025_hydraulic_authority_hash=task025_hydraulic_authority_hash or "",
+        task025_result_hash=task025_result_hash or "",
         task026_result_hash=task026_result_hash or "",
         property_snapshot_hash=property_snapshot_hash or "",
         raw_request_projection=raw_request_projection,
@@ -231,11 +225,11 @@ def build_blocked_result(
     return Task028BlockedResult(
         schema_version=TASK028_BLOCKED_RESULT_SCHEMA_VERSION,
         profile_id=profile_id,
-        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
         request_hash=request_hash or "",
         result_hash=result_hash,
         result_id=result_id,
         task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
         task026_result_hash=task026_result_hash,
         property_snapshot_hash=property_snapshot_hash,
         raw_request_projection=raw_request_projection,
@@ -255,7 +249,7 @@ def build_raw_boundary_blocked_result(
     """Build a frozen Task028RawBoundaryBlockedResult."""
     return Task028RawBoundaryBlockedResult(
         schema_version=TASK028_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
-        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
+        implementation_software_version="0.1.0",
         raw_request_projection=raw_request_projection,
         blockers=blockers,
         warnings=(),

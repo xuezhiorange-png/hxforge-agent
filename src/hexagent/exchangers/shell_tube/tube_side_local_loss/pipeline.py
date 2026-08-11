@@ -17,8 +17,8 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.blocker_registry import
     emit_blocker,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
-    IMPLEMENTATION_SOFTWARE_VERSION,
     TASK028_AUTHORITY_SCHEMA_VERSION,
+    TASK028_DEFERRED_CAPABILITIES_V1,
     TASK028_REQUEST_SCHEMA_VERSION,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.computation import (
@@ -192,13 +192,14 @@ def compute_task028_local_loss(
             profile_id=profile_id,
             request_hash=None,
             task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+            task025_result_hash=None,
             task026_result_hash=task026_result.result_hash,
             property_snapshot_hash=task026_result.property_snapshot_hash,
             raw_request_projection=raw_request_projection,
             raw_upstream_blocked_projection=None,
             warnings=(),
             blockers=collapsed,
-            deferred_capabilities=(),
+            deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
             provenance=None,
         )
 
@@ -369,13 +370,14 @@ def compute_task028_local_loss(
             profile_id=profile_id,
             request_hash=None,
             task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+            task025_result_hash=task025_result.result_hash,
             task026_result_hash=task026_result.result_hash,
             property_snapshot_hash=property_snapshot_hash,
             raw_request_projection=raw_request_projection,
             raw_upstream_blocked_projection=None,
             warnings=(),
             blockers=collapsed,
-            deferred_capabilities=(),
+            deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
             provenance=None,
         )
 
@@ -418,13 +420,14 @@ def compute_task028_local_loss(
             profile_id=profile_id,
             request_hash=None,
             task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+            task025_result_hash=task025_result.result_hash,
             task026_result_hash=task026_result.result_hash,
             property_snapshot_hash=property_snapshot_hash,
             raw_request_projection=raw_request_projection,
             raw_upstream_blocked_projection=None,
             warnings=(),
             blockers=collapsed,
-            deferred_capabilities=(),
+            deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
             provenance=None,
         )
 
@@ -510,13 +513,13 @@ def compute_task028_local_loss(
             downstream_reference_plane=auth.downstream_reference_plane,
             flow_direction_assertion=auth.flow_direction_assertion.value,
             authority_hash=auth.authority_hash,
-            reference_flow_area_m2=str(auth.reference_flow_area_m2),
-            reference_velocity_m_s=str(ref_vel),
-            loss_coefficient=str(auth.loss_coefficient),
+            reference_flow_area_m2=auth.reference_flow_area_m2,
+            reference_velocity_m_s=ref_vel,
+            loss_coefficient=auth.loss_coefficient,
             loss_coefficient_convention=auth.loss_coefficient_convention.value,
             multiplicity=auth.multiplicity,
-            single_occurrence_irreversible_pressure_loss_pa=str(single_occ),
-            component_irreversible_pressure_loss_pa=str(comp_pa),
+            single_occurrence_irreversible_pressure_loss_pa=single_occ,
+            component_irreversible_pressure_loss_pa=comp_pa,
         )
 
         comp_result = TubeSideLocalLossComponentResult(
@@ -550,7 +553,7 @@ def compute_task028_local_loss(
     provenance = Task028Provenance(
         task_id="TASK-028",
         design_contract_path=design_contract_path,
-        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
+        implementation_software_version="0.1.0",
         input_evidence_refs=(),
         upstream_identity_hashes=upstream_hashes,
     )
@@ -568,7 +571,7 @@ def compute_task028_local_loss(
         component_results=tuple(component_results),
         warnings=(),
         blockers=(),
-        deferred_capabilities=(),
+        deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
         provenance=provenance,
     )
 
@@ -732,28 +735,20 @@ def _validate_and_build_authority(
     recomputed_hash = compute_authority_hash(
         schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id=comp["component_id"],
-        component_type=comp["component_type"].value
-        if hasattr(comp["component_type"], "value")
-        else str(comp["component_type"]),
+        component_type=comp["component_type"].value,
         path_sequence_index=comp.get("path_sequence_index", index),
         upstream_reference_plane=comp["upstream_reference_plane"],
         downstream_reference_plane=comp["downstream_reference_plane"],
-        flow_direction_assertion=comp["flow_direction_assertion"].value
-        if hasattr(comp["flow_direction_assertion"], "value")
-        else str(comp["flow_direction_assertion"]),
-        loss_coefficient=str(loss_coeff),
-        loss_coefficient_convention=comp["loss_coefficient_convention"].value
-        if hasattr(comp["loss_coefficient_convention"], "value")
-        else str(comp["loss_coefficient_convention"]),
-        reference_flow_area_m2=str(ref_area),
+        flow_direction_assertion=comp["flow_direction_assertion"].value,
+        loss_coefficient=loss_coeff,
+        loss_coefficient_convention=comp["loss_coefficient_convention"].value,
+        reference_flow_area_m2=ref_area,
         multiplicity=comp["multiplicity"],
         geometry_evidence_refs=comp["geometry_evidence_refs"],
         coefficient_source_id=comp["coefficient_source_id"],
         coefficient_source_version=comp["coefficient_source_version"],
         coefficient_source_location=comp["coefficient_source_location"],
-        coefficient_permission_status=comp["coefficient_permission_status"].value
-        if hasattr(comp["coefficient_permission_status"], "value")
-        else str(comp["coefficient_permission_status"]),
+        coefficient_permission_status=comp["coefficient_permission_status"].value,
     )
 
     auth = TubeSideLocalLossComponentAuthority(
@@ -803,13 +798,14 @@ def _blocked_s01(
         profile_id=profile_id,
         request_hash=None,
         task025_hydraulic_authority_hash=None,
+        task025_result_hash=None,
         task026_result_hash=None,
         property_snapshot_hash=None,
         raw_request_projection=raw_request_projection,
         raw_upstream_blocked_projection=raw_upstream_blocked_projection,
         warnings=(),
         blockers=collapsed,
-        deferred_capabilities=(),
+        deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
         provenance=None,
     )
 
@@ -831,13 +827,14 @@ def _blocked_s05(
         profile_id=profile_id,
         request_hash=None,
         task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+        task025_result_hash=None,
         task026_result_hash=task026_result.result_hash,
         property_snapshot_hash=task026_result.property_snapshot_hash,
         raw_request_projection=raw_request_projection,
         raw_upstream_blocked_projection=None,
         warnings=(),
         blockers=collapsed,
-        deferred_capabilities=(),
+        deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
         provenance=None,
     )
 
@@ -859,13 +856,14 @@ def _blocked_applicability(
         profile_id=profile_id,
         request_hash=None,
         task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+        task025_result_hash=None,
         task026_result_hash=task026_result.result_hash,
         property_snapshot_hash=task026_result.property_snapshot_hash,
         raw_request_projection=raw_request_projection,
         raw_upstream_blocked_projection=None,
         warnings=(),
         blockers=collapsed,
-        deferred_capabilities=(),
+        deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
         provenance=None,
     )
 
@@ -887,13 +885,14 @@ def _blocked_s08_top(
         profile_id=profile_id,
         request_hash=None,
         task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+        task025_result_hash=None,
         task026_result_hash=task026_result.result_hash,
         property_snapshot_hash=task026_result.property_snapshot_hash,
         raw_request_projection=raw_request_projection,
         raw_upstream_blocked_projection=None,
         warnings=(),
         blockers=collapsed,
-        deferred_capabilities=(),
+        deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
         provenance=None,
     )
 

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import Any, Final
 
 from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
@@ -29,9 +30,9 @@ def compute_authority_hash(
     upstream_reference_plane: str,
     downstream_reference_plane: str,
     flow_direction_assertion: str,
-    loss_coefficient: str,
+    loss_coefficient: Decimal,
     loss_coefficient_convention: str,
-    reference_flow_area_m2: str,
+    reference_flow_area_m2: Decimal,
     multiplicity: int,
     geometry_evidence_refs: tuple[str, ...],
     coefficient_source_id: str,
@@ -96,7 +97,7 @@ def compute_success_result_hash(
     task025_result_hash: str,
     task026_result_hash: str,
     property_snapshot_hash: str,
-    component_result_hashes: tuple[str, ...],
+    component_result_records: tuple[bytes, ...],
     warnings: tuple[str, ...],
     blockers: tuple[Any, ...],
     deferred_capabilities: tuple[str, ...],
@@ -111,7 +112,7 @@ def compute_success_result_hash(
         task025_result_hash=task025_result_hash,
         task026_result_hash=task026_result_hash,
         property_snapshot_hash=property_snapshot_hash,
-        component_result_hashes=component_result_hashes,
+        component_result_records=component_result_records,
         warnings=warnings,
         blockers=blockers,
         deferred_capabilities=deferred_capabilities,
@@ -124,6 +125,7 @@ def compute_blocked_result_hash(
     profile_id: str,
     request_hash: str,
     task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
     task026_result_hash: str,
     property_snapshot_hash: str,
     raw_request_projection: Any,
@@ -139,6 +141,7 @@ def compute_blocked_result_hash(
         profile_id=profile_id,
         request_hash=request_hash,
         task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
         task026_result_hash=task026_result_hash,
         property_snapshot_hash=property_snapshot_hash,
         raw_request_projection=raw_request_projection,
