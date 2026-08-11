@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
     _u32_be,
@@ -48,14 +48,15 @@ def _raw_decimal_payload(value: Decimal) -> bytes:
     if value.is_infinite():
         return b"-Infinity" if value.is_signed() else b"Infinity"
     sign, digits, exponent = value.as_tuple()
+    finite_exponent = cast(int, exponent)
     digits_ascii = "".join(str(d) for d in digits)
     if digits_ascii == "":
         digits_ascii = "0"
-    if exponent >= 0:
-        integer_part = digits_ascii + ("0" * exponent)
+    if finite_exponent >= 0:
+        integer_part = digits_ascii + ("0" * finite_exponent)
         fractional_part = ""
     else:
-        fractional_digits = -exponent
+        fractional_digits = -finite_exponent
         if len(digits_ascii) <= fractional_digits:
             integer_part = "0"
             fractional_part = ("0" * (fractional_digits - len(digits_ascii))) + digits_ascii

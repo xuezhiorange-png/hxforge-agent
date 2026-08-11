@@ -68,7 +68,7 @@ from hexagent.exchangers.shell_tube.tube_side_thermal.result import (
 TASK028_R1_SCHEMA_VERSION: Final[str] = "task028-r1.schema.v1"
 
 
-def _validate_task028_source_authority() -> tuple[_Task028PendingBlocker, []]:
+def _validate_task028_source_authority() -> tuple[_Task028PendingBlocker, ...]:
     """§7 — Validate internal source authority contract. Returns empty tuple if valid."""
     if not TASK028_LOCAL_LOSS_SOURCE_AUTHORITY_ID:
         return (
