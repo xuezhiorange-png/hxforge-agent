@@ -96,9 +96,7 @@ REQUEST_HASH_FIELD_COUNT: Final[int] = 10
 
 def _encode_string_tuple(items: tuple[str, ...]) -> bytes:
     """Encode a tuple of strings using frozen framed children."""
-    return task028_tuple_payload(
-        [frame_value(KIND_STRING, item.encode("utf-8")) for item in items]
-    )
+    return task028_tuple_payload([frame_value(KIND_STRING, item.encode("utf-8")) for item in items])
 
 
 def _encode_bytes_tuple(items: tuple[bytes, ...]) -> bytes:
@@ -147,7 +145,11 @@ def _encode_provenance_canonical(provenance: Any) -> bytes:
                 KIND_STRING,
                 provenance.implementation_software_version.encode("utf-8"),
             ),
-            ("input_evidence_refs", KIND_TUPLE, _encode_string_tuple(provenance.input_evidence_refs)),
+            (
+                "input_evidence_refs",
+                KIND_TUPLE,
+                _encode_string_tuple(provenance.input_evidence_refs),
+            ),
             (
                 "upstream_identity_hashes",
                 KIND_TUPLE,
@@ -240,7 +242,11 @@ def canonicalize_request_hash(
             zero_elevation_assertion.encode("ascii"),
         ),
         ("flow_direction_assertion", KIND_ENUM, flow_direction_assertion.encode("ascii")),
-        ("component_authority_hashes", KIND_TUPLE, _encode_string_tuple(component_authority_hashes)),
+        (
+            "component_authority_hashes",
+            KIND_TUPLE,
+            _encode_string_tuple(component_authority_hashes),
+        ),
     ]
     framed = frame_record(REQUEST_HASH_NAMESPACE, fields)
     return sha256_hex_from_framed_bytes(framed)
