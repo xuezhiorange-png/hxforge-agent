@@ -12,6 +12,7 @@ from hexagent.exchangers.shell_tube.tube_side.canonical import (
     _u32_be,
     _u64_be,
     frame_record,
+    frame_value,
     sha256_hex_from_framed_bytes,
 )
 
@@ -93,25 +94,25 @@ TASK028_REQUEST_FIELDS: Final[tuple[str, ...]] = (
 REQUEST_HASH_FIELD_COUNT: Final[int] = 10
 
 
-def _encode_tuple(items: tuple[str, ...] | tuple[bytes, ...]) -> bytes:
-    """Encode a tuple of strings/bytes using frozen TUPLE framing with U64 child-lengths."""
-    out = _u32_be(len(items))
-    for item in items:
-        if isinstance(item, bytes):
-            out += _u64_be(len(item)) + item
-        else:
-            b = item.encode("utf-8")
-            out += _u64_be(len(b)) + b
-    return out
+def _encode_string_tuple(items: tuple[str, ...]) -> bytes:
+    """Encode a tuple of strings using frozen framed children."""
+    return task028_tuple_payload(
+        [frame_value(KIND_STRING, item.encode("utf-8")) for item in items]
+    )
+
+
+def _encode_bytes_tuple(items: tuple[bytes, ...]) -> bytes:
+    """Encode a tuple of raw bytes using frozen framed children."""
+    return task028_tuple_payload(list(items))
 
 
 def _encode_blocker_entry(entry: Any) -> bytes:
     """Frame a single Task028BlockerEntry as a canonical RECORD."""
     fields = [
         ("code", KIND_STRING, entry.code.value.encode("utf-8")),
-        ("field_path", KIND_TUPLE, _encode_tuple(entry.field_path)),
+        ("field_path", KIND_TUPLE, _encode_string_tuple(entry.field_path)),
         ("message_key", KIND_STRING, entry.message_key.encode("utf-8")),
-        ("evidence_refs", KIND_TUPLE, _encode_tuple(entry.evidence_refs)),
+        ("evidence_refs", KIND_TUPLE, _encode_string_tuple(entry.evidence_refs)),
     ]
     return frame_record("task028.blocker-entry.v1", fields)
 
@@ -146,11 +147,11 @@ def _encode_provenance_canonical(provenance: Any) -> bytes:
                 KIND_STRING,
                 provenance.implementation_software_version.encode("utf-8"),
             ),
-            ("input_evidence_refs", KIND_TUPLE, _encode_tuple(provenance.input_evidence_refs)),
+            ("input_evidence_refs", KIND_TUPLE, _encode_string_tuple(provenance.input_evidence_refs)),
             (
                 "upstream_identity_hashes",
                 KIND_TUPLE,
-                _encode_tuple(provenance.upstream_identity_hashes),
+                _encode_string_tuple(provenance.upstream_identity_hashes),
             ),
         ]
     else:
@@ -158,8 +159,8 @@ def _encode_provenance_canonical(provenance: Any) -> bytes:
             ("task_id", KIND_STRING, b"unknown"),
             ("design_contract_path", KIND_STRING, b"unknown"),
             ("implementation_software_version", KIND_STRING, b"unknown"),
-            ("input_evidence_refs", KIND_TUPLE, _encode_tuple(())),
-            ("upstream_identity_hashes", KIND_TUPLE, _encode_tuple(())),
+            ("input_evidence_refs", KIND_TUPLE, _encode_string_tuple(())),
+            ("upstream_identity_hashes", KIND_TUPLE, _encode_string_tuple(())),
         ]
     return frame_record(PROVENANCE_NAMESPACE, fields)
 
@@ -198,7 +199,7 @@ def canonicalize_authority(
         ("loss_coefficient_convention", KIND_ENUM, loss_coefficient_convention.encode("ascii")),
         ("reference_flow_area_m2", KIND_DECIMAL, reference_flow_area_m2.encode("utf-8")),
         ("multiplicity", KIND_INTEGER, str(multiplicity).encode("utf-8")),
-        ("geometry_evidence_refs", KIND_TUPLE, _encode_tuple(geometry_evidence_refs)),
+        ("geometry_evidence_refs", KIND_TUPLE, _encode_string_tuple(geometry_evidence_refs)),
         ("coefficient_source_id", KIND_STRING, coefficient_source_id.encode("utf-8")),
         ("coefficient_source_version", KIND_STRING, coefficient_source_version.encode("utf-8")),
         ("coefficient_source_location", KIND_STRING, coefficient_source_location.encode("utf-8")),
@@ -239,7 +240,7 @@ def canonicalize_request_hash(
             zero_elevation_assertion.encode("ascii"),
         ),
         ("flow_direction_assertion", KIND_ENUM, flow_direction_assertion.encode("ascii")),
-        ("component_authority_hashes", KIND_TUPLE, _encode_tuple(component_authority_hashes)),
+        ("component_authority_hashes", KIND_TUPLE, _encode_string_tuple(component_authority_hashes)),
     ]
     framed = frame_record(REQUEST_HASH_NAMESPACE, fields)
     return sha256_hex_from_framed_bytes(framed)
@@ -308,7 +309,16 @@ def canonicalize_success_result_hash(
 
     14-field success result → hash projection excludes result_hash and result_id.
     """
-    blocker_payload = b"".join(_encode_blocker_entry(b) for b in blockers)
+    # Component results: each child is a framed RECORD wrapping the canonical hash bytes
+    component_child_frames = (
+        [frame_value(KIND_RECORD, bytes.fromhex(h)) for h in component_result_hashes]
+        if component_result_hashes
+        else []
+    )
+    component_results_payload = task028_tuple_payload(component_child_frames)
+    # Blockers: each child is a framed RECORD wrapping the blocker entry record
+    blocker_child_frames = [frame_value(KIND_RECORD, _encode_blocker_entry(b)) for b in blockers]
+    blockers_payload = task028_tuple_payload(blocker_child_frames)
     fields: list[tuple[str, bytes, bytes]] = [
         ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
         ("profile_id", KIND_STRING, profile_id.encode("utf-8")),
@@ -321,16 +331,10 @@ def canonicalize_success_result_hash(
         ("task025_result_hash", KIND_STRING, task025_result_hash.encode("utf-8")),
         ("task026_result_hash", KIND_STRING, task026_result_hash.encode("utf-8")),
         ("property_snapshot_hash", KIND_STRING, property_snapshot_hash.encode("utf-8")),
-        (
-            "component_results",
-            KIND_TUPLE,
-            task028_tuple_payload([bytes.fromhex(h) for h in component_result_hashes])
-            if component_result_hashes
-            else task028_tuple_payload([]),
-        ),
-        ("warnings", KIND_TUPLE, _encode_tuple(warnings)),
-        ("blockers", KIND_TUPLE, blocker_payload),
-        ("deferred_capabilities", KIND_TUPLE, _encode_tuple(deferred_capabilities)),
+        ("component_results", KIND_TUPLE, component_results_payload),
+        ("warnings", KIND_TUPLE, _encode_string_tuple(warnings)),
+        ("blockers", KIND_TUPLE, blockers_payload),
+        ("deferred_capabilities", KIND_TUPLE, _encode_string_tuple(deferred_capabilities)),
         (
             "provenance",
             KIND_RECORD if provenance is not None else KIND_NONE,
@@ -356,7 +360,9 @@ def canonicalize_blocked_result_hash(
     provenance: Any,
 ) -> str:
     """§15 — Canonical blocked result hash (self-excludes result_hash, result_id)."""
-    blocker_payload = b"".join(_encode_blocker_entry(b) for b in blockers)
+    # Blockers: each child is a framed RECORD wrapping the blocker entry record
+    blocker_child_frames = [frame_value(KIND_RECORD, _encode_blocker_entry(b)) for b in blockers]
+    blockers_payload = task028_tuple_payload(blocker_child_frames)
     fields: list[tuple[str, bytes, bytes]] = [
         ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
         ("profile_id", KIND_STRING, profile_id.encode("utf-8")),
@@ -382,9 +388,9 @@ def canonicalize_blocked_result_hash(
             if raw_upstream_blocked_projection is None
             else _encode_raw_projection_canonical(raw_upstream_blocked_projection),
         ),
-        ("warnings", KIND_TUPLE, _encode_tuple(warnings)),
-        ("blockers", KIND_TUPLE, blocker_payload),
-        ("deferred_capabilities", KIND_TUPLE, _encode_tuple(deferred_capabilities)),
+        ("warnings", KIND_TUPLE, _encode_string_tuple(warnings)),
+        ("blockers", KIND_TUPLE, blockers_payload),
+        ("deferred_capabilities", KIND_TUPLE, _encode_string_tuple(deferred_capabilities)),
         (
             "provenance",
             KIND_NONE if provenance is None else KIND_RECORD,
@@ -404,16 +410,18 @@ def canonicalize_raw_boundary_blocked_hash(
     implementation_software_version: str,
 ) -> str:
     """§16 — Canonical raw boundary blocked hash (6 fields)."""
-    blocker_payload = b"".join(_encode_blocker_entry(b) for b in blockers)
+    # Blockers: each child is a framed RECORD wrapping the blocker entry record
+    blocker_child_frames = [frame_value(KIND_RECORD, _encode_blocker_entry(b)) for b in blockers]
+    blockers_payload = task028_tuple_payload(blocker_child_frames)
     fields: list[tuple[str, bytes, bytes]] = [
         (
             "raw_request_projection",
             KIND_RAW_PROJECTION,
             _encode_raw_projection_canonical(raw_request_projection),
         ),
-        ("blockers", KIND_TUPLE, blocker_payload),
-        ("warnings", KIND_TUPLE, _encode_tuple(warnings)),
-        ("deferred_capabilities", KIND_TUPLE, _encode_tuple(deferred_capabilities)),
+        ("blockers", KIND_TUPLE, blockers_payload),
+        ("warnings", KIND_TUPLE, _encode_string_tuple(warnings)),
+        ("deferred_capabilities", KIND_TUPLE, _encode_string_tuple(deferred_capabilities)),
         ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
         (
             "implementation_software_version",
@@ -459,7 +467,8 @@ __all__ = [
     "IMPLEMENTATION_SOFTWARE_VERSION",
     "SUPPORTED_PROFILE_IDS",
     "TASK028_REQUEST_FIELDS",
-    "_encode_tuple",
+    "_encode_string_tuple",
+    "_encode_bytes_tuple",
     "_encode_blocker_entry",
     "_encode_raw_projection_canonical",
     "_encode_provenance_canonical",
