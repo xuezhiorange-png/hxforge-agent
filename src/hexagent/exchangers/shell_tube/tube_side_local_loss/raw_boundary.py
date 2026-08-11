@@ -32,7 +32,10 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.raw_projection import (
 
 @dataclass(frozen=True)
 class RawBoundaryResult:
-    """Result of raw boundary validation. Either blocked (non-None) or typed request data (None + typed data)."""
+    """Result of raw boundary validation.
+
+    Either blocked (non-None) or typed request data (None + typed data).
+    """
 
     blocked: bool
     typed_data: dict[str, Any] | None

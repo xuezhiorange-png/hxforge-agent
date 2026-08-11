@@ -1120,7 +1120,7 @@ def test_T028_ENGINEERING_QUANTITY_IRREVERSIBLE_LOSS_SEMANTICS() -> None:
 
 def test_T028_FLOW_DIRECTION_ORIENTATION_MISMATCH_BLOCKED() -> None:
     """Component END_TO_START != request START_TO_END
-      -> BL_T028_COMPONENT_FLOW_DIRECTION_MISMATCH."""
+    -> BL_T028_COMPONENT_FLOW_DIRECTION_MISMATCH."""
     auth = _make_entrance_authority(
         flow_direction=Task028ComponentFlowDirectionAssertion.END_TO_START,
     )

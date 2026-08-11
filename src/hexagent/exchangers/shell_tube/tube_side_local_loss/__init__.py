@@ -36,7 +36,7 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
     TASK028_REQUEST_FIELDS,
     TASK028_REQUEST_SCHEMA_VERSION,
     TASK028_SUCCESS_RESULT_SCHEMA_VERSION,
-    )
+)
 from hexagent.exchangers.shell_tube.tube_side_local_loss.computation import (
     compute_local_loss_component,
 )

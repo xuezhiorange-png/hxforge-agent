@@ -1,4 +1,6 @@
-"""TASK-028 frozen enums: ComponentType, FlowDirection (two domains), Convention, Permission, Applicability.
+"""TASK-028 frozen enums.
+
+ComponentType, FlowDirection (two domains), Convention, Permission, Applicability.
 
 §18 — Frozen exact enums.
 """

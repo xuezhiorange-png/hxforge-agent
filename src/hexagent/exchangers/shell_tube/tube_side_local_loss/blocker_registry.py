@@ -158,7 +158,9 @@ def emit_blocker(
 def collapse_blockers(
     pending: list[_Task028PendingBlocker],
 ) -> tuple[Task028BlockerEntry, ...]:
-    """§12 — Sort and deduplicate pending blockers by (registry ordinal, field_path, component_id_tiebreaker)."""
+    """§12 — Sort and deduplicate pending blockers.
+    Ordering uses registry ordinal, field_path, and component_id_tiebreaker.
+    """
 
     def _ordering_key(p: _Task028PendingBlocker) -> tuple[int, tuple[str, ...], str]:
         ordinal = _BLOCKER_REGISTRY.get(p.entry.code, 999)
@@ -183,5 +185,4 @@ __all__ = [
     "emit_blocker",
     "collapse_blockers",
     "BLOCKER_REGISTRY_COUNT",
-    "BLOCKER_REGISTRY",
 ]

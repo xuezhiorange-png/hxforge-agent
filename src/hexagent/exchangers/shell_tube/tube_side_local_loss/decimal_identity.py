@@ -55,7 +55,11 @@ def normalize_negative_zero(value: Decimal, quantum: Decimal) -> Decimal:
 def task028_decimal_payload(quantized_value: Decimal, owning_quantum: Decimal) -> bytes:
     """§9.4 — Produce fixed-point exact-scale canonical payload bytes.
 
-    Guarantees: NO_EXPONENT_NOTATION, EXACT_SCALE_PRESERVED, NO_LEADING_PLUS, NEGATIVE_ZERO_NORMALIZED.
+    Guarantees:
+    - NO_EXPONENT_NOTATION
+    - EXACT_SCALE_PRESERVED
+    - NO_LEADING_PLUS
+    - NEGATIVE_ZERO_NORMALIZED
 
     Examples:
     Decimal("0.5") with K quantum → b"0.50000000"
