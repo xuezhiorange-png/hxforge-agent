@@ -61,6 +61,9 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
     build_raw_boundary_blocked_result,
     build_success_result,
 )
+from hexagent.exchangers.shell_tube.tube_side_thermal import (
+    PhaseRegion,
+)
 from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import (
     PropertySnapshot,
     recompute_property_snapshot_hash,
@@ -262,7 +265,7 @@ def compute_task028_local_loss(
             ),
             bulk_temperature_k=Decimal(str(ps_raw.get("bulk_temperature_k", "293.15"))),
             bulk_pressure_pa=Decimal(str(ps_raw.get("bulk_pressure_pa", "101325"))),
-            phase_region=ps_raw.get("phase_region", "SINGLE_PHASE_LIQUID"),
+            phase_region=PhaseRegion(ps_raw.get("phase_region", "SINGLE_PHASE_LIQUID")),
             property_source_id=ps_raw.get("property_source_id", "default"),
             property_source_version=ps_raw.get("property_source_version", "1.0"),
             property_snapshot_hash=supplied_property_snapshot_hash,

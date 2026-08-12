@@ -23,6 +23,9 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.identity import (
     compute_result_id,
     compute_success_result_hash,
 )
+from hexagent.exchangers.shell_tube.tube_side_local_loss.models import (
+    TubeSideLocalLossComponentResult,
+)
 
 # §26 — Frozen field counts
 SUCCESS_RESULT_FIELD_COUNT: Final[int] = 14
@@ -58,7 +61,7 @@ class Task028SuccessResult:
     task025_result_hash: str
     task026_result_hash: str
     property_snapshot_hash: str
-    component_results: tuple[Any, ...]  # TubeSideLocalLossComponentResult
+    component_results: tuple[TubeSideLocalLossComponentResult, ...]
     warnings: tuple[str, ...]
     blockers: tuple[Task028BlockerEntry, ...]
     deferred_capabilities: tuple[str, ...]
@@ -128,7 +131,7 @@ def build_success_result(
     task025_result_hash: str,
     task026_result_hash: str,
     property_snapshot_hash: str,
-    component_results: tuple[Any, ...],
+    component_results: tuple[TubeSideLocalLossComponentResult, ...],
     warnings: tuple[str, ...],
     blockers: tuple[Task028BlockerEntry, ...],
     deferred_capabilities: tuple[str, ...],
