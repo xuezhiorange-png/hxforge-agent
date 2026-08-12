@@ -1,11 +1,13 @@
-"""TASK-029 frozen schema constants and field-order tuples.
+"""TASK-029 frozen schema constants, framing primitives, and field-order tuples.
 
-I01 scope: namespaces, schema versions, field-order tuples, and frozen constants
-only. Framing primitives and kind-tag maps are owned by later slices.
+I01: namespaces, schema versions, field-order tuples, and frozen constants.
+I02: VALUE / RECORD / TUPLE framing primitives and exact §11.2 kind-tag maps.
 """
 
 from __future__ import annotations
 
+import struct
+from collections.abc import Sequence
 from typing import Final
 
 # ---------------------------------------------------------------------------
@@ -68,6 +70,225 @@ BLOCKER_ENTRY_NAMESPACE: Final[str] = BLOCKER_ENTRY_SCHEMA_VERSION
 
 RESULT_ID_NAMESPACE: Final[str] = "a0290000-0000-5000-8000-000000000001"
 RESULT_ID_NAME_PREFIX: Final[str] = "task029-result-v1::"
+
+# ---------------------------------------------------------------------------
+# §11.1 — Frozen kind-tag byte literals (TASK-029 package-local)
+# ---------------------------------------------------------------------------
+
+KIND_NONE: Final[bytes] = b"NONE"
+KIND_STRING: Final[bytes] = b"STRING"
+KIND_INTEGER: Final[bytes] = b"INTEGER"
+KIND_DECIMAL: Final[bytes] = b"DECIMAL"
+KIND_ENUM: Final[bytes] = b"ENUM"
+KIND_TUPLE: Final[bytes] = b"TUPLE"
+KIND_RECORD: Final[bytes] = b"RECORD"
+KIND_RAW_PROJECTION: Final[bytes] = b"RAW_PROJECTION"
+KIND_NONE_OR_RAW_PROJECTION: Final[bytes] = b"NONE_OR_RAW_PROJECTION"
+KIND_NONE_OR_RECORD: Final[bytes] = b"NONE_OR_RECORD"
+
+
+def _u32_be(n: int) -> bytes:
+    """Encode a non-negative integer as big-endian u32."""
+    if n < 0 or n > 0xFFFFFFFF:
+        raise ValueError("u32_be out of range")
+    return struct.pack(">I", n)
+
+
+def _u64_be(n: int) -> bytes:
+    """Encode a non-negative integer as big-endian u64."""
+    if n < 0 or n > 0xFFFFFFFFFFFFFFFF:
+        raise ValueError("u64_be out of range")
+    return struct.pack(">Q", n)
+
+
+def frame_value(kind_tag_ascii: bytes, payload_bytes: bytes) -> bytes:
+    """§11.1 — Universal VALUE framing.
+
+    VALUE = U32_BE(kind_len) || kind_ascii || U64_BE(payload_len) || payload
+    """
+    if not isinstance(kind_tag_ascii, bytes):
+        raise TypeError("kind_tag_ascii must be bytes")
+    if not isinstance(payload_bytes, bytes):
+        raise TypeError("payload_bytes must be bytes")
+    return (
+        _u32_be(len(kind_tag_ascii)) + kind_tag_ascii + _u64_be(len(payload_bytes)) + payload_bytes
+    )
+
+
+def frame_record(node_namespace: str, fields: Sequence[tuple[str, bytes, bytes]]) -> bytes:
+    """§11.1 — RECORD framing with caller-supplied frozen field order."""
+    namespace_bytes = node_namespace.encode("utf-8")
+    out = _u32_be(len(namespace_bytes)) + namespace_bytes + _u32_be(len(fields))
+    for field_name, field_kind_tag, field_payload in fields:
+        name_bytes = field_name.encode("utf-8")
+        if not isinstance(field_kind_tag, bytes):
+            raise TypeError("field_kind_tag must be bytes")
+        if not isinstance(field_payload, bytes):
+            raise TypeError("field_payload must be bytes")
+        out += _u32_be(len(name_bytes)) + name_bytes + frame_value(field_kind_tag, field_payload)
+    return out
+
+
+def task029_tuple_payload(item_frames: Sequence[bytes]) -> bytes:
+    """§11.1 — TASK-029 TUPLE framing with U64 child-length prefixes.
+
+    TUPLE = U32_BE(item_count) || repeated[ U64_BE(child_frame_len) || child_frame ]
+    """
+    out = _u32_be(len(item_frames))
+    for child_frame in item_frames:
+        if not isinstance(child_frame, bytes):
+            raise TypeError("child_frame must be bytes")
+        out += _u64_be(len(child_frame)) + child_frame
+    return out
+
+
+# ---------------------------------------------------------------------------
+# §11.2 — Exact kind-tag maps (frozen; T029_ID_008_EXACT_KIND_TAG_MAPS)
+# ---------------------------------------------------------------------------
+
+MEMBER_AUTHORITY_HASH_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "INTEGER",
+    "ENUM",
+    "ENUM",
+    "STRING",
+    "ENUM",
+    "STRING",
+    "STRING",
+    "STRING",
+    "INTEGER",
+    "TUPLE",
+)
+EXCLUSION_AUTHORITY_HASH_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "STRING",
+    "ENUM",
+    "TUPLE",
+)
+COMPOSITION_AUTHORITY_HASH_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "ENUM",
+    "STRING",
+    "STRING",
+    "TUPLE",
+    "TUPLE",
+    "TUPLE",
+)
+REQUEST_HASH_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+)
+LEDGER_MEMBER_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "INTEGER",
+    "ENUM",
+    "STRING",
+    "ENUM",
+    "STRING",
+    "ENUM",
+    "STRING",
+    "STRING",
+    "STRING",
+    "INTEGER",
+    "INTEGER",
+    "DECIMAL",
+    "STRING",
+    "ENUM",
+)
+LEDGER_EXCLUSION_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "STRING",
+    "ENUM",
+    "TUPLE",
+    "STRING",
+    "ENUM",
+)
+LEDGER_HASH_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "INTEGER",
+    "INTEGER",
+    "TUPLE",
+    "TUPLE",
+    "ENUM",
+    "ENUM",
+    "ENUM",
+)
+SUCCESS_HASH_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "RECORD",
+    "DECIMAL",
+    "TUPLE",
+    "TUPLE",
+    "TUPLE",
+    "RECORD",
+)
+BLOCKED_HASH_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "STRING",
+    "RAW_PROJECTION",
+    "NONE_OR_RAW_PROJECTION",
+    "TUPLE",
+    "TUPLE",
+    "TUPLE",
+    "NONE_OR_RECORD",
+)
+PROVENANCE_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "STRING",
+    "TUPLE",
+    "TUPLE",
+)
+BLOCKER_ENTRY_KIND_TAGS: Final[tuple[str, ...]] = (
+    "ENUM",
+    "STRING",
+    "STRING",
+    "TUPLE",
+)
+RAW_PROJECTION_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+)
+RAW_BOUNDARY_BLOCKED_KIND_TAGS: Final[tuple[str, ...]] = (
+    "STRING",
+    "STRING",
+    "RAW_PROJECTION",
+    "TUPLE",
+    "TUPLE",
+    "TUPLE",
+)
 
 # ---------------------------------------------------------------------------
 # §3.11 / §12 — Raw projection kinds
@@ -327,6 +548,20 @@ assert len(RAW_PROJECTION_FIELDS) == RAW_PROJECTION_FIELD_COUNT
 assert len(BLOCKER_ENTRY_FIELDS) == BLOCKER_ENTRY_FIELD_COUNT
 assert len(PROVENANCE_FIELDS) == PROVENANCE_FIELD_COUNT
 
+assert len(MEMBER_AUTHORITY_HASH_KIND_TAGS) == len(MEMBER_AUTHORITY_FIELDS) - 1
+assert len(EXCLUSION_AUTHORITY_HASH_KIND_TAGS) == len(EXCLUSION_AUTHORITY_FIELDS) - 1
+assert len(COMPOSITION_AUTHORITY_HASH_KIND_TAGS) == len(COMPOSITION_AUTHORITY_FIELDS) - 1
+assert len(REQUEST_HASH_KIND_TAGS) == REQUEST_HASH_SEMANTIC_FIELD_COUNT
+assert len(LEDGER_MEMBER_KIND_TAGS) == LEDGER_MEMBER_EVIDENCE_FIELD_COUNT
+assert len(LEDGER_EXCLUSION_KIND_TAGS) == LEDGER_EXCLUSION_EVIDENCE_FIELD_COUNT
+assert len(LEDGER_HASH_KIND_TAGS) == len(COMPLETENESS_LEDGER_FIELDS) - 1
+assert len(SUCCESS_HASH_KIND_TAGS) == TASK029_SUCCESS_RESULT_FIELD_COUNT - 2
+assert len(BLOCKED_HASH_KIND_TAGS) == TASK029_BLOCKED_RESULT_FIELD_COUNT - 2
+assert len(PROVENANCE_KIND_TAGS) == PROVENANCE_FIELD_COUNT
+assert len(BLOCKER_ENTRY_KIND_TAGS) == BLOCKER_ENTRY_FIELD_COUNT
+assert len(RAW_PROJECTION_KIND_TAGS) == RAW_PROJECTION_FIELD_COUNT
+assert len(RAW_BOUNDARY_BLOCKED_KIND_TAGS) == TASK029_RAW_BOUNDARY_BLOCKED_FIELD_COUNT
+
 __all__ = [
     "IMPLEMENTATION_SOFTWARE_VERSION",
     "TASK029_DECIMAL_PRECISION",
@@ -368,6 +603,34 @@ __all__ = [
     "BLOCKER_ENTRY_NAMESPACE",
     "RESULT_ID_NAMESPACE",
     "RESULT_ID_NAME_PREFIX",
+    "KIND_NONE",
+    "KIND_STRING",
+    "KIND_INTEGER",
+    "KIND_DECIMAL",
+    "KIND_ENUM",
+    "KIND_TUPLE",
+    "KIND_RECORD",
+    "KIND_RAW_PROJECTION",
+    "KIND_NONE_OR_RAW_PROJECTION",
+    "KIND_NONE_OR_RECORD",
+    "_u32_be",
+    "_u64_be",
+    "frame_value",
+    "frame_record",
+    "task029_tuple_payload",
+    "MEMBER_AUTHORITY_HASH_KIND_TAGS",
+    "EXCLUSION_AUTHORITY_HASH_KIND_TAGS",
+    "COMPOSITION_AUTHORITY_HASH_KIND_TAGS",
+    "REQUEST_HASH_KIND_TAGS",
+    "LEDGER_MEMBER_KIND_TAGS",
+    "LEDGER_EXCLUSION_KIND_TAGS",
+    "LEDGER_HASH_KIND_TAGS",
+    "SUCCESS_HASH_KIND_TAGS",
+    "BLOCKED_HASH_KIND_TAGS",
+    "PROVENANCE_KIND_TAGS",
+    "BLOCKER_ENTRY_KIND_TAGS",
+    "RAW_PROJECTION_KIND_TAGS",
+    "RAW_BOUNDARY_BLOCKED_KIND_TAGS",
     "RAW_REQUEST_PROJECTION_KIND",
     "UPSTREAM_BLOCKED_SET_PROJECTION_KIND",
     "TASK029_DEFERRED_CAPABILITIES_V1",
