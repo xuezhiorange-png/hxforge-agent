@@ -1,0 +1,178 @@
+"""TASK-029 frozen enums.
+
+Producer routing, exclusion partition, ledger status, path continuity, and the
+closed 43-code blocker registry ordinals.
+"""
+
+from __future__ import annotations
+
+import enum
+from typing import Final
+
+
+class ProducerTask(enum.StrEnum):
+    """§3.1 — Upstream producer task identity."""
+
+    TASK_027 = "TASK-027"
+    TASK_028 = "TASK-028"
+
+
+class ProducerMemberKind(enum.StrEnum):
+    """§3.1 — Member kind for composition authority binding."""
+
+    DISTRIBUTED_FRICTION = "DISTRIBUTED_FRICTION"
+    LOCAL_MINOR_LOSS = "LOCAL_MINOR_LOSS"
+
+
+class ProducerComponentIdentity(enum.StrEnum):
+    """§3.1 — Frozen TASK-027 distributed-friction component identity sentinel."""
+
+    STRAIGHT_TUBE_FRICTION = "STRAIGHT_TUBE_FRICTION"
+
+
+class Task029FlowDirectionAssertion(enum.StrEnum):
+    """§3.3 — Composition authority flow direction (V1: START_TO_END only)."""
+
+    START_TO_END = "START_TO_END"
+
+
+class ExclusionReason(enum.StrEnum):
+    """§3.2 — Exclusion authority reason."""
+
+    PHYSICALLY_ABSENT = "PHYSICALLY_ABSENT"
+    V0_2_OUT_OF_SCOPE = "V0_2_OUT_OF_SCOPE"
+
+
+class V02OutOfScopeItemIdentity(enum.StrEnum):
+    """§3.2 — Required v0.2 out-of-scope exclusion identities."""
+
+    PASS_PARTITION = "PASS_PARTITION"
+    RETURN_HEADER = "RETURN_HEADER"
+    RETURN_BEND = "RETURN_BEND"
+    U_BEND = "U_BEND"
+
+
+class Task029InScopeComponentType(enum.StrEnum):
+    """§3.2 — TASK-028 in-scope component types referenced by TASK-029 completeness."""
+
+    ENTRANCE = "ENTRANCE"
+    EXIT = "EXIT"
+    CHANNEL_HEAD = "CHANNEL_HEAD"
+    NOZZLE = "NOZZLE"
+    CONTRACTION = "CONTRACTION"
+    EXPANSION = "EXPANSION"
+
+
+class MemberStatus(enum.StrEnum):
+    """§3.5 — Ledger member evidence status on success."""
+
+    VERIFIED = "VERIFIED"
+
+
+class ExclusionStatus(enum.StrEnum):
+    """§3.6 — Ledger exclusion evidence status on success."""
+
+    VERIFIED_EXCLUSION = "VERIFIED_EXCLUSION"
+
+
+class PathContinuityStatus(enum.StrEnum):
+    """§3.7 — Completeness ledger path continuity status on success."""
+
+    CONTIGUOUS_EXACT_REFERENCE_PLANE_CHAIN = "CONTIGUOUS_EXACT_REFERENCE_PLANE_CHAIN"
+
+
+class IdentityCompatibilityStatus(enum.StrEnum):
+    """§3.7 — Completeness ledger upstream identity compatibility on success."""
+
+    MATCHED = "MATCHED"
+
+
+class CompletenessStatus(enum.StrEnum):
+    """§3.7 — Completeness ledger partition status on success."""
+
+    COMPLETE_WITHIN_EXPLICIT_MODELED_BOUNDARY = "COMPLETE_WITHIN_EXPLICIT_MODELED_BOUNDARY"
+
+
+class Task029BlockerCode(enum.StrEnum):
+    """§13 — Closed 43-code TASK-029 blocker registry.
+
+    Members are sorted alphabetically by lexical name; registry ordinals 00..42
+    are assigned separately in ``blocker_registry.py``.
+    """
+
+    BL_T029_ARITHMETIC_FAILURE = "BL_T029_ARITHMETIC_FAILURE"
+    BL_T029_COMPLETENESS_LEDGER_INCOMPLETE = "BL_T029_COMPLETENESS_LEDGER_INCOMPLETE"
+    BL_T029_COMPOSITION_AUTHORITY_HASH_MISMATCH = "BL_T029_COMPOSITION_AUTHORITY_HASH_MISMATCH"
+    BL_T029_COMPOSITION_AUTHORITY_MALFORMED = "BL_T029_COMPOSITION_AUTHORITY_MALFORMED"
+    BL_T029_COMPOSITION_AUTHORITY_MISSING = "BL_T029_COMPOSITION_AUTHORITY_MISSING"
+    BL_T029_COMPOSITION_MEMBER_AUTHORITY_HASH_MISMATCH = (
+        "BL_T029_COMPOSITION_MEMBER_AUTHORITY_HASH_MISMATCH"
+    )
+    BL_T029_DUPLICATE_MEMBER = "BL_T029_DUPLICATE_MEMBER"
+    BL_T029_EMPTY_MODELED_PATH = "BL_T029_EMPTY_MODELED_PATH"
+    BL_T029_EXCLUSION_AUTHORITY_INVALID = "BL_T029_EXCLUSION_AUTHORITY_INVALID"
+    BL_T029_EXCLUSION_EVIDENCE_MISSING = "BL_T029_EXCLUSION_EVIDENCE_MISSING"
+    BL_T029_EXPECTED_MEMBER_MISSING = "BL_T029_EXPECTED_MEMBER_MISSING"
+    BL_T029_FLOW_DIRECTION_MISMATCH = "BL_T029_FLOW_DIRECTION_MISMATCH"
+    BL_T029_MODELED_PATH_BOUNDARY_INVALID = "BL_T029_MODELED_PATH_BOUNDARY_INVALID"
+    BL_T029_MULTIPLICITY_INCOMPATIBILITY = "BL_T029_MULTIPLICITY_INCOMPATIBILITY"
+    BL_T029_OUT_OF_ORDER_MEMBER = "BL_T029_OUT_OF_ORDER_MEMBER"
+    BL_T029_OVERLAPPING_PATH_SEGMENT = "BL_T029_OVERLAPPING_PATH_SEGMENT"
+    BL_T029_PARTIAL_RESULT_FORBIDDEN = "BL_T029_PARTIAL_RESULT_FORBIDDEN"
+    BL_T029_PATH_CYCLE = "BL_T029_PATH_CYCLE"
+    BL_T029_PATH_FORK = "BL_T029_PATH_FORK"
+    BL_T029_PATH_JOIN = "BL_T029_PATH_JOIN"
+    BL_T029_PRESSURE_CONTRIBUTION_NONFINITE = "BL_T029_PRESSURE_CONTRIBUTION_NONFINITE"
+    BL_T029_PRESSURE_CONTRIBUTION_NONPOSITIVE = "BL_T029_PRESSURE_CONTRIBUTION_NONPOSITIVE"
+    BL_T029_PRESSURE_QUANTUM_MISMATCH = "BL_T029_PRESSURE_QUANTUM_MISMATCH"
+    BL_T029_PRODUCER_CONVENTION_MISMATCH = "BL_T029_PRODUCER_CONVENTION_MISMATCH"
+    BL_T029_PROFILE_MISMATCH = "BL_T029_PROFILE_MISMATCH"
+    BL_T029_RAW_INPUT_BOUNDARY_MALFORMED = "BL_T029_RAW_INPUT_BOUNDARY_MALFORMED"
+    BL_T029_REFERENCE_PLANE_DISCONTINUITY = "BL_T029_REFERENCE_PLANE_DISCONTINUITY"
+    BL_T029_REFERENCE_PLANE_SELF_LOOP = "BL_T029_REFERENCE_PLANE_SELF_LOOP"
+    BL_T029_REQUEST_HASH_MISMATCH = "BL_T029_REQUEST_HASH_MISMATCH"
+    BL_T029_REQUEST_UNKNOWN_FIELD = "BL_T029_REQUEST_UNKNOWN_FIELD"
+    BL_T029_REQUIRED_FIELD_MISSING = "BL_T029_REQUIRED_FIELD_MISSING"
+    BL_T029_UNEXPECTED_EXTRA_MEMBER = "BL_T029_UNEXPECTED_EXTRA_MEMBER"
+    BL_T029_UPSTREAM_IDENTITY_MISMATCH = "BL_T029_UPSTREAM_IDENTITY_MISMATCH"
+    BL_T029_UPSTREAM_SCHEMA_VERSION_UNSUPPORTED = "BL_T029_UPSTREAM_SCHEMA_VERSION_UNSUPPORTED"
+    BL_T029_UPSTREAM_SUCCESS_DIAGNOSTICS_NONEMPTY = "BL_T029_UPSTREAM_SUCCESS_DIAGNOSTICS_NONEMPTY"
+    BL_T029_UPSTREAM_TASK027_RAW_BLOCKED = "BL_T029_UPSTREAM_TASK027_RAW_BLOCKED"
+    BL_T029_UPSTREAM_TASK027_RESULT_IDENTITY_INVALID = (
+        "BL_T029_UPSTREAM_TASK027_RESULT_IDENTITY_INVALID"
+    )
+    BL_T029_UPSTREAM_TASK027_TYPE_INVALID = "BL_T029_UPSTREAM_TASK027_TYPE_INVALID"
+    BL_T029_UPSTREAM_TASK027_TYPED_BLOCKED = "BL_T029_UPSTREAM_TASK027_TYPED_BLOCKED"
+    BL_T029_UPSTREAM_TASK028_RAW_BLOCKED = "BL_T029_UPSTREAM_TASK028_RAW_BLOCKED"
+    BL_T029_UPSTREAM_TASK028_RESULT_IDENTITY_INVALID = (
+        "BL_T029_UPSTREAM_TASK028_RESULT_IDENTITY_INVALID"
+    )
+    BL_T029_UPSTREAM_TASK028_TYPE_INVALID = "BL_T029_UPSTREAM_TASK028_TYPE_INVALID"
+    BL_T029_UPSTREAM_TASK028_TYPED_BLOCKED = "BL_T029_UPSTREAM_TASK028_TYPED_BLOCKED"
+
+    @property
+    def canonical_utf8_bytes(self) -> bytes:
+        return self.value.encode("ascii")
+
+
+_BLOCKER_CODE_COUNT: Final[int] = 43
+assert len(Task029BlockerCode.__members__) == _BLOCKER_CODE_COUNT, (
+    f"Task029BlockerCode must have exactly {_BLOCKER_CODE_COUNT} members"
+)
+
+
+__all__ = [
+    "ProducerTask",
+    "ProducerMemberKind",
+    "ProducerComponentIdentity",
+    "Task029FlowDirectionAssertion",
+    "ExclusionReason",
+    "V02OutOfScopeItemIdentity",
+    "Task029InScopeComponentType",
+    "MemberStatus",
+    "ExclusionStatus",
+    "PathContinuityStatus",
+    "IdentityCompatibilityStatus",
+    "CompletenessStatus",
+    "Task029BlockerCode",
+]
