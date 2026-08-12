@@ -142,6 +142,12 @@ def task029_tuple_payload(item_frames: Sequence[bytes]) -> bytes:
     return out
 
 
+def sort_evidence_refs(refs: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    """Return evidence refs in UTF-8 byte lexical ascending order (frozen §3)."""
+    refs_tuple = tuple(refs) if isinstance(refs, list) else refs
+    return tuple(sorted(refs_tuple, key=lambda item: item.encode("utf-8")))
+
+
 # ---------------------------------------------------------------------------
 # §11.2 — Exact kind-tag maps (frozen; T029_ID_008_EXACT_KIND_TAG_MAPS)
 # ---------------------------------------------------------------------------
@@ -618,6 +624,7 @@ __all__ = [
     "frame_value",
     "frame_record",
     "task029_tuple_payload",
+    "sort_evidence_refs",
     "MEMBER_AUTHORITY_HASH_KIND_TAGS",
     "EXCLUSION_AUTHORITY_HASH_KIND_TAGS",
     "COMPOSITION_AUTHORITY_HASH_KIND_TAGS",
