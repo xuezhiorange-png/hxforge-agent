@@ -1682,9 +1682,11 @@ def test_T028_PY311_PY312_CANONICAL_BYTE_IDENTITY() -> None:
     # --- VECTOR_03: Request hash (permuted authority order → same bytes) ---
     # The pipeline sorts by path_sequence_index before hashing.
     # After sorting, the permuted order becomes the canonical order.
-    sorted_hashes = tuple(sorted(
-        (FROZEN_AUTHORITY_1_HASH, FROZEN_AUTHORITY_0_HASH),
-    ))
+    sorted_hashes = tuple(
+        sorted(
+            (FROZEN_AUTHORITY_1_HASH, FROZEN_AUTHORITY_0_HASH),
+        )
+    )
     req_framed3, req_h3 = _canonicalize_request_record(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id="default",
@@ -1772,6 +1774,7 @@ def test_T028_PY311_PY312_CANONICAL_BYTE_IDENTITY() -> None:
     from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
         canonicalize_component_result,
     )
+
     comp_record, _ = canonicalize_component_result(
         component_id="ENG-001",
         component_type="ENTRANCE",
