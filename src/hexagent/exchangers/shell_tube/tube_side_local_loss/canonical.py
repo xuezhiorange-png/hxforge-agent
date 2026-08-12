@@ -220,7 +220,7 @@ def canonicalize_authority(
     return framed, sha256_hex_from_framed_bytes(framed)
 
 
-def canonicalize_request_hash(
+def _canonicalize_request_record(
     schema_version: str,
     profile_id: str,
     task025_hydraulic_authority_hash: str,
@@ -231,8 +231,8 @@ def canonicalize_request_hash(
     zero_elevation_assertion: str,
     flow_direction_assertion: str,
     component_authority_hashes: tuple[str, ...],
-) -> str:
-    """§14.2 — Compute request hash from 10 semantic fields (namespace task028.request.v1)."""
+) -> tuple[bytes, str]:
+    """§14.2 — Canonical 10-field request record → (framed_bytes, sha256_hex)."""
     fields = [
         ("schema_version", KIND_STRING, schema_version.encode("utf-8")),
         ("profile_id", KIND_STRING, profile_id.encode("utf-8")),
@@ -258,7 +258,35 @@ def canonicalize_request_hash(
         ),
     ]
     framed = frame_record(REQUEST_HASH_NAMESPACE, fields)
-    return sha256_hex_from_framed_bytes(framed)
+    return framed, sha256_hex_from_framed_bytes(framed)
+
+
+def canonicalize_request_hash(
+    schema_version: str,
+    profile_id: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    constant_density_assertion: str,
+    zero_elevation_assertion: str,
+    flow_direction_assertion: str,
+    component_authority_hashes: tuple[str, ...],
+) -> str:
+    """§14.2 — Compute request hash from 10 semantic fields (namespace task028.request.v1)."""
+    _, sha256_hex = _canonicalize_request_record(
+        schema_version=schema_version,
+        profile_id=profile_id,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        constant_density_assertion=constant_density_assertion,
+        zero_elevation_assertion=zero_elevation_assertion,
+        flow_direction_assertion=flow_direction_assertion,
+        component_authority_hashes=component_authority_hashes,
+    )
+    return sha256_hex
 
 
 def _canonical_component_result_record(record_bytes: bytes) -> bytes:
@@ -332,7 +360,7 @@ def canonicalize_component_result(
     return framed, sha256_hex_from_framed_bytes(framed)
 
 
-def canonicalize_success_result_hash(
+def _canonicalize_success_result_record(
     schema_version: str,
     profile_id: str,
     request_hash: str,
@@ -345,8 +373,8 @@ def canonicalize_success_result_hash(
     blockers: tuple[Any, ...],
     deferred_capabilities: tuple[str, ...],
     provenance: Any,
-) -> str:
-    """§15 — Canonical success result hash (self-excludes result_hash, result_id).
+) -> tuple[bytes, str]:
+    """§15 — Canonical 12-field success result record → (framed_bytes, sha256_hex).
 
     14-field success result → hash projection excludes result_hash and result_id.
     component_result_records are the canonical record bytes for each component.
@@ -384,10 +412,42 @@ def canonicalize_success_result_hash(
         ),
     ]
     framed = frame_record(SUCCESS_RESULT_HASH_NAMESPACE, fields)
-    return sha256_hex_from_framed_bytes(framed)
+    return framed, sha256_hex_from_framed_bytes(framed)
 
 
-def canonicalize_blocked_result_hash(
+def canonicalize_success_result_hash(
+    schema_version: str,
+    profile_id: str,
+    request_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    component_result_records: tuple[bytes, ...],
+    warnings: tuple[str, ...],
+    blockers: tuple[Any, ...],
+    deferred_capabilities: tuple[str, ...],
+    provenance: Any,
+) -> str:
+    """§15 — Canonical success result hash (self-excludes result_hash, result_id)."""
+    _, sha256_hex = _canonicalize_success_result_record(
+        schema_version=schema_version,
+        profile_id=profile_id,
+        request_hash=request_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        component_result_records=component_result_records,
+        warnings=warnings,
+        blockers=blockers,
+        deferred_capabilities=deferred_capabilities,
+        provenance=provenance,
+    )
+    return sha256_hex
+
+
+def _canonicalize_blocked_result_record(
     schema_version: str,
     profile_id: str,
     request_hash: str,
@@ -401,8 +461,8 @@ def canonicalize_blocked_result_hash(
     blockers: tuple[Any, ...],
     deferred_capabilities: tuple[str, ...],
     provenance: Any,
-) -> str:
-    """§15 — Canonical blocked result hash (self-excludes result_hash, result_id)."""
+) -> tuple[bytes, str]:
+    """§15 — Canonical 13-field blocked result record → (framed_bytes, sha256_hex)."""
     # Blockers: each child is a framed RECORD wrapping the blocker entry record
     blocker_child_frames = [frame_value(KIND_RECORD, _encode_blocker_entry(b)) for b in blockers]
     blockers_payload = task028_tuple_payload(blocker_child_frames)
@@ -442,7 +502,41 @@ def canonicalize_blocked_result_hash(
         ),
     ]
     framed = frame_record(BLOCKED_RESULT_HASH_NAMESPACE, fields)
-    return sha256_hex_from_framed_bytes(framed)
+    return framed, sha256_hex_from_framed_bytes(framed)
+
+
+def canonicalize_blocked_result_hash(
+    schema_version: str,
+    profile_id: str,
+    request_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    raw_request_projection: Any,
+    raw_upstream_blocked_projection: Any,
+    warnings: tuple[str, ...],
+    blockers: tuple[Any, ...],
+    deferred_capabilities: tuple[str, ...],
+    provenance: Any,
+) -> str:
+    """§15 — Canonical blocked result hash (self-excludes result_hash, result_id)."""
+    _, sha256_hex = _canonicalize_blocked_result_record(
+        schema_version=schema_version,
+        profile_id=profile_id,
+        request_hash=request_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        raw_request_projection=raw_request_projection,
+        raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        warnings=warnings,
+        blockers=blockers,
+        deferred_capabilities=deferred_capabilities,
+        provenance=provenance,
+    )
+    return sha256_hex
 
 
 def canonicalize_raw_boundary_blocked_hash(
@@ -494,6 +588,9 @@ __all__ = [
     "canonicalize_blocked_result_hash",
     "canonicalize_raw_boundary_blocked_hash",
     "_canonical_component_result_record",
+    "_canonicalize_request_record",
+    "_canonicalize_success_result_record",
+    "_canonicalize_blocked_result_record",
     "REQUEST_HASH_NAMESPACE",
     "SUCCESS_RESULT_HASH_NAMESPACE",
     "BLOCKED_RESULT_HASH_NAMESPACE",
