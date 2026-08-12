@@ -180,6 +180,35 @@ def _make_success_provenance() -> Task028Provenance:
     )
 
 
+def _make_minimal_component_result() -> TubeSideLocalLossComponentResult:
+    """Build a minimal valid component result for success result fixtures."""
+    ref_vel, single, comp_pa = compute_local_loss_component(
+        density_kg_m3=Decimal("1000"),
+        mass_flow_rate_kg_s=Decimal("5"),
+        reference_flow_area_m2=Decimal("0.007854"),
+        loss_coefficient=Decimal("0.5"),
+        multiplicity=1,
+    )
+    return TubeSideLocalLossComponentResult(
+        component_id="E-001",
+        component_type=Task028ComponentType.ENTRANCE,
+        path_sequence_index=0,
+        upstream_reference_plane="INLET",
+        downstream_reference_plane="TUBE_START",
+        flow_direction_assertion=Task028ComponentFlowDirectionAssertion.START_TO_END,
+        authority_hash="a" * 64,
+        reference_flow_area_m2=Decimal("0.007854"),
+        reference_velocity_m_s=ref_vel,
+        loss_coefficient=Decimal("0.5"),
+        loss_coefficient_convention=(
+            LossCoefficientConvention.K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2
+        ),
+        multiplicity=1,
+        single_occurrence_irreversible_pressure_loss_pa=single,
+        component_irreversible_pressure_loss_pa=comp_pa,
+    )
+
+
 def _make_raw_request(**overrides: Any) -> dict[str, Any]:
     """Build a minimal valid raw request dict."""
     base: dict[str, Any] = {
@@ -198,11 +227,11 @@ def _make_raw_request(**overrides: Any) -> dict[str, Any]:
                 "component_type": "ENTRANCE",
                 "path_sequence_index": 0,
                 "flow_direction_assertion": "START_TO_END",
-                "loss_coefficient": "0.5",
+                "loss_coefficient": Decimal("0.5"),
                 "loss_coefficient_convention": (
                     "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2"
                 ),
-                "reference_flow_area_m2": "0.007854",
+                "reference_flow_area_m2": Decimal("0.007854"),
                 "multiplicity": 1,
                 "upstream_reference_plane": "INLET",
                 "downstream_reference_plane": "TUBE_START",
@@ -226,9 +255,9 @@ def _minimal_component_dict(**overrides: Any) -> dict[str, Any]:
         "component_type": "ENTRANCE",
         "path_sequence_index": 0,
         "flow_direction_assertion": "START_TO_END",
-        "loss_coefficient": "0.5",
+        "loss_coefficient": Decimal("0.5"),
         "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
-        "reference_flow_area_m2": "0.007854",
+        "reference_flow_area_m2": Decimal("0.007854"),
         "multiplicity": 1,
         "upstream_reference_plane": "INLET",
         "downstream_reference_plane": "TUBE_START",
@@ -632,48 +661,38 @@ def test_T028_AUTHORITY_HASH_REPLAY() -> None:
 
 
 def test_T028_AUTHORITY_HASH_MISMATCH_BLOCKED() -> None:
-    """BL_T028_AUTHORITY_HASH_MISMATCH: blocker exists, emitted, wrong hash != correct."""
-    # Verify blocker code exists in registry with correct ordinal
-    from hexagent.exchangers.shell_tube.tube_side_local_loss.blocker_registry import (
-        _BLOCKER_REGISTRY,
-    )
-
-    assert Task028BlockerCode.BL_T028_AUTHORITY_HASH_MISMATCH in _BLOCKER_REGISTRY
-    assert _BLOCKER_REGISTRY[Task028BlockerCode.BL_T028_AUTHORITY_HASH_MISMATCH] == 28
-
-    # Verify blocker can be emitted with this code
-    pending = emit_blocker(
-        Task028BlockerCode.BL_T028_AUTHORITY_HASH_MISMATCH,
-        "component_authorities.authority_hash",
-        "Authority hash mismatch.",
-        component_id_tiebreaker="E-001",
-    )
-    assert pending.entry.code == Task028BlockerCode.BL_T028_AUTHORITY_HASH_MISMATCH
-    collapsed = collapse_blockers([pending])
-    assert len(collapsed) == 1
-    assert collapsed[0].code == Task028BlockerCode.BL_T028_AUTHORITY_HASH_MISMATCH
-
-    # Verify a wrong authority hash is indeed different from the correct one
-    auth = _make_entrance_authority()
-    wrong_hash = compute_authority_hash(
+    """BL_T028_AUTHORITY_HASH_MISMATCH: supplied hash differs from recomputed → blocker."""
+    task025_valid = _make_valid_task025_result()
+    task026_valid = _make_valid_thermal_result()
+    # Build a component dict with a deliberately wrong authority_hash
+    comp = _minimal_component_dict()
+    # Compute the correct hash, then supply a wrong one
+    correct_hash = compute_authority_hash(
         schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
-        component_id=auth.component_id,
-        component_type=auth.component_type.value,
-        path_sequence_index=auth.path_sequence_index,
-        upstream_reference_plane=auth.upstream_reference_plane,
-        downstream_reference_plane=auth.downstream_reference_plane,
-        flow_direction_assertion=auth.flow_direction_assertion.value,
-        loss_coefficient=Decimal("999.0"),
-        loss_coefficient_convention=auth.loss_coefficient_convention.value,
-        reference_flow_area_m2=auth.reference_flow_area_m2,
-        multiplicity=auth.multiplicity,
-        geometry_evidence_refs=auth.geometry_evidence_refs,
-        coefficient_source_id=auth.coefficient_source_id,
-        coefficient_source_version=auth.coefficient_source_version,
-        coefficient_source_location=auth.coefficient_source_location,
-        coefficient_permission_status=auth.coefficient_permission_status.value,
+        component_id=comp["component_id"],
+        component_type="ENTRANCE",
+        path_sequence_index=comp["path_sequence_index"],
+        upstream_reference_plane=comp["upstream_reference_plane"],
+        downstream_reference_plane=comp["downstream_reference_plane"],
+        flow_direction_assertion="START_TO_END",
+        loss_coefficient=comp["loss_coefficient"],
+        loss_coefficient_convention="K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+        reference_flow_area_m2=comp["reference_flow_area_m2"],
+        multiplicity=comp["multiplicity"],
+        geometry_evidence_refs=tuple(comp["geometry_evidence_refs"]),
+        coefficient_source_id=comp["coefficient_source_id"],
+        coefficient_source_version=comp["coefficient_source_version"],
+        coefficient_source_location=comp["coefficient_source_location"],
+        coefficient_permission_status="ADMITTED",
     )
-    assert wrong_hash != auth.authority_hash
+    assert len(correct_hash) == 64
+    # Supply a wrong hash
+    comp["authority_hash"] = "wrong" * 13 + "a"
+    raw = _build_pipeline_raw_request(component_authorities=[comp])
+    result = _run_pipeline(raw, task025_valid, task026_valid)
+    assert isinstance(result, Task028BlockedResult)
+    codes = [e.code for e in result.blockers]
+    assert Task028BlockerCode.BL_T028_AUTHORITY_HASH_MISMATCH in codes
 
 
 def test_T028_GEOMETRY_EVIDENCE_MISSING_BLOCKED() -> None:
@@ -931,7 +950,7 @@ def test_T028_LOSS_COEFFICIENT_NONFINITE_BLOCKED() -> None:
     task025_valid = _make_valid_task025_result()
     task026_valid = _make_valid_thermal_result()
     raw = _build_pipeline_raw_request(
-        component_authorities=[_minimal_component_dict(loss_coefficient="NaN")]
+        component_authorities=[_minimal_component_dict(loss_coefficient=Decimal("NaN"))]
     )
     result = _run_pipeline(raw, task025_valid, task026_valid)
     assert isinstance(result, Task028BlockedResult)
@@ -945,7 +964,7 @@ def test_T028_LOSS_COEFFICIENT_ZERO_PSEUDO_COMPONENT_BLOCKED() -> None:
     task025_valid = _make_valid_task025_result()
     task026_valid = _make_valid_thermal_result()
     raw = _build_pipeline_raw_request(
-        component_authorities=[_minimal_component_dict(loss_coefficient="0")]
+        component_authorities=[_minimal_component_dict(loss_coefficient=Decimal("0"))]
     )
     result = _run_pipeline(raw, task025_valid, task026_valid)
     assert isinstance(result, Task028BlockedResult)
@@ -959,7 +978,7 @@ def test_T028_LOSS_COEFFICIENT_NEGATIVE_BLOCKED() -> None:
     task025_valid = _make_valid_task025_result()
     task026_valid = _make_valid_thermal_result()
     raw = _build_pipeline_raw_request(
-        component_authorities=[_minimal_component_dict(loss_coefficient="-0.5")]
+        component_authorities=[_minimal_component_dict(loss_coefficient=Decimal("-0.5"))]
     )
     result = _run_pipeline(raw, task025_valid, task026_valid)
     assert isinstance(result, Task028BlockedResult)
@@ -987,7 +1006,7 @@ def test_T028_REFERENCE_FLOW_AREA_ZERO_BLOCKED() -> None:
     task025_valid = _make_valid_task025_result()
     task026_valid = _make_valid_thermal_result()
     raw = _build_pipeline_raw_request(
-        component_authorities=[_minimal_component_dict(reference_flow_area_m2="0")]
+        component_authorities=[_minimal_component_dict(reference_flow_area_m2=Decimal("0"))]
     )
     result = _run_pipeline(raw, task025_valid, task026_valid)
     assert isinstance(result, Task028BlockedResult)
@@ -1001,7 +1020,7 @@ def test_T028_REFERENCE_FLOW_AREA_NEGATIVE_BLOCKED() -> None:
     task025_valid = _make_valid_task025_result()
     task026_valid = _make_valid_thermal_result()
     raw = _build_pipeline_raw_request(
-        component_authorities=[_minimal_component_dict(reference_flow_area_m2="-0.001")]
+        component_authorities=[_minimal_component_dict(reference_flow_area_m2=Decimal("-0.001"))]
     )
     result = _run_pipeline(raw, task025_valid, task026_valid)
     assert isinstance(result, Task028BlockedResult)
@@ -1015,7 +1034,7 @@ def test_T028_REFERENCE_FLOW_AREA_NONFINITE_BLOCKED() -> None:
     task025_valid = _make_valid_task025_result()
     task026_valid = _make_valid_thermal_result()
     raw = _build_pipeline_raw_request(
-        component_authorities=[_minimal_component_dict(reference_flow_area_m2="NaN")]
+        component_authorities=[_minimal_component_dict(reference_flow_area_m2=Decimal("NaN"))]
     )
     result = _run_pipeline(raw, task025_valid, task026_valid)
     assert isinstance(result, Task028BlockedResult)
@@ -1228,13 +1247,13 @@ def test_T028_COMPONENT_RESULTS_ORDERED_BY_PATH_SEQUENCE_INDEX() -> None:
         task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
-        component_results=(),
+        component_results=(_make_minimal_component_result(),),
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
         provenance=_make_success_provenance(),
     )
-    assert result.component_results == ()
+    assert len(result.component_results) == 1
     assert not hasattr(result, "total_irreversible_pressure_loss_pa")
 
 
@@ -1254,7 +1273,7 @@ def test_T028_NO_MODELED_TOTAL_FIELD() -> None:
         task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
-        component_results=(),
+        component_results=(_make_minimal_component_result(),),
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
@@ -1273,7 +1292,7 @@ def test_T028_NO_UNCONDITIONAL_TOTAL_FIELD() -> None:
         task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
-        component_results=(),
+        component_results=(_make_minimal_component_result(),),
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
@@ -1515,7 +1534,10 @@ def test_T028_MULTIPLICITY_CHANGE_CHANGES_RESULT_IDENTITY() -> None:
 
 def test_T028_PY311_PY312_CANONICAL_BYTE_IDENTITY() -> None:
     """Deterministic canonical framing (cross-Python-version stable bytes)."""
-    from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import canonicalize_authority
+    from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
+        RESULT_ID_NAMESPACE,
+        canonicalize_authority,
+    )
 
     args = dict(
         schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
@@ -1535,10 +1557,15 @@ def test_T028_PY311_PY312_CANONICAL_BYTE_IDENTITY() -> None:
         coefficient_source_location="USACE HEC-RAS, Section 6.2.1",
         coefficient_permission_status="ADMITTED",
     )
-    f1, _ = canonicalize_authority(**args)
-    f2, _ = canonicalize_authority(**args)
+    f1, h1 = canonicalize_authority(**args)
+    f2, h2 = canonicalize_authority(**args)
     assert f1 == f2
     assert isinstance(f1, bytes)
+    # Frozen constants — cross-Python-version stable
+    assert len(f1) == 1016
+    assert h1 == "5e64a1a60fffa633d524881d9fa264a90e1af13ed1b9b2eedaed131020663c04"
+    assert h1 == h2
+    assert RESULT_ID_NAMESPACE == "a0280000-0000-5000-8000-000000000001"
 
 
 # --- ENGINEERING SEMANTICS (2 tests) ----------------------------------------
@@ -1883,7 +1910,7 @@ def test_T028_WARNING_EMPTY_CONTRACT() -> None:
         task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
-        component_results=(),
+        component_results=(_make_minimal_component_result(),),
         warnings=(),
         blockers=(),
         deferred_capabilities=(),
@@ -1943,7 +1970,7 @@ def test_T028_DEFERRED_CAPABILITIES_EXACT_TUPLE() -> None:
         task025_result_hash="b2" * 32,
         task026_result_hash="c" * 64,
         property_snapshot_hash="d" * 64,
-        component_results=(),
+        component_results=(_make_minimal_component_result(),),
         warnings=(),
         blockers=(),
         deferred_capabilities=TASK028_DEFERRED_CAPABILITIES_V1,
@@ -2048,11 +2075,11 @@ def test_T028_PERMUTATION_REPLAY_STABLE() -> None:
         assert ca.path_sequence_index == cb.path_sequence_index
 
 
-# --- FROZEN VECTOR TESTS (ITEMS 6-9) ---------------------------------------
+# --- FROZEN VECTOR TESTS (ITEMS 6-9) — exact frozen canonical byte oracles ---
 
 
-def test_T028_VECTOR_02_CANONICAL_BYTES() -> None:
-    """ITEM 6: VECTOR_02 canonical bytes: CANONICAL_BYTE_LENGTH=1016."""
+def test_T028_FROZEN_VECTOR_01_CANONICAL_AUTHORITY_FRAMING() -> None:
+    """ITEM 6: VECTOR_01 — canonical authority framing frozen bytes."""
     from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
         canonicalize_authority,
     )
@@ -2077,10 +2104,11 @@ def test_T028_VECTOR_02_CANONICAL_BYTES() -> None:
     )
     framed, sha = canonicalize_authority(**args)
     assert len(framed) == 1016
+    assert sha == "5e64a1a60fffa633d524881d9fa264a90e1af13ed1b9b2eedaed131020663c04"
 
 
-def test_T028_VECTOR_03_REQUEST_HASH() -> None:
-    """ITEM 7: VECTOR_03 request hash: bda7341f..."""
+def test_T028_FROZEN_VECTOR_02_REQUEST_HASH() -> None:
+    """ITEM 7: VECTOR_02 — request hash frozen value."""
     h = compute_request_hash(
         schema_version=TASK028_REQUEST_SCHEMA_VERSION,
         profile_id="profile-001",
@@ -2094,41 +2122,41 @@ def test_T028_VECTOR_03_REQUEST_HASH() -> None:
         component_authority_hashes=(),
     )
     assert len(h) == 64
+    assert h == "5b844491a2de1ba45ea5ddf95419ded4ab732fc3827666f75ed0d527ae6eead7"
 
 
-def test_T028_VECTOR_02_03_BYTES_EQUAL() -> None:
-    """ITEM 6-7: VECTOR_02_BYTES == VECTOR_03_BYTES (same canonical authority framing)."""
-    from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
-        canonicalize_authority,
-    )
-
-    args = dict(
-        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
-        component_id="E-001",
-        component_type="ENTRANCE",
-        path_sequence_index=0,
-        upstream_reference_plane="INLET",
-        downstream_reference_plane="TUBE_START",
+def test_T028_FROZEN_VECTOR_03_REQUEST_HASH_REPLAY() -> None:
+    """ITEM 8: VECTOR_03 — same as VECTOR_02 (deterministic replay)."""
+    h1 = compute_request_hash(
+        schema_version=TASK028_REQUEST_SCHEMA_VERSION,
+        profile_id="profile-001",
+        task025_hydraulic_authority_hash="hyd" * 21 + "a",
+        task025_result_hash="a" * 64,
+        task026_result_hash="b" * 64,
+        property_snapshot_hash="c" * 64,
+        constant_density_assertion="TRUE",
+        zero_elevation_assertion="TRUE",
         flow_direction_assertion="START_TO_END",
-        loss_coefficient=Decimal("0.5"),
-        loss_coefficient_convention="K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
-        reference_flow_area_m2=Decimal("0.007854"),
-        multiplicity=1,
-        geometry_evidence_refs=("EVIDENCE-001",),
-        coefficient_source_id="USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL",
-        coefficient_source_version="2024.1",
-        coefficient_source_location="USACE HEC-RAS, Section 6.2.1",
-        coefficient_permission_status="ADMITTED",
+        component_authority_hashes=(),
     )
-    framed_a, sha_a = canonicalize_authority(**args)
-    framed_b, sha_b = canonicalize_authority(**args)
-    assert framed_a == framed_b
-    assert sha_a == sha_b
-    assert len(framed_a) == 1016
+    h2 = compute_request_hash(
+        schema_version=TASK028_REQUEST_SCHEMA_VERSION,
+        profile_id="profile-001",
+        task025_hydraulic_authority_hash="hyd" * 21 + "a",
+        task025_result_hash="a" * 64,
+        task026_result_hash="b" * 64,
+        property_snapshot_hash="c" * 64,
+        constant_density_assertion="TRUE",
+        zero_elevation_assertion="TRUE",
+        flow_direction_assertion="START_TO_END",
+        component_authority_hashes=(),
+    )
+    assert h1 == h2
+    assert h1 == "5b844491a2de1ba45ea5ddf95419ded4ab732fc3827666f75ed0d527ae6eead7"
 
 
-def test_T028_VECTOR_04_SUCCESS_RESULT_HASH() -> None:
-    """ITEM 8: VECTOR_04 success result hash."""
+def test_T028_FROZEN_VECTOR_04_SUCCESS_RESULT_HASH() -> None:
+    """ITEM 9: VECTOR_04 — success result hash frozen value."""
     h = compute_success_result_hash(
         schema_version=TASK028_SUCCESS_RESULT_SCHEMA_VERSION,
         profile_id="profile-001",
@@ -2144,14 +2172,13 @@ def test_T028_VECTOR_04_SUCCESS_RESULT_HASH() -> None:
         provenance=None,
     )
     rid = compute_result_id(h)
-    assert isinstance(h, str) and len(h) == 64
-    assert isinstance(rid, str)
-    parsed = uuid.UUID(rid)
-    assert parsed.version == 5
+    assert len(h) == 64
+    assert h == "6a6ec1ba1e6d6b707470d18526bda1befde70a206a57653a9d3ef1ae981eb212"
+    assert rid == "6bd45090-8814-5ca2-825f-a4ad21152e7f"
 
 
-def test_T028_VECTOR_05_ENGINEERING_VALUES() -> None:
-    """ITEM 9: VECTOR_05 engineering values frozen."""
+def test_T028_FROZEN_VECTOR_05_ENGINEERING_VALUES() -> None:
+    """ITEM 10: VECTOR_05 — engineering values frozen."""
     ref_vel, single, comp = compute_local_loss_component(
         density_kg_m3=Decimal("1000"),
         mass_flow_rate_kg_s=Decimal("5"),
@@ -2175,57 +2202,3 @@ def test_T028_VECTOR_05_ENGINEERING_VALUES() -> None:
 
 
 # --- CROSS-PYTHON PROOF (ITEM 10) ------------------------------------------
-
-
-def test_T028_PY311_PY312_FROZEN_ORACLE() -> None:
-    """ITEM 10: Both Python versions assert against the same frozen constants."""
-    import sys
-
-    # Verify Python version is 3.11 or 3.12
-    assert sys.version_info[:2] in [(3, 11), (3, 12)], (
-        f"Expected Python 3.11 or 3.12, got {sys.version}"
-    )
-
-    # Frozen authority hash for known input
-    auth_hash = compute_authority_hash(
-        schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
-        component_id="E-001",
-        component_type="ENTRANCE",
-        path_sequence_index=0,
-        upstream_reference_plane="INLET",
-        downstream_reference_plane="TUBE_START",
-        flow_direction_assertion="START_TO_END",
-        loss_coefficient=Decimal("0.5"),
-        loss_coefficient_convention="K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
-        reference_flow_area_m2=Decimal("0.007854"),
-        multiplicity=1,
-        geometry_evidence_refs=("EVIDENCE-001",),
-        coefficient_source_id="USACE-HEC-RAS-HYDRAULIC-REFERENCE-MANUAL",
-        coefficient_source_version="2024.1",
-        coefficient_source_location="USACE HEC-RAS, Section 6.2.1",
-        coefficient_permission_status="ADMITTED",
-    )
-    assert len(auth_hash) == 64
-    assert all(c in "0123456789abcdef" for c in auth_hash)
-
-    # Frozen request hash for known input
-    req_hash = compute_request_hash(
-        schema_version=TASK028_REQUEST_SCHEMA_VERSION,
-        profile_id="profile-001",
-        task025_hydraulic_authority_hash="hyd" * 21 + "a",
-        task025_result_hash="a" * 64,
-        task026_result_hash="b" * 64,
-        property_snapshot_hash="c" * 64,
-        constant_density_assertion="TRUE",
-        zero_elevation_assertion="TRUE",
-        flow_direction_assertion="START_TO_END",
-        component_authority_hashes=(),
-    )
-    assert len(req_hash) == 64
-
-    # Frozen result ID namespace
-    from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
-        RESULT_ID_NAMESPACE,
-    )
-
-    assert RESULT_ID_NAMESPACE == "a0280000-0000-5000-8000-000000000001"

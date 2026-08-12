@@ -354,43 +354,21 @@ def _validate_component_record(
         return None
     typed["flow_direction_assertion"] = Task028ComponentFlowDirectionAssertion(fda)
 
-    # loss_coefficient
+    # loss_coefficient — CR-01: MUST be Decimal at raw boundary
     lc = comp.get("loss_coefficient")
-    from decimal import Decimal, InvalidOperation
+    from decimal import Decimal
 
-    if isinstance(lc, (int, float)):
+    if not isinstance(lc, Decimal):
         pending_blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
                 f"{prefix}.loss_coefficient",
-                "loss_coefficient must be str or Decimal; "
-                "float/int implicit conversion is forbidden.",
+                "loss_coefficient must be Decimal at raw boundary.",
                 component_id_tiebreaker=tiebreaker,
             )
         )
         return None
-    if not isinstance(lc, (str, Decimal)):
-        pending_blockers.append(
-            emit_blocker(
-                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
-                f"{prefix}.loss_coefficient",
-                "loss_coefficient must be str or Decimal.",
-                component_id_tiebreaker=tiebreaker,
-            )
-        )
-        return None
-    try:
-        typed["loss_coefficient"] = Decimal(lc) if isinstance(lc, str) else lc
-    except (InvalidOperation, ValueError):
-        pending_blockers.append(
-            emit_blocker(
-                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
-                f"{prefix}.loss_coefficient",
-                "The TASK-028 raw input boundary is malformed.",
-                component_id_tiebreaker=tiebreaker,
-            )
-        )
-        return None
+    typed["loss_coefficient"] = lc
 
     # loss_coefficient_convention
     lcc = comp.get("loss_coefficient_convention", "")
@@ -416,41 +394,21 @@ def _validate_component_record(
         return None
     typed["loss_coefficient_convention"] = LossCoefficientConvention(lcc)
 
-    # reference_flow_area_m2
+    # reference_flow_area_m2 — CR-01: MUST be Decimal at raw boundary
     rfa = comp.get("reference_flow_area_m2")
-    if isinstance(rfa, (int, float)):
+    from decimal import Decimal
+
+    if not isinstance(rfa, Decimal):
         pending_blockers.append(
             emit_blocker(
                 Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
                 f"{prefix}.reference_flow_area_m2",
-                "reference_flow_area_m2 must be str or Decimal; "
-                "float/int implicit conversion is forbidden.",
+                "reference_flow_area_m2 must be Decimal at raw boundary.",
                 component_id_tiebreaker=tiebreaker,
             )
         )
         return None
-    if not isinstance(rfa, (str, Decimal)):
-        pending_blockers.append(
-            emit_blocker(
-                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
-                f"{prefix}.reference_flow_area_m2",
-                "reference_flow_area_m2 must be str or Decimal.",
-                component_id_tiebreaker=tiebreaker,
-            )
-        )
-        return None
-    try:
-        typed["reference_flow_area_m2"] = Decimal(rfa) if isinstance(rfa, str) else rfa
-    except (InvalidOperation, ValueError):
-        pending_blockers.append(
-            emit_blocker(
-                Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
-                f"{prefix}.reference_flow_area_m2",
-                "The TASK-028 raw input boundary is malformed.",
-                component_id_tiebreaker=tiebreaker,
-            )
-        )
-        return None
+    typed["reference_flow_area_m2"] = rfa
 
     # multiplicity
     mult = comp.get("multiplicity", 1)
@@ -573,6 +531,13 @@ def _validate_component_record(
         )
         return None
     typed["coefficient_permission_status"] = CoefficientPermissionStatus(cps)
+
+    # authority_hash — optional caller replay (CR-02)
+    # Pass through if present; pipeline validates against recomputed hash.
+    if "authority_hash" in comp:
+        ah = comp["authority_hash"]
+        if isinstance(ah, str):
+            typed["authority_hash"] = ah
 
     return typed
 

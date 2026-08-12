@@ -616,10 +616,8 @@ def _validate_and_build_authority(
             )
         )
 
-    # loss_coefficient validation
+    # loss_coefficient validation (S08 typed validation — already Decimal from raw boundary)
     lc = comp.get("loss_coefficient", Decimal(0))
-    if isinstance(lc, str):
-        lc = Decimal(lc)
     if not lc.is_finite():
         blockers.append(
             emit_blocker(
@@ -660,10 +658,8 @@ def _validate_and_build_authority(
             )
         )
 
-    # reference_flow_area_m2 validation
+    # reference_flow_area_m2 validation (already Decimal from raw boundary)
     rfa = comp.get("reference_flow_area_m2", Decimal(0))
-    if isinstance(rfa, str):
-        rfa = Decimal(rfa)
     if not rfa.is_finite() or rfa <= Decimal(0):
         blockers.append(
             emit_blocker(
@@ -726,20 +722,16 @@ def _validate_and_build_authority(
     if blockers:
         return None, blockers
 
-    # Build authority object
+    # Build authority object — values already typed from raw boundary
     loss_coeff = comp["loss_coefficient"]
-    if not isinstance(loss_coeff, Decimal):
-        loss_coeff = Decimal(str(loss_coeff))
     ref_area = comp["reference_flow_area_m2"]
-    if not isinstance(ref_area, Decimal):
-        ref_area = Decimal(str(ref_area))
 
     # Compute authority hash
     recomputed_hash = compute_authority_hash(
         schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id=comp["component_id"],
         component_type=comp["component_type"].value,
-        path_sequence_index=comp.get("path_sequence_index", index),
+        path_sequence_index=comp["path_sequence_index"],
         upstream_reference_plane=comp["upstream_reference_plane"],
         downstream_reference_plane=comp["downstream_reference_plane"],
         flow_direction_assertion=comp["flow_direction_assertion"].value,
@@ -754,13 +746,26 @@ def _validate_and_build_authority(
         coefficient_permission_status=comp["coefficient_permission_status"].value,
     )
 
+    # CR-02: authority_hash optional caller replay
+    supplied_hash = comp.get("authority_hash")
+    if supplied_hash is not None and supplied_hash != recomputed_hash:
+        blockers.append(
+            emit_blocker(
+                Task028BlockerCode.BL_T028_AUTHORITY_HASH_MISMATCH,
+                f"{prefix}.authority_hash",
+                "Supplied authority hash does not match recomputed hash.",
+                component_id_tiebreaker=tiebreaker,
+            )
+        )
+        return None, blockers
+
     auth = TubeSideLocalLossComponentAuthority(
         schema_version=TASK028_AUTHORITY_SCHEMA_VERSION,
         component_id=comp["component_id"],
         component_type=comp["component_type"]
         if isinstance(comp["component_type"], Task028ComponentType)
         else Task028ComponentType(comp["component_type"]),
-        path_sequence_index=comp.get("path_sequence_index", index),
+        path_sequence_index=comp["path_sequence_index"],
         upstream_reference_plane=comp["upstream_reference_plane"],
         downstream_reference_plane=comp["downstream_reference_plane"],
         flow_direction_assertion=comp["flow_direction_assertion"]

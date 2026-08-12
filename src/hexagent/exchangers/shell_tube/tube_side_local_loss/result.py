@@ -72,6 +72,8 @@ class Task028SuccessResult:
             raise ValueError(f"schema_version must be '{TASK028_SUCCESS_RESULT_SCHEMA_VERSION}'")
         if self.blockers != ():
             raise ValueError("success result blockers must be empty")
+        if self.component_results == ():
+            raise ValueError("success result component_results must be non-empty")
 
 
 # §15 — Blocked result (15 fields)
