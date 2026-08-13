@@ -1,7 +1,7 @@
-"""TASK-029 pressure contribution extraction and T07 validation primitives.
+"""TASK-029 pressure contribution extraction, T07 validation, and T11 composition.
 
-I12/T07 scope: producer-field extraction, loss-coefficient convention, and exact
-Decimal contribution guards. Ordered summation is deferred to a later gate.
+I12/T07 scope: producer-field extraction, loss-coefficient convention, exact
+Decimal contribution guards, and ordered pressure summation.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.blocker_
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.decimal_identity import (
     TASK029_PRESSURE_QUANTUM_PA,
+    normalize_negative_zero,
     task029_decimal_context,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums import (
@@ -181,9 +182,19 @@ def pressure_contribution_field_path(bound_member: BoundPressurePathMember) -> s
     return _TASK028_PRESSURE_CONTRIBUTION_FIELD_PATH
 
 
+def sum_ordered_contributions(contributions: tuple[Decimal, ...]) -> Decimal:
+    """Sum globally ordered validated pressure contributions with one final quantization."""
+    with localcontext(task029_decimal_context()):
+        total = Decimal("0")
+        for contribution in contributions:
+            total += contribution
+        return normalize_negative_zero(total.quantize(TASK029_PRESSURE_QUANTUM_PA))
+
+
 __all__ = [
     "extract_pressure_contribution",
     "pressure_contribution_field_path",
+    "sum_ordered_contributions",
     "validate_bound_member_producer_convention",
     "validate_bound_member_task028_component_direction",
     "validate_contribution",
