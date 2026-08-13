@@ -1,6 +1,7 @@
-"""TASK-029 authority identity: member, exclusion, and composition canonicalize + hash.
+"""TASK-029 authority identity: member, exclusion, composition, and request hash.
 
-I03 scope only. Request, ledger, and result identity are deferred.
+I03: member, exclusion, composition canonicalize + hash.
+Slice 7A: request hash semantic projection primitive.
 """
 
 from __future__ import annotations
@@ -18,6 +19,9 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonica
     KIND_STRING,
     KIND_TUPLE,
     MEMBER_AUTHORITY_HASH_NAMESPACE,
+    REQUEST_HASH_KIND_TAGS,
+    REQUEST_HASH_NAMESPACE,
+    REQUEST_HASH_SEMANTIC_FIELDS,
     frame_record,
     frame_value,
     sort_evidence_refs,
@@ -276,6 +280,84 @@ def compute_composition_authority_hash(
     return _sha256_hex(canonicalize_composition_authority(authority))
 
 
+_REQUEST_HASH_KIND_TAG_BYTES: dict[str, bytes] = {
+    "STRING": KIND_STRING,
+}
+
+
+def _request_hash_kind_tag_bytes(kind_tag: str) -> bytes:
+    try:
+        return _REQUEST_HASH_KIND_TAG_BYTES[kind_tag]
+    except KeyError as exc:
+        raise ValueError(f"unsupported request hash kind tag: {kind_tag!r}") from exc
+
+
+def canonicalize_request_projection(
+    schema_version: str,
+    profile_id: str,
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    composition_authority_hash: str,
+) -> bytes:
+    """Canonicalize request hash semantic projection (9 STRING fields)."""
+    values_by_field: dict[str, str] = {
+        "schema_version": schema_version,
+        "profile_id": profile_id,
+        "task027_result_hash": task027_result_hash,
+        "task028_result_hash": task028_result_hash,
+        "task025_hydraulic_authority_hash": task025_hydraulic_authority_hash,
+        "task025_result_hash": task025_result_hash,
+        "task026_result_hash": task026_result_hash,
+        "property_snapshot_hash": property_snapshot_hash,
+        "composition_authority_hash": composition_authority_hash,
+    }
+    fields: list[tuple[str, bytes, bytes]] = []
+    for field_name, kind_tag in zip(
+        REQUEST_HASH_SEMANTIC_FIELDS,
+        REQUEST_HASH_KIND_TAGS,
+        strict=True,
+    ):
+        fields.append(
+            (
+                field_name,
+                _request_hash_kind_tag_bytes(kind_tag),
+                values_by_field[field_name].encode("utf-8"),
+            )
+        )
+    return frame_record(REQUEST_HASH_NAMESPACE, fields)
+
+
+def compute_request_hash(
+    schema_version: str,
+    profile_id: str,
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    composition_authority_hash: str,
+) -> str:
+    """Compute lowercase SHA-256 hex for the 9-field request hash projection."""
+    return _sha256_hex(
+        canonicalize_request_projection(
+            schema_version=schema_version,
+            profile_id=profile_id,
+            task027_result_hash=task027_result_hash,
+            task028_result_hash=task028_result_hash,
+            task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+            task025_result_hash=task025_result_hash,
+            task026_result_hash=task026_result_hash,
+            property_snapshot_hash=property_snapshot_hash,
+            composition_authority_hash=composition_authority_hash,
+        )
+    )
+
+
 __all__ = [
     "canonicalize_member_authority",
     "compute_member_authority_hash",
@@ -283,4 +365,6 @@ __all__ = [
     "compute_exclusion_authority_hash",
     "canonicalize_composition_authority",
     "compute_composition_authority_hash",
+    "canonicalize_request_projection",
+    "compute_request_hash",
 ]
