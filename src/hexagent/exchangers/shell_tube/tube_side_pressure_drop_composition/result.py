@@ -1,9 +1,10 @@
-"""TASK-029 ledger evidence projection and success result builder.
+"""TASK-029 ledger evidence projection and result builders.
 
 I11 / T10: pure projection of validated bound members and exclusion authorities
 into frozen ledger evidence records.
 
 I13B: success result builder using I13A identity primitives.
+I13C: typed blocked result builder using I13A identity primitives.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from decimal import Decimal
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonical import (
     LEDGER_EXCLUSION_EVIDENCE_SCHEMA_VERSION,
     LEDGER_MEMBER_EVIDENCE_SCHEMA_VERSION,
+    TASK029_BLOCKED_RESULT_SCHEMA_VERSION,
     TASK029_DEFERRED_CAPABILITIES_V1,
     TASK029_SUCCESS_RESULT_SCHEMA_VERSION,
 )
@@ -23,11 +25,15 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums im
     ProducerTask,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.identity import (
+    compute_blocked_result_hash,
     compute_ledger_hash,
     compute_success_result_hash,
     derive_result_id,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models import (
+    FrozenTask029RawProjection,
+    Task029BlockedResult,
+    Task029BlockerEntry,
     Task029Provenance,
     Task029SuccessResult,
     TubeSidePressurePathCompletenessLedger,
@@ -143,7 +149,65 @@ def build_success_result(
     )
 
 
+def _blocked_identity_string(value: str | None) -> str:
+    """Map unavailable typed-blocked identity inputs to the frozen empty-string sentinel."""
+    if value is None:
+        return ""
+    return value
+
+
+def build_blocked_result(
+    *,
+    profile_id: str,
+    request_hash: str | None,
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str | None,
+    composition_authority_hash: str,
+    raw_request_projection: FrozenTask029RawProjection,
+    raw_upstream_blocked_projection: FrozenTask029RawProjection | None,
+    blockers: tuple[Task029BlockerEntry, ...],
+    provenance: Task029Provenance | None = None,
+) -> Task029BlockedResult:
+    """Build a frozen Task029BlockedResult with computed hash and ID."""
+    if len(blockers) == 0:
+        msg = "typed blocked result must have non-empty blockers"
+        raise ValueError(msg)
+
+    semantic_result = Task029BlockedResult(
+        schema_version=TASK029_BLOCKED_RESULT_SCHEMA_VERSION,
+        profile_id=profile_id,
+        request_hash=_blocked_identity_string(request_hash),
+        result_hash="",
+        result_id="",
+        task027_result_hash=task027_result_hash,
+        task028_result_hash=task028_result_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=_blocked_identity_string(property_snapshot_hash),
+        composition_authority_hash=composition_authority_hash,
+        raw_request_projection=raw_request_projection,
+        raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        warnings=(),
+        blockers=blockers,
+        deferred_capabilities=TASK029_DEFERRED_CAPABILITIES_V1,
+        provenance=provenance,
+    )
+    result_hash = compute_blocked_result_hash(semantic_result)
+    result_id = derive_result_id(result_hash)
+    return replace(
+        semantic_result,
+        result_hash=result_hash,
+        result_id=result_id,
+    )
+
+
 __all__ = [
+    "build_blocked_result",
     "build_exclusion_evidence",
     "build_member_evidence",
     "build_success_result",
