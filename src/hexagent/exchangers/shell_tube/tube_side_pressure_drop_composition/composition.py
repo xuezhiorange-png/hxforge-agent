@@ -10,6 +10,7 @@ from decimal import Decimal, localcontext
 
 from hexagent.exchangers.shell_tube.tube_side_local_loss.enums import (
     LossCoefficientConvention,
+    Task028ComponentFlowDirectionAssertion,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.models import (
     TubeSideLocalLossComponentResult,
@@ -35,6 +36,12 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_bin
 
 _TASK027_PRESSURE_FIELD_PATH = "task027_success_result.straight_tube_friction_pressure_drop_pa"
 _TASK028_PRESSURE_FIELD_PATH = "task028_success_result.component_results"
+_TASK028_COMPONENT_DIRECTION_FIELD_PATH = (
+    "task028_success_result.component_results[].flow_direction_assertion"
+)
+_TASK028_PRESSURE_CONTRIBUTION_FIELD_PATH = (
+    "task028_success_result.component_results[].component_irreversible_pressure_loss_pa"
+)
 _REQUIRED_TASK028_LOSS_COEFFICIENT_CONVENTION = (
     LossCoefficientConvention.K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2
 )
@@ -136,9 +143,50 @@ def validate_bound_member_producer_convention(
     return validate_task028_loss_coefficient_convention(component, field_path=field_path)
 
 
+def validate_task028_component_direction(
+    component: TubeSideLocalLossComponentResult,
+    *,
+    field_path: str = _TASK028_COMPONENT_DIRECTION_FIELD_PATH,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Validate TASK-028 component flow direction against frozen production enum."""
+    if component.flow_direction_assertion != Task028ComponentFlowDirectionAssertion.START_TO_END:
+        return (
+            emit_blocker(
+                Task029BlockerCode.BL_T029_FLOW_DIRECTION_MISMATCH,
+                field_path,
+                evidence_refs=(component.component_id,),
+            ),
+        )
+    return ()
+
+
+def validate_bound_member_task028_component_direction(
+    bound_member: BoundPressurePathMember,
+    *,
+    field_path: str = _TASK028_COMPONENT_DIRECTION_FIELD_PATH,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Validate TASK-028 component direction for a bound member when applicable."""
+    if bound_member.producer_task != ProducerTask.TASK_028:
+        return ()
+    component = bound_member.task028_component_result
+    if component is None:
+        return ()
+    return validate_task028_component_direction(component, field_path=field_path)
+
+
+def pressure_contribution_field_path(bound_member: BoundPressurePathMember) -> str:
+    """Return frozen producer pressure field path for a T06-bound member."""
+    if bound_member.producer_task == ProducerTask.TASK_027:
+        return _TASK027_PRESSURE_FIELD_PATH
+    return _TASK028_PRESSURE_CONTRIBUTION_FIELD_PATH
+
+
 __all__ = [
     "extract_pressure_contribution",
+    "pressure_contribution_field_path",
     "validate_bound_member_producer_convention",
+    "validate_bound_member_task028_component_direction",
     "validate_contribution",
+    "validate_task028_component_direction",
     "validate_task028_loss_coefficient_convention",
 ]

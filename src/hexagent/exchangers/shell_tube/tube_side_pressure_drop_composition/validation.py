@@ -1,6 +1,7 @@
 """TASK-029 typed validation stage primitives.
 
 I07 / T05: composition authority tree and hash replay validation.
+I12 / T07: direction, multiplicity, convention, and pressure contribution validation.
 """
 
 from __future__ import annotations
@@ -14,6 +15,13 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonica
     EXCLUSION_AUTHORITY_SCHEMA_VERSION,
     MEMBER_AUTHORITY_SCHEMA_VERSION,
     sort_evidence_refs,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.composition import (
+    extract_pressure_contribution,
+    pressure_contribution_field_path,
+    validate_bound_member_producer_convention,
+    validate_bound_member_task028_component_direction,
+    validate_contribution,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums import (
     ExclusionReason,
@@ -35,6 +43,10 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models i
     TubeSidePressurePathCompositionAuthority,
     TubeSidePressurePathExclusionAuthority,
     TubeSidePressurePathMemberAuthority,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_binding import (
+    BoundPressurePathMember,
+    validate_bound_members_multiplicity,
 )
 
 _TASK029_IN_SCOPE_COMPONENT_TYPES: frozenset[str] = frozenset(
@@ -225,14 +237,6 @@ def T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES(
 
     authority = composition_authority
 
-    if authority.flow_direction_assertion != Task029FlowDirectionAssertion.START_TO_END:
-        blockers.append(
-            emit_blocker(
-                Task029BlockerCode.BL_T029_FLOW_DIRECTION_MISMATCH,
-                "composition_authority.flow_direction_assertion",
-            )
-        )
-
     structure_safe = _validate_composition_structure(authority)
     if not structure_safe:
         blockers.append(
@@ -284,6 +288,54 @@ def T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES(
     return collapse_blockers(blockers)
 
 
+def T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE(
+    *,
+    composition_authority: TubeSidePressurePathCompositionAuthority,
+    bound_members: tuple[BoundPressurePathMember, ...],
+) -> tuple[Task029BlockerEntry, ...]:
+    """Validate direction, multiplicity, K convention, and pressure contributions."""
+    blockers: list[Task029BlockerEntry] = []
+
+    if composition_authority.flow_direction_assertion != Task029FlowDirectionAssertion.START_TO_END:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_FLOW_DIRECTION_MISMATCH,
+                "composition_authority.flow_direction_assertion",
+            )
+        )
+
+    for bound_member in bound_members:
+        blockers.extend(validate_bound_member_task028_component_direction(bound_member))
+
+    blockers.extend(validate_bound_members_multiplicity(bound_members))
+
+    for bound_member in bound_members:
+        blockers.extend(validate_bound_member_producer_convention(bound_member))
+
+        if bound_member.producer_task == ProducerTask.TASK_027:
+            if bound_member.task027_replay_evidence is None:
+                continue
+        elif bound_member.producer_task == ProducerTask.TASK_028:
+            if bound_member.task028_component_result is None:
+                continue
+        else:
+            continue
+
+        try:
+            contribution = extract_pressure_contribution(bound_member)
+        except ValueError:
+            continue
+
+        blockers.extend(
+            validate_contribution(
+                contribution,
+                field_path=pressure_contribution_field_path(bound_member),
+            )
+        )
+
+    return collapse_blockers(blockers)
+
+
 def validate_composition_authority_tree_and_hashes(
     request: Task029Request,
 ) -> tuple[Task029BlockerEntry, ...]:
@@ -304,5 +356,6 @@ def validate_composition_authority_tree_and_hashes(
 
 __all__ = [
     "T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES",
+    "T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE",
     "validate_composition_authority_tree_and_hashes",
 ]
