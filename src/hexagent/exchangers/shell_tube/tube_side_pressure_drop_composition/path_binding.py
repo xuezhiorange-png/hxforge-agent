@@ -605,6 +605,38 @@ def evaluate_path_topology(
     )
 
 
+def validate_bound_member_multiplicity(
+    bound_member: BoundPressurePathMember,
+    *,
+    member_index: int | None = None,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Validate producer-bound observed multiplicity against member authority expectation."""
+    if bound_member.observed_multiplicity == bound_member.expected_multiplicity:
+        return ()
+
+    if member_index is None:
+        field_path = "composition_authority.member_authorities[].expected_multiplicity"
+    else:
+        field_path = _member_index_field_path(member_index, "expected_multiplicity")
+
+    return (
+        emit_blocker(
+            Task029BlockerCode.BL_T029_MULTIPLICITY_INCOMPATIBILITY,
+            field_path,
+        ),
+    )
+
+
+def validate_bound_members_multiplicity(
+    bound_members: tuple[BoundPressurePathMember, ...],
+) -> tuple[Task029BlockerEntry, ...]:
+    """Validate multiplicity compatibility for all bound members."""
+    blockers: list[Task029BlockerEntry] = []
+    for index, bound_member in enumerate(bound_members):
+        blockers.extend(validate_bound_member_multiplicity(bound_member, member_index=index))
+    return collapse_blockers(blockers)
+
+
 __all__ = [
     "BoundPressurePathMember",
     "BindingResult",
@@ -612,5 +644,7 @@ __all__ = [
     "bind_members_to_producers",
     "evaluate_path_topology",
     "sort_members_by_global_index",
+    "validate_bound_member_multiplicity",
+    "validate_bound_members_multiplicity",
     "validate_global_index_domain",
 ]
