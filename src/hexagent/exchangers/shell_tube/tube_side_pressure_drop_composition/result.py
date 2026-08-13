@@ -6,6 +6,7 @@ into frozen ledger evidence records.
 I13B: success result builder using I13A identity primitives.
 I13C: typed blocked result builder using I13A identity primitives.
 I13D: raw-boundary blocked result builder (6-field contract, no result hash/ID).
+I13E: provenance builder for success-path frozen provenance records.
 """
 
 from __future__ import annotations
@@ -17,8 +18,10 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonica
     IMPLEMENTATION_SOFTWARE_VERSION,
     LEDGER_EXCLUSION_EVIDENCE_SCHEMA_VERSION,
     LEDGER_MEMBER_EVIDENCE_SCHEMA_VERSION,
+    SUCCESS_PROVENANCE_UPSTREAM_HASH_ORDER,
     TASK029_BLOCKED_RESULT_SCHEMA_VERSION,
     TASK029_DEFERRED_CAPABILITIES_V1,
+    TASK029_DESIGN_CONTRACT_PATH,
     TASK029_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
     TASK029_SUCCESS_RESULT_SCHEMA_VERSION,
 )
@@ -210,6 +213,43 @@ def build_blocked_result(
     )
 
 
+_TASK029_PROVENANCE_TASK_ID: str = "TASK-029"
+
+
+def build_provenance(
+    *,
+    input_evidence_refs: tuple[str, ...],
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    composition_authority_hash: str,
+) -> Task029Provenance:
+    """Build a frozen Task029Provenance with fixed task metadata and ordered upstream hashes."""
+    upstream_values_by_field: dict[str, str] = {
+        "task027_result_hash": task027_result_hash,
+        "task028_result_hash": task028_result_hash,
+        "task025_hydraulic_authority_hash": task025_hydraulic_authority_hash,
+        "task025_result_hash": task025_result_hash,
+        "task026_result_hash": task026_result_hash,
+        "property_snapshot_hash": property_snapshot_hash,
+        "composition_authority_hash": composition_authority_hash,
+    }
+    upstream_identity_hashes = tuple(
+        upstream_values_by_field[field_name]
+        for field_name in SUCCESS_PROVENANCE_UPSTREAM_HASH_ORDER
+    )
+    return Task029Provenance(
+        task_id=_TASK029_PROVENANCE_TASK_ID,
+        design_contract_path=TASK029_DESIGN_CONTRACT_PATH,
+        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
+        input_evidence_refs=input_evidence_refs,
+        upstream_identity_hashes=upstream_identity_hashes,
+    )
+
+
 def build_raw_boundary_blocked_result(
     *,
     raw_request_projection: FrozenTask029RawProjection,
@@ -234,6 +274,7 @@ __all__ = [
     "build_blocked_result",
     "build_exclusion_evidence",
     "build_member_evidence",
+    "build_provenance",
     "build_raw_boundary_blocked_result",
     "build_success_result",
 ]
