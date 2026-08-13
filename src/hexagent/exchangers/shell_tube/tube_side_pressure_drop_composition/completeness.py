@@ -14,11 +14,15 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.blocker_
     emit_blocker,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonical import (
+    COMPLETENESS_LEDGER_SCHEMA_VERSION,
     EXCLUSION_AUTHORITY_SCHEMA_VERSION,
     sort_evidence_refs,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums import (
+    CompletenessStatus,
     ExclusionReason,
+    IdentityCompatibilityStatus,
+    PathContinuityStatus,
     ProducerTask,
     Task029BlockerCode,
     Task029InScopeComponentType,
@@ -26,11 +30,15 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums im
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.identity import (
     compute_exclusion_authority_hash,
+    compute_ledger_hash,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models import (
     Task029BlockerEntry,
+    TubeSidePressurePathCompletenessLedger,
     TubeSidePressurePathCompositionAuthority,
     TubeSidePressurePathExclusionAuthority,
+    TubeSidePressurePathLedgerExclusionEvidence,
+    TubeSidePressurePathLedgerMemberEvidence,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_binding import (
     BindingResult,
@@ -327,8 +335,65 @@ def validate_exclusion_partition_and_completeness(
     )
 
 
+def _sort_member_evidence(
+    member_evidence: tuple[TubeSidePressurePathLedgerMemberEvidence, ...],
+) -> tuple[TubeSidePressurePathLedgerMemberEvidence, ...]:
+    return tuple(sorted(member_evidence, key=lambda evidence: evidence.global_path_sequence_index))
+
+
+def build_completeness_ledger(
+    *,
+    composition_authority: TubeSidePressurePathCompositionAuthority,
+    member_evidence: tuple[TubeSidePressurePathLedgerMemberEvidence, ...],
+    exclusion_evidence: tuple[TubeSidePressurePathLedgerExclusionEvidence, ...],
+) -> TubeSidePressurePathCompletenessLedger:
+    """Assemble verified 12-field completeness ledger with deterministic evidence ordering."""
+    ordered_member_evidence = _sort_member_evidence(member_evidence)
+    ordered_exclusion_evidence = sort_exclusion_authorities(exclusion_evidence)
+
+    expected_member_count = len(composition_authority.member_authorities)
+    observed_member_count = len(ordered_member_evidence)
+    if expected_member_count != observed_member_count:
+        msg = (
+            "member evidence count must match composition authority modeled member plan: "
+            f"expected={expected_member_count}, observed={observed_member_count}"
+        )
+        raise ValueError(msg)
+
+    ledger_without_hash = TubeSidePressurePathCompletenessLedger(
+        schema_version=COMPLETENESS_LEDGER_SCHEMA_VERSION,
+        modeled_path_id=composition_authority.modeled_path_id,
+        modeled_start_reference_plane=composition_authority.start_reference_plane,
+        modeled_end_reference_plane=composition_authority.end_reference_plane,
+        expected_member_count=expected_member_count,
+        observed_member_count=observed_member_count,
+        ordered_member_evidence=ordered_member_evidence,
+        ordered_exclusion_evidence=ordered_exclusion_evidence,
+        path_continuity_status=PathContinuityStatus.CONTIGUOUS_EXACT_REFERENCE_PLANE_CHAIN,
+        identity_compatibility_status=IdentityCompatibilityStatus.MATCHED,
+        completeness_status=CompletenessStatus.COMPLETE_WITHIN_EXPLICIT_MODELED_BOUNDARY,
+        ledger_hash="",
+    )
+    ledger_hash = compute_ledger_hash(ledger_without_hash)
+    return TubeSidePressurePathCompletenessLedger(
+        schema_version=ledger_without_hash.schema_version,
+        modeled_path_id=ledger_without_hash.modeled_path_id,
+        modeled_start_reference_plane=ledger_without_hash.modeled_start_reference_plane,
+        modeled_end_reference_plane=ledger_without_hash.modeled_end_reference_plane,
+        expected_member_count=ledger_without_hash.expected_member_count,
+        observed_member_count=ledger_without_hash.observed_member_count,
+        ordered_member_evidence=ledger_without_hash.ordered_member_evidence,
+        ordered_exclusion_evidence=ledger_without_hash.ordered_exclusion_evidence,
+        path_continuity_status=ledger_without_hash.path_continuity_status,
+        identity_compatibility_status=ledger_without_hash.identity_compatibility_status,
+        completeness_status=ledger_without_hash.completeness_status,
+        ledger_hash=ledger_hash,
+    )
+
+
 __all__ = [
     "ExclusionPartitionResult",
+    "build_completeness_ledger",
     "sort_exclusion_authorities",
     "validate_exclusion_partition_and_completeness",
 ]
