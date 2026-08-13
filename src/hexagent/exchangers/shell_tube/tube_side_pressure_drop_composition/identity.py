@@ -7,16 +7,23 @@ Slice 7A: request hash semantic projection primitive.
 from __future__ import annotations
 
 import hashlib
+import uuid
 from collections.abc import Sequence
 from decimal import Decimal, localcontext
 from enum import StrEnum
 
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonical import (
+    BLOCKED_HASH_KIND_TAGS,
+    BLOCKED_RESULT_HASH_NAMESPACE,
+    BLOCKER_ENTRY_NAMESPACE,
+    COMPLETENESS_LEDGER_SCHEMA_VERSION,
     COMPOSITION_AUTHORITY_HASH_NAMESPACE,
     EXCLUSION_AUTHORITY_HASH_NAMESPACE,
     KIND_DECIMAL,
     KIND_ENUM,
     KIND_INTEGER,
+    KIND_NONE,
+    KIND_RAW_PROJECTION,
     KIND_RECORD,
     KIND_STRING,
     KIND_TUPLE,
@@ -24,9 +31,20 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonica
     LEDGER_HASH_NAMESPACE,
     LEDGER_MEMBER_EVIDENCE_SCHEMA_VERSION,
     MEMBER_AUTHORITY_HASH_NAMESPACE,
+    PROVENANCE_NAMESPACE,
+    RAW_BOUNDARY_BLOCKED_HASH_NAMESPACE,
+    RAW_BOUNDARY_BLOCKED_KIND_TAGS,
+    RAW_PROJECTION_NAMESPACE,
     REQUEST_HASH_KIND_TAGS,
     REQUEST_HASH_NAMESPACE,
     REQUEST_HASH_SEMANTIC_FIELDS,
+    RESULT_ID_NAME_PREFIX,
+    RESULT_ID_NAMESPACE,
+    SUCCESS_HASH_KIND_TAGS,
+    SUCCESS_RESULT_HASH_NAMESPACE,
+    TASK029_BLOCKED_RESULT_FIELDS,
+    TASK029_RAW_BOUNDARY_BLOCKED_FIELDS,
+    TASK029_SUCCESS_RESULT_FIELDS,
     frame_record,
     frame_value,
     sort_evidence_refs,
@@ -38,12 +56,31 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.decimal_
     task029_decimal_context,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models import (
+    FrozenTask029RawProjection,
+    Task029BlockedResult,
+    Task029BlockerEntry,
+    Task029Provenance,
+    Task029RawBoundaryBlockedResult,
+    Task029SuccessResult,
     TubeSidePressurePathCompletenessLedger,
     TubeSidePressurePathCompositionAuthority,
     TubeSidePressurePathExclusionAuthority,
     TubeSidePressurePathLedgerExclusionEvidence,
     TubeSidePressurePathLedgerMemberEvidence,
     TubeSidePressurePathMemberAuthority,
+)
+
+_RESULT_ID_NAMESPACE_UUID = uuid.UUID(RESULT_ID_NAMESPACE)
+
+_SUCCESS_HASH_SEMANTIC_FIELDS: tuple[str, ...] = tuple(
+    field_name
+    for field_name in TASK029_SUCCESS_RESULT_FIELDS
+    if field_name not in ("result_hash", "result_id")
+)
+_BLOCKED_HASH_SEMANTIC_FIELDS: tuple[str, ...] = tuple(
+    field_name
+    for field_name in TASK029_BLOCKED_RESULT_FIELDS
+    if field_name not in ("result_hash", "result_id")
 )
 
 
@@ -543,7 +580,30 @@ def _encode_ledger_exclusion_evidence_tuple(
 
 def canonicalize_ledger(ledger: TubeSidePressurePathCompletenessLedger) -> bytes:
     """Canonicalize completeness ledger hash projection (fields 1–11 only)."""
-    fields: list[tuple[str, bytes, bytes]] = [
+    return frame_record(LEDGER_HASH_NAMESPACE, _ledger_hash_projection_field_values(ledger))
+
+
+def compute_ledger_hash(ledger: TubeSidePressurePathCompletenessLedger) -> str:
+    """Compute lowercase SHA-256 hex for completeness ledger fields 1–11."""
+    return _sha256_hex(canonicalize_ledger(ledger))
+
+
+def _encode_string_tuple_preserve_order(refs: tuple[str, ...]) -> bytes:
+    child_frames = [frame_value(KIND_STRING, ref.encode("utf-8")) for ref in refs]
+    return task029_tuple_payload(child_frames)
+
+
+def _canonicalize_full_ledger_record(ledger: TubeSidePressurePathCompletenessLedger) -> bytes:
+    """Canonicalize full 12-field completeness ledger record for nested RECORD encoding."""
+    fields = list(_ledger_hash_projection_field_values(ledger))
+    fields.append(("ledger_hash", KIND_STRING, ledger.ledger_hash.encode("utf-8")))
+    return frame_record(COMPLETENESS_LEDGER_SCHEMA_VERSION, fields)
+
+
+def _ledger_hash_projection_field_values(
+    ledger: TubeSidePressurePathCompletenessLedger,
+) -> list[tuple[str, bytes, bytes]]:
+    return [
         ("schema_version", KIND_STRING, ledger.schema_version.encode("utf-8")),
         ("modeled_path_id", KIND_STRING, ledger.modeled_path_id.encode("utf-8")),
         (
@@ -592,12 +652,237 @@ def canonicalize_ledger(ledger: TubeSidePressurePathCompletenessLedger) -> bytes
             _enum_value(ledger.completeness_status).encode("ascii"),
         ),
     ]
-    return frame_record(LEDGER_HASH_NAMESPACE, fields)
 
 
-def compute_ledger_hash(ledger: TubeSidePressurePathCompletenessLedger) -> str:
-    """Compute lowercase SHA-256 hex for completeness ledger fields 1–11."""
-    return _sha256_hex(canonicalize_ledger(ledger))
+def _canonicalize_provenance_record(provenance: Task029Provenance) -> bytes:
+    fields: list[tuple[str, bytes, bytes]] = [
+        ("task_id", KIND_STRING, provenance.task_id.encode("utf-8")),
+        (
+            "design_contract_path",
+            KIND_STRING,
+            provenance.design_contract_path.encode("utf-8"),
+        ),
+        (
+            "implementation_software_version",
+            KIND_STRING,
+            provenance.implementation_software_version.encode("utf-8"),
+        ),
+        (
+            "input_evidence_refs",
+            KIND_TUPLE,
+            _encode_string_tuple_preserve_order(provenance.input_evidence_refs),
+        ),
+        (
+            "upstream_identity_hashes",
+            KIND_TUPLE,
+            _encode_string_tuple_preserve_order(provenance.upstream_identity_hashes),
+        ),
+    ]
+    return frame_record(PROVENANCE_NAMESPACE, fields)
+
+
+def _canonicalize_blocker_entry_record(entry: Task029BlockerEntry) -> bytes:
+    fields: list[tuple[str, bytes, bytes]] = [
+        ("code", KIND_ENUM, entry.code.value.encode("ascii")),
+        ("field_path", KIND_STRING, entry.field_path.encode("utf-8")),
+        ("message_key", KIND_STRING, entry.message_key.encode("utf-8")),
+        ("evidence_refs", KIND_TUPLE, _encode_string_tuple(entry.evidence_refs)),
+    ]
+    return frame_record(BLOCKER_ENTRY_NAMESPACE, fields)
+
+
+def _canonicalize_raw_projection_record(projection: FrozenTask029RawProjection) -> bytes:
+    fields: list[tuple[str, bytes, bytes]] = [
+        ("projection_kind", KIND_STRING, projection.projection_kind.encode("utf-8")),
+        (
+            "canonical_bytes_hex",
+            KIND_STRING,
+            projection.canonical_bytes_hex.encode("utf-8"),
+        ),
+    ]
+    return frame_record(RAW_PROJECTION_NAMESPACE, fields)
+
+
+def _encode_blocker_tuple(blockers: tuple[Task029BlockerEntry, ...]) -> bytes:
+    child_frames = [
+        _wrap_record_child(_canonicalize_blocker_entry_record(blocker)) for blocker in blockers
+    ]
+    return task029_tuple_payload(child_frames)
+
+
+def _encode_none_or_raw_projection(
+    projection: FrozenTask029RawProjection | None,
+) -> tuple[bytes, bytes]:
+    if projection is None:
+        return KIND_NONE, b""
+    return KIND_RAW_PROJECTION, _canonicalize_raw_projection_record(projection)
+
+
+def _encode_none_or_provenance(
+    provenance: Task029Provenance | None,
+) -> tuple[bytes, bytes]:
+    if provenance is None:
+        return KIND_NONE, b""
+    return KIND_RECORD, _canonicalize_provenance_record(provenance)
+
+
+def _success_result_field_payload(
+    result: Task029SuccessResult,
+    field_name: str,
+) -> tuple[bytes, bytes]:
+    if field_name == "completeness_ledger":
+        return KIND_RECORD, _canonicalize_full_ledger_record(result.completeness_ledger)
+    if field_name == "modeled_total_tube_side_pressure_drop_pa":
+        return KIND_DECIMAL, _canonicalize_pressure_decimal(
+            result.modeled_total_tube_side_pressure_drop_pa
+        )
+    if field_name == "warnings":
+        return KIND_TUPLE, _encode_string_tuple_preserve_order(result.warnings)
+    if field_name == "blockers":
+        return KIND_TUPLE, _encode_blocker_tuple(result.blockers)
+    if field_name == "deferred_capabilities":
+        return KIND_TUPLE, _encode_string_tuple_preserve_order(result.deferred_capabilities)
+    if field_name == "provenance":
+        return KIND_RECORD, _canonicalize_provenance_record(result.provenance)
+
+    value = getattr(result, field_name)
+    if not isinstance(value, str):
+        msg = f"success hash field {field_name!r} requires STRING payload"
+        raise TypeError(msg)
+    return KIND_STRING, value.encode("utf-8")
+
+
+def _blocked_result_field_payload(
+    result: Task029BlockedResult,
+    field_name: str,
+) -> tuple[bytes, bytes]:
+    if field_name == "raw_request_projection":
+        if result.raw_request_projection is None:
+            msg = "raw_request_projection must be present for blocked hash projection"
+            raise ValueError(msg)
+        return KIND_RAW_PROJECTION, _canonicalize_raw_projection_record(
+            result.raw_request_projection
+        )
+    if field_name == "raw_upstream_blocked_projection":
+        return _encode_none_or_raw_projection(result.raw_upstream_blocked_projection)
+    if field_name == "warnings":
+        return KIND_TUPLE, _encode_string_tuple_preserve_order(result.warnings)
+    if field_name == "blockers":
+        return KIND_TUPLE, _encode_blocker_tuple(result.blockers)
+    if field_name == "deferred_capabilities":
+        return KIND_TUPLE, _encode_string_tuple_preserve_order(result.deferred_capabilities)
+    if field_name == "provenance":
+        return _encode_none_or_provenance(result.provenance)
+
+    value = getattr(result, field_name)
+    if not isinstance(value, str):
+        msg = f"blocked hash field {field_name!r} requires STRING payload"
+        raise TypeError(msg)
+    return KIND_STRING, value.encode("utf-8")
+
+
+_HASH_SEMANTIC_KIND_TAGS: frozenset[str] = frozenset(
+    {
+        "STRING",
+        "RECORD",
+        "DECIMAL",
+        "TUPLE",
+        "RAW_PROJECTION",
+        "NONE_OR_RAW_PROJECTION",
+        "NONE_OR_RECORD",
+    }
+)
+
+
+def _build_semantic_record_fields(
+    *,
+    field_names: Sequence[str],
+    kind_tags: Sequence[str],
+    payload_builder: object,
+    value: object,
+) -> list[tuple[str, bytes, bytes]]:
+    fields: list[tuple[str, bytes, bytes]] = []
+    for field_name, kind_tag in zip(field_names, kind_tags, strict=True):
+        if kind_tag not in _HASH_SEMANTIC_KIND_TAGS:
+            raise ValueError(f"unsupported hash kind tag: {kind_tag!r}")
+        kind_bytes, payload = payload_builder(value, field_name)  # type: ignore[operator]
+        fields.append((field_name, kind_bytes, payload))
+    return fields
+
+
+def canonicalize_success_result(result: Task029SuccessResult) -> bytes:
+    """Canonicalize success result hash projection (all fields except result_hash/result_id)."""
+    fields = _build_semantic_record_fields(
+        field_names=_SUCCESS_HASH_SEMANTIC_FIELDS,
+        kind_tags=SUCCESS_HASH_KIND_TAGS,
+        payload_builder=_success_result_field_payload,
+        value=result,
+    )
+    return frame_record(SUCCESS_RESULT_HASH_NAMESPACE, fields)
+
+
+def compute_success_result_hash(result: Task029SuccessResult) -> str:
+    """Compute lowercase SHA-256 hex for success result semantic projection."""
+    return _sha256_hex(canonicalize_success_result(result))
+
+
+def canonicalize_blocked_result(result: Task029BlockedResult) -> bytes:
+    """Canonicalize blocked result hash projection (all fields except result_hash/result_id)."""
+    fields = _build_semantic_record_fields(
+        field_names=_BLOCKED_HASH_SEMANTIC_FIELDS,
+        kind_tags=BLOCKED_HASH_KIND_TAGS,
+        payload_builder=_blocked_result_field_payload,
+        value=result,
+    )
+    return frame_record(BLOCKED_RESULT_HASH_NAMESPACE, fields)
+
+
+def compute_blocked_result_hash(result: Task029BlockedResult) -> str:
+    """Compute lowercase SHA-256 hex for blocked result semantic projection."""
+    return _sha256_hex(canonicalize_blocked_result(result))
+
+
+def _raw_boundary_blocked_field_payload(
+    result: Task029RawBoundaryBlockedResult,
+    field_name: str,
+) -> tuple[bytes, bytes]:
+    if field_name == "raw_request_projection":
+        return KIND_RAW_PROJECTION, _canonicalize_raw_projection_record(
+            result.raw_request_projection
+        )
+    if field_name == "blockers":
+        return KIND_TUPLE, _encode_blocker_tuple(result.blockers)
+    if field_name == "warnings":
+        return KIND_TUPLE, _encode_string_tuple_preserve_order(result.warnings)
+    if field_name == "deferred_capabilities":
+        return KIND_TUPLE, _encode_string_tuple_preserve_order(result.deferred_capabilities)
+
+    value = getattr(result, field_name)
+    if not isinstance(value, str):
+        msg = f"raw-boundary blocked field {field_name!r} requires STRING payload"
+        raise TypeError(msg)
+    return KIND_STRING, value.encode("utf-8")
+
+
+def canonicalize_raw_boundary_blocked(result: Task029RawBoundaryBlockedResult) -> bytes:
+    """Canonicalize raw-boundary blocked result (all six semantic fields)."""
+    fields = _build_semantic_record_fields(
+        field_names=TASK029_RAW_BOUNDARY_BLOCKED_FIELDS,
+        kind_tags=RAW_BOUNDARY_BLOCKED_KIND_TAGS,
+        payload_builder=_raw_boundary_blocked_field_payload,
+        value=result,
+    )
+    return frame_record(RAW_BOUNDARY_BLOCKED_HASH_NAMESPACE, fields)
+
+
+def compute_raw_boundary_blocked_hash(result: Task029RawBoundaryBlockedResult) -> str:
+    """Compute lowercase SHA-256 hex for raw-boundary blocked canonical bytes."""
+    return _sha256_hex(canonicalize_raw_boundary_blocked(result))
+
+
+def derive_result_id(result_hash: str) -> str:
+    """Derive canonical UUIDv5 from a TASK-029 result hash."""
+    return str(uuid.uuid5(_RESULT_ID_NAMESPACE_UUID, RESULT_ID_NAME_PREFIX + result_hash))
 
 
 __all__ = [
@@ -611,4 +896,11 @@ __all__ = [
     "compute_request_hash",
     "canonicalize_ledger",
     "compute_ledger_hash",
+    "canonicalize_success_result",
+    "compute_success_result_hash",
+    "canonicalize_blocked_result",
+    "compute_blocked_result_hash",
+    "canonicalize_raw_boundary_blocked",
+    "compute_raw_boundary_blocked_hash",
+    "derive_result_id",
 ]
