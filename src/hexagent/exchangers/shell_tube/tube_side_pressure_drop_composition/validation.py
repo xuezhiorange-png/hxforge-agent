@@ -1,11 +1,24 @@
-"""TASK-029 typed validation stage primitives.
+"""TASK-029 typed validation stage primitives and scheduler foundation.
 
-I07 / T05: composition authority tree and hash replay validation.
-I12 / T07: direction, multiplicity, convention, and pressure contribution validation.
+T00-T04 / T06 / T08 / T09: validation stage wrappers and safe accumulation.
+T05: composition authority tree and hash replay validation.
+T07: direction, multiplicity, convention, and pressure contribution validation.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
+    Task027BlockedResult,
+    Task027RawBoundaryBlockedResult,
+    Task027SuccessResult,
+)
+from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
+    Task028BlockedResult,
+    Task028RawBoundaryBlockedResult,
+    Task028SuccessResult,
+)
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.blocker_registry import (
     collapse_blockers,
     emit_blocker,
@@ -14,7 +27,12 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonica
     COMPOSITION_AUTHORITY_SCHEMA_VERSION,
     EXCLUSION_AUTHORITY_SCHEMA_VERSION,
     MEMBER_AUTHORITY_SCHEMA_VERSION,
+    TASK027_ACCEPTED_SCHEMA_VERSION,
+    TASK028_ACCEPTED_SCHEMA_VERSION,
     sort_evidence_refs,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.completeness import (
+    validate_exclusion_partition_and_completeness,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.composition import (
     extract_pressure_contribution,
@@ -45,8 +63,19 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models i
     TubeSidePressurePathMemberAuthority,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_binding import (
+    BindingResult,
     BoundPressurePathMember,
+    PathTopologyResult,
+    bind_members_to_producers,
+    evaluate_path_topology,
     validate_bound_members_multiplicity,
+    validate_global_index_domain,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.upstream_replay import (
+    Task027ReplayEvidence,
+    Task028ReplayEvidence,
+    replay_task027_success,
+    replay_task028_success,
 )
 
 _TASK029_IN_SCOPE_COMPONENT_TYPES: frozenset[str] = frozenset(
@@ -201,6 +230,238 @@ def _validate_composition_structure(
     return True
 
 
+_COMMON_RUNTIME_IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
+    ("task025_hydraulic_authority_hash", "task025_hydraulic_authority_hash"),
+    ("task025_result_hash", "task025_result_hash"),
+    ("task026_result_hash", "task026_result_hash"),
+    ("property_snapshot_hash", "property_snapshot_hash"),
+)
+
+
+@dataclass(frozen=True)
+class T01ThroughT09ValidationResult:
+    """Package-internal T01-T09 foundation output."""
+
+    blockers: tuple[Task029BlockerEntry, ...]
+    bound_members: tuple[BoundPressurePathMember, ...] | None
+
+
+def _is_task029_blocker_entry(value: object) -> bool:
+    return type(value) is Task029BlockerEntry
+
+
+def _composition_authority_safe_for_binding(
+    composition_authority: TubeSidePressurePathCompositionAuthority | None,
+) -> bool:
+    if composition_authority is None:
+        return False
+    if type(composition_authority) is not TubeSidePressurePathCompositionAuthority:
+        return False
+    return _validate_composition_structure(composition_authority)
+
+
+def T00_ROUTE_UPSTREAM_BLOCKED_AND_REQUIRE_EXACT_TYPES(
+    *,
+    task027_result: object,
+    task028_result: object,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Route raw/typed blocked upstream variants and require exact success types."""
+    blockers: list[Task029BlockerEntry] = []
+
+    if type(task027_result) is Task027RawBoundaryBlockedResult:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_TASK027_RAW_BLOCKED,
+                "task027_success_result",
+            )
+        )
+    elif type(task027_result) is Task027BlockedResult:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_TASK027_TYPED_BLOCKED,
+                "task027_success_result",
+            )
+        )
+    elif type(task027_result) is not Task027SuccessResult:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_TASK027_TYPE_INVALID,
+                "task027_success_result",
+            )
+        )
+
+    if type(task028_result) is Task028RawBoundaryBlockedResult:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_TASK028_RAW_BLOCKED,
+                "task028_success_result",
+            )
+        )
+    elif type(task028_result) is Task028BlockedResult:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_TASK028_TYPED_BLOCKED,
+                "task028_success_result",
+            )
+        )
+    elif type(task028_result) is not Task028SuccessResult:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_TASK028_TYPE_INVALID,
+                "task028_success_result",
+            )
+        )
+
+    return collapse_blockers(blockers)
+
+
+def T01_VALIDATE_UPSTREAM_SCHEMA_VERSIONS(
+    *,
+    task027_success_result: Task027SuccessResult,
+    task028_success_result: Task028SuccessResult,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Validate accepted TASK-027/TASK-028 schema versions after exact type gating."""
+    blockers: list[Task029BlockerEntry] = []
+
+    if task027_success_result.schema_version != TASK027_ACCEPTED_SCHEMA_VERSION:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_SCHEMA_VERSION_UNSUPPORTED,
+                "task027_success_result.schema_version",
+            )
+        )
+
+    if task028_success_result.schema_version != TASK028_ACCEPTED_SCHEMA_VERSION:
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_SCHEMA_VERSION_UNSUPPORTED,
+                "task028_success_result.schema_version",
+            )
+        )
+
+    return collapse_blockers(blockers)
+
+
+def T02_REPLAY_UPSTREAM_RESULT_HASH_AND_UUID(
+    *,
+    task027_success_result: Task027SuccessResult,
+    task028_success_result: Task028SuccessResult,
+    task027_schema_supported: bool,
+    task028_schema_supported: bool,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Replay production upstream hash and UUID evidence for supported schemas."""
+    blockers: list[Task029BlockerEntry] = []
+
+    if task027_schema_supported:
+        task027_replay = replay_task027_success(task027_success_result)
+        if _is_task029_blocker_entry(task027_replay):
+            blockers.append(task027_replay)
+
+    if task028_schema_supported:
+        task028_replay = replay_task028_success(task028_success_result)
+        if _is_task029_blocker_entry(task028_replay):
+            blockers.append(task028_replay)
+
+    return collapse_blockers(blockers)
+
+
+def _extract_task027_replay_evidence(
+    replay_result: Task027ReplayEvidence | Task029BlockerEntry,
+) -> Task027ReplayEvidence | None:
+    if type(replay_result) is Task027ReplayEvidence:
+        return replay_result
+    return None
+
+
+def _extract_task028_replay_evidence(
+    replay_result: Task028ReplayEvidence | Task029BlockerEntry,
+) -> Task028ReplayEvidence | None:
+    if type(replay_result) is Task028ReplayEvidence:
+        return replay_result
+    return None
+
+
+def T03_VALIDATE_UPSTREAM_SUCCESS_WARNINGS_BLOCKERS(
+    *,
+    task027_success_result: Task027SuccessResult,
+    task028_success_result: Task028SuccessResult,
+    task027_schema_supported: bool,
+    task028_schema_supported: bool,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Require empty upstream success warnings and blockers when schema is supported."""
+    blockers: list[Task029BlockerEntry] = []
+
+    if task027_schema_supported:
+        if task027_success_result.warnings != ():
+            blockers.append(
+                emit_blocker(
+                    Task029BlockerCode.BL_T029_UPSTREAM_SUCCESS_DIAGNOSTICS_NONEMPTY,
+                    "task027_success_result.warnings",
+                )
+            )
+        if task027_success_result.blockers != ():
+            blockers.append(
+                emit_blocker(
+                    Task029BlockerCode.BL_T029_UPSTREAM_SUCCESS_DIAGNOSTICS_NONEMPTY,
+                    "task027_success_result.blockers",
+                )
+            )
+
+    if task028_schema_supported:
+        if task028_success_result.warnings != ():
+            blockers.append(
+                emit_blocker(
+                    Task029BlockerCode.BL_T029_UPSTREAM_SUCCESS_DIAGNOSTICS_NONEMPTY,
+                    "task028_success_result.warnings",
+                )
+            )
+        if task028_success_result.blockers != ():
+            blockers.append(
+                emit_blocker(
+                    Task029BlockerCode.BL_T029_UPSTREAM_SUCCESS_DIAGNOSTICS_NONEMPTY,
+                    "task028_success_result.blockers",
+                )
+            )
+
+    return collapse_blockers(blockers)
+
+
+def T04_COMPARE_PROFILE_AND_COMMON_IDENTITIES(
+    *,
+    request_profile_id: str,
+    task027_success_result: Task027SuccessResult,
+    task028_success_result: Task028SuccessResult,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Compare request profile and common upstream runtime identity fields."""
+    blockers: list[Task029BlockerEntry] = []
+
+    if (
+        request_profile_id != task027_success_result.profile_id
+        or request_profile_id != task028_success_result.profile_id
+    ):
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_PROFILE_MISMATCH,
+                "profile_id",
+            )
+        )
+
+    for attribute_name, field_suffix in _COMMON_RUNTIME_IDENTITY_FIELDS:
+        task027_value = getattr(task027_success_result, attribute_name)
+        task028_value = getattr(task028_success_result, attribute_name)
+        if task027_value == task028_value:
+            continue
+        blockers.append(
+            emit_blocker(
+                Task029BlockerCode.BL_T029_UPSTREAM_IDENTITY_MISMATCH,
+                f"task028_success_result.{field_suffix}",
+                evidence_refs=sort_evidence_refs((task027_value, task028_value)),
+            )
+        )
+
+    return collapse_blockers(blockers)
+
+
 def T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES(
     *,
     schema_version: str,
@@ -336,6 +597,186 @@ def T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE(
     return collapse_blockers(blockers)
 
 
+def T06_BIND_EXPECTED_MEMBERS_TO_PRODUCER_RESULTS(
+    *,
+    composition_authority: TubeSidePressurePathCompositionAuthority,
+    task027_replay_evidence: Task027ReplayEvidence,
+    task028_replay_evidence: Task028ReplayEvidence,
+    task027_upstream_reference_plane: str,
+    task027_downstream_reference_plane: str,
+) -> BindingResult:
+    """Bind composition member authorities to trusted TASK-027/TASK-028 replay evidence."""
+    blockers: list[Task029BlockerEntry] = []
+    blockers.extend(validate_global_index_domain(composition_authority.member_authorities))
+
+    binding_result = bind_members_to_producers(
+        composition_authority=composition_authority,
+        task027_replay_evidence=task027_replay_evidence,
+        task028_replay_evidence=task028_replay_evidence,
+        task027_upstream_reference_plane=task027_upstream_reference_plane,
+        task027_downstream_reference_plane=task027_downstream_reference_plane,
+    )
+    blockers.extend(binding_result.blockers)
+    return BindingResult(
+        bound_members=binding_result.bound_members,
+        blockers=collapse_blockers(blockers),
+    )
+
+
+def T08_VALIDATE_GLOBAL_ORDER_BOUNDARIES_AND_PATH_TOPOLOGY(
+    *,
+    composition_authority: TubeSidePressurePathCompositionAuthority,
+    binding_result: BindingResult,
+    task027_upstream_reference_plane: str,
+    task027_downstream_reference_plane: str,
+) -> PathTopologyResult:
+    """Validate global order, modeled boundaries, and path topology predicates."""
+    return evaluate_path_topology(
+        composition_authority=composition_authority,
+        binding_result=binding_result,
+        task027_upstream_reference_plane=task027_upstream_reference_plane,
+        task027_downstream_reference_plane=task027_downstream_reference_plane,
+    )
+
+
+def T09_VALIDATE_EXCLUSION_PARTITION_AND_COMPLETENESS(
+    *,
+    composition_authority: TubeSidePressurePathCompositionAuthority,
+    binding_result: BindingResult,
+) -> tuple[Task029BlockerEntry, ...]:
+    """Validate exclusion partition and modeled-boundary completeness proof."""
+    return validate_exclusion_partition_and_completeness(
+        composition_authority=composition_authority,
+        binding_result=binding_result,
+    ).blockers
+
+
+def _run_t01_through_t09_validation(
+    request: Task029Request,
+) -> T01ThroughT09ValidationResult:
+    """Accumulate safely applicable T01-T09 blockers for a typed TASK-029 request."""
+    blockers: list[Task029BlockerEntry] = []
+    bound_members: tuple[BoundPressurePathMember, ...] | None = None
+
+    task027_success_result = request.task027_success_result
+    task028_success_result = request.task028_success_result
+
+    blockers.extend(
+        T01_VALIDATE_UPSTREAM_SCHEMA_VERSIONS(
+            task027_success_result=task027_success_result,
+            task028_success_result=task028_success_result,
+        )
+    )
+
+    task027_schema_supported = (
+        task027_success_result.schema_version == TASK027_ACCEPTED_SCHEMA_VERSION
+    )
+    task028_schema_supported = (
+        task028_success_result.schema_version == TASK028_ACCEPTED_SCHEMA_VERSION
+    )
+
+    blockers.extend(
+        T02_REPLAY_UPSTREAM_RESULT_HASH_AND_UUID(
+            task027_success_result=task027_success_result,
+            task028_success_result=task028_success_result,
+            task027_schema_supported=task027_schema_supported,
+            task028_schema_supported=task028_schema_supported,
+        )
+    )
+
+    blockers.extend(
+        T03_VALIDATE_UPSTREAM_SUCCESS_WARNINGS_BLOCKERS(
+            task027_success_result=task027_success_result,
+            task028_success_result=task028_success_result,
+            task027_schema_supported=task027_schema_supported,
+            task028_schema_supported=task028_schema_supported,
+        )
+    )
+
+    if task027_schema_supported and task028_schema_supported:
+        blockers.extend(
+            T04_COMPARE_PROFILE_AND_COMMON_IDENTITIES(
+                request_profile_id=request.profile_id,
+                task027_success_result=task027_success_result,
+                task028_success_result=task028_success_result,
+            )
+        )
+
+    blockers.extend(
+        T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES(
+            schema_version=request.schema_version,
+            profile_id=request.profile_id,
+            request_hash=request.request_hash,
+            composition_authority=request.composition_authority,
+            task027_result_hash=task027_success_result.result_hash,
+            task028_result_hash=task028_success_result.result_hash,
+            task025_hydraulic_authority_hash=task027_success_result.task025_hydraulic_authority_hash,
+            task025_result_hash=task027_success_result.task025_result_hash,
+            task026_result_hash=task027_success_result.task026_result_hash,
+            property_snapshot_hash=task027_success_result.property_snapshot_hash,
+        )
+    )
+
+    composition_authority = request.composition_authority
+    composition_safe = _composition_authority_safe_for_binding(composition_authority)
+
+    task027_replay_evidence: Task027ReplayEvidence | None = None
+    task028_replay_evidence: Task028ReplayEvidence | None = None
+    if task027_schema_supported:
+        task027_replay_evidence = _extract_task027_replay_evidence(
+            replay_task027_success(task027_success_result)
+        )
+    if task028_schema_supported:
+        task028_replay_evidence = _extract_task028_replay_evidence(
+            replay_task028_success(task028_success_result)
+        )
+
+    if (
+        composition_safe
+        and task027_replay_evidence is not None
+        and task028_replay_evidence is not None
+        and type(composition_authority) is TubeSidePressurePathCompositionAuthority
+    ):
+        binding_result = T06_BIND_EXPECTED_MEMBERS_TO_PRODUCER_RESULTS(
+            composition_authority=composition_authority,
+            task027_replay_evidence=task027_replay_evidence,
+            task028_replay_evidence=task028_replay_evidence,
+            task027_upstream_reference_plane=task027_success_result.upstream_reference_plane,
+            task027_downstream_reference_plane=task027_success_result.downstream_reference_plane,
+        )
+        blockers.extend(binding_result.blockers)
+
+        if binding_result.bound_members:
+            blockers.extend(
+                T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE(
+                    composition_authority=composition_authority,
+                    bound_members=binding_result.bound_members,
+                )
+            )
+
+            topology_result = T08_VALIDATE_GLOBAL_ORDER_BOUNDARIES_AND_PATH_TOPOLOGY(
+                composition_authority=composition_authority,
+                binding_result=binding_result,
+                task027_upstream_reference_plane=task027_success_result.upstream_reference_plane,
+                task027_downstream_reference_plane=task027_success_result.downstream_reference_plane,
+            )
+            blockers.extend(topology_result.blockers)
+            if topology_result.ordered_bound_members:
+                bound_members = topology_result.ordered_bound_members
+
+            blockers.extend(
+                T09_VALIDATE_EXCLUSION_PARTITION_AND_COMPLETENESS(
+                    composition_authority=composition_authority,
+                    binding_result=binding_result,
+                )
+            )
+
+    return T01ThroughT09ValidationResult(
+        blockers=collapse_blockers(blockers),
+        bound_members=bound_members,
+    )
+
+
 def validate_composition_authority_tree_and_hashes(
     request: Task029Request,
 ) -> tuple[Task029BlockerEntry, ...]:
@@ -355,7 +796,17 @@ def validate_composition_authority_tree_and_hashes(
 
 
 __all__ = [
+    "T00_ROUTE_UPSTREAM_BLOCKED_AND_REQUIRE_EXACT_TYPES",
+    "T01ThroughT09ValidationResult",
+    "T01_VALIDATE_UPSTREAM_SCHEMA_VERSIONS",
+    "T02_REPLAY_UPSTREAM_RESULT_HASH_AND_UUID",
+    "T03_VALIDATE_UPSTREAM_SUCCESS_WARNINGS_BLOCKERS",
+    "T04_COMPARE_PROFILE_AND_COMMON_IDENTITIES",
     "T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES",
+    "T06_BIND_EXPECTED_MEMBERS_TO_PRODUCER_RESULTS",
     "T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE",
+    "T08_VALIDATE_GLOBAL_ORDER_BOUNDARIES_AND_PATH_TOPOLOGY",
+    "T09_VALIDATE_EXCLUSION_PARTITION_AND_COMPLETENESS",
+    "_run_t01_through_t09_validation",
     "validate_composition_authority_tree_and_hashes",
 ]
