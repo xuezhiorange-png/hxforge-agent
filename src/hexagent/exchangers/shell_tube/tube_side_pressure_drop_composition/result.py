@@ -5,6 +5,7 @@ into frozen ledger evidence records.
 
 I13B: success result builder using I13A identity primitives.
 I13C: typed blocked result builder using I13A identity primitives.
+I13D: raw-boundary blocked result builder (6-field contract, no result hash/ID).
 """
 
 from __future__ import annotations
@@ -13,10 +14,12 @@ from dataclasses import replace
 from decimal import Decimal
 
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonical import (
+    IMPLEMENTATION_SOFTWARE_VERSION,
     LEDGER_EXCLUSION_EVIDENCE_SCHEMA_VERSION,
     LEDGER_MEMBER_EVIDENCE_SCHEMA_VERSION,
     TASK029_BLOCKED_RESULT_SCHEMA_VERSION,
     TASK029_DEFERRED_CAPABILITIES_V1,
+    TASK029_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
     TASK029_SUCCESS_RESULT_SCHEMA_VERSION,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums import (
@@ -35,6 +38,7 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models i
     Task029BlockedResult,
     Task029BlockerEntry,
     Task029Provenance,
+    Task029RawBoundaryBlockedResult,
     Task029SuccessResult,
     TubeSidePressurePathCompletenessLedger,
     TubeSidePressurePathExclusionAuthority,
@@ -206,9 +210,30 @@ def build_blocked_result(
     )
 
 
+def build_raw_boundary_blocked_result(
+    *,
+    raw_request_projection: FrozenTask029RawProjection,
+    blockers: tuple[Task029BlockerEntry, ...],
+) -> Task029RawBoundaryBlockedResult:
+    """Build a frozen Task029RawBoundaryBlockedResult (6-field contract, no result hash/ID)."""
+    if len(blockers) == 0:
+        msg = "raw-boundary blocked result must have non-empty blockers"
+        raise ValueError(msg)
+
+    return Task029RawBoundaryBlockedResult(
+        schema_version=TASK029_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
+        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
+        raw_request_projection=raw_request_projection,
+        blockers=blockers,
+        warnings=(),
+        deferred_capabilities=TASK029_DEFERRED_CAPABILITIES_V1,
+    )
+
+
 __all__ = [
     "build_blocked_result",
     "build_exclusion_evidence",
     "build_member_evidence",
+    "build_raw_boundary_blocked_result",
     "build_success_result",
 ]
