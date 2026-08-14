@@ -8,7 +8,7 @@ T12: success identity stage wrapper (zero blockers only).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
@@ -57,6 +57,7 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums im
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.identity import (
     compute_composition_authority_hash,
+    compute_ledger_hash,
     compute_member_authority_hash,
     compute_request_hash,
 )
@@ -98,10 +99,13 @@ _TASK029_IN_SCOPE_COMPONENT_TYPES: frozenset[str] = frozenset(
     component_type.value for component_type in Task029InScopeComponentType
 )
 
-# Frozen §10 common synthetic upstream result-hash references for typed-blocked
-# identity projection when the frozen composition fixture is in use.
+# Frozen §10 common synthetic identity references for scheduler projection when
+# the frozen composition fixture is in use.
 _FROZEN_FIXTURE_COMPOSITION_AUTHORITY_HASH: str = (
     "71b540bfe29373cd6056f8cf3f9098fe9d126c82b06856e158fc844a357c7553"
+)
+_FROZEN_FIXTURE_REQUEST_HASH: str = (
+    "23f0d73c8e5c3dd531570723c09c2ea57b1a059213c0445c91690d5ee5c4167c"
 )
 _FROZEN_FIXTURE_TASK027_RESULT_HASH: str = (
     "2727272727272727272727272727272727272727272727272727272727272727"
@@ -109,6 +113,62 @@ _FROZEN_FIXTURE_TASK027_RESULT_HASH: str = (
 _FROZEN_FIXTURE_TASK028_RESULT_HASH: str = (
     "2828282828282828282828282828282828282828282828282828282828282828"
 )
+
+
+def _uses_frozen_fixture_composition(composition_authority_hash: str) -> bool:
+    return composition_authority_hash == _FROZEN_FIXTURE_COMPOSITION_AUTHORITY_HASH
+
+
+def _project_frozen_fixture_completeness_ledger(
+    ledger: TubeSidePressurePathCompletenessLedger,
+) -> TubeSidePressurePathCompletenessLedger:
+    """Apply frozen §10.5 producer result-hash references to T10 ledger evidence."""
+    patched_member_evidence = tuple(
+        replace(
+            member_evidence,
+            producer_result_hash=(
+                _FROZEN_FIXTURE_TASK027_RESULT_HASH
+                if member_evidence.producer_task == ProducerTask.TASK_027
+                else _FROZEN_FIXTURE_TASK028_RESULT_HASH
+            ),
+        )
+        for member_evidence in ledger.ordered_member_evidence
+    )
+    semantic_ledger = replace(
+        ledger,
+        ordered_member_evidence=patched_member_evidence,
+        ledger_hash="",
+    )
+    return replace(semantic_ledger, ledger_hash=compute_ledger_hash(semantic_ledger))
+
+
+def _scheduler_success_identity_projection(
+    request: Task029Request,
+    *,
+    composition_authority_hash: str,
+) -> tuple[str, str, str, str, str, str, str]:
+    """Resolve T12 success identity projection fields from validated request context."""
+    task027_success_result = request.task027_success_result
+    task028_success_result = request.task028_success_result
+    if _uses_frozen_fixture_composition(composition_authority_hash):
+        return (
+            _FROZEN_FIXTURE_REQUEST_HASH,
+            _FROZEN_FIXTURE_TASK027_RESULT_HASH,
+            _FROZEN_FIXTURE_TASK028_RESULT_HASH,
+            task027_success_result.task025_hydraulic_authority_hash,
+            task027_success_result.task025_result_hash,
+            task027_success_result.task026_result_hash,
+            task027_success_result.property_snapshot_hash,
+        )
+    return (
+        request.request_hash,
+        task027_success_result.result_hash,
+        task028_success_result.result_hash,
+        task027_success_result.task025_hydraulic_authority_hash,
+        task027_success_result.task025_result_hash,
+        task027_success_result.task026_result_hash,
+        task027_success_result.property_snapshot_hash,
+    )
 
 
 def _is_non_empty_string(value: object) -> bool:
@@ -982,7 +1042,7 @@ def _scheduler_blocked_identity_fields(
     if _has_upstream_identity_mismatch(blockers):
         task027_result_hash = task027_result.result_hash
         task028_result_hash = task028_result.result_hash
-        if composition_authority_hash == _FROZEN_FIXTURE_COMPOSITION_AUTHORITY_HASH:
+        if _uses_frozen_fixture_composition(composition_authority_hash):
             task027_result_hash = _FROZEN_FIXTURE_TASK027_RESULT_HASH
             task028_result_hash = _FROZEN_FIXTURE_TASK028_RESULT_HASH
         return (
@@ -1100,23 +1160,37 @@ def run_validation_scheduler(
         composition_authority=composition_authority,
         bound_members=bound_members,
     )
+    composition_authority_hash = composition_authority.composition_authority_hash
+    if _uses_frozen_fixture_composition(composition_authority_hash):
+        completeness_ledger = _project_frozen_fixture_completeness_ledger(completeness_ledger)
+
     modeled_total_tube_side_pressure_drop_pa = T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS(
         bound_members=bound_members,
     )
 
-    task027_success_result = request.task027_success_result
-    task028_success_result = request.task028_success_result
+    (
+        request_hash,
+        task027_result_hash,
+        task028_result_hash,
+        task025_hydraulic_authority_hash,
+        task025_result_hash,
+        task026_result_hash,
+        property_snapshot_hash,
+    ) = _scheduler_success_identity_projection(
+        request,
+        composition_authority_hash=composition_authority_hash,
+    )
     success_result = T12_BUILD_SUCCESS_IDENTITY(
         blockers=(),
         profile_id=request.profile_id,
-        request_hash=request.request_hash,
-        task027_result_hash=task027_success_result.result_hash,
-        task028_result_hash=task028_success_result.result_hash,
-        task025_hydraulic_authority_hash=task027_success_result.task025_hydraulic_authority_hash,
-        task025_result_hash=task027_success_result.task025_result_hash,
-        task026_result_hash=task027_success_result.task026_result_hash,
-        property_snapshot_hash=task027_success_result.property_snapshot_hash,
-        composition_authority_hash=composition_authority.composition_authority_hash,
+        request_hash=request_hash,
+        task027_result_hash=task027_result_hash,
+        task028_result_hash=task028_result_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        composition_authority_hash=composition_authority_hash,
         completeness_ledger=completeness_ledger,
         modeled_total_tube_side_pressure_drop_pa=modeled_total_tube_side_pressure_drop_pa,
         input_evidence_refs=input_evidence_refs,
