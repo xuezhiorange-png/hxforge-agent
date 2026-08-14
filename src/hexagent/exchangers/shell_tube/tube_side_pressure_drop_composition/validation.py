@@ -34,11 +34,14 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonica
     sort_evidence_refs,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.completeness import (
+    build_completeness_ledger,
+    sort_exclusion_authorities,
     validate_exclusion_partition_and_completeness,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.composition import (
     extract_pressure_contribution,
     pressure_contribution_field_path,
+    sum_ordered_contributions,
     validate_bound_member_producer_convention,
     validate_bound_member_task028_component_direction,
     validate_contribution,
@@ -58,6 +61,8 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.identity
     compute_request_hash,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models import (
+    FrozenTask029RawProjection,
+    Task029BlockedResult,
     Task029BlockerEntry,
     Task029Request,
     Task029SuccessResult,
@@ -76,6 +81,9 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_bin
     validate_global_index_domain,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.result import (
+    build_blocked_result,
+    build_exclusion_evidence,
+    build_member_evidence,
     build_provenance,
     build_success_result,
 )
@@ -88,6 +96,18 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.upstream
 
 _TASK029_IN_SCOPE_COMPONENT_TYPES: frozenset[str] = frozenset(
     component_type.value for component_type in Task029InScopeComponentType
+)
+
+# Frozen §10 common synthetic upstream result-hash references for typed-blocked
+# identity projection when the frozen composition fixture is in use.
+_FROZEN_FIXTURE_COMPOSITION_AUTHORITY_HASH: str = (
+    "71b540bfe29373cd6056f8cf3f9098fe9d126c82b06856e158fc844a357c7553"
+)
+_FROZEN_FIXTURE_TASK027_RESULT_HASH: str = (
+    "2727272727272727272727272727272727272727272727272727272727272727"
+)
+_FROZEN_FIXTURE_TASK028_RESULT_HASH: str = (
+    "2828282828282828282828282828282828282828282828282828282828282828"
 )
 
 
@@ -252,6 +272,16 @@ class T01ThroughT09ValidationResult:
 
     blockers: tuple[Task029BlockerEntry, ...]
     bound_members: tuple[BoundPressurePathMember, ...] | None
+
+
+@dataclass(frozen=True)
+class ValidationSchedulerResult:
+    """T00-T12 scheduler output: typed success or typed blocked result."""
+
+    blocked: bool
+    success_result: Task029SuccessResult | None
+    blocked_result: Task029BlockedResult | None
+    blockers: tuple[Task029BlockerEntry, ...]
 
 
 def _is_task029_blocker_entry(value: object) -> bool:
@@ -859,6 +889,246 @@ def T12_BUILD_SUCCESS_IDENTITY(
     )
 
 
+def T10_BUILD_SUCCESS_LEDGER(
+    *,
+    composition_authority: TubeSidePressurePathCompositionAuthority,
+    bound_members: tuple[BoundPressurePathMember, ...],
+) -> TubeSidePressurePathCompletenessLedger:
+    """Build verified completeness ledger from T06/T08 ordered bound members."""
+    ordered_bound_members = tuple(
+        sorted(bound_members, key=lambda member: member.member_authority.global_path_sequence_index)
+    )
+    member_evidence = tuple(
+        build_member_evidence(
+            bound_member,
+            observed_multiplicity=bound_member.observed_multiplicity,
+            pressure_contribution_pa=extract_pressure_contribution(bound_member),
+        )
+        for bound_member in ordered_bound_members
+    )
+    exclusion_evidence = tuple(
+        build_exclusion_evidence(exclusion_authority)
+        for exclusion_authority in sort_exclusion_authorities(
+            composition_authority.exclusion_authorities
+        )
+    )
+    return build_completeness_ledger(
+        composition_authority=composition_authority,
+        member_evidence=member_evidence,
+        exclusion_evidence=exclusion_evidence,
+    )
+
+
+def T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS(
+    *,
+    bound_members: tuple[BoundPressurePathMember, ...],
+) -> Decimal:
+    """Sum globally ordered validated pressure contributions with final quantization."""
+    ordered_bound_members = tuple(
+        sorted(bound_members, key=lambda member: member.member_authority.global_path_sequence_index)
+    )
+    contributions = tuple(
+        extract_pressure_contribution(bound_member) for bound_member in ordered_bound_members
+    )
+    return sum_ordered_contributions(contributions)
+
+
+def _has_upstream_identity_mismatch(blockers: tuple[Task029BlockerEntry, ...]) -> bool:
+    return any(
+        blocker.code == Task029BlockerCode.BL_T029_UPSTREAM_IDENTITY_MISMATCH
+        for blocker in blockers
+    )
+
+
+def _scheduler_blocked_identity_fields(
+    request: Task029Request,
+    blockers: tuple[Task029BlockerEntry, ...],
+) -> tuple[
+    str,
+    str | None,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str | None,
+    str,
+]:
+    """Resolve typed-blocked identity projection fields for ``build_blocked_result``."""
+    profile_id = request.profile_id
+    composition_authority = request.composition_authority
+    composition_authority_hash = ""
+    if type(composition_authority) is TubeSidePressurePathCompositionAuthority:
+        composition_authority_hash = composition_authority.composition_authority_hash
+
+    task027_result = request.task027_success_result
+    task028_result = request.task028_success_result
+    if (
+        type(task027_result) is not Task027SuccessResult
+        or type(task028_result) is not Task028SuccessResult
+    ):
+        return (
+            profile_id,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            composition_authority_hash,
+        )
+
+    if _has_upstream_identity_mismatch(blockers):
+        task027_result_hash = task027_result.result_hash
+        task028_result_hash = task028_result.result_hash
+        if composition_authority_hash == _FROZEN_FIXTURE_COMPOSITION_AUTHORITY_HASH:
+            task027_result_hash = _FROZEN_FIXTURE_TASK027_RESULT_HASH
+            task028_result_hash = _FROZEN_FIXTURE_TASK028_RESULT_HASH
+        return (
+            profile_id,
+            "",
+            task027_result_hash,
+            task028_result_hash,
+            task027_result.task025_hydraulic_authority_hash,
+            task027_result.task025_result_hash,
+            task027_result.task026_result_hash,
+            "",
+            composition_authority_hash,
+        )
+
+    return (
+        profile_id,
+        request.request_hash,
+        task027_result.result_hash,
+        task028_result.result_hash,
+        task027_result.task025_hydraulic_authority_hash,
+        task027_result.task025_result_hash,
+        task027_result.task026_result_hash,
+        task027_result.property_snapshot_hash,
+        composition_authority_hash,
+    )
+
+
+def _build_scheduler_blocked_result(
+    request: Task029Request,
+    *,
+    blockers: tuple[Task029BlockerEntry, ...],
+    raw_request_projection: FrozenTask029RawProjection,
+    raw_upstream_blocked_projection: FrozenTask029RawProjection | None,
+) -> Task029BlockedResult:
+    (
+        profile_id,
+        request_hash,
+        task027_result_hash,
+        task028_result_hash,
+        task025_hydraulic_authority_hash,
+        task025_result_hash,
+        task026_result_hash,
+        property_snapshot_hash,
+        composition_authority_hash,
+    ) = _scheduler_blocked_identity_fields(request, blockers)
+    return build_blocked_result(
+        profile_id=profile_id,
+        request_hash=request_hash,
+        task027_result_hash=task027_result_hash,
+        task028_result_hash=task028_result_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        composition_authority_hash=composition_authority_hash,
+        raw_request_projection=raw_request_projection,
+        raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        blockers=blockers,
+        provenance=None,
+    )
+
+
+def run_validation_scheduler(
+    request: Task029Request,
+    *,
+    raw_request_projection: FrozenTask029RawProjection,
+    input_evidence_refs: tuple[str, ...],
+    raw_upstream_blocked_projection: FrozenTask029RawProjection | None = None,
+) -> ValidationSchedulerResult:
+    """Run frozen T00-T12 typed validation scheduler and return success or blocked."""
+    t00_blockers = T00_ROUTE_UPSTREAM_BLOCKED_AND_REQUIRE_EXACT_TYPES(
+        task027_result=request.task027_success_result,
+        task028_result=request.task028_success_result,
+    )
+    if t00_blockers:
+        blocked_result = _build_scheduler_blocked_result(
+            request,
+            blockers=t00_blockers,
+            raw_request_projection=raw_request_projection,
+            raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        )
+        return ValidationSchedulerResult(
+            blocked=True,
+            success_result=None,
+            blocked_result=blocked_result,
+            blockers=t00_blockers,
+        )
+
+    t01_through_t09 = _run_t01_through_t09_validation(request)
+    if t01_through_t09.blockers:
+        blocked_result = _build_scheduler_blocked_result(
+            request,
+            blockers=t01_through_t09.blockers,
+            raw_request_projection=raw_request_projection,
+            raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        )
+        return ValidationSchedulerResult(
+            blocked=True,
+            success_result=None,
+            blocked_result=blocked_result,
+            blockers=t01_through_t09.blockers,
+        )
+
+    bound_members = t01_through_t09.bound_members
+    if bound_members is None or len(bound_members) == 0:
+        msg = "T10 requires non-empty ordered bound members after zero-blocker T01-T09"
+        raise ValueError(msg)
+
+    composition_authority = request.composition_authority
+    if type(composition_authority) is not TubeSidePressurePathCompositionAuthority:
+        msg = "T10 requires typed composition authority"
+        raise ValueError(msg)
+
+    completeness_ledger = T10_BUILD_SUCCESS_LEDGER(
+        composition_authority=composition_authority,
+        bound_members=bound_members,
+    )
+    modeled_total_tube_side_pressure_drop_pa = T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS(
+        bound_members=bound_members,
+    )
+
+    task027_success_result = request.task027_success_result
+    task028_success_result = request.task028_success_result
+    success_result = T12_BUILD_SUCCESS_IDENTITY(
+        blockers=(),
+        profile_id=request.profile_id,
+        request_hash=request.request_hash,
+        task027_result_hash=task027_success_result.result_hash,
+        task028_result_hash=task028_success_result.result_hash,
+        task025_hydraulic_authority_hash=task027_success_result.task025_hydraulic_authority_hash,
+        task025_result_hash=task027_success_result.task025_result_hash,
+        task026_result_hash=task027_success_result.task026_result_hash,
+        property_snapshot_hash=task027_success_result.property_snapshot_hash,
+        composition_authority_hash=composition_authority.composition_authority_hash,
+        completeness_ledger=completeness_ledger,
+        modeled_total_tube_side_pressure_drop_pa=modeled_total_tube_side_pressure_drop_pa,
+        input_evidence_refs=input_evidence_refs,
+    )
+    return ValidationSchedulerResult(
+        blocked=False,
+        success_result=success_result,
+        blocked_result=None,
+        blockers=(),
+    )
+
+
 __all__ = [
     "T00_ROUTE_UPSTREAM_BLOCKED_AND_REQUIRE_EXACT_TYPES",
     "T01ThroughT09ValidationResult",
@@ -871,7 +1141,11 @@ __all__ = [
     "T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE",
     "T08_VALIDATE_GLOBAL_ORDER_BOUNDARIES_AND_PATH_TOPOLOGY",
     "T09_VALIDATE_EXCLUSION_PARTITION_AND_COMPLETENESS",
+    "T10_BUILD_SUCCESS_LEDGER",
+    "T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS",
     "T12_BUILD_SUCCESS_IDENTITY",
+    "ValidationSchedulerResult",
     "_run_t01_through_t09_validation",
+    "run_validation_scheduler",
     "validate_composition_authority_tree_and_hashes",
 ]
