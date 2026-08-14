@@ -3,11 +3,13 @@
 T00-T04 / T06 / T08 / T09: validation stage wrappers and safe accumulation.
 T05: composition authority tree and hash replay validation.
 T07: direction, multiplicity, convention, and pressure contribution validation.
+T12: success identity stage wrapper (zero blockers only).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     Task027BlockedResult,
@@ -58,6 +60,8 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.identity
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models import (
     Task029BlockerEntry,
     Task029Request,
+    Task029SuccessResult,
+    TubeSidePressurePathCompletenessLedger,
     TubeSidePressurePathCompositionAuthority,
     TubeSidePressurePathExclusionAuthority,
     TubeSidePressurePathMemberAuthority,
@@ -70,6 +74,10 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_bin
     evaluate_path_topology,
     validate_bound_members_multiplicity,
     validate_global_index_domain,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.result import (
+    build_provenance,
+    build_success_result,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.upstream_replay import (
     Task027ReplayEvidence,
@@ -795,6 +803,62 @@ def validate_composition_authority_tree_and_hashes(
     )
 
 
+def T12_BUILD_SUCCESS_IDENTITY(
+    *,
+    blockers: tuple[Task029BlockerEntry, ...],
+    profile_id: str,
+    request_hash: str,
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    composition_authority_hash: str,
+    completeness_ledger: TubeSidePressurePathCompletenessLedger,
+    modeled_total_tube_side_pressure_drop_pa: Decimal,
+    input_evidence_refs: tuple[str, ...],
+) -> Task029SuccessResult:
+    """Build frozen success identity from validated T10 ledger and T11 modeled total."""
+    if len(blockers) != 0:
+        msg = "T12 requires zero blockers before building success identity"
+        raise ValueError(msg)
+
+    if type(completeness_ledger) is not TubeSidePressurePathCompletenessLedger:
+        msg = "T12 requires T10 completeness ledger"
+        raise ValueError(msg)
+
+    if type(modeled_total_tube_side_pressure_drop_pa) is not Decimal:
+        msg = "T12 requires T11 modeled total as exact Decimal"
+        raise ValueError(msg)
+
+    provenance = build_provenance(
+        input_evidence_refs=input_evidence_refs,
+        task027_result_hash=task027_result_hash,
+        task028_result_hash=task028_result_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        composition_authority_hash=composition_authority_hash,
+    )
+
+    return build_success_result(
+        profile_id=profile_id,
+        request_hash=request_hash,
+        task027_result_hash=task027_result_hash,
+        task028_result_hash=task028_result_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        composition_authority_hash=composition_authority_hash,
+        completeness_ledger=completeness_ledger,
+        modeled_total_tube_side_pressure_drop_pa=modeled_total_tube_side_pressure_drop_pa,
+        provenance=provenance,
+    )
+
+
 __all__ = [
     "T00_ROUTE_UPSTREAM_BLOCKED_AND_REQUIRE_EXACT_TYPES",
     "T01ThroughT09ValidationResult",
@@ -807,6 +871,7 @@ __all__ = [
     "T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE",
     "T08_VALIDATE_GLOBAL_ORDER_BOUNDARIES_AND_PATH_TOPOLOGY",
     "T09_VALIDATE_EXCLUSION_PARTITION_AND_COMPLETENESS",
+    "T12_BUILD_SUCCESS_IDENTITY",
     "_run_t01_through_t09_validation",
     "validate_composition_authority_tree_and_hashes",
 ]
