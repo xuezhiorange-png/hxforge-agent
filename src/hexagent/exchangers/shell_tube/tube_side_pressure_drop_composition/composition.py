@@ -6,7 +6,7 @@ Decimal contribution guards, and ordered pressure summation.
 
 from __future__ import annotations
 
-from decimal import Decimal, localcontext
+from decimal import Decimal, InvalidOperation, localcontext
 
 from hexagent.exchangers.shell_tube.tube_side_local_loss.enums import (
     LossCoefficientConvention,
@@ -46,6 +46,10 @@ _TASK028_PRESSURE_CONTRIBUTION_FIELD_PATH = (
 _REQUIRED_TASK028_LOSS_COEFFICIENT_CONVENTION = (
     LossCoefficientConvention.K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2
 )
+
+
+class CompositionArithmeticFailure(Exception):
+    """Internal T11 ordered-sum arithmetic failure after T07 contribution validation."""
 
 
 def extract_pressure_contribution(bound_member: BoundPressurePathMember) -> Decimal:
@@ -184,14 +188,19 @@ def pressure_contribution_field_path(bound_member: BoundPressurePathMember) -> s
 
 def sum_ordered_contributions(contributions: tuple[Decimal, ...]) -> Decimal:
     """Sum globally ordered validated pressure contributions with one final quantization."""
-    with localcontext(task029_decimal_context()):
-        total = Decimal("0")
-        for contribution in contributions:
-            total += contribution
-        return normalize_negative_zero(total.quantize(TASK029_PRESSURE_QUANTUM_PA))
+    try:
+        with localcontext(task029_decimal_context()):
+            total = Decimal("0")
+            for contribution in contributions:
+                total += contribution
+            return normalize_negative_zero(total.quantize(TASK029_PRESSURE_QUANTUM_PA))
+    except (InvalidOperation, OverflowError, ValueError) as exc:
+        msg = "ordered pressure contribution sum failed"
+        raise CompositionArithmeticFailure(msg) from exc
 
 
 __all__ = [
+    "CompositionArithmeticFailure",
     "extract_pressure_contribution",
     "pressure_contribution_field_path",
     "sum_ordered_contributions",

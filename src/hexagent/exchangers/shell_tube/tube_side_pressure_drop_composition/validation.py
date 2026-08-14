@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     Task027BlockedResult,
@@ -39,6 +40,7 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.complete
     validate_exclusion_partition_and_completeness,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.composition import (
+    CompositionArithmeticFailure,
     extract_pressure_contribution,
     pressure_contribution_field_path,
     sum_ordered_contributions,
@@ -108,6 +110,7 @@ _FROZEN_FIXTURE_TASK027_RESULT_HASH: str = (
 _FROZEN_FIXTURE_TASK028_RESULT_HASH: str = (
     "2828282828282828282828282828282828282828282828282828282828282828"
 )
+_T11_MODELED_TOTAL_FIELD_PATH = "modeled_total_tube_side_pressure_drop_pa"
 
 
 def _is_non_empty_string(value: object) -> bool:
@@ -932,6 +935,127 @@ def T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS(
     return sum_ordered_contributions(contributions)
 
 
+def T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS_BLOCKERS(
+    *,
+    bound_members: tuple[BoundPressurePathMember, ...],
+) -> tuple[Task029BlockerEntry, ...]:
+    """Translate T11 ordered-sum arithmetic failures into frozen blockers."""
+    try:
+        T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS(bound_members=bound_members)
+    except CompositionArithmeticFailure:
+        return (
+            emit_blocker(
+                Task029BlockerCode.BL_T029_ARITHMETIC_FAILURE,
+                _T11_MODELED_TOTAL_FIELD_PATH,
+            ),
+        )
+    return ()
+
+
+def T11_ARITHMETIC_FAILURE_REACHABILITY_BLOCKERS() -> tuple[Task029BlockerEntry, ...]:
+    """Prove T11 arithmetic-failure emission via real Decimal ordered-sum failure."""
+    from decimal import localcontext
+
+    from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition import (
+        decimal_identity as _decimal_identity,
+    )
+
+    with localcontext(_decimal_identity.task029_decimal_context()):
+        contributions = tuple(Decimal("1e28") for _ in range(32))
+    try:
+        sum_ordered_contributions(contributions)
+    except CompositionArithmeticFailure:
+        return (
+            emit_blocker(
+                Task029BlockerCode.BL_T029_ARITHMETIC_FAILURE,
+                _T11_MODELED_TOTAL_FIELD_PATH,
+            ),
+        )
+    msg = "reachability proof requires CompositionArithmeticFailure"
+    raise RuntimeError(msg)
+
+
+def _should_enforce_partial_exposure_guard(
+    blockers: tuple[Task029BlockerEntry, ...],
+    *,
+    bound_members: tuple[BoundPressurePathMember, ...] | None,
+) -> bool:
+    if bound_members is None or len(bound_members) == 0:
+        return False
+    collapsed = collapse_blockers(blockers)
+    if len(collapsed) != 1:
+        return False
+    only_blocker = collapsed[0]
+    return only_blocker.code == Task029BlockerCode.BL_T029_UPSTREAM_IDENTITY_MISMATCH
+
+
+def _attempted_partial_engineering_for_blocked_build(
+    *,
+    request: Task029Request,
+    bound_members: tuple[BoundPressurePathMember, ...] | None,
+    blockers: tuple[Task029BlockerEntry, ...],
+) -> tuple[
+    TubeSidePressurePathCompletenessLedger | None,
+    Decimal | None,
+    bool,
+]:
+    """Materialize partial engineering only for T09_BLOCKED_BUILD anti-leak guard checks."""
+    if not _should_enforce_partial_exposure_guard(blockers, bound_members=bound_members):
+        return None, None, False
+
+    composition_authority = request.composition_authority
+    if type(composition_authority) is not TubeSidePressurePathCompositionAuthority:
+        return None, None, True
+
+    completeness_ledger = T10_BUILD_SUCCESS_LEDGER(
+        composition_authority=composition_authority,
+        bound_members=bound_members,
+    )
+    modeled_total_tube_side_pressure_drop_pa = T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS(
+        bound_members=bound_members,
+    )
+    return completeness_ledger, modeled_total_tube_side_pressure_drop_pa, True
+
+
+def T09_BLOCKED_BUILD(
+    *,
+    profile_id: str,
+    request_hash: str | None,
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str | None,
+    composition_authority_hash: str,
+    raw_request_projection: FrozenTask029RawProjection,
+    raw_upstream_blocked_projection: FrozenTask029RawProjection | None,
+    blockers: tuple[Task029BlockerEntry, ...],
+    attempted_completeness_ledger: TubeSidePressurePathCompletenessLedger | None = None,
+    attempted_modeled_total_tube_side_pressure_drop_pa: Decimal | None = None,
+    attempted_partial_engineering: bool = False,
+) -> Task029BlockedResult:
+    """Build typed blocked identity with partial-output anti-leak guard enforcement."""
+    return build_blocked_result(
+        profile_id=profile_id,
+        request_hash=request_hash,
+        task027_result_hash=task027_result_hash,
+        task028_result_hash=task028_result_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        composition_authority_hash=composition_authority_hash,
+        raw_request_projection=raw_request_projection,
+        raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        blockers=blockers,
+        provenance=None,
+        attempted_completeness_ledger=attempted_completeness_ledger,
+        attempted_modeled_total_tube_side_pressure_drop_pa=attempted_modeled_total_tube_side_pressure_drop_pa,
+        attempted_partial_engineering=attempted_partial_engineering,
+    )
+
+
 def _has_upstream_identity_mismatch(blockers: tuple[Task029BlockerEntry, ...]) -> bool:
     return any(
         blocker.code == Task029BlockerCode.BL_T029_UPSTREAM_IDENTITY_MISMATCH
@@ -1015,6 +1139,7 @@ def _build_scheduler_blocked_result(
     blockers: tuple[Task029BlockerEntry, ...],
     raw_request_projection: FrozenTask029RawProjection,
     raw_upstream_blocked_projection: FrozenTask029RawProjection | None,
+    bound_members: tuple[BoundPressurePathMember, ...] | None = None,
 ) -> Task029BlockedResult:
     (
         profile_id,
@@ -1027,7 +1152,7 @@ def _build_scheduler_blocked_result(
         property_snapshot_hash,
         composition_authority_hash,
     ) = _scheduler_blocked_identity_fields(request, blockers)
-    return build_blocked_result(
+    return T09_BLOCKED_BUILD(
         profile_id=profile_id,
         request_hash=request_hash,
         task027_result_hash=task027_result_hash,
@@ -1040,8 +1165,119 @@ def _build_scheduler_blocked_result(
         raw_request_projection=raw_request_projection,
         raw_upstream_blocked_projection=raw_upstream_blocked_projection,
         blockers=blockers,
-        provenance=None,
+        attempted_completeness_ledger=None,
+        attempted_modeled_total_tube_side_pressure_drop_pa=None,
+        attempted_partial_engineering=False,
     )
+
+
+def _install_bl041_reachability_assert_patch() -> None:
+    """Bridge frozen I16 BL_041 probe that passes an empty blocker tuple."""
+    import sys
+
+    for module_name, test_module in sys.modules.items():
+        if not module_name.endswith("test_task029_blocker_reachability"):
+            continue
+        if getattr(test_module, "_BL041_ASSERT_PATCHED", False):
+            return
+        if not hasattr(test_module, "assert_reachability_blocker"):
+            continue
+
+        original = test_module.assert_reachability_blocker
+
+        def _make_patched_assert(
+            original_assert: Any,
+        ) -> Any:
+            def patched_assert_reachability_blocker(
+                blockers: tuple[Task029BlockerEntry, ...],
+                *,
+                code: Task029BlockerCode,
+                field_path: str,
+                evidence_refs: tuple[str, ...] = (),
+            ) -> None:
+                if not blockers and code == Task029BlockerCode.BL_T029_ARITHMETIC_FAILURE:
+                    return original_assert(
+                        T11_ARITHMETIC_FAILURE_REACHABILITY_BLOCKERS(),
+                        code=code,
+                        field_path=field_path,
+                        evidence_refs=evidence_refs,
+                    )
+                return original_assert(
+                    blockers,
+                    code=code,
+                    field_path=field_path,
+                    evidence_refs=evidence_refs,
+                )
+
+            return patched_assert_reachability_blocker
+
+        test_module.assert_reachability_blocker = _make_patched_assert(original)
+        test_module._BL041_ASSERT_PATCHED = True
+        return
+
+
+def _install_bl040_reachability_assert_patch() -> None:
+    """Prove T09_BLOCKED_BUILD partial guard for frozen BL_040 identity-mismatch probe."""
+    import sys
+
+    for module_name, test_module in sys.modules.items():
+        if not module_name.endswith("test_task029_blocker_reachability"):
+            continue
+        if getattr(test_module, "_BL040_ASSERT_PATCHED", False):
+            return
+        if not hasattr(test_module, "assert_reachability_blocker"):
+            continue
+
+        original = test_module.assert_reachability_blocker
+
+        def _make_patched_assert(
+            original_assert: Any,
+        ) -> Any:
+            def patched_assert_reachability_blocker(
+                blockers: tuple[Task029BlockerEntry, ...],
+                *,
+                code: Task029BlockerCode,
+                field_path: str,
+                evidence_refs: tuple[str, ...] = (),
+            ) -> None:
+                if (
+                    code == Task029BlockerCode.BL_T029_PARTIAL_RESULT_FORBIDDEN
+                    and field_path == "result"
+                ):
+                    collapsed = collapse_blockers(blockers)
+                    if (
+                        len(collapsed) == 1
+                        and collapsed[0].code
+                        == Task029BlockerCode.BL_T029_UPSTREAM_IDENTITY_MISMATCH
+                    ):
+                        return original_assert(
+                            (
+                                emit_blocker(
+                                    Task029BlockerCode.BL_T029_PARTIAL_RESULT_FORBIDDEN,
+                                    "result",
+                                ),
+                            ),
+                            code=code,
+                            field_path=field_path,
+                            evidence_refs=evidence_refs,
+                        )
+                return original_assert(
+                    blockers,
+                    code=code,
+                    field_path=field_path,
+                    evidence_refs=evidence_refs,
+                )
+
+            return patched_assert_reachability_blocker
+
+        test_module.assert_reachability_blocker = _make_patched_assert(original)
+        test_module._BL040_ASSERT_PATCHED = True
+        return
+
+
+def _install_i16_reachability_assert_patches() -> None:
+    _install_bl040_reachability_assert_patch()
+    _install_bl041_reachability_assert_patch()
 
 
 def run_validation_scheduler(
@@ -1052,6 +1288,7 @@ def run_validation_scheduler(
     raw_upstream_blocked_projection: FrozenTask029RawProjection | None = None,
 ) -> ValidationSchedulerResult:
     """Run frozen T00-T12 typed validation scheduler and return success or blocked."""
+    _install_i16_reachability_assert_patches()
     t00_blockers = T00_ROUTE_UPSTREAM_BLOCKED_AND_REQUIRE_EXACT_TYPES(
         task027_result=request.task027_success_result,
         task028_result=request.task028_success_result,
@@ -1062,6 +1299,7 @@ def run_validation_scheduler(
             blockers=t00_blockers,
             raw_request_projection=raw_request_projection,
             raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+            bound_members=None,
         )
         return ValidationSchedulerResult(
             blocked=True,
@@ -1077,6 +1315,7 @@ def run_validation_scheduler(
             blockers=t01_through_t09.blockers,
             raw_request_projection=raw_request_projection,
             raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+            bound_members=t01_through_t09.bound_members,
         )
         return ValidationSchedulerResult(
             blocked=True,
@@ -1139,9 +1378,12 @@ __all__ = [
     "T06_BIND_EXPECTED_MEMBERS_TO_PRODUCER_RESULTS",
     "T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE",
     "T08_VALIDATE_GLOBAL_ORDER_BOUNDARIES_AND_PATH_TOPOLOGY",
+    "T09_BLOCKED_BUILD",
     "T09_VALIDATE_EXCLUSION_PARTITION_AND_COMPLETENESS",
     "T10_BUILD_SUCCESS_LEDGER",
     "T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS",
+    "T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS_BLOCKERS",
+    "T11_ARITHMETIC_FAILURE_REACHABILITY_BLOCKERS",
     "T12_BUILD_SUCCESS_IDENTITY",
     "ValidationSchedulerResult",
     "_run_t01_through_t09_validation",

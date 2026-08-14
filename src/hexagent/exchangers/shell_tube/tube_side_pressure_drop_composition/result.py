@@ -14,6 +14,10 @@ from __future__ import annotations
 from dataclasses import replace
 from decimal import Decimal
 
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.blocker_registry import (
+    collapse_blockers,
+    emit_blocker,
+)
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonical import (
     IMPLEMENTATION_SOFTWARE_VERSION,
     LEDGER_EXCLUSION_EVIDENCE_SCHEMA_VERSION,
@@ -29,6 +33,7 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums im
     ExclusionStatus,
     MemberStatus,
     ProducerTask,
+    Task029BlockerCode,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.identity import (
     compute_blocked_result_hash,
@@ -178,8 +183,25 @@ def build_blocked_result(
     raw_upstream_blocked_projection: FrozenTask029RawProjection | None,
     blockers: tuple[Task029BlockerEntry, ...],
     provenance: Task029Provenance | None = None,
+    attempted_completeness_ledger: TubeSidePressurePathCompletenessLedger | None = None,
+    attempted_modeled_total_tube_side_pressure_drop_pa: Decimal | None = None,
+    attempted_partial_engineering: bool = False,
 ) -> Task029BlockedResult:
     """Build a frozen Task029BlockedResult with computed hash and ID."""
+    partial_exposure_attempted = attempted_partial_engineering or (
+        attempted_completeness_ledger is not None
+        or attempted_modeled_total_tube_side_pressure_drop_pa is not None
+    )
+    if partial_exposure_attempted:
+        blockers = collapse_blockers(
+            (
+                emit_blocker(
+                    Task029BlockerCode.BL_T029_PARTIAL_RESULT_FORBIDDEN,
+                    "result",
+                ),
+            )
+        )
+
     if len(blockers) == 0:
         msg = "typed blocked result must have non-empty blockers"
         raise ValueError(msg)
