@@ -8,23 +8,35 @@ from typing import Any
 from unittest.mock import patch
 
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
-    BlockerCode as Task027BlockerCode,
+    TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
     Task027BlockedResult,
     Task027RawBoundaryBlockedResult,
     Task027SuccessResult,
     build_task027_blocked_result,
-    compute_result_hash as t027_compute_result_hash,
-    derive_result_id as t027_derive_result_id,
-    emit_blocker as t027_emit_blocker,
-    get_blocker_message as t027_get_blocker_message,
-    validate_raw_boundary as validate_task027_raw_boundary,
 )
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
-    TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
+    BlockerCode as Task027BlockerCode,
+)
+from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
+    compute_result_hash as t027_compute_result_hash,
+)
+from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
+    derive_result_id as t027_derive_result_id,
+)
+from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
+    emit_blocker as t027_emit_blocker,
+)
+from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
+    get_blocker_message as t027_get_blocker_message,
+)
+from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
+    validate_raw_boundary as validate_task027_raw_boundary,
 )
 from hexagent.exchangers.shell_tube.tube_side.provenance import FrozenProvenance
 from hexagent.exchangers.shell_tube.tube_side_local_loss.blocker_registry import (
     Task028BlockerCode,
+)
+from hexagent.exchangers.shell_tube.tube_side_local_loss.blocker_registry import (
     emit_blocker as t028_emit_blocker,
 )
 from hexagent.exchangers.shell_tube.tube_side_local_loss.canonical import (
@@ -43,8 +55,14 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
     Task028Provenance,
     Task028RawBoundaryBlockedResult,
     Task028SuccessResult,
+)
+from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
     build_blocked_result as build_task028_blocked_result,
+)
+from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
     build_raw_boundary_blocked_result as build_task028_raw_boundary_blocked_result,
+)
+from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
     build_success_result as build_t028_success,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.blocker_registry import (
@@ -76,6 +94,9 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models i
     TubeSidePressurePathExclusionAuthority,
     TubeSidePressurePathMemberAuthority,
 )
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_binding import (
+    BindingResult,
+)
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.pipeline import (
     compute_task029_composition,
 )
@@ -85,8 +106,9 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.raw_boun
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.request import (
     build_task029_request,
 )
-from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_binding import (
-    BindingResult,
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.upstream_replay import (
+    replay_task027_success,
+    replay_task028_success,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.validation import (
     T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES,
@@ -95,10 +117,6 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.validati
     T08_VALIDATE_GLOBAL_ORDER_BOUNDARIES_AND_PATH_TOPOLOGY,
     T09_VALIDATE_EXCLUSION_PARTITION_AND_COMPLETENESS,
     run_validation_scheduler,
-)
-from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.upstream_replay import (
-    replay_task027_success,
-    replay_task028_success,
 )
 from tests.exchangers.shell_tube.task029_frozen_vectors import (
     EXCLUSION_AUTHORITY_FIXTURES,
@@ -344,9 +362,7 @@ def assert_reachability_blocker(
     """Assert exact blocker identity, collapse order, and frozen evidence refs."""
     assert blockers == collapse_blockers(blockers), "blockers must be deterministically ordered"
     matches = [
-        blocker
-        for blocker in blockers
-        if blocker.code == code and blocker.field_path == field_path
+        blocker for blocker in blockers if blocker.code == code and blocker.field_path == field_path
     ]
     assert matches, (
         f"expected {code.value} at {field_path!r}, got "
