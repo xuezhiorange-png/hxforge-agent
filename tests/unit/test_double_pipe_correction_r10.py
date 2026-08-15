@@ -10,7 +10,10 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import math
+from collections.abc import Iterator
 from unittest.mock import MagicMock
 
 import pytest
@@ -518,11 +521,34 @@ class TestVerifierStatefulRules:
 # =========================================================================
 
 
+_CURRENT_EVALUATION_ROLE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "_CURRENT_EVALUATION_ROLE",
+    default=None,
+)
+
+
+@contextlib.contextmanager
+def _track_evaluation_roles() -> Iterator[None]:
+    """Expose the active EvaluationRole to selective provider mocks."""
+    original_begin = EvaluationRecorder.begin
+
+    def _begin_with_role(self, role, trial_q_w=None):
+        _CURRENT_EVALUATION_ROLE.set(role)
+        return original_begin(self, role, trial_q_w)
+
+    EvaluationRecorder.begin = _begin_with_role
+    try:
+        yield
+    finally:
+        EvaluationRecorder.begin = original_begin
+
+
 def _make_final_only_cold_ph_fail(provider: CoolPropProvider) -> MagicMock:
     """Provider that fails cold PH only on FINAL_EVALUATION.
 
-    Uses a call counter: succeeds for the first N calls, then fails
-    on cold-side state_ph (P == 150000.0) for subsequent calls.
+    Solver-phase property calls succeed so the solver converges first.
+    Failure injection is keyed to EvaluationRole.FINAL_EVALUATION rather
+    than a brittle global state_ph call count.
     """
     mock = MagicMock()
     mock.name = provider.name
@@ -533,18 +559,13 @@ def _make_final_only_cold_ph_fail(provider: CoolPropProvider) -> MagicMock:
     real_ph = provider.state_ph
     mock.state_tp.side_effect = real_tp
 
-    call_count = [0]
-
     def _selective_ph(fluid, P, h, reference_state=None):
-        call_count[0] += 1
         state = real_ph(fluid, P, h, reference_state=reference_state)
-        # Fail cold PH on the final evaluation (after solver converged).
-        # The final evaluation is the last PH call batch.
-        # We detect it by checking if we've had enough prior calls.
-        # With standard conditions: ~4 bracket probes + ~12 solver iterations
-        # = ~35 PH calls before final evaluation. Threshold of 37 ensures
-        # only the final evaluation's cold PH call triggers the failure.
-        if fluid.name == "Water" and P == 150000.0 and call_count[0] >= 37:
+        if (
+            _CURRENT_EVALUATION_ROLE.get() == EvaluationRole.FINAL_EVALUATION.value
+            and fluid.name == "Water"
+            and P == 150000.0
+        ):
             from hexagent.properties.base import PropertyErrorCode
             from hexagent.properties.errors import PropertyServiceError
 
@@ -566,7 +587,8 @@ class TestFinalEvaluationPartialBlocked:
         converged=True, solver converged, diagnostics preserved.
         """
         mock_provider = _make_final_only_cold_ph_fail(provider)
-        result = _run_rating(mock_provider)
+        with _track_evaluation_roles():
+            result = _run_rating(mock_provider)
 
         # Status should be BLOCKED (final evaluation failed)
         assert result.status == RatingStatus.BLOCKED
