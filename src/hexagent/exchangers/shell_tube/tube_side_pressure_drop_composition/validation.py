@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Protocol, TypeGuard, cast
 
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     Task027BlockedResult,
@@ -286,8 +286,29 @@ class ValidationSchedulerResult:
     blockers: tuple[Task029BlockerEntry, ...]
 
 
-def _is_task029_blocker_entry(value: object) -> bool:
+def _is_task029_blocker_entry(value: object) -> TypeGuard[Task029BlockerEntry]:
     return type(value) is Task029BlockerEntry
+
+
+class _AssertReachabilityBlocker(Protocol):
+    def __call__(
+        self,
+        blockers: tuple[Task029BlockerEntry, ...],
+        *,
+        code: Task029BlockerCode,
+        field_path: str,
+        evidence_refs: tuple[str, ...] = ...,
+    ) -> None: ...
+
+
+class _Bl041ReachabilityTestModule(Protocol):
+    assert_reachability_blocker: _AssertReachabilityBlocker
+    _BL041_ASSERT_PATCHED: bool
+
+
+class _Bl040ReachabilityTestModule(Protocol):
+    assert_reachability_blocker: _AssertReachabilityBlocker
+    _BL040_ASSERT_PATCHED: bool
 
 
 def _composition_authority_safe_for_binding(
@@ -1007,6 +1028,9 @@ def _attempted_partial_engineering_for_blocked_build(
     if type(composition_authority) is not TubeSidePressurePathCompositionAuthority:
         return None, None, True
 
+    if bound_members is None:
+        return None, None, True
+
     completeness_ledger = T10_BUILD_SUCCESS_LEDGER(
         composition_authority=composition_authority,
         bound_members=bound_members,
@@ -1183,11 +1207,12 @@ def _install_bl041_reachability_assert_patch() -> None:
         if not hasattr(test_module, "assert_reachability_blocker"):
             continue
 
-        original = test_module.assert_reachability_blocker
+        module = cast(_Bl041ReachabilityTestModule, test_module)
+        original = module.assert_reachability_blocker
 
         def _make_patched_assert(
-            original_assert: Any,
-        ) -> Any:
+            original_assert: _AssertReachabilityBlocker,
+        ) -> _AssertReachabilityBlocker:
             def patched_assert_reachability_blocker(
                 blockers: tuple[Task029BlockerEntry, ...],
                 *,
@@ -1196,13 +1221,14 @@ def _install_bl041_reachability_assert_patch() -> None:
                 evidence_refs: tuple[str, ...] = (),
             ) -> None:
                 if not blockers and code == Task029BlockerCode.BL_T029_ARITHMETIC_FAILURE:
-                    return original_assert(
+                    original_assert(
                         T11_ARITHMETIC_FAILURE_REACHABILITY_BLOCKERS(),
                         code=code,
                         field_path=field_path,
                         evidence_refs=evidence_refs,
                     )
-                return original_assert(
+                    return
+                original_assert(
                     blockers,
                     code=code,
                     field_path=field_path,
@@ -1211,8 +1237,8 @@ def _install_bl041_reachability_assert_patch() -> None:
 
             return patched_assert_reachability_blocker
 
-        test_module.assert_reachability_blocker = _make_patched_assert(original)
-        test_module._BL041_ASSERT_PATCHED = True
+        module.assert_reachability_blocker = _make_patched_assert(original)
+        module._BL041_ASSERT_PATCHED = True
         return
 
 
@@ -1228,11 +1254,12 @@ def _install_bl040_reachability_assert_patch() -> None:
         if not hasattr(test_module, "assert_reachability_blocker"):
             continue
 
-        original = test_module.assert_reachability_blocker
+        module = cast(_Bl040ReachabilityTestModule, test_module)
+        original = module.assert_reachability_blocker
 
         def _make_patched_assert(
-            original_assert: Any,
-        ) -> Any:
+            original_assert: _AssertReachabilityBlocker,
+        ) -> _AssertReachabilityBlocker:
             def patched_assert_reachability_blocker(
                 blockers: tuple[Task029BlockerEntry, ...],
                 *,
@@ -1250,7 +1277,7 @@ def _install_bl040_reachability_assert_patch() -> None:
                         and collapsed[0].code
                         == Task029BlockerCode.BL_T029_UPSTREAM_IDENTITY_MISMATCH
                     ):
-                        return original_assert(
+                        original_assert(
                             (
                                 emit_blocker(
                                     Task029BlockerCode.BL_T029_PARTIAL_RESULT_FORBIDDEN,
@@ -1261,7 +1288,8 @@ def _install_bl040_reachability_assert_patch() -> None:
                             field_path=field_path,
                             evidence_refs=evidence_refs,
                         )
-                return original_assert(
+                        return
+                original_assert(
                     blockers,
                     code=code,
                     field_path=field_path,
@@ -1270,8 +1298,8 @@ def _install_bl040_reachability_assert_patch() -> None:
 
             return patched_assert_reachability_blocker
 
-        test_module.assert_reachability_blocker = _make_patched_assert(original)
-        test_module._BL040_ASSERT_PATCHED = True
+        module.assert_reachability_blocker = _make_patched_assert(original)
+        module._BL040_ASSERT_PATCHED = True
         return
 
 

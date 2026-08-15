@@ -341,6 +341,12 @@ def _sort_member_evidence(
     return tuple(sorted(member_evidence, key=lambda evidence: evidence.global_path_sequence_index))
 
 
+def _sort_exclusion_evidence(
+    exclusion_evidence: tuple[TubeSidePressurePathLedgerExclusionEvidence, ...],
+) -> tuple[TubeSidePressurePathLedgerExclusionEvidence, ...]:
+    return tuple(sorted(exclusion_evidence, key=lambda evidence: evidence.exclusion_id))
+
+
 def build_completeness_ledger(
     *,
     composition_authority: TubeSidePressurePathCompositionAuthority,
@@ -349,7 +355,7 @@ def build_completeness_ledger(
 ) -> TubeSidePressurePathCompletenessLedger:
     """Assemble verified 12-field completeness ledger with deterministic evidence ordering."""
     ordered_member_evidence = _sort_member_evidence(member_evidence)
-    ordered_exclusion_evidence = sort_exclusion_authorities(exclusion_evidence)
+    ordered_exclusion_evidence = _sort_exclusion_evidence(exclusion_evidence)
 
     expected_member_count = len(composition_authority.member_authorities)
     observed_member_count = len(ordered_member_evidence)

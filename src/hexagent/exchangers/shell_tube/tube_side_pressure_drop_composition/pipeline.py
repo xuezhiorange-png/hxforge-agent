@@ -59,11 +59,11 @@ def compute_task029_composition(
         raw_upstream_blocked_projection=raw_upstream_blocked_projection,
     )
     if scheduler_result.blocked:
-        blocked_result = scheduler_result.blocked_result
-        if blocked_result is None:
+        typed_blocked_result = scheduler_result.blocked_result
+        if typed_blocked_result is None:
             msg = "scheduler blocked path requires Task029BlockedResult"
             raise ValueError(msg)
-        return blocked_result
+        return typed_blocked_result
 
     success_result = scheduler_result.success_result
     if success_result is None:

@@ -68,6 +68,7 @@ def build_member_evidence(
     member_authority = bound_member.member_authority
     if bound_member.producer_task == ProducerTask.TASK_028:
         component_result = bound_member.task028_component_result
+        assert component_result is not None
         producer_component_type = component_result.component_type.value
     else:
         producer_component_type = member_authority.expected_producer_component_type
