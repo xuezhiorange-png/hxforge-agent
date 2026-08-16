@@ -20,6 +20,15 @@ from dataclasses import dataclass
 from decimal import Context, Decimal, localcontext
 from typing import Any, Final
 
+from hexagent.exchangers.shell_tube.tube_side.provenance import FrozenProvenance
+from hexagent.exchangers.shell_tube.tube_side.valid_result import Task025ValidResult
+from hexagent.exchangers.shell_tube.tube_side_thermal import PhaseRegion
+from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import (
+    PropertySnapshot,
+    recompute_property_snapshot_hash,
+)
+from hexagent.exchangers.shell_tube.tube_side_thermal.result import TubeSideThermalResult
+
 _WORKING_PRECISION: Final[int] = 28
 
 
@@ -1598,6 +1607,366 @@ assert len(TASK027_REQUEST_FIELDS) == REQUEST_FIELD_COUNT, (
 # §15.7 — Result ID constants
 # ---------------------------------------------------------------------------
 RESULT_ID_NAMESPACE_UUID: Final[uuid.UUID] = uuid.UUID(RESULT_ID_NAMESPACE)
+
+
+# ---------------------------------------------------------------------------
+# P00-P09 — Typed production orchestration entry
+# ---------------------------------------------------------------------------
+_TASK027_FROZEN_INPUT_EVIDENCE_REFS: Final[tuple[str, ...]] = (
+    "github-issue:xuezhiorange-png/hxforge-agent#167",
+    "github-issue:xuezhiorange-png/hxforge-agent#168",
+    "github-comment:xuezhiorange-png/hxforge-agent#168:5165576642",
+    "git-commit:5038cbd2b8f296592dc3fbe91dd01bb360fb5510",
+    "repo-path:src/hexagent/exchangers/shell_tube/tube_side/valid_result.py@5038cbd2b8f296592dc3fbe91dd01bb360fb5510",
+    "repo-path:src/hexagent/exchangers/shell_tube/tube_side_thermal/result.py@5038cbd2b8f296592dc3fbe91dd01bb360fb5510",
+)
+
+
+def _map_property_snapshot_phase(phase_region: PhaseRegion) -> str:
+    """Map TASK-026 phase_region to TASK-027 liquid/gas representation."""
+    if phase_region == PhaseRegion.SINGLE_PHASE_LIQUID:
+        return PhaseType.LIQUID.value
+    if phase_region == PhaseRegion.SINGLE_PHASE_GAS:
+        return PhaseType.GAS.value
+    return phase_region.value
+
+
+def _assertion_enum_value(assertion: AssertionState) -> str:
+    return assertion.value
+
+
+def _flow_direction_enum_value(assertion: FlowDirectionAssertion) -> str:
+    return assertion.value
+
+
+def _build_task027_frozen_provenance(
+    *,
+    task025_result: Task025ValidResult,
+    task026_result: TubeSideThermalResult,
+    property_snapshot: PropertySnapshot,
+) -> FrozenProvenance:
+    return FrozenProvenance(
+        task_id="TASK-027",
+        design_contract_path="github-issue:xuezhiorange-png/hxforge-agent#168",
+        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
+        input_evidence_refs=_TASK027_FROZEN_INPUT_EVIDENCE_REFS,
+        upstream_identity_hashes=(
+            task025_result.hydraulic_authority_hash,
+            task025_result.result_hash,
+            task026_result.result_hash,
+            property_snapshot.property_snapshot_hash,
+        ),
+    )
+
+
+def _build_production_blocked_result(
+    *,
+    profile_id: str,
+    blockers: list[Task027BlockerEntry],
+    task025_result: Task025ValidResult,
+    task026_result: TubeSideThermalResult,
+    property_snapshot_hash: str,
+    request_hash: str,
+    provenance: FrozenProvenance,
+) -> Task027BlockedResult:
+    return build_task027_blocked_result(
+        profile_id=profile_id,
+        request_hash=request_hash,
+        task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+        task025_result_hash=task025_result.result_hash,
+        task026_result_hash=task026_result.result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        raw_request_projection=None,
+        raw_upstream_blocked_projection=None,
+        warnings=(),
+        blockers=tuple(blockers),
+        deferred_capabilities=(),
+        provenance=provenance,
+    )
+
+
+def compute_task027_friction_pressure_drop(
+    *,
+    task025_result: Task025ValidResult,
+    task026_result: TubeSideThermalResult,
+    property_snapshot: PropertySnapshot,
+    constant_density_path_assertion: AssertionState,
+    zero_net_elevation_change_assertion: AssertionState,
+    flow_direction_assertion: FlowDirectionAssertion,
+    roughness_authority: RoughnessAuthority,
+    profile_id: str = "profile-001",
+) -> Task027SuccessResult | Task027BlockedResult:
+    """C00-C10 typed production orchestration for TASK-027 friction pressure drop."""
+    # C00 — typed/profile/materializability gate
+    if not isinstance(task025_result, Task025ValidResult):
+        raise TypeError("task025_result must be Task025ValidResult")
+    if not isinstance(task026_result, TubeSideThermalResult):
+        raise TypeError("task026_result must be TubeSideThermalResult")
+    if not isinstance(property_snapshot, PropertySnapshot):
+        raise TypeError("property_snapshot must be PropertySnapshot")
+    if not isinstance(constant_density_path_assertion, AssertionState):
+        raise TypeError("constant_density_path_assertion must be AssertionState")
+    if not isinstance(zero_net_elevation_change_assertion, AssertionState):
+        raise TypeError("zero_net_elevation_change_assertion must be AssertionState")
+    if not isinstance(flow_direction_assertion, FlowDirectionAssertion):
+        raise TypeError("flow_direction_assertion must be FlowDirectionAssertion")
+    if not isinstance(roughness_authority, (AbsoluteRoughnessAuthority, SmoothRoughnessAuthority)):
+        raise TypeError("roughness_authority must be RoughnessAuthority")
+    if profile_id not in SUPPORTED_PROFILE_IDS:
+        raise ValueError(f"profile_id must be one of {SUPPORTED_PROFILE_IDS}")
+
+    # C01 — request identity (supplied bindings only)
+    request_hash = compute_request_hash(
+        schema_version=TASK027_REQUEST_SCHEMA_VERSION,
+        profile_id=profile_id,
+        task025_result_hash=task025_result.result_hash,
+        task026_result_hash=task026_result.result_hash,
+        property_snapshot_hash=property_snapshot.property_snapshot_hash,
+        constant_density_assertion=_assertion_enum_value(constant_density_path_assertion),
+        zero_elevation_assertion=_assertion_enum_value(zero_net_elevation_change_assertion),
+        flow_direction_assertion=_flow_direction_enum_value(flow_direction_assertion),
+        roughness_authority_hash=roughness_authority.authority_hash,
+    )
+    _ = Task027Request(
+        schema_version=TASK027_REQUEST_SCHEMA_VERSION,
+        profile_id=profile_id,
+        task025_valid_result=task025_result,
+        task026_success_result=task026_result,
+        property_snapshot=property_snapshot,
+        property_snapshot_hash=property_snapshot.property_snapshot_hash,
+        constant_density_path_assertion=constant_density_path_assertion,
+        zero_net_elevation_change_assertion=zero_net_elevation_change_assertion,
+        flow_direction_assertion=flow_direction_assertion,
+        roughness_authority=roughness_authority,
+        request_hash=request_hash,
+    )
+
+    # C02 — FrozenProvenance (supplied producer bindings)
+    provenance = _build_task027_frozen_provenance(
+        task025_result=task025_result,
+        task026_result=task026_result,
+        property_snapshot=property_snapshot,
+    )
+
+    # C03 — upstream identity binding
+    if task026_result.upstream_geometry_hash != task025_result.hydraulic_authority_hash:
+        return _build_production_blocked_result(
+            profile_id=profile_id,
+            blockers=[
+                emit_blocker(
+                    BlockerCode.BL_T027_UPSTREAM_IDENTITY_MISMATCH,
+                    "upstream_geometry_hash",
+                    get_blocker_message(BlockerCode.BL_T027_UPSTREAM_IDENTITY_MISMATCH),
+                )
+            ],
+            task025_result=task025_result,
+            task026_result=task026_result,
+            property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
+        )
+
+    # C04 — property-snapshot three-way binding
+    recomputed_property_snapshot_hash = recompute_property_snapshot_hash(property_snapshot)
+    if not (
+        recomputed_property_snapshot_hash
+        == property_snapshot.property_snapshot_hash
+        == task026_result.property_snapshot_hash
+    ):
+        return _build_production_blocked_result(
+            profile_id=profile_id,
+            blockers=[
+                emit_blocker(
+                    BlockerCode.BL_T027_PROPERTY_SNAPSHOT_HASH_MISMATCH,
+                    "property_snapshot_hash",
+                    get_blocker_message(BlockerCode.BL_T027_PROPERTY_SNAPSHOT_HASH_MISMATCH),
+                )
+            ],
+            task025_result=task025_result,
+            task026_result=task026_result,
+            property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
+        )
+
+    # C05 — applicability
+    applicability_blockers = validate_applicability(
+        phase=_map_property_snapshot_phase(property_snapshot.phase_region),
+        rheology=RheologyType.NEWTONIAN.value,
+        constant_density_assertion=constant_density_path_assertion,
+        zero_elevation_assertion=zero_net_elevation_change_assertion,
+        flow_direction=flow_direction_assertion,
+    )
+    if applicability_blockers:
+        return _build_production_blocked_result(
+            profile_id=profile_id,
+            blockers=applicability_blockers,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
+        )
+
+    # C06 — roughness authority
+    validated_roughness, roughness_blockers = validate_roughness_authority(
+        roughness_authority,
+        roughness_authority.authority_hash,
+    )
+    if roughness_blockers:
+        return _build_production_blocked_result(
+            profile_id=profile_id,
+            blockers=roughness_blockers,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
+        )
+    assert validated_roughness is not None
+
+    if isinstance(validated_roughness, SmoothRoughnessAuthority):
+        relative_roughness = Decimal(0)
+    else:
+        quantized_absolute = quantize_roughness(validated_roughness.absolute_roughness_m)
+        relative_roughness = compute_relative_roughness(
+            quantized_absolute,
+            task025_result.hydraulic_diameter_m,
+        )
+        rr_blockers = validate_relative_roughness(relative_roughness)
+        if rr_blockers:
+            return _build_production_blocked_result(
+                profile_id=profile_id,
+                blockers=rr_blockers,
+                task025_result=task025_result,
+                task026_result=task026_result,
+                property_snapshot_hash=property_snapshot.property_snapshot_hash,
+                request_hash=request_hash,
+                provenance=provenance,
+            )
+
+    # C07 — Reynolds / friction factor
+    reynolds = task026_result.reynolds_number
+    re_blockers = validate_reynolds(reynolds)
+    if re_blockers:
+        return _build_production_blocked_result(
+            profile_id=profile_id,
+            blockers=re_blockers,
+            task025_result=task025_result,
+            task026_result=task026_result,
+            property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
+        )
+
+    regime = classify_reynolds(reynolds)
+    friction_factor_raw: Decimal
+    if regime == "laminar":
+        friction_factor_raw = compute_laminar_friction_factor(reynolds)
+    elif regime == "turbulent":
+        turbulent_factor, turbulent_blockers = compute_turbulent_friction_factor_safe(
+            reynolds=reynolds,
+            relative_roughness=relative_roughness,
+        )
+        if turbulent_blockers:
+            return _build_production_blocked_result(
+                profile_id=profile_id,
+                blockers=turbulent_blockers,
+                task025_result=task025_result,
+                task026_result=task026_result,
+                property_snapshot_hash=property_snapshot.property_snapshot_hash,
+                request_hash=request_hash,
+                provenance=provenance,
+            )
+        if turbulent_factor is None:
+            return _build_production_blocked_result(
+                profile_id=profile_id,
+                blockers=[
+                    emit_blocker(
+                        BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE,
+                        "compute_colebrook_white",
+                        get_blocker_message(BlockerCode.BL_T027_TURBULENT_SOLVER_FAILURE),
+                    )
+                ],
+                task025_result=task025_result,
+                task026_result=task026_result,
+                property_snapshot_hash=property_snapshot.property_snapshot_hash,
+                request_hash=request_hash,
+                provenance=provenance,
+            )
+        friction_factor_raw = turbulent_factor
+    else:
+        return _build_production_blocked_result(
+            profile_id=profile_id,
+            blockers=[
+                emit_blocker(
+                    BlockerCode.BL_T027_UNSUPPORTED_REYNOLDS_REGIME,
+                    "reynolds_number",
+                    get_blocker_message(BlockerCode.BL_T027_UNSUPPORTED_REYNOLDS_REGIME),
+                )
+            ],
+            task025_result=task025_result,
+            task026_result=task026_result,
+            property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
+        )
+
+    # C08 — frozen public friction-factor quantization
+    ctx = _task027_decimal_context()
+    with localcontext(ctx):
+        darcy_friction_factor = friction_factor_raw.quantize(FRICTION_FACTOR_QUANTUM)
+
+    # C09 — Darcy pressure drop + reference-plane binding
+    friction_length_m = task025_result.internal_flow_authority.length_m
+    upstream_reference_plane = task025_result.internal_flow_authority.start_plane.start.value
+    downstream_reference_plane = task025_result.internal_flow_authority.end_plane.end.value
+    pressure_drop_raw = compute_pressure_drop(
+        darcy_friction_factor=darcy_friction_factor,
+        friction_length_m=friction_length_m,
+        hydraulic_diameter_m=task025_result.hydraulic_diameter_m,
+        density_kg_m3=property_snapshot.density_kg_m3,
+        bulk_velocity_m_s=task026_result.bulk_velocity_m_s,
+    )
+    with localcontext(ctx):
+        straight_tube_friction_pressure_drop_pa = pressure_drop_raw.quantize(PRESSURE_DROP_QUANTUM)
+
+    # C10 — success identity (reuse C01 request_hash and C02 provenance)
+    result_hash = compute_result_hash(
+        schema_version=TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
+        profile_id=profile_id,
+        request_hash=request_hash,
+        darcy_friction_factor=str(darcy_friction_factor),
+        friction_length_m=str(friction_length_m),
+        upstream_reference_plane=upstream_reference_plane,
+        downstream_reference_plane=downstream_reference_plane,
+        straight_tube_friction_pressure_drop_pa=str(straight_tube_friction_pressure_drop_pa),
+        task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+        task025_result_hash=task025_result.result_hash,
+        task026_result_hash=task026_result.result_hash,
+        property_snapshot_hash=property_snapshot.property_snapshot_hash,
+    )
+    result_id = derive_result_id(result_hash)
+    return Task027SuccessResult(
+        schema_version=TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
+        profile_id=profile_id,
+        request_hash=request_hash,
+        result_hash=result_hash,
+        result_id=result_id,
+        task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+        task025_result_hash=task025_result.result_hash,
+        task026_result_hash=task026_result.result_hash,
+        property_snapshot_hash=property_snapshot.property_snapshot_hash,
+        darcy_friction_factor=darcy_friction_factor,
+        friction_length_m=friction_length_m,
+        upstream_reference_plane=upstream_reference_plane,
+        downstream_reference_plane=downstream_reference_plane,
+        straight_tube_friction_pressure_drop_pa=straight_tube_friction_pressure_drop_pa,
+        warnings=(),
+        blockers=(),
+        deferred_capabilities=(),
+        provenance=provenance,
+    )
 
 
 __all__ = [
