@@ -429,6 +429,23 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
+      - name: Install TASK029 cross-version runtimes
+        if: matrix.name == 'ci'
+        shell: bash
+        run: |
+          uv python install 3.11 3.12
+
+          PY311="$(uv python find 3.11)"
+          PY312="$(uv python find 3.12)"
+
+          test -x "${PY311}"
+          test -x "${PY312}"
+
+          test "$("${PY311}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.11"
+          test "$("${PY312}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
+
+          echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
+          echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
       - name: Run shard with real telemetry
         id: pytest
         env:
