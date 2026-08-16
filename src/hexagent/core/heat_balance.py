@@ -2943,6 +2943,7 @@ def _handle_zero_duty(
             status=status,
             duty_w=0.0 if not has_blockers else None,
             acceptance_basis=acceptance_basis,
+            solver_converged=solver_converged,
         )
     )
 
