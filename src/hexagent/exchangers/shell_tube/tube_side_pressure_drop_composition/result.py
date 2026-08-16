@@ -1,0 +1,303 @@
+"""TASK-029 ledger evidence projection and result builders.
+
+I11 / T10: pure projection of validated bound members and exclusion authorities
+into frozen ledger evidence records.
+
+I13B: success result builder using I13A identity primitives.
+I13C: typed blocked result builder using I13A identity primitives.
+I13D: raw-boundary blocked result builder (6-field contract, no result hash/ID).
+I13E: provenance builder for success-path frozen provenance records.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from decimal import Decimal
+
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.blocker_registry import (
+    collapse_blockers,
+    emit_blocker,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonical import (
+    IMPLEMENTATION_SOFTWARE_VERSION,
+    LEDGER_EXCLUSION_EVIDENCE_SCHEMA_VERSION,
+    LEDGER_MEMBER_EVIDENCE_SCHEMA_VERSION,
+    SUCCESS_PROVENANCE_UPSTREAM_HASH_ORDER,
+    TASK029_BLOCKED_RESULT_SCHEMA_VERSION,
+    TASK029_DEFERRED_CAPABILITIES_V1,
+    TASK029_DESIGN_CONTRACT_PATH,
+    TASK029_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
+    TASK029_SUCCESS_RESULT_SCHEMA_VERSION,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.enums import (
+    ExclusionStatus,
+    MemberStatus,
+    ProducerTask,
+    Task029BlockerCode,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.identity import (
+    compute_blocked_result_hash,
+    compute_ledger_hash,
+    compute_success_result_hash,
+    derive_result_id,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models import (
+    FrozenTask029RawProjection,
+    Task029BlockedResult,
+    Task029BlockerEntry,
+    Task029Provenance,
+    Task029RawBoundaryBlockedResult,
+    Task029SuccessResult,
+    TubeSidePressurePathCompletenessLedger,
+    TubeSidePressurePathExclusionAuthority,
+    TubeSidePressurePathLedgerExclusionEvidence,
+    TubeSidePressurePathLedgerMemberEvidence,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.path_binding import (
+    BoundPressurePathMember,
+)
+
+
+def build_member_evidence(
+    bound_member: BoundPressurePathMember,
+    *,
+    observed_multiplicity: int,
+    pressure_contribution_pa: Decimal,
+) -> TubeSidePressurePathLedgerMemberEvidence:
+    """Project a T06-bound member into frozen 16-field ledger member evidence."""
+    member_authority = bound_member.member_authority
+    if bound_member.producer_task == ProducerTask.TASK_028:
+        component_result = bound_member.task028_component_result
+        assert component_result is not None
+        producer_component_type = component_result.component_type.value
+    else:
+        producer_component_type = member_authority.expected_producer_component_type
+
+    return TubeSidePressurePathLedgerMemberEvidence(
+        schema_version=LEDGER_MEMBER_EVIDENCE_SCHEMA_VERSION,
+        member_id=member_authority.member_id,
+        global_path_sequence_index=member_authority.global_path_sequence_index,
+        producer_task=bound_member.producer_task,
+        producer_result_hash=bound_member.producer_result_hash,
+        producer_member_kind=member_authority.producer_member_kind,
+        producer_component_identity=bound_member.producer_component_identity,
+        producer_component_type=producer_component_type,
+        producer_authority_hash=bound_member.producer_authority_hash,
+        upstream_reference_plane=bound_member.upstream_reference_plane,
+        downstream_reference_plane=bound_member.downstream_reference_plane,
+        expected_multiplicity=bound_member.expected_multiplicity,
+        observed_multiplicity=observed_multiplicity,
+        pressure_contribution_pa=pressure_contribution_pa,
+        composition_member_authority_hash=member_authority.member_authority_hash,
+        member_status=MemberStatus.VERIFIED,
+    )
+
+
+def build_exclusion_evidence(
+    exclusion_authority: TubeSidePressurePathExclusionAuthority,
+) -> TubeSidePressurePathLedgerExclusionEvidence:
+    """Project a T09-validated exclusion authority into frozen 7-field ledger exclusion evidence."""
+    return TubeSidePressurePathLedgerExclusionEvidence(
+        schema_version=LEDGER_EXCLUSION_EVIDENCE_SCHEMA_VERSION,
+        exclusion_id=exclusion_authority.exclusion_id,
+        excluded_item_identity=exclusion_authority.excluded_item_identity,
+        exclusion_reason=exclusion_authority.exclusion_reason,
+        evidence_refs=exclusion_authority.evidence_refs,
+        exclusion_authority_hash=exclusion_authority.exclusion_authority_hash,
+        exclusion_status=ExclusionStatus.VERIFIED_EXCLUSION,
+    )
+
+
+def build_success_result(
+    *,
+    profile_id: str,
+    request_hash: str,
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    composition_authority_hash: str,
+    completeness_ledger: TubeSidePressurePathCompletenessLedger,
+    modeled_total_tube_side_pressure_drop_pa: Decimal,
+    provenance: Task029Provenance,
+) -> Task029SuccessResult:
+    """Build a frozen Task029SuccessResult with computed hash and ID."""
+    if modeled_total_tube_side_pressure_drop_pa <= Decimal("0"):
+        msg = "modeled_total_tube_side_pressure_drop_pa must be positive"
+        raise ValueError(msg)
+
+    replayed_ledger_hash = compute_ledger_hash(completeness_ledger)
+    if replayed_ledger_hash != completeness_ledger.ledger_hash:
+        msg = "completeness_ledger.ledger_hash does not match replay"
+        raise ValueError(msg)
+
+    semantic_result = Task029SuccessResult(
+        schema_version=TASK029_SUCCESS_RESULT_SCHEMA_VERSION,
+        profile_id=profile_id,
+        request_hash=request_hash,
+        result_hash="",
+        result_id="",
+        task027_result_hash=task027_result_hash,
+        task028_result_hash=task028_result_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=property_snapshot_hash,
+        composition_authority_hash=composition_authority_hash,
+        completeness_ledger=completeness_ledger,
+        modeled_total_tube_side_pressure_drop_pa=modeled_total_tube_side_pressure_drop_pa,
+        warnings=(),
+        blockers=(),
+        deferred_capabilities=TASK029_DEFERRED_CAPABILITIES_V1,
+        provenance=provenance,
+    )
+    result_hash = compute_success_result_hash(semantic_result)
+    result_id = derive_result_id(result_hash)
+    return replace(
+        semantic_result,
+        result_hash=result_hash,
+        result_id=result_id,
+    )
+
+
+def _blocked_identity_string(value: str | None) -> str:
+    """Map unavailable typed-blocked identity inputs to the frozen empty-string sentinel."""
+    if value is None:
+        return ""
+    return value
+
+
+def build_blocked_result(
+    *,
+    profile_id: str,
+    request_hash: str | None,
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str | None,
+    composition_authority_hash: str,
+    raw_request_projection: FrozenTask029RawProjection,
+    raw_upstream_blocked_projection: FrozenTask029RawProjection | None,
+    blockers: tuple[Task029BlockerEntry, ...],
+    provenance: Task029Provenance | None = None,
+    attempted_completeness_ledger: TubeSidePressurePathCompletenessLedger | None = None,
+    attempted_modeled_total_tube_side_pressure_drop_pa: Decimal | None = None,
+    attempted_partial_engineering: bool = False,
+) -> Task029BlockedResult:
+    """Build a frozen Task029BlockedResult with computed hash and ID."""
+    partial_exposure_attempted = attempted_partial_engineering or (
+        attempted_completeness_ledger is not None
+        or attempted_modeled_total_tube_side_pressure_drop_pa is not None
+    )
+    if partial_exposure_attempted:
+        blockers = collapse_blockers(
+            (
+                emit_blocker(
+                    Task029BlockerCode.BL_T029_PARTIAL_RESULT_FORBIDDEN,
+                    "result",
+                ),
+            )
+        )
+
+    if len(blockers) == 0:
+        msg = "typed blocked result must have non-empty blockers"
+        raise ValueError(msg)
+
+    semantic_result = Task029BlockedResult(
+        schema_version=TASK029_BLOCKED_RESULT_SCHEMA_VERSION,
+        profile_id=profile_id,
+        request_hash=_blocked_identity_string(request_hash),
+        result_hash="",
+        result_id="",
+        task027_result_hash=task027_result_hash,
+        task028_result_hash=task028_result_hash,
+        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
+        task025_result_hash=task025_result_hash,
+        task026_result_hash=task026_result_hash,
+        property_snapshot_hash=_blocked_identity_string(property_snapshot_hash),
+        composition_authority_hash=composition_authority_hash,
+        raw_request_projection=raw_request_projection,
+        raw_upstream_blocked_projection=raw_upstream_blocked_projection,
+        warnings=(),
+        blockers=blockers,
+        deferred_capabilities=TASK029_DEFERRED_CAPABILITIES_V1,
+        provenance=provenance,
+    )
+    result_hash = compute_blocked_result_hash(semantic_result)
+    result_id = derive_result_id(result_hash)
+    return replace(
+        semantic_result,
+        result_hash=result_hash,
+        result_id=result_id,
+    )
+
+
+_TASK029_PROVENANCE_TASK_ID: str = "TASK-029"
+
+
+def build_provenance(
+    *,
+    input_evidence_refs: tuple[str, ...],
+    task027_result_hash: str,
+    task028_result_hash: str,
+    task025_hydraulic_authority_hash: str,
+    task025_result_hash: str,
+    task026_result_hash: str,
+    property_snapshot_hash: str,
+    composition_authority_hash: str,
+) -> Task029Provenance:
+    """Build a frozen Task029Provenance with fixed task metadata and ordered upstream hashes."""
+    upstream_values_by_field: dict[str, str] = {
+        "task027_result_hash": task027_result_hash,
+        "task028_result_hash": task028_result_hash,
+        "task025_hydraulic_authority_hash": task025_hydraulic_authority_hash,
+        "task025_result_hash": task025_result_hash,
+        "task026_result_hash": task026_result_hash,
+        "property_snapshot_hash": property_snapshot_hash,
+        "composition_authority_hash": composition_authority_hash,
+    }
+    upstream_identity_hashes = tuple(
+        upstream_values_by_field[field_name]
+        for field_name in SUCCESS_PROVENANCE_UPSTREAM_HASH_ORDER
+    )
+    return Task029Provenance(
+        task_id=_TASK029_PROVENANCE_TASK_ID,
+        design_contract_path=TASK029_DESIGN_CONTRACT_PATH,
+        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
+        input_evidence_refs=input_evidence_refs,
+        upstream_identity_hashes=upstream_identity_hashes,
+    )
+
+
+def build_raw_boundary_blocked_result(
+    *,
+    raw_request_projection: FrozenTask029RawProjection,
+    blockers: tuple[Task029BlockerEntry, ...],
+) -> Task029RawBoundaryBlockedResult:
+    """Build a frozen Task029RawBoundaryBlockedResult (6-field contract, no result hash/ID)."""
+    if len(blockers) == 0:
+        msg = "raw-boundary blocked result must have non-empty blockers"
+        raise ValueError(msg)
+
+    return Task029RawBoundaryBlockedResult(
+        schema_version=TASK029_RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION,
+        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
+        raw_request_projection=raw_request_projection,
+        blockers=blockers,
+        warnings=(),
+        deferred_capabilities=TASK029_DEFERRED_CAPABILITIES_V1,
+    )
+
+
+__all__ = [
+    "build_blocked_result",
+    "build_exclusion_evidence",
+    "build_member_evidence",
+    "build_provenance",
+    "build_raw_boundary_blocked_result",
+    "build_success_result",
+]

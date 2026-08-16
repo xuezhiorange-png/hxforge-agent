@@ -16,6 +16,7 @@ import pytest
 from hexagent.core.heat_balance import (
     FlowArrangement,
     HeatBalanceInput,
+    HeatBalanceResult,
     SolverParams,
     StreamState,
     solve_heat_balance,
@@ -26,6 +27,29 @@ from hexagent.properties.base import FluidIdentifier
 pytestmark = pytest.mark.golden
 
 _GOLDEN_DIR = Path(__file__).parent
+
+
+def _assert_result_hash_format(result_hash: str) -> None:
+    assert result_hash.startswith("sha256:")
+    assert len(result_hash) == 71
+    int(result_hash[7:], 16)
+
+
+def _assert_result_hash_integrity(
+    result: HeatBalanceResult,
+    inp: HeatBalanceInput,
+    provider: CoolPropProvider,
+) -> None:
+    """Assert result_hash is internally valid and same-platform deterministic."""
+    _assert_result_hash_format(result.result_hash)
+    assert result.validate_integrity() is True
+    assert result.verify_hash() is True
+
+    repeat = solve_heat_balance(inp, provider)
+    _assert_result_hash_format(repeat.result_hash)
+    assert repeat.validate_integrity() is True
+    assert repeat.verify_hash() is True
+    assert repeat.result_hash == result.result_hash
 
 
 def _load_golden_cases() -> list[dict]:
@@ -131,6 +155,7 @@ def test_golden_case(case: dict, provider: CoolPropProvider) -> None:
     if "solver_converged" in expected:
         assert result.solver_converged == expected["solver_converged"]
 
-    # Assert hash (if present)
+    # Result-hash integrity: valid canonical payload/provenance and same-platform
+    # determinism. Golden literals are not cross-platform execution identity.
     if "result_hash" in expected:
-        assert result.result_hash == expected["result_hash"]
+        _assert_result_hash_integrity(result, inp, provider)

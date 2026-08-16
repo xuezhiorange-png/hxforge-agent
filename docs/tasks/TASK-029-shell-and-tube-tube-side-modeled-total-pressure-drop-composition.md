@@ -1,16 +1,17 @@
-# TASK-029 Design Contract —
+# TASK-029 Design Contract R5 —
 # Shell-and-Tube Tube-Side Modeled Total Pressure-Drop Composition,
-# Reference-Plane Compatibility and Completeness Ledger
+# Reference-Plane Compatibility and Completeness Ledger — FROZEN
 > Binding implementation design for TASK-029.
-> Translates frozen Issue #173 Source Definition R4 into an implementation-ready architecture.
-> Does not modify frozen engineering semantics.
+> Translates frozen Issue #173 Source Definition R5 into an implementation-ready architecture.
+> **Design Contract R5 FROZEN.** Source Definition authority: Issue #173 R5 (`SOURCE_DEFINITION_R5_FROZEN=YES`).
+> Design R5 independent rereview: PASS (26/26). Design R5 freeze complete.
+> F17 direction-ownership semantics frozen; unrelated R4 design semantics preserved.
 ## 1. Design authorization
 
 ```text
 TASK_ID=TASK-029
 
-TASK029_DESIGN_CONTRACT_FREEZE_AUTHORIZATION=
-AUTHORIZE_TASK029_DESIGN_CONTRACT_FREEZE_AND_COMMIT_ONLY
+AUTHORIZATION=AUTHORIZE_TASK029_DESIGN_CONTRACT_R5_FREEZE_AND_ACCEPTANCE_ONLY
 
 SOURCE_DEFINITION_AUTHORITY=ISSUE_173
 VERSION_ALLOCATION_AUTHORITY=ISSUE_167
@@ -19,26 +20,40 @@ DESIGN_BASE=
 main@6dd4bfa81a330fb36eec4cb262664184657279d4
 
 SOURCE_DEFINITION_ISSUE=173
-SOURCE_DEFINITION_REVISION=R4
+SOURCE_DEFINITION_REVISION=R5
 SOURCE_DEFINITION_FROZEN=YES
-SOURCE_DEFINITION_R4_REREVIEW_RESULT=PASS
+SOURCE_DEFINITION_R5_REREVIEW_RESULT=PASS
 
-TASK029_DESIGN_CONTRACT_R4_REVIEW_RESULT=PASS
+PREVIOUS_FROZEN_DESIGN_CONTRACT_SOURCE_REVISION=R4
+PREVIOUS_FROZEN_DESIGN_CONTRACT_AUTHORITY_SHA=f65ed86a0e27d9706aaf03fc32deae975803ebb0
+PREVIOUS_DESIGN_CONTRACT_R4_REVIEW_RESULT=PASS
 
-DESIGN_CONTRACT_R4_ALIGNED=true
+CURRENT_DESIGN_CONTRACT_SOURCE_REVISION=R5
+CURRENT_DESIGN_CONTRACT_SOURCE_REREVIEW_RESULT=PASS
+
+DESIGN_CONTRACT_R5_ALIGNED=true
+DESIGN_CONTRACT_R5_ALIGNMENT_COMPLETE=true
+
+DESIGN_CONTRACT_R5_REREVIEW_RESULT=PASS
+DESIGN_CONTRACT_R5_REREVIEW_PASS_COUNT=26
+DESIGN_CONTRACT_R5_REREVIEW_CHECK_COUNT=26
+DESIGN_CONTRACT_R5_ACTIVE_STALE_R4_DIRECTION_CLAIM_COUNT=0
+DESIGN_CONTRACT_R5_NEW_INTERNAL_CONTRADICTION_COUNT=0
+F17_DESIGN_R5_REREVIEW_RESULT=PASS
+
+DESIGN_CONTRACT_R5_REVIEW_READY=NO
+DESIGN_CONTRACT_R5_FROZEN=true
+DESIGN_CONTRACT_R5_FREEZE_AUTHORIZED=true
+DESIGN_CONTRACT_R5_FREEZE_COMPLETE=true
+
 DESIGN_CONTRACT_STATUS=FROZEN
 DESIGN_CONTRACT_FROZEN=true
 DESIGN_CONTRACT_FREEZE_COMPLETE=true
 
-DESIGN_ACCEPTANCE_PASS_COUNT=26/26
-IMPLEMENTATION_READINESS=PASS
+DESIGN_CONTRACT_R4_ALIGNED=true
+DESIGN_CONTRACT_R4_FROZEN_HISTORICAL=true
 
-REVIEW_BLOCKER_COUNT=0
-MAJOR_NONBLOCKING_COUNT=0
-MINOR_NONBLOCKING_COUNT=1
-
-F_T03_TABLE_DISPOSITION=ACCEPTED_MINOR_NONBLOCKING
-F_T03_TABLE_REMEDIATION_REQUIRED_BEFORE_FREEZE=false
+SOURCE_DESIGN_R5_ALIGNMENT_COMPLETE=true
 
 FROZEN_BLOCKER_REGISTRY_COUNT=43
 FROZEN_BLOCKER_REACHABILITY_TEST_COUNT=43
@@ -51,8 +66,22 @@ FROZEN_ORACLE_VECTOR_COUNT=8
 FROZEN_ORACLE_VECTOR_VALUES_CHANGED=false
 FROZEN_ORACLE_REVIEW_PASS_COUNT=8
 
+CURRENT_IMPLEMENTATION_BASE_BEFORE_R5_DESIGN_FREEZE=3eaa4ea911f507fde8da395b4ebc8ef1fee99e66
+CURRENT_IMPLEMENTATION_VALID_THROUGH_SLICE11C=true
+T07_CORE_PRIMITIVES_IMPLEMENTED=true
+TASK028_COMPONENT_DIRECTION_VALIDATION_FINALIZED=false
+T07_STAGE_INTEGRATION_IMPLEMENTED=false
+T11_IMPLEMENTED=false
+I12_IMPLEMENTED=false
+IMPLEMENTATION_REQUIRES_R5_DIRECTION_CORRECTION=true
+IMPLEMENTATION_R5_DIRECTION_CORRECTION_COMPLETE=false
+
+T05_FINAL_DIRECTION_COMPATIBILITY_OWNER=false
+T07_FINAL_DIRECTION_COMPATIBILITY_OWNER=true
+
 TASK029_DESIGN_AUTHORIZED=NO
 IMPLEMENTATION_AUTHORIZED=NO
+TASK029_IMPLEMENTATION_CORRECTION_AUTHORIZED=false
 BRANCH_AUTHORIZED=NO
 COMMIT_AUTHORIZED=NO
 PUSH_AUTHORIZED=NO
@@ -60,6 +89,24 @@ PR_AUTHORIZED=NO
 TASK030_AUTHORIZED=NO
 
 NO_STEP_IMPLIES_THE_NEXT=TRUE
+```
+
+### 1.1 F17 R5 frozen design resolution
+
+```text
+F17_T07_DIRECTION_OWNERSHIP_CONFLICT=RESOLVED_BY_SOURCE_R5
+
+DESIGN_R5_DIRECTION_ALIGNMENT=
+MOVE_AND_EXPAND_EXISTING_BL_T029_FLOW_DIRECTION_MISMATCH_TO_T07
+
+SOURCE_R5_SEMANTICS_CHANGED_ONLY_FOR_F17=true
+UNRELATED_R4_DESIGN_SEMANTICS_PRESERVED=true
+
+BL_T029_FLOW_DIRECTION_MISMATCH_OWNER_STAGE=
+T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE
+
+BL_T029_FLOW_DIRECTION_MISMATCH_ORDINAL=12
+NEW_BLOCKER_ADDED=false
 ```
 ## 2. Frozen engineering contract restatement
 
@@ -513,7 +560,7 @@ DESIGN_IMPLEMENTATION_FILE_COUNT=17
 | 10 | `blocker_registry.py` | 43-code registry, `emit_blocker()`, `collapse_blockers()`, message map |
 | 11 | `path_binding.py` | Member sort, index domain, producer binding, path topology predicates (§8) |
 | 12 | `completeness.py` | Exclusion partition validation, ledger exclusion evidence (§9) |
-| 13 | `composition.py` | Pressure contribution extraction, quantum validation, ordered Decimal sum (§10–11) |
+| 13 | `composition.py` | Pressure contribution extraction, TASK-028 component direction primitive, K convention validation, pressure validation, ordered Decimal sum (§10–11) |
 | 14 | `validation.py` | Typed validation scheduler T00–T12 orchestration (§7) |
 | 15 | `request.py` | `Task029Request`, `build_task029_request()` |
 | 16 | `result.py` | Success/blocked/raw-boundary builders, member/exclusion evidence builders |
@@ -593,14 +640,87 @@ Frozen scheduler semantics from Issue #173:
 | T04 | `T04_COMPARE_PROFILE_AND_COMMON_IDENTITIES` | Profile and common identity equality |
 | T05 | `T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES` | Composition/member/exclusion authority tree and hashes |
 | T06 | `T06_BIND_EXPECTED_MEMBERS_TO_PRODUCER_RESULTS` | One-to-one producer-member binding |
-| T07 | `T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE` | START_TO_END, multiplicity, K convention, pressure quantum |
+| T07 | `T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE` | Composition/component direction, multiplicity, K convention, pressure quantum |
 | T08 | `T08_VALIDATE_GLOBAL_ORDER_BOUNDARIES_AND_PATH_TOPOLOGY` | Global order, boundaries, path topology predicates |
 | T09 | `T09_VALIDATE_EXCLUSION_PARTITION_AND_COMPLETENESS` | Exclusion partition and completeness proof |
 | T10 | `T10_BUILD_SUCCESS_LEDGER` | Build completeness ledger (zero blockers only) |
 | T11 | `T11_SUM_ORDERED_PRESSURE_CONTRIBUTIONS` | Ordered Decimal composition |
 | T12 | `T12_BUILD_SUCCESS_IDENTITY` | Success result hash, UUID, provenance |
 
-T02/T03 ownership and interaction (frozen R4):
+T05 frozen responsibility (R5 — composition authority tree only):
+
+```text
+T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES owns:
+  composition authority presence
+  structural validation
+  member/exclusion authority tree validation
+  member authority hash replay
+  composition authority hash replay
+  request hash replay
+
+T05_FINAL_DIRECTION_COMPATIBILITY_OWNER=false
+T05_MUST_NOT_EMIT_FOR_FINAL_OWNERSHIP=BL_T029_FLOW_DIRECTION_MISMATCH
+composition_authority.flow_direction_assertion remains structurally required
+```
+
+T07 frozen responsibility (R5 — direction, multiplicity, convention, pressure):
+
+```text
+T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE owns:
+  1. composition authority flow direction compatibility
+  2. trusted T06-bound TASK-028 component flow direction compatibility
+  3. expected/observed multiplicity compatibility
+  4. TASK-028 loss coefficient convention compatibility
+  5. producer pressure finite check
+  6. producer pressure positive check
+  7. producer pressure 0.001 Pa quantum check
+```
+
+Frozen authority direction predicate (T07 Predicate A):
+
+```text
+composition_authority.flow_direction_assertion == START_TO_END
+Mismatch -> BL_T029_FLOW_DIRECTION_MISMATCH
+field_path=composition_authority.flow_direction_assertion
+evidence_refs=()
+```
+
+Frozen TASK-028 component direction predicate (T07 Predicate B):
+
+```text
+for every safely T06-bound TASK-028 component:
+  component_result.flow_direction_assertion ==
+  Task028ComponentFlowDirectionAssertion.START_TO_END
+Mismatch -> BL_T029_FLOW_DIRECTION_MISMATCH
+field_path=task028_success_result.component_results[].flow_direction_assertion
+evidence_refs=(component_id,)
+MULTI_COMPONENT_FAILURE=one blocker per distinct failing component_id
+```
+
+Safe dependency (frozen):
+
+```text
+TASK-028 component-direction evaluation requires:
+  exact accepted TASK-028 success type
+  supported TASK-028 schema
+  successful producer identity replay evidence
+  safe T06 producer-member binding
+NO_ARBITRARY_COMPONENT_INSPECTION_FROM_T05=true
+NO_DUCK_TYPING=true
+NO_INFERRED_COMPONENT_DIRECTION=true
+TASK027_HAS_NO_SYNTHETIC_COMPONENT_DIRECTION_FIELD=true
+```
+
+Blocker evidence policy (frozen):
+
+```text
+Authority direction mismatch: evidence_refs=()
+TASK-028 component direction mismatch: evidence_refs=(component_id,)
+DEDUPLICATION=(code, field_path, evidence_refs)
+ORDERING=(registry_index ASC, field_path UTF8 ASC, evidence_refs tuple lexical ASC)
+```
+
+T02/T03 ownership and interaction (historical R4; unchanged by R5 F17 alignment):
 
 | Stage | Blockers owned |
 |-------|----------------|
@@ -662,7 +782,7 @@ T10_THROUGH_T12_REQUIRE_ZERO_BLOCKERS=true
 NO_PARTIAL_ENGINEERING_ON_ANY_BLOCKER=true
 ```
 
-Implementation: `validation.py` owns stage functions including T03 upstream diagnostics validation; `upstream_replay.py` owns T02 production replay only; `pipeline.py` calls `run_validation_scheduler()`.
+Implementation: `validation.py` owns stage functions including T03 upstream diagnostics validation and T07 stage wrapper/final blocker integration; `composition.py` owns TASK-028 component direction primitive; `upstream_replay.py` owns T02 production replay only; `pipeline.py` calls `run_validation_scheduler()`.
 
 F_T029_DC_001_RESOLVED_BY_SOURCE_R4=true
 RESOLUTION=BL_T029_UPSTREAM_SUCCESS_DIAGNOSTICS_NONEMPTY
@@ -925,7 +1045,7 @@ UNREACHABLE_BLOCKER_COUNT=0
 | `BL_T029_UPSTREAM_SCHEMA_VERSION_UNSUPPORTED` | T01 | schema_version not in supported set | `task027_success_result.schema_version|task028_success_result.schema_version` | True | False |
 | `BL_T029_UPSTREAM_IDENTITY_MISMATCH` | T04 | common identity field inequality | `task028_success_result.property_snapshot_hash` | True | False |
 | `BL_T029_PROFILE_MISMATCH` | T04 | profile_id mismatch across request/upstream | `profile_id` | True | False |
-| `BL_T029_FLOW_DIRECTION_MISMATCH` | T05 | flow_direction_assertion != START_TO_END | `composition_authority.flow_direction_assertion` | True | False |
+| `BL_T029_FLOW_DIRECTION_MISMATCH` | T07 | (A) `composition_authority.flow_direction_assertion != START_TO_END` OR (B) trusted T06-bound `component_result.flow_direction_assertion != START_TO_END` | `composition_authority.flow_direction_assertion` \| `task028_success_result.component_results[].flow_direction_assertion` | True | False |
 | `BL_T029_COMPOSITION_AUTHORITY_MISSING` | T05 | composition_authority is None | `composition_authority` | True | False |
 | `BL_T029_COMPOSITION_AUTHORITY_MALFORMED` | T05 | composition authority structural invalid | `composition_authority` | True | False |
 | `BL_T029_COMPOSITION_AUTHORITY_HASH_MISMATCH` | T05 | composition_authority_hash replay mismatch | `composition_authority.composition_authority_hash` | True | False |
@@ -1030,7 +1150,7 @@ ORACLE_VECTOR_VALUES_CHANGED=false
 ORACLE_REPLAY_PASS_COUNT=8
 ```
 
-R4 does not change existing oracle bytes. `Task029BlockerEntry` canonical bytes encode only `code`, `field_path`, `message_key`, and `evidence_refs`. The global blocker registry member count and ordinal table are not embedded inside existing blocker-entry vectors. Adding ordinal 42 is additive registry metadata and does not alter VECTOR_07 or VECTOR_08.
+R5 direction alignment does not change existing oracle bytes. `Task029BlockerEntry` canonical bytes encode only `code`, `field_path`, `message_key`, and `evidence_refs`. The global blocker registry member count and ordinal table are not embedded inside existing blocker-entry vectors. Adding ordinal 42 is additive registry metadata and does not alter VECTOR_07 or VECTOR_08.
 
 Do not recalculate. Production code under test must not generate its own expected values.
 
@@ -1144,7 +1264,7 @@ BLOCKER_REACHABILITY_VERIFIED_TARGET=43
 | `T029_BL_009_REACHABILITY` | `blocker_registry.py / validation.py` | `emit_blocker / stage T01` | BLOCKER_EMITTED | NONE | BL_T029_UPSTREAM_SCHEMA_VERSION_UNSUPPORTED |
 | `T029_BL_010_REACHABILITY` | `blocker_registry.py / validation.py` | `emit_blocker / stage T04` | BLOCKER_EMITTED | NONE | BL_T029_UPSTREAM_IDENTITY_MISMATCH |
 | `T029_BL_011_REACHABILITY` | `blocker_registry.py / validation.py` | `emit_blocker / stage T04` | BLOCKER_EMITTED | NONE | BL_T029_PROFILE_MISMATCH |
-| `T029_BL_012_REACHABILITY` | `blocker_registry.py / validation.py` | `emit_blocker / stage T05` | BLOCKER_EMITTED | NONE | BL_T029_FLOW_DIRECTION_MISMATCH |
+| `T029_BL_012_REACHABILITY` | `blocker_registry.py / validation.py` | `emit_blocker / stage T07` | BLOCKER_EMITTED component END_TO_START | NONE | BL_T029_FLOW_DIRECTION_MISMATCH |
 | `T029_BL_013_REACHABILITY` | `blocker_registry.py / validation.py` | `emit_blocker / stage T05` | BLOCKER_EMITTED | NONE | BL_T029_COMPOSITION_AUTHORITY_MISSING |
 | `T029_BL_014_REACHABILITY` | `blocker_registry.py / validation.py` | `emit_blocker / stage T05` | BLOCKER_EMITTED | NONE | BL_T029_COMPOSITION_AUTHORITY_MALFORMED |
 | `T029_BL_015_REACHABILITY` | `blocker_registry.py / validation.py` | `emit_blocker / stage T05` | BLOCKER_EMITTED | NONE | BL_T029_COMPOSITION_AUTHORITY_HASH_MISMATCH |
@@ -1209,7 +1329,7 @@ BLOCKER_REACHABILITY_VERIFIED_TARGET=43
 | `T029_AUTH_010_TASK028_AUTHORITY_HASH_BINDING` | `path_binding.py` | `bind_members_to_producers` | HASH_MATCH | NONE | BL_T029_COMPOSITION_MEMBER_AUTHORITY_HASH_MISMATCH |
 | `T029_AUTH_011_EXPECTED_MULTIPLICITY_BINDING` | `path_binding.py` | `bind_members_to_producers` | MULTIPLICITY_MATCH | NONE | BL_T029_MULTIPLICITY_INCOMPATIBILITY |
 | `T029_AUTH_012_EXACT_MEMBER_PLANES` | `path_binding.py` | `bind_members_to_producers` | PLANE_MATCH | NONE | BL_T029_REFERENCE_PLANE_DISCONTINUITY |
-| `T029_AUTH_013_FLOW_DIRECTION_START_TO_END` | `validation.py` | `T05_VALIDATE_COMPOSITION_AUTHORITY_TREE_AND_HASHES` | START_TO_END | NONE | BL_T029_FLOW_DIRECTION_MISMATCH |
+| `T029_AUTH_013_FLOW_DIRECTION_START_TO_END` | `validation.py` | `T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE` | authority+component START_TO_END; mismatch blocks | NONE | BL_T029_FLOW_DIRECTION_MISMATCH |
 | `T029_AUTH_014_NO_HIDDEN_EXCLUSION` | `completeness.py` | `validate_exclusion_partition` | NO_INFERENCE | NONE | BL_T029_EXCLUSION_EVIDENCE_MISSING |
 | `T029_AUTH_015_EVIDENCE_REF_CANONICAL_ORDER` | `canonical.py` | `sort_evidence_refs` | UTF8_ASC | NONE | NONE |
 | `T029_AUTH_016_EXCLUSION_PARTITION_COVERAGE` | `completeness.py` | `validate_exclusion_partition` | COMPLETE | NONE | BL_T029_COMPLETENESS_LEDGER_INCOMPLETE |
@@ -1249,6 +1369,31 @@ BLOCKER_REACHABILITY_VERIFIED_TARGET=43
 | `T029_ID_008_EXACT_KIND_TAG_MAPS` | `canonical.py` | `kind tag constants` | EXACT_MAPS | NONE | NONE |
 | `T029_ID_009_REPEAT_RUN_IDENTITY` | `pipeline.py` | `compute_task029_composition` | DETERMINISTIC_REPEAT | VECTOR_06 | NONE |
 | `T029_ID_010_CALLER_PERMUTATION_REQUEST_IDENTITY` | `identity.py` | `compute_request_hash` | PERMUTATION_INVARIANT | VECTOR_03 | NONE |
+
+Frozen reachability fixture for `T029_BL_012_REACHABILITY` (frozen owner T07):
+
+```text
+OWNER_STAGE=T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE
+FIXTURE=
+  composition authority flow_direction_assertion=START_TO_END
+  trusted TASK-028 bound component via T06
+  component flow_direction_assertion=END_TO_START
+EXPECTED_BLOCKER=BL_T029_FLOW_DIRECTION_MISMATCH
+EXPECTED_FIELD_PATH=task028_success_result.component_results[].flow_direction_assertion
+EXPECTED_EVIDENCE_REFS=(<component_id>,)
+```
+
+`T029_AUTH_013_FLOW_DIRECTION_START_TO_END` frozen mapping:
+
+```text
+TARGET_FILE=validation.py
+TARGET_STAGE=T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE
+SEMANTIC_COVERAGE=
+  1. valid authority START_TO_END passes
+  2. all trusted bound TASK-028 components START_TO_END pass
+  3. bad authority direction blocks
+  4. bad bound TASK-028 component direction blocks
+```
 
 Frozen reachability fixture for `T029_BL_042_REACHABILITY`:
 
@@ -1309,8 +1454,11 @@ ISSUE_173_CONTRIBUTOR_ATTRIBUTION_GOVERNANCE_ERRATUM_001
 ENGINEERING_DESIGN_REVIEW_RESULT=PASS
 ENGINEERING_DESIGN_REVIEW_REOPEN_REQUIRED=false
 
+DESIGN_CONTRACT_R5_ALIGNED=true
+DESIGN_CONTRACT_R5_ALIGNMENT_COMPLETE=true
+DESIGN_CONTRACT_R5_FROZEN=true
 DESIGN_CONTRACT_STATUS=FROZEN
-DESIGN_CONTRACT_FROZEN=true
+DESIGN_CONTRACT_R4_FROZEN_HISTORICAL=true
 
 HXFORGE_IMPLEMENTATION_CONTRIBUTOR=CURSOR
 
@@ -1353,7 +1501,7 @@ No engineering Design Review rerun is required solely for this governance erratu
 
 | Item | Description | DESIGN_SPECIFIED |
 |------|-------------|------------------|
-| D01_SOURCE_DEFINITION_EXACT_BINDING | Design binds Issue #173 R4 without semantic change | YES |
+| D01_SOURCE_DEFINITION_EXACT_BINDING | Design binds Issue #173 R5 F17 direction semantics; unrelated R4 preserved | YES |
 | D02_SCOPE_ISOLATION | No TASK-030, no public API, no new physics | YES |
 | D03_MODULE_ARCHITECTURE | 17-file package tree frozen | YES |
 | D04_EXACT_SCHEMA_MAPPING | All §3 schemas with exact field order/count | YES |
@@ -1367,7 +1515,7 @@ No engineering Design Review rerun is required solely for this governance erratu
 | D12_DECIMAL_COMPOSITION | 28-digit HALF_EVEN, 0.001 quantum, one final quantize | YES |
 | D13_CANONICAL_KIND_MAP | All frozen kind-tag maps in §11 | YES |
 | D14_RAW_PROJECTION | Closed encoder, bool-before-int, dict order preserved | YES |
-| D15_BLOCKER_REGISTRY_43 | 43 codes, exact order, ordinals 00..41 preserved, ordinal 42 additive | YES |
+| D15_BLOCKER_REGISTRY_43 | 43 codes, exact order; BL_T029_FLOW_DIRECTION_MISMATCH owner T07 (R5) | YES |
 | D16_BLOCKER_REACHABILITY_43 | 43/43 reachability TEST_ID mapped | YES |
 | D17_SUCCESS_RESULT_BUILDER | T10–T12 gated success builder | YES |
 | D18_TYPED_BLOCKED_BUILDER | No ledger/total/partial engineering | YES |
@@ -1379,34 +1527,62 @@ No engineering Design Review rerun is required solely for this governance erratu
 | D24_NO_NEW_PHYSICS | TASK029_NEW_PHYSICS_FORMULAS=FORBIDDEN | YES |
 | D25_NO_PUBLIC_API_EXTENSION | PUBLIC_API_EXTENSION=false | YES |
 | D26_NO_TASK030_SCOPE_IMPORT | No TASK-030 authorization or scope | YES |
+| D27_R5_DIRECTION_OWNERSHIP_ALIGNMENT | F17 T07 direction ownership aligned to frozen Source R5 | YES |
 
 ```text
-DESIGN_ACCEPTANCE_ITEM_COUNT=26
+DESIGN_ACCEPTANCE_ITEM_COUNT=27
 ```
-## 22. Final governance block
+## 22. Frozen R5 design contract final governance block
 
 ```text
-TASK029_DESIGN_CONTRACT_FREEZE_RESULT=PASS
+TASK029_DESIGN_CONTRACT_R5_FREEZE_RESULT=PASS
+
+PREVIOUS_DESIGN_CANDIDATE_SHA=182ebd2833503bc0064d2af9ec9d01e3b98a3acb
 
 DESIGN_CONTRACT_PATH=
 docs/tasks/TASK-029-shell-and-tube-tube-side-modeled-total-pressure-drop-composition.md
 
-BASE_SHA=6dd4bfa81a330fb36eec4cb262664184657279d4
+PREVIOUS_FROZEN_DESIGN_CONTRACT_AUTHORITY_SHA=f65ed86a0e27d9706aaf03fc32deae975803ebb0
+PREVIOUS_FROZEN_DESIGN_CONTRACT_SOURCE_REVISION=R4
+PREVIOUS_DESIGN_CONTRACT_R4_REVIEW_RESULT=PASS
 
 SOURCE_DEFINITION_ISSUE=173
-SOURCE_DEFINITION_REVISION=R4
-SOURCE_DEFINITION_FROZEN=true
+SOURCE_DEFINITION_REVISION=R5
+SOURCE_DEFINITION_FROZEN=YES
+SOURCE_DEFINITION_R5_REREVIEW_RESULT=PASS
+SOURCE_R5_FROZEN=true
 
-TASK029_DESIGN_CONTRACT_R4_REVIEW_RESULT=PASS
+CURRENT_DESIGN_CONTRACT_SOURCE_REVISION=R5
+CURRENT_DESIGN_CONTRACT_SOURCE_REREVIEW_RESULT=PASS
 
-DESIGN_CONTRACT_R4_ALIGNED=true
+DESIGN_CONTRACT_R5_ALIGNED=true
+DESIGN_CONTRACT_R5_ALIGNMENT_COMPLETE=true
+
+DESIGN_CONTRACT_R5_REREVIEW_RESULT=PASS
+DESIGN_CONTRACT_R5_REREVIEW_PASS_COUNT=26
+DESIGN_CONTRACT_R5_REREVIEW_CHECK_COUNT=26
+DESIGN_CONTRACT_R5_ACTIVE_STALE_R4_DIRECTION_CLAIM_COUNT=0
+DESIGN_CONTRACT_R5_NEW_INTERNAL_CONTRADICTION_COUNT=0
+F17_DESIGN_R5_REREVIEW_RESULT=PASS
+
+DESIGN_CONTRACT_R5_FROZEN=true
+DESIGN_CONTRACT_R5_FREEZE_AUTHORIZED=true
+DESIGN_CONTRACT_R5_FREEZE_COMPLETE=true
+
 DESIGN_CONTRACT_STATUS=FROZEN
 DESIGN_CONTRACT_FROZEN=true
 DESIGN_CONTRACT_FREEZE_COMPLETE=true
 
+SOURCE_DESIGN_R5_ALIGNMENT_COMPLETE=true
+
 BLOCKER_REGISTRY_COUNT=43
 BLOCKER_REACHABILITY_VERIFIED_COUNT=43
 UNREACHABLE_BLOCKER_COUNT=0
+BL_T029_FLOW_DIRECTION_MISMATCH_OWNER_STAGE=T07_VALIDATE_DIRECTION_MULTIPLICITY_CONVENTION_PRESSURE
+BL_T029_FLOW_DIRECTION_MISMATCH_ORDINAL=12
+
+T05_FINAL_DIRECTION_COMPATIBILITY_OWNER=false
+T07_FINAL_DIRECTION_COMPATIBILITY_OWNER=true
 
 FROZEN_TEST_ID_COUNT=117
 UNIQUE_FROZEN_TEST_ID_COUNT=117
@@ -1415,18 +1591,42 @@ ORACLE_VECTOR_COUNT=8
 ORACLE_REVIEW_PASS_COUNT=8
 ORACLE_VECTOR_VALUES_CHANGED=false
 
-DESIGN_ACCEPTANCE_PASS_COUNT=26/26
-IMPLEMENTATION_READINESS=PASS
+VECTOR_01_UNCHANGED=true
+VECTOR_02_UNCHANGED=true
+VECTOR_03_UNCHANGED=true
+VECTOR_04_UNCHANGED=true
+VECTOR_05_UNCHANGED=true
+VECTOR_06_UNCHANGED=true
+VECTOR_07_UNCHANGED=true
+VECTOR_08_UNCHANGED=true
 
+VECTOR_06_MODELED_TOTAL=351.504
+VECTOR_06_SUCCESS_RESULT_HASH=1fa5ef8a46de30132e4540be87b1b38f6098ce65aa60fb301eb85480309690d4
+VECTOR_06_SUCCESS_RESULT_ID=eeaad53c-5843-52d4-9a7e-3e0c4511976f
+
+F17_T07_DIRECTION_OWNERSHIP_CONFLICT=RESOLVED_BY_SOURCE_R5
 F_T029_DC_001_RESOLVED_BY_SOURCE_R4=true
 F_T029_DC_002_RESOLVED=true
 F_T029_DC_003_RESOLVED=true
 F_T029_DC_004_RESOLVED=true
 
-F_T03_TABLE_DISPOSITION=ACCEPTED_MINOR_NONBLOCKING
+CURRENT_IMPLEMENTATION_BASE_BEFORE_R5_DESIGN_FREEZE=3eaa4ea911f507fde8da395b4ebc8ef1fee99e66
+CURRENT_IMPLEMENTATION_VALID_THROUGH_SLICE11C=true
+T07_CORE_PRIMITIVES_IMPLEMENTED=true
+TASK028_COMPONENT_DIRECTION_VALIDATION_FINALIZED=false
+T07_STAGE_INTEGRATION_IMPLEMENTED=false
+T11_IMPLEMENTED=false
+I12_IMPLEMENTED=false
+IMPLEMENTATION_REQUIRES_R5_DIRECTION_CORRECTION=true
+IMPLEMENTATION_R5_DIRECTION_CORRECTION_COMPLETE=false
+TASK029_IMPLEMENTATION_CORRECTION_AUTHORIZED=false
 
 TASK029_IMPLEMENTATION_AUTHORIZED=false
 TASK030_AUTHORIZED=false
 
+NEXT_GATE=
+AUTHORIZE_TASK029_R5_DIRECTION_IMPLEMENTATION_CORRECTION_ONLY
+
+STOPPED_AFTER_DESIGN_R5_FREEZE=true
 NO_STEP_IMPLIES_THE_NEXT=TRUE
 ```
