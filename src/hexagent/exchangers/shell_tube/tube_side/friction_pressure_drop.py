@@ -1631,51 +1631,57 @@ def _map_property_snapshot_phase(phase_region: PhaseRegion) -> str:
     return phase_region.value
 
 
-def _assertion_enum_value(assertion: AssertionState | None) -> str:
-    if assertion is None:
-        return ""
+def _assertion_enum_value(assertion: AssertionState) -> str:
     return assertion.value
 
 
-def _flow_direction_enum_value(assertion: FlowDirectionAssertion | None) -> str:
-    if assertion is None:
-        return ""
+def _flow_direction_enum_value(assertion: FlowDirectionAssertion) -> str:
     return assertion.value
+
+
+def _build_task027_frozen_provenance(
+    *,
+    task025_result: Task025ValidResult,
+    task026_result: TubeSideThermalResult,
+    property_snapshot: PropertySnapshot,
+) -> FrozenProvenance:
+    return FrozenProvenance(
+        task_id="TASK-027",
+        design_contract_path="github-issue:xuezhiorange-png/hxforge-agent#168",
+        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
+        input_evidence_refs=_TASK027_FROZEN_INPUT_EVIDENCE_REFS,
+        upstream_identity_hashes=(
+            task025_result.hydraulic_authority_hash,
+            task025_result.result_hash,
+            task026_result.result_hash,
+            property_snapshot.property_snapshot_hash,
+        ),
+    )
 
 
 def _build_production_blocked_result(
     *,
     profile_id: str,
     blockers: list[Task027BlockerEntry],
-    task025_result: Task025ValidResult | None = None,
-    task026_result: TubeSideThermalResult | None = None,
-    property_snapshot_hash: str | None = None,
-    request_hash: str | None = None,
+    task025_result: Task025ValidResult,
+    task026_result: TubeSideThermalResult,
+    property_snapshot_hash: str,
+    request_hash: str,
+    provenance: FrozenProvenance,
 ) -> Task027BlockedResult:
-    task025_hydraulic_authority_hash: str | None = None
-    task025_result_hash: str | None = None
-    task026_result_hash: str | None = None
-    if task025_result is not None:
-        task025_hydraulic_authority_hash = task025_result.hydraulic_authority_hash
-        task025_result_hash = None
-    if task026_result is not None:
-        task026_result_hash = task026_result.result_hash
-        if property_snapshot_hash is None:
-            property_snapshot_hash = task026_result.property_snapshot_hash
-
     return build_task027_blocked_result(
         profile_id=profile_id,
         request_hash=request_hash,
-        task025_hydraulic_authority_hash=task025_hydraulic_authority_hash,
-        task025_result_hash=task025_result_hash,
-        task026_result_hash=task026_result_hash,
+        task025_hydraulic_authority_hash=task025_result.hydraulic_authority_hash,
+        task025_result_hash=task025_result.result_hash,
+        task026_result_hash=task026_result.result_hash,
         property_snapshot_hash=property_snapshot_hash,
         raw_request_projection=None,
         raw_upstream_blocked_projection=None,
         warnings=(),
         blockers=tuple(blockers),
         deferred_capabilities=(),
-        provenance=None,
+        provenance=provenance,
     )
 
 
@@ -1684,18 +1690,65 @@ def compute_task027_friction_pressure_drop(
     task025_result: Task025ValidResult,
     task026_result: TubeSideThermalResult,
     property_snapshot: PropertySnapshot,
-    constant_density_path_assertion: AssertionState | None,
-    zero_net_elevation_change_assertion: AssertionState | None,
-    flow_direction_assertion: FlowDirectionAssertion | None,
-    roughness_authority: RoughnessAuthority | None,
+    constant_density_path_assertion: AssertionState,
+    zero_net_elevation_change_assertion: AssertionState,
+    flow_direction_assertion: FlowDirectionAssertion,
+    roughness_authority: RoughnessAuthority,
     profile_id: str = "profile-001",
 ) -> Task027SuccessResult | Task027BlockedResult:
-    """P00-P09 typed production orchestration for TASK-027 friction pressure drop."""
-    # P00 — typed/profile gate (existing contract enforcement only)
+    """C00-C10 typed production orchestration for TASK-027 friction pressure drop."""
+    # C00 — typed/profile/materializability gate
+    if not isinstance(task025_result, Task025ValidResult):
+        raise TypeError("task025_result must be Task025ValidResult")
+    if not isinstance(task026_result, TubeSideThermalResult):
+        raise TypeError("task026_result must be TubeSideThermalResult")
+    if not isinstance(property_snapshot, PropertySnapshot):
+        raise TypeError("property_snapshot must be PropertySnapshot")
+    if not isinstance(constant_density_path_assertion, AssertionState):
+        raise TypeError("constant_density_path_assertion must be AssertionState")
+    if not isinstance(zero_net_elevation_change_assertion, AssertionState):
+        raise TypeError("zero_net_elevation_change_assertion must be AssertionState")
+    if not isinstance(flow_direction_assertion, FlowDirectionAssertion):
+        raise TypeError("flow_direction_assertion must be FlowDirectionAssertion")
+    if not isinstance(roughness_authority, (AbsoluteRoughnessAuthority, SmoothRoughnessAuthority)):
+        raise TypeError("roughness_authority must be RoughnessAuthority")
     if profile_id not in SUPPORTED_PROFILE_IDS:
         raise ValueError(f"profile_id must be one of {SUPPORTED_PROFILE_IDS}")
 
-    # P01 — upstream identity binding
+    # C01 — request identity (supplied bindings only)
+    request_hash = compute_request_hash(
+        schema_version=TASK027_REQUEST_SCHEMA_VERSION,
+        profile_id=profile_id,
+        task025_result_hash=task025_result.result_hash,
+        task026_result_hash=task026_result.result_hash,
+        property_snapshot_hash=property_snapshot.property_snapshot_hash,
+        constant_density_assertion=_assertion_enum_value(constant_density_path_assertion),
+        zero_elevation_assertion=_assertion_enum_value(zero_net_elevation_change_assertion),
+        flow_direction_assertion=_flow_direction_enum_value(flow_direction_assertion),
+        roughness_authority_hash=roughness_authority.authority_hash,
+    )
+    _ = Task027Request(
+        schema_version=TASK027_REQUEST_SCHEMA_VERSION,
+        profile_id=profile_id,
+        task025_valid_result=task025_result,
+        task026_success_result=task026_result,
+        property_snapshot=property_snapshot,
+        property_snapshot_hash=property_snapshot.property_snapshot_hash,
+        constant_density_path_assertion=constant_density_path_assertion,
+        zero_net_elevation_change_assertion=zero_net_elevation_change_assertion,
+        flow_direction_assertion=flow_direction_assertion,
+        roughness_authority=roughness_authority,
+        request_hash=request_hash,
+    )
+
+    # C02 — FrozenProvenance (supplied producer bindings)
+    provenance = _build_task027_frozen_provenance(
+        task025_result=task025_result,
+        task026_result=task026_result,
+        property_snapshot=property_snapshot,
+    )
+
+    # C03 — upstream identity binding
     if task026_result.upstream_geometry_hash != task025_result.hydraulic_authority_hash:
         return _build_production_blocked_result(
             profile_id=profile_id,
@@ -1708,9 +1761,12 @@ def compute_task027_friction_pressure_drop(
             ],
             task025_result=task025_result,
             task026_result=task026_result,
+            property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
         )
 
-    # P02 — property-snapshot three-way binding
+    # C04 — property-snapshot three-way binding
     recomputed_property_snapshot_hash = recompute_property_snapshot_hash(property_snapshot)
     if not (
         recomputed_property_snapshot_hash
@@ -1729,9 +1785,11 @@ def compute_task027_friction_pressure_drop(
             task025_result=task025_result,
             task026_result=task026_result,
             property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
         )
 
-    # P03 — applicability
+    # C05 — applicability
     applicability_blockers = validate_applicability(
         phase=_map_property_snapshot_phase(property_snapshot.phase_region),
         rheology=RheologyType.NEWTONIAN.value,
@@ -1746,17 +1804,14 @@ def compute_task027_friction_pressure_drop(
             task025_result=task025_result,
             task026_result=task026_result,
             property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
         )
 
-    assert constant_density_path_assertion is not None
-    assert zero_net_elevation_change_assertion is not None
-    assert flow_direction_assertion is not None
-
-    # P04 — roughness authority
-    roughness_hash = roughness_authority.authority_hash if roughness_authority is not None else ""
+    # C06 — roughness authority
     validated_roughness, roughness_blockers = validate_roughness_authority(
         roughness_authority,
-        roughness_hash,
+        roughness_authority.authority_hash,
     )
     if roughness_blockers:
         return _build_production_blocked_result(
@@ -1765,6 +1820,8 @@ def compute_task027_friction_pressure_drop(
             task025_result=task025_result,
             task026_result=task026_result,
             property_snapshot_hash=property_snapshot.property_snapshot_hash,
+            request_hash=request_hash,
+            provenance=provenance,
         )
     assert validated_roughness is not None
 
@@ -1784,35 +1841,11 @@ def compute_task027_friction_pressure_drop(
                 task025_result=task025_result,
                 task026_result=task026_result,
                 property_snapshot_hash=property_snapshot.property_snapshot_hash,
+                request_hash=request_hash,
+                provenance=provenance,
             )
 
-    # P05 — request identity
-    request_hash = compute_request_hash(
-        schema_version=TASK027_REQUEST_SCHEMA_VERSION,
-        profile_id=profile_id,
-        task025_result_hash=task025_result.result_hash,
-        task026_result_hash=task026_result.result_hash,
-        property_snapshot_hash=property_snapshot.property_snapshot_hash,
-        constant_density_assertion=_assertion_enum_value(constant_density_path_assertion),
-        zero_elevation_assertion=_assertion_enum_value(zero_net_elevation_change_assertion),
-        flow_direction_assertion=_flow_direction_enum_value(flow_direction_assertion),
-        roughness_authority_hash=validated_roughness.authority_hash,
-    )
-    _ = Task027Request(
-        schema_version=TASK027_REQUEST_SCHEMA_VERSION,
-        profile_id=profile_id,
-        task025_valid_result=task025_result,
-        task026_success_result=task026_result,
-        property_snapshot=property_snapshot,
-        property_snapshot_hash=property_snapshot.property_snapshot_hash,
-        constant_density_path_assertion=constant_density_path_assertion,
-        zero_net_elevation_change_assertion=zero_net_elevation_change_assertion,
-        flow_direction_assertion=flow_direction_assertion,
-        roughness_authority=validated_roughness,
-        request_hash=request_hash,
-    )
-
-    # P06 — Reynolds / friction factor
+    # C07 — Reynolds / friction factor
     reynolds = task026_result.reynolds_number
     re_blockers = validate_reynolds(reynolds)
     if re_blockers:
@@ -1823,6 +1856,7 @@ def compute_task027_friction_pressure_drop(
             task026_result=task026_result,
             property_snapshot_hash=property_snapshot.property_snapshot_hash,
             request_hash=request_hash,
+            provenance=provenance,
         )
 
     regime = classify_reynolds(reynolds)
@@ -1842,6 +1876,7 @@ def compute_task027_friction_pressure_drop(
                 task026_result=task026_result,
                 property_snapshot_hash=property_snapshot.property_snapshot_hash,
                 request_hash=request_hash,
+                provenance=provenance,
             )
         if turbulent_factor is None:
             return _build_production_blocked_result(
@@ -1857,6 +1892,7 @@ def compute_task027_friction_pressure_drop(
                 task026_result=task026_result,
                 property_snapshot_hash=property_snapshot.property_snapshot_hash,
                 request_hash=request_hash,
+                provenance=provenance,
             )
         friction_factor_raw = turbulent_factor
     else:
@@ -1873,14 +1909,15 @@ def compute_task027_friction_pressure_drop(
             task026_result=task026_result,
             property_snapshot_hash=property_snapshot.property_snapshot_hash,
             request_hash=request_hash,
+            provenance=provenance,
         )
 
-    # P07 — frozen public friction-factor quantization
+    # C08 — frozen public friction-factor quantization
     ctx = _task027_decimal_context()
     with localcontext(ctx):
         darcy_friction_factor = friction_factor_raw.quantize(FRICTION_FACTOR_QUANTUM)
 
-    # P08 — Darcy pressure drop + reference-plane binding
+    # C09 — Darcy pressure drop + reference-plane binding
     friction_length_m = task025_result.internal_flow_authority.length_m
     upstream_reference_plane = task025_result.internal_flow_authority.start_plane.start.value
     downstream_reference_plane = task025_result.internal_flow_authority.end_plane.end.value
@@ -1894,19 +1931,7 @@ def compute_task027_friction_pressure_drop(
     with localcontext(ctx):
         straight_tube_friction_pressure_drop_pa = pressure_drop_raw.quantize(PRESSURE_DROP_QUANTUM)
 
-    # P09 — provenance / success identity
-    provenance = FrozenProvenance(
-        task_id="TASK-027",
-        design_contract_path="github-issue:xuezhiorange-png/hxforge-agent#168",
-        implementation_software_version=IMPLEMENTATION_SOFTWARE_VERSION,
-        input_evidence_refs=_TASK027_FROZEN_INPUT_EVIDENCE_REFS,
-        upstream_identity_hashes=(
-            task025_result.hydraulic_authority_hash,
-            task025_result.result_hash,
-            task026_result.result_hash,
-            property_snapshot.property_snapshot_hash,
-        ),
-    )
+    # C10 — success identity (reuse C01 request_hash and C02 provenance)
     result_hash = compute_result_hash(
         schema_version=TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
         profile_id=profile_id,

@@ -17,6 +17,7 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     KIND_TUPLE,
     PRESSURE_DROP_QUANTUM,
     ROUGHNESS_SCHEMA_VERSION,
+    TASK027_BLOCKED_RESULT_SCHEMA_VERSION,
     TASK027_REQUEST_SCHEMA_VERSION,
     TASK027_SUCCESS_RESULT_SCHEMA_VERSION,
     AssertionState,
@@ -27,6 +28,7 @@ from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     Task027BlockedResult,
     Task027SuccessResult,
     classify_reynolds,
+    compute_blocked_result_hash,
     compute_laminar_friction_factor,
     compute_pressure_drop,
     compute_request_hash,
@@ -127,6 +129,46 @@ def _default_assertions() -> dict[str, AssertionState | FlowDirectionAssertion]:
     }
 
 
+def _replay_request_hash(
+    *,
+    task025: Any,
+    task026: Any,
+    property_snapshot: Any,
+    roughness: SmoothRoughnessAuthority,
+    profile_id: str = "profile-001",
+) -> str:
+    assertions = _default_assertions()
+    return compute_request_hash(
+        schema_version=TASK027_REQUEST_SCHEMA_VERSION,
+        profile_id=profile_id,
+        task025_result_hash=task025.result_hash,
+        task026_result_hash=task026.result_hash,
+        property_snapshot_hash=property_snapshot.property_snapshot_hash,
+        constant_density_assertion=assertions["constant_density_path_assertion"].value,
+        zero_elevation_assertion=assertions["zero_net_elevation_change_assertion"].value,
+        flow_direction_assertion=assertions["flow_direction_assertion"].value,
+        roughness_authority_hash=roughness.authority_hash,
+    )
+
+
+def _replay_blocked_result_hash(result: Task027BlockedResult) -> str:
+    return compute_blocked_result_hash(
+        schema_version=TASK027_BLOCKED_RESULT_SCHEMA_VERSION,
+        profile_id=result.profile_id,
+        request_hash=result.request_hash,
+        task025_hydraulic_authority_hash=result.task025_hydraulic_authority_hash,
+        task025_result_hash=result.task025_result_hash,
+        task026_result_hash=result.task026_result_hash,
+        property_snapshot_hash=result.property_snapshot_hash,
+        raw_request_projection=result.raw_request_projection,
+        raw_upstream_blocked_projection=result.raw_upstream_blocked_projection,
+        warnings=result.warnings,
+        blockers=result.blockers,
+        deferred_capabilities=result.deferred_capabilities,
+        provenance=result.provenance,
+    )
+
+
 class TestT027F01Pb001ActualSuccess:
     """T027_F01_PB_001_ACTUAL_SUCCESS — actual upstream replay success."""
 
@@ -154,15 +196,16 @@ class TestT027F01Pb002UpstreamIdentityMismatchReachable:
 
     def test_upstream_identity_mismatch_from_production_entry(self) -> None:
         task025, task026, property_snapshot = _produce_release_demo_upstream()
-        mismatched = replace(
+        roughness = _make_smooth_roughness_authority()
+        mismatched_task026 = replace(
             task026,
             upstream_geometry_hash="f" * 64,
         )
         result = compute_task027_friction_pressure_drop(
             task025_result=task025,
-            task026_result=mismatched,
+            task026_result=mismatched_task026,
             property_snapshot=property_snapshot,
-            roughness_authority=_make_smooth_roughness_authority(),
+            roughness_authority=roughness,
             **_default_assertions(),
         )
         assert isinstance(result, Task027BlockedResult)
@@ -170,27 +213,71 @@ class TestT027F01Pb002UpstreamIdentityMismatchReachable:
         assert BlockerCode.BL_T027_UPSTREAM_IDENTITY_MISMATCH in codes
         assert any(b.field_path == ("upstream_geometry_hash",) for b in result.blockers)
 
+        expected_request_hash = _replay_request_hash(
+            task025=task025,
+            task026=mismatched_task026,
+            property_snapshot=property_snapshot,
+            roughness=roughness,
+        )
+        assert result.request_hash == expected_request_hash
+        assert result.task025_hydraulic_authority_hash == task025.hydraulic_authority_hash
+        assert result.task025_result_hash == task025.result_hash
+        assert result.task026_result_hash == mismatched_task026.result_hash
+        assert result.property_snapshot_hash == property_snapshot.property_snapshot_hash
+        assert isinstance(result.provenance, FrozenProvenance)
+        assert result.provenance.upstream_identity_hashes == (
+            task025.hydraulic_authority_hash,
+            task025.result_hash,
+            mismatched_task026.result_hash,
+            property_snapshot.property_snapshot_hash,
+        )
+        replayed_blocked_hash = _replay_blocked_result_hash(result)
+        assert result.result_hash == replayed_blocked_hash
+        assert result.result_id == derive_result_id(result.result_hash)
+
 
 class TestT027F01Pb003PropertySnapshotMismatchReachable:
     """T027_F01_PB_003_PROPERTY_SNAPSHOT_MISMATCH_REACHABLE."""
 
     def test_property_snapshot_mismatch_from_production_entry(self) -> None:
         task025, task026, property_snapshot = _produce_release_demo_upstream()
-        mismatched = replace(
+        roughness = _make_smooth_roughness_authority()
+        mismatched_property_snapshot = replace(
             property_snapshot,
             property_snapshot_hash="a" * 64,
         )
         result = compute_task027_friction_pressure_drop(
             task025_result=task025,
             task026_result=task026,
-            property_snapshot=mismatched,
-            roughness_authority=_make_smooth_roughness_authority(),
+            property_snapshot=mismatched_property_snapshot,
+            roughness_authority=roughness,
             **_default_assertions(),
         )
         assert isinstance(result, Task027BlockedResult)
         codes = [b.code for b in result.blockers]
         assert BlockerCode.BL_T027_PROPERTY_SNAPSHOT_HASH_MISMATCH in codes
         assert any(b.field_path == ("property_snapshot_hash",) for b in result.blockers)
+
+        expected_request_hash = _replay_request_hash(
+            task025=task025,
+            task026=task026,
+            property_snapshot=mismatched_property_snapshot,
+            roughness=roughness,
+        )
+        assert result.request_hash == expected_request_hash
+        assert result.task025_result_hash == task025.result_hash
+        assert result.task026_result_hash == task026.result_hash
+        assert result.property_snapshot_hash == mismatched_property_snapshot.property_snapshot_hash
+        assert isinstance(result.provenance, FrozenProvenance)
+        assert result.provenance.upstream_identity_hashes == (
+            task025.hydraulic_authority_hash,
+            task025.result_hash,
+            task026.result_hash,
+            mismatched_property_snapshot.property_snapshot_hash,
+        )
+        replayed_blocked_hash = _replay_blocked_result_hash(result)
+        assert result.result_hash == replayed_blocked_hash
+        assert result.result_id == derive_result_id(result.result_hash)
 
 
 class TestT027F01Pb004ReferencePlaneAndLengthBinding:
@@ -252,6 +339,12 @@ class TestT027F01Pb006NoPartialResultOnBlock:
         assert result.blockers
         assert not hasattr(result, "darcy_friction_factor")
         assert not hasattr(result, "straight_tube_friction_pressure_drop_pa")
+        assert result.request_hash is not None
+        assert result.task025_hydraulic_authority_hash is not None
+        assert result.task025_result_hash is not None
+        assert result.task026_result_hash is not None
+        assert result.property_snapshot_hash is not None
+        assert isinstance(result.provenance, FrozenProvenance)
 
     def test_upstream_identity_mismatch_has_no_partial_result(self) -> None:
         task025, task026, property_snapshot = _produce_release_demo_upstream()
@@ -277,16 +370,20 @@ class TestT027F01Pb006NoPartialResultOnBlock:
         assert isinstance(result, Task027BlockedResult)
         self._assert_blocked_without_partial_result(result)
 
-    def test_missing_roughness_authority_has_no_partial_result(self) -> None:
+    def test_roughness_authority_hash_mismatch_has_no_partial_result(self) -> None:
         task025, task026, property_snapshot = _produce_release_demo_upstream()
+        roughness = _make_smooth_roughness_authority()
+        tampered_roughness = replace(roughness, authority_hash="b" * 64)
         result = compute_task027_friction_pressure_drop(
             task025_result=task025,
             task026_result=task026,
             property_snapshot=property_snapshot,
-            roughness_authority=None,
+            roughness_authority=tampered_roughness,
             **_default_assertions(),
         )
         assert isinstance(result, Task027BlockedResult)
+        codes = [b.code for b in result.blockers]
+        assert BlockerCode.BL_T027_ROUGHNESS_AUTHORITY_HASH_MISMATCH in codes
         self._assert_blocked_without_partial_result(result)
 
 
