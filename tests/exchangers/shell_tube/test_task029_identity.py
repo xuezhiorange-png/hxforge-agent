@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import replace
@@ -93,14 +94,31 @@ from tests.exchangers.shell_tube.test_task029_upstream import (
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_PY311_EXECUTABLE = Path(
-    "/Users/charles/.local/share/uv/python/cpython-3.11-macos-aarch64-none/bin/python3.11"
-)
-_PY312_EXECUTABLE = Path(
-    "/Users/charles/.local/share/uv/python/cpython-3.12-macos-aarch64-none/bin/python3.12"
-)
 _I18_PY311_EVIDENCE_DIR = Path("/tmp/task029-i18-py311")
 _I18_PY312_EVIDENCE_DIR = Path("/tmp/task029-i18-py312")
+
+
+def _resolve_python_executable(env_name: str, command_name: str) -> Path:
+    """Resolve a Python executable from CI env or PATH lookup."""
+    explicit = os.environ.get(env_name)
+    if explicit:
+        return Path(explicit)
+
+    discovered = shutil.which(command_name)
+    if discovered:
+        return Path(discovered)
+
+    return Path(command_name)
+
+
+_PY311_EXECUTABLE = _resolve_python_executable(
+    "TASK029_PY311_EXECUTABLE",
+    "python3.11",
+)
+_PY312_EXECUTABLE = _resolve_python_executable(
+    "TASK029_PY312_EXECUTABLE",
+    "python3.12",
+)
 
 
 def _vector_record(
