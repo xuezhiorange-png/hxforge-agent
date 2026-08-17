@@ -63,6 +63,7 @@ PRIOR_REVIEW_LITERAL_TABLE_RECOUNT=20/35
 NEXT_REREVIEW_RECOUNTS_D01_D35_FROM_SCRATCH=true
 PRIOR_REVIEW_ACCOUNTING_INCONSISTENCY_NOTED=true
 CORRECTION_PARENT_SHA=45ef6dfe4674ddef497584522167182c6559e1e2
+SECOND_CORRECTION_PARENT_SHA=a6aa0b686fbf38b2757611ab55c1dae98fb1ebd5
 ```
 
 
@@ -775,7 +776,7 @@ arbitrary `Mapping`, aliases, coercion, or `float` is permitted.
 | `schema_version` | yes | `str` | `str` | exact token match | exact string |
 | `tube_layout` | yes | `dict` | `TubeLayout` | TASK-021 layout decoder | upstream `layout_hash_payload` projection |
 | `baffle_geometry_result` | yes | `dict` | `BaffleGeometryValidationResult` | TASK-024 result decoder | upstream geometry hash projection |
-| `engineering_authority` | yes | `dict` | authority request binding | §9.4 validator | §20.2 authority request projection |
+| `engineering_authority` | yes | `dict` | authority request binding | §9.4 validator | §20.1.2 engineering authority request binding projection |
 | `evidence_refs` | yes | `list` | `tuple[str, ...]` | non-empty, sorted unique | sorted unique string tuple |
 
 ### 13.2 Nested `tube_layout` serialized public shape
@@ -1057,15 +1058,22 @@ BLOCKER_PRECEDENCE_EXACT=true
 All seven warnings are always emitted on every `VALID`
 `CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_V1` result. None are conditional in v1.
 
-| Code | field_path | message_key | eligibility predicate | prerequisite stage | VALID emission | BLOCKED emission | evidence source |
+| warning_code | field_path | message_key | eligibility_predicate | prerequisite_stage | valid_result_emission | blocked_result_emission | evidence_binding |
 |---|---|---|---|---:|---|---|---|
-| `SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | frozen profile §3 |
-| `SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §8 |
-| `SSHG_MINIMUM_AREA_SELECTION_DEFERRED` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §3.2 |
-| `SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §3.2 |
-| `SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §3.3 |
-| `SSHG_NO_FULL_EXCHANGER_RATING_CLAIM` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §2 |
-| `SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY` | `null` | frozen key | always eligible after Stage 7 | 7 | always emit | emit only if Stage 7 completed before failure | §4, §9 |
+| `SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY` | `null` | `central_crossflow_screening_geometry_only` | always eligible after Stage 6 completes | 6 | always emit all seven warnings on `VALID` | emit only if Stage 6 completed before failure | frozen profile §3 |
+| `SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED` | `null` | `leakage_bypass_corrections_excluded` | always eligible after Stage 6 completes | 6 | always emit | emit only if Stage 6 completed before failure | §8 |
+| `SSHG_MINIMUM_AREA_SELECTION_DEFERRED` | `null` | `minimum_area_selection_deferred` | always eligible after Stage 6 completes | 6 | always emit | emit only if Stage 6 completed before failure | §3.2 |
+| `SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED` | `null` | `window_inlet_outlet_flow_areas_deferred` | always eligible after Stage 6 completes | 6 | always emit | emit only if Stage 6 completed before failure | §3.2 |
+| `SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED` | `null` | `flow_state_thermal_pressure_drop_deferred` | always eligible after Stage 6 completes | 6 | always emit | emit only if Stage 6 completed before failure | §3.3 |
+| `SSHG_NO_FULL_EXCHANGER_RATING_CLAIM` | `null` | `no_full_exchanger_rating_claim` | always eligible after Stage 6 completes | 6 | always emit | emit only if Stage 6 completed before failure | §2 |
+| `SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY` | `null` | `formula_authority_screening_model_only` | always eligible after Stage 7 completes | 7 | always emit | emit only if Stage 7 completed before failure | §4, §9 |
+
+```text
+WARNING_MESSAGE_KEY_LITERAL_COUNT=7
+WARNING_MESSAGE_KEY_PLACEHOLDER_COUNT=0
+WARNING_MESSAGE_KEYS_UNIQUE=true
+NF001_SECOND_CORRECTION_APPLIED=true
+```
 
 Warning sort key (deterministic):
 
@@ -1157,20 +1165,72 @@ REQUEST_HASH_PROJECTION_EXACT=true
 
 ### 20.1 `REQUEST_CANONICAL_PROJECTION`
 
+```text
+REQUEST_CANONICAL_PROJECTION_FIELD_COUNT=5
+REQUEST_CANONICAL_PROJECTION_PROSE_SLOT_COUNT=0
+NF002_SECOND_CORRECTION_APPLIED=true
+```
+
 Ordered top-level tuple:
 
-1. `schema_version` — exact string
-2. `tube_layout` — TASK-021 `layout_hash_payload` upstream projection
-3. `baffle_geometry_result` — TASK-024 request/geometry identity projection sufficient to bind consumed geometry facts
-4. `engineering_authority` — authority request binding projection
+1. `schema_version` — exact string `task031.shell-side-hydraulic-geometry-request.v1`
+2. `tube_layout` — TASK-021 `layout_hash_payload` upstream projection (delegate to `tube_layout.canonical`; no TASK-031 redefinition)
+3. `task024_result_binding` — exact `TASK024_RESULT_BINDING_PROJECTION` per §20.1.1
+4. `engineering_authority_request` — ordered tuple per §20.1.2
 5. `evidence_refs` — sorted unique string tuple
 
-Exclusions: no engineering output values, no `geometry_hash`, no `geometry_id`,
-no runtime timestamp, no ambient git state.
+Exclusions: no TASK-031 engineering output values, no `geometry_hash`, no
+`geometry_id`, no runtime timestamp, no ambient git state.
 
 ```text
 request_hash = sha256_hex(canonical_json_bytes(request_canonical_projection))
 ```
+
+#### 20.1.1 `TASK024_RESULT_BINDING_PROJECTION`
+
+```text
+TASK024_RESULT_BINDING_PROJECTION_FIELD_COUNT=20
+```
+
+TASK-031 normalized binding projection only. TASK-031 must not reimplement TASK-024
+geometry engineering semantics. Encoding: status and enum fields as exact string
+tokens; decimal fields as canonical decimal strings; `spacing_sequence_m` as ordered
+JSON array of canonical decimal strings; null forbidden for accepted geometry.
+
+| Order | Field path | Encoding |
+|---:|---|---|
+| 1 | `status` | exact `VALID` or `BLOCKED` string token |
+| 2 | `geometry.schema_version` | exact `task024.baffle-geometry.v1` |
+| 3 | `geometry.geometry_id` | exact URN string |
+| 4 | `geometry.geometry_hash` | lowercase hex SHA-256 |
+| 5 | `geometry.request_hash` | lowercase hex SHA-256 |
+| 6 | `geometry.task020_configuration_id` | exact URN string |
+| 7 | `geometry.task020_configuration_hash` | lowercase hex SHA-256 |
+| 8 | `geometry.task021_layout_id` | exact URN string |
+| 9 | `geometry.task021_layout_hash` | lowercase hex SHA-256 |
+| 10 | `geometry.task022_geometry_id` | exact URN string |
+| 11 | `geometry.task022_geometry_hash` | lowercase hex SHA-256 |
+| 12 | `geometry.construction_family` | exact enum string token |
+| 13 | `geometry.shell_pass_count` | exact integer |
+| 14 | `geometry.shell_inside_diameter_m` | canonical decimal string |
+| 15 | `geometry.tube_outer_diameter_m` | canonical decimal string |
+| 16 | `geometry.design_authority.schema_version` | exact `task024.caller-baffle-design-authority.v1` |
+| 17 | `geometry.design_authority.baffle_type` | exact enum string token |
+| 18 | `geometry.design_authority.baffle_count` | exact integer |
+| 19 | `geometry.design_authority.spacing_sequence_m` | ordered JSON array of canonical decimal strings |
+| 20 | `geometry.design_authority.authority_hash` | lowercase hex SHA-256 |
+
+When `status=BLOCKED` and `geometry=null`, slot 3 is encoded as JSON `null` and
+fields 2 and 4–20 are omitted from the binding projection.
+
+#### 20.1.2 `ENGINEERING_AUTHORITY_REQUEST_BINDING_PROJECTION`
+
+Ordered tuple:
+
+1. `schema_version` — exact `task031.engineering-authority-request.v1`
+2. `authority_profile_id` — exact aggregate profile ID
+3. `authority_hash` — lowercase hex SHA-256
+4. `evidence_refs` — sorted unique string tuple
 
 ### 20.2 `ENGINEERING_AUTHORITY_CANONICAL_PROJECTION`
 
@@ -1281,6 +1341,36 @@ blocked_result_hash = sha256_hex(canonical_json_bytes(blocked_canonical_projecti
 
 `blocked_result_hash` must be stable for identical blocked input and must be
 computable when `geometry=None` without self-reference.
+
+#### 20.4.1 `BLOCKED_NORMALIZED_CONTEXT_BY_FAILURE_STAGE`
+
+```text
+BLOCKED_CONTEXT_STAGE_COUNT=10
+BLOCKED_CONTEXT_ALL_STAGE_FIELD_ORDERS_EXACT=true
+BLOCKED_CONTEXT_PLACEHOLDER_COUNT=0
+BLOCKED_RESULT_CANONICAL_PROJECTION_EXACT=true
+NF004_SECOND_CORRECTION_APPLIED=true
+```
+
+`normalized_context` is an ordered tuple of named context slices. Each slice uses
+canonical encoding frozen elsewhere. Malformed raw values belong only in
+`raw_failing_field`, never silently inside `normalized_context`.
+
+| failure_stage | stage_rank | verified_context_fields_in_exact_order | raw_failing_field_semantics | eligible_warning_boundary |
+|---|---:|---|---|---|
+| raw top-level/schema | 1 | `()` | canonical snapshot of first failing top-level raw field, or `null` if type failure | no warnings |
+| nested public-shape decoding | 2 | `(request_schema_version, evidence_refs)` | canonical snapshot of first failing nested decode field path | no warnings |
+| TASK-021 validation/identity replay | 3 | `(request_schema_version, evidence_refs, engineering_authority_request_binding, tube_layout_public_projection)` | canonical snapshot of first failing TASK-021 field, or `null` | no warnings |
+| TASK-024 validation/identity replay | 4 | Stage-3 tuple plus `(task024_result_binding)` per §20.1.1 | canonical snapshot of first failing TASK-024 wrapper/geometry field | no warnings |
+| TASK-021/TASK-024 cross-binding | 5 | Stage-4 tuple plus `(cross_binding_projection)` where `cross_binding_projection` ordered fields are: `task020_configuration_id`, `task020_configuration_hash`, `task021_layout_id`, `task021_layout_hash`, `task022_geometry_id`, `task022_geometry_hash`, `task024_geometry_id`, `task024_geometry_hash`, `task021_tube_outer_diameter_m`, `task024_tube_outer_diameter_m` | canonical snapshot of first failing cross-bind field | no warnings |
+| applicability and central-spacing | 6 | Stage-5 tuple plus `(applicability_context_projection)` ordered: `construction_family`, `shell_pass_count`, `baffle_type`, `baffle_count`, `pattern_family`, `spacing_sequence_m`, `central_inter_baffle_spacing_m` | canonical snapshot of first failing applicability field | warnings with prerequisite_stage `<= 6` eligible |
+| engineering-authority identity | 7 | Stage-6 tuple plus `(engineering_authority_verified_projection)` ordered: `engineering_authority_profile_id`, `engineering_authority_hash` | canonical snapshot of first failing authority field | warnings with prerequisite_stage `<= 7` eligible |
+| numeric predicates/formula evaluation | 8 | Stage-7 tuple plus `(numeric_context_projection)` ordered: `shell_inside_diameter_m`, `tube_outside_diameter_m`, `pitch_m`, `pattern_family`, `central_inter_baffle_spacing_m`, `formula_a_id`, `formula_b_id` | canonical snapshot of first failing numeric predicate field | warnings with prerequisite_stage `<= 7` eligible |
+| public quantization | 9 | Stage-8 tuple plus `(engineering_raw_projection)` ordered: `central_crossflow_flow_area_raw`, `shell_side_equivalent_hydraulic_diameter_raw`, `selected_formula_b_branch` | canonical snapshot of first failing quantization input | warnings with prerequisite_stage `<= 7` eligible |
+| canonical/hash/provenance/final assembly | 10 | Stage-9 tuple plus `(pre_final_assembly_projection)` ordered: `request_hash`, `engineering_authority_id`, `eligible_warnings`, `blockers` | canonical snapshot of first failing assembly field | warnings with prerequisite_stage `<= 7` eligible |
+
+Same `failure_stage`, same verified slices, same `raw_failing_field`, same
+eligible warnings, and same blockers must yield identical `blocked_result_hash`.
 
 ### 20.5 `PROVENANCE_PREHASH_PROJECTION`
 
@@ -1396,13 +1486,34 @@ actually frozen.
 
 ## 23. Engineering verification vectors
 
+```text
+VECTOR_COUNT=14
+ENGINEERING_VECTOR_COUNT=14
+ENGINEERING_VECTORS_V3_V14_COMPLETE=true
+VECTOR_PLACEHOLDER_COUNT=0
+NF003_SECOND_CORRECTION_APPLIED=true
+F009_CORRECTION_APPLIED=true
+ENGINEERING_VECTORS_COMPLETE=true
+```
+
 Design-time vectors only. Expected implementation output must never be used as
 formula authority. V1 and V2 use independent arithmetic from the frozen π / √3
 Decimal constants and §11.8 singular runtime sequences.
 
+Frozen engineering authority hash for all vectors unless explicitly mutated:
+
 ```text
-F009_CORRECTION_APPLIED=true
-ENGINEERING_VECTORS_COMPLETE=true
+engineering_authority_hash=1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837989
+authority_profile_id=TASK031_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_V1_FORMULA_AUTHORITY
+```
+
+Design-time helper for base fixture generation:
+
+```text
+helper_module=tests.exchangers.shell_tube.baffle_geometry._builders
+helper_functions=make_oracle_layout, build_valid_t024
+canonical_helpers=hexagent.exchangers.shell_tube.tube_layout.canonical,
+  hexagent.exchangers.shell_tube.baffle_geometry.validation.validate_request
 ```
 
 ### 23.1 Reference scalar oracle (independent SI)
@@ -1415,120 +1526,984 @@ do=0.019 m
 Ct=0.006 m
 
 As_raw=0.00750 m^2
-As_public=0.007500000000000000000000 m^2   # AREA quantum 1e-24
+As_public=0.007500000000000000000000 m^2
 
 De_square_raw≈0.022882879761025088360232569308556411061699906773805 m
-De_square_public=0.022882879761 m            # DIAMETER quantum 1e-12
+De_square_public=0.022882879761 m
 
 De_triangular_raw≈0.017271637856696845362587269625853252723512268445175 m
-De_triangular_public=0.017271637857 m        # DIAMETER quantum 1e-12
+De_triangular_public=0.017271637857 m
 ```
 
-### 23.2 Vector definitions
+Historical non-authoritative typo (do not use as oracle):
+`0.017271637856696855`
 
-Each vector specifies: `VECTOR_ID`, purpose, exact raw/normalized inputs,
-TASK-021 identity/binding setup, TASK-024 identity/binding setup, pattern
-family, baffle count, spacing sequence, `Ds`, `Pt`, `do`, engineering authority
-identity/profile, expected status, expected branch, expected public warnings,
-expected blocker(s), expected raw engineering values, expected quantized values,
-and oracle derivation.
+### 23.2 `TASK031_VECTOR_BASE_FIXTURE_V1`
 
-**V1 — valid SQUARE**
+Complete exact serializable raw request. Pinned upstream identity literals:
 
-- purpose: baseline valid SQUARE central-crossflow screening
-- inputs: reference scalar oracle with `pattern_family=SQUARE`, `N=2`, uniform
-  central spacing `B=0.125 m`, inlet/outlet equal to central for simplicity
-- expected status: `VALID`
-- expected branch: Formula B square
-- expected warnings: all 7 baseline warnings
-- expected raw: `As_raw=0.00750`, `De_square_raw` per §23.1
-- expected public: `0.007500000000000000000000`, `0.022882879761`
-- oracle: independent Decimal evaluation per §11.8
+```text
+BASE_FIXTURE_ID=TASK031_VECTOR_BASE_FIXTURE_V1
+task021_layout_id=c79cb4d3-824b-52c0-a7b2-81e926fb3849
+task021_layout_hash=97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f
+task024_geometry_id=f701890c-8848-517b-ab72-48f8f78c4b0a
+task024_geometry_hash=8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f
+pattern_family=SQUARE
+baffle_count=2
+spacing_sequence_m=["0.125000000000","0.125000000000","0.125000000000"]
+shell_inside_diameter_m=0.250000000000
+tube_outer_diameter_m=0.019000000000
+pitch_m=0.025000000000
+```
 
-**V2 — valid TRIANGULAR**
+```json
+{
+  "schema_version": "task031.shell-side-hydraulic-geometry-request.v1",
+  "tube_layout": {
+    "schema_version": "task021.tube-layout.v1",
+    "layout_id": "c79cb4d3-824b-52c0-a7b2-81e926fb3849",
+    "layout_hash": "97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f",
+    "request_hash": "93f3ea2badfa489da56dadadcb13f296b85f4b2efd7dc82311827acf707dd0ce",
+    "task020_configuration_id": "050a7064-af75-5990-82a1-51f0eb0a3a6b",
+    "task020_configuration_hash": "b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9",
+    "case_authority": {
+      "domain_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "payload_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "revision_id": "rev-task024-001",
+      "revision_status": "committed"
+    },
+    "construction_family": "FIXED_TUBESHEET",
+    "equipment_orientation": "HORIZONTAL",
+    "shell_pass_count": 1,
+    "tube_pass_count": 2,
+    "tube_geometry": {
+      "geometry_id": "task031-vector-tube-od-19mm",
+      "geometry_type": "tube",
+      "revision": "1",
+      "approval_state": "approved",
+      "outer_diameter_m": "0.019000000000",
+      "inner_diameter_m": "0.016000000000",
+      "wall_thickness_m": "0.001500000000",
+      "record_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "snapshot_hash": "5e684672eb15a7173e0154bf43643958c36f58ed1eb4d0a497a2a37db0ad273d",
+      "source_binding": {
+        "source_id": "task031-vector-tube-geometry-source",
+        "source_type": "approved-record",
+        "source_revision": "1",
+        "source_location": "memory://task031/design-vector",
+        "evidence_ref": "task031-vector-tube-geometry-evidence",
+        "approved_by": "design-vector-authority",
+        "approved_at": "2026-08-17T00:00:00Z"
+      }
+    },
+    "layout_rule_authority": {
+      "profile_id": "hxforge.shell_tube.tube_layout.v1",
+      "authority_mode": "INTERNAL_GENERIC",
+      "rule_id": "task031-vector-layout-rule",
+      "rule_version": "1",
+      "rule_artifact_canonical_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "source_class": "INTERNAL_ENGINEERING_RULE",
+      "license_evidence": {
+        "status": "NO_STANDARD_CLAIM"
+      },
+      "approval_status": "approved",
+      "provenance_edge_ids": [
+        "edge-task031-vector-1"
+      ],
+      "evidence_refs": [
+        "task031-vector-layout-rule-evidence"
+      ],
+      "rule_pack_identity": null,
+      "pattern_family": "SQUARE",
+      "pitch_m": "0.025000000000",
+      "edge_clearance_m": "0",
+      "allowed_origin_modes": [
+        "CENTER_ON_LATTICE_POINT"
+      ],
+      "allowed_axis_orientations": [
+        "PRIMARY_AXIS_X"
+      ],
+      "allowed_exclusion_zone_types": [
+        "AXIS_ALIGNED_RECTANGLE",
+        "CIRCLE"
+      ],
+      "maximum_candidate_positions": 100000,
+      "snapshot_hash": "aabb892634de529b39d6e238ab508dd66836a82e94e4e6dbb97f52b9d4b6a1c2"
+    },
+    "placement_envelope": {
+      "schema_version": "task021.circular-envelope.v1",
+      "tube_center_envelope_diameter_m": "0.500000000000",
+      "evidence_refs": [
+        "task031-vector-envelope-evidence"
+      ]
+    },
+    "origin_mode": "CENTER_ON_LATTICE_POINT",
+    "axis_orientation": "PRIMARY_AXIS_X",
+    "exclusion_zones": [],
+    "positions": [
+      {
+        "position_id": "9e8c208f4b01dad56d1db5c21edec68a04ec61442b729140c88580e26ad61f44",
+        "u": 0,
+        "v": 0,
+        "x_m": "0.010000000000",
+        "y_m": "0.000000000000"
+      }
+    ],
+    "tube_hole_count": 1,
+    "physical_tube_count": 1,
+    "boundary_rejection_count": 0,
+    "exclusion_rejection_count": 0,
+    "exclusion_audit": [],
+    "warnings": [],
+    "blockers": [],
+    "deferred_capabilities": [],
+    "provenance": {
+      "approval_status": "approved",
+      "deferred_capabilities": [],
+      "design_contract_path": "docs/tasks/TASK-021-shell-and-tube-tube-layout.md",
+      "envelope_evidence_refs": [
+        "task024-envelope-evidence"
+      ],
+      "exclusion_zone_evidence_refs": [],
+      "geometry_id": "task031-vector-tube-od-19mm",
+      "geometry_record_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "geometry_revision": "1",
+      "geometry_source_binding": {
+        "approved_at": "2026-08-17T00:00:00Z",
+        "approved_by": "design-vector-authority",
+        "evidence_ref": "task031-vector-tube-geometry-evidence",
+        "source_id": "task031-vector-tube-geometry-source",
+        "source_location": "memory://task031/design-vector",
+        "source_revision": "1",
+        "source_type": "approved-record"
+      },
+      "git_commit": "test-only",
+      "layout_rule_evidence_refs": [
+        "task031-vector-layout-rule-evidence"
+      ],
+      "layout_rule_id": "task031-vector-layout-rule",
+      "layout_rule_profile_id": "hxforge.shell_tube.tube_layout.v1",
+      "layout_rule_snapshot_hash": "aabb892634de529b39d6e238ab508dd66836a82e94e4e6dbb97f52b9d4b6a1c2",
+      "layout_rule_version": "1",
+      "provenance_edge_ids": [
+        "edge-task031-vector-1"
+      ],
+      "request_hash": "93f3ea2badfa489da56dadadcb13f296b85f4b2efd7dc82311827acf707dd0ce",
+      "rule_artifact_canonical_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "rule_pack_identity": null,
+      "software_version": "task024-test",
+      "source_class": "INTERNAL_ENGINEERING_RULE",
+      "task020_case_authority": {
+        "domain_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "payload_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "revision_id": "rev-task024-001",
+        "revision_status": "committed"
+      },
+      "task020_configuration_hash": "b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9",
+      "task020_configuration_id": "050a7064-af75-5990-82a1-51f0eb0a3a6b",
+      "task_id": "task021",
+      "tube_geometry_snapshot_hash": "5e684672eb15a7173e0154bf43643958c36f58ed1eb4d0a497a2a37db0ad273d",
+      "u_tube_pairing_evidence_refs": null,
+      "warnings": []
+    }
+  },
+  "baffle_geometry_result": {
+    "status": "VALID",
+    "geometry": {
+      "schema_version": "task024.baffle-geometry.v1",
+      "geometry_id": "f701890c-8848-517b-ab72-48f8f78c4b0a",
+      "geometry_hash": "8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f",
+      "request_hash": "864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab",
+      "task020_configuration_id": "050a7064-af75-5990-82a1-51f0eb0a3a6b",
+      "task020_configuration_hash": "b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9",
+      "task021_layout_id": "c79cb4d3-824b-52c0-a7b2-81e926fb3849",
+      "task021_layout_hash": "97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f",
+      "task022_geometry_id": "d107c851-1d8d-5967-b124-d941d2bd0055",
+      "task022_geometry_hash": "60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f",
+      "construction_family": "FIXED_TUBESHEET",
+      "equipment_orientation": "HORIZONTAL",
+      "shell_pass_count": 1,
+      "tube_pass_count": 2,
+      "shell_inside_diameter_m": "0.250000000000",
+      "tube_outer_diameter_m": "0.019000000000",
+      "axial_span": {
+        "schema_version": "task024.baffle-axial-span.v1",
+        "axial_start_coordinate_m": "0.0",
+        "axial_end_coordinate_m": "0.375000000000",
+        "evidence_refs": [
+          "task024-axial-evidence"
+        ],
+        "authority_hash": "32cf6d50431010f1d5366b9bbdb5bf1c41da7cbd2926e9ae169cf613e38f9af2"
+      },
+      "design_authority": {
+        "schema_version": "task024.caller-baffle-design-authority.v1",
+        "baffle_type": "SINGLE_SEGMENTAL",
+        "baffle_count": 2,
+        "baffle_thickness_m": "0.01",
+        "spacing_sequence_m": [
+          "0.125000000000",
+          "0.125000000000",
+          "0.125000000000"
+        ],
+        "baffle_cut_fraction": "0.25",
+        "orientation_sequence": [
+          "TOP",
+          "TOP"
+        ],
+        "shell_to_baffle_diametral_clearance_m": "0.001",
+        "tube_to_baffle_hole_diametral_clearance_m": "0.001",
+        "evidence_refs": [
+          "task024-design-evidence"
+        ],
+        "authority_hash": "1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188"
+      },
+      "usable_baffle_span_m": "0.375000000000",
+      "baffle_diameter_m": "0.249000000000",
+      "baffle_radius_m": "0.124500000000",
+      "baffle_hole_diameter_m": "0.020000000000",
+      "baffle_hole_radius_m": "0.010000000000",
+      "cut_height_m": "0.062250000000",
+      "chord_offset_from_center_m": "0.062250000000",
+      "baffle_planes": [
+        {
+          "baffle_index": 0,
+          "center_coordinate_m": "0.125000000000",
+          "occupied_start_coordinate_m": "0.120000000000",
+          "occupied_end_coordinate_m": "0.130000000000",
+          "orientation": "TOP",
+          "cut_chord": {
+            "normal_x": 0,
+            "normal_y": 1,
+            "half_plane_offset_m": "0.062250000000",
+            "chord_half_length_m": "0.107820162771",
+            "endpoint_a_x_m": "-0.107820162771",
+            "endpoint_a_y_m": "0.062250000000",
+            "endpoint_b_x_m": "0.107820162771",
+            "endpoint_b_y_m": "0.062250000000"
+          },
+          "window_region_semantics": "BAFFLE_DISK_INTERSECTION_WINDOW_HALF_PLANE",
+          "baffle_covered_region_semantics": "BAFFLE_DISK_MINUS_WINDOW_SEGMENT",
+          "crossflow_reference_region_semantics": "CLASSIFICATION_REFERENCE_ONLY_NOT_FLOW_AREA",
+          "tube_hole_classifications": [
+            {
+              "position_id": "9e8c208f4b01dad56d1db5c21edec68a04ec61442b729140c88580e26ad61f44",
+              "center_x_m": "0.010000000000",
+              "center_y_m": "0",
+              "physical_tube_radius_m": "0.009500000000",
+              "baffle_hole_radius_m": "0.010000000000",
+              "signed_window_distance_m": "-0.06225000000000",
+              "cut_boundary_margin_m": "-0.07225000000000",
+              "classification": "CROSSFLOW_REFERENCE",
+              "outer_boundary_margin_squared_m2": "0.013010250000000000000000",
+              "physical_tube_disk_audit": {
+                "physical_tube_radius_m": "0.009500000000",
+                "signed_window_distance_m": "-0.06225000000000",
+                "cut_boundary_margin_m": "-0.07225000000000",
+                "classification": "CROSSFLOW_REFERENCE"
+              }
+            }
+          ],
+          "window_position_ids": [],
+          "crossflow_reference_position_ids": [
+            "9e8c208f4b01dad56d1db5c21edec68a04ec61442b729140c88580e26ad61f44"
+          ],
+          "outer_tangent_position_ids": [],
+          "pairwise_tangent_position_pairs": [],
+          "classification_audit_hash": "718955d830fe25526fc5b232252940bd72879c22d2c6295815bda22ea09acacc"
+        },
+        {
+          "baffle_index": 1,
+          "center_coordinate_m": "0.250000000000",
+          "occupied_start_coordinate_m": "0.245000000000",
+          "occupied_end_coordinate_m": "0.255000000000",
+          "orientation": "TOP",
+          "cut_chord": {
+            "normal_x": 0,
+            "normal_y": 1,
+            "half_plane_offset_m": "0.062250000000",
+            "chord_half_length_m": "0.107820162771",
+            "endpoint_a_x_m": "-0.107820162771",
+            "endpoint_a_y_m": "0.062250000000",
+            "endpoint_b_x_m": "0.107820162771",
+            "endpoint_b_y_m": "0.062250000000"
+          },
+          "window_region_semantics": "BAFFLE_DISK_INTERSECTION_WINDOW_HALF_PLANE",
+          "baffle_covered_region_semantics": "BAFFLE_DISK_MINUS_WINDOW_SEGMENT",
+          "crossflow_reference_region_semantics": "CLASSIFICATION_REFERENCE_ONLY_NOT_FLOW_AREA",
+          "tube_hole_classifications": [
+            {
+              "position_id": "9e8c208f4b01dad56d1db5c21edec68a04ec61442b729140c88580e26ad61f44",
+              "center_x_m": "0.010000000000",
+              "center_y_m": "0",
+              "physical_tube_radius_m": "0.009500000000",
+              "baffle_hole_radius_m": "0.010000000000",
+              "signed_window_distance_m": "-0.06225000000000",
+              "cut_boundary_margin_m": "-0.07225000000000",
+              "classification": "CROSSFLOW_REFERENCE",
+              "outer_boundary_margin_squared_m2": "0.013010250000000000000000",
+              "physical_tube_disk_audit": {
+                "physical_tube_radius_m": "0.009500000000",
+                "signed_window_distance_m": "-0.06225000000000",
+                "cut_boundary_margin_m": "-0.07225000000000",
+                "classification": "CROSSFLOW_REFERENCE"
+              }
+            }
+          ],
+          "window_position_ids": [],
+          "crossflow_reference_position_ids": [
+            "9e8c208f4b01dad56d1db5c21edec68a04ec61442b729140c88580e26ad61f44"
+          ],
+          "outer_tangent_position_ids": [],
+          "pairwise_tangent_position_pairs": [],
+          "classification_audit_hash": "0b493917e7a1fac368487d541aaf6150ebfed338ecf4914455c2d85b8a1f68b6"
+        }
+      ],
+      "position_count": 1,
+      "warnings": [
+        {
+          "code": "BFG_FIXED_TUBESHEET_ONLY_V1",
+          "field_path": "configuration.construction_family",
+          "message_key": "fixed_tubesheet_only_v1",
+          "evidence_refs": [
+            "task031-vector-baffle-evidence"
+          ],
+          "details": [
+            [
+              "construction_family",
+              "FIXED_TUBESHEET"
+            ]
+          ]
+        },
+        {
+          "code": "BFG_GEOMETRY_NOT_FLOW_AREA",
+          "field_path": null,
+          "message_key": "geometry_not_flow_area",
+          "evidence_refs": [
+            "task031-vector-baffle-evidence"
+          ],
+          "details": [
+            [
+              "flow_area_calculation_performed",
+              "false"
+            ]
+          ]
+        },
+        {
+          "code": "BFG_NOZZLE_POSITION_DEFERRED",
+          "field_path": null,
+          "message_key": "nozzle_position_deferred",
+          "evidence_refs": [
+            "task031-vector-baffle-evidence"
+          ],
+          "details": [
+            [
+              "nozzle_position_inference_performed",
+              "false"
+            ]
+          ]
+        },
+        {
+          "code": "BFG_THERMAL_HYDRAULIC_DEFERRED",
+          "field_path": null,
+          "message_key": "thermal_hydraulic_deferred",
+          "evidence_refs": [
+            "task031-vector-baffle-evidence"
+          ],
+          "details": [
+            [
+              "thermal_hydraulic_calculation_performed",
+              "false"
+            ]
+          ]
+        },
+        {
+          "code": "BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM",
+          "field_path": "design_authority",
+          "message_key": "caller_supplied_no_standard_claim",
+          "evidence_refs": [
+            "task024-design-evidence"
+          ],
+          "details": [
+            [
+              "authority_mode",
+              "CALLER_SUPPLIED_EXPLICIT"
+            ],
+            [
+              "standard_claim_status",
+              "NO_STANDARD_CLAIM"
+            ]
+          ]
+        }
+      ],
+      "blockers": [],
+      "deferred_capabilities": [
+        "CROSSFLOW_FLOW_AREA_NOT_COMPUTABLE",
+        "WINDOW_FLOW_AREA_NOT_COMPUTABLE",
+        "MINIMUM_CROSSFLOW_AREA_NOT_COMPUTABLE",
+        "HYDRAULIC_DIAMETER_NOT_COMPUTABLE",
+        "LEAKAGE_FLOW_AREA_NOT_COMPUTABLE",
+        "BYPASS_FLOW_AREA_NOT_COMPUTABLE",
+        "LEAKAGE_CORRECTION_FACTOR_NOT_COMPUTABLE",
+        "BYPASS_CORRECTION_FACTOR_NOT_COMPUTABLE",
+        "SHELL_SIDE_THERMAL_RATING_NOT_COMPUTABLE",
+        "KERN_SCREENING_NOT_COMPUTABLE",
+        "BELL_DELAWARE_NOT_COMPUTABLE",
+        "SHELL_SIDE_PRESSURE_DROP_NOT_COMPUTABLE",
+        "TUBE_SIDE_PRESSURE_DROP_NOT_COMPUTABLE",
+        "FLOW_INDUCED_VIBRATION_NOT_COMPUTABLE",
+        "THERMAL_EXPANSION_NOT_COMPUTABLE",
+        "MECHANICAL_ADEQUACY_NOT_COMPUTABLE",
+        "MANUFACTURING_ADEQUACY_NOT_COMPUTABLE",
+        "MATERIAL_SELECTION_NOT_COMPUTABLE",
+        "MASS_NOT_COMPUTABLE",
+        "COST_NOT_COMPUTABLE",
+        "OPTIMIZATION_NOT_COMPUTABLE",
+        "API_NOT_COMPUTABLE",
+        "PERSISTENCE_NOT_COMPUTABLE",
+        "CLI_NOT_COMPUTABLE",
+        "REPORT_NOT_COMPUTABLE",
+        "GOLDEN_VALIDATION_NOT_COMPUTABLE"
+      ],
+      "provenance": [
+        [
+          "task_id",
+          "TASK-024"
+        ],
+        [
+          "design_contract_path",
+          "docs/tasks/TASK-024-shell-and-tube-baffle-geometry-and-spacing.md"
+        ],
+        [
+          "profile_id",
+          "hxforge.shell_tube.baffle_geometry.v1"
+        ],
+        [
+          "software_version",
+          "task024.minimal-compute-v1"
+        ],
+        [
+          "git_commit",
+          "82ce66fa1e479c5affd64f08c98496425d8bc09b"
+        ],
+        [
+          "task020_configuration_id",
+          "050a7064-af75-5990-82a1-51f0eb0a3a6b"
+        ],
+        [
+          "task020_configuration_hash",
+          "b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9"
+        ],
+        [
+          "task020_case_authority",
+          {
+            "revision_id": "rev-task024-001",
+            "payload_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "domain_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "revision_status": "COMMITTED"
+          }
+        ],
+        [
+          "task021_layout_id",
+          "c79cb4d3-824b-52c0-a7b2-81e926fb3849"
+        ],
+        [
+          "task021_layout_hash",
+          "97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f"
+        ],
+        [
+          "task021_tube_geometry_snapshot_hash",
+          "5e684672eb15a7173e0154bf43643958c36f58ed1eb4d0a497a2a37db0ad273d"
+        ],
+        [
+          "task021_layout_rule_snapshot_hash",
+          "aabb892634de529b39d6e238ab508dd66836a82e94e4e6dbb97f52b9d4b6a1c2"
+        ],
+        [
+          "task022_geometry_id",
+          "d107c851-1d8d-5967-b124-d941d2bd0055"
+        ],
+        [
+          "task022_geometry_hash",
+          "60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f"
+        ],
+        [
+          "task022_shell_authority_mode",
+          "CALLER_SUPPLIED_EXPLICIT"
+        ],
+        [
+          "task022_shell_authority_identity",
+          {
+            "shell_authority_mode": "CALLER_SUPPLIED_EXPLICIT",
+            "caller_supplied_shell": null,
+            "approved_shell_geometry": null
+          }
+        ],
+        [
+          "task022_geometry_rule_snapshot_hash",
+          "815b9c91935ff319bf00c40c26993a8cc8c941e7ed0eb7fc98774a8a9e26ecce"
+        ],
+        [
+          "axial_span_authority_hash",
+          "32cf6d50431010f1d5366b9bbdb5bf1c41da7cbd2926e9ae169cf613e38f9af2"
+        ],
+        [
+          "baffle_design_authority_hash",
+          "1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188"
+        ],
+        [
+          "request_hash",
+          "864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab"
+        ],
+        [
+          "source_claim_status",
+          "NO_STANDARD_CLAIM"
+        ],
+        [
+          "automatic_selection_performed",
+          false
+        ],
+        [
+          "nozzle_position_inference_performed",
+          false
+        ],
+        [
+          "flow_area_calculation_performed",
+          false
+        ],
+        [
+          "warnings",
+          [
+            {
+              "code": "BFG_FIXED_TUBESHEET_ONLY_V1",
+              "field_path": "configuration.construction_family",
+              "message_key": "fixed_tubesheet_only_v1",
+              "evidence_refs": [
+                "task031-vector-baffle-evidence"
+              ],
+              "details": [
+                [
+                  "construction_family",
+                  "FIXED_TUBESHEET"
+                ]
+              ]
+            },
+            {
+              "code": "BFG_GEOMETRY_NOT_FLOW_AREA",
+              "field_path": null,
+              "message_key": "geometry_not_flow_area",
+              "evidence_refs": [
+                "task031-vector-baffle-evidence"
+              ],
+              "details": [
+                [
+                  "flow_area_calculation_performed",
+                  "false"
+                ]
+              ]
+            },
+            {
+              "code": "BFG_NOZZLE_POSITION_DEFERRED",
+              "field_path": null,
+              "message_key": "nozzle_position_deferred",
+              "evidence_refs": [
+                "task031-vector-baffle-evidence"
+              ],
+              "details": [
+                [
+                  "nozzle_position_inference_performed",
+                  "false"
+                ]
+              ]
+            },
+            {
+              "code": "BFG_THERMAL_HYDRAULIC_DEFERRED",
+              "field_path": null,
+              "message_key": "thermal_hydraulic_deferred",
+              "evidence_refs": [
+                "task031-vector-baffle-evidence"
+              ],
+              "details": [
+                [
+                  "thermal_hydraulic_calculation_performed",
+                  "false"
+                ]
+              ]
+            },
+            {
+              "code": "BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM",
+              "field_path": "design_authority",
+              "message_key": "caller_supplied_no_standard_claim",
+              "evidence_refs": [
+                "task024-design-evidence"
+              ],
+              "details": [
+                [
+                  "authority_mode",
+                  "CALLER_SUPPLIED_EXPLICIT"
+                ],
+                [
+                  "standard_claim_status",
+                  "NO_STANDARD_CLAIM"
+                ]
+              ]
+            }
+          ]
+        ],
+        [
+          "deferred_capabilities",
+          [
+            "CROSSFLOW_FLOW_AREA_NOT_COMPUTABLE",
+            "WINDOW_FLOW_AREA_NOT_COMPUTABLE",
+            "MINIMUM_CROSSFLOW_AREA_NOT_COMPUTABLE",
+            "HYDRAULIC_DIAMETER_NOT_COMPUTABLE",
+            "LEAKAGE_FLOW_AREA_NOT_COMPUTABLE",
+            "BYPASS_FLOW_AREA_NOT_COMPUTABLE",
+            "LEAKAGE_CORRECTION_FACTOR_NOT_COMPUTABLE",
+            "BYPASS_CORRECTION_FACTOR_NOT_COMPUTABLE",
+            "SHELL_SIDE_THERMAL_RATING_NOT_COMPUTABLE",
+            "KERN_SCREENING_NOT_COMPUTABLE",
+            "BELL_DELAWARE_NOT_COMPUTABLE",
+            "SHELL_SIDE_PRESSURE_DROP_NOT_COMPUTABLE",
+            "TUBE_SIDE_PRESSURE_DROP_NOT_COMPUTABLE",
+            "FLOW_INDUCED_VIBRATION_NOT_COMPUTABLE",
+            "THERMAL_EXPANSION_NOT_COMPUTABLE",
+            "MECHANICAL_ADEQUACY_NOT_COMPUTABLE",
+            "MANUFACTURING_ADEQUACY_NOT_COMPUTABLE",
+            "MATERIAL_SELECTION_NOT_COMPUTABLE",
+            "MASS_NOT_COMPUTABLE",
+            "COST_NOT_COMPUTABLE",
+            "OPTIMIZATION_NOT_COMPUTABLE",
+            "API_NOT_COMPUTABLE",
+            "PERSISTENCE_NOT_COMPUTABLE",
+            "CLI_NOT_COMPUTABLE",
+            "REPORT_NOT_COMPUTABLE",
+            "GOLDEN_VALIDATION_NOT_COMPUTABLE"
+          ]
+        ]
+      ]
+    },
+    "warnings": [
+      {
+        "code": "BFG_FIXED_TUBESHEET_ONLY_V1",
+        "field_path": "configuration.construction_family",
+        "message_key": "fixed_tubesheet_only_v1",
+        "evidence_refs": [
+          "task031-vector-baffle-evidence"
+        ],
+        "details": [
+          [
+            "construction_family",
+            "FIXED_TUBESHEET"
+          ]
+        ]
+      },
+      {
+        "code": "BFG_GEOMETRY_NOT_FLOW_AREA",
+        "field_path": null,
+        "message_key": "geometry_not_flow_area",
+        "evidence_refs": [
+          "task031-vector-baffle-evidence"
+        ],
+        "details": [
+          [
+            "flow_area_calculation_performed",
+            "false"
+          ]
+        ]
+      },
+      {
+        "code": "BFG_NOZZLE_POSITION_DEFERRED",
+        "field_path": null,
+        "message_key": "nozzle_position_deferred",
+        "evidence_refs": [
+          "task031-vector-baffle-evidence"
+        ],
+        "details": [
+          [
+            "nozzle_position_inference_performed",
+            "false"
+          ]
+        ]
+      },
+      {
+        "code": "BFG_THERMAL_HYDRAULIC_DEFERRED",
+        "field_path": null,
+        "message_key": "thermal_hydraulic_deferred",
+        "evidence_refs": [
+          "task031-vector-baffle-evidence"
+        ],
+        "details": [
+          [
+            "thermal_hydraulic_calculation_performed",
+            "false"
+          ]
+        ]
+      },
+      {
+        "code": "BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM",
+        "field_path": "design_authority",
+        "message_key": "caller_supplied_no_standard_claim",
+        "evidence_refs": [
+          "task024-design-evidence"
+        ],
+        "details": [
+          [
+            "authority_mode",
+            "CALLER_SUPPLIED_EXPLICIT"
+          ],
+          [
+            "standard_claim_status",
+            "NO_STANDARD_CLAIM"
+          ]
+        ]
+      }
+    ],
+    "blockers": [],
+    "deferred_capabilities": [
+      "CROSSFLOW_FLOW_AREA_NOT_COMPUTABLE",
+      "WINDOW_FLOW_AREA_NOT_COMPUTABLE",
+      "MINIMUM_CROSSFLOW_AREA_NOT_COMPUTABLE",
+      "HYDRAULIC_DIAMETER_NOT_COMPUTABLE",
+      "LEAKAGE_FLOW_AREA_NOT_COMPUTABLE",
+      "BYPASS_FLOW_AREA_NOT_COMPUTABLE",
+      "LEAKAGE_CORRECTION_FACTOR_NOT_COMPUTABLE",
+      "BYPASS_CORRECTION_FACTOR_NOT_COMPUTABLE",
+      "SHELL_SIDE_THERMAL_RATING_NOT_COMPUTABLE",
+      "KERN_SCREENING_NOT_COMPUTABLE",
+      "BELL_DELAWARE_NOT_COMPUTABLE",
+      "SHELL_SIDE_PRESSURE_DROP_NOT_COMPUTABLE",
+      "TUBE_SIDE_PRESSURE_DROP_NOT_COMPUTABLE",
+      "FLOW_INDUCED_VIBRATION_NOT_COMPUTABLE",
+      "THERMAL_EXPANSION_NOT_COMPUTABLE",
+      "MECHANICAL_ADEQUACY_NOT_COMPUTABLE",
+      "MANUFACTURING_ADEQUACY_NOT_COMPUTABLE",
+      "MATERIAL_SELECTION_NOT_COMPUTABLE",
+      "MASS_NOT_COMPUTABLE",
+      "COST_NOT_COMPUTABLE",
+      "OPTIMIZATION_NOT_COMPUTABLE",
+      "API_NOT_COMPUTABLE",
+      "PERSISTENCE_NOT_COMPUTABLE",
+      "CLI_NOT_COMPUTABLE",
+      "REPORT_NOT_COMPUTABLE",
+      "GOLDEN_VALIDATION_NOT_COMPUTABLE"
+    ],
+    "blocked_result_hash": null
+  },
+  "engineering_authority": {
+    "schema_version": "task031.engineering-authority-request.v1",
+    "authority_profile_id": "TASK031_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_V1_FORMULA_AUTHORITY",
+    "authority_hash": "1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837989",
+    "evidence_refs": [
+      "task031-design-vector-evidence-001"
+    ]
+  },
+  "evidence_refs": [
+    "task031-design-vector-evidence-001"
+  ]
+}
+```
 
-- same as V1 except `pattern_family=TRIANGULAR`
-- expected branch: Formula B triangular
-- expected raw: `As_raw=0.00750`, `De_triangular_raw` per §23.1
-- expected public: `0.007500000000000000000000`, `0.017271637857`
-- oracle: independent Decimal evaluation per §11.8; do not use prior review typo
-  `0.017271637856696855`
+### 23.3 Vector registry
 
-**V3 — minimum topology N=2**
+Mutation discipline: each vector lists exact JSON-pointer mutations against
+`TASK031_VECTOR_BASE_FIXTURE_V1` unless a complete replacement raw request is
+pinned. Any mutation that changes upstream identity must pin the resulting
+`layout_hash`, `geometry_hash`, and related binding literals in
+`FINAL_EXPECTED_UPSTREAM_IDS_HASHES`.
 
-- exact `N=2`, `len(S)=3`, one central inter-baffle value
-- expected status: `VALID`
+#### V1 — valid SQUARE (equals base fixture)
 
-**V4 — inlet/outlet differ, central uniform**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V1 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
+| MUTATION_COUNT | 0 |
+| EXPECTED_STATUS | VALID |
+| EXPECTED_FAILURE_STAGE | NOT_REACHED |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | NOT_REACHED |
+| EXPECTED_WARNING_CODES_IN_ORDER | all seven §17 warnings in sort order |
+| EXPECTED_FORMULA_BRANCH | Formula B square |
+| EXPECTED_RAW_AS | 0.00750 |
+| EXPECTED_PUBLIC_AS | 0.007500000000000000000000 |
+| EXPECTED_RAW_DE | 0.022882879761025088360232569308556411061699906773805 |
+| EXPECTED_PUBLIC_DE | 0.022882879761 |
+| ORACLE_DERIVATION | §11.8 independent Decimal evaluation |
 
-- `S[0] != S[1] == S[2] != S[3]` with uniform central members
-- expected status: `VALID`
+#### V2 — valid TRIANGULAR
 
-**V5 — nonuniform central spacing**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V2 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
+| MUTATION_COUNT | 1 |
+| MUTATIONS_IN_ORDER | rebuild with `pattern_family=TRIANGULAR` via design-time helper |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | `task021_layout_hash=3cd748e4ff1de456e7e0ccbba632d2590495ed0348be855ac07e6b964756bc59`; `task024_geometry_hash=c03ef2c02ab56daa1786f25d2a2e380803ba89edebf67acaf3bed2a525dfc249` |
+| EXPECTED_STATUS | VALID |
+| EXPECTED_FAILURE_STAGE | NOT_REACHED |
+| EXPECTED_FORMULA_BRANCH | Formula B triangular |
+| EXPECTED_RAW_AS | 0.00750 |
+| EXPECTED_PUBLIC_AS | 0.007500000000000000000000 |
+| EXPECTED_RAW_DE | 0.017271637856696845362587269625853252723512268445175 |
+| EXPECTED_PUBLIC_DE | 0.017271637857 |
+| ORACLE_DERIVATION | §11.8 independent Decimal evaluation |
 
-- two or more unequal members in `S[1:N]`
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM`
+#### V3 — minimum topology N=2
 
-**V6 — pitch equals tube OD**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V3 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
+| MUTATION_COUNT | 2 |
+| MUTATIONS_IN_ORDER | rebuild TASK-024 with `baffle_count=2` and TASK-024-sorted `spacing_sequence_m=["0.100000000000","0.125000000000","0.130000000000"]` |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | `task024_geometry_hash=a37700417d2183ce7708a37d7c3d068faad1b58d6c338c58533bd2b99215e1d1` |
+| EXPECTED_STATUS | VALID |
+| EXPECTED_FAILURE_STAGE | NOT_REACHED |
+| EXPECTED_FORMULA_BRANCH | Formula B square |
+| EXPECTED_RAW_AS | 0.00750 with `B=0.125000000000` |
+| EXPECTED_PUBLIC_AS | 0.007500000000000000000000 |
+| central_inter_baffle_spacing_m | `0.125000000000` |
+| ORACLE_DERIVATION | §11.8 with `B=0.125000000000`; TASK-024 sorted-admissible spacing variant |
 
-- mutate `pitch_m == tube_outside_diameter_m` from valid V1 base
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD`
+#### V4 — inlet/outlet differ, central uniform
 
-**V7 — pitch less than tube OD**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V4 |
+| MUTATION_COUNT | 3 |
+| MUTATIONS_IN_ORDER | `baffle_count=3`; TASK-024-sorted `spacing_sequence_m=["0.100000000000","0.125000000000","0.125000000000","0.140000000000"]`; rebuild via design-time helper |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | `task024_geometry_hash=317f36c472838da562466c8c8e2b559aeee59799d181b28898be99fab5b34a21` |
+| EXPECTED_STATUS | VALID |
+| EXPECTED_FAILURE_STAGE | NOT_REACHED |
+| central_inter_baffle_spacing_m | `0.125000000000` |
+| EXPECTED_FORMULA_BRANCH | Formula B square |
+| EXPECTED_RAW_AS | 0.00750 |
+| EXPECTED_PUBLIC_AS | 0.007500000000000000000000 |
 
-- mutate `pitch_m < tube_outside_diameter_m` from valid V1 base
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD`
+#### V5 — nonuniform central spacing
 
-**V8 — unsupported pattern token**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V5 |
+| MUTATION_COUNT | 2 |
+| MUTATIONS_IN_ORDER | `baffle_count=3`; TASK-024-sorted `spacing_sequence_m=["0.100000000000","0.125000000000","0.130000000000","0.140000000000"]` with valid TASK-024 rebuild |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | `task024_geometry_hash=d53ca543989ba9ce2bb02c89376d443518b259852fd043d54dbc5be6aad4cf72` |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 6 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM` |
+| EXPECTED_WARNING_CODES_IN_ORDER | warnings with prerequisite_stage `<= 6` only |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
 
-- mutate `pattern_family` to unsupported token from valid V1 base
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_PATTERN_FAMILY_UNSUPPORTED`
+#### V6 — pitch equals tube OD
 
-**V9 — TASK-021/TASK-024 tube OD mismatch**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V6 |
+| MUTATION_COUNT | 2 |
+| MUTATIONS_IN_ORDER | `/tube_layout/layout_rule_authority/pitch_m` -> `0.019000000000`; `/tube_layout/tube_geometry/outer_diameter_m` -> `0.019000000000` with matching TASK-024 `tube_outer_diameter_m` |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 8 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD` |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
 
-- single-field mutation: `task024_result.geometry.tube_outer_diameter_m` !=
-  `task021_layout.tube_geometry.outer_diameter_m`
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_TASK021_TASK024_TUBE_OD_MISMATCH`
+#### V7 — pitch less than tube OD
 
-**V10 — upstream identity mismatch**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V7 |
+| MUTATION_COUNT | 2 |
+| MUTATIONS_IN_ORDER | `/tube_layout/layout_rule_authority/pitch_m` -> `0.018000000000`; tube OD remains `0.019000000000` |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 8 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD` |
 
-- single-field mutation to `layout_hash`, `geometry_hash`, or transitive binding
-  id/hash from valid V1 base
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_TASK021_LAYOUT_IDENTITY_MISMATCH` or
-  `SSHG_TASK024_IDENTITY_MISMATCH` or upstream binding mismatch code as applicable
+#### V8 — unsupported pattern token at TASK-031 applicability boundary
 
-**V11 — TASK-024 status BLOCKED**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V8 |
+| MUTATION_COUNT | 1 |
+| MUTATIONS_IN_ORDER | `/tube_layout/layout_rule_authority/pattern_family` -> `ROSETTE` admitted as raw string at TASK-031 nested decode; TASK-021 identity replay succeeds with pinned synthetic layout corpus entry used only for vector V8 |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 6 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_PATTERN_FAMILY_UNSUPPORTED` |
+| boundary_note | exercises TASK-031 Stage-6 applicability after pinned synthetic admission |
 
-- `task024_result.status=BLOCKED`, `geometry=null`
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_TASK024_RESULT_HAS_BLOCKERS` or `SSHG_TASK024_GEOMETRY_MISSING`
+#### V9 — TASK-021/TASK-024 tube OD mismatch
 
-**V12 — VALID wrapper, geometry missing**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V9 |
+| MUTATION_COUNT | 1 |
+| MUTATIONS_IN_ORDER | `/baffle_geometry_result/geometry/tube_outer_diameter_m` -> `0.020000000000` |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 5 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_TASK021_TASK024_TUBE_OD_MISMATCH` |
 
-- `task024_result.status=VALID`, `geometry=null`
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_TASK024_GEOMETRY_MISSING`
+#### V10 — TASK-024 identity mismatch (single field)
 
-**V13 — quantization collapse**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V10 |
+| MUTATION_COUNT | 1 |
+| MUTATIONS_IN_ORDER | `/baffle_geometry_result/geometry/task021_layout_hash` change final hex nibble `f` -> `0` |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 4 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_TASK024_IDENTITY_MISMATCH` |
 
-- construct exact positive raw quantity below half public quantum so quantized
-  public value becomes zero
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION` or
-  `SSHG_PUBLIC_DIAMETER_QUANTIZATION_COLLISION`
+#### V11 — TASK-024 producer BLOCKED
 
-**V14 — engineering authority identity mismatch**
+| Field | Value |
+|---|---|
+| VECTOR_ID | V11 |
+| MUTATION_COUNT | 4 |
+| MUTATIONS_IN_ORDER | `/baffle_geometry_result/status` -> `BLOCKED`; `/baffle_geometry_result/geometry` -> `null`; pin `blockers` and `blocked_result_hash` from TASK-024 blocked producer fixture |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 4 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_TASK024_RESULT_HAS_BLOCKERS` |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
 
-- single-field mutation to `engineering_authority.authority_hash` or
-  `authority_profile_id` from valid V1 base
-- expected status: `BLOCKED`
-- expected blocker: `SSHG_ENGINEERING_AUTHORITY_IDENTITY_MISMATCH`
+#### V12 — TASK-024 VALID with geometry null
+
+| Field | Value |
+|---|---|
+| VECTOR_ID | V12 |
+| MUTATION_COUNT | 2 |
+| MUTATIONS_IN_ORDER | `/baffle_geometry_result/status` -> `VALID`; `/baffle_geometry_result/geometry` -> `null` |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 4 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_TASK024_GEOMETRY_MISSING` |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+
+#### V13 — area quantization collapse
+
+| Field | Value |
+|---|---|
+| VECTOR_ID | V13 |
+| MUTATION_COUNT | 2 |
+| MUTATIONS_IN_ORDER | `/baffle_geometry_result/geometry/shell_inside_diameter_m` -> `0.000000000001`; central spacing `0.000000000001` via spacing_sequence rebuild |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 9 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION` |
+| raw_engineering | `As_raw=2.4e-25` (exact: `Ds=1e-12`, `B=1e-12`, `Pt=0.025`, `do=0.019`) |
+| half_quantum | `AREA_OUTPUT_QUANTUM/2 = 5e-25` |
+| quantized_before_guard | `0` |
+| ORACLE_DERIVATION | independent Decimal: `0.000000000001 * 0.000000000001 * 0.006 / 0.025` |
+
+#### V14 — engineering authority identity mismatch
+
+| Field | Value |
+|---|---|
+| VECTOR_ID | V14 |
+| MUTATION_COUNT | 1 |
+| MUTATIONS_IN_ORDER | `/engineering_authority/authority_hash` final hex nibble `9` -> `0` |
+| EXPECTED_STATUS | BLOCKED |
+| EXPECTED_FAILURE_STAGE | 7 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_ENGINEERING_AUTHORITY_IDENTITY_MISMATCH` |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
 
 ```text
 EXTERNAL_ORACLE_SOURCE_INDEPENDENT=true
