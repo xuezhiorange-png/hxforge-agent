@@ -126,6 +126,8 @@ shards:
       - tests/exchangers/shell_tube/baffle_geometry/test_schema.py
       - tests/exchangers/shell_tube/baffle_geometry/test_authority.py
       - tests/exchangers/shell_tube/baffle_geometry/test_geometry.py
+      - tests/exchangers/shell_tube/baffle_geometry/test_validation.py
+      - tests/exchangers/shell_tube/baffle_geometry/test_architecture.py
       - tests/shell_geometry_catalogs/test_models.py
       - tests/shell_geometry_catalogs/test_catalog.py
       - tests/shell_geometry_catalogs/test_architecture.py
