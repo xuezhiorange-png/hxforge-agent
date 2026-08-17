@@ -1081,7 +1081,6 @@ def render_markdown_bytes(evidence: Mapping[str, object]) -> bytes:
     disclaimer = cast("dict[str, object]", model["disclaimer"])
     for key in sorted(disclaimer):
         lines.append(f"- {key}: `{disclaimer[key]}`")
-    lines.append("")
     return "\n".join(lines).encode("utf-8") + b"\n"
 
 
@@ -1104,7 +1103,6 @@ def render_acceptance_bytes(evidence: Mapping[str, object]) -> bytes:
     lines.append("## Engineering-Proof Boundary")
     lines.append("")
     lines.append("- release_acceptance_is_not_engineering_correctness_proof: `true`")
-    lines.append("")
     return "\n".join(lines).encode("utf-8") + b"\n"
 
 

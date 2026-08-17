@@ -162,4 +162,3 @@
 - release_acceptance_is_not_engineering_correctness_proof: `True`
 - standard_claim: `False`
 - vendor_specification: `False`
-
