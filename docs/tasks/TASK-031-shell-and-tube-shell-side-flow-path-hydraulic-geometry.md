@@ -58,6 +58,7 @@ TASK031_PRE_DESIGN_PREREQUISITES_SATISFIED=true
 ```text
 CORRECTED_DESIGN_READY_FOR_REREVIEW=true
 THIRD_CORRECTION_PARENT_SHA=41e593319bbc03ed1ab49e595dc522aa8aa7e3ae
+FOURTH_CORRECTION_PARENT_SHA=a932df8663f5393d942ba55c382215c388b15856
 DESIGN_DOCUMENT_STATUS=PROPOSED
 PRIOR_REVIEW_REPORTED_PASS_COUNT=21/35
 PRIOR_REVIEW_LITERAL_TABLE_RECOUNT=20/35
@@ -1504,13 +1505,20 @@ NEXT_REREVIEW_RECOUNTS_VECTOR_IDENTITY_REPLAY_FROM_SCRATCH=true
 UNSUPPORTED_PATTERN_RAW_TOKEN_REACHES_TASK031_STAGE6=false
 REASON=TASK021_CLOSED_PATTERN_ENUM_BLOCKS_EARLIER
 V8_SYNTHETIC_ACCEPTED_PATTERN_OBJECT_PRESENT=false
-TASK024_VECTOR_FIXTURE_PUBLIC_ENTRY=hexagent.exchangers.shell_tube.baffle_geometry.geometry::compute_geometry_foundation
+TASK024_PUBLIC_IMPORT=hexagent.exchangers.shell_tube.baffle_geometry.validate_request
+TASK024_PUBLIC_IMPLEMENTATION=hexagent.exchangers.shell_tube.baffle_geometry.validation.validate_request
+TASK024_VECTOR_FIXTURE_PUBLIC_ENTRY=hexagent.exchangers.shell_tube.baffle_geometry.validate_request
 TASK024_VECTOR_FIXTURE_AUTHORITY_ENTRY=hexagent.exchangers.shell_tube.baffle_geometry.authority::validate_authority_foundation
-TASK024_EXPORTED_VALIDATE_REQUEST_PRESENT_AT_BASELINE=false
+TASK024_EXPORTED_VALIDATE_REQUEST_PRESENT_AT_BASELINE=true
+NF003_FOURTH_CORRECTION_APPLIED=true
+FOURTH_CORRECTION_SCOPE=V11_PUBLIC_PRODUCER_REPLAY_ONLY
 VECTOR_REPLAY_VERIFIED_COUNT=14/14
-V11_TASK024_BLOCKED_RESULT_REPLAY=PASS
+V11_TASK024_PUBLIC_PRODUCER_REPLAY=PASS
+V11_PRIVATE_FOUNDATION_USED_AS_PUBLIC_AUTHORITY=false
+V11_PUBLIC_RESULT_LITERAL_COMPLETE=true
 V11_PINNED_BLOCKER_COUNT=1
 V11_BLOCKED_RESULT_HASH_LITERAL_PRESENT=true
+V11_PREVIOUS_HASH_MATCHES_PUBLIC_PRODUCER=false
 ENGINEERING_VECTORS_COMPLETE=true
 F009_CORRECTION_APPLIED=true
 ```
@@ -1520,12 +1528,12 @@ formula authority. V1 and V2 use independent arithmetic from the frozen π / √
 Decimal constants and §11.8 singular runtime sequences.
 
 At authoring baseline `main@4add89515e1efa17e8af71f670d30a8df7fc85fb`, TASK-024
-exported `validate_request` is design-contract frozen but not yet present in
-production. Design-time vector construction composes
-`validate_authority_foundation` (Stages 2–8) and `compute_geometry_foundation`
-(Stages 9–18), then serializes to the frozen `BaffleGeometryValidationResult`
-public dict shape. This is consistent with TASK-024 design §6.3 composition and
-does not substitute engineering authority.
+exported `validate_request` is present and is the sole public producer authority
+for TASK-024 vector replay. V11 replays through that public producer only;
+`compute_geometry_foundation` remains module-private implementation foundation
+and is not used as public-producer replay authority. Other vectors retain their
+prior derivation routes except where they already consume the frozen public
+`BaffleGeometryValidationResult` dict shape from upstream replay.
 
 Frozen engineering authority hash for all vectors unless explicitly mutated:
 
@@ -2599,7 +2607,7 @@ in `FINAL_EXPECTED_UPSTREAM_IDS_HASHES`.
 | VECTOR_ID | V11 |
 | BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 4 |
-| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/status, "VALID", "BLOCKED"), (2, /baffle_geometry_result/geometry, "VALID_GEOMETRY_OBJECT", null), (3, /baffle_geometry_result/blockers, [], [{"code": "BFG_BAFFLE_THICKNESS_INVALID", "field_path": "design_authority.baffle_thickness_m", "message_key": "baffle_thickness_non_positive", "evidence_refs": [], "details": [["baffle_thickness_m", "0"]]}]), (4, /baffle_geometry_result/blocked_result_hash, null, "0307b72479e2df79b5caaaac271904b64d20f9f32116627f6a2d06dbdfcaf6e0")) |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/status, "VALID", "BLOCKED"), (2, /baffle_geometry_result/geometry, "VALID_GEOMETRY_OBJECT", null), (3, /baffle_geometry_result/blockers, [], [{"code": "BFG_DECIMAL_LEXICAL_INVALID", "field_path": ".design_authority.baffle_thickness_m", "message_key": "decimal_lexical_invalid", "evidence_refs": [], "details": []}]), (4, /baffle_geometry_result/blocked_result_hash, null, "5af8473ec8b1f17477c55b91ee668d3e5ae76dbd67d565f7b0586560db1365e4")) |
 | FINAL_CHANGED_FIELDS | (baffle_geometry_result.status, baffle_geometry_result.geometry, baffle_geometry_result.blockers, baffle_geometry_result.blocked_result_hash) |
 | FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
@@ -2679,9 +2687,13 @@ in `FINAL_EXPECTED_UPSTREAM_IDS_HASHES`.
 #### V11 pinned `TASK024_BLOCKED_RESULT_FRAGMENT`
 
 Design-time construction route:
-`hexagent.exchangers.shell_tube.baffle_geometry.geometry::compute_geometry_foundation`
-with `design_authority.baffle_thickness_m="0"` on the oracle TASK-024 request.
-`blocked_result_hash` is `sha256_hex(raw_blocked_projection(request))` per TASK-024 §14.6.
+`hexagent.exchangers.shell_tube.baffle_geometry.validate_request`
+with `design_authority.baffle_thickness_m="0"` on the oracle TASK-024 request
+built from `tests.exchangers.shell_tube.baffle_geometry._builders` and the
+§23.2 oracle layout identities.
+`blocked_result_hash` is the public producer value from
+`validate_request(V11_RAW_REQUEST)` at baseline
+`main@4add89515e1efa17e8af71f670d30a8df7fc85fb`.
 
 ```json
 {
@@ -2690,16 +2702,11 @@ with `design_authority.baffle_thickness_m="0"` on the oracle TASK-024 request.
   "warnings": [],
   "blockers": [
     {
-      "code": "BFG_BAFFLE_THICKNESS_INVALID",
-      "field_path": "design_authority.baffle_thickness_m",
-      "message_key": "baffle_thickness_non_positive",
+      "code": "BFG_DECIMAL_LEXICAL_INVALID",
+      "field_path": ".design_authority.baffle_thickness_m",
+      "message_key": "decimal_lexical_invalid",
       "evidence_refs": [],
-      "details": [
-        [
-          "baffle_thickness_m",
-          "0"
-        ]
-      ]
+      "details": []
     }
   ],
   "deferred_capabilities": [
@@ -2730,8 +2737,27 @@ with `design_authority.baffle_thickness_m="0"` on the oracle TASK-024 request.
     "REPORT_NOT_COMPUTABLE",
     "GOLDEN_VALIDATION_NOT_COMPUTABLE"
   ],
-  "blocked_result_hash": "0307b72479e2df79b5caaaac271904b64d20f9f32116627f6a2d06dbdfcaf6e0"
+  "blocked_result_hash": "5af8473ec8b1f17477c55b91ee668d3e5ae76dbd67d565f7b0586560db1365e4"
 }
+```
+
+```text
+V11_TASK024_PUBLIC_STATUS=BLOCKED
+V11_TASK024_PUBLIC_GEOMETRY=null
+V11_TASK024_PUBLIC_WARNING_COUNT=0
+V11_TASK024_PUBLIC_BLOCKER_COUNT=1
+V11_TASK024_PUBLIC_WARNINGS=()
+V11_TASK024_PUBLIC_BLOCKERS=({"code": "BFG_DECIMAL_LEXICAL_INVALID", "field_path": ".design_authority.baffle_thickness_m", "message_key": "decimal_lexical_invalid", "evidence_refs": [], "details": []})
+V11_TASK024_PUBLIC_DEFERRED_CAPABILITIES=(CROSSFLOW_FLOW_AREA_NOT_COMPUTABLE, WINDOW_FLOW_AREA_NOT_COMPUTABLE, MINIMUM_CROSSFLOW_AREA_NOT_COMPUTABLE, HYDRAULIC_DIAMETER_NOT_COMPUTABLE, LEAKAGE_FLOW_AREA_NOT_COMPUTABLE, BYPASS_FLOW_AREA_NOT_COMPUTABLE, LEAKAGE_CORRECTION_FACTOR_NOT_COMPUTABLE, BYPASS_CORRECTION_FACTOR_NOT_COMPUTABLE, SHELL_SIDE_THERMAL_RATING_NOT_COMPUTABLE, KERN_SCREENING_NOT_COMPUTABLE, BELL_DELAWARE_NOT_COMPUTABLE, SHELL_SIDE_PRESSURE_DROP_NOT_COMPUTABLE, TUBE_SIDE_PRESSURE_DROP_NOT_COMPUTABLE, FLOW_INDUCED_VIBRATION_NOT_COMPUTABLE, THERMAL_EXPANSION_NOT_COMPUTABLE, MECHANICAL_ADEQUACY_NOT_COMPUTABLE, MANUFACTURING_ADEQUACY_NOT_COMPUTABLE, MATERIAL_SELECTION_NOT_COMPUTABLE, MASS_NOT_COMPUTABLE, COST_NOT_COMPUTABLE, OPTIMIZATION_NOT_COMPUTABLE, API_NOT_COMPUTABLE, PERSISTENCE_NOT_COMPUTABLE, CLI_NOT_COMPUTABLE, REPORT_NOT_COMPUTABLE, GOLDEN_VALIDATION_NOT_COMPUTABLE)
+V11_TASK024_PUBLIC_BLOCKED_RESULT_HASH=5af8473ec8b1f17477c55b91ee668d3e5ae76dbd67d565f7b0586560db1365e4
+V11_TASK024_PUBLIC_PRODUCER_REPLAY=PASS
+V11_PRIVATE_FOUNDATION_USED_AS_PUBLIC_AUTHORITY=false
+V11_PUBLIC_RESULT_LITERAL_COMPLETE=true
+V11_ACCIDENTAL_EARLIER_FAILURE_PRESENT=false
+V11_PREVIOUS_HASH_MATCHES_PUBLIC_PRODUCER=false
+V11_PREVIOUS_BLOCKED_RESULT_HASH=0307b72479e2df79b5caaaac271904b64d20f9f32116627f6a2d06dbdfcaf6e0
+V11_TASK031_EXPECTED_FAILURE_STAGE=4
+V11_TASK031_EXPECTED_BLOCKERS=(SSHG_TASK024_RESULT_HAS_BLOCKERS)
 ```
 
 ### 23.3.1 Vector fixture derivation annex
@@ -2777,6 +2803,14 @@ FIXTURE_USED_AS_ENGINEERING_AUTHORITY=false
 NPTEL_EXACT_ORACLE_INCLUDED=false
 AUTHORITATIVE_VECTOR_PLACEHOLDER_COUNT=0
 THIRD_CORRECTION_READY_FOR_REREVIEW=true
+FOURTH_CORRECTION_READY_FOR_REREVIEW=true
+FOURTH_CORRECTION_SCOPE=V11_PUBLIC_PRODUCER_REPLAY_ONLY
+TASK024_PUBLIC_IMPORT=hexagent.exchangers.shell_tube.baffle_geometry.validate_request
+V11_TASK024_PUBLIC_PRODUCER_REPLAY=PASS
+V11_PRIVATE_FOUNDATION_USED_AS_PUBLIC_AUTHORITY=false
+V11_PUBLIC_RESULT_LITERAL_COMPLETE=true
+V11_ACCIDENTAL_EARLIER_FAILURE_PRESENT=false
+V11_PREVIOUS_HASH_MATCHES_PUBLIC_PRODUCER=false
 ```
 
 ## 24. Future implementation package boundary
