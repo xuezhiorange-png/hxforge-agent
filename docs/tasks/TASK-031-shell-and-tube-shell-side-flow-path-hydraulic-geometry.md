@@ -55,6 +55,16 @@ TASK031_PREREQUISITE_A=SATISFIED_MERGED_DELIVERY
 TASK031_PREREQUISITE_B=SATISFIED_ENGINEERING_SOURCE_AUTHORITY_FROZEN
 TASK031_PRE_DESIGN_PREREQUISITES_SATISFIED=true
 ```
+```text
+CORRECTED_DESIGN_READY_FOR_REREVIEW=true
+DESIGN_DOCUMENT_STATUS=PROPOSED
+PRIOR_REVIEW_REPORTED_PASS_COUNT=21/35
+PRIOR_REVIEW_LITERAL_TABLE_RECOUNT=20/35
+NEXT_REREVIEW_RECOUNTS_D01_D35_FROM_SCRATCH=true
+PRIOR_REVIEW_ACCOUNTING_INCONSISTENCY_NOTED=true
+CORRECTION_PARENT_SHA=45ef6dfe4674ddef497584522167182c6559e1e2
+```
+
 
 This design authoring gate permits one branch and this one repository design
 file. Authoring this document does **not** freeze or approve the design. A
@@ -243,18 +253,44 @@ TASK-031 consumes complete accepted upstream values, not ID-only projections.
 
 ### 5.1 TASK-021 accepted input
 
-The public raw request carries a complete accepted `TubeLayout` public model
-exactly as produced by TASK-021 validation. Minimum replay fields include:
+```text
+TASK021_CONSUMER_TYPE=TubeLayout
+TASK021_STATUS_CHECK_PRESENT=false
+TASK021_BLOCKERS_EMPTY_REQUIRED=true
+```
 
-- `schema_version`
+The public raw request carries a complete accepted `TubeLayout` object exactly
+as produced by TASK-021 validation. TASK-031 consumes `TubeLayout` directly, not
+`TubeLayoutValidationResult`. `TubeLayout` has no `status` field; `status` is
+owned by the outer `TubeLayoutValidationResult` wrapper and is not part of the
+TASK-031 request contract.
+
+Frozen TASK-021 acceptance requires all of:
+
+```text
+task021_layout is a complete TubeLayout
+task021_layout.schema_version == "task021.tube-layout.v1"
+task021_layout.blockers == ()
+task021_layout.layout_hash replay == supplied layout_hash
+task021_layout.layout_id replay == supplied layout_id
+all required TASK020 ancestry replay succeeds
+all required TASK021 canonical invariants succeed
+```
+
+Minimum replay fields include:
+
+- `schema_version` exact `task021.tube-layout.v1`
 - `layout_id`, `layout_hash`
+- `request_hash`
 - `task020_configuration_id`, `task020_configuration_hash`
 - `task022_geometry_id`, `task022_geometry_hash`
 - `layout_rule_authority.pattern_family`
 - `layout_rule_authority.pitch_m`
 - `tube_geometry.outer_diameter_m`
-- `status == VALID`
-- `blockers == ()`
+- `blockers` exactly `[]` (empty list in serialized public shape)
+
+TASK-031 must not fabricate a `status` property on `TubeLayout`. TASK-031 must
+not require the caller to supply both `TubeLayout` and `TubeLayoutValidationResult`.
 
 ### 5.2 TASK-024 accepted input
 
@@ -271,6 +307,10 @@ task024_result.blockers == ()
 ```
 
 No lookalike object, duck typing, or partial projection is permitted.
+
+```text
+F001_CORRECTION_APPLIED=true
+```
 
 ### 5.3 Frozen consumer bindings
 
@@ -372,6 +412,39 @@ TASK031_ADMITTED_ENGINEERING_FORMULA_DOMAIN:
 Repository applicability may narrow source applicability. Repository
 applicability must never broaden frozen source authority from comment
 `5311936966`.
+
+### 7.1 Applicability enforcement table
+
+Each predicate below binds to an exact production field path, exact accepted
+value or domain, exact blocker code, and stage rank. `SSHG_FORMULA_DOMAIN_VIOLATION`
+may cover only residual formula-domain violations not already assigned a more
+specific blocker.
+
+| Field | Production binding | Accepted value / domain | Blocker code | Stage rank |
+|---|---|---|---|---|
+| `construction_family` | `task024_result.geometry.construction_family` | `FIXED_TUBESHEET` | `SSHG_CONSTRUCTION_FAMILY_UNSUPPORTED` | 6 |
+| `shell_pass_count` | `task024_result.geometry.shell_pass_count` | `1` | `SSHG_SHELL_PASS_COUNT_UNSUPPORTED` | 6 |
+| `baffle_type` | `task024_result.geometry.design_authority.baffle_type` | `SINGLE_SEGMENTAL` | `SSHG_BAFFLE_TYPE_UNSUPPORTED` | 6 |
+| `baffle_count` | `task024_result.geometry.design_authority.baffle_count` | `>= 2` | `SSHG_BAFFLE_COUNT_INSUFFICIENT` | 6 |
+| `pattern_family` | `task021_layout.layout_rule_authority.pattern_family` | `SQUARE` or `TRIANGULAR` | `SSHG_PATTERN_FAMILY_UNSUPPORTED` | 6 |
+| central spacing uniformity | `task024_result.geometry.design_authority.spacing_sequence_m[S[1:N]]` | all members exactly equal | `SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM` | 6 |
+| `tube_outer_diameter_m` | `task024_result.geometry.tube_outer_diameter_m` | finite `> 0` | `SSHG_TUBE_OD_INVALID` | 8 |
+| `pitch_m` | `task021_layout.layout_rule_authority.pitch_m` | finite `> 0` | `SSHG_PITCH_INVALID` | 8 |
+| pitch vs tube OD | cross-bind TASK-021/TASK-024 | `pitch_m > tube_outside_diameter_m` | `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD` | 8 |
+| `shell_inside_diameter_m` | `task024_result.geometry.shell_inside_diameter_m` | finite `> 0` | `SSHG_SHELL_INSIDE_DIAMETER_INVALID` | 8 |
+| `central_inter_baffle_spacing_m` | extracted from `S[1:N]` | finite `> 0` | `SSHG_CENTRAL_INTER_BAFFLE_SPACING_INVALID` | 8 |
+| spacing sequence shape | `spacing_sequence_m`, `baffle_count` | `len(S) == N + 1`, `len(S[1:N]) >= 1` | `SSHG_SPACING_SEQUENCE_INVALID` | 6 |
+| central spacing presence | `S[1:N]` | at least one member | `SSHG_CENTRAL_INTER_BAFFLE_SPACING_ABSENT` | 6 |
+| flow region identity | frozen profile | `CENTRAL_CROSSFLOW_SCREENING` | `SSHG_FORMULA_DOMAIN_VIOLATION` | 6 |
+
+Do not double-report the same predicate through both a specific blocker and
+`SSHG_FORMULA_DOMAIN_VIOLATION` unless exact aggregation semantics explicitly
+require it.
+
+```text
+F008_CORRECTION_APPLIED=true
+APPLICABILITY_ENFORCEMENT_EXACT=true
+```
 
 ## 8. Leakage and bypass semantics
 
@@ -496,6 +569,33 @@ branch coefficient source.
 `pi` is not imported from `math` or `cmath`. The frozen `PI_REPRESENTATION`
 constant is the sole circular-geometry coefficient source.
 
+```text
+DECIMAL_STRING_CONSTRUCTION_IS_EXACT=true
+CONSTANTS_ROUNDED_ON_LOAD=false
+```
+
+`PI_REPRESENTATION` must be created only as:
+
+```python
+PI = Decimal("3.141592653589793238462643383279502884197169399375105820974944592307816406286208628620898062808825348")
+```
+
+`SQRT3_REPRESENTATION` must be created only as:
+
+```python
+SQRT3 = Decimal("1.7320508075688772935274463415058723669428052538103806280558069794519330169088000370811461867572485756")
+```
+
+Constants are constructed from strings as immutable exact `Decimal` values
+outside the narrowed calculation context. They may contain more than 50 digits.
+Every engineering calculation then runs inside an explicit `localcontext` with
+`prec=50` and `rounding=ROUND_HALF_EVEN`.
+
+Forbidden:
+
+- `math.pi`, `math.sqrt`, `cmath.sqrt`
+- `float(...)`, `Decimal(float)`, `Decimal.sqrt()`
+
 ### 11.4 Output quanta
 
 ```text
@@ -520,9 +620,44 @@ computed area > 0, computed diameter > 0, central spacing uniformity) execute on
 unquantized Decimal values. Public output strings are produced only after
 predicates pass.
 
-If quantization of a positive unquantized value collapses to canonical zero,
-the result is `SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION` or
-`SSHG_PUBLIC_DIAMETER_QUANTIZATION_COLLISION`.
+### 11.5.1 Exact public output quantization algorithm
+
+```text
+AREA_OUTPUT_QUANTUM=Decimal("0.000000000000000000000001")
+DIAMETER_OUTPUT_QUANTUM=Decimal("0.000000000001")
+TRAILING_ZERO_POLICY=PRESERVE_QUANTUM_SCALE
+```
+
+Required semantics:
+
+1. Formula predicates operate on unquantized `Decimal` values.
+2. Formula result must be finite and `> 0` before quantization.
+3. Quantize only at the public-output boundary.
+4. Quantize with `ROUND_HALF_EVEN`.
+5. If `raw_value > 0` and public quantized value `== 0`: BLOCK.
+6. Normalize any signed zero to positive zero before formatting.
+7. Emit canonical fixed-point decimal strings.
+8. Preserve quantum scale in output strings.
+
+Exact algorithm:
+
+```python
+public_q = raw_value.quantize(output_quantum, rounding=ROUND_HALF_EVEN)
+if raw_value > 0 and public_q.is_zero():
+    emit SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION or SSHG_PUBLIC_DIAMETER_QUANTIZATION_COLLISION
+if public_q.is_zero():
+    public_q = public_q.copy_abs()
+canonical_string = format(public_q, "f")
+```
+
+Half-quantum tie behavior follows `ROUND_HALF_EVEN` exactly. `InvalidOperation`,
+overflow, and non-finite values fail closed with `SSHG_FORMULA_CALCULATION_FAILED`
+or the applicable quantization blocker.
+
+```text
+F005_CORRECTION_APPLIED=true
+QUANTIZATION_ALGORITHM_EXACT=true
+```
 
 ### 11.6 Public decimal lexical domain
 
@@ -541,6 +676,76 @@ The frozen Decimal context, constant strings, quantization rules, and canonical
 JSON projection must produce byte-identical public outputs on Python 3.11 and
 3.12.
 
+
+### 11.8 Singular formula evaluation sequences
+
+Formula A has exactly one runtime operation sequence:
+
+```python
+Ct = Pt - do
+ratio = Ds / Pt
+As_step = ratio * B
+As_raw = As_step * Ct
+```
+
+Formula B SQUARE has exactly one runtime operation sequence:
+
+```python
+do2 = do * do
+pt2 = Pt * Pt
+tube_term = PI * do2 / Decimal("4")
+free_area = pt2 - tube_term
+numerator = Decimal("4") * free_area
+denominator = PI * do
+De_square_raw = numerator / denominator
+```
+
+Formula B TRIANGULAR has exactly one runtime operation sequence:
+
+```python
+do2 = do * do
+pt2 = Pt * Pt
+cell_term = SQRT3 * pt2 / Decimal("4")
+tube_term = PI * do2 / Decimal("8")
+free_area = cell_term - tube_term
+numerator = Decimal("4") * free_area
+denominator = PI * do / Decimal("2")
+De_triangular_raw = numerator / denominator
+```
+
+The algebraic identity `(2*sqrt(3)*Pt^2 - pi*do^2)/(pi*do)` may remain as a
+source note only. It must not become a second runtime evaluation path.
+
+```text
+F006_CORRECTION_APPLIED=true
+PI_SQRT3_LOADING_EXACT=true
+FORMULA_EVALUATION_ORDER_EXACT=true
+```
+
+### 11.9 Determinism closure (D32–D33)
+
+Given the same normalized request and the same frozen engineering authority,
+TASK-031 must produce byte-identical outputs on Python 3.11 and 3.12 for:
+
+- `request_hash`
+- `engineering_authority_hash`
+- raw formula branch selection
+- unquantized engineering values
+- public quantized engineering strings
+- ordered warnings
+- ordered blockers
+- provenance pre-hash and final provenance
+- `geometry_hash` / `geometry_id`
+- `blocked_result_hash`
+
+Determinism is testable only through the frozen contracts in §11.3–§11.8,
+§16–§17, §19, and §20: Decimal constants, operation sequence, quantization,
+message ordering, canonical projections, and UUID/hash rules.
+
+```text
+PY311_PY312_BYTE_IDENTITY_CONTRACT=true
+```
+
 ## 12. Closed schema versions and identities
 
 ```text
@@ -554,18 +759,118 @@ DESIGN_CONTRACT_PATH=docs/tasks/TASK-031-shell-and-tube-shell-side-flow-path-hyd
 
 ## 13. Public raw request schema
 
-`ALTERNATIVE_REQUEST_SHAPES=false`
+```text
+REQUEST_SCHEMA_VERSION=task031.shell-side-hydraulic-geometry-request.v1
+ALTERNATIVE_REQUEST_SHAPES=false
+REQUEST_SCHEMA_SINGULAR=true
+```
 
-The top-level raw request is an exact built-in `dict` with string keys and
-exactly this field set:
+The top-level raw request is an exact built-in `dict` with string keys. No
+arbitrary `Mapping`, aliases, coercion, or `float` is permitted.
 
-| Field | Requirement |
+### 13.1 Top-level field table
+
+| Field | Required | Raw type | Normalized type | Parser / validator | Canonical representation |
+|---|---|---|---|---|---|
+| `schema_version` | yes | `str` | `str` | exact token match | exact string |
+| `tube_layout` | yes | `dict` | `TubeLayout` | TASK-021 layout decoder | upstream `layout_hash_payload` projection |
+| `baffle_geometry_result` | yes | `dict` | `BaffleGeometryValidationResult` | TASK-024 result decoder | upstream geometry hash projection |
+| `engineering_authority` | yes | `dict` | authority request binding | §9.4 validator | §20.2 authority request projection |
+| `evidence_refs` | yes | `list` | `tuple[str, ...]` | non-empty, sorted unique | sorted unique string tuple |
+
+### 13.2 Nested `tube_layout` serialized public shape
+
+`tube_layout` is an exact built-in `dict` with the closed TASK-021 `TubeLayout`
+field set. Unknown nested fields block at Stage 2.
+
+| Field | Raw type | Encoding rule |
+|---|---|---|
+| `schema_version` | `str` | exact `task021.tube-layout.v1` |
+| `layout_id` | `str` | URN string |
+| `layout_hash` | `str` | lowercase hex SHA-256 |
+| `request_hash` | `str` | lowercase hex SHA-256 |
+| `task020_configuration_id` | `str` | URN string |
+| `task020_configuration_hash` | `str` | lowercase hex SHA-256 |
+| `case_authority` | `dict` | closed TASK-020 case authority public shape |
+| `construction_family` | `str` | exact enum token |
+| `equipment_orientation` | `str` | exact enum token |
+| `shell_pass_count` | `int` | exact `int`, not `bool` |
+| `tube_pass_count` | `int` | exact `int`, not `bool` |
+| `tube_geometry` | `dict` | approved tube geometry snapshot; `outer_diameter_m` as canonical decimal string |
+| `layout_rule_authority` | `dict` | `pattern_family` as string token; `pitch_m` as canonical decimal string |
+| `placement_envelope` | `dict` | closed TASK-021 envelope shape |
+| `origin_mode` | `str` | exact enum token |
+| `axis_orientation` | `str` | exact enum token |
+| `exclusion_zones` | `list` | JSON array of closed zone dicts |
+| `positions` | `list` | JSON array of closed position dicts |
+| `tube_hole_count` | `int` | exact `int` |
+| `physical_tube_count` | `int` | exact `int` |
+| `boundary_rejection_count` | `int` | exact `int` |
+| `exclusion_rejection_count` | `int` | exact `int` |
+| `exclusion_audit` | `list` | JSON array of closed audit dicts |
+| `warnings` | `list` | JSON array of `MessageEntry` dicts per §16.1 |
+| `blockers` | `list` | JSON array of `MessageEntry` dicts; must be `[]` on acceptance |
+| `deferred_capabilities` | `list` | JSON array of exact capability tokens |
+| `provenance` | `dict` | closed TASK-021 provenance public shape |
+
+Reconstruction helper: `hexagent.exchangers.shell_tube.tube_layout.schema` and
+`tube_layout.canonical` replay contracts. TASK-031 maps serialized dict fields
+to immutable upstream dataclass fields without duplicating upstream engineering
+semantics.
+
+### 13.3 Nested `baffle_geometry_result` serialized public shape
+
+`baffle_geometry_result` is an exact built-in `dict` with the closed TASK-024
+`BaffleGeometryValidationResult` field set.
+
+| Field | Raw type | Encoding rule |
+|---|---|---|
+| `status` | `str` | exact `VALID` or `BLOCKED` |
+| `geometry` | `dict` or `null` | complete `BaffleGeometry` dict when `VALID`; `null` when absent |
+| `warnings` | `list` | JSON array of `MessageEntry` dicts per §16.1 |
+| `blockers` | `list` | JSON array of `MessageEntry` dicts; must be `[]` on acceptance |
+| `deferred_capabilities` | `list` | JSON array of exact capability tokens |
+| `blocked_result_hash` | `str` or `null` | lowercase hex SHA-256 or `null` on accepted valid result |
+
+When `geometry` is present, it is an exact built-in `dict` with the closed
+`BaffleGeometry` field set. TASK-031-consumed geometry fields include at minimum:
+
+| Field | Encoding rule |
 |---|---|
-| `schema_version` | exact `task031.shell-side-hydraulic-geometry-request.v1` |
-| `tube_layout` | complete accepted TASK-021 `TubeLayout` public model |
-| `baffle_geometry_result` | complete accepted TASK-024 `BaffleGeometryValidationResult` |
-| `engineering_authority` | exact built-in `dict` per §9.4 |
-| `evidence_refs` | non-empty `list[str]`, sorted unique after validation |
+| `schema_version` | exact `task024.baffle-geometry.v1` |
+| `geometry_id` | URN string |
+| `geometry_hash` | lowercase hex SHA-256 |
+| `shell_inside_diameter_m` | canonical decimal string |
+| `tube_outer_diameter_m` | canonical decimal string |
+| `construction_family` | exact enum token |
+| `shell_pass_count` | exact `int` |
+| `design_authority.baffle_type` | exact enum token |
+| `design_authority.baffle_count` | exact `int` |
+| `design_authority.spacing_sequence_m` | JSON array of canonical decimal strings |
+
+Reconstruction helper: `hexagent.exchangers.shell_tube.baffle_geometry.schema`
+and `baffle_geometry.canonical` replay contracts.
+
+### 13.4 Nested `engineering_authority` serialized public shape
+
+| Field | Raw type | Encoding rule |
+|---|---|---|
+| `schema_version` | `str` | exact `task031.engineering-authority-request.v1` |
+| `authority_profile_id` | `str` | exact aggregate profile ID |
+| `authority_hash` | `str` | lowercase hex SHA-256 |
+| `evidence_refs` | `list` | non-empty JSON array of strings, sorted unique |
+
+### 13.5 Tuple and enum encoding rules
+
+- production tuple-valued fields are encoded as JSON arrays in field order
+- enum values are encoded as exact string tokens, never integers
+- `Decimal` geometry values are encoded as canonical decimal strings
+- `None` is encoded only where explicitly admitted (`geometry` on blocked results)
+- unknown nested fields block with `SSHG_UNKNOWN_FIELD`
+
+```text
+F002_CORRECTION_APPLIED=true
+```
 
 Forbidden:
 
@@ -649,76 +954,145 @@ successful geometry object.
 
 Any failure returns `status=BLOCKED`, `geometry=None`. No partial geometry.
 
-## 16. Closed blocker taxonomy
+## 16. Closed blocker taxonomy and message pipeline
 
 `BLOCKER_CODE_COUNT=36`
 
-```text
-SSHG_SCHEMA_VERSION_UNSUPPORTED
-SSHG_RAW_TYPE_INVALID
-SSHG_UNKNOWN_FIELD
-SSHG_DECIMAL_LEXICAL_INVALID
-SSHG_EVIDENCE_REFS_INVALID
+### 16.1 Closed `MessageEntry` shape
 
-SSHG_TASK021_LAYOUT_MISSING
-SSHG_TASK021_LAYOUT_INVALID
-SSHG_TASK021_LAYOUT_HAS_BLOCKERS
-SSHG_TASK021_LAYOUT_IDENTITY_MISMATCH
-
-SSHG_TASK024_RESULT_MISSING
-SSHG_TASK024_RESULT_INVALID
-SSHG_TASK024_RESULT_HAS_BLOCKERS
-SSHG_TASK024_GEOMETRY_MISSING
-SSHG_TASK024_IDENTITY_MISMATCH
-
-SSHG_TASK021_TASK024_TUBE_OD_MISMATCH
-SSHG_UPSTREAM_CONFIGURATION_BINDING_MISMATCH
-SSHG_UPSTREAM_LAYOUT_BINDING_MISMATCH
-
-SSHG_CONSTRUCTION_FAMILY_UNSUPPORTED
-SSHG_SHELL_PASS_COUNT_UNSUPPORTED
-SSHG_BAFFLE_TYPE_UNSUPPORTED
-
-SSHG_BAFFLE_COUNT_INSUFFICIENT
-SSHG_SPACING_SEQUENCE_INVALID
-SSHG_CENTRAL_INTER_BAFFLE_SPACING_ABSENT
-SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM
-
-SSHG_PATTERN_FAMILY_UNSUPPORTED
-
-SSHG_PITCH_INVALID
-SSHG_TUBE_OD_INVALID
-SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD
-SSHG_SHELL_INSIDE_DIAMETER_INVALID
-SSHG_CENTRAL_INTER_BAFFLE_SPACING_INVALID
-
-SSHG_ENGINEERING_AUTHORITY_IDENTITY_MISMATCH
-SSHG_FORMULA_DOMAIN_VIOLATION
-SSHG_FORMULA_CALCULATION_FAILED
-
-SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION
-SSHG_PUBLIC_DIAMETER_QUANTIZATION_COLLISION
-
-SSHG_CANONICALIZATION_FAILED
+```python
+MessageEntry(
+    code: str,
+    field_path: str | None,
+    message_key: str,
+    evidence_refs: tuple[str, ...],
+    details: tuple[tuple[str, str], ...],
+)
 ```
 
+Field order is frozen as above. `details` is not an unconstrained generic
+object. Serialized public shape:
+
+```json
+{
+  "code": "...",
+  "field_path": "...",
+  "message_key": "...",
+  "evidence_refs": ["..."],
+  "details": [["key", "value"]]
+}
+```
+
+```text
+MESSAGE_ENTRY_SCHEMA_CLOSED=true
+```
+
+### 16.2 Global blocker sort key
+
+```python
+(
+    stage_rank,
+    code,
+    field_path_or_empty_string,
+    message_key,
+    sha256(canonical_details),
+    sha256(canonical_evidence_refs),
+)
+```
+
+No set iteration ordering. No implementation-dependent order.
+
+### 16.3 Complete blocker enumeration
+
+| Code | validation_stage | stage_rank | field_path | meaning | aggregation |
+|---|---|---:|---|---|---|
+| `SSHG_SCHEMA_VERSION_UNSUPPORTED` | raw top-level/schema | 1 | `schema_version` | unsupported request schema token | accumulate all Stage 1 blockers |
+| `SSHG_RAW_TYPE_INVALID` | raw top-level/schema | 1 | top-level or nested | raw value is not exact built-in dict/list/str/int | accumulate all Stage 1 blockers |
+| `SSHG_UNKNOWN_FIELD` | raw top-level/schema | 1 | offending path | unknown field in closed schema | accumulate all Stage 1 blockers |
+| `SSHG_DECIMAL_LEXICAL_INVALID` | nested public-shape decoding | 2 | decimal field path | decimal lexical domain violation | accumulate all Stage 2 blockers |
+| `SSHG_EVIDENCE_REFS_INVALID` | raw top-level/schema | 1 | `evidence_refs` | evidence refs empty or not sorted unique | accumulate all Stage 1 blockers |
+| `SSHG_TASK021_LAYOUT_MISSING` | nested public-shape decoding | 2 | `tube_layout` | required layout absent | accumulate all Stage 2 blockers |
+| `SSHG_TASK021_LAYOUT_INVALID` | nested public-shape decoding | 2 | `tube_layout` | layout fails TASK-021 shape decode | accumulate all Stage 2 blockers |
+| `SSHG_TASK021_LAYOUT_HAS_BLOCKERS` | TASK-021 validation/replay | 3 | `tube_layout.blockers` | layout carries upstream blockers | accumulate all Stage 3 blockers |
+| `SSHG_TASK021_LAYOUT_IDENTITY_MISMATCH` | TASK-021 validation/replay | 3 | `tube_layout` | layout hash/id replay failure | accumulate all Stage 3 blockers |
+| `SSHG_TASK024_RESULT_MISSING` | nested public-shape decoding | 2 | `baffle_geometry_result` | required result absent | accumulate all Stage 2 blockers |
+| `SSHG_TASK024_RESULT_INVALID` | nested public-shape decoding | 2 | `baffle_geometry_result` | result fails TASK-024 shape decode | accumulate all Stage 2 blockers |
+| `SSHG_TASK024_RESULT_HAS_BLOCKERS` | TASK-024 validation/replay | 4 | `baffle_geometry_result.blockers` | wrapper carries upstream blockers | accumulate all Stage 4 blockers |
+| `SSHG_TASK024_GEOMETRY_MISSING` | TASK-024 validation/replay | 4 | `baffle_geometry_result.geometry` | `VALID` wrapper with `geometry=null` | accumulate all Stage 4 blockers |
+| `SSHG_TASK024_IDENTITY_MISMATCH` | TASK-024 validation/replay | 4 | `baffle_geometry_result` | geometry hash/id replay failure | accumulate all Stage 4 blockers |
+| `SSHG_TASK021_TASK024_TUBE_OD_MISMATCH` | TASK-021/TASK-024 cross-binding | 5 | `tube_layout` / `baffle_geometry_result` | tube OD cross-bind failure | accumulate all Stage 5 blockers |
+| `SSHG_UPSTREAM_CONFIGURATION_BINDING_MISMATCH` | TASK-021/TASK-024 cross-binding | 5 | upstream ids | TASK-020 configuration binding mismatch | accumulate all Stage 5 blockers |
+| `SSHG_UPSTREAM_LAYOUT_BINDING_MISMATCH` | TASK-021/TASK-024 cross-binding | 5 | upstream ids | TASK-021/TASK-024 layout binding mismatch | accumulate all Stage 5 blockers |
+| `SSHG_CONSTRUCTION_FAMILY_UNSUPPORTED` | applicability / central spacing | 6 | `baffle_geometry_result.geometry.construction_family` | unsupported construction family | accumulate all Stage 6 blockers |
+| `SSHG_SHELL_PASS_COUNT_UNSUPPORTED` | applicability / central spacing | 6 | `baffle_geometry_result.geometry.shell_pass_count` | unsupported shell pass count | accumulate all Stage 6 blockers |
+| `SSHG_BAFFLE_TYPE_UNSUPPORTED` | applicability / central spacing | 6 | `...design_authority.baffle_type` | unsupported baffle type | accumulate all Stage 6 blockers |
+| `SSHG_BAFFLE_COUNT_INSUFFICIENT` | applicability / central spacing | 6 | `...design_authority.baffle_count` | baffle count below minimum | accumulate all Stage 6 blockers |
+| `SSHG_SPACING_SEQUENCE_INVALID` | applicability / central spacing | 6 | `...design_authority.spacing_sequence_m` | spacing sequence shape invalid | accumulate all Stage 6 blockers |
+| `SSHG_CENTRAL_INTER_BAFFLE_SPACING_ABSENT` | applicability / central spacing | 6 | `...spacing_sequence_m` | no central inter-baffle member | accumulate all Stage 6 blockers |
+| `SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM` | applicability / central spacing | 6 | `...spacing_sequence_m` | unequal central spacing members | accumulate all Stage 6 blockers |
+| `SSHG_PATTERN_FAMILY_UNSUPPORTED` | applicability / central spacing | 6 | `tube_layout.layout_rule_authority.pattern_family` | unsupported pattern family | accumulate all Stage 6 blockers |
+| `SSHG_ENGINEERING_AUTHORITY_IDENTITY_MISMATCH` | engineering-authority identity | 7 | `engineering_authority` | authority hash/profile mismatch | accumulate all Stage 7 blockers |
+| `SSHG_PITCH_INVALID` | numeric predicates / formula evaluation | 8 | `tube_layout.layout_rule_authority.pitch_m` | pitch not finite positive | accumulate all Stage 8 blockers |
+| `SSHG_TUBE_OD_INVALID` | numeric predicates / formula evaluation | 8 | tube OD binding path | tube OD not finite positive | accumulate all Stage 8 blockers |
+| `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD` | numeric predicates / formula evaluation | 8 | pitch / tube OD | pitch not strictly greater than tube OD | accumulate all Stage 8 blockers |
+| `SSHG_SHELL_INSIDE_DIAMETER_INVALID` | numeric predicates / formula evaluation | 8 | `...shell_inside_diameter_m` | shell ID not finite positive | accumulate all Stage 8 blockers |
+| `SSHG_CENTRAL_INTER_BAFFLE_SPACING_INVALID` | numeric predicates / formula evaluation | 8 | extracted central spacing | central spacing not finite positive | accumulate all Stage 8 blockers |
+| `SSHG_FORMULA_DOMAIN_VIOLATION` | numeric predicates / formula evaluation | 8 | engineering inputs | residual formula-domain violation | accumulate all Stage 8 blockers |
+| `SSHG_FORMULA_CALCULATION_FAILED` | numeric predicates / formula evaluation | 8 | engineering outputs | non-finite or non-positive raw result | accumulate all Stage 8 blockers |
+| `SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION` | public quantization | 9 | `central_crossflow_flow_area_m2` | positive raw area quantizes to zero | accumulate all Stage 9 blockers |
+| `SSHG_PUBLIC_DIAMETER_QUANTIZATION_COLLISION` | public quantization | 9 | `shell_side_equivalent_hydraulic_diameter_m` | positive raw diameter quantizes to zero | accumulate all Stage 9 blockers |
+| `SSHG_CANONICALIZATION_FAILED` | canonical/hash/provenance/final assembly | 10 | result assembly | canonical projection failure | accumulate all Stage 10 blockers |
+
 Codes are exact and cannot be aliased.
+
+```text
+F003_CORRECTION_APPLIED=true
+BLOCKER_PRECEDENCE_EXACT=true
+```
 
 ## 17. Closed warning taxonomy
 
 `WARNING_CODE_COUNT=7`
 
-```text
-SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY
-SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED
-SSHG_MINIMUM_AREA_SELECTION_DEFERRED
-SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED
-SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED
-SSHG_NO_FULL_EXCHANGER_RATING_CLAIM
-SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY
+All seven warnings are always emitted on every `VALID`
+`CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_V1` result. None are conditional in v1.
+
+| Code | field_path | message_key | eligibility predicate | prerequisite stage | VALID emission | BLOCKED emission | evidence source |
+|---|---|---|---|---:|---|---|---|
+| `SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | frozen profile §3 |
+| `SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §8 |
+| `SSHG_MINIMUM_AREA_SELECTION_DEFERRED` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §3.2 |
+| `SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §3.2 |
+| `SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §3.3 |
+| `SSHG_NO_FULL_EXCHANGER_RATING_CLAIM` | `null` | frozen key | always eligible after Stage 6 | 6 | always emit | emit only if Stage 6 completed before failure | §2 |
+| `SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY` | `null` | frozen key | always eligible after Stage 7 | 7 | always emit | emit only if Stage 7 completed before failure | §4, §9 |
+
+Warning sort key (deterministic):
+
+```python
+(
+    code,
+    field_path_or_empty_string,
+    message_key,
+    sha256(canonical_details),
+    sha256(canonical_evidence_refs),
+)
 ```
 
+Frozen projection rule:
+
+```text
+provenance.warnings == public_result.warnings
+```
+
+by exact canonical message projection.
+
 Warnings must not be used for conditions that should block.
+
+```text
+F004_CORRECTION_APPLIED=true
+WARNING_ELIGIBILITY_EXACT=true
+```
 
 ## 18. Deferred capabilities
 
@@ -744,54 +1118,220 @@ OUTLET_TEMPERATURES_NOT_COMPUTABLE
 FULL_EXCHANGER_RATING_NOT_COMPUTABLE
 ```
 
-## 19. Validation stages
+## 19. Validation stages and failure policy
 
-1. raw schema parse and closed-field validation
-2. engineering authority identity replay
-3. TASK-021 completeness, validity, and identity replay
-4. TASK-024 completeness, validity, and identity replay
-5. TASK-021/TASK-024 cross-binding verification
-6. applicability-domain verification
-7. central spacing extraction
-8. numeric validity predicates on unquantized Decimal inputs
-9. Formula A evaluation
-10. Formula B branch dispatch and evaluation
-11. public output quantization
-12. canonical serialization, hashes, IDs, provenance, final result
+| Stage rank | validation_stage | scope |
+|---:|---|---|
+| 1 | raw top-level/schema | top-level dict, `schema_version`, `evidence_refs`, closed field set |
+| 2 | nested public-shape decoding | `tube_layout`, `baffle_geometry_result`, `engineering_authority` decode |
+| 3 | TASK-021 validation/identity replay | `TubeLayout` acceptance without `status`; `blockers == ()`; hash/id replay |
+| 4 | TASK-024 validation/identity replay | `status == VALID`, `geometry is not None`, `blockers == ()`; hash/id replay |
+| 5 | TASK-021/TASK-024 cross-binding | TASK-020/TASK-021/TASK-022/TASK-024 transitive bindings and tube OD match |
+| 6 | applicability and central-spacing | §7.1 enforcement table and §6 central spacing extraction |
+| 7 | engineering-authority identity | frozen authority hash/profile replay |
+| 8 | numeric predicates/formula evaluation | unquantized Decimal predicates and Formula A/B singular sequences |
+| 9 | public quantization | §11.5.1 exact quantize algorithm |
+| 10 | canonical/hash/provenance/final assembly | projections §20, provenance §22, result assembly |
+
+Failure policy:
+
+- evaluate stages strictly in ascending `stage_rank`
+- within the first failing stage, accumulate **all** complete blockers from that stage
+- do not execute later engineering stages after the first failing stage
+- sort blockers deterministically using §16.2 global sort key
 
 Any stage failure blocks. No partial geometry.
 
 ## 20. Canonical projections and hashes
 
-TASK-031 uses repository `sha256_canonical` / frozen JSON conventions. It does
-not create a competing generic canonical framework.
+TASK-031 uses repository `sha256_hex` / `canonical_json_bytes` conventions. It
+does not create a competing generic canonical framework. Each projection below
+is an ordered field tuple. Nested upstream values delegate to verified upstream
+canonical/public projections.
 
-### 20.1 Request hash
+```text
+F007_CORRECTION_APPLIED=true
+CANONICAL_PROJECTIONS_EXACT=true
+REQUEST_HASH_PROJECTION_EXACT=true
+```
+
+### 20.1 `REQUEST_CANONICAL_PROJECTION`
+
+Ordered top-level tuple:
+
+1. `schema_version` — exact string
+2. `tube_layout` — TASK-021 `layout_hash_payload` upstream projection
+3. `baffle_geometry_result` — TASK-024 request/geometry identity projection sufficient to bind consumed geometry facts
+4. `engineering_authority` — authority request binding projection
+5. `evidence_refs` — sorted unique string tuple
+
+Exclusions: no engineering output values, no `geometry_hash`, no `geometry_id`,
+no runtime timestamp, no ambient git state.
 
 ```text
 request_hash = sha256_hex(canonical_json_bytes(request_canonical_projection))
 ```
 
-`request_canonical_projection` includes schema version, complete upstream
-canonical projections, engineering authority binding, and evidence refs.
+### 20.2 `ENGINEERING_AUTHORITY_CANONICAL_PROJECTION`
 
-### 20.2 Geometry hash and ID
+Ordered tuple independent from request data:
+
+1. `schema_version` — `task031.engineering-authority.v1`
+2. `aggregate_profile_id` — `TASK031_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_V1_FORMULA_AUTHORITY`
+3. `formula_a_id` — `TASK031_CF_AREA_KERN_SCREENING_INTCHOPN_EQ55_56_V1`
+4. `formula_b_id` — `TASK031_DE_KERN_SCREENING_INTCHOPN_EQ51_BRANCH_V1`
+5. `primary_source_id` — `SRC-INTECHOPEN-100450-KHARAJI-2021`
+6. `exact_source_locations` — frozen tuple of §4 locations
+7. `corroborating_source_ids` — frozen corroboration tuple
+8. `supported_pattern_families` — `("SQUARE", "TRIANGULAR")`
+9. `applicability_envelope` — frozen §7 envelope object
+10. `permission_state` — `LAWFUL_PUBLIC_ACCESS_REUSE_WITH_ATTRIBUTION`
+11. `issue_number` — `181`
+12. `freeze_comment_id` — `5311936966`
+13. `source_ledger_version` — frozen ledger version token
+14. `source_ledger_count` — exact count `4`
+15. `formula_authority_record_model` — `PER_FORMULA_PLUS_AGGREGATE`
+
+Exclusions: `authority_hash` and `authority_id` must not self-contain in the
+hash input.
+
+```text
+engineering_authority_hash =
+  sha256_hex(canonical_json_bytes(authority_canonical_projection))
+engineering_authority_id =
+  urn:hxforge:task031:engineering-authority:v1:{engineering_authority_hash}
+```
+
+### 20.3 `SUCCESS_GEOMETRY_CANONICAL_PROJECTION`
+
+Ordered tuple with explicit sections:
+
+**INPUT BINDINGS**
+
+1. `schema_version`
+2. `request_hash`
+3. `task020_configuration_id`
+4. `task020_configuration_hash`
+5. `task021_layout_id`
+6. `task021_layout_hash`
+7. `task022_geometry_id`
+8. `task022_geometry_hash`
+9. `task024_geometry_id`
+10. `task024_geometry_hash`
+11. `pattern_family`
+
+**ENGINEERING OUTPUTS**
+
+12. `central_inter_baffle_spacing_m` — canonical decimal string (public evidence field)
+13. `central_crossflow_flow_area_m2` — canonical decimal string
+14. `shell_side_equivalent_hydraulic_diameter_m` — canonical decimal string
+15. `flow_region_identity` — `CENTRAL_CROSSFLOW_SCREENING`
+
+**AUTHORITY IDENTITY**
+
+16. `engineering_authority_id`
+17. `engineering_authority_hash`
+18. `formula_a_id`
+19. `formula_b_id`
+
+**WARNINGS**
+
+20. `warnings` — ordered `MessageEntry` projection tuple
+
+**DEFERRED CAPABILITIES**
+
+21. `deferred_capabilities` — ordered exact token tuple
+
+**PROVENANCE PREHASH IDENTITY**
+
+22. `provenance_prehash` — `PROVENANCE_PREHASH_PROJECTION` per §22.1
+
+Exclusions: `geometry_hash` and `geometry_id` must not appear in the hash input.
 
 ```text
 geometry_hash = sha256_hex(canonical_json_bytes(geometry_canonical_projection))
-geometry_id = urn:hxforge:task031:shell-side-hydraulic-geometry:v1:{geometry_hash}
+geometry_id = uuid5_from_hash(
+  namespace=URN_NAMESPACE_HXFORGE_TASK031_SHELL_SIDE_HYDRAULIC_GEOMETRY_V1,
+  name=geometry_hash,
+)
 ```
 
-### 20.3 Blocked result hash
+`geometry_id` consumes the previously completed stable `geometry_hash`. No
+alternate UUID construction is permitted.
+
+### 20.4 `BLOCKED_RESULT_CANONICAL_PROJECTION`
+
+Ordered tuple:
+
+1. `schema_version` — `task031.shell-side-hydraulic-geometry.v1`
+2. `failure_stage` — integer stage rank of first failing stage
+3. `normalized_context` — normalized request context available up to failure stage
+4. `raw_failing_field` — canonical snapshot of first failing raw field or `null`
+5. `eligible_warnings` — warnings whose prerequisite stage completed
+6. `blockers` — ordered blocker `MessageEntry` tuple
+7. `deferred_capabilities` — closed deferred capability tuple
+
+`geometry` is absent/`null` by exact schema rule. No partial
+`central_crossflow_flow_area_m2` or `shell_side_equivalent_hydraulic_diameter_m`
+fields may appear.
 
 ```text
 blocked_result_hash = sha256_hex(canonical_json_bytes(blocked_canonical_projection))
 ```
 
-Blocked projection uses the complete raw request plus ordered blockers and
-allowed prior-stage warnings.
+`blocked_result_hash` must be stable for identical blocked input and must be
+computable when `geometry=None` without self-reference.
 
-### 20.4 Software / build identity
+### 20.5 `PROVENANCE_PREHASH_PROJECTION`
+
+Ordered tuple binding upstream and authority identity before final provenance
+hash:
+
+1. `task_id`
+2. `design_contract_path`
+3. `task020_configuration_id`
+4. `task020_configuration_hash`
+5. `task021_layout_id`
+6. `task021_layout_hash`
+7. `task022_geometry_id`
+8. `task022_geometry_hash`
+9. `task024_geometry_id`
+10. `task024_geometry_hash`
+11. `engineering_authority_profile_id`
+12. `engineering_authority_hash`
+13. `formula_a_id`
+14. `formula_b_id`
+15. `freeze_comment_id`
+16. `source_ids`
+17. `pattern_family`
+18. `flow_region_identity`
+19. `software_version`
+20. `git_commit`
+21. `request_hash`
+22. `warnings`
+23. `deferred_capabilities`
+
+No `datetime.now`, no current timezone, no runtime `git rev-parse`, no
+filesystem-dependent build identity.
+
+### 20.6 `FINAL_PROVENANCE_PROJECTION`
+
+`PROVENANCE_PREHASH_PROJECTION` plus:
+
+24. `provenance_hash` — `sha256_hex(canonical_json_bytes(PROVENANCE_PREHASH_PROJECTION))`
+
+Provenance hash construction must not create
+`request_hash -> provenance_hash -> request_hash` cycles.
+
+Encoding rules for all projections:
+
+- enum tokens as exact strings
+- decimals as canonical decimal strings
+- messages as ordered `MessageEntry` projections
+- `None` only where explicitly admitted
+- sequence ordering preserved in JSON arrays
+
+### 20.7 Software / build identity
 
 ```text
 IMPLEMENTATION_SOFTWARE_VERSION=task031.minimal-compute-v1
@@ -811,33 +1351,44 @@ TASK-031 must not duplicate upstream serializers.
 
 ## 22. Provenance contract
 
-Provenance must retain at minimum:
+Provenance is an ordered immutable schema, not an unordered generic mapping.
+
+### 22.1 Ordered provenance fields
+
+Final public provenance tuple order:
+
+1. `task_id` — `TASK031`
+2. `design_contract_path` — `docs/tasks/TASK-031-shell-and-tube-shell-side-flow-path-hydraulic-geometry.md`
+3. `task020_configuration_id`
+4. `task020_configuration_hash`
+5. `task021_layout_id`
+6. `task021_layout_hash`
+7. `task022_geometry_id`
+8. `task022_geometry_hash`
+9. `task024_geometry_id`
+10. `task024_geometry_hash`
+11. `engineering_authority_profile_id`
+12. `engineering_authority_hash`
+13. `formula_a_id`
+14. `formula_b_id`
+15. `source_authority_freeze_issue` — `181`
+16. `source_authority_freeze_comment_id` — `5311936966`
+17. `source_ids` — four frozen source IDs in sorted order
+18. `pattern_family`
+19. `flow_region_identity` — `CENTRAL_CROSSFLOW_SCREENING`
+20. `software_version`
+21. `git_commit`
+22. `request_hash`
+23. `warnings`
+24. `deferred_capabilities`
+25. `provenance_hash`
+
+Pre-hash projection is §20.5. Final projection is §20.6.
+
+Frozen rule:
 
 ```text
-task_id=TASK031
-design_contract_path
-task020_configuration_id
-task020_configuration_hash
-task021_layout_id
-task021_layout_hash
-task022_geometry_id
-task022_geometry_hash
-task024_geometry_id
-task024_geometry_hash
-engineering_authority_profile_id
-engineering_authority_hash
-formula_a_id
-formula_b_id
-source_authority_freeze_issue=181
-source_authority_freeze_comment_id=5311936966
-source_ids=(four frozen IDs)
-pattern_family
-flow_region_identity=CENTRAL_CROSSFLOW_SCREENING
-software_version
-git_commit
-request_hash
-warnings
-deferred_capabilities
+provenance.warnings == public_result.warnings
 ```
 
 No provenance field may claim a standard, formula, or correction model not
@@ -846,38 +1397,138 @@ actually frozen.
 ## 23. Engineering verification vectors
 
 Design-time vectors only. Expected implementation output must never be used as
-formula authority.
+formula authority. V1 and V2 use independent arithmetic from the frozen π / √3
+Decimal constants and §11.8 singular runtime sequences.
 
-| ID | Scenario | Expected |
-|---|---|---|
-| V1 | valid SQUARE | PASS; positive area and diameter |
-| V2 | valid TRIANGULAR | PASS; positive area and diameter |
-| V3 | minimum topology `N=2` | PASS |
-| V4 | inlet/outlet differ, central uniform | PASS |
-| V5 | unequal central spacing | `SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM` |
-| V6 | `pitch_m == tube_outside_diameter_m` | `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD` |
-| V7 | `pitch_m < tube_outside_diameter_m` | `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD` |
-| V8 | unsupported pattern token | `SSHG_PATTERN_FAMILY_UNSUPPORTED` |
-| V9 | TASK-021/TASK-024 tube OD mismatch | `SSHG_TASK021_TASK024_TUBE_OD_MISMATCH` |
-| V10 | TASK-021 or TASK-024 identity mismatch | respective identity blocker |
-| V11 | blocked TASK-024 producer | `SSHG_TASK024_RESULT_HAS_BLOCKERS` |
-| V12 | VALID wrapper but `geometry=None` | `SSHG_TASK024_GEOMETRY_MISSING` |
-| V13 | quantization collapse | area/diameter quantization blocker |
-| V14 | authority identity mismatch | `SSHG_ENGINEERING_AUTHORITY_IDENTITY_MISMATCH` |
+```text
+F009_CORRECTION_APPLIED=true
+ENGINEERING_VECTORS_COMPLETE=true
+```
 
-### 23.1 Manual formula verification vector (independent SI oracle)
+### 23.1 Reference scalar oracle (independent SI)
 
 ```text
 Ds=0.25 m
 B=0.125 m
 Pt=0.025 m
 do=0.019 m
-pattern_family=SQUARE
+Ct=0.006 m
 
-As = 0.00750 m^2
-De_square = 0.0228828797610251 m
-De_triangular = 0.017271637856696855 m
+As_raw=0.00750 m^2
+As_public=0.007500000000000000000000 m^2   # AREA quantum 1e-24
+
+De_square_raw≈0.022882879761025088360232569308556411061699906773805 m
+De_square_public=0.022882879761 m            # DIAMETER quantum 1e-12
+
+De_triangular_raw≈0.017271637856696845362587269625853252723512268445175 m
+De_triangular_public=0.017271637857 m        # DIAMETER quantum 1e-12
 ```
+
+### 23.2 Vector definitions
+
+Each vector specifies: `VECTOR_ID`, purpose, exact raw/normalized inputs,
+TASK-021 identity/binding setup, TASK-024 identity/binding setup, pattern
+family, baffle count, spacing sequence, `Ds`, `Pt`, `do`, engineering authority
+identity/profile, expected status, expected branch, expected public warnings,
+expected blocker(s), expected raw engineering values, expected quantized values,
+and oracle derivation.
+
+**V1 — valid SQUARE**
+
+- purpose: baseline valid SQUARE central-crossflow screening
+- inputs: reference scalar oracle with `pattern_family=SQUARE`, `N=2`, uniform
+  central spacing `B=0.125 m`, inlet/outlet equal to central for simplicity
+- expected status: `VALID`
+- expected branch: Formula B square
+- expected warnings: all 7 baseline warnings
+- expected raw: `As_raw=0.00750`, `De_square_raw` per §23.1
+- expected public: `0.007500000000000000000000`, `0.022882879761`
+- oracle: independent Decimal evaluation per §11.8
+
+**V2 — valid TRIANGULAR**
+
+- same as V1 except `pattern_family=TRIANGULAR`
+- expected branch: Formula B triangular
+- expected raw: `As_raw=0.00750`, `De_triangular_raw` per §23.1
+- expected public: `0.007500000000000000000000`, `0.017271637857`
+- oracle: independent Decimal evaluation per §11.8; do not use prior review typo
+  `0.017271637856696855`
+
+**V3 — minimum topology N=2**
+
+- exact `N=2`, `len(S)=3`, one central inter-baffle value
+- expected status: `VALID`
+
+**V4 — inlet/outlet differ, central uniform**
+
+- `S[0] != S[1] == S[2] != S[3]` with uniform central members
+- expected status: `VALID`
+
+**V5 — nonuniform central spacing**
+
+- two or more unequal members in `S[1:N]`
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM`
+
+**V6 — pitch equals tube OD**
+
+- mutate `pitch_m == tube_outside_diameter_m` from valid V1 base
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD`
+
+**V7 — pitch less than tube OD**
+
+- mutate `pitch_m < tube_outside_diameter_m` from valid V1 base
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD`
+
+**V8 — unsupported pattern token**
+
+- mutate `pattern_family` to unsupported token from valid V1 base
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_PATTERN_FAMILY_UNSUPPORTED`
+
+**V9 — TASK-021/TASK-024 tube OD mismatch**
+
+- single-field mutation: `task024_result.geometry.tube_outer_diameter_m` !=
+  `task021_layout.tube_geometry.outer_diameter_m`
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_TASK021_TASK024_TUBE_OD_MISMATCH`
+
+**V10 — upstream identity mismatch**
+
+- single-field mutation to `layout_hash`, `geometry_hash`, or transitive binding
+  id/hash from valid V1 base
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_TASK021_LAYOUT_IDENTITY_MISMATCH` or
+  `SSHG_TASK024_IDENTITY_MISMATCH` or upstream binding mismatch code as applicable
+
+**V11 — TASK-024 status BLOCKED**
+
+- `task024_result.status=BLOCKED`, `geometry=null`
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_TASK024_RESULT_HAS_BLOCKERS` or `SSHG_TASK024_GEOMETRY_MISSING`
+
+**V12 — VALID wrapper, geometry missing**
+
+- `task024_result.status=VALID`, `geometry=null`
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_TASK024_GEOMETRY_MISSING`
+
+**V13 — quantization collapse**
+
+- construct exact positive raw quantity below half public quantum so quantized
+  public value becomes zero
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION` or
+  `SSHG_PUBLIC_DIAMETER_QUANTIZATION_COLLISION`
+
+**V14 — engineering authority identity mismatch**
+
+- single-field mutation to `engineering_authority.authority_hash` or
+  `authority_profile_id` from valid V1 base
+- expected status: `BLOCKED`
+- expected blocker: `SSHG_ENGINEERING_AUTHORITY_IDENTITY_MISMATCH`
 
 ```text
 EXTERNAL_ORACLE_SOURCE_INDEPENDENT=true
@@ -1018,6 +1669,16 @@ engineering-formula selection
 
 This authoring gate does not mark checklist items PASS. Independent review is
 required.
+
+The prior design-contract review reported `21/35` PASS, but a literal D01–D35
+table recount yields `20/35` PASS and `15/35` CHANGES_REQUIRED. F-008 is a MAJOR
+finding against D15 applicability enforcement; D15 must not inherit a prior PASS
+token. The next rereview must recount D01–D35 from scratch:
+
+```text
+NEXT_REREVIEW_RECOUNTS_D01_D35_FROM_SCRATCH=true
+PRIOR_REVIEW_ACCOUNTING_INCONSISTENCY_NOTED=true
+```
 
 ## 28. Explicit non-authorization statement
 
