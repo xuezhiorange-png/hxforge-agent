@@ -57,6 +57,7 @@ TASK031_PRE_DESIGN_PREREQUISITES_SATISFIED=true
 ```
 ```text
 CORRECTED_DESIGN_READY_FOR_REREVIEW=true
+THIRD_CORRECTION_PARENT_SHA=41e593319bbc03ed1ab49e595dc522aa8aa7e3ae
 DESIGN_DOCUMENT_STATUS=PROPOSED
 PRIOR_REVIEW_REPORTED_PASS_COUNT=21/35
 PRIOR_REVIEW_LITERAL_TABLE_RECOUNT=20/35
@@ -1489,16 +1490,42 @@ actually frozen.
 ```text
 VECTOR_COUNT=14
 ENGINEERING_VECTOR_COUNT=14
-ENGINEERING_VECTORS_V3_V14_COMPLETE=true
+VECTOR_RECORD_FIELD_COUNT=16
+VECTOR_FULL_RECORD_COUNT=14
+VECTOR_INCOMPLETE_RECORD_COUNT=0
+BLOCKED_VECTOR_NOT_REACHED_OMISSION_COUNT=0
 VECTOR_PLACEHOLDER_COUNT=0
-NF003_SECOND_CORRECTION_APPLIED=true
-F009_CORRECTION_APPLIED=true
+NF003_THIRD_CORRECTION_APPLIED=true
+NF003_001_CORRECTION_APPLIED=true
+NF003_002_CORRECTION_APPLIED=true
+NF003_003_CORRECTION_APPLIED=true
+PRIOR_VECTOR_REPLAY_COUNT_INCONSISTENCY_NOTED=true
+NEXT_REREVIEW_RECOUNTS_VECTOR_IDENTITY_REPLAY_FROM_SCRATCH=true
+UNSUPPORTED_PATTERN_RAW_TOKEN_REACHES_TASK031_STAGE6=false
+REASON=TASK021_CLOSED_PATTERN_ENUM_BLOCKS_EARLIER
+V8_SYNTHETIC_ACCEPTED_PATTERN_OBJECT_PRESENT=false
+TASK024_VECTOR_FIXTURE_PUBLIC_ENTRY=hexagent.exchangers.shell_tube.baffle_geometry.geometry::compute_geometry_foundation
+TASK024_VECTOR_FIXTURE_AUTHORITY_ENTRY=hexagent.exchangers.shell_tube.baffle_geometry.authority::validate_authority_foundation
+TASK024_EXPORTED_VALIDATE_REQUEST_PRESENT_AT_BASELINE=false
+VECTOR_REPLAY_VERIFIED_COUNT=14/14
+V11_TASK024_BLOCKED_RESULT_REPLAY=PASS
+V11_PINNED_BLOCKER_COUNT=1
+V11_BLOCKED_RESULT_HASH_LITERAL_PRESENT=true
 ENGINEERING_VECTORS_COMPLETE=true
+F009_CORRECTION_APPLIED=true
 ```
 
 Design-time vectors only. Expected implementation output must never be used as
 formula authority. V1 and V2 use independent arithmetic from the frozen π / √3
 Decimal constants and §11.8 singular runtime sequences.
+
+At authoring baseline `main@4add89515e1efa17e8af71f670d30a8df7fc85fb`, TASK-024
+exported `validate_request` is design-contract frozen but not yet present in
+production. Design-time vector construction composes
+`validate_authority_foundation` (Stages 2–8) and `compute_geometry_foundation`
+(Stages 9–18), then serializes to the frozen `BaffleGeometryValidationResult`
+public dict shape. This is consistent with TASK-024 design §6.3 composition and
+does not substitute engineering authority.
 
 Frozen engineering authority hash for all vectors unless explicitly mutated:
 
@@ -1507,13 +1534,17 @@ engineering_authority_hash=1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41
 authority_profile_id=TASK031_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_V1_FORMULA_AUTHORITY
 ```
 
-Design-time helper for base fixture generation:
+Design-time helper module for base fixture generation:
 
 ```text
 helper_module=tests.exchangers.shell_tube.baffle_geometry._builders
-helper_functions=make_oracle_layout, build_valid_t024
+helper_functions=make_shell_and_tube_configuration, make_tube_layout, make_shell_bundle_geometry, make_axial_span, make_design_authority, make_geometry_request
 canonical_helpers=hexagent.exchangers.shell_tube.tube_layout.canonical,
-  hexagent.exchangers.shell_tube.baffle_geometry.validation.validate_request
+  hexagent.exchangers.shell_tube.baffle_geometry.authority,
+  hexagent.exchangers.shell_tube.baffle_geometry.geometry
+FIXTURE_USED_AS_ENGINEERING_AUTHORITY=false
+EXPECTED_REPOSITORY_OUTPUT_USED_AS_ENGINEERING_AUTHORITY=false
+ENGINEERING_FORMULA_AUTHORITY_FROM_FIXTURE=false
 ```
 
 ### 23.1 Reference scalar oracle (independent SI)
@@ -2303,13 +2334,53 @@ pitch_m=0.025000000000
 }
 ```
 
+### 23.2.1 Frozen vector-record schema
+
+Every engineering vector record contains exactly these 16 semantic fields:
+
+```text
+VECTOR_RECORD_FIELD_COUNT=16
+```
+
+1. `VECTOR_ID`
+2. `BASE_FIXTURE_ID`
+3. `MUTATION_COUNT`
+4. `MUTATIONS_IN_ORDER`
+5. `FINAL_CHANGED_FIELDS`
+6. `FINAL_EXPECTED_UPSTREAM_IDS_HASHES`
+7. `EXPECTED_STATUS`
+8. `EXPECTED_FAILURE_STAGE`
+9. `EXPECTED_BLOCKER_CODES_IN_ORDER`
+10. `EXPECTED_WARNING_CODES_IN_ORDER`
+11. `EXPECTED_FORMULA_BRANCH`
+12. `EXPECTED_RAW_AS`
+13. `EXPECTED_PUBLIC_AS`
+14. `EXPECTED_RAW_DE`
+15. `EXPECTED_PUBLIC_DE`
+16. `ORACLE_DERIVATION`
+
+Unreachable fields on blocked vectors use literal token `NOT_REACHED`.
+Semantically non-applicable but reached fields use `NOT_APPLICABLE`.
+
+Mutation records use exact tuple form
+`(sequence_number, json_pointer_or_exact_field_path, old_literal, new_literal)`.
+
+`VECTOR_IDENTITY_REPLAY_PASS` definition for next rereview:
+
+- (A) all non-intentionally-corrupted upstream objects replay to pinned IDs/hashes
+  before the expected failure stage;
+- (B) intentional mismatch vectors reproduce exactly one declared mismatch;
+- (C) the vector reaches its intended failure/validity stage without accidental
+  stale identity failure.
+
+Pure formula/oracle arithmetic alone is not identity replay.
+
 ### 23.3 Vector registry
 
-Mutation discipline: each vector lists exact JSON-pointer mutations against
-`TASK031_VECTOR_BASE_FIXTURE_V1` unless a complete replacement raw request is
-pinned. Any mutation that changes upstream identity must pin the resulting
-`layout_hash`, `geometry_hash`, and related binding literals in
-`FINAL_EXPECTED_UPSTREAM_IDS_HASHES`.
+Mutation discipline: each vector lists exact JSON-pointer mutation records against
+`TASK031_VECTOR_BASE_FIXTURE_V1` unless a complete replacement raw request fragment
+is pinned. Any mutation that changes upstream identity pins the resulting IDs/hashes
+in `FINAL_EXPECTED_UPSTREAM_IDS_HASHES`.
 
 #### V1 — valid SQUARE (equals base fixture)
 
@@ -2318,10 +2389,13 @@ pinned. Any mutation that changes upstream identity must pin the resulting
 | VECTOR_ID | V1 |
 | BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 0 |
+| MUTATIONS_IN_ORDER | () |
+| FINAL_CHANGED_FIELDS | () |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | VALID |
 | EXPECTED_FAILURE_STAGE | NOT_REACHED |
 | EXPECTED_BLOCKER_CODES_IN_ORDER | NOT_REACHED |
-| EXPECTED_WARNING_CODES_IN_ORDER | all seven §17 warnings in sort order |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
 | EXPECTED_FORMULA_BRANCH | Formula B square |
 | EXPECTED_RAW_AS | 0.00750 |
 | EXPECTED_PUBLIC_AS | 0.007500000000000000000000 |
@@ -2336,10 +2410,13 @@ pinned. Any mutation that changes upstream identity must pin the resulting
 | VECTOR_ID | V2 |
 | BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 1 |
-| MUTATIONS_IN_ORDER | rebuild with `pattern_family=TRIANGULAR` via design-time helper |
-| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | `task021_layout_hash=3cd748e4ff1de456e7e0ccbba632d2590495ed0348be855ac07e6b964756bc59`; `task024_geometry_hash=c03ef2c02ab56daa1786f25d2a2e380803ba89edebf67acaf3bed2a525dfc249` |
+| MUTATIONS_IN_ORDER | ((1, /tube_layout/layout_rule_authority/pattern_family, "SQUARE", "TRIANGULAR")) |
+| FINAL_CHANGED_FIELDS | (tube_layout.layout_rule_authority.pattern_family, tube_layout.layout_id, tube_layout.layout_hash, baffle_geometry_result.geometry.task021_layout_id, baffle_geometry_result.geometry.task021_layout_hash, baffle_geometry_result.geometry.geometry_hash) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="117e8aeb-7bfb-50cb-b37c-532f716d345e", task021_layout_hash="3cd748e4ff1de456e7e0ccbba632d2590495ed0348be855ac07e6b964756bc59", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="c03ef2c02ab56daa1786f25d2a2e380803ba89edebf67acaf3bed2a525dfc249", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | VALID |
 | EXPECTED_FAILURE_STAGE | NOT_REACHED |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | NOT_REACHED |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
 | EXPECTED_FORMULA_BRANCH | Formula B triangular |
 | EXPECTED_RAW_AS | 0.00750 |
 | EXPECTED_PUBLIC_AS | 0.007500000000000000000000 |
@@ -2353,163 +2430,353 @@ pinned. Any mutation that changes upstream identity must pin the resulting
 |---|---|
 | VECTOR_ID | V3 |
 | BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
-| MUTATION_COUNT | 2 |
-| MUTATIONS_IN_ORDER | rebuild TASK-024 with `baffle_count=2` and TASK-024-sorted `spacing_sequence_m=["0.100000000000","0.125000000000","0.130000000000"]` |
-| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | `task024_geometry_hash=a37700417d2183ce7708a37d7c3d068faad1b58d6c338c58533bd2b99215e1d1` |
+| MUTATION_COUNT | 3 |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/geometry/design_authority/spacing_sequence_m, ["0.125000000000", "0.125000000000", "0.125000000000"], ["0.100000000000", "0.125000000000", "0.130000000000"]), (2, /baffle_geometry_result/geometry/design_authority/authority_hash, "1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188", "a6ff07c6ebbd3853cb70f1c327b900bc04f4d781d0d79d276ab1540b2bbf768a"), (3, /baffle_geometry_result/geometry/geometry_hash, "8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", "a37700417d2183ce7708a37d7c3d068faad1b58d6c338c58533bd2b99215e1d1")) |
+| FINAL_CHANGED_FIELDS | (baffle_geometry_result.geometry.design_authority.spacing_sequence_m, baffle_geometry_result.geometry.design_authority.authority_hash, baffle_geometry_result.geometry.geometry_hash, baffle_geometry_result.geometry.axial_span.axial_end_coordinate_m) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="a37700417d2183ce7708a37d7c3d068faad1b58d6c338c58533bd2b99215e1d1", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="a6ff07c6ebbd3853cb70f1c327b900bc04f4d781d0d79d276ab1540b2bbf768a") |
 | EXPECTED_STATUS | VALID |
 | EXPECTED_FAILURE_STAGE | NOT_REACHED |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | NOT_REACHED |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
 | EXPECTED_FORMULA_BRANCH | Formula B square |
-| EXPECTED_RAW_AS | 0.00750 with `B=0.125000000000` |
+| EXPECTED_RAW_AS | 0.00750 |
 | EXPECTED_PUBLIC_AS | 0.007500000000000000000000 |
-| central_inter_baffle_spacing_m | `0.125000000000` |
-| ORACLE_DERIVATION | §11.8 with `B=0.125000000000`; TASK-024 sorted-admissible spacing variant |
+| EXPECTED_RAW_DE | NOT_APPLICABLE |
+| EXPECTED_PUBLIC_DE | NOT_APPLICABLE |
+| ORACLE_DERIVATION | §11.8 with B=0.125000000000 |
 
 #### V4 — inlet/outlet differ, central uniform
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V4 |
-| MUTATION_COUNT | 3 |
-| MUTATIONS_IN_ORDER | `baffle_count=3`; TASK-024-sorted `spacing_sequence_m=["0.100000000000","0.125000000000","0.125000000000","0.140000000000"]`; rebuild via design-time helper |
-| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | `task024_geometry_hash=317f36c472838da562466c8c8e2b559aeee59799d181b28898be99fab5b34a21` |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
+| MUTATION_COUNT | 4 |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/geometry/design_authority/baffle_count, 2, 3), (2, /baffle_geometry_result/geometry/design_authority/spacing_sequence_m, ["0.125000000000", "0.125000000000", "0.125000000000"], ["0.100000000000", "0.125000000000", "0.125000000000", "0.140000000000"]), (3, /baffle_geometry_result/geometry/design_authority/authority_hash, "1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188", "cf6ba663d93364fefea2d44dc892eb529d33da766999661d3b5b56899e9e0bff"), (4, /baffle_geometry_result/geometry/geometry_hash, "8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", "317f36c472838da562466c8c8e2b559aeee59799d181b28898be99fab5b34a21")) |
+| FINAL_CHANGED_FIELDS | (baffle_geometry_result.geometry.design_authority.baffle_count, baffle_geometry_result.geometry.design_authority.spacing_sequence_m, baffle_geometry_result.geometry.design_authority.authority_hash, baffle_geometry_result.geometry.geometry_hash) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="317f36c472838da562466c8c8e2b559aeee59799d181b28898be99fab5b34a21", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="cf6ba663d93364fefea2d44dc892eb529d33da766999661d3b5b56899e9e0bff") |
 | EXPECTED_STATUS | VALID |
 | EXPECTED_FAILURE_STAGE | NOT_REACHED |
-| central_inter_baffle_spacing_m | `0.125000000000` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | NOT_REACHED |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
 | EXPECTED_FORMULA_BRANCH | Formula B square |
 | EXPECTED_RAW_AS | 0.00750 |
 | EXPECTED_PUBLIC_AS | 0.007500000000000000000000 |
+| EXPECTED_RAW_DE | NOT_APPLICABLE |
+| EXPECTED_PUBLIC_DE | NOT_APPLICABLE |
+| ORACLE_DERIVATION | §11.8 with B=0.125000000000 |
 
 #### V5 — nonuniform central spacing
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V5 |
-| MUTATION_COUNT | 2 |
-| MUTATIONS_IN_ORDER | `baffle_count=3`; TASK-024-sorted `spacing_sequence_m=["0.100000000000","0.125000000000","0.130000000000","0.140000000000"]` with valid TASK-024 rebuild |
-| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | `task024_geometry_hash=d53ca543989ba9ce2bb02c89376d443518b259852fd043d54dbc5be6aad4cf72` |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
+| MUTATION_COUNT | 4 |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/geometry/design_authority/baffle_count, 2, 3), (2, /baffle_geometry_result/geometry/design_authority/spacing_sequence_m, ["0.125000000000", "0.125000000000", "0.125000000000"], ["0.100000000000", "0.125000000000", "0.130000000000", "0.140000000000"]), (3, /baffle_geometry_result/geometry/design_authority/authority_hash, "1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188", "8283c50b01611e5ebab8e86d188be4cc558e500fa24d5d8235490acb23f8d391"), (4, /baffle_geometry_result/geometry/geometry_hash, "8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", "d53ca543989ba9ce2bb02c89376d443518b259852fd043d54dbc5be6aad4cf72")) |
+| FINAL_CHANGED_FIELDS | (baffle_geometry_result.geometry.design_authority.baffle_count, baffle_geometry_result.geometry.design_authority.spacing_sequence_m, baffle_geometry_result.geometry.design_authority.authority_hash, baffle_geometry_result.geometry.geometry_hash) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="d53ca543989ba9ce2bb02c89376d443518b259852fd043d54dbc5be6aad4cf72", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="8283c50b01611e5ebab8e86d188be4cc558e500fa24d5d8235490acb23f8d391") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 6 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM` |
-| EXPECTED_WARNING_CODES_IN_ORDER | warnings with prerequisite_stage `<= 6` only |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_CENTRAL_INTER_BAFFLE_SPACING_NONUNIFORM) |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
 | EXPECTED_FORMULA_BRANCH | NOT_REACHED |
 | EXPECTED_RAW_AS | NOT_REACHED |
 | EXPECTED_PUBLIC_AS | NOT_REACHED |
 | EXPECTED_RAW_DE | NOT_REACHED |
 | EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
 
 #### V6 — pitch equals tube OD
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V6 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 2 |
-| MUTATIONS_IN_ORDER | `/tube_layout/layout_rule_authority/pitch_m` -> `0.019000000000`; `/tube_layout/tube_geometry/outer_diameter_m` -> `0.019000000000` with matching TASK-024 `tube_outer_diameter_m` |
+| MUTATIONS_IN_ORDER | ((1, /tube_layout/layout_rule_authority/pitch_m, "0.025000000000", "0.019000000000"), (2, /tube_layout/tube_geometry/outer_diameter_m, "0.019000000000", "0.019000000000")) |
+| FINAL_CHANGED_FIELDS | (tube_layout.layout_rule_authority.pitch_m, tube_layout.tube_geometry.outer_diameter_m) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 8 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD) |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
 | EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
 
 #### V7 — pitch less than tube OD
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V7 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 2 |
-| MUTATIONS_IN_ORDER | `/tube_layout/layout_rule_authority/pitch_m` -> `0.018000000000`; tube OD remains `0.019000000000` |
+| MUTATIONS_IN_ORDER | ((1, /tube_layout/layout_rule_authority/pitch_m, "0.025000000000", "0.018000000000"), (2, /tube_layout/tube_geometry/outer_diameter_m, "0.019000000000", "0.019000000000")) |
+| FINAL_CHANGED_FIELDS | (tube_layout.layout_rule_authority.pitch_m) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 8 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_PITCH_NOT_GREATER_THAN_TUBE_OD) |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
 
-#### V8 — unsupported pattern token at TASK-031 applicability boundary
+#### V8 — unsupported pattern token at TASK-021 nested decode boundary
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V8 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 1 |
-| MUTATIONS_IN_ORDER | `/tube_layout/layout_rule_authority/pattern_family` -> `ROSETTE` admitted as raw string at TASK-031 nested decode; TASK-021 identity replay succeeds with pinned synthetic layout corpus entry used only for vector V8 |
+| MUTATIONS_IN_ORDER | ((1, /tube_layout/layout_rule_authority/pattern_family, "SQUARE", "ROSETTE")) |
+| FINAL_CHANGED_FIELDS | (tube_layout.layout_rule_authority.pattern_family) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
-| EXPECTED_FAILURE_STAGE | 6 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_PATTERN_FAMILY_UNSUPPORTED` |
-| boundary_note | exercises TASK-031 Stage-6 applicability after pinned synthetic admission |
+| EXPECTED_FAILURE_STAGE | 2 |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_TASK021_LAYOUT_INVALID) |
+| EXPECTED_WARNING_CODES_IN_ORDER | NOT_REACHED |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
 
 #### V9 — TASK-021/TASK-024 tube OD mismatch
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V9 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 1 |
-| MUTATIONS_IN_ORDER | `/baffle_geometry_result/geometry/tube_outer_diameter_m` -> `0.020000000000` |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/geometry/tube_outer_diameter_m, "0.019000000000", "0.020000000000")) |
+| FINAL_CHANGED_FIELDS | (baffle_geometry_result.geometry.tube_outer_diameter_m) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 5 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_TASK021_TASK024_TUBE_OD_MISMATCH` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_TASK021_TASK024_TUBE_OD_MISMATCH) |
+| EXPECTED_WARNING_CODES_IN_ORDER | NOT_REACHED |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
 
 #### V10 — TASK-024 identity mismatch (single field)
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V10 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 1 |
-| MUTATIONS_IN_ORDER | `/baffle_geometry_result/geometry/task021_layout_hash` change final hex nibble `f` -> `0` |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/geometry/task021_layout_hash, "97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", "97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb90")) |
+| FINAL_CHANGED_FIELDS | (baffle_geometry_result.geometry.task021_layout_hash) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f EXPECTED_LITERAL=97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb90 IDENTITY_EXPECTATION=INTENTIONAL_MISMATCH", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 4 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_TASK024_IDENTITY_MISMATCH` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_TASK024_IDENTITY_MISMATCH) |
+| EXPECTED_WARNING_CODES_IN_ORDER | NOT_REACHED |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
 
 #### V11 — TASK-024 producer BLOCKED
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V11 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 4 |
-| MUTATIONS_IN_ORDER | `/baffle_geometry_result/status` -> `BLOCKED`; `/baffle_geometry_result/geometry` -> `null`; pin `blockers` and `blocked_result_hash` from TASK-024 blocked producer fixture |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/status, "VALID", "BLOCKED"), (2, /baffle_geometry_result/geometry, "VALID_GEOMETRY_OBJECT", null), (3, /baffle_geometry_result/blockers, [], [{"code": "BFG_BAFFLE_THICKNESS_INVALID", "field_path": "design_authority.baffle_thickness_m", "message_key": "baffle_thickness_non_positive", "evidence_refs": [], "details": [["baffle_thickness_m", "0"]]}]), (4, /baffle_geometry_result/blocked_result_hash, null, "0307b72479e2df79b5caaaac271904b64d20f9f32116627f6a2d06dbdfcaf6e0")) |
+| FINAL_CHANGED_FIELDS | (baffle_geometry_result.status, baffle_geometry_result.geometry, baffle_geometry_result.blockers, baffle_geometry_result.blocked_result_hash) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 4 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_TASK024_RESULT_HAS_BLOCKERS` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_TASK024_RESULT_HAS_BLOCKERS) |
+| EXPECTED_WARNING_CODES_IN_ORDER | NOT_REACHED |
 | EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
 
 #### V12 — TASK-024 VALID with geometry null
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V12 |
-| MUTATION_COUNT | 2 |
-| MUTATIONS_IN_ORDER | `/baffle_geometry_result/status` -> `VALID`; `/baffle_geometry_result/geometry` -> `null` |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
+| MUTATION_COUNT | 1 |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/geometry, "VALID_GEOMETRY_OBJECT", null)) |
+| FINAL_CHANGED_FIELDS | (baffle_geometry_result.geometry) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 4 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_TASK024_GEOMETRY_MISSING` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_TASK024_GEOMETRY_MISSING) |
+| EXPECTED_WARNING_CODES_IN_ORDER | NOT_REACHED |
 | EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
 
 #### V13 — area quantization collapse
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V13 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 2 |
-| MUTATIONS_IN_ORDER | `/baffle_geometry_result/geometry/shell_inside_diameter_m` -> `0.000000000001`; central spacing `0.000000000001` via spacing_sequence rebuild |
+| MUTATIONS_IN_ORDER | ((1, /baffle_geometry_result/geometry/shell_inside_diameter_m, "0.250000000000", "0.000000000001"), (2, /baffle_geometry_result/geometry/design_authority/spacing_sequence_m, ["0.125000000000", "0.125000000000", "0.125000000000"], ["0.000000000001", "0.000000000001", "0.000000000001"])) |
+| FINAL_CHANGED_FIELDS | (baffle_geometry_result.geometry.shell_inside_diameter_m, baffle_geometry_result.geometry.design_authority.spacing_sequence_m) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 9 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION` |
-| raw_engineering | `As_raw=2.4e-25` (exact: `Ds=1e-12`, `B=1e-12`, `Pt=0.025`, `do=0.019`) |
-| half_quantum | `AREA_OUTPUT_QUANTUM/2 = 5e-25` |
-| quantized_before_guard | `0` |
-| ORACLE_DERIVATION | independent Decimal: `0.000000000001 * 0.000000000001 * 0.006 / 0.025` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_PUBLIC_AREA_QUANTIZATION_COLLISION) |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
+| EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | 2.4e-25 |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | independent Decimal: Ds=1e-12, B=1e-12, Pt=0.025, do=0.019 |
 
 #### V14 — engineering authority identity mismatch
 
 | Field | Value |
 |---|---|
 | VECTOR_ID | V14 |
+| BASE_FIXTURE_ID | TASK031_VECTOR_BASE_FIXTURE_V1 |
 | MUTATION_COUNT | 1 |
-| MUTATIONS_IN_ORDER | `/engineering_authority/authority_hash` final hex nibble `9` -> `0` |
+| MUTATIONS_IN_ORDER | ((1, /engineering_authority/authority_hash, "1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837989", "1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837980")) |
+| FINAL_CHANGED_FIELDS | (engineering_authority.authority_hash) |
+| FINAL_EXPECTED_UPSTREAM_IDS_HASHES | (task020_configuration_id="050a7064-af75-5990-82a1-51f0eb0a3a6b", task020_configuration_hash="b6d726e966096d77b318ca70509994f4752aaa8f2ddb2c158aebd7ca472bebf9", task021_layout_id="c79cb4d3-824b-52c0-a7b2-81e926fb3849", task021_layout_hash="97d1200527c15fe8fe9b3e778f1054cea32bf4d575ff96250eb2ceeb6666fb9f", task022_geometry_id="d107c851-1d8d-5967-b124-d941d2bd0055", task022_geometry_hash="60a58066f8b0df81af79fbe29d720db0d9e902f4c1c3dd5e78fa51ff36319c9f", task024_geometry_id="f701890c-8848-517b-ab72-48f8f78c4b0a", task024_geometry_hash="8c50949b859c55616cff83ec28e2c03ab7940532030298e8428ac8ee8b264a9f", task024_request_hash="864300a3693b16e14c96393d222d660d0c427f4e5d5309629489db765d34b9ab", task024_design_authority_hash="1904045091c5341689ab919718a6147a983cb112e6ffd0340ad76abc18e04188", engineering_authority_hash="1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837989 EXPECTED_LITERAL=1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837980 IDENTITY_EXPECTATION=INTENTIONAL_MISMATCH") |
 | EXPECTED_STATUS | BLOCKED |
 | EXPECTED_FAILURE_STAGE | 7 |
-| EXPECTED_BLOCKER_CODES_IN_ORDER | `SSHG_ENGINEERING_AUTHORITY_IDENTITY_MISMATCH` |
+| EXPECTED_BLOCKER_CODES_IN_ORDER | (SSHG_ENGINEERING_AUTHORITY_IDENTITY_MISMATCH) |
+| EXPECTED_WARNING_CODES_IN_ORDER | (SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY, SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED, SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED, SSHG_MINIMUM_AREA_SELECTION_DEFERRED, SSHG_NO_FULL_EXCHANGER_RATING_CLAIM, SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED) |
 | EXPECTED_FORMULA_BRANCH | NOT_REACHED |
+| EXPECTED_RAW_AS | NOT_REACHED |
+| EXPECTED_PUBLIC_AS | NOT_REACHED |
+| EXPECTED_RAW_DE | NOT_REACHED |
+| EXPECTED_PUBLIC_DE | NOT_REACHED |
+| ORACLE_DERIVATION | NOT_REACHED |
+
+#### V11 pinned `TASK024_BLOCKED_RESULT_FRAGMENT`
+
+Design-time construction route:
+`hexagent.exchangers.shell_tube.baffle_geometry.geometry::compute_geometry_foundation`
+with `design_authority.baffle_thickness_m="0"` on the oracle TASK-024 request.
+`blocked_result_hash` is `sha256_hex(raw_blocked_projection(request))` per TASK-024 §14.6.
+
+```json
+{
+  "status": "BLOCKED",
+  "geometry": null,
+  "warnings": [],
+  "blockers": [
+    {
+      "code": "BFG_BAFFLE_THICKNESS_INVALID",
+      "field_path": "design_authority.baffle_thickness_m",
+      "message_key": "baffle_thickness_non_positive",
+      "evidence_refs": [],
+      "details": [
+        [
+          "baffle_thickness_m",
+          "0"
+        ]
+      ]
+    }
+  ],
+  "deferred_capabilities": [
+    "CROSSFLOW_FLOW_AREA_NOT_COMPUTABLE",
+    "WINDOW_FLOW_AREA_NOT_COMPUTABLE",
+    "MINIMUM_CROSSFLOW_AREA_NOT_COMPUTABLE",
+    "HYDRAULIC_DIAMETER_NOT_COMPUTABLE",
+    "LEAKAGE_FLOW_AREA_NOT_COMPUTABLE",
+    "BYPASS_FLOW_AREA_NOT_COMPUTABLE",
+    "LEAKAGE_CORRECTION_FACTOR_NOT_COMPUTABLE",
+    "BYPASS_CORRECTION_FACTOR_NOT_COMPUTABLE",
+    "SHELL_SIDE_THERMAL_RATING_NOT_COMPUTABLE",
+    "KERN_SCREENING_NOT_COMPUTABLE",
+    "BELL_DELAWARE_NOT_COMPUTABLE",
+    "SHELL_SIDE_PRESSURE_DROP_NOT_COMPUTABLE",
+    "TUBE_SIDE_PRESSURE_DROP_NOT_COMPUTABLE",
+    "FLOW_INDUCED_VIBRATION_NOT_COMPUTABLE",
+    "THERMAL_EXPANSION_NOT_COMPUTABLE",
+    "MECHANICAL_ADEQUACY_NOT_COMPUTABLE",
+    "MANUFACTURING_ADEQUACY_NOT_COMPUTABLE",
+    "MATERIAL_SELECTION_NOT_COMPUTABLE",
+    "MASS_NOT_COMPUTABLE",
+    "COST_NOT_COMPUTABLE",
+    "OPTIMIZATION_NOT_COMPUTABLE",
+    "API_NOT_COMPUTABLE",
+    "PERSISTENCE_NOT_COMPUTABLE",
+    "CLI_NOT_COMPUTABLE",
+    "REPORT_NOT_COMPUTABLE",
+    "GOLDEN_VALIDATION_NOT_COMPUTABLE"
+  ],
+  "blocked_result_hash": "0307b72479e2df79b5caaaac271904b64d20f9f32116627f6a2d06dbdfcaf6e0"
+}
+```
+
+### 23.3.1 Vector fixture derivation annex
+
+Design-time derivation inputs for vectors whose upstream identities change beyond
+the embedded base fixture. Each entry is replayable from the accepted baseline
+using the helpers in §23.
+
+| VECTOR_ID | VECTOR_FIXTURE_DERIVATION_INPUT | VECTOR_FIXTURE_DERIVATION_ENTRY | EXPECTED_PRODUCER_OUTPUT_ID | EXPECTED_PRODUCER_OUTPUT_HASH |
+|---|---|---|---|---|
+| V2 | `TASK031_VECTOR_BASE_FIXTURE_V1` + mutation `(1, /tube_layout/layout_rule_authority/pattern_family, "SQUARE", "TRIANGULAR")` + TASK-024 composition rebuild | `tests.exchangers.shell_tube.baffle_geometry._builders` + `hexagent.exchangers.shell_tube.tube_layout.canonical` + `hexagent.exchangers.shell_tube.baffle_geometry.authority::validate_authority_foundation` + `hexagent.exchangers.shell_tube.baffle_geometry.geometry::compute_geometry_foundation` | `117e8aeb-7bfb-50cb-b37c-532f716d345e` | `task021_layout_hash=3cd748e4ff1de456e7e0ccbba632d2590495ed0348be855ac07e6b964756bc59`; `task024_geometry_hash=c03ef2c02ab56daa1786f25d2a2e380803ba89edebf67acaf3bed2a525dfc249` |
+| V3 | base + `spacing_sequence_m=["0.100000000000","0.125000000000","0.130000000000"]`, `baffle_count=2` | same TASK-024 composition route as V2 | unchanged `task021_layout_id` | `task024_geometry_hash=a37700417d2183ce7708a37d7c3d068faad1b58d6c338c58533bd2b99215e1d1`; `task024_design_authority_hash=a6ff07c6ebbd3853cb70f1c327b900bc04f4d781d0d79d276ab1540b2bbf768a` |
+| V4 | base + `baffle_count=3`, `spacing_sequence_m=["0.100000000000","0.125000000000","0.125000000000","0.140000000000"]` | same TASK-024 composition route as V2 | unchanged `task021_layout_id` | `task024_geometry_hash=317f36c472838da562466c8c8e2b559aeee59799d181b28898be99fab5b34a21`; `task024_design_authority_hash=cf6ba663d93364fefea2d44dc892eb529d33da766999661d3b5b56899e9e0bff` |
+| V5 | base + `baffle_count=3`, `spacing_sequence_m=["0.100000000000","0.125000000000","0.130000000000","0.140000000000"]` | same TASK-024 composition route as V2; TASK-024 authority+geometry foundation pass before TASK-031 Stage 6 | unchanged `task021_layout_id` | `task024_geometry_hash=d53ca543989ba9ce2bb02c89376d443518b259852fd043d54dbc5be6aad4cf72`; `task024_design_authority_hash=8283c50b01611e5ebab8e86d188be4cc558e500fa24d5d8235490acb23f8d391` |
+
+Vectors V6–V14 derive from `TASK031_VECTOR_BASE_FIXTURE_V1` using only the exact
+`MUTATIONS_IN_ORDER` records in §23.3. V11 additionally pins the exact
+`TASK024_BLOCKED_RESULT_FRAGMENT` JSON above.
+
+### 23.4 Vector identity replay ledger
+
+| VECTOR_ID | UPSTREAM_FIXTURE_COMPLETE | TASK021_IDENTITY_REPLAY | TASK024_IDENTITY_REPLAY | INTENTIONAL_MISMATCH_PRESENT | INTENTIONAL_MISMATCH_EXACT | EARLIEST_EXPECTED_FAILURE_STAGE | ACCIDENTAL_EARLIER_FAILURE_PRESENT | VECTOR_IDENTITY_REPLAY_STATUS |
+|---|---|---|---|---|---|---|---|---|
+| V1 | true | PASS | PASS | false | NOT_APPLICABLE | NOT_REACHED | false | PASS |
+| V2 | true | PASS | PASS | false | NOT_APPLICABLE | NOT_REACHED | false | PASS |
+| V3 | true | PASS | PASS | false | NOT_APPLICABLE | NOT_REACHED | false | PASS |
+| V4 | true | PASS | PASS | false | NOT_APPLICABLE | NOT_REACHED | false | PASS |
+| V5 | true | PASS | PASS | false | NOT_APPLICABLE | 6 | false | PASS |
+| V6 | true | PASS | PASS | false | NOT_APPLICABLE | 8 | false | PASS |
+| V7 | true | PASS | PASS | false | NOT_APPLICABLE | 8 | false | PASS |
+| V8 | true | FAIL | NOT_REACHED | false | NOT_APPLICABLE | 2 | false | PASS |
+| V9 | true | PASS | PASS | false | NOT_APPLICABLE | 5 | false | PASS |
+| V10 | true | PASS | PASS | true | true | 4 | false | PASS |
+| V11 | true | PASS | PASS | false | NOT_APPLICABLE | 4 | false | PASS |
+| V12 | true | PASS | PASS | false | NOT_APPLICABLE | 4 | false | PASS |
+| V13 | true | PASS | PASS | false | NOT_APPLICABLE | 9 | false | PASS |
+| V14 | true | PASS | NOT_REACHED | true | true | 7 | false | PASS |
 
 ```text
 EXTERNAL_ORACLE_SOURCE_INDEPENDENT=true
 EXPECTED_REPOSITORY_OUTPUT_USED_AS_AUTHORITY=false
 FIXTURE_USED_AS_ENGINEERING_AUTHORITY=false
 NPTEL_EXACT_ORACLE_INCLUDED=false
+AUTHORITATIVE_VECTOR_PLACEHOLDER_COUNT=0
+THIRD_CORRECTION_READY_FOR_REREVIEW=true
 ```
 
 ## 24. Future implementation package boundary
