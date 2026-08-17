@@ -35,8 +35,10 @@
 | Field | Binding value |
 |---|---|
 | Repository | `xuezhiorange-png/hxforge-agent` |
-| Allocation authority | Issue #185 — TASK-032 allocation |
+| Allocation authority | Issue #180 — TASK-032 allocation |
 | Source-definition authority | Issue #185 governance comment chain |
+| Design independent review R1 comment | `5317687475` |
+| Design correction R1 authorization comment | `5317692890` |
 | Source-definition R1 proposal comment | `5316626425` |
 | Engineering source/formula authority freeze comment | `5317111718` |
 | Deterministic/schema freeze comment | `5317255912` |
@@ -45,7 +47,7 @@
 | Authoring base | `main@02875eb4c6fcf5a8e7cb452f0a846f92aca946a2` |
 | Design branch | `docs/task-032-shell-side-single-phase-flow-state-design` |
 | Design file | `docs/tasks/TASK-032-shell-and-tube-shell-side-single-phase-flow-state.md` |
-| Frozen allocation | `TASK-032 = Shell-and-Tube Shell-Side Single-Phase Flow State` |
+| Frozen allocation | `TASK-032 = Shell-and-Tube Shell-Side Single-Phase Flow-State Foundation` |
 | First-slice profile | `SHELL_SIDE_SINGLE_PHASE_NEWTONIAN_BULK_FLOW_STATE_SCREENING_V1` |
 | Public profile ID | `hxforge.shell_tube.shell_side_flow_state.v1` |
 | Design status | `PROPOSED` |
@@ -70,6 +72,10 @@ IMPLEMENTATION_AUTHORIZED=false
 PULL_REQUEST_AUTHORIZED=false
 TASK033_AUTHORIZED=false
 TASK034_AUTHORIZED=false
+DESIGN_AUTHORING_PUSH_AUTHORIZED_BY_5317271091=true
+ORIGINAL_DESIGN_AUTHORING_PUSH_COMPLETED=true
+DESIGN_CORRECTION_R1_PUSH_AUTHORIZED_BY_5317692890=true
+FURTHER_PUSH_AUTHORIZED=false
 ```
 
 This design authoring gate permits one branch and this one repository design
@@ -166,7 +172,7 @@ NON_NEWTONIAN_RHEOLOGY
 COMPRESSIBLE_PATH_INTEGRATION
 PROPERTY_PATH_INTEGRATION
 HEAT_TRANSFER_COEFFICIENT
-NUSSULT_NUMBER
+SHELL_SIDE_NUSSELT_NUMBER
 FRICTION_FACTOR
 PRESSURE_DROP
 BELL_DELAWARE
@@ -246,7 +252,7 @@ FORMULA_ID=TASK032_PRANDTL_DIMENSIONLESS_INTCHOPN_EQ35_V1
 PUBLIC_ENGINEERING_QUANTITY=shell_side_prandtl_number
 shell_side_prandtl_number = Pr_s = mu_s * Cp_s / k_s
 PRIMARY_SOURCE=SRC-INTECHOPEN-100450-KHARAJI-2021
-EXACT_SOURCE_LOCATION=§4.2 "Tube side", Eq. (35)
+EXACT_SOURCE_LOCATION=§4.3 "Tube-side heat transfer coefficient", Eq. (35)
 ```
 
 ### 4.5 Raw calculation graph
@@ -273,11 +279,18 @@ Binary float conversion of `A_s_text` or `D_e_text` is forbidden.
 
 ## 5. Direct upstream contract
 ```text
-TASK032_DIRECT_UPSTREAM=TASK031,TASK026
+TASK032_DIRECT_UPSTREAM=TASK031
+TASK026_IS_TASK032_DIRECT_UPSTREAM=false
+TASK026_PROPERTY_SNAPSHOT_VALUE_OBJECT_REUSED=true
 TASK020_DIRECT_INPUT=false
 TASK020_TRANSITIVE_IDENTITY_REQUIRED=true
 PROPERTY_REEVALUATION_FORBIDDEN=true
 ```
+
+TASK-026 is not a direct upstream Task. TASK-032 reuses the frozen
+`PropertySnapshot` value object from
+`hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot.PropertySnapshot`
+without requiring TASK-026 success result or engineering output.
 
 ### 5.1 TASK-031 accepted input
 
@@ -532,9 +545,29 @@ DESIGN_CONTRACT_PATH=docs/tasks/TASK-032-shell-and-tube-shell-side-single-phase-
 
 ## 13. Public raw request schema
 ```text
+PUBLIC_CALCULATION_OPERATION_COUNT=1
+PUBLIC_CALCULATION_OPERATION=validate_request(raw_request)
+
+REQUEST_TYPE=ShellSideFlowStateRequest
 REQUEST_SCHEMA_VERSION=task032.shell-side-flow-state-request.v1
+PROFILE_ID=hxforge.shell_tube.shell_side_flow_state.v1
+
+RAW_REQUEST_CONTAINER_TYPE=EXACT_BUILTIN_DICT
+CUSTOM_MAPPING_ACCEPTED=false
+UNKNOWN_FIELDS_BLOCKED=true
 ALTERNATIVE_REQUEST_SHAPES=false
 REQUEST_SCHEMA_SINGULAR=true
+
+RAW_REQUEST_FIELDS=(
+  schema_version,
+  profile_id,
+  task031_result,
+  property_snapshot_hash,
+  property_snapshot,
+  mass_flow_authority,
+  evidence_refs
+)
+RAW_REQUEST_FIELD_COUNT=7
 ```
 
 ### 13.1 Top-level field table (count 7)
@@ -559,6 +592,157 @@ REQUEST_FIELDS=(
   evidence_refs
 )
 REQUEST_HASH_KIND_TAGS=(STRING,STRING,RECORD,STRING,RECORD,RECORD,TUPLE)
+```
+
+### 13.2 Top-level field lexical contracts
+
+`schema_version`:
+
+- `raw_type=str`
+- `exact_value=task032.shell-side-flow-state-request.v1`
+
+`profile_id`:
+
+- `raw_type=str`
+- `exact_value=hxforge.shell_tube.shell_side_flow_state.v1`
+
+`property_snapshot_hash`:
+
+- `raw_type=str`
+- `lexical_domain=LOWERCASE_64_HEX`
+
+`evidence_refs`:
+
+- `raw_type=EXACT_BUILTIN_LIST_OF_STRINGS`
+- `empty=false`
+- `duplicates=false`
+- `normalized_type=tuple[str,...]`
+- `canonical_order=LEXICOGRAPHIC_SORT`
+
+Unsorted but otherwise valid raw `evidence_refs` MUST be accepted. Accepted raw
+`evidence_refs` are an exact built-in list that is non-empty, duplicate-free,
+and contains only non-empty strings. Normalization converts to `tuple` and
+lexicographically sorts. Unsorted input alone is not a blocker.
+```text
+UNSORTED_BUT_VALID_RAW_EVIDENCE_REFS=ACCEPTED
+UNSORTED_INPUT_ALONE_IS_NOT_A_BLOCKER=true
+```
+
+### 13.3 `task031_result` nested raw contract (count 6)
+```text
+TASK031_RESULT_RAW_FIELDS=(
+  status,
+  geometry,
+  warnings,
+  blockers,
+  deferred_capabilities,
+  blocked_result_hash
+)
+TASK031_RESULT_RAW_FIELD_COUNT=6
+```
+
+### 13.4 `task031_result.geometry` nested raw contract (count 25)
+```text
+TASK031_GEOMETRY_RAW_FIELDS=(
+  schema_version,
+  geometry_id,
+  geometry_hash,
+  request_hash,
+  task020_configuration_id,
+  task020_configuration_hash,
+  task021_layout_id,
+  task021_layout_hash,
+  task022_geometry_id,
+  task022_geometry_hash,
+  task024_geometry_id,
+  task024_geometry_hash,
+  engineering_authority_id,
+  engineering_authority_hash,
+  formula_a_id,
+  formula_b_id,
+  pattern_family,
+  flow_region_identity,
+  central_inter_baffle_spacing_m,
+  central_crossflow_flow_area_m2,
+  shell_side_equivalent_hydraulic_diameter_m,
+  warnings,
+  blockers,
+  deferred_capabilities,
+  provenance
+)
+TASK031_GEOMETRY_RAW_FIELD_COUNT=25
+```
+
+### 13.5 `property_snapshot` nested raw contract (count 10)
+```text
+PROPERTY_SNAPSHOT_RAW_FIELDS=(
+  density_kg_m3,
+  dynamic_viscosity_pa_s,
+  thermal_conductivity_w_m_k,
+  specific_heat_capacity_j_kg_k,
+  bulk_temperature_k,
+  bulk_pressure_pa,
+  phase_region,
+  property_source_id,
+  property_source_version,
+  property_snapshot_hash
+)
+PROPERTY_SNAPSHOT_RAW_FIELD_COUNT=10
+```
+
+The six numeric `PropertySnapshot` fields must be canonical finite base-10
+fixed-point strings. Forbidden: exponent notation, leading `+`, whitespace,
+NaN, Infinity, binary float, float-to-Decimal coercion.
+
+### 13.6 `mass_flow_authority` nested raw contract (count 18)
+```text
+MASS_FLOW_AUTHORITY_RAW_FIELDS=(
+  schema_version,
+  authority_profile_id,
+  shell_side_case_id,
+  shell_side_stream_id,
+  shell_side_fluid_id,
+  rheology_model,
+  task020_configuration_id,
+  task020_configuration_hash,
+  task031_geometry_id,
+  task031_geometry_hash,
+  property_snapshot_hash,
+  property_state_role,
+  mass_flow_rate_kg_s,
+  mass_flow_sign_convention,
+  authority_source_id,
+  authority_source_version,
+  evidence_refs,
+  authority_hash
+)
+MASS_FLOW_AUTHORITY_RAW_FIELD_COUNT=18
+```
+
+`mass_flow_rate_kg_s`:
+
+- canonical finite base-10 fixed-point string
+- decoded to `Decimal`
+- no exponent notation
+- no leading `+`
+- no whitespace
+- no NaN/Infinity
+- no binary float
+- no float-to-Decimal coercion
+
+### 13.7 Forbidden raw-request behavior
+```text
+ARBITRARY_MAPPING
+CUSTOM_MAPPING
+ALIASES
+IMPLICIT_COERCION
+REPR_BASED_UNKNOWN_OBJECT_PROJECTION
+STR_BASED_UNKNOWN_OBJECT_PROJECTION
+BINARY_FLOAT_INPUT
+PARTIAL_TASK031_PROJECTION
+TASK031_ID_ONLY_INPUT
+SILENT_MISSING_FIELD_SYNTHESIS
+RUNTIME_UPSTREAM_REPAIR
 ```
 
 ## 14. Public operation
@@ -669,7 +853,7 @@ Blocker entry contract (7 fields): `code, severity, stage, field_path, message_k
 | 3 | `SSFS_RAW_TYPE_INVALID` | S00 | raw value is not exact built-in dict/list/str |
 | 4 | `SSFS_UNKNOWN_FIELD` | S01 | unknown field in closed schema |
 | 5 | `SSFS_DECIMAL_LEXICAL_INVALID` | S01 | decimal lexical domain violation |
-| 6 | `SSFS_EVIDENCE_REFS_INVALID` | S01 | evidence refs empty or not sorted unique |
+| 6 | `SSFS_EVIDENCE_REFS_INVALID` | S01 | evidence refs wrong type, empty, invalid entry, duplicates, or other invalid lexical/content |
 | 7 | `SSFS_TASK031_RESULT_MISSING` | S01 | required task031_result absent |
 | 8 | `SSFS_TASK031_RESULT_INVALID` | S02 | task031_result fails shape decode |
 | 9 | `SSFS_TASK031_RESULT_HAS_BLOCKERS` | S02 | task031_result carries upstream blockers |
@@ -1178,7 +1362,7 @@ DESIGN_REVIEW_CHECK_COUNT=28
 
 | ID | Item | Authoring supplies contract |
 |---|---|---|
-| D01 | allocation matches Issue #185 | §1 |
+| D01 | allocation matches Issue #180 | §1 |
 | D02 | source-definition freeze preserved | §1, §4 |
 | D03 | TASK-031 upstream binding exact | §5 |
 | D04 | PropertySnapshot reuse exact | §5.3, §21 |
@@ -1220,11 +1404,17 @@ ISSUE_MUTATION_AUTHORIZED=false
 DESIGN_FROZEN=false
 TASK033_AUTHORIZED=false
 TASK034_AUTHORIZED=false
+DESIGN_AUTHORING_PUSH_AUTHORIZED_BY_5317271091=true
+ORIGINAL_DESIGN_AUTHORING_PUSH_COMPLETED=true
+DESIGN_CORRECTION_R1_PUSH_AUTHORIZED_BY_5317692890=true
+FURTHER_PUSH_AUTHORIZED=false
 ```
 
 Authoring this `PROPOSED` design contract does not authorize implementation,
-tests, fixtures, CI changes, pull request creation, push, merge, or Issue
-mutation.
+tests, fixtures, CI changes, pull request creation, merge, or Issue mutation.
+The original design authoring push was authorized by comment `5317271091`.
+Design correction R1 push is authorized by comment `5317692890`. No further
+push is authorized unless another explicit authorization is recorded.
 
 ---
 
@@ -1246,6 +1436,8 @@ mutation.
 | Earlier proposal text | 5317255912 deterministic/schema freeze | D15–D28 frozen as corrected |
 | All prior amendments | 5317260370 complete source-definition freeze | D01–D28 frozen |
 | — | 5317271091 design authoring authorization | Design doc only; no implementation |
+| — | 5317687475 design independent review R1 | Eight review findings |
+| — | 5317692890 design correction R1 authorization | Design doc correction only |
 
 ## Appendix B — Package constants
 ```text
@@ -1312,7 +1504,7 @@ FIRST_SLICE_FLOW_REGIME_CLASSIFICATION=DEFERRED
 - `stage=S01`
 - `severity=hard`
 - `message_key=ssfs_evidence_refs_invalid`
-- Meaning: evidence refs empty or not sorted unique
+- Meaning: evidence refs wrong type, empty list, empty/invalid entry, duplicates, or other invalid lexical/content cases; unsorted but otherwise valid input is accepted and normalized
 - `payload`: canonical key-value tuple when required by stage
 - `evidence_refs`: sorted unique non-empty when stage requires evidence binding
 
