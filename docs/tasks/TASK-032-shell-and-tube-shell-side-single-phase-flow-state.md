@@ -630,6 +630,7 @@ UNSORTED_INPUT_ALONE_IS_NOT_A_BLOCKER=true
 
 ### 13.3 `task031_result` nested raw contract (count 6)
 ```text
+TASK031_RESULT_RAW_CONTAINER_TYPE=EXACT_BUILTIN_DICT
 TASK031_RESULT_RAW_FIELDS=(
   status,
   geometry,
@@ -643,6 +644,7 @@ TASK031_RESULT_RAW_FIELD_COUNT=6
 
 ### 13.4 `task031_result.geometry` nested raw contract (count 25)
 ```text
+TASK031_GEOMETRY_RAW_CONTAINER_TYPE=EXACT_BUILTIN_DICT_WHEN_PRESENT
 TASK031_GEOMETRY_RAW_FIELDS=(
   schema_version,
   geometry_id,
@@ -675,6 +677,7 @@ TASK031_GEOMETRY_RAW_FIELD_COUNT=25
 
 ### 13.5 `property_snapshot` nested raw contract (count 10)
 ```text
+PROPERTY_SNAPSHOT_RAW_CONTAINER_TYPE=EXACT_BUILTIN_DICT
 PROPERTY_SNAPSHOT_RAW_FIELDS=(
   density_kg_m3,
   dynamic_viscosity_pa_s,
@@ -688,14 +691,20 @@ PROPERTY_SNAPSHOT_RAW_FIELDS=(
   property_snapshot_hash
 )
 PROPERTY_SNAPSHOT_RAW_FIELD_COUNT=10
+PROPERTY_SNAPSHOT_PHASE_REGION_RAW_RULE=EXACT_ADMITTED_ENUM_STRING_TOKEN
+PROPERTY_SNAPSHOT_SOURCE_ID_RAW_RULE=NON_EMPTY_STRING
+PROPERTY_SNAPSHOT_SOURCE_VERSION_RAW_RULE=NON_EMPTY_STRING
+PROPERTY_SNAPSHOT_HASH_RAW_RULE=LOWERCASE_64_HEX
 ```
 
-The six numeric `PropertySnapshot` fields must be canonical finite base-10
-fixed-point strings. Forbidden: exponent notation, leading `+`, whitespace,
-NaN, Infinity, binary float, float-to-Decimal coercion.
+The six numeric `PropertySnapshot` fields must be
+`CANONICAL_FINITE_BASE10_FIXED_POINT_STRING`. Forbidden: exponent notation,
+leading `+`, whitespace, NaN, Infinity, `-Infinity`, binary float,
+float-to-Decimal coercion.
 
 ### 13.6 `mass_flow_authority` nested raw contract (count 18)
 ```text
+MASS_FLOW_AUTHORITY_RAW_CONTAINER_TYPE=EXACT_BUILTIN_DICT
 MASS_FLOW_AUTHORITY_RAW_FIELDS=(
   schema_version,
   authority_profile_id,
@@ -718,6 +727,46 @@ MASS_FLOW_AUTHORITY_RAW_FIELDS=(
 )
 MASS_FLOW_AUTHORITY_RAW_FIELD_COUNT=18
 ```
+
+`rheology_model`:
+
+- `EXACT_STRING_TOKEN`
+
+`property_state_role`:
+
+- `EXACT_STRING_TOKEN`
+
+`mass_flow_sign_convention`:
+
+- `EXACT_STRING_TOKEN`
+
+`task020_configuration_hash`:
+
+- `LOWERCASE_64_HEX`
+
+`task031_geometry_hash`:
+
+- `LOWERCASE_64_HEX`
+
+`property_snapshot_hash`:
+
+- `LOWERCASE_64_HEX`
+
+`authority_hash`:
+
+- `LOWERCASE_64_HEX`
+
+`evidence_refs`:
+
+- `MASS_FLOW_AUTHORITY_EVIDENCE_REFS_RAW_TYPE=EXACT_BUILTIN_LIST_OF_STRINGS`
+- `MASS_FLOW_AUTHORITY_EVIDENCE_REFS_EMPTY=false`
+- `MASS_FLOW_AUTHORITY_EVIDENCE_REFS_ENTRIES=NON_EMPTY_STRINGS`
+- `MASS_FLOW_AUTHORITY_EVIDENCE_REFS_DUPLICATES=false`
+- `MASS_FLOW_AUTHORITY_EVIDENCE_REFS_NORMALIZED_TYPE=tuple[str,...]`
+- `MASS_FLOW_AUTHORITY_EVIDENCE_REFS_CANONICAL_ORDER=LEXICOGRAPHIC_SORT`
+- `MASS_FLOW_AUTHORITY_UNSORTED_BUT_VALID_EVIDENCE_REFS=ACCEPTED`
+
+The caller's raw `evidence_refs` list is not required to already be sorted.
 
 `mass_flow_rate_kg_s`:
 
