@@ -16,6 +16,9 @@ from tests.ci.artifact_identity import (
     REQUIRED_ARTIFACT_KINDS,
     SHARD_REQUIRED_ARTIFACT_KINDS,
     ArtifactError,
+    resolve_global_bundles,
+    resolve_shard_bundles,
+    selected_coverage_raw_paths,
     verify_artifacts,
     verify_global_bundles,
 )
@@ -1493,3 +1496,432 @@ class TestRunTestShard:
         assert telemetry["tests_failed"] > 0
         assert telemetry["execution_status"] == "completed"
         assert not telemetry["producer_authoritative"]
+
+
+# ---------------------------------------------------------------------------
+# Attempt-scoped artifact resolution regression tests (R01-R08)
+# ---------------------------------------------------------------------------
+
+
+def _make_full_attempt1_shard_set(root: Path, *, track: str = "pr-head") -> None:
+    _make_artifact_bundle(
+        root,
+        track=track,
+        shard="ci",
+        python_version="3.11",
+        commit_sha=_SHA40,
+        run_id="100",
+        run_attempt=1,
+    )
+    _make_artifact_bundle(
+        root,
+        track=track,
+        shard="unit",
+        python_version="3.11",
+        commit_sha=_SHA40,
+        run_id="100",
+        run_attempt=1,
+    )
+    _make_artifact_bundle(
+        root,
+        track=track,
+        shard="unit",
+        python_version="3.12",
+        commit_sha=_SHA40,
+        run_id="100",
+        run_attempt=1,
+    )
+
+
+class TestAttemptScopedArtifactResolution:
+    """Regression coverage for failed-job rerun attempt fallback."""
+
+    def test_r01_single_attempt_strict_identity_still_passes(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_full_attempt1_shard_set(root)
+        verify_artifacts(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            expected_run_attempt=1,
+        )
+
+    def test_r02_mixed_attempt_fallback_selects_latest_per_logical_producer(
+        self, tmp_path: Path
+    ) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_full_attempt1_shard_set(root)
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=2,
+            bundle_name="pr-head-ci-py3.11-attempt2",
+        )
+        resolved = resolve_shard_bundles(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            consumer_run_attempt=2,
+        )
+        assert (
+            resolved[
+                next(k for k in resolved if k.shard == "ci" and k.python_version == "3.11")
+            ].identity.run_attempt
+            == 2
+        )
+        assert (
+            resolved[
+                next(k for k in resolved if k.shard == "unit" and k.python_version == "3.11")
+            ].identity.run_attempt
+            == 1
+        )
+        assert (
+            resolved[
+                next(k for k in resolved if k.shard == "unit" and k.python_version == "3.12")
+            ].identity.run_attempt
+            == 1
+        )
+
+    def test_r03_producer_not_rerun_reuses_prior_attempt(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_full_attempt1_shard_set(root)
+        resolved = resolve_shard_bundles(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            consumer_run_attempt=2,
+        )
+        assert all(bundle.identity.run_attempt == 1 for bundle in resolved.values())
+
+    def test_r04_rerun_producer_prefers_newer_attempt(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=2,
+            bundle_name="pr-head-ci-py3.11-attempt2",
+        )
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="unit",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="unit",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        resolved = resolve_shard_bundles(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            consumer_run_attempt=2,
+        )
+        ci_key = next(k for k in resolved if k.shard == "ci")
+        assert resolved[ci_key].identity.run_attempt == 2
+
+    def test_r05_future_attempt_rejected(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=3,
+        )
+        with pytest.raises(ArtifactError, match="FUTURE_ATTEMPT_ARTIFACT_GT_CURRENT"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=2,
+            )
+
+    def test_r06_duplicate_same_attempt_rejected(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+            bundle_name="dup-ci",
+        )
+        with pytest.raises(ArtifactError, match="DUPLICATE_SAME_LOGICAL_KEY_AND_ATTEMPT"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=2,
+            )
+
+    def test_r07_missing_logical_producer_still_rejected(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        with pytest.raises(ArtifactError, match="MISSING_LOGICAL_PRODUCER_AFTER_FALLBACK"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=2,
+            )
+
+    def test_r08_global_collection_mixed_attempt_fallback(self, tmp_path: Path) -> None:
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+            scope="global",
+            bundle_name="pr-head-global-py3.11-attempt1",
+        )
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=2,
+            scope="global",
+            bundle_name="pr-head-global-py3.12-attempt2",
+        )
+        resolved = resolve_global_bundles(
+            artifact_root=root,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            consumer_run_attempt=2,
+            python_versions=["3.11", "3.12"],
+        )
+        assert resolved["3.11"].identity.run_attempt == 1
+        assert resolved["3.12"].identity.run_attempt == 2
+
+    def test_selected_coverage_paths_one_bundle_per_logical_producer(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_full_attempt1_shard_set(root)
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=2,
+            bundle_name="pr-head-ci-py3.11-attempt2",
+        )
+        resolved = resolve_shard_bundles(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            consumer_run_attempt=2,
+        )
+        coverage_paths = selected_coverage_raw_paths(resolved)
+        assert len(coverage_paths) == len(resolved)
+        assert len({p.parent.resolve() for p in coverage_paths}) == len(resolved)
+
+    def test_r09_per_python_scoped_shard_resolution_passes(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="unit",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        resolved = resolve_shard_bundles(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            consumer_run_attempt=2,
+            python_versions=["3.12"],
+        )
+        assert {logical.python_version for logical in resolved} == {"3.12"}
+        assert {logical.shard for logical in resolved} == {"unit"}
+
+    def test_r10_per_python_scoped_resolution_still_rejects_missing_applicable_shard(
+        self, tmp_path: Path
+    ) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        with pytest.raises(ArtifactError, match="MISSING_LOGICAL_PRODUCER_AFTER_FALLBACK"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=2,
+                python_versions=["3.11"],
+            )
+
+    def test_unscoped_resolution_still_requires_full_multi_python_set(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="unit",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        with pytest.raises(ArtifactError, match="MISSING_LOGICAL_PRODUCER_AFTER_FALLBACK"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=2,
+            )
+
+    def test_python_version_scope_rejects_empty_and_unknown(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        with pytest.raises(ArtifactError, match="PYTHON_VERSION_SCOPE_EMPTY"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=1,
+                python_versions=[],
+            )
+        with pytest.raises(ArtifactError, match="PYTHON_VERSION_NOT_IN_MANIFEST"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=1,
+                python_versions=["3.10"],
+            )
+
+
+class TestWorkflowCompletenessResolverScope:
+    """Static workflow regression for per-Python completeness scoping."""
+
+    def test_completeness_callsites_scope_shard_resolution(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        pr_head_block = workflow.split("Verify per-version completeness (pr-head)", 1)[1].split(
+            "verify-completeness-merge-ref", 1
+        )[0]
+        merge_ref_block = workflow.split("Verify per-version completeness (merge-ref)", 1)[1].split(
+            "verify-completeness-main", 1
+        )[0]
+        aggregate_block = workflow.split("Combine coverage", 1)[1].split("merge-ref-aggregate", 1)[
+            0
+        ]
+
+        assert "python_versions=[python_version]" in pr_head_block
+        assert "resolve_shard_bundles(" in pr_head_block
+        assert "python_versions=[python_version]" in merge_ref_block
+        assert "resolve_shard_bundles(" in merge_ref_block
+        assert "resolve_shard_bundles(" in aggregate_block
+        assert "python_versions=[python_version]" not in aggregate_block
