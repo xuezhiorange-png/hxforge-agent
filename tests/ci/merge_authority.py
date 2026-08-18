@@ -23,6 +23,7 @@ PR_HEAD_REF_PREFIX: Final[str] = "refs/hxforge-ci/pr-head"
 REQUIRED_OBJECT_FORMAT: Final[str] = "sha1"
 
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
+_PR_NUMBER_ASCII_RE = re.compile(r"^[1-9][0-9]*$")
 
 
 class MergeAuthorityError(Exception):
@@ -57,10 +58,34 @@ class GitHubCandidateOutcome(StrEnum):
     TREE_MISMATCH = "TREE_MISMATCH"
 
 
+class GitHubCandidateStatus(StrEnum):
+    VALID_EQUIVALENT = "VALID_EQUIVALENT"
+    STALE_PARENT_BINDING = "STALE_PARENT_BINDING"
+    MISSING = "MISSING"
+
+
 @dataclass(frozen=True, slots=True)
 class GitHubCandidateClassification:
     outcome: GitHubCandidateOutcome
     candidate_sha: str | None = None
+
+
+def external_candidate_status(
+    classification: GitHubCandidateClassification,
+) -> GitHubCandidateStatus:
+    """Map internal diagnostic classification to frozen external resolver status."""
+    if classification.outcome == GitHubCandidateOutcome.ABSENT:
+        return GitHubCandidateStatus.MISSING
+    if classification.outcome in (
+        GitHubCandidateOutcome.INVALID_PARENT_COUNT,
+        GitHubCandidateOutcome.STALE_PARENT_BINDING,
+    ):
+        return GitHubCandidateStatus.STALE_PARENT_BINDING
+    if classification.outcome == GitHubCandidateOutcome.VALID_EQUIVALENT:
+        return GitHubCandidateStatus.VALID_EQUIVALENT
+    raise MergeAuthorityError(
+        "TREE_MISMATCH must fail closed before emitting external candidate status"
+    )
 
 
 def _validate_sha40(value: str, label: str) -> str:
@@ -71,15 +96,12 @@ def _validate_sha40(value: str, label: str) -> str:
 
 
 def validate_pr_number_lexical(value: str) -> int:
-    """Reject empty, whitespace, non-decimal, zero, and negative PR numbers."""
-    if value != value.strip():
-        raise MergeAuthorityError(f"pr_number has surrounding whitespace: {value!r}")
-    if not value.isdecimal():
-        raise MergeAuthorityError(f"pr_number is not a decimal lexical form: {value!r}")
-    number = int(value, 10)
-    if number <= 0:
-        raise MergeAuthorityError(f"pr_number must be positive: {value!r}")
-    return number
+    """Reject PR numbers outside the exact ASCII lexical form ^[1-9][0-9]*$."""
+    if not _PR_NUMBER_ASCII_RE.fullmatch(value):
+        raise MergeAuthorityError(
+            f"pr_number must match ASCII lexical form ^[1-9][0-9]*$: {value!r}"
+        )
+    return int(value, 10)
 
 
 def _base_git_env() -> dict[str, str]:
@@ -100,6 +122,32 @@ def _commit_git_env() -> dict[str, str]:
     env["GIT_COMMITTER_EMAIL"] = "hxforge-ci@example.invalid"
     env["GIT_COMMITTER_DATE"] = "946684800 +0000"
     return env
+
+
+def _run_git_bytes(
+    args: list[str],
+    *,
+    env: dict[str, str] | None = None,
+    input_bytes: bytes | None = None,
+    cwd: str | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    if args and args[0] == "git":
+        args = ["git", "-c", "core.hooksPath=/dev/null", *args[1:]]
+    completed = subprocess.run(
+        args,
+        check=False,
+        capture_output=True,
+        text=False,
+        input=input_bytes,
+        env=env if env is not None else _base_git_env(),
+        cwd=cwd,
+    )
+    if completed.returncode != 0:
+        stderr = completed.stderr.decode("utf-8", errors="replace").strip()
+        stdout = completed.stdout.decode("utf-8", errors="replace").strip()
+        detail = stderr or stdout or f"exit {completed.returncode}"
+        raise MergeAuthorityError(f"git command failed ({' '.join(args)}): {detail}")
+    return completed
 
 
 def _run_git(
@@ -134,6 +182,51 @@ def git_version() -> str:
 
 def git_object_format() -> str:
     return _run_git(["git", "rev-parse", "--show-object-format"]).stdout.strip()
+
+
+def _expected_canonical_header_bytes(
+    base_sha: str,
+    pr_head_sha: str,
+    merge_tree_sha: str,
+) -> bytes:
+    lines = (
+        f"tree {merge_tree_sha}",
+        f"parent {base_sha}",
+        f"parent {pr_head_sha}",
+        "author HxForge CI <hxforge-ci@example.invalid> 946684800 +0000",
+        "committer HxForge CI <hxforge-ci@example.invalid> 946684800 +0000",
+    )
+    return "\n".join(lines).encode("ascii")
+
+
+def _cat_file_raw_bytes(sha: str) -> bytes:
+    commit_sha = _validate_sha40(sha, "commit sha")
+    return _run_git_bytes(["git", "cat-file", "-p", commit_sha]).stdout
+
+
+def inspect_canonical_commit_raw(
+    sha: str,
+    *,
+    base_sha: str,
+    pr_head_sha: str,
+    merge_tree_sha: str,
+) -> tuple[bytes, bytes]:
+    """Inspect canonical merge commit raw bytes with fail-closed header verification."""
+    raw = _cat_file_raw_bytes(sha)
+    separator = raw.find(b"\n\n")
+    if separator < 0:
+        raise MergeAuthorityError(f"commit {sha} has no message separator")
+    header_bytes = raw[:separator]
+    message_bytes = raw[separator + 2 :]
+    expected_header = _expected_canonical_header_bytes(base_sha, pr_head_sha, merge_tree_sha)
+    if header_bytes != expected_header:
+        raise MergeAuthorityError(
+            "canonical commit header bytes mismatch: "
+            f"expected {expected_header!r}, got {header_bytes!r}"
+        )
+    if message_bytes != CANONICAL_COMMIT_MESSAGE_BYTES:
+        raise MergeAuthorityError(f"canonical commit message bytes mismatch: {message_bytes!r}")
+    return header_bytes, message_bytes
 
 
 def inspect_commit(sha: str) -> InspectedCommit:
@@ -258,28 +351,12 @@ def _verify_canonical_raw_commit(
     pr_head_sha: str,
     merge_tree_sha: str,
 ) -> None:
-    inspected = inspect_commit(commit_sha)
-    if inspected.tree_sha != merge_tree_sha:
-        raise MergeAuthorityError(
-            f"canonical commit tree mismatch: {inspected.tree_sha} != {merge_tree_sha}"
-        )
-    if inspected.parents != (base_sha, pr_head_sha):
-        raise MergeAuthorityError(
-            f"canonical commit parents mismatch: {inspected.parents} != {(base_sha, pr_head_sha)}"
-        )
-    expected_author = "HxForge CI <hxforge-ci@example.invalid> 946684800 +0000"
-    if inspected.author_line != expected_author:
-        raise MergeAuthorityError(f"canonical author mismatch: {inspected.author_line!r}")
-    if inspected.committer_line != expected_author:
-        raise MergeAuthorityError(f"canonical committer mismatch: {inspected.committer_line!r}")
-    if inspected.message_bytes != CANONICAL_COMMIT_MESSAGE_BYTES:
-        raise MergeAuthorityError(
-            f"canonical commit message bytes mismatch: {inspected.message_bytes!r}"
-        )
-    if len(inspected.parents) != 2:
-        raise MergeAuthorityError(
-            f"canonical commit must have exactly two parents, got {len(inspected.parents)}"
-        )
+    inspect_canonical_commit_raw(
+        commit_sha,
+        base_sha=base_sha,
+        pr_head_sha=pr_head_sha,
+        merge_tree_sha=merge_tree_sha,
+    )
 
 
 def build_canonical_ephemeral_merge(
@@ -477,6 +554,9 @@ def _write_github_output(name: str, value: str) -> None:
 
 def _cmd_resolve(args: argparse.Namespace) -> int:
     pr_number = validate_pr_number_lexical(args.pr_number)
+    base_ref = args.base_ref.strip()
+    if not base_ref:
+        raise MergeAuthorityError("base_ref must be non-empty")
     base_sha = _validate_sha40(args.base_sha, "base_sha")
     pr_head_sha = _validate_sha40(args.pr_head_sha, "pr_head_sha")
     object_format = git_object_format()
@@ -492,16 +572,18 @@ def _cmd_resolve(args: argparse.Namespace) -> int:
         pr_head_sha,
         github_candidate_sha=github_candidate,
     )
+    external_status = external_candidate_status(classification)
     _write_github_output("pr-number", str(pr_number))
+    _write_github_output("base-ref", base_ref)
     _write_github_output("base-sha", identity.base_sha)
     _write_github_output("pr-head-sha", identity.pr_head_sha)
     _write_github_output("merge-tree-sha", identity.merge_tree_sha)
     _write_github_output("merge-sha", identity.merge_sha)
     _write_github_output("git-version", version)
     _write_github_output("git-object-format", object_format)
-    _write_github_output("github-candidate-outcome", classification.outcome.value)
-    if github_candidate is not None:
-        _write_github_output("github-candidate-sha", github_candidate)
+    _write_github_output("github-candidate-status", external_status.value)
+    if classification.candidate_sha is not None:
+        _write_github_output("github-candidate-sha", classification.candidate_sha)
     return 0
 
 
@@ -525,6 +607,7 @@ def main(argv: list[str] | None = None) -> int:
 
     resolve_parser = subparsers.add_parser("resolve")
     resolve_parser.add_argument("--pr-number", required=True)
+    resolve_parser.add_argument("--base-ref", required=True)
     resolve_parser.add_argument("--base-sha", required=True)
     resolve_parser.add_argument("--pr-head-sha", required=True)
     resolve_parser.add_argument("--skip-github-candidate", action="store_true")

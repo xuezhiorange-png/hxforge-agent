@@ -90,11 +90,14 @@ jobs:
     outputs:
       merge-sha: ${{ steps.resolve.outputs.merge-sha }}
       merge-tree-sha: ${{ steps.resolve.outputs.merge-tree-sha }}
+      base-ref: ${{ steps.resolve.outputs.base-ref }}
       base-sha: ${{ steps.resolve.outputs.base-sha }}
       pr-head-sha: ${{ steps.resolve.outputs.pr-head-sha }}
       pr-number: ${{ steps.resolve.outputs.pr-number }}
       git-version: ${{ steps.resolve.outputs.git-version }}
       git-object-format: ${{ steps.resolve.outputs.git-object-format }}
+      github-candidate-status: ${{ steps.resolve.outputs.github-candidate-status }}
+      github-candidate-sha: ${{ steps.resolve.outputs.github-candidate-sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -106,21 +109,34 @@ jobs:
       - run: uv sync --locked --all-extras
       - name: Resolve canonical ephemeral merge authority
         id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             PR_NUMBER="${{ github.event.pull_request.number }}"
+            BASE_REF="${{ github.event.pull_request.base.ref }}"
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
             PR_HEAD="${{ github.event.pull_request.head.sha }}"
           else
             PR_NUMBER="${{ inputs.pr_number }}"
-            git fetch --no-tags --force origin main
-            BASE_SHA="$(git rev-parse origin/main)"
-            git fetch --no-tags --force origin "refs/pull/${PR_NUMBER}/head"
-            PR_HEAD="$(git rev-parse FETCH_HEAD)"
+            uv run --locked python -c "
+          from tests.ci.merge_authority import validate_pr_number_lexical
+          validate_pr_number_lexical('${PR_NUMBER}')
+          "
+            PR_JSON="$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}")"
+            STATE="$(printf '%s' "$PR_JSON" | jq -r '.state')"
+            if [ "$STATE" != "open" ]; then
+              echo "merge-authority-error: pull request ${PR_NUMBER} is not open (state=${STATE})" >&2
+              exit 1
+            fi
+            BASE_REF="$(printf '%s' "$PR_JSON" | jq -r '.base.ref')"
+            BASE_SHA="$(printf '%s' "$PR_JSON" | jq -r '.base.sha')"
+            PR_HEAD="$(printf '%s' "$PR_JSON" | jq -r '.head.sha')"
           fi
           uv run --locked python -m tests.ci.merge_authority resolve \
             --pr-number "${PR_NUMBER}" \
+            --base-ref "${BASE_REF}" \
             --base-sha "${BASE_SHA}" \
             --pr-head-sha "${PR_HEAD}"
 
