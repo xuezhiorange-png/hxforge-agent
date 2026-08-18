@@ -2088,6 +2088,36 @@ def _ma_resolve(
     return resolve_merge_authority(pr_number, base_ref, base_metadata_sha, pr_head_sha, **kwargs)
 
 
+def _ma_make_signed_candidate_commit(
+    repo: Path,
+    *,
+    tree_sha: str,
+    parents: tuple[str, ...],
+) -> str:
+    parent_lines = "\n".join(f"parent {parent}" for parent in parents)
+    commit_object = (
+        f"tree {tree_sha}\n"
+        f"{parent_lines}\n"
+        "author Candidate <candidate@example.invalid> 946684800 +0000\n"
+        "committer Candidate <candidate@example.invalid> 946684800 +0000\n"
+        "gpgsig -----BEGIN PGP SIGNATURE-----\n"
+        " \n"
+        " fake-signature-line\n"
+        " -----END PGP SIGNATURE-----\n"
+        "\n"
+        "candidate\n"
+    )
+    completed = _ma_git(
+        ["git", "hash-object", "-t", "commit", "-w", "--stdin"],
+        cwd=repo,
+        input_bytes=commit_object.encode("utf-8"),
+    )
+    stdout = completed.stdout
+    if isinstance(stdout, bytes):
+        stdout = stdout.decode("ascii")
+    return stdout.strip()
+
+
 def _ma_make_candidate_commit(
     repo: Path,
     *,
@@ -2651,6 +2681,60 @@ class TestMergeAuthorityCIMA:
             assert pattern.search(block)
             assert "merge-tree-sha" in block
             assert "merge-sha" in block
+
+    def test_pr188_signed_candidate_exact_binding_is_valid_equivalent(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            candidate = _ma_make_signed_candidate_commit(
+                work, tree_sha=tree, parents=(base_sha, head_sha)
+            )
+            outcome = classify_github_candidate(candidate, base_sha, head_sha, tree)
+        assert outcome.outcome == GitHubCandidateOutcome.VALID_EQUIVALENT
+
+    def test_pr188_signed_candidate_stale_parent_is_stale_parent_binding(
+        self, tmp_path: Path
+    ) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            stale_parent = _ma_commit_file(work, "stale.txt", "stale\n", "stale")
+            candidate = _ma_make_signed_candidate_commit(
+                work, tree_sha=tree, parents=(stale_parent, head_sha)
+            )
+            outcome = classify_github_candidate(candidate, base_sha, head_sha, tree)
+        assert outcome.outcome == GitHubCandidateOutcome.STALE_PARENT_BINDING
+
+    def test_pr188_signed_candidate_non_two_parent_maps_to_stale_parent_binding(
+        self, tmp_path: Path
+    ) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            candidate = _ma_make_signed_candidate_commit(work, tree_sha=tree, parents=(base_sha,))
+            classification = classify_github_candidate(candidate, base_sha, head_sha, tree)
+        assert (
+            external_candidate_status(classification) == GitHubCandidateStatus.STALE_PARENT_BINDING
+        )
+        assert classification.outcome == GitHubCandidateOutcome.INVALID_PARENT_COUNT
+
+    def test_pr188_signed_candidate_exact_parents_different_tree_is_tree_mismatch(
+        self, tmp_path: Path
+    ) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            merge_tree = compute_merge_tree(base_sha, head_sha)
+            other_tree_commit = _ma_commit_file(work, "other-tree.txt", "z\n", "other-tree")
+            tree_other = _ma_git(
+                ["git", "rev-parse", f"{other_tree_commit}^{{tree}}"], cwd=work
+            ).stdout.strip()
+            candidate = _ma_make_signed_candidate_commit(
+                work, tree_sha=tree_other, parents=(base_sha, head_sha)
+            )
+            classification = classify_github_candidate(candidate, base_sha, head_sha, merge_tree)
+            assert classification.outcome == GitHubCandidateOutcome.TREE_MISMATCH
+            with pytest.raises(MergeAuthorityError, match="different tree"):
+                _ma_resolve(1, base_sha, head_sha, github_candidate_sha=candidate)
 
     def test_r3_current_base_branch_tip_match_continues(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)

@@ -53,6 +53,13 @@ class InspectedCommit:
     raw_header: str
 
 
+@dataclass(frozen=True, slots=True)
+class GitHubCandidateCommitStructure:
+    sha: str
+    tree_sha: str
+    parents: tuple[str, ...]
+
+
 class GitHubCandidateOutcome(StrEnum):
     ABSENT = "ABSENT"
     STALE_PARENT_BINDING = "STALE_PARENT_BINDING"
@@ -319,6 +326,47 @@ def inspect_commit(sha: str) -> InspectedCommit:
     )
 
 
+def inspect_github_candidate_structure(sha: str) -> GitHubCandidateCommitStructure:
+    """Inspect GitHub synthetic merge candidate authority-bearing structure only."""
+    commit_sha = _validate_sha40(sha, "commit sha")
+    _assert_commit_exists(commit_sha)
+    raw = _cat_file_raw_bytes(commit_sha)
+    separator = raw.find(b"\n\n")
+    if separator < 0:
+        raise MergeAuthorityError(f"commit {commit_sha} has no message separator")
+    header_text = raw[:separator].decode("utf-8", errors="strict")
+    tree_sha = ""
+    parents: list[str] = []
+    tree_count = 0
+    for line in header_text.splitlines():
+        if line.startswith(" "):
+            continue
+        if line.startswith("tree "):
+            parts = line.split()
+            if len(parts) != 2:
+                raise MergeAuthorityError(
+                    f"commit {commit_sha} has malformed tree header: {line!r}"
+                )
+            tree_count += 1
+            if tree_count > 1:
+                raise MergeAuthorityError(f"commit {commit_sha} has multiple tree headers")
+            tree_sha = _validate_sha40(parts[1], "tree sha")
+        elif line.startswith("parent "):
+            parts = line.split()
+            if len(parts) != 2:
+                raise MergeAuthorityError(
+                    f"commit {commit_sha} has malformed parent header: {line!r}"
+                )
+            parents.append(_validate_sha40(parts[1], "parent sha"))
+    if not tree_sha:
+        raise MergeAuthorityError(f"commit {commit_sha} missing tree header")
+    return GitHubCandidateCommitStructure(
+        sha=commit_sha,
+        tree_sha=tree_sha,
+        parents=tuple(parents),
+    )
+
+
 def _assert_full_history() -> None:
     shallow = _run_git(["git", "rev-parse", "--is-shallow-repository"]).stdout.strip()
     if shallow != "false":
@@ -481,7 +529,7 @@ def classify_github_candidate(
     base = _validate_sha40(base_sha, "base_sha")
     head = _validate_sha40(pr_head_sha, "pr_head_sha")
     tree = _validate_sha40(merge_tree_sha, "merge_tree_sha")
-    inspected = inspect_commit(candidate)
+    inspected = inspect_github_candidate_structure(candidate)
     if len(inspected.parents) != 2:
         return GitHubCandidateClassification(
             outcome=GitHubCandidateOutcome.INVALID_PARENT_COUNT,
