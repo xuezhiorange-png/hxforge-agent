@@ -91,6 +91,7 @@ jobs:
       merge-sha: ${{ steps.resolve.outputs.merge-sha }}
       merge-tree-sha: ${{ steps.resolve.outputs.merge-tree-sha }}
       base-ref: ${{ steps.resolve.outputs.base-ref }}
+      base-metadata-sha: ${{ steps.resolve.outputs.base-metadata-sha }}
       base-sha: ${{ steps.resolve.outputs.base-sha }}
       pr-head-sha: ${{ steps.resolve.outputs.pr-head-sha }}
       pr-number: ${{ steps.resolve.outputs.pr-number }}
@@ -110,34 +111,32 @@ jobs:
       - name: Resolve canonical ephemeral merge authority
         id: resolve
         env:
+          HXFORGE_RAW_PR_NUMBER: ${{ inputs.pr_number }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             PR_NUMBER="${{ github.event.pull_request.number }}"
             BASE_REF="${{ github.event.pull_request.base.ref }}"
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            BASE_METADATA_SHA="${{ github.event.pull_request.base.sha }}"
             PR_HEAD="${{ github.event.pull_request.head.sha }}"
           else
-            PR_NUMBER="${{ inputs.pr_number }}"
-            uv run --locked python -c "
-          from tests.ci.merge_authority import validate_pr_number_lexical
-          validate_pr_number_lexical('${PR_NUMBER}')
-          "
-            PR_JSON="$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}")"
+            SANITIZED_PR_NUMBER="$(uv run --locked python -m tests.ci.merge_authority validate-pr-number-env)"
+            PR_JSON="$(gh api "repos/${{ github.repository }}/pulls/${SANITIZED_PR_NUMBER}")"
             STATE="$(printf '%s' "$PR_JSON" | jq -r '.state')"
             if [ "$STATE" != "open" ]; then
-              echo "merge-authority-error: pull request ${PR_NUMBER} is not open (state=${STATE})" >&2
+              echo "merge-authority-error: pull request ${SANITIZED_PR_NUMBER} is not open (state=${STATE})" >&2
               exit 1
             fi
+            PR_NUMBER="${SANITIZED_PR_NUMBER}"
             BASE_REF="$(printf '%s' "$PR_JSON" | jq -r '.base.ref')"
-            BASE_SHA="$(printf '%s' "$PR_JSON" | jq -r '.base.sha')"
+            BASE_METADATA_SHA="$(printf '%s' "$PR_JSON" | jq -r '.base.sha')"
             PR_HEAD="$(printf '%s' "$PR_JSON" | jq -r '.head.sha')"
           fi
           uv run --locked python -m tests.ci.merge_authority resolve \
             --pr-number "${PR_NUMBER}" \
             --base-ref "${BASE_REF}" \
-            --base-sha "${BASE_SHA}" \
+            --base-metadata-sha "${BASE_METADATA_SHA}" \
             --pr-head-sha "${PR_HEAD}"
 
   # ── PR-head shard jobs ────────────────────────────────────────────────────
@@ -306,6 +305,7 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
             --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
+            --base-ref "${{ needs.resolve-authority.outputs.base-ref }}" \
             --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
             --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
             --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
@@ -679,6 +679,7 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
             --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
+            --base-ref "${{ needs.resolve-authority.outputs.base-ref }}" \
             --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
             --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
             --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
@@ -930,6 +931,7 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
             --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
+            --base-ref "${{ needs.resolve-authority.outputs.base-ref }}" \
             --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
             --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
             --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
@@ -1164,6 +1166,7 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
             --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
+            --base-ref "${{ needs.resolve-authority.outputs.base-ref }}" \
             --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
             --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
             --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \

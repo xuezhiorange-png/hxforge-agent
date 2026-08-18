@@ -34,6 +34,9 @@ from tests.ci.marker_inventory import (
 )
 from tests.ci.merge_authority import (
     CANONICAL_COMMIT_MESSAGE_BYTES,
+    CURRENT_BASE_REF,
+    HXFORGE_RAW_PR_NUMBER_ENV,
+    METADATA_TIP_MISMATCH_ERROR,
     GitHubCandidateOutcome,
     GitHubCandidateStatus,
     MergeAuthorityError,
@@ -46,8 +49,11 @@ from tests.ci.merge_authority import (
     inspect_canonical_commit_raw,
     inspect_commit,
     materialize_and_verify,
+    resolve_current_base_sha,
     resolve_merge_authority,
+    sanitized_pr_number_text,
     validate_pr_number_lexical,
+    validate_raw_pr_number_from_env,
 )
 
 _SHA40 = "a" * 40
@@ -2019,6 +2025,13 @@ def _ma_setup_clean_merge_repo(tmp_path: Path) -> tuple[Path, str, str]:
     return work, base_sha, head_sha
 
 
+def _ma_advance_origin_main_tip(work: Path, *, rel: str, content: str, message: str) -> str:
+    _ma_git(["git", "checkout", "main"], cwd=work)
+    new_tip = _ma_commit_file(work, rel, content, message)
+    _ma_git(["git", "push", "origin", "main"], cwd=work)
+    return new_tip
+
+
 def _ma_setup_diverged_merge_repo(tmp_path: Path) -> tuple[Path, str, str, Path]:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -2061,6 +2074,17 @@ def _ma_use_repo(repo: Path):
         yield
     finally:
         os.chdir(previous)
+
+
+def _ma_resolve(
+    pr_number: int,
+    base_metadata_sha: str,
+    pr_head_sha: str,
+    *,
+    base_ref: str = "main",
+    **kwargs,
+):
+    return resolve_merge_authority(pr_number, base_ref, base_metadata_sha, pr_head_sha, **kwargs)
 
 
 def _ma_make_candidate_commit(
@@ -2187,28 +2211,27 @@ class TestMergeAuthorityCIMA:
                 work, tree_sha=tree_other, parents=(base_sha, head_sha)
             )
             with pytest.raises(MergeAuthorityError, match="different tree"):
-                resolve_merge_authority(1, base_sha, head_sha, github_candidate_sha=candidate)
+                _ma_resolve(1, base_sha, head_sha, github_candidate_sha=candidate)
 
     def test_ci_ma_010_missing_candidate_does_not_block_clean_merge(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, classification = resolve_merge_authority(
-                1, base_sha, head_sha, github_candidate_sha=None
-            )
+            identity, classification = _ma_resolve(1, base_sha, head_sha)
         assert identity.merge_sha
         assert external_candidate_status(classification) == GitHubCandidateStatus.MISSING
 
     def test_ci_ma_011_local_merge_conflict_fails_closed(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_conflict_repo(tmp_path)
         with _ma_use_repo(work), pytest.raises(MergeAuthorityError, match="merge-tree failed"):
-            resolve_merge_authority(3, base_sha, head_sha, github_candidate_sha=None)
+            _ma_resolve(3, base_sha, head_sha, github_candidate_sha=None)
 
     def test_ci_ma_012_materialization_reproduces_merge_tree(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            identity, _ = _ma_resolve(1, base_sha, head_sha)
             materialized = materialize_and_verify(
                 1,
+                "main",
                 base_sha,
                 head_sha,
                 identity.merge_tree_sha,
@@ -2221,9 +2244,10 @@ class TestMergeAuthorityCIMA:
     def test_ci_ma_013_materialization_reproduces_merge_sha(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            identity, _ = _ma_resolve(1, base_sha, head_sha)
             materialized = materialize_and_verify(
                 1,
+                "main",
                 base_sha,
                 head_sha,
                 identity.merge_tree_sha,
@@ -2236,11 +2260,12 @@ class TestMergeAuthorityCIMA:
     def test_ci_ma_014_tampered_merge_tree_hard_fails(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            identity, _ = _ma_resolve(1, base_sha, head_sha)
             tampered = "0" * 40
             with pytest.raises(MergeAuthorityError, match="merge_tree_sha mismatch"):
                 materialize_and_verify(
                     1,
+                    "main",
                     base_sha,
                     head_sha,
                     tampered,
@@ -2252,11 +2277,12 @@ class TestMergeAuthorityCIMA:
     def test_ci_ma_015_tampered_merge_sha_hard_fails(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            identity, _ = _ma_resolve(1, base_sha, head_sha)
             tampered = "1" * 40
             with pytest.raises(MergeAuthorityError, match="merge_sha mismatch"):
                 materialize_and_verify(
                     1,
+                    "main",
                     base_sha,
                     head_sha,
                     identity.merge_tree_sha,
@@ -2272,19 +2298,24 @@ class TestMergeAuthorityCIMA:
             _ma_use_repo(work),
             pytest.raises(MergeAuthorityError, match="refs/hxforge-ci/pr-head mismatch"),
         ):
-            resolve_merge_authority(1, base_sha, drift, github_candidate_sha=None)
+            _ma_resolve(1, base_sha, drift, github_candidate_sha=None)
 
     def test_ci_ma_017_workflow_dispatch_pr_number_validation(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        module = (repo_root / "tests" / "ci" / "merge_authority.py").read_text(encoding="utf-8")
         resolve_block = workflow.split("resolve-authority:", 1)[1].split("shard:", 1)[0]
-        dispatch_start = resolve_block.index('PR_NUMBER="${{ inputs.pr_number }}"')
+        assert "HXFORGE_RAW_PR_NUMBER: ${{ inputs.pr_number }}" in resolve_block
+        assert resolve_block.count("${{ inputs.pr_number }}") == 1
+        run_section = resolve_block.split("run: |", 1)[1]
+        assert "${{ inputs.pr_number }}" not in run_section
+        assert "validate-pr-number-env" in resolve_block
+        assert HXFORGE_RAW_PR_NUMBER_ENV in module
+        assert "os.environ" in module
+        dispatch_start = resolve_block.index("validate-pr-number-env")
         dispatch_end = resolve_block.index("tests.ci.merge_authority resolve", dispatch_start)
         dispatch_section = resolve_block[dispatch_start:dispatch_end]
-        validate_pos = dispatch_section.index("validate_pr_number_lexical")
-        gh_api_pos = dispatch_section.index('gh api "repos/')
-        assert validate_pos < gh_api_pos
-        assert "refs/pull" not in dispatch_section
+        assert "refs/pull" not in dispatch_section.split("validate-pr-number-env", 1)[0]
         assert "git rev-parse origin/main" not in dispatch_section
         assert "GH_TOKEN: ${{ github.token }}" in resolve_block
         assert "jq -r '.state'" in dispatch_section
@@ -2292,10 +2323,37 @@ class TestMergeAuthorityCIMA:
         assert "jq -r '.base.sha'" in dispatch_section
         assert "jq -r '.head.sha'" in dispatch_section
         assert 'STATE" != "open"' in dispatch_section
-        for invalid in ("", "0", "-1", "01", "1a", " 1", "1 ", "+1", "１", "١"):
+        hostile_inputs = (
+            "",
+            "0",
+            "-1",
+            "01",
+            "1a",
+            " 1",
+            "1 ",
+            "+1",
+            "１",
+            "١",
+            "$(printf 42)",
+            "`printf 42`",
+            "$((42))",
+            '"42"',
+            "'42'",
+            "42\n",
+        )
+        for invalid in hostile_inputs:
             with pytest.raises(MergeAuthorityError):
                 validate_pr_number_lexical(invalid)
         assert validate_pr_number_lexical("42") == 42
+        with pytest.raises(MergeAuthorityError):
+            validate_raw_pr_number_from_env()
+        os.environ[HXFORGE_RAW_PR_NUMBER_ENV] = "$(printf 42)"
+        try:
+            with pytest.raises(MergeAuthorityError):
+                validate_raw_pr_number_from_env()
+        finally:
+            os.environ.pop(HXFORGE_RAW_PR_NUMBER_ENV, None)
+        assert sanitized_pr_number_text("42") == "42"
 
     def test_ci_ma_018_workflow_permissions_read_only(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
@@ -2312,6 +2370,7 @@ class TestMergeAuthorityCIMA:
         resolve_outputs = workflow.split("resolve-authority:", 1)[1].split("shard:", 1)[0]
         for output_name in (
             "base-ref",
+            "base-metadata-sha",
             "base-sha",
             "pr-head-sha",
             "merge-tree-sha",
@@ -2326,11 +2385,16 @@ class TestMergeAuthorityCIMA:
         assert "github-candidate-outcome" not in module
         assert '_write_github_output("github-candidate-status"' in module
         assert '_write_github_output("base-ref"' in module
+        assert '_write_github_output("base-metadata-sha"' in module
+        assert "--base-metadata-sha" in module
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, classification = resolve_merge_authority(1, base_sha, head_sha)
+            identity, classification = _ma_resolve(1, base_sha, head_sha)
+            current_tip = resolve_current_base_sha("main")
         assert identity.merge_sha
         assert len(identity.merge_sha) == 40
+        assert identity.base_sha == current_tip
+        assert identity.base_sha == base_sha
         assert external_candidate_status(classification) == GitHubCandidateStatus.MISSING
 
     def test_ci_ma_020_all_merge_content_jobs_materialize_before_tests(self) -> None:
@@ -2422,9 +2486,14 @@ class TestMergeAuthorityCIMA:
     def test_ci_ma_027_workflow_requires_full_history_checkout(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        module = (repo_root / "tests" / "ci" / "merge_authority.py").read_text(encoding="utf-8")
         resolve_block = workflow.split("resolve-authority:", 1)[1].split("shard:", 1)[0]
         assert "fetch-depth: 0" in resolve_block
         assert "persist-credentials: false" in resolve_block
+        assert "refs/heads/" in module
+        assert CURRENT_BASE_REF in module
+        assert "git rev-parse origin/main" not in resolve_block
+        assert "--base-metadata-sha" in resolve_block
         for job in (
             "shard-merge-ref:",
             "collect-global-merge-ref:",
@@ -2440,7 +2509,7 @@ class TestMergeAuthorityCIMA:
     ) -> None:
         work, base_sha, head_sha, bare = _ma_setup_diverged_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, _ = resolve_merge_authority(2, base_sha, head_sha)
+            identity, _ = _ma_resolve(2, base_sha, head_sha)
         assert identity.merge_sha
 
         partial_work = tmp_path / "partial-work"
@@ -2449,7 +2518,7 @@ class TestMergeAuthorityCIMA:
         _ma_git(["git", "remote", "add", "origin", str(bare)], cwd=partial_work)
         _ma_git(["git", "fetch", "--depth", "1", "origin", base_sha], cwd=partial_work)
         with _ma_use_repo(partial_work), pytest.raises(MergeAuthorityError):
-            resolve_merge_authority(2, base_sha, head_sha)
+            _ma_resolve(2, base_sha, head_sha)
 
     def test_ci_ma_029_canonical_message_bytes_exact(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
@@ -2541,10 +2610,11 @@ class TestMergeAuthorityCIMA:
     def test_ci_ma_032_downstream_git_version_mismatch_fails(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            identity, _ = _ma_resolve(1, base_sha, head_sha)
             with pytest.raises(MergeAuthorityError, match="git-version mismatch"):
                 materialize_and_verify(
                     1,
+                    "main",
                     base_sha,
                     head_sha,
                     identity.merge_tree_sha,
@@ -2556,10 +2626,11 @@ class TestMergeAuthorityCIMA:
     def test_ci_ma_033_object_format_mismatch_or_non_sha1_fails(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
-            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            identity, _ = _ma_resolve(1, base_sha, head_sha)
             with pytest.raises(MergeAuthorityError, match="git-object-format mismatch"):
                 materialize_and_verify(
                     1,
+                    "main",
                     base_sha,
                     head_sha,
                     identity.merge_tree_sha,
@@ -2585,3 +2656,92 @@ class TestMergeAuthorityCIMA:
             assert pattern.search(block)
             assert "merge-tree-sha" in block
             assert "merge-sha" in block
+
+    def test_r3_current_base_branch_tip_match_continues(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            current_tip = resolve_current_base_sha("main")
+            identity, _ = _ma_resolve(1, base_sha, head_sha)
+        assert current_tip == base_sha
+        assert identity.base_sha == current_tip
+
+    def test_r3_current_base_metadata_tip_mismatch_fails_closed(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        stale_metadata = base_sha
+        _ma_advance_origin_main_tip(
+            work, rel="advance-main.txt", content="advance\n", message="advance-main"
+        )
+        with (
+            _ma_use_repo(work),
+            pytest.raises(MergeAuthorityError, match=METADATA_TIP_MISMATCH_ERROR),
+        ):
+            _ma_resolve(1, stale_metadata, head_sha)
+
+    def test_r3_base_ref_invalid_fails_closed(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work), pytest.raises(MergeAuthorityError):
+            _ma_resolve(1, base_sha, head_sha, base_ref="bad..ref")
+
+    def test_r3_base_ref_missing_fails_closed(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with (
+            _ma_use_repo(work),
+            pytest.raises(MergeAuthorityError, match="base_ref must be non-empty"),
+        ):
+            resolve_merge_authority(1, "   ", base_sha, head_sha)
+
+    def test_r3_base_branch_moved_before_freeze_causes_mismatch_block(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            resolve_current_base_sha("main")
+        _ma_advance_origin_main_tip(work, rel="move-tip.txt", content="moved\n", message="move-tip")
+        with (
+            _ma_use_repo(work),
+            pytest.raises(MergeAuthorityError, match=METADATA_TIP_MISMATCH_ERROR),
+        ):
+            _ma_resolve(1, base_sha, head_sha)
+
+    def test_r3_base_branch_name_is_transported_as_data(self, tmp_path: Path) -> None:
+        repo = tmp_path / "develop-repo"
+        repo.mkdir()
+        _ma_git(["git", "init", "-b", "develop"], cwd=repo)
+        _ma_commit_file(repo, "README.md", "root\n", "root")
+        base_sha = _ma_commit_file(repo, "develop.txt", "develop\n", "develop")
+        _ma_git(["git", "checkout", "-b", "feature"], cwd=repo)
+        head_sha = _ma_commit_file(repo, "feature.txt", "feature\n", "feature")
+        _ma_git(["git", "checkout", "develop"], cwd=repo)
+        bare = tmp_path / "origin-develop.git"
+        _ma_git(["git", "clone", "--bare", str(repo), str(bare)], cwd=tmp_path)
+        _ma_git(["git", "update-ref", "refs/pull/4/head", head_sha], cwd=bare)
+        work = tmp_path / "develop-work"
+        _ma_git(["git", "clone", str(bare), str(work)], cwd=tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = _ma_resolve(4, base_sha, head_sha, base_ref="develop")
+        assert identity.base_sha == base_sha
+
+    def test_r3_raw_pr_number_metacharacters_cannot_transform_before_validation(self) -> None:
+        os.environ[HXFORGE_RAW_PR_NUMBER_ENV] = "$((42))"
+        try:
+            with pytest.raises(MergeAuthorityError):
+                validate_raw_pr_number_from_env()
+        finally:
+            os.environ.pop(HXFORGE_RAW_PR_NUMBER_ENV, None)
+
+    def test_r3_metadata_sha_cannot_substitute_for_current_tip(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        new_tip = _ma_advance_origin_main_tip(
+            work, rel="new-tip.txt", content="new\n", message="new-tip"
+        )
+        assert new_tip != base_sha
+        with (
+            _ma_use_repo(work),
+            pytest.raises(MergeAuthorityError, match=METADATA_TIP_MISMATCH_ERROR),
+        ):
+            _ma_resolve(1, base_sha, head_sha)
+
+    def test_r3_no_remote_temporary_ref_is_pushed(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        module = (repo_root / "tests" / "ci" / "merge_authority.py").read_text(encoding="utf-8")
+        assert "git push" not in module
+        assert CURRENT_BASE_REF in module
+        assert "+refs/heads/" in module

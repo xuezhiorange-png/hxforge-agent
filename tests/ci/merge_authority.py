@@ -20,6 +20,9 @@ CANONICAL_COMMIT_MESSAGE_BYTES: Final[bytes] = (
     b"hxforge-ci-current-base-ephemeral-merge-authority-v1\n"
 )
 PR_HEAD_REF_PREFIX: Final[str] = "refs/hxforge-ci/pr-head"
+CURRENT_BASE_REF: Final[str] = "refs/hxforge-ci/current-base"
+HXFORGE_RAW_PR_NUMBER_ENV: Final[str] = "HXFORGE_RAW_PR_NUMBER"
+METADATA_TIP_MISMATCH_ERROR: Final[str] = "CURRENT_BASE_METADATA_TIP_MISMATCH"
 REQUIRED_OBJECT_FORMAT: Final[str] = "sha1"
 
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -102,6 +105,56 @@ def validate_pr_number_lexical(value: str) -> int:
             f"pr_number must match ASCII lexical form ^[1-9][0-9]*$: {value!r}"
         )
     return int(value, 10)
+
+
+def validate_raw_pr_number_from_env() -> int:
+    """Validate HXFORGE_RAW_PR_NUMBER from the environment as data-only input."""
+    raw = os.environ.get(HXFORGE_RAW_PR_NUMBER_ENV)
+    if raw is None:
+        raise MergeAuthorityError(f"{HXFORGE_RAW_PR_NUMBER_ENV} environment variable is not set")
+    return validate_pr_number_lexical(raw)
+
+
+def sanitized_pr_number_text(value: str) -> str:
+    """Return canonical ASCII decimal text after lexical validation."""
+    return str(validate_pr_number_lexical(value))
+
+
+def _validate_base_ref(base_ref: str) -> str:
+    ref = base_ref.strip()
+    if not ref:
+        raise MergeAuthorityError("base_ref must be non-empty")
+    full_ref = f"refs/heads/{ref}"
+    _run_git(["git", "check-ref-format", full_ref])
+    return ref
+
+
+def resolve_current_base_sha(base_ref: str) -> str:
+    """Independently resolve the current tip SHA of refs/heads/<base_ref>."""
+    ref = _validate_base_ref(base_ref)
+    _run_git(
+        [
+            "git",
+            "fetch",
+            "--no-tags",
+            "--force",
+            "origin",
+            f"+refs/heads/{ref}:{CURRENT_BASE_REF}",
+        ]
+    )
+    current_base_sha = _run_git(["git", "rev-parse", CURRENT_BASE_REF]).stdout.strip()
+    current_base_sha = _validate_sha40(current_base_sha, "current_base_sha")
+    _assert_commit_exists(current_base_sha)
+    return current_base_sha
+
+
+def _assert_metadata_tip_consistency(base_metadata_sha: str, current_base_sha: str) -> None:
+    metadata = _validate_sha40(base_metadata_sha, "base_metadata_sha")
+    current = _validate_sha40(current_base_sha, "current_base_sha")
+    if metadata != current:
+        raise MergeAuthorityError(
+            f"{METADATA_TIP_MISMATCH_ERROR}: metadata={metadata} current_tip={current}"
+        )
 
 
 def _base_git_env() -> dict[str, str]:
@@ -282,18 +335,31 @@ def _assert_tree_exists(tree_sha: str) -> None:
     _run_git(["git", "cat-file", "-e", f"{tree_sha}^{{tree}}"])
 
 
-def acquire_objects(pr_number: int, base_sha: str, pr_head_sha: str) -> None:
-    """Full-history object acquisition protocol (steps 1-10)."""
-    base = _validate_sha40(base_sha, "base_sha")
+def acquire_objects(
+    pr_number: int,
+    base_ref: str,
+    current_base_sha: str,
+    pr_head_sha: str,
+) -> None:
+    """Full-history object acquisition protocol using frozen current-base SHA."""
+    ref = _validate_base_ref(base_ref)
+    base = _validate_sha40(current_base_sha, "current_base_sha")
     head = _validate_sha40(pr_head_sha, "pr_head_sha")
     _assert_full_history()
-    fetch_base = _run_git(["git", "fetch", "--no-tags", "--force", "origin", base])
-    fetched_base = fetch_base.stdout  # unused; FETCH_HEAD checked below
-    del fetched_base
-    fetch_head = _run_git(["git", "rev-parse", "FETCH_HEAD"]).stdout.strip()
-    if fetch_head != base:
+    _run_git(
+        [
+            "git",
+            "fetch",
+            "--no-tags",
+            "--force",
+            "origin",
+            f"+refs/heads/{ref}:{CURRENT_BASE_REF}",
+        ]
+    )
+    fetched_base = _run_git(["git", "rev-parse", CURRENT_BASE_REF]).stdout.strip()
+    if fetched_base != base:
         raise MergeAuthorityError(
-            f"FETCH_HEAD after base fetch mismatch: expected {base}, got {fetch_head}"
+            f"{CURRENT_BASE_REF} mismatch: expected {base}, got {fetched_base}"
         )
     _run_git(["git", "checkout", "--detach", base])
     head_now = _run_git(["git", "rev-parse", "HEAD"]).stdout.strip()
@@ -463,23 +529,26 @@ def fetch_github_merge_candidate(pr_number: int) -> str | None:
 
 def resolve_merge_authority(
     pr_number: int,
-    base_sha: str,
+    base_ref: str,
+    base_metadata_sha: str,
     pr_head_sha: str,
     *,
     github_candidate_sha: str | None = None,
 ) -> tuple[MergeAuthorityIdentity, GitHubCandidateClassification]:
-    acquire_objects(pr_number, base_sha, pr_head_sha)
-    merge_tree_sha = compute_merge_tree(base_sha, pr_head_sha)
-    merge_sha = build_canonical_ephemeral_merge(base_sha, pr_head_sha, merge_tree_sha)
+    current_base_sha = resolve_current_base_sha(base_ref)
+    _assert_metadata_tip_consistency(base_metadata_sha, current_base_sha)
+    acquire_objects(pr_number, base_ref, current_base_sha, pr_head_sha)
+    merge_tree_sha = compute_merge_tree(current_base_sha, pr_head_sha)
+    merge_sha = build_canonical_ephemeral_merge(current_base_sha, pr_head_sha, merge_tree_sha)
     identity = MergeAuthorityIdentity(
         schema_version=SCHEMA_VERSION,
-        base_sha=base_sha,
+        base_sha=current_base_sha,
         pr_head_sha=pr_head_sha,
         merge_tree_sha=merge_tree_sha,
         merge_sha=merge_sha,
     )
     classification = classify_github_candidate(
-        github_candidate_sha, base_sha, pr_head_sha, merge_tree_sha
+        github_candidate_sha, current_base_sha, pr_head_sha, merge_tree_sha
     )
     if classification.outcome == GitHubCandidateOutcome.TREE_MISMATCH:
         raise MergeAuthorityError(
@@ -514,7 +583,8 @@ def _assert_resolver_git_binding(
 
 def materialize_and_verify(
     pr_number: int,
-    base_sha: str,
+    base_ref: str,
+    current_base_sha: str,
     pr_head_sha: str,
     expected_merge_tree_sha: str,
     expected_merge_sha: str,
@@ -523,7 +593,16 @@ def materialize_and_verify(
     resolver_git_object_format: str,
 ) -> MergeAuthorityIdentity:
     _assert_resolver_git_binding(resolver_git_version, resolver_git_object_format)
-    identity, _ = resolve_merge_authority(pr_number, base_sha, pr_head_sha)
+    acquire_objects(pr_number, base_ref, current_base_sha, pr_head_sha)
+    merge_tree_sha = compute_merge_tree(current_base_sha, pr_head_sha)
+    merge_sha = build_canonical_ephemeral_merge(current_base_sha, pr_head_sha, merge_tree_sha)
+    identity = MergeAuthorityIdentity(
+        schema_version=SCHEMA_VERSION,
+        base_sha=current_base_sha,
+        pr_head_sha=pr_head_sha,
+        merge_tree_sha=merge_tree_sha,
+        merge_sha=merge_sha,
+    )
     if identity.merge_tree_sha != expected_merge_tree_sha:
         raise MergeAuthorityError(
             "materialized merge_tree_sha mismatch: "
@@ -552,12 +631,18 @@ def _write_github_output(name: str, value: str) -> None:
         print(f"{name}={value}")
 
 
+def _cmd_validate_pr_number_env(_args: argparse.Namespace) -> int:
+    number = validate_raw_pr_number_from_env()
+    canonical = str(number)
+    _write_github_output("pr-number", canonical)
+    sys.stdout.write(canonical)
+    return 0
+
+
 def _cmd_resolve(args: argparse.Namespace) -> int:
     pr_number = validate_pr_number_lexical(args.pr_number)
-    base_ref = args.base_ref.strip()
-    if not base_ref:
-        raise MergeAuthorityError("base_ref must be non-empty")
-    base_sha = _validate_sha40(args.base_sha, "base_sha")
+    base_ref = _validate_base_ref(args.base_ref)
+    base_metadata_sha = _validate_sha40(args.base_metadata_sha, "base_metadata_sha")
     pr_head_sha = _validate_sha40(args.pr_head_sha, "pr_head_sha")
     object_format = git_object_format()
     if object_format != REQUIRED_OBJECT_FORMAT:
@@ -568,13 +653,15 @@ def _cmd_resolve(args: argparse.Namespace) -> int:
         github_candidate = fetch_github_merge_candidate(pr_number)
     identity, classification = resolve_merge_authority(
         pr_number,
-        base_sha,
+        base_ref,
+        base_metadata_sha,
         pr_head_sha,
         github_candidate_sha=github_candidate,
     )
     external_status = external_candidate_status(classification)
     _write_github_output("pr-number", str(pr_number))
     _write_github_output("base-ref", base_ref)
+    _write_github_output("base-metadata-sha", base_metadata_sha)
     _write_github_output("base-sha", identity.base_sha)
     _write_github_output("pr-head-sha", identity.pr_head_sha)
     _write_github_output("merge-tree-sha", identity.merge_tree_sha)
@@ -591,6 +678,7 @@ def _cmd_materialize(args: argparse.Namespace) -> int:
     pr_number = validate_pr_number_lexical(args.pr_number)
     materialize_and_verify(
         pr_number,
+        _validate_base_ref(args.base_ref),
         _validate_sha40(args.base_sha, "base_sha"),
         _validate_sha40(args.pr_head_sha, "pr_head_sha"),
         _validate_sha40(args.expected_merge_tree_sha, "expected_merge_tree_sha"),
@@ -605,16 +693,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="tests.ci.merge_authority")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    validate_env_parser = subparsers.add_parser("validate-pr-number-env")
+    validate_env_parser.set_defaults(func=_cmd_validate_pr_number_env)
+
     resolve_parser = subparsers.add_parser("resolve")
     resolve_parser.add_argument("--pr-number", required=True)
     resolve_parser.add_argument("--base-ref", required=True)
-    resolve_parser.add_argument("--base-sha", required=True)
+    resolve_parser.add_argument("--base-metadata-sha", required=True)
     resolve_parser.add_argument("--pr-head-sha", required=True)
     resolve_parser.add_argument("--skip-github-candidate", action="store_true")
     resolve_parser.set_defaults(func=_cmd_resolve)
 
     materialize_parser = subparsers.add_parser("materialize")
     materialize_parser.add_argument("--pr-number", required=True)
+    materialize_parser.add_argument("--base-ref", required=True)
     materialize_parser.add_argument("--base-sha", required=True)
     materialize_parser.add_argument("--pr-head-sha", required=True)
     materialize_parser.add_argument("--expected-merge-tree-sha", required=True)
