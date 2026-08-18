@@ -6,6 +6,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
+import subprocess
+import textwrap
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +31,20 @@ from tests.ci.marker_inventory import (
     MarkerInventoryError,
     load_marker_inventory,
     verify_marker_ownership,
+)
+from tests.ci.merge_authority import (
+    CANONICAL_COMMIT_MESSAGE_BYTES,
+    GitHubCandidateOutcome,
+    MergeAuthorityError,
+    build_canonical_ephemeral_merge,
+    classify_github_candidate,
+    compute_merge_tree,
+    git_object_format,
+    git_version,
+    inspect_commit,
+    materialize_and_verify,
+    resolve_merge_authority,
+    validate_pr_number_lexical,
 )
 
 _SHA40 = "a" * 40
@@ -1925,3 +1944,573 @@ class TestWorkflowCompletenessResolverScope:
         assert "resolve_shard_bundles(" in merge_ref_block
         assert "resolve_shard_bundles(" in aggregate_block
         assert "python_versions=[python_version]" not in aggregate_block
+
+
+# ---------------------------------------------------------------------------
+# Merge authority (TASK-032 CI-MA-001 .. CI-MA-034)
+# ---------------------------------------------------------------------------
+
+
+def _ma_git(
+    args: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str] | None = None,
+    input_bytes: bytes | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    if args and args[0] == "git":
+        args = ["git", "-c", "core.hooksPath=/dev/null", *args[1:]]
+    base_env = os.environ.copy()
+    base_env.update(
+        {
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "LC_ALL": "C",
+            "TZ": "UTC",
+            "GIT_AUTHOR_NAME": "Test",
+            "GIT_AUTHOR_EMAIL": "test@example.invalid",
+            "GIT_COMMITTER_NAME": "Test",
+            "GIT_COMMITTER_EMAIL": "test@example.invalid",
+        }
+    )
+    if env:
+        base_env.update(env)
+    completed = subprocess.run(
+        args,
+        cwd=cwd,
+        env=base_env,
+        check=False,
+        capture_output=True,
+        text=input_bytes is None,
+        input=input_bytes,
+    )
+    if check and completed.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} failed: {completed.stderr or completed.stdout}")
+    return completed
+
+
+def _ma_commit_file(repo: Path, rel: str, content: str, message: str) -> str:
+    path = repo / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    _ma_git(["git", "add", rel], cwd=repo)
+    _ma_git(["git", "commit", "-m", message], cwd=repo)
+    return _ma_git(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+
+
+def _ma_setup_clean_merge_repo(tmp_path: Path) -> tuple[Path, str, str]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _ma_git(["git", "init", "-b", "main"], cwd=repo)
+    _ma_commit_file(repo, "README.md", "root\n", "root")
+    base_sha = _ma_commit_file(repo, "base.txt", "base\n", "base")
+    _ma_git(["git", "checkout", "-b", "feature"], cwd=repo)
+    head_sha = _ma_commit_file(repo, "feature.txt", "feature\n", "feature")
+    _ma_git(["git", "checkout", "main"], cwd=repo)
+    bare = tmp_path / "origin.git"
+    _ma_git(["git", "clone", "--bare", str(repo), str(bare)], cwd=tmp_path)
+    _ma_git(["git", "update-ref", "refs/pull/1/head", head_sha], cwd=bare)
+    work = tmp_path / "work"
+    _ma_git(["git", "clone", str(bare), str(work)], cwd=tmp_path)
+    return work, base_sha, head_sha
+
+
+def _ma_setup_diverged_merge_repo(tmp_path: Path) -> tuple[Path, str, str, Path]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _ma_git(["git", "init", "-b", "main"], cwd=repo)
+    ancestor = _ma_commit_file(repo, "shared.txt", "ancestor\n", "ancestor")
+    _ma_git(["git", "checkout", "-b", "feature", ancestor], cwd=repo)
+    head_sha = _ma_commit_file(repo, "head-only.txt", "head\n", "head")
+    _ma_git(["git", "checkout", "main"], cwd=repo)
+    base_sha = _ma_commit_file(repo, "base-only.txt", "base\n", "base")
+    bare = tmp_path / "origin.git"
+    _ma_git(["git", "clone", "--bare", str(repo), str(bare)], cwd=tmp_path)
+    _ma_git(["git", "update-ref", "refs/pull/2/head", head_sha], cwd=bare)
+    work = tmp_path / "work"
+    _ma_git(["git", "clone", str(bare), str(work)], cwd=tmp_path)
+    return work, base_sha, head_sha, bare
+
+
+def _ma_setup_conflict_repo(tmp_path: Path) -> tuple[Path, str, str]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _ma_git(["git", "init", "-b", "main"], cwd=repo)
+    _ma_commit_file(repo, "conflict.txt", "line\n", "root")
+    base_sha = _ma_commit_file(repo, "conflict.txt", "base change\n", "base")
+    _ma_git(["git", "checkout", "-b", "feature", "HEAD~1"], cwd=repo)
+    head_sha = _ma_commit_file(repo, "conflict.txt", "head change\n", "head")
+    _ma_git(["git", "checkout", "main"], cwd=repo)
+    bare = tmp_path / "origin.git"
+    _ma_git(["git", "clone", "--bare", str(repo), str(bare)], cwd=tmp_path)
+    _ma_git(["git", "update-ref", "refs/pull/3/head", head_sha], cwd=bare)
+    work = tmp_path / "work-conflict"
+    _ma_git(["git", "clone", str(bare), str(work)], cwd=tmp_path)
+    return work, base_sha, head_sha
+
+
+@contextmanager
+def _ma_use_repo(repo: Path):
+    previous = os.getcwd()
+    os.chdir(repo)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
+
+
+def _ma_make_candidate_commit(
+    repo: Path,
+    *,
+    tree_sha: str,
+    parents: tuple[str, ...],
+) -> str:
+    env = {
+        "GIT_AUTHOR_NAME": "Candidate",
+        "GIT_AUTHOR_EMAIL": "candidate@example.invalid",
+        "GIT_COMMITTER_NAME": "Candidate",
+        "GIT_COMMITTER_EMAIL": "candidate@example.invalid",
+    }
+    args = [
+        "git",
+        "commit-tree",
+        tree_sha,
+        *[item for parent in parents for item in ("-p", parent)],
+    ]
+    completed = _ma_git(
+        args,
+        cwd=repo,
+        env=env,
+        input_bytes=b"candidate\n",
+    )
+    stdout = completed.stdout
+    if isinstance(stdout, bytes):
+        stdout = stdout.decode("ascii")
+    return stdout.strip()
+
+
+def _ma_workflow_job_block(workflow: str, job: str) -> str:
+    start = workflow.index(job) + len(job)
+    rest = workflow[start:]
+    match = re.search(r"\n  [a-z][a-z0-9-]*:", rest)
+    return rest[: match.start()] if match else rest
+
+
+class TestMergeAuthorityCIMA:
+    """CI-MA-001 through CI-MA-034 merge authority regression matrix."""
+
+    def test_ci_ma_001_clean_merge_produces_tree_and_sha(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            merge_sha = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+        assert tree
+        assert merge_sha
+
+    def test_ci_ma_002_repeated_construction_is_identical(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            first = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+            second = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+        assert first == second
+
+    def test_ci_ma_003_parent_order_base_then_head(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            merge_sha = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+            inspected = inspect_commit(merge_sha)
+        assert inspected.parents == (base_sha, head_sha)
+
+    def test_ci_ma_004_tree_equals_merge_tree_sha(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            merge_sha = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+            inspected = inspect_commit(merge_sha)
+        assert inspected.tree_sha == tree
+
+    def test_ci_ma_005_stale_candidate_wrong_first_parent(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            stale_parent = _ma_commit_file(work, "stale.txt", "stale\n", "stale")
+            candidate = _ma_make_candidate_commit(
+                work, tree_sha=tree, parents=(stale_parent, head_sha)
+            )
+            outcome = classify_github_candidate(candidate, base_sha, head_sha, tree)
+        assert outcome.outcome == GitHubCandidateOutcome.STALE_PARENT_BINDING
+
+    def test_ci_ma_006_stale_candidate_wrong_second_parent(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            stale_head = _ma_commit_file(work, "stale-head.txt", "x\n", "stale-head")
+            candidate = _ma_make_candidate_commit(
+                work, tree_sha=tree, parents=(base_sha, stale_head)
+            )
+            outcome = classify_github_candidate(candidate, base_sha, head_sha, tree)
+        assert outcome.outcome == GitHubCandidateOutcome.STALE_PARENT_BINDING
+
+    def test_ci_ma_007_non_two_parent_candidate_rejected(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            single = _ma_make_candidate_commit(work, tree_sha=tree, parents=(base_sha,))
+            outcome = classify_github_candidate(single, base_sha, head_sha, tree)
+        assert outcome.outcome == GitHubCandidateOutcome.INVALID_PARENT_COUNT
+
+    def test_ci_ma_008_valid_candidate_same_tree(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            candidate = _ma_make_candidate_commit(work, tree_sha=tree, parents=(base_sha, head_sha))
+            outcome = classify_github_candidate(candidate, base_sha, head_sha, tree)
+        assert outcome.outcome == GitHubCandidateOutcome.VALID_EQUIVALENT
+
+    def test_ci_ma_009_valid_parents_different_tree_hard_fails(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            compute_merge_tree(base_sha, head_sha)
+            other_tree_commit = _ma_commit_file(work, "other-tree.txt", "z\n", "other-tree")
+            tree_other = _ma_git(
+                ["git", "rev-parse", f"{other_tree_commit}^{{tree}}"], cwd=work
+            ).stdout.strip()
+            candidate = _ma_make_candidate_commit(
+                work, tree_sha=tree_other, parents=(base_sha, head_sha)
+            )
+            with pytest.raises(MergeAuthorityError, match="different tree"):
+                resolve_merge_authority(1, base_sha, head_sha, github_candidate_sha=candidate)
+
+    def test_ci_ma_010_missing_candidate_does_not_block_clean_merge(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, classification = resolve_merge_authority(
+                1, base_sha, head_sha, github_candidate_sha=None
+            )
+        assert identity.merge_sha
+        assert classification.outcome == GitHubCandidateOutcome.ABSENT
+
+    def test_ci_ma_011_local_merge_conflict_fails_closed(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_conflict_repo(tmp_path)
+        with _ma_use_repo(work), pytest.raises(MergeAuthorityError, match="merge-tree failed"):
+            resolve_merge_authority(3, base_sha, head_sha, github_candidate_sha=None)
+
+    def test_ci_ma_012_materialization_reproduces_merge_tree(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            materialized = materialize_and_verify(
+                1,
+                base_sha,
+                head_sha,
+                identity.merge_tree_sha,
+                identity.merge_sha,
+                resolver_git_version=git_version(),
+                resolver_git_object_format=git_object_format(),
+            )
+        assert materialized.merge_tree_sha == identity.merge_tree_sha
+
+    def test_ci_ma_013_materialization_reproduces_merge_sha(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            materialized = materialize_and_verify(
+                1,
+                base_sha,
+                head_sha,
+                identity.merge_tree_sha,
+                identity.merge_sha,
+                resolver_git_version=git_version(),
+                resolver_git_object_format=git_object_format(),
+            )
+        assert materialized.merge_sha == identity.merge_sha
+
+    def test_ci_ma_014_tampered_merge_tree_hard_fails(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            tampered = "0" * 40
+            with pytest.raises(MergeAuthorityError, match="merge_tree_sha mismatch"):
+                materialize_and_verify(
+                    1,
+                    base_sha,
+                    head_sha,
+                    tampered,
+                    identity.merge_sha,
+                    resolver_git_version=git_version(),
+                    resolver_git_object_format=git_object_format(),
+                )
+
+    def test_ci_ma_015_tampered_merge_sha_hard_fails(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            tampered = "1" * 40
+            with pytest.raises(MergeAuthorityError, match="merge_sha mismatch"):
+                materialize_and_verify(
+                    1,
+                    base_sha,
+                    head_sha,
+                    identity.merge_tree_sha,
+                    tampered,
+                    resolver_git_version=git_version(),
+                    resolver_git_object_format=git_object_format(),
+                )
+
+    def test_ci_ma_016_pr_head_ref_drift_hard_fails(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        drift = _ma_commit_file(work, "drift.txt", "drift\n", "drift")
+        with (
+            _ma_use_repo(work),
+            pytest.raises(MergeAuthorityError, match="refs/hxforge-ci/pr-head mismatch"),
+        ):
+            resolve_merge_authority(1, base_sha, drift, github_candidate_sha=None)
+
+    def test_ci_ma_017_workflow_dispatch_pr_number_validation(self) -> None:
+        with pytest.raises(MergeAuthorityError):
+            validate_pr_number_lexical("")
+        with pytest.raises(MergeAuthorityError):
+            validate_pr_number_lexical("0")
+        with pytest.raises(MergeAuthorityError):
+            validate_pr_number_lexical("-1")
+        with pytest.raises(MergeAuthorityError):
+            validate_pr_number_lexical("1a")
+        with pytest.raises(MergeAuthorityError):
+            validate_pr_number_lexical(" 1")
+        assert validate_pr_number_lexical("42") == 42
+
+    def test_ci_ma_018_workflow_permissions_read_only(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        assert "contents: read" in workflow
+        assert "pull-requests: read" in workflow
+        assert "contents: write" not in workflow
+        assert "pull-requests: write" not in workflow
+
+    def test_ci_ma_019_resolve_success_never_empty_merge_sha(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+        assert identity.merge_sha
+        assert len(identity.merge_sha) == 40
+
+    def test_ci_ma_020_all_merge_content_jobs_materialize_before_tests(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        for job in (
+            "shard-merge-ref:",
+            "collect-global-merge-ref:",
+            "verify-completeness-merge-ref:",
+            "verify-golden-benchmark-merge-ref:",
+        ):
+            block = _ma_workflow_job_block(workflow, job)
+            assert "Materialize canonical ephemeral merge authority" in block
+            assert "Assert frozen merge-ref SHA" in block
+            assert "tests.ci.merge_authority materialize" in block
+
+    def test_ci_ma_021_no_push_of_ephemeral_commit_or_ref(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        module = (repo_root / "tests" / "ci" / "merge_authority.py").read_text(encoding="utf-8")
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        assert "git push" not in module
+        assert "git push" not in workflow.split("merge_authority", 1)[1]
+
+    def test_ci_ma_022_merge_ref_artifact_metadata_uses_canonical_merge_sha(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        shard_block = workflow.split("shard-merge-ref:", 1)[1].split("collect-global:", 1)[0]
+        assert "needs.resolve-authority.outputs.merge-sha" in shard_block
+        assert "'commit_sha': '${{ needs.resolve-authority.outputs.merge-sha }}'" in shard_block
+
+    def test_ci_ma_023_merge_ref_aggregate_expects_canonical_merge_sha(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        block = workflow.split("merge-ref-aggregate:", 1)[1].split("main-aggregate:", 1)[0]
+        assert "expected_commit_sha='${{ needs.resolve-authority.outputs.merge-sha }}'" in block
+
+    def test_ci_ma_024_verifier_rejects_wrong_merge_ref_commit_sha(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="merge-ref",
+            shard="ci",
+            python_version="3.11",
+            commit_sha="f" * 40,
+            run_id="100",
+            run_attempt=1,
+        )
+        with pytest.raises(ArtifactError, match="COMMIT_SHA_MISMATCH"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="merge-ref",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=1,
+            )
+
+    def test_ci_ma_025_attempt_fallback_behavior_still_passes(self, tmp_path: Path) -> None:
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        manifest = _make_manifest(tmp_path)
+        _make_full_attempt1_shard_set(root)
+        resolved = resolve_shard_bundles(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            consumer_run_attempt=2,
+        )
+        assert resolved
+
+    def test_ci_ma_026_final_gate_requires_resolve_authority_for_pr_dispatch(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        gate = workflow.split("final-gate:", 1)[1]
+        needs_block = gate.split("needs:", 1)[1].split("runs-on:", 1)[0]
+        assert "- resolve-authority" in needs_block
+        pr_event_guard = (
+            'if [ "${{ github.event_name }}" = "pull_request" ] || '
+            '[ "${{ github.event_name }}" = "workflow_dispatch" ]; then'
+        )
+        pr_block = gate.split(pr_event_guard, 1)[1].split("elif", 1)[0]
+        assert 'check "resolve-authority"' in pr_block
+        assert "merge-sha is empty" in gate
+
+    def test_ci_ma_027_workflow_requires_full_history_checkout(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        resolve_block = workflow.split("resolve-authority:", 1)[1].split("shard:", 1)[0]
+        assert "fetch-depth: 0" in resolve_block
+        assert "persist-credentials: false" in resolve_block
+        for job in (
+            "shard-merge-ref:",
+            "collect-global-merge-ref:",
+            "verify-completeness-merge-ref:",
+            "verify-golden-benchmark-merge-ref:",
+        ):
+            block = _ma_workflow_job_block(workflow, job)
+            assert "fetch-depth: 0" in block
+            assert "persist-credentials: false" in block
+
+    def test_ci_ma_028_diverged_history_materializes_full_history_only(
+        self, tmp_path: Path
+    ) -> None:
+        work, base_sha, head_sha, bare = _ma_setup_diverged_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = resolve_merge_authority(2, base_sha, head_sha)
+        assert identity.merge_sha
+
+        partial_work = tmp_path / "partial-work"
+        partial_work.mkdir()
+        _ma_git(["git", "init"], cwd=partial_work)
+        _ma_git(["git", "remote", "add", "origin", str(bare)], cwd=partial_work)
+        _ma_git(["git", "fetch", "--depth", "1", "origin", base_sha], cwd=partial_work)
+        with _ma_use_repo(partial_work), pytest.raises(MergeAuthorityError):
+            resolve_merge_authority(2, base_sha, head_sha)
+
+    def test_ci_ma_029_canonical_message_bytes_exact(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            merge_sha = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+            inspected = inspect_commit(merge_sha)
+        assert inspected.message_bytes == CANONICAL_COMMIT_MESSAGE_BYTES
+        assert inspected.message_bytes.endswith(b"\n")
+        assert not inspected.message_bytes.startswith(b"\n")
+        assert b"\n\n" not in inspected.message_bytes
+
+    def test_ci_ma_030_hostile_global_config_cannot_change_canonical_sha(
+        self, tmp_path: Path
+    ) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        hostile_cfg = tmp_path / "hostile.gitconfig"
+        hostile_cfg.write_text(
+            textwrap.dedent(
+                """\
+                [commit]
+                    gpgSign = true
+                [i18n]
+                    commitEncoding = ISO-8859-1
+                """
+            ),
+            encoding="utf-8",
+        )
+        os.environ["GIT_CONFIG_GLOBAL"] = str(hostile_cfg)
+        os.environ["GIT_CONFIG_NOSYSTEM"] = "0"
+        try:
+            with _ma_use_repo(work):
+                tree = compute_merge_tree(base_sha, head_sha)
+                first = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+                second = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+                inspected = inspect_commit(first)
+        finally:
+            os.environ.pop("GIT_CONFIG_GLOBAL", None)
+            os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
+        assert first == second
+        assert "gpgsig" not in inspected.raw_header
+        assert "encoding" not in inspected.raw_header
+
+    def test_ci_ma_031_canonical_author_committer_identity_exact(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            merge_sha = build_canonical_ephemeral_merge(base_sha, head_sha, tree)
+            inspected = inspect_commit(merge_sha)
+        expected = "HxForge CI <hxforge-ci@example.invalid> 946684800 +0000"
+        assert inspected.author_line == expected
+        assert inspected.committer_line == expected
+
+    def test_ci_ma_032_downstream_git_version_mismatch_fails(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            with pytest.raises(MergeAuthorityError, match="git-version mismatch"):
+                materialize_and_verify(
+                    1,
+                    base_sha,
+                    head_sha,
+                    identity.merge_tree_sha,
+                    identity.merge_sha,
+                    resolver_git_version="git version 0.0.0",
+                    resolver_git_object_format=git_object_format(),
+                )
+
+    def test_ci_ma_033_object_format_mismatch_or_non_sha1_fails(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            identity, _ = resolve_merge_authority(1, base_sha, head_sha)
+            with pytest.raises(MergeAuthorityError, match="git-object-format mismatch"):
+                materialize_and_verify(
+                    1,
+                    base_sha,
+                    head_sha,
+                    identity.merge_tree_sha,
+                    identity.merge_sha,
+                    resolver_git_version=git_version(),
+                    resolver_git_object_format="sha256",
+                )
+
+    def test_ci_ma_034_all_merge_content_jobs_bind_resolver_git_env(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        pattern = re.compile(
+            r"resolver-git-version.*?resolver-git-object-format",
+            re.DOTALL,
+        )
+        for job in (
+            "shard-merge-ref:",
+            "collect-global-merge-ref:",
+            "verify-completeness-merge-ref:",
+            "verify-golden-benchmark-merge-ref:",
+        ):
+            block = _ma_workflow_job_block(workflow, job)
+            assert pattern.search(block)
+            assert "merge-tree-sha" in block
+            assert "merge-sha" in block

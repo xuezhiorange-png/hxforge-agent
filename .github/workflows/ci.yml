@@ -13,6 +13,7 @@ name: ci
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   # ── Shared: lint ───────────────────────────────────────────────────────────
@@ -81,46 +82,47 @@ jobs:
             --manifest ci-shard-manifest.yml \
             --test-root tests
 
-  # ── PR-only: resolve-authority (freeze merge SHA) ─────────────────────────
+  # ── PR-only: resolve-authority (canonical ephemeral merge SHA) ────────────
   resolve-authority:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       merge-sha: ${{ steps.resolve.outputs.merge-sha }}
+      merge-tree-sha: ${{ steps.resolve.outputs.merge-tree-sha }}
+      base-sha: ${{ steps.resolve.outputs.base-sha }}
       pr-head-sha: ${{ steps.resolve.outputs.pr-head-sha }}
       pr-number: ${{ steps.resolve.outputs.pr-number }}
+      git-version: ${{ steps.resolve.outputs.git-version }}
+      git-object-format: ${{ steps.resolve.outputs.git-object-format }}
     steps:
       - uses: actions/checkout@v4
-      - name: Resolve and freeze merge-ref SHA
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Resolve canonical ephemeral merge authority
         id: resolve
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             PR_NUMBER="${{ github.event.pull_request.number }}"
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
             PR_HEAD="${{ github.event.pull_request.head.sha }}"
           else
             PR_NUMBER="${{ inputs.pr_number }}"
-            PR_HEAD=""
-          fi
-          echo "pr-number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
-
-          if [ -z "${PR_HEAD}" ]; then
-            # workflow_dispatch: fetch PR head ref to discover the actual HEAD SHA
-            git fetch origin "refs/pull/${PR_NUMBER}/head"
+            git fetch --no-tags --force origin main
+            BASE_SHA="$(git rev-parse origin/main)"
+            git fetch --no-tags --force origin "refs/pull/${PR_NUMBER}/head"
             PR_HEAD="$(git rev-parse FETCH_HEAD)"
           fi
-          echo "pr-head-sha=${PR_HEAD}" >> "$GITHUB_OUTPUT"
-          echo "PR head SHA: ${PR_HEAD}"
-
-          # Fetch the exact merge ref (may not exist if PR has conflicts)
-          if git fetch origin "refs/pull/${PR_NUMBER}/merge" 2>/dev/null; then
-            MERGE_SHA="$(git rev-parse FETCH_HEAD)"
-            echo "merge-sha=${MERGE_SHA}" >> "$GITHUB_OUTPUT"
-            echo "Frozen merge-ref SHA: ${MERGE_SHA}"
-          else
-            echo "WARNING: merge ref not available (PR may have conflicts)"
-            echo "merge-sha=" >> "$GITHUB_OUTPUT"
-          fi
+          uv run --locked python -m tests.ci.merge_authority resolve \
+            --pr-number "${PR_NUMBER}" \
+            --base-sha "${BASE_SHA}" \
+            --pr-head-sha "${PR_HEAD}"
 
   # ── PR-head shard jobs ────────────────────────────────────────────────────
   shard:
@@ -278,16 +280,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-authority.outputs.merge-sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Materialize canonical ephemeral merge authority
+        run: |
+          uv run --locked python -m tests.ci.merge_authority materialize \
+            --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
+            --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
+            --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
+            --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
+            --expected-merge-sha "${{ needs.resolve-authority.outputs.merge-sha }}" \
+            --resolver-git-version "${{ needs.resolve-authority.outputs.git-version }}" \
+            --resolver-git-object-format "${{ needs.resolve-authority.outputs.git-object-format }}"
       - name: Assert frozen merge-ref SHA
         run: |
           test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.merge-sha }}"
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
-        with:
-          version: "0.11.25"
       - run: uv sync --locked --all-extras
       - name: Install TASK029 cross-version runtimes
         if: matrix.name == 'ci'
@@ -639,16 +653,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-authority.outputs.merge-sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Materialize canonical ephemeral merge authority
+        run: |
+          uv run --locked python -m tests.ci.merge_authority materialize \
+            --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
+            --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
+            --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
+            --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
+            --expected-merge-sha "${{ needs.resolve-authority.outputs.merge-sha }}" \
+            --resolver-git-version "${{ needs.resolve-authority.outputs.git-version }}" \
+            --resolver-git-object-format "${{ needs.resolve-authority.outputs.git-object-format }}"
       - name: Assert frozen merge-ref SHA
         run: |
           test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.merge-sha }}"
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
-        with:
-          version: "0.11.25"
       - run: uv sync --locked --all-extras
       - name: Global collection merge-ref (py${{ matrix.python }})
         run: |
@@ -878,10 +904,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-authority.outputs.merge-sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
           version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Materialize canonical ephemeral merge authority
+        run: |
+          uv run --locked python -m tests.ci.merge_authority materialize \
+            --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
+            --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
+            --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
+            --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
+            --expected-merge-sha "${{ needs.resolve-authority.outputs.merge-sha }}" \
+            --resolver-git-version "${{ needs.resolve-authority.outputs.git-version }}" \
+            --resolver-git-object-format "${{ needs.resolve-authority.outputs.git-object-format }}"
+      - name: Assert frozen merge-ref SHA
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.merge-sha }}"
       - run: uv sync --locked --all-extras
       - name: Download shard inventories
         uses: actions/download-artifact@v4
@@ -1097,10 +1138,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-authority.outputs.merge-sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
           version: "0.11.25"
+      - run: uv sync --locked --all-extras
+      - name: Materialize canonical ephemeral merge authority
+        run: |
+          uv run --locked python -m tests.ci.merge_authority materialize \
+            --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
+            --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
+            --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
+            --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
+            --expected-merge-sha "${{ needs.resolve-authority.outputs.merge-sha }}" \
+            --resolver-git-version "${{ needs.resolve-authority.outputs.git-version }}" \
+            --resolver-git-object-format "${{ needs.resolve-authority.outputs.git-object-format }}"
+      - name: Assert frozen merge-ref SHA
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.merge-sha }}"
       - run: uv sync --locked --all-extras
       - name: Download all inventories
         uses: actions/download-artifact@v4
@@ -1496,11 +1552,11 @@ jobs:
             fi
           }
 
-          # Determine if merge-ref jobs should be required or optional
+          # Merge-ref jobs are required when resolve-authority succeeds with canonical merge SHA.
           MERGE_REF_REQUIRED="yes"
           if [ -z "${{ needs.resolve-authority.outputs.merge-sha }}" ]; then
-            MERGE_REF_REQUIRED="skip-if-skipped"
-            echo "WARNING: merge-sha is empty, merge-ref jobs will be optional"
+            echo "ERROR: merge-sha is empty after resolve-authority" >&2
+            FAILED=1
           fi
 
           if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
