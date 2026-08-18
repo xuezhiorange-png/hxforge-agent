@@ -1581,15 +1581,13 @@ jobs:
             fi
           }
 
-          # Merge-ref jobs are required when resolve-authority succeeds with canonical merge SHA.
-          MERGE_REF_REQUIRED="yes"
-          if [ -z "${{ needs.resolve-authority.outputs.merge-sha }}" ]; then
-            echo "ERROR: merge-sha is empty after resolve-authority" >&2
-            FAILED=1
-          fi
-
           if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # PR-head + merge-ref required; main-track skipped
+            MERGE_REF_REQUIRED="yes"
+            if [ -z "${{ needs.resolve-authority.outputs.merge-sha }}" ]; then
+              echo "ERROR: merge-sha is empty after resolve-authority" >&2
+              FAILED=1
+            fi
             check "lint" "${{ needs.lint.result }}" "yes"
             check "parse-manifest" "${{ needs.parse-manifest.result }}" "yes"
             check "verify-manifest" "${{ needs.verify-manifest.result }}" "yes"
