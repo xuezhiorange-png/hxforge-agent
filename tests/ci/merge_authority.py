@@ -26,6 +26,7 @@ METADATA_TIP_MISMATCH_ERROR: Final[str] = "CURRENT_BASE_METADATA_TIP_MISMATCH"
 REQUIRED_OBJECT_FORMAT: Final[str] = "sha1"
 
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
+_SHA40_BYTES_RE = re.compile(rb"^[0-9a-f]{40}$")
 _PR_NUMBER_ASCII_RE = re.compile(r"^[1-9][0-9]*$")
 
 
@@ -103,6 +104,12 @@ def _validate_sha40(value: str, label: str) -> str:
     if not _SHA40_RE.fullmatch(lowered):
         raise MergeAuthorityError(f"{label} is not a 40-char lowercase SHA: {value!r}")
     return lowered
+
+
+def _validate_sha40_bytes(token: bytes, label: str) -> str:
+    if not _SHA40_BYTES_RE.fullmatch(token):
+        raise MergeAuthorityError(f"{label} is not a 40-char lowercase SHA: {token!r}")
+    return token.decode("ascii")
 
 
 def validate_pr_number_lexical(value: str) -> int:
@@ -334,14 +341,14 @@ def inspect_github_candidate_structure(sha: str) -> GitHubCandidateCommitStructu
     separator = raw.find(b"\n\n")
     if separator < 0:
         raise MergeAuthorityError(f"commit {commit_sha} has no message separator")
-    header_text = raw[:separator].decode("utf-8", errors="strict")
+    header_bytes = raw[:separator]
     tree_sha = ""
     parents: list[str] = []
     tree_count = 0
-    for line in header_text.splitlines():
-        if line.startswith(" "):
+    for line in header_bytes.splitlines():
+        if line.startswith(b" "):
             continue
-        if line.startswith("tree "):
+        if line.startswith(b"tree "):
             parts = line.split()
             if len(parts) != 2:
                 raise MergeAuthorityError(
@@ -350,14 +357,14 @@ def inspect_github_candidate_structure(sha: str) -> GitHubCandidateCommitStructu
             tree_count += 1
             if tree_count > 1:
                 raise MergeAuthorityError(f"commit {commit_sha} has multiple tree headers")
-            tree_sha = _validate_sha40(parts[1], "tree sha")
-        elif line.startswith("parent "):
+            tree_sha = _validate_sha40_bytes(parts[1], "tree sha")
+        elif line.startswith(b"parent "):
             parts = line.split()
             if len(parts) != 2:
                 raise MergeAuthorityError(
                     f"commit {commit_sha} has malformed parent header: {line!r}"
                 )
-            parents.append(_validate_sha40(parts[1], "parent sha"))
+            parents.append(_validate_sha40_bytes(parts[1], "parent sha"))
     if not tree_sha:
         raise MergeAuthorityError(f"commit {commit_sha} missing tree header")
     return GitHubCandidateCommitStructure(

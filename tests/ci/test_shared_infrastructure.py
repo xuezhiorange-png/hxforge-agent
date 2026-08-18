@@ -2682,6 +2682,36 @@ class TestMergeAuthorityCIMA:
             assert "merge-tree-sha" in block
             assert "merge-sha" in block
 
+    def test_pr188_candidate_non_utf8_nonauthority_metadata_does_not_block_structural_classification(  # noqa: E501
+        self, tmp_path: Path
+    ) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            tree = compute_merge_tree(base_sha, head_sha)
+            gpgsig = (
+                b"gpgsig -----BEGIN PGP SIGNATURE-----\n"
+                b" \n fake\n -----END PGP SIGNATURE-----\n\nmsg\n"
+            )
+            commit_object = (
+                f"tree {tree}\n".encode()
+                + f"parent {base_sha}\n".encode()
+                + f"parent {head_sha}\n".encode()
+                + b"author Bad \xff Name <bad@example.invalid> 946684800 +0000\n"
+                + b"committer Candidate <candidate@example.invalid> 946684800 +0000\n"
+                + gpgsig
+            )
+            completed = _ma_git(
+                ["git", "hash-object", "-t", "commit", "-w", "--stdin"],
+                cwd=work,
+                input_bytes=commit_object,
+            )
+            stdout = completed.stdout
+            if isinstance(stdout, bytes):
+                stdout = stdout.decode("ascii")
+            candidate = stdout.strip()
+            outcome = classify_github_candidate(candidate, base_sha, head_sha, tree)
+        assert outcome.outcome == GitHubCandidateOutcome.VALID_EQUIVALENT
+
     def test_pr188_signed_candidate_exact_binding_is_valid_equivalent(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
         with _ma_use_repo(work):
