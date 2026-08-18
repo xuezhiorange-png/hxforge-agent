@@ -2508,7 +2508,7 @@ class TestMergeAuthorityCIMA:
         )
         pr_block = gate.split(pr_event_guard, 1)[1].split("elif", 1)[0]
         assert 'check "resolve-authority"' in pr_block
-        assert "merge-sha is empty" in gate
+        assert "merge-sha is empty" in pr_block
 
     def test_ci_ma_027_workflow_requires_full_history_checkout(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
@@ -2910,3 +2910,196 @@ class TestMergeAuthorityCIMA:
             assert "outputs.base-sha" in block
             assert "outputs.pr-head-sha" in block
             assert "outputs.base-ref" not in block.split("materialize", 1)[1]
+
+
+def _ma_final_gate_policy_blocks(workflow: str) -> tuple[str, str, str]:
+    gate = workflow.split("final-gate:", 1)[1]
+    pr_event_guard = (
+        'if [ "${{ github.event_name }}" = "pull_request" ] || '
+        '[ "${{ github.event_name }}" = "workflow_dispatch" ]; then'
+    )
+    event_dispatch_start = gate.index(pr_event_guard)
+    pre_event = gate[:event_dispatch_start]
+    pr_block = gate.split(pr_event_guard, 1)[1].split("elif", 1)[0]
+    push_block = gate.split('elif [ "${{ github.event_name }}" = "push" ]; then', 1)[1].split(
+        "else", 1
+    )[0]
+    return pre_event, pr_block, push_block
+
+
+def _ma_final_gate_run_script(workflow: str) -> str:
+    gate = workflow.split("final-gate:", 1)[1]
+    step = gate.split("- name: Event-aware final gate", 1)[1]
+    lines = step.split("run: |", 1)[1].splitlines()
+    body: list[str] = []
+    for line in lines[1:]:
+        if line.startswith("          "):
+            body.append(line[10:])
+        elif line.strip() == "":
+            body.append("")
+        else:
+            break
+    return "\n".join(body)
+
+
+def _ma_render_final_gate_script(
+    workflow: str,
+    *,
+    event_name: str,
+    merge_sha: str,
+    job_results: dict[str, str],
+) -> str:
+    script = _ma_final_gate_run_script(workflow)
+    rendered = script.replace("${{ github.event_name }}", event_name)
+    rendered = rendered.replace("${{ needs.resolve-authority.outputs.merge-sha }}", merge_sha)
+    for job, result in job_results.items():
+        token = f"${{{{ needs.{job}.result }}}}"
+        rendered = rendered.replace(token, result)
+    return rendered
+
+
+def _ma_run_final_gate_policy(
+    workflow: str,
+    *,
+    event_name: str,
+    merge_sha: str,
+    job_results: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    rendered = _ma_render_final_gate_script(
+        workflow,
+        event_name=event_name,
+        merge_sha=merge_sha,
+        job_results=job_results,
+    )
+    return subprocess.run(
+        ["bash", "-c", rendered],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+_SUCCESS_PR_DISPATCH_RESULTS = {
+    "lint": "success",
+    "parse-manifest": "success",
+    "verify-manifest": "success",
+    "resolve-authority": "success",
+    "shard": "success",
+    "shard-merge-ref": "success",
+    "shard-main": "skipped",
+    "collect-global": "success",
+    "collect-global-merge-ref": "success",
+    "collect-global-main": "skipped",
+    "verify-completeness": "success",
+    "verify-completeness-merge-ref": "success",
+    "verify-completeness-main": "skipped",
+    "verify-golden-benchmark": "success",
+    "verify-golden-benchmark-merge-ref": "success",
+    "verify-golden-benchmark-main": "skipped",
+    "aggregate": "success",
+    "merge-ref-aggregate": "success",
+    "main-aggregate": "skipped",
+}
+
+_SUCCESS_PUSH_MAIN_RESULTS = {
+    "lint": "success",
+    "parse-manifest": "success",
+    "verify-manifest": "success",
+    "resolve-authority": "skipped",
+    "shard": "skipped",
+    "shard-merge-ref": "skipped",
+    "shard-main": "success",
+    "collect-global": "skipped",
+    "collect-global-merge-ref": "skipped",
+    "collect-global-main": "success",
+    "verify-completeness": "skipped",
+    "verify-completeness-merge-ref": "skipped",
+    "verify-completeness-main": "success",
+    "verify-golden-benchmark": "skipped",
+    "verify-golden-benchmark-merge-ref": "skipped",
+    "verify-golden-benchmark-main": "success",
+    "aggregate": "skipped",
+    "merge-ref-aggregate": "skipped",
+    "main-aggregate": "success",
+}
+
+
+class TestFinalGateEventScopingPostMerge:
+    """CI-MA-POSTMERGE-001 regression: event-scoped merge-sha final-gate policy."""
+
+    @pytest.fixture
+    def workflow(self) -> str:
+        repo_root = Path(__file__).resolve().parents[2]
+        return (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    def test_postmerge_static_contract_event_scoped_merge_sha_check(self, workflow: str) -> None:
+        pre_event, pr_block, push_block = _ma_final_gate_policy_blocks(workflow)
+        assert "merge-sha is empty" not in pre_event
+        assert "MERGE_REF_REQUIRED" not in pre_event
+        assert "merge-sha is empty" in pr_block
+        assert "MERGE_REF_REQUIRED" in pr_block
+        assert "merge-sha" not in push_block
+
+    @pytest.mark.parametrize("event_name", ["pull_request", "workflow_dispatch"])
+    def test_postmerge_case_present_merge_sha_passes_pr_dispatch(
+        self, workflow: str, event_name: str
+    ) -> None:
+        completed = _ma_run_final_gate_policy(
+            workflow,
+            event_name=event_name,
+            merge_sha=_SHA40,
+            job_results=_SUCCESS_PR_DISPATCH_RESULTS,
+        )
+        assert completed.returncode == 0, completed.stderr + completed.stdout
+        assert "FINAL GATE: ALL PASSED" in completed.stdout
+
+    @pytest.mark.parametrize("event_name", ["pull_request", "workflow_dispatch"])
+    def test_postmerge_case_empty_merge_sha_fails_pr_dispatch(
+        self, workflow: str, event_name: str
+    ) -> None:
+        completed = _ma_run_final_gate_policy(
+            workflow,
+            event_name=event_name,
+            merge_sha="",
+            job_results=_SUCCESS_PR_DISPATCH_RESULTS,
+        )
+        assert completed.returncode != 0
+        assert "ERROR: merge-sha is empty after resolve-authority" in (
+            completed.stderr + completed.stdout
+        )
+
+    def test_postmerge_case_push_empty_merge_sha_all_main_success_passes(
+        self, workflow: str
+    ) -> None:
+        completed = _ma_run_final_gate_policy(
+            workflow,
+            event_name="push",
+            merge_sha="",
+            job_results=_SUCCESS_PUSH_MAIN_RESULTS,
+        )
+        assert completed.returncode == 0, completed.stderr + completed.stdout
+        assert "FINAL GATE: ALL PASSED" in completed.stdout
+
+    def test_postmerge_case_push_main_required_failure_fails(self, workflow: str) -> None:
+        results = dict(_SUCCESS_PUSH_MAIN_RESULTS)
+        results["shard-main"] = "failure"
+        completed = _ma_run_final_gate_policy(
+            workflow,
+            event_name="push",
+            merge_sha="",
+            job_results=results,
+        )
+        assert completed.returncode != 0
+        assert "FAIL: shard-main = failure" in (completed.stderr + completed.stdout)
+
+    def test_postmerge_case_unknown_event_fails_closed(self, workflow: str) -> None:
+        completed = _ma_run_final_gate_policy(
+            workflow,
+            event_name="schedule",
+            merge_sha=_SHA40,
+            job_results=_SUCCESS_PR_DISPATCH_RESULTS,
+        )
+        assert completed.returncode != 0
+        assert "ERROR: Unknown event 'schedule' -- FAIL CLOSED" in (
+            completed.stderr + completed.stdout
+        )
