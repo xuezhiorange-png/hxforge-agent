@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Literal, NamedTuple
 
@@ -72,6 +73,21 @@ class ArtifactIdentity(NamedTuple):
     shard: str | None
 
 
+class ArtifactLogicalIdentity(NamedTuple):
+    track: str
+    commit_sha: str
+    run_id: str
+    python_version: str
+    collection_scope: Literal["global", "shard"]
+    shard: str | None
+
+
+@dataclass(frozen=True)
+class ResolvedBundle:
+    meta_path: Path
+    identity: ArtifactIdentity
+
+
 class ArtifactError(Exception):
     """Raised when artifact identity verification fails."""
 
@@ -115,6 +131,234 @@ def _parse_identity(meta: dict[str, Any]) -> ArtifactIdentity:
         collection_scope=collection_scope,
         shard=shard,
     )
+
+
+def _to_logical_identity(identity: ArtifactIdentity) -> ArtifactLogicalIdentity:
+    return ArtifactLogicalIdentity(
+        track=identity.track,
+        commit_sha=identity.commit_sha,
+        run_id=identity.run_id,
+        python_version=identity.python_version,
+        collection_scope=identity.collection_scope,
+        shard=identity.shard,
+    )
+
+
+def _validate_static_identity_fields(
+    identity: ArtifactIdentity,
+    *,
+    expected_track: str,
+    expected_commit_sha: str,
+    expected_run_id: str,
+    consumer_run_attempt: int,
+) -> None:
+    if identity.track != expected_track:
+        raise ArtifactError(f"TRACK_MISMATCH: {identity.track!r} vs {expected_track!r}")
+    if identity.commit_sha != expected_commit_sha:
+        raise ArtifactError(
+            f"COMMIT_SHA_MISMATCH: {identity.commit_sha!r} vs {expected_commit_sha!r}"
+        )
+    if identity.run_id != str(expected_run_id):
+        raise ArtifactError(f"RUN_ID_MISMATCH: {identity.run_id!r} vs {expected_run_id!r}")
+    if identity.run_attempt > consumer_run_attempt:
+        raise ArtifactError(
+            "FUTURE_ATTEMPT_ARTIFACT_GT_CURRENT: "
+            f"{identity.run_attempt} > consumer_run_attempt={consumer_run_attempt}"
+        )
+
+
+def _iter_bundle_candidates(
+    artifact_root: Path,
+    *,
+    collection_scope: Literal["global", "shard"],
+) -> list[tuple[Path, dict[str, Any], ArtifactIdentity]]:
+    candidates: list[tuple[Path, dict[str, Any], ArtifactIdentity]] = []
+    for meta_path in sorted(artifact_root.rglob("artifact-metadata.json")):
+        meta = _read_json_strict(
+            meta_path,
+            "artifact-metadata.json",
+            f"candidate-scan:{meta_path}",
+        )
+        identity = _parse_identity(meta)
+        if identity.collection_scope != collection_scope:
+            continue
+        candidates.append((meta_path, meta, identity))
+    return candidates
+
+
+def _resolve_selected_bundles(
+    *,
+    candidates: list[tuple[Path, dict[str, Any], ArtifactIdentity]],
+    required_logical: set[ArtifactLogicalIdentity],
+    expected_track: str,
+    expected_commit_sha: str,
+    expected_run_id: str,
+    consumer_run_attempt: int,
+) -> dict[ArtifactLogicalIdentity, ResolvedBundle]:
+    grouped: dict[
+        ArtifactLogicalIdentity,
+        dict[int, tuple[Path, dict[str, Any], ArtifactIdentity]],
+    ] = {}
+    unexpected: set[ArtifactLogicalIdentity] = set()
+
+    for meta_path, meta, identity in candidates:
+        _validate_static_identity_fields(
+            identity,
+            expected_track=expected_track,
+            expected_commit_sha=expected_commit_sha,
+            expected_run_id=expected_run_id,
+            consumer_run_attempt=consumer_run_attempt,
+        )
+        logical = _to_logical_identity(identity)
+        if logical not in required_logical:
+            unexpected.add(logical)
+            continue
+
+        attempt_group = grouped.setdefault(logical, {})
+        if identity.run_attempt in attempt_group:
+            raise ArtifactError(
+                f"DUPLICATE_SAME_LOGICAL_KEY_AND_ATTEMPT: {logical} attempt={identity.run_attempt}"
+            )
+        attempt_group[identity.run_attempt] = (meta_path, meta, identity)
+
+    if unexpected:
+        raise ArtifactError(f"UNEXPECTED logical producers: {sorted(unexpected)}")
+
+    selected: dict[ArtifactLogicalIdentity, ResolvedBundle] = {}
+    for logical in sorted(required_logical):
+        attempt_group = grouped.get(logical, {})
+        eligible_attempts = [
+            attempt for attempt in attempt_group if attempt <= consumer_run_attempt
+        ]
+        if not eligible_attempts:
+            raise ArtifactError(f"MISSING_LOGICAL_PRODUCER_AFTER_FALLBACK: {logical}")
+        chosen_attempt = max(eligible_attempts)
+        meta_path, meta, identity = attempt_group[chosen_attempt]
+        _verify_bundle_contents(meta_path, meta, identity)
+        selected[logical] = ResolvedBundle(meta_path=meta_path, identity=identity)
+
+    return selected
+
+
+def resolve_shard_bundles(
+    *,
+    artifact_root: Path,
+    manifest_path: Path,
+    expected_track: str,
+    expected_commit_sha: str,
+    expected_run_id: str,
+    consumer_run_attempt: int,
+) -> dict[ArtifactLogicalIdentity, ResolvedBundle]:
+    """Select latest eligible shard bundle per logical producer at attempt N."""
+    import yaml  # noqa: WPS433
+
+    with open(manifest_path) as f:
+        manifest = yaml.safe_load(f)
+
+    required_logical: set[ArtifactLogicalIdentity] = set()
+    for shard_spec in manifest["shards"]:
+        for py in shard_spec["python"]:
+            required_logical.add(
+                ArtifactLogicalIdentity(
+                    track=expected_track,
+                    commit_sha=expected_commit_sha,
+                    run_id=str(expected_run_id),
+                    python_version=py,
+                    collection_scope="shard",
+                    shard=shard_spec["name"],
+                )
+            )
+
+    candidates = _iter_bundle_candidates(artifact_root, collection_scope="shard")
+    if not candidates:
+        raise ArtifactError("no artifact-metadata.json files found")
+
+    return _resolve_selected_bundles(
+        candidates=candidates,
+        required_logical=required_logical,
+        expected_track=expected_track,
+        expected_commit_sha=expected_commit_sha,
+        expected_run_id=expected_run_id,
+        consumer_run_attempt=consumer_run_attempt,
+    )
+
+
+def resolve_global_bundles(
+    *,
+    artifact_root: Path,
+    expected_track: str,
+    expected_commit_sha: str,
+    expected_run_id: str,
+    consumer_run_attempt: int,
+    python_versions: list[str],
+) -> dict[str, ResolvedBundle]:
+    """Select latest eligible global bundle per Python version at attempt N."""
+    required_logical = {
+        ArtifactLogicalIdentity(
+            track=expected_track,
+            commit_sha=expected_commit_sha,
+            run_id=str(expected_run_id),
+            python_version=py,
+            collection_scope="global",
+            shard=None,
+        )
+        for py in python_versions
+    }
+
+    candidates = _iter_bundle_candidates(artifact_root, collection_scope="global")
+    if not candidates:
+        raise ArtifactError("no artifact-metadata.json files found for global bundles")
+
+    selected = _resolve_selected_bundles(
+        candidates=candidates,
+        required_logical=required_logical,
+        expected_track=expected_track,
+        expected_commit_sha=expected_commit_sha,
+        expected_run_id=expected_run_id,
+        consumer_run_attempt=consumer_run_attempt,
+    )
+    return {logical.python_version: bundle for logical, bundle in selected.items()}
+
+
+def node_inventory_path_from_bundle(bundle: ResolvedBundle) -> Path:
+    """Return the node-inventory path declared by a resolved bundle."""
+    meta = _read_json_strict(
+        bundle.meta_path,
+        "artifact-metadata.json",
+        str(bundle.identity),
+    )
+    for entry in meta.get("artifacts", []):
+        if isinstance(entry, dict) and entry.get("kind") == "node-inventory":
+            path_str = entry.get("path", "")
+            if isinstance(path_str, str) and path_str:
+                return bundle.meta_path.parent / path_str
+    raise ArtifactError(f"node-inventory path missing for {bundle.identity}")
+
+
+def selected_coverage_raw_paths(
+    resolved_shards: dict[ArtifactLogicalIdentity, ResolvedBundle],
+) -> list[Path]:
+    """Return coverage-raw paths from exactly one selected bundle per logical shard."""
+    paths: list[Path] = []
+    for logical in sorted(resolved_shards):
+        bundle = resolved_shards[logical]
+        meta = _read_json_strict(
+            bundle.meta_path,
+            "artifact-metadata.json",
+            str(bundle.identity),
+        )
+        for entry in meta.get("artifacts", []):
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("kind") != "coverage-raw":
+                continue
+            if not entry.get("present", False):
+                continue
+            path_str = entry.get("path", "")
+            if not isinstance(path_str, str) or not path_str:
+                raise ArtifactError(f"coverage-raw path missing for {bundle.identity}")
+            paths.append(bundle.meta_path.parent / path_str)
+    return paths
 
 
 def _is_relative_safe(path_str: str) -> bool:
@@ -498,8 +742,20 @@ def verify_shard_bundles(
     expected_commit_sha: str,
     expected_run_id: str,
     expected_run_attempt: int,
+    allow_prior_attempt_fallback: bool = False,
 ) -> None:
     """Verify all shard artifact identities match expected parameters."""
+    if allow_prior_attempt_fallback:
+        resolve_shard_bundles(
+            artifact_root=artifact_root,
+            manifest_path=manifest_path,
+            expected_track=expected_track,
+            expected_commit_sha=expected_commit_sha,
+            expected_run_id=expected_run_id,
+            consumer_run_attempt=expected_run_attempt,
+        )
+        return
+
     import yaml  # noqa: WPS433
 
     with open(manifest_path) as f:
@@ -570,8 +826,20 @@ def verify_global_bundles(
     expected_run_id: str,
     expected_run_attempt: int,
     python_versions: list[str],
+    allow_prior_attempt_fallback: bool = False,
 ) -> None:
     """Verify all global collection bundle identities."""
+    if allow_prior_attempt_fallback:
+        resolve_global_bundles(
+            artifact_root=artifact_root,
+            expected_track=expected_track,
+            expected_commit_sha=expected_commit_sha,
+            expected_run_id=expected_run_id,
+            consumer_run_attempt=expected_run_attempt,
+            python_versions=python_versions,
+        )
+        return
+
     expected: set[ArtifactIdentity] = set()
     for py in python_versions:
         expected.add(
