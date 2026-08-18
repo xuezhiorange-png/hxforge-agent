@@ -300,6 +300,9 @@ jobs:
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
           version: "0.11.25"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
       - run: uv sync --locked --all-extras
       - name: Materialize canonical ephemeral merge authority
         run: |
@@ -314,10 +317,14 @@ jobs:
       - name: Assert frozen merge-ref SHA
         run: |
           test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.merge-sha }}"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
       - run: uv sync --locked --all-extras
+      - name: Assert merge-ref producer runtime matches matrix python
+        shell: bash
+        run: |
+          ACTUAL_PYTHON="$(uv run --locked python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+          echo "matrix.python=${{ matrix.python }}"
+          echo "uv-runtime=${ACTUAL_PYTHON}"
+          test "${ACTUAL_PYTHON}" = "${{ matrix.python }}"
       - name: Install TASK029 cross-version runtimes
         if: matrix.name == 'ci'
         shell: bash
@@ -673,6 +680,9 @@ jobs:
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
           version: "0.11.25"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
       - run: uv sync --locked --all-extras
       - name: Materialize canonical ephemeral merge authority
         run: |
@@ -687,10 +697,14 @@ jobs:
       - name: Assert frozen merge-ref SHA
         run: |
           test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.merge-sha }}"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
       - run: uv sync --locked --all-extras
+      - name: Assert merge-ref producer runtime matches matrix python
+        shell: bash
+        run: |
+          ACTUAL_PYTHON="$(uv run --locked python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+          echo "matrix.python=${{ matrix.python }}"
+          echo "uv-runtime=${ACTUAL_PYTHON}"
+          test "${ACTUAL_PYTHON}" = "${{ matrix.python }}"
       - name: Global collection merge-ref (py${{ matrix.python }})
         run: |
           uv run --locked pytest --collect-only -q \
