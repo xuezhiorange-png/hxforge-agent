@@ -40,6 +40,7 @@ from tests.ci.merge_authority import (
     GitHubCandidateOutcome,
     GitHubCandidateStatus,
     MergeAuthorityError,
+    acquire_objects,
     build_canonical_ephemeral_merge,
     classify_github_candidate,
     compute_merge_tree,
@@ -2231,7 +2232,6 @@ class TestMergeAuthorityCIMA:
             identity, _ = _ma_resolve(1, base_sha, head_sha)
             materialized = materialize_and_verify(
                 1,
-                "main",
                 base_sha,
                 head_sha,
                 identity.merge_tree_sha,
@@ -2247,7 +2247,6 @@ class TestMergeAuthorityCIMA:
             identity, _ = _ma_resolve(1, base_sha, head_sha)
             materialized = materialize_and_verify(
                 1,
-                "main",
                 base_sha,
                 head_sha,
                 identity.merge_tree_sha,
@@ -2265,7 +2264,6 @@ class TestMergeAuthorityCIMA:
             with pytest.raises(MergeAuthorityError, match="merge_tree_sha mismatch"):
                 materialize_and_verify(
                     1,
-                    "main",
                     base_sha,
                     head_sha,
                     tampered,
@@ -2282,7 +2280,6 @@ class TestMergeAuthorityCIMA:
             with pytest.raises(MergeAuthorityError, match="merge_sha mismatch"):
                 materialize_and_verify(
                     1,
-                    "main",
                     base_sha,
                     head_sha,
                     identity.merge_tree_sha,
@@ -2614,7 +2611,6 @@ class TestMergeAuthorityCIMA:
             with pytest.raises(MergeAuthorityError, match="git-version mismatch"):
                 materialize_and_verify(
                     1,
-                    "main",
                     base_sha,
                     head_sha,
                     identity.merge_tree_sha,
@@ -2630,7 +2626,6 @@ class TestMergeAuthorityCIMA:
             with pytest.raises(MergeAuthorityError, match="git-object-format mismatch"):
                 materialize_and_verify(
                     1,
-                    "main",
                     base_sha,
                     head_sha,
                     identity.merge_tree_sha,
@@ -2745,3 +2740,59 @@ class TestMergeAuthorityCIMA:
         assert "git push" not in module
         assert CURRENT_BASE_REF in module
         assert "+refs/heads/" in module
+
+    def test_r3r1_acquire_objects_uses_frozen_sha_not_moving_branch_ref(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        module = (repo_root / "tests" / "ci" / "merge_authority.py").read_text(encoding="utf-8")
+        acquire_block = module.split("def acquire_objects", 1)[1].split("\ndef ", 1)[0]
+        assert "refs/heads/" not in acquire_block
+        assert 'f"+{base}:{CURRENT_BASE_REF}"' in acquire_block
+
+    def test_r3r1_branch_stable_post_freeze_acquisition_succeeds(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            frozen_sha = resolve_current_base_sha("main")
+            acquire_objects(1, frozen_sha, head_sha)
+            fetched = _ma_git(["git", "rev-parse", CURRENT_BASE_REF], cwd=work).stdout.strip()
+        assert fetched == frozen_sha == base_sha
+
+    def test_r3r1_branch_moves_after_freeze_still_acquires_frozen_sha(self, tmp_path: Path) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        with _ma_use_repo(work):
+            frozen_sha = resolve_current_base_sha("main")
+        new_tip = _ma_advance_origin_main_tip(
+            work, rel="post-freeze-move.txt", content="moved\n", message="post-freeze-move"
+        )
+        assert new_tip != frozen_sha
+        with _ma_use_repo(work):
+            acquire_objects(1, frozen_sha, head_sha)
+            fetched = _ma_git(["git", "rev-parse", CURRENT_BASE_REF], cwd=work).stdout.strip()
+        assert fetched == frozen_sha
+        assert fetched != new_tip
+
+    def test_r3r1_frozen_sha_unavailable_fails_closed_no_branch_fallback(
+        self, tmp_path: Path
+    ) -> None:
+        work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
+        missing_sha = "f" * 40
+        assert missing_sha != base_sha
+        with _ma_use_repo(work), pytest.raises(MergeAuthorityError):
+            acquire_objects(1, missing_sha, head_sha)
+
+    def test_r3r1_downstream_materializer_uses_frozen_sha_pair_only(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        module = (repo_root / "tests" / "ci" / "merge_authority.py").read_text(encoding="utf-8")
+        materialize_block = module.split("def materialize_and_verify", 1)[1].split("\ndef ", 1)[0]
+        assert "base_ref" not in materialize_block
+        for job in (
+            "shard-merge-ref:",
+            "collect-global-merge-ref:",
+            "verify-completeness-merge-ref:",
+            "verify-golden-benchmark-merge-ref:",
+        ):
+            block = _ma_workflow_job_block(workflow, job)
+            assert "merge_authority materialize" in block
+            assert "outputs.base-sha" in block
+            assert "outputs.pr-head-sha" in block
+            assert "outputs.base-ref" not in block.split("materialize", 1)[1]

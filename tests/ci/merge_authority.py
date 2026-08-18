@@ -337,12 +337,10 @@ def _assert_tree_exists(tree_sha: str) -> None:
 
 def acquire_objects(
     pr_number: int,
-    base_ref: str,
     current_base_sha: str,
     pr_head_sha: str,
 ) -> None:
-    """Full-history object acquisition protocol using frozen current-base SHA."""
-    ref = _validate_base_ref(base_ref)
+    """Phase B: acquire Git objects from the frozen SHA pair only."""
     base = _validate_sha40(current_base_sha, "current_base_sha")
     head = _validate_sha40(pr_head_sha, "pr_head_sha")
     _assert_full_history()
@@ -353,7 +351,7 @@ def acquire_objects(
             "--no-tags",
             "--force",
             "origin",
-            f"+refs/heads/{ref}:{CURRENT_BASE_REF}",
+            f"+{base}:{CURRENT_BASE_REF}",
         ]
     )
     fetched_base = _run_git(["git", "rev-parse", CURRENT_BASE_REF]).stdout.strip()
@@ -537,7 +535,7 @@ def resolve_merge_authority(
 ) -> tuple[MergeAuthorityIdentity, GitHubCandidateClassification]:
     current_base_sha = resolve_current_base_sha(base_ref)
     _assert_metadata_tip_consistency(base_metadata_sha, current_base_sha)
-    acquire_objects(pr_number, base_ref, current_base_sha, pr_head_sha)
+    acquire_objects(pr_number, current_base_sha, pr_head_sha)
     merge_tree_sha = compute_merge_tree(current_base_sha, pr_head_sha)
     merge_sha = build_canonical_ephemeral_merge(current_base_sha, pr_head_sha, merge_tree_sha)
     identity = MergeAuthorityIdentity(
@@ -583,7 +581,6 @@ def _assert_resolver_git_binding(
 
 def materialize_and_verify(
     pr_number: int,
-    base_ref: str,
     current_base_sha: str,
     pr_head_sha: str,
     expected_merge_tree_sha: str,
@@ -593,7 +590,7 @@ def materialize_and_verify(
     resolver_git_object_format: str,
 ) -> MergeAuthorityIdentity:
     _assert_resolver_git_binding(resolver_git_version, resolver_git_object_format)
-    acquire_objects(pr_number, base_ref, current_base_sha, pr_head_sha)
+    acquire_objects(pr_number, current_base_sha, pr_head_sha)
     merge_tree_sha = compute_merge_tree(current_base_sha, pr_head_sha)
     merge_sha = build_canonical_ephemeral_merge(current_base_sha, pr_head_sha, merge_tree_sha)
     identity = MergeAuthorityIdentity(
@@ -678,7 +675,6 @@ def _cmd_materialize(args: argparse.Namespace) -> int:
     pr_number = validate_pr_number_lexical(args.pr_number)
     materialize_and_verify(
         pr_number,
-        _validate_base_ref(args.base_ref),
         _validate_sha40(args.base_sha, "base_sha"),
         _validate_sha40(args.pr_head_sha, "pr_head_sha"),
         _validate_sha40(args.expected_merge_tree_sha, "expected_merge_tree_sha"),
@@ -706,7 +702,6 @@ def main(argv: list[str] | None = None) -> int:
 
     materialize_parser = subparsers.add_parser("materialize")
     materialize_parser.add_argument("--pr-number", required=True)
-    materialize_parser.add_argument("--base-ref", required=True)
     materialize_parser.add_argument("--base-sha", required=True)
     materialize_parser.add_argument("--pr-head-sha", required=True)
     materialize_parser.add_argument("--expected-merge-tree-sha", required=True)

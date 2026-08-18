@@ -305,7 +305,6 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
             --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
-            --base-ref "${{ needs.resolve-authority.outputs.base-ref }}" \
             --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
             --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
             --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
@@ -679,7 +678,6 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
             --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
-            --base-ref "${{ needs.resolve-authority.outputs.base-ref }}" \
             --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
             --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
             --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
@@ -931,7 +929,6 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
             --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
-            --base-ref "${{ needs.resolve-authority.outputs.base-ref }}" \
             --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
             --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
             --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
@@ -1166,7 +1163,6 @@ jobs:
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
             --pr-number "${{ needs.resolve-authority.outputs.pr-number }}" \
-            --base-ref "${{ needs.resolve-authority.outputs.base-ref }}" \
             --base-sha "${{ needs.resolve-authority.outputs.base-sha }}" \
             --pr-head-sha "${{ needs.resolve-authority.outputs.pr-head-sha }}" \
             --expected-merge-tree-sha "${{ needs.resolve-authority.outputs.merge-tree-sha }}" \
