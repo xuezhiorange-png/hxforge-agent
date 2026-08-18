@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Literal, NamedTuple
@@ -240,24 +241,43 @@ def _resolve_selected_bundles(
     return selected
 
 
-def resolve_shard_bundles(
+def _manifest_python_versions(manifest: dict[str, Any]) -> set[str]:
+    versions: set[str] = set()
+    for shard_spec in manifest["shards"]:
+        versions.update(shard_spec["python"])
+    return versions
+
+
+def _normalize_python_version_scope(
+    python_versions: Collection[str] | None,
     *,
-    artifact_root: Path,
-    manifest_path: Path,
+    manifest: dict[str, Any],
+) -> set[str] | None:
+    if python_versions is None:
+        return None
+    if not python_versions:
+        raise ArtifactError("PYTHON_VERSION_SCOPE_EMPTY")
+    manifest_versions = _manifest_python_versions(manifest)
+    requested = set(python_versions)
+    unknown = sorted(requested - manifest_versions)
+    if unknown:
+        raise ArtifactError(f"PYTHON_VERSION_NOT_IN_MANIFEST: {unknown}")
+    return requested
+
+
+def _build_required_shard_logical_identities(
+    *,
+    manifest: dict[str, Any],
     expected_track: str,
     expected_commit_sha: str,
     expected_run_id: str,
-    consumer_run_attempt: int,
-) -> dict[ArtifactLogicalIdentity, ResolvedBundle]:
-    """Select latest eligible shard bundle per logical producer at attempt N."""
-    import yaml  # noqa: WPS433
-
-    with open(manifest_path) as f:
-        manifest = yaml.safe_load(f)
-
+    python_versions: set[str] | None,
+) -> set[ArtifactLogicalIdentity]:
     required_logical: set[ArtifactLogicalIdentity] = set()
     for shard_spec in manifest["shards"]:
         for py in shard_spec["python"]:
+            if python_versions is not None and py not in python_versions:
+                continue
             required_logical.add(
                 ArtifactLogicalIdentity(
                     track=expected_track,
@@ -268,6 +288,36 @@ def resolve_shard_bundles(
                     shard=shard_spec["name"],
                 )
             )
+    return required_logical
+
+
+def resolve_shard_bundles(
+    *,
+    artifact_root: Path,
+    manifest_path: Path,
+    expected_track: str,
+    expected_commit_sha: str,
+    expected_run_id: str,
+    consumer_run_attempt: int,
+    python_versions: Collection[str] | None = None,
+) -> dict[ArtifactLogicalIdentity, ResolvedBundle]:
+    """Select latest eligible shard bundle per logical producer at attempt N."""
+    import yaml  # noqa: WPS433
+
+    with open(manifest_path) as f:
+        manifest = yaml.safe_load(f)
+
+    scoped_versions = _normalize_python_version_scope(
+        python_versions,
+        manifest=manifest,
+    )
+    required_logical = _build_required_shard_logical_identities(
+        manifest=manifest,
+        expected_track=expected_track,
+        expected_commit_sha=expected_commit_sha,
+        expected_run_id=expected_run_id,
+        python_versions=scoped_versions,
+    )
 
     candidates = _iter_bundle_candidates(artifact_root, collection_scope="shard")
     if not candidates:

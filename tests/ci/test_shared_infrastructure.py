@@ -1802,3 +1802,126 @@ class TestAttemptScopedArtifactResolution:
         coverage_paths = selected_coverage_raw_paths(resolved)
         assert len(coverage_paths) == len(resolved)
         assert len({p.parent.resolve() for p in coverage_paths}) == len(resolved)
+
+    def test_r09_per_python_scoped_shard_resolution_passes(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="unit",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        resolved = resolve_shard_bundles(
+            artifact_root=root,
+            manifest_path=manifest,
+            expected_track="pr-head",
+            expected_commit_sha=_SHA40,
+            expected_run_id="100",
+            consumer_run_attempt=2,
+            python_versions=["3.12"],
+        )
+        assert {logical.python_version for logical in resolved} == {"3.12"}
+        assert {logical.shard for logical in resolved} == {"unit"}
+
+    def test_r10_per_python_scoped_resolution_still_rejects_missing_applicable_shard(
+        self, tmp_path: Path
+    ) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        with pytest.raises(ArtifactError, match="MISSING_LOGICAL_PRODUCER_AFTER_FALLBACK"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=2,
+                python_versions=["3.11"],
+            )
+
+    def test_unscoped_resolution_still_requires_full_multi_python_set(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="unit",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        with pytest.raises(ArtifactError, match="MISSING_LOGICAL_PRODUCER_AFTER_FALLBACK"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=2,
+            )
+
+    def test_python_version_scope_rejects_empty_and_unknown(self, tmp_path: Path) -> None:
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        with pytest.raises(ArtifactError, match="PYTHON_VERSION_SCOPE_EMPTY"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=1,
+                python_versions=[],
+            )
+        with pytest.raises(ArtifactError, match="PYTHON_VERSION_NOT_IN_MANIFEST"):
+            resolve_shard_bundles(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                consumer_run_attempt=1,
+                python_versions=["3.10"],
+            )
+
+
+class TestWorkflowCompletenessResolverScope:
+    """Static workflow regression for per-Python completeness scoping."""
+
+    def test_completeness_callsites_scope_shard_resolution(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        pr_head_block = workflow.split("Verify per-version completeness (pr-head)", 1)[1].split(
+            "verify-completeness-merge-ref", 1
+        )[0]
+        merge_ref_block = workflow.split("Verify per-version completeness (merge-ref)", 1)[1].split(
+            "verify-completeness-main", 1
+        )[0]
+        aggregate_block = workflow.split("Combine coverage", 1)[1].split("merge-ref-aggregate", 1)[
+            0
+        ]
+
+        assert "python_versions=[python_version]" in pr_head_block
+        assert "resolve_shard_bundles(" in pr_head_block
+        assert "python_versions=[python_version]" in merge_ref_block
+        assert "resolve_shard_bundles(" in merge_ref_block
+        assert "resolve_shard_bundles(" in aggregate_block
+        assert "python_versions=[python_version]" not in aggregate_block

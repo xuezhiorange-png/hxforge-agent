@@ -853,11 +853,10 @@ jobs:
               expected_commit_sha='${{ needs.resolve-authority.outputs.pr-head-sha }}',
               expected_run_id='${{ github.run_id }}',
               consumer_run_attempt=consumer_attempt,
+              python_versions=[python_version],
           )
           shard_inventories = {}
           for logical, bundle in shard_resolved.items():
-              if logical.python_version != python_version:
-                  continue
               inv = load_inventory(node_inventory_path_from_bundle(bundle))
               shard_inventories[logical.shard] = inv
               print(f'  Shard {logical.shard}: {inv.node_count} nodes (attempt {bundle.identity.run_attempt})')
@@ -931,11 +930,10 @@ jobs:
               expected_commit_sha='${{ needs.resolve-authority.outputs.merge-sha }}',
               expected_run_id='${{ github.run_id }}',
               consumer_run_attempt=consumer_attempt,
+              python_versions=[python_version],
           )
           shard_inventories = {}
           for logical, bundle in shard_resolved.items():
-              if logical.python_version != python_version:
-                  continue
               inv = load_inventory(node_inventory_path_from_bundle(bundle))
               shard_inventories[logical.shard] = inv
 
