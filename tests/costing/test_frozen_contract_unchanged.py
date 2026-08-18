@@ -18,10 +18,14 @@ precedent PR 46). NEVER silence this test by editing it to pass.
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
+
+LOCAL_AUTHORIZED_ORIGIN = "git@github.com-hxforge:xuezhiorange-png/hxforge-agent.git"
+GITHUB_ACTIONS_CANONICAL_ORIGIN = "https://github.com/xuezhiorange-png/hxforge-agent"
 
 FROZEN_CONTRACT_AUTHORITY_COMMIT_SHA = "19200bf1a3c5d86b6b6129a3fc78c820ff9d3fa8"
 FROZEN_CONTRACT_AUTHORITY_BASE_SHA = "5f96cf761d470b82faa1a5d164eefd42360c7df9"
@@ -95,12 +99,26 @@ def _origin_available(repo_root: Path) -> bool:
     return proc.returncode == 0
 
 
+def _is_github_actions_canonical_origin(origin_url: str) -> bool:
+    """Return True only for the GitHub Actions checkout HTTPS origin.
+
+    Local developer checkouts must still use the project-authorized SSH
+    alias; this helper does not weaken that requirement.
+    """
+    return (
+        os.environ.get("GITHUB_ACTIONS") == "true" and origin_url == GITHUB_ACTIONS_CANONICAL_ORIGIN
+    )
+
+
 def test_origin_remote_is_hxforge_ssh(repo_root: Path) -> None:
     """Sanity: the origin remote is the project-authorized SSH alias.
 
-    Skipped in CI's sparse-checkout PR-head checkout where ``origin``
-    is not configured. The merge-ref pipeline (full clone) and any
-    local dev checkout still execute this assertion.
+    Skipped when ``origin`` is unavailable (CI sparse-checkout PR-head
+    checkout where ``origin/main`` is not resolvable).
+
+    GitHub Actions merge-ref/full-clone checkouts use the canonical
+    repository HTTPS origin and skip this developer-machine transport
+    assertion. Local developer checkouts still require the SSH alias.
     """
     if not _origin_available(repo_root):
         pytest.skip("origin remote not available (CI sparse-checkout)")
@@ -112,7 +130,43 @@ def test_origin_remote_is_hxforge_ssh(repo_root: Path) -> None:
         check=False,
     )
     assert proc.returncode == 0, proc.stderr
-    assert proc.stdout.strip() == "git@github.com-hxforge:xuezhiorange-png/hxforge-agent.git"
+    origin_url = proc.stdout.strip()
+    if _is_github_actions_canonical_origin(origin_url):
+        pytest.skip("GitHub Actions checkout uses the canonical HTTPS origin")
+    assert origin_url == LOCAL_AUTHORIZED_ORIGIN
+
+
+@pytest.mark.parametrize(
+    ("github_actions", "origin_url", "expected"),
+    [
+        (None, LOCAL_AUTHORIZED_ORIGIN, "pass"),
+        (None, GITHUB_ACTIONS_CANONICAL_ORIGIN, "fail"),
+        ("true", GITHUB_ACTIONS_CANONICAL_ORIGIN, "skip"),
+        ("true", "https://github.com/xuezhiorange-png/not-hxforge-agent", "fail"),
+        ("true", "git@github.com:xuezhiorange-png/hxforge-agent.git", "fail"),
+    ],
+)
+def test_github_actions_canonical_origin_matrix(
+    github_actions: str | None,
+    origin_url: str,
+    expected: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression guard for the CI exception matrix."""
+    if github_actions is None:
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_ACTIONS", github_actions)
+
+    if expected == "skip":
+        assert _is_github_actions_canonical_origin(origin_url)
+        return
+
+    assert not _is_github_actions_canonical_origin(origin_url)
+    if expected == "pass":
+        assert origin_url == LOCAL_AUTHORIZED_ORIGIN
+    else:
+        assert origin_url != LOCAL_AUTHORIZED_ORIGIN
 
 
 def test_main_head_includes_frozen_base_authority(repo_root: Path) -> None:
