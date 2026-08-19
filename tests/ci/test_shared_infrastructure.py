@@ -2692,7 +2692,8 @@ class TestMergeAuthorityCIMA:
         normalize_step = "Normalize merge-authority Git toolchain"
         authority_env = 'HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION: "2.45.2"'
         normalize_body_markers = (
-            'HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version ${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"',
+            'HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version '
+            '${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"',
             'export PATH="/usr/local/bin:${PATH}"',
             'echo "/usr/local/bin" >> "${GITHUB_PATH}"',
             "merge-authority-error: git toolchain normalization failed",
