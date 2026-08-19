@@ -956,7 +956,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-authority.outputs.pr-head-sha }}
+          ref: ${{ github.sha }}
+      - name: Assert PR-head verifier checkout SHA
+        run: test "$(git rev-parse HEAD)" = "${{ github.sha }}"
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
           version: "0.11.25"
