@@ -2347,7 +2347,8 @@ class TestMergeAuthorityCIMA:
         assert "GH_TOKEN: ${{ github.token }}" in resolve_block
         assert "jq -r '.state'" in dispatch_section
         assert "jq -r '.base.ref'" in dispatch_section
-        assert "jq -r '.base.sha'" in dispatch_section
+        assert "jq -r '.base.sha'" not in dispatch_section
+        assert 'BASE_METADATA_SHA="${{ github.sha }}"' in dispatch_section
         assert "jq -r '.head.sha'" in dispatch_section
         assert 'STATE" != "open"' in dispatch_section
         hostile_inputs = (

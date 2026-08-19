@@ -130,7 +130,7 @@ jobs:
             fi
             PR_NUMBER="${SANITIZED_PR_NUMBER}"
             BASE_REF="$(printf '%s' "$PR_JSON" | jq -r '.base.ref')"
-            BASE_METADATA_SHA="$(printf '%s' "$PR_JSON" | jq -r '.base.sha')"
+            BASE_METADATA_SHA="${{ github.sha }}"
             PR_HEAD="$(printf '%s' "$PR_JSON" | jq -r '.head.sha')"
           fi
           uv run --locked python -m tests.ci.merge_authority resolve \
