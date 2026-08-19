@@ -191,6 +191,16 @@ jobs:
           fetch-depth: 0
       - name: Assert checkout SHA
         run: test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.pr-head-sha }}"
+      - name: Isolate frozen PR-head from current-base remote ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          git update-ref -d refs/remotes/origin/main
+          if git rev-parse --verify refs/remotes/origin/main >/dev/null 2>&1; then
+            echo "pr-head-isolation-error: origin/main still resolvable" >&2
+            exit 1
+          fi
+          git cat-file -e "${{ needs.resolve-authority.outputs.pr-head-sha }}^{commit}"
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
