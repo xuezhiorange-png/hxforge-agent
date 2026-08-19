@@ -2334,7 +2334,10 @@ class TestMergeAuthorityCIMA:
         resolve_block = workflow.split("resolve-authority:", 1)[1].split("shard:", 1)[0]
         assert "HXFORGE_RAW_PR_NUMBER: ${{ inputs.pr_number }}" in resolve_block
         assert resolve_block.count("${{ inputs.pr_number }}") == 1
-        run_section = resolve_block.split("run: |", 1)[1]
+        resolve_step_block = resolve_block.split(
+            "- name: Resolve canonical ephemeral merge authority", 1
+        )[1]
+        run_section = resolve_step_block.split("run: |", 1)[1]
         assert "${{ inputs.pr_number }}" not in run_section
         assert "validate-pr-number-env" in resolve_block
         assert HXFORGE_RAW_PR_NUMBER_ENV in module
@@ -2687,42 +2690,60 @@ class TestMergeAuthorityCIMA:
         repo_root = Path(__file__).resolve().parents[2]
         workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         normalize_step = "Normalize merge-authority Git toolchain"
-        normalize_anchor = "*merge-authority-git-normalize"
         authority_env = 'HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION: "2.45.2"'
-        assert authority_env in workflow
-        assert normalize_step in workflow
-        assert normalize_anchor in workflow
-        assert "merge-authority-error: git toolchain normalization failed" in workflow
-        assert "merge-authority-git-version=" in workflow
-        assert "git-version:" in workflow.split("resolve-authority:", 1)[1].split("shard:", 1)[0]
-
-        resolve_block = _ma_workflow_job_block(workflow, "resolve-authority:")
-        resolve_step = resolve_block.index("Resolve canonical ephemeral merge authority")
-        resolve_materialize = resolve_block.index("tests.ci.merge_authority resolve")
-        normalize_before_resolve = max(
-            resolve_block.rfind(normalize_step, 0, resolve_step),
-            resolve_block.rfind(normalize_anchor, 0, resolve_step),
+        normalize_body_markers = (
+            'HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version ${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"',
+            'export PATH="/usr/local/bin:${PATH}"',
+            'echo "/usr/local/bin" >> "${GITHUB_PATH}"',
+            "merge-authority-error: git toolchain normalization failed",
+            "merge-authority-git-version=",
         )
-        assert normalize_before_resolve != -1
-        assert normalize_before_resolve < resolve_materialize
 
-        for job in (
-            "shard-merge-ref:",
-            "collect-global-merge-ref:",
-            "verify-completeness-merge-ref:",
-            "verify-golden-benchmark-merge-ref:",
-        ):
-            block = _ma_workflow_job_block(workflow, job)
-            materialize_step = block.index("Materialize canonical ephemeral merge authority")
-            materialize_command = block.index("tests.ci.merge_authority materialize")
-            normalize_before_materialize = max(
-                block.rfind(normalize_step, 0, materialize_step),
-                block.rfind(normalize_anchor, 0, materialize_step),
-            )
-            assert normalize_before_materialize != -1, job
-            assert normalize_before_materialize < materialize_command
-            assert "resolver-git-version" in block
-            assert authority_env in workflow
+        def assert_contract(source: str) -> None:
+            assert authority_env in source
+            assert "x-merge-authority-git-normalize" not in source
+            assert "*merge-authority-git-normalize" not in source
+            assert "git-version:" in source.split("resolve-authority:", 1)[1].split("shard:", 1)[0]
+
+            resolve_block = _ma_workflow_job_block(source, "resolve-authority:")
+            resolve_step = resolve_block.index("Resolve canonical ephemeral merge authority")
+            resolve_command = resolve_block.index("tests.ci.merge_authority resolve")
+            assert f"- name: {normalize_step}" in resolve_block
+            normalize_block = resolve_block[
+                resolve_block.index(f"- name: {normalize_step}") : resolve_step
+            ]
+            assert normalize_block
+            assert normalize_block.index(f"- name: {normalize_step}") < resolve_step
+            assert resolve_command > resolve_step
+            for marker in normalize_body_markers:
+                assert marker in normalize_block
+
+            for job in (
+                "shard-merge-ref:",
+                "collect-global-merge-ref:",
+                "verify-completeness-merge-ref:",
+                "verify-golden-benchmark-merge-ref:",
+            ):
+                block = _ma_workflow_job_block(source, job)
+                materialize_step = block.index("Materialize canonical ephemeral merge authority")
+                materialize_command = block.index("tests.ci.merge_authority materialize")
+                assert f"- name: {normalize_step}" in block, job
+                job_normalize_block = block[
+                    block.index(f"- name: {normalize_step}") : materialize_step
+                ]
+                assert job_normalize_block, job
+                assert job_normalize_block.index(f"- name: {normalize_step}") < materialize_step
+                assert materialize_command > materialize_step
+                for marker in normalize_body_markers:
+                    assert marker in job_normalize_block, job
+                assert "resolver-git-version" in block
+                assert "HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION" in job_normalize_block
+
+        assert_contract(workflow)
+
+        broken = workflow.replace(f"- name: {normalize_step}", "", 1)
+        with pytest.raises(AssertionError):
+            assert_contract(broken)
 
     def test_pr188_candidate_non_utf8_nonauthority_metadata_does_not_block_structural_classification(  # noqa: E501
         self, tmp_path: Path

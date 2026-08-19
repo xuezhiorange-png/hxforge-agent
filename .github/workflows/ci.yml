@@ -18,34 +18,6 @@ permissions:
 env:
   HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION: "2.45.2"
 
-x-merge-authority-git-normalize: &merge-authority-git-normalize
-  name: Normalize merge-authority Git toolchain
-  run: |
-    set -euo pipefail
-    HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version ${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
-    if [ "$(git --version)" = "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
-      echo "merge-authority-git-version=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}"
-      exit 0
-    fi
-    sudo apt-get update
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
-    SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
-    SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
-    rm -rf "${SRC_PARENT}"
-    mkdir -p "${SRC_PARENT}"
-    curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
-      | tar -xz -C "${SRC_PARENT}"
-    make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
-    sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
-    echo "PATH=/usr/local/bin:${PATH}" >> "${GITHUB_ENV}"
-    ACTUAL="$(git --version)"
-    if [ "${ACTUAL}" != "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
-      echo "merge-authority-error: git toolchain normalization failed: expected=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED} actual=${ACTUAL}" >&2
-      exit 1
-    fi
-    echo "merge-authority-git-version=${ACTUAL}"
-
 jobs:
   # ── Shared: lint ───────────────────────────────────────────────────────────
   lint:
@@ -139,7 +111,35 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
-      - *merge-authority-git-normalize
+      - name: Normalize merge-authority Git toolchain
+        run: |
+          set -euo pipefail
+          HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version ${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          export PATH="/usr/local/bin:${PATH}"
+          if [ "$(git --version)" = "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-git-version=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}"
+            echo "/usr/local/bin" >> "${GITHUB_PATH}"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+          SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
+          SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          rm -rf "${SRC_PARENT}"
+          mkdir -p "${SRC_PARENT}"
+          curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
+            | tar -xz -C "${SRC_PARENT}"
+          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          export PATH="/usr/local/bin:${PATH}"
+          echo "/usr/local/bin" >> "${GITHUB_PATH}"
+          ACTUAL="$(git --version)"
+          if [ "${ACTUAL}" != "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-error: git toolchain normalization failed: expected=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED} actual=${ACTUAL}" >&2
+            exit 1
+          fi
+          echo "merge-authority-git-version=${ACTUAL}"
       - name: Resolve canonical ephemeral merge authority
         id: resolve
         env:
@@ -336,7 +336,35 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --all-extras
-      - *merge-authority-git-normalize
+      - name: Normalize merge-authority Git toolchain
+        run: |
+          set -euo pipefail
+          HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version ${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          export PATH="/usr/local/bin:${PATH}"
+          if [ "$(git --version)" = "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-git-version=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}"
+            echo "/usr/local/bin" >> "${GITHUB_PATH}"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+          SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
+          SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          rm -rf "${SRC_PARENT}"
+          mkdir -p "${SRC_PARENT}"
+          curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
+            | tar -xz -C "${SRC_PARENT}"
+          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          export PATH="/usr/local/bin:${PATH}"
+          echo "/usr/local/bin" >> "${GITHUB_PATH}"
+          ACTUAL="$(git --version)"
+          if [ "${ACTUAL}" != "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-error: git toolchain normalization failed: expected=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED} actual=${ACTUAL}" >&2
+            exit 1
+          fi
+          echo "merge-authority-git-version=${ACTUAL}"
       - name: Materialize canonical ephemeral merge authority
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
@@ -717,7 +745,35 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --all-extras
-      - *merge-authority-git-normalize
+      - name: Normalize merge-authority Git toolchain
+        run: |
+          set -euo pipefail
+          HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version ${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          export PATH="/usr/local/bin:${PATH}"
+          if [ "$(git --version)" = "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-git-version=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}"
+            echo "/usr/local/bin" >> "${GITHUB_PATH}"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+          SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
+          SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          rm -rf "${SRC_PARENT}"
+          mkdir -p "${SRC_PARENT}"
+          curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
+            | tar -xz -C "${SRC_PARENT}"
+          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          export PATH="/usr/local/bin:${PATH}"
+          echo "/usr/local/bin" >> "${GITHUB_PATH}"
+          ACTUAL="$(git --version)"
+          if [ "${ACTUAL}" != "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-error: git toolchain normalization failed: expected=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED} actual=${ACTUAL}" >&2
+            exit 1
+          fi
+          echo "merge-authority-git-version=${ACTUAL}"
       - name: Materialize canonical ephemeral merge authority
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
@@ -973,7 +1029,35 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
-      - *merge-authority-git-normalize
+      - name: Normalize merge-authority Git toolchain
+        run: |
+          set -euo pipefail
+          HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version ${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          export PATH="/usr/local/bin:${PATH}"
+          if [ "$(git --version)" = "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-git-version=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}"
+            echo "/usr/local/bin" >> "${GITHUB_PATH}"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+          SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
+          SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          rm -rf "${SRC_PARENT}"
+          mkdir -p "${SRC_PARENT}"
+          curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
+            | tar -xz -C "${SRC_PARENT}"
+          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          export PATH="/usr/local/bin:${PATH}"
+          echo "/usr/local/bin" >> "${GITHUB_PATH}"
+          ACTUAL="$(git --version)"
+          if [ "${ACTUAL}" != "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-error: git toolchain normalization failed: expected=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED} actual=${ACTUAL}" >&2
+            exit 1
+          fi
+          echo "merge-authority-git-version=${ACTUAL}"
       - name: Materialize canonical ephemeral merge authority
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
@@ -1208,7 +1292,35 @@ jobs:
         with:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
-      - *merge-authority-git-normalize
+      - name: Normalize merge-authority Git toolchain
+        run: |
+          set -euo pipefail
+          HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED="git version ${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          export PATH="/usr/local/bin:${PATH}"
+          if [ "$(git --version)" = "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-git-version=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}"
+            echo "/usr/local/bin" >> "${GITHUB_PATH}"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+          SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
+          SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
+          rm -rf "${SRC_PARENT}"
+          mkdir -p "${SRC_PARENT}"
+          curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
+            | tar -xz -C "${SRC_PARENT}"
+          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          export PATH="/usr/local/bin:${PATH}"
+          echo "/usr/local/bin" >> "${GITHUB_PATH}"
+          ACTUAL="$(git --version)"
+          if [ "${ACTUAL}" != "${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED}" ]; then
+            echo "merge-authority-error: git toolchain normalization failed: expected=${HXFORGE_MERGE_AUTHORITY_GIT_EXPECTED} actual=${ACTUAL}" >&2
+            exit 1
+          fi
+          echo "merge-authority-git-version=${ACTUAL}"
       - name: Materialize canonical ephemeral merge authority
         run: |
           uv run --locked python -m tests.ci.merge_authority materialize \
