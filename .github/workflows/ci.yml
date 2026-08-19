@@ -89,7 +89,7 @@ jobs:
   resolve-authority:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     outputs:
       merge-sha: ${{ steps.resolve.outputs.merge-sha }}
       merge-tree-sha: ${{ steps.resolve.outputs.merge-tree-sha }}

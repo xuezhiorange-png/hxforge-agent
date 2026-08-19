@@ -2746,6 +2746,21 @@ class TestMergeAuthorityCIMA:
         with pytest.raises(AssertionError):
             assert_contract(broken)
 
+    def test_ci_ma_036_resolve_authority_timeout_covers_git_normalization(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+        resolve_block = _ma_workflow_job_block(workflow, "resolve-authority:")
+        assert "timeout-minutes: 15" in resolve_block
+        assert "Normalize merge-authority Git toolchain" in resolve_block
+
+        broken = resolve_block.replace(
+            "timeout-minutes: 15",
+            "timeout-minutes: 5",
+            1,
+        )
+        assert "timeout-minutes: 15" not in broken
+
     def test_pr188_candidate_non_utf8_nonauthority_metadata_does_not_block_structural_classification(  # noqa: E501
         self, tmp_path: Path
     ) -> None:
