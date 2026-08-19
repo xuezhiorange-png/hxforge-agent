@@ -2156,7 +2156,7 @@ def _ma_workflow_job_block(workflow: str, job: str) -> str:
 
 
 class TestMergeAuthorityCIMA:
-    """CI-MA-001 through CI-MA-035 merge authority regression matrix."""
+    """CI-MA-001 through CI-MA-037 merge authority regression matrix."""
 
     def test_ci_ma_001_clean_merge_produces_tree_and_sha(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
@@ -2768,6 +2768,30 @@ class TestMergeAuthorityCIMA:
         assert broken_resolve_block != resolve_block
 
         broken = workflow.replace(resolve_block, broken_resolve_block, 1)
+        with pytest.raises(AssertionError):
+            assert_contract(broken)
+
+    def test_ci_ma_037_pr_head_shard_checkout_is_full_history(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        pr_head_ref = "ref: ${{ needs.resolve-authority.outputs.pr-head-sha }}"
+
+        def assert_contract(source: str) -> None:
+            shard_block = _ma_workflow_job_block(source, "shard:")
+            assert pr_head_ref in shard_block
+            assert "fetch-depth: 0" in shard_block
+
+        assert_contract(workflow)
+
+        shard_block = _ma_workflow_job_block(workflow, "shard:")
+        broken_shard_block = shard_block.replace(
+            "fetch-depth: 0",
+            "fetch-depth: 1",
+            1,
+        )
+        assert broken_shard_block != shard_block
+
+        broken = workflow.replace(shard_block, broken_shard_block, 1)
         with pytest.raises(AssertionError):
             assert_contract(broken)
 
