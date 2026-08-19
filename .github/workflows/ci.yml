@@ -1252,22 +1252,27 @@ jobs:
                       if 'benchmark' in marker_set:
                           benchmark_nodes.add(nid)
 
+              # Check: golden + benchmark mutually exclusive
               overlap = golden_nodes & benchmark_nodes
               if overlap:
                   print(f'VIOLATION Python {py}: {len(overlap)} nodes carry both golden and benchmark', file=sys.stderr)
                   sys.exit(1)
 
+              # Check: golden shard isolation per-Python
               golden_shard_nodes = shard_node_sets.get('golden', set())
+
               golden_in_other = golden_nodes - golden_shard_nodes
               if golden_in_other:
                   print(f'VIOLATION Python {py}: {len(golden_in_other)} golden nodes outside golden shard', file=sys.stderr)
                   sys.exit(1)
 
+              # No non-golden node in golden shard
               non_golden_in_golden = golden_shard_nodes - golden_nodes
               if non_golden_in_golden:
                   print(f'VIOLATION Python {py}: {len(non_golden_in_golden)} non-golden nodes in golden shard', file=sys.stderr)
                   sys.exit(1)
 
+              # Check: no benchmark in PR-blocking shards
               pr_shards = set(shard_node_sets.keys())
               benchmark_in_pr = set()
               for nid in benchmark_nodes:
@@ -1736,6 +1741,7 @@ jobs:
           }
 
           if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # PR-head + merge-ref required; main-track skipped
             MERGE_REF_REQUIRED="yes"
             if [ -z "${{ needs.resolve-authority.outputs.merge-sha }}" ]; then
               echo "ERROR: merge-sha is empty after resolve-authority" >&2
@@ -1761,6 +1767,7 @@ jobs:
             check "merge-ref-aggregate" "${{ needs.merge-ref-aggregate.result }}" "${MERGE_REF_REQUIRED}"
             check "main-aggregate" "${{ needs.main-aggregate.result }}" "no"
           elif [ "${{ github.event_name }}" = "push" ]; then
+            # push to main: main-track required; PR-head + merge-ref skipped
             check "lint" "${{ needs.lint.result }}" "yes"
             check "parse-manifest" "${{ needs.parse-manifest.result }}" "yes"
             check "verify-manifest" "${{ needs.verify-manifest.result }}" "yes"
@@ -1781,6 +1788,7 @@ jobs:
             check "merge-ref-aggregate" "${{ needs.merge-ref-aggregate.result }}" "no"
             check "main-aggregate" "${{ needs.main-aggregate.result }}" "yes"
           else
+            # Unknown event: FAIL CLOSED
             echo "ERROR: Unknown event '${{ github.event_name }}' -- FAIL CLOSED" >&2
             FAILED=1
           fi
