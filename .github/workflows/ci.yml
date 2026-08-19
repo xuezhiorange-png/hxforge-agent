@@ -188,6 +188,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.resolve-authority.outputs.pr-head-sha }}
+          fetch-depth: 0
       - name: Assert checkout SHA
         run: test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.pr-head-sha }}"
       - uses: actions/setup-python@v5
