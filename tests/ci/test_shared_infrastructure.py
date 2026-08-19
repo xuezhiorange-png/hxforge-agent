@@ -2156,7 +2156,7 @@ def _ma_workflow_job_block(workflow: str, job: str) -> str:
 
 
 class TestMergeAuthorityCIMA:
-    """CI-MA-001 through CI-MA-034 merge authority regression matrix."""
+    """CI-MA-001 through CI-MA-035 merge authority regression matrix."""
 
     def test_ci_ma_001_clean_merge_produces_tree_and_sha(self, tmp_path: Path) -> None:
         work, base_sha, head_sha = _ma_setup_clean_merge_repo(tmp_path)
@@ -2682,6 +2682,47 @@ class TestMergeAuthorityCIMA:
             assert pattern.search(block)
             assert "merge-tree-sha" in block
             assert "merge-sha" in block
+
+    def test_ci_ma_035_merge_authority_git_homogeneity_pin_contract(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        normalize_step = "Normalize merge-authority Git toolchain"
+        normalize_anchor = "*merge-authority-git-normalize"
+        authority_env = 'HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION: "2.45.2"'
+        assert authority_env in workflow
+        assert normalize_step in workflow
+        assert normalize_anchor in workflow
+        assert "merge-authority-error: git toolchain normalization failed" in workflow
+        assert "merge-authority-git-version=" in workflow
+        assert "git-version:" in workflow.split("resolve-authority:", 1)[1].split("shard:", 1)[0]
+
+        resolve_block = _ma_workflow_job_block(workflow, "resolve-authority:")
+        resolve_step = resolve_block.index("Resolve canonical ephemeral merge authority")
+        resolve_materialize = resolve_block.index("tests.ci.merge_authority resolve")
+        normalize_before_resolve = max(
+            resolve_block.rfind(normalize_step, 0, resolve_step),
+            resolve_block.rfind(normalize_anchor, 0, resolve_step),
+        )
+        assert normalize_before_resolve != -1
+        assert normalize_before_resolve < resolve_materialize
+
+        for job in (
+            "shard-merge-ref:",
+            "collect-global-merge-ref:",
+            "verify-completeness-merge-ref:",
+            "verify-golden-benchmark-merge-ref:",
+        ):
+            block = _ma_workflow_job_block(workflow, job)
+            materialize_step = block.index("Materialize canonical ephemeral merge authority")
+            materialize_command = block.index("tests.ci.merge_authority materialize")
+            normalize_before_materialize = max(
+                block.rfind(normalize_step, 0, materialize_step),
+                block.rfind(normalize_anchor, 0, materialize_step),
+            )
+            assert normalize_before_materialize != -1, job
+            assert normalize_before_materialize < materialize_command
+            assert "resolver-git-version" in block
+            assert authority_env in workflow
 
     def test_pr188_candidate_non_utf8_nonauthority_metadata_does_not_block_structural_classification(  # noqa: E501
         self, tmp_path: Path
