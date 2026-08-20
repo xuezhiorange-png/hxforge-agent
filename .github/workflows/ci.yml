@@ -1020,7 +1020,9 @@ jobs:
               print(f'  Shard {logical.shard}: {inv.node_count} nodes (attempt {bundle.identity.run_attempt})')
 
           verify_per_version(manifest=manifest, version=python_version,
-                             global_inventory=global_inv, shard_inventories=shard_inventories)
+                             global_inventory=global_inv, shard_inventories=shard_inventories,
+                             allow_mixed_run_attempts=True,
+                             consumer_run_attempt=consumer_attempt)
           print(f'PR-head completeness PASS Python {python_version}')
           "
 
@@ -1140,7 +1142,9 @@ jobs:
               shard_inventories[logical.shard] = inv
 
           verify_per_version(manifest=manifest, version=python_version,
-                             global_inventory=global_inv, shard_inventories=shard_inventories)
+                             global_inventory=global_inv, shard_inventories=shard_inventories,
+                             allow_mixed_run_attempts=True,
+                             consumer_run_attempt=consumer_attempt)
           print(f'Merge-ref completeness PASS Python {python_version}')
           "
 

@@ -272,12 +272,32 @@ def load_inventory(path: Path) -> NodeInventory:
     )
 
 
+_SHARED_AUTHORITY_FIELDS: Final = (
+    "pytest_version",
+    "commit_sha",
+    "track",
+    "run_id",
+    "behavior_fingerprint_sha256",
+)
+
+
+def _assert_attempt_within_consumer(
+    run_attempt: int, consumer_run_attempt: int, context: str
+) -> None:
+    if run_attempt < 1 or run_attempt > consumer_run_attempt:
+        raise InventoryError(
+            f"{context} run_attempt {run_attempt} is outside 1..{consumer_run_attempt}"
+        )
+
+
 def verify_per_version(
     *,
     manifest: ShardManifest,
     version: PythonVersion,
     global_inventory: NodeInventory,
     shard_inventories: dict[str, NodeInventory],
+    allow_mixed_run_attempts: bool = False,
+    consumer_run_attempt: int | None = None,
 ) -> None:
     """Prove per-version union equality and pairwise disjointness."""
 
@@ -285,6 +305,17 @@ def verify_per_version(
         raise InventoryError("global_inventory must have global scope and shard=null")
     if global_inventory.python_version != version:
         raise InventoryError("global inventory Python version mismatch")
+
+    mixed_consumer_attempt: int | None = None
+    if allow_mixed_run_attempts:
+        if consumer_run_attempt is None:
+            raise InventoryError(
+                "consumer_run_attempt is required when allow_mixed_run_attempts is enabled"
+            )
+        mixed_consumer_attempt = _positive_int(consumer_run_attempt, "consumer_run_attempt")
+        _assert_attempt_within_consumer(
+            global_inventory.run_attempt, mixed_consumer_attempt, "global inventory"
+        )
 
     applicable = manifest.applicable_shards(version)
     expected_names = {shard.name for shard in applicable}
@@ -310,19 +341,20 @@ def verify_per_version(
         if inventory.file_set != frozenset(shard_spec.files):
             raise InventoryError(f"file set mismatch for shard {shard_spec.name!r}")
 
-        authority_fields = (
-            "pytest_version",
-            "commit_sha",
-            "track",
-            "run_id",
-            "run_attempt",
-            "behavior_fingerprint_sha256",
-        )
+        authority_fields = _SHARED_AUTHORITY_FIELDS
+        if not allow_mixed_run_attempts:
+            authority_fields = (*authority_fields, "run_attempt")
         for field in authority_fields:
             if getattr(inventory, field) != getattr(global_inventory, field):
                 raise InventoryError(
                     f"{field} mismatch between global and shard {shard_spec.name!r}"
                 )
+        if mixed_consumer_attempt is not None:
+            _assert_attempt_within_consumer(
+                inventory.run_attempt,
+                mixed_consumer_attempt,
+                f"shard {shard_spec.name!r}",
+            )
 
         for node_id in inventory.node_ids:
             previous_owner = owner_by_node.get(node_id)
