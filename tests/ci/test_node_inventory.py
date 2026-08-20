@@ -7,8 +7,13 @@ from typing import Any
 
 import pytest
 
-from tests.ci.node_inventory import InventoryError, load_inventory, verify_per_version
-from tests.ci.shard_manifest import load_manifest
+from tests.ci.node_inventory import (
+    InventoryError,
+    NodeInventory,
+    load_inventory,
+    verify_per_version,
+)
+from tests.ci.shard_manifest import ShardManifest, load_manifest
 
 pytestmark = pytest.mark.pure
 
@@ -22,6 +27,7 @@ def _payload(
     shard: str | None,
     files: dict[str, list[str]],
     version: str = "3.12",
+    run_attempt: int = 1,
 ) -> dict[str, Any]:
     node_ids = sorted(node for nodes in files.values() for node in nodes)
     return {
@@ -33,7 +39,7 @@ def _payload(
         "track": "pr-head",
         "shard": shard,
         "run_id": "123",
-        "run_attempt": 1,
+        "run_attempt": run_attempt,
         "behavior_fingerprint_sha256": _FINGERPRINT,
         "node_count": len(node_ids),
         "node_ids": node_ids,
@@ -247,6 +253,160 @@ def test_verify_per_version_rejects_duplicate_node_ownership(tmp_path: Path) -> 
                 "shard-a": shard_a,
                 "shard-b": overlapping_shard_b,
             },
+        )
+
+
+def _load_complete_inventories(
+    tmp_path: Path,
+    *,
+    global_attempt: int = 1,
+    shard_a_attempt: int = 1,
+    shard_b_attempt: int = 1,
+) -> tuple[ShardManifest, NodeInventory, NodeInventory, NodeInventory]:
+    repo, manifest_path = _write_manifest(tmp_path)
+    manifest = load_manifest(manifest_path, repo_root=repo)
+    global_inventory = load_inventory(
+        _write_inventory(
+            tmp_path,
+            "global.json",
+            _payload(
+                scope="global",
+                shard=None,
+                run_attempt=global_attempt,
+                files={
+                    "tests/unit/test_a.py": ["tests/unit/test_a.py::test_a"],
+                    "tests/unit/test_b.py": ["tests/unit/test_b.py::test_b"],
+                },
+            ),
+        )
+    )
+    shard_a = load_inventory(
+        _write_inventory(
+            tmp_path,
+            "a.json",
+            _payload(
+                scope="shard",
+                shard="shard-a",
+                run_attempt=shard_a_attempt,
+                files={"tests/unit/test_a.py": ["tests/unit/test_a.py::test_a"]},
+            ),
+        )
+    )
+    shard_b = load_inventory(
+        _write_inventory(
+            tmp_path,
+            "b.json",
+            _payload(
+                scope="shard",
+                shard="shard-b",
+                run_attempt=shard_b_attempt,
+                files={"tests/unit/test_b.py": ["tests/unit/test_b.py::test_b"]},
+            ),
+        )
+    )
+    return manifest, global_inventory, shard_a, shard_b
+
+
+def test_verify_per_version_default_strict_mode_rejects_mixed_attempt(
+    tmp_path: Path,
+) -> None:
+    manifest, global_inventory, shard_a, shard_b = _load_complete_inventories(
+        tmp_path, global_attempt=1, shard_a_attempt=2, shard_b_attempt=1
+    )
+
+    with pytest.raises(InventoryError, match="run_attempt mismatch"):
+        verify_per_version(
+            manifest=manifest,
+            version="3.12",
+            global_inventory=global_inventory,
+            shard_inventories={"shard-a": shard_a, "shard-b": shard_b},
+            allow_mixed_run_attempts=False,
+        )
+
+
+def test_verify_per_version_explicit_fallback_accepts_mixed_attempt(
+    tmp_path: Path,
+) -> None:
+    manifest, global_inventory, shard_a, shard_b = _load_complete_inventories(
+        tmp_path, global_attempt=1, shard_a_attempt=1, shard_b_attempt=2
+    )
+
+    verify_per_version(
+        manifest=manifest,
+        version="3.12",
+        global_inventory=global_inventory,
+        shard_inventories={"shard-a": shard_a, "shard-b": shard_b},
+        allow_mixed_run_attempts=True,
+        consumer_run_attempt=2,
+    )
+
+
+def test_verify_per_version_future_attempt_rejected_in_fallback_mode(
+    tmp_path: Path,
+) -> None:
+    manifest, global_inventory, shard_a, shard_b = _load_complete_inventories(
+        tmp_path, global_attempt=1, shard_a_attempt=3, shard_b_attempt=1
+    )
+
+    with pytest.raises(InventoryError, match="outside 1..2"):
+        verify_per_version(
+            manifest=manifest,
+            version="3.12",
+            global_inventory=global_inventory,
+            shard_inventories={"shard-a": shard_a, "shard-b": shard_b},
+            allow_mixed_run_attempts=True,
+            consumer_run_attempt=2,
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "commit_sha",
+        "track",
+        "run_id",
+        "pytest_version",
+        "behavior_fingerprint_sha256",
+    ],
+)
+def test_verify_per_version_non_attempt_authority_mismatch_still_rejected(
+    tmp_path: Path, field: str
+) -> None:
+    manifest, global_inventory, shard_a, shard_b = _load_complete_inventories(
+        tmp_path, global_attempt=1, shard_a_attempt=2, shard_b_attempt=1
+    )
+    mutated_value = {
+        "commit_sha": "c" * 40,
+        "track": "merge-ref",
+        "run_id": "999",
+        "pytest_version": "9.0.0",
+        "behavior_fingerprint_sha256": "d" * 64,
+    }[field]
+    shard_a = replace(shard_a, **{field: mutated_value})
+
+    with pytest.raises(InventoryError, match=f"{field} mismatch"):
+        verify_per_version(
+            manifest=manifest,
+            version="3.12",
+            global_inventory=global_inventory,
+            shard_inventories={"shard-a": shard_a, "shard-b": shard_b},
+            allow_mixed_run_attempts=True,
+            consumer_run_attempt=2,
+        )
+
+
+def test_verify_per_version_fallback_requires_consumer_run_attempt(
+    tmp_path: Path,
+) -> None:
+    manifest, global_inventory, shard_a, shard_b = _load_complete_inventories(tmp_path)
+
+    with pytest.raises(InventoryError, match="consumer_run_attempt is required"):
+        verify_per_version(
+            manifest=manifest,
+            version="3.12",
+            global_inventory=global_inventory,
+            shard_inventories={"shard-a": shard_a, "shard-b": shard_b},
+            allow_mixed_run_attempts=True,
         )
 
 
