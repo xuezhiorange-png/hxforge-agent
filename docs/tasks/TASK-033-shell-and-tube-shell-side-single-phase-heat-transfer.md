@@ -285,7 +285,7 @@ TASK033_FLOW_STATE_EVIDENCE_FIELD_COUNT=29
 COMPLETE_TASK032_SUCCESS_CANONICAL_PROJECTION_REQUIRED=true
 TASK032_FLOW_STATE_EVIDENCE_PARTIAL_PROJECTION_ALLOWED=false
 
-TASK032_FLOW_STATE_EVIDENCE_FIELDS=(
+TASK033_FLOW_STATE_EVIDENCE_FIELDS=(
   schema_version,
   profile_id,
   implementation_software_version,
@@ -326,7 +326,7 @@ TASK033_REQUEST_EVIDENCE_MODEL=TASK033_OWNED_IMMUTABLE_REPLAY_ENVELOPE
 TASK033_AUXILIARY_VALUE_PROOF_MODEL=REPLAY_EXACT_ACCEPTED_TASK032_REQUEST
 UPSTREAM_NESTED_PROJECTION_BYTE_EQUIVALENCE_REQUIRED=true
 
-TASK032_REQUEST_EVIDENCE_FIELDS=(
+TASK033_REQUEST_EVIDENCE_FIELDS=(
   schema_version,
   profile_id,
   complete TASK031 result projection,
@@ -1051,12 +1051,14 @@ NO_TASK035_COMPOSITION_PHYSICS=true
 
 ## 19. Lifecycle stop and next independent gate
 
-This document is authored but not yet independently reviewed or frozen.
+The R2 correction is recorded, and the design remains unfrozen pending the
+next independent R3 review.
 
 ```text
 TASK033_SOURCE_DEFINITION_FROZEN=true
 TASK033_DESIGN_AUTHORIZED=true
 TASK033_DESIGN_DOCUMENT_AUTHORED=true
+TASK033_DESIGN_CORRECTION_R2_RECORDED=true
 TASK033_DESIGN_FROZEN=false
 TASK033_IMPLEMENTATION_AUTHORIZED=false
 REPOSITORY_PRODUCTION_CODE_MUTATION_AUTHORIZED=false
@@ -1067,15 +1069,17 @@ ISSUE_CLOSE_AUTHORIZED=false
 TASK034_AUTHORIZED=false
 TASK035_AUTHORIZED=false
 TASK036_AUTHORIZED=false
+NEXT_GATE=AUTHORIZE_TASK033_DESIGN_INDEPENDENT_REVIEW_R3_ONLY
+NEXT_GATE_AUTHORIZED=false
 NO_STEP_IMPLIES_THE_NEXT=true
 ```
 
-Recommended next independent gate after authoring verification:
+Recommended next independent gate after this correction:
 
 ```text
-AUTHORIZE_TASK033_DESIGN_INDEPENDENT_REVIEW_R1_ONLY
+AUTHORIZE_TASK033_DESIGN_INDEPENDENT_REVIEW_R3_ONLY
 ```
 
 That future gate is review-only. It must not modify this design, freeze the
 design, authorize implementation, create a PR, or advance TASK-034 without a
-separate explicit authorization.
+separate explicit authorization. `NEXT_GATE_AUTHORIZED=false`.
