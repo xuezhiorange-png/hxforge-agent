@@ -272,13 +272,74 @@ TASK032_PRIVATE_CANONICAL_IMPORT=false
 TASK033_PRIVATE_TASK032_INTERNAL_ACCESS=false
 ```
 
-The two design envelopes are:
+The two design envelopes are TASK-033-owned immutable replay representations.
+They are not TASK-032 public API extensions and must not import TASK-032
+private model or canonical classes.
 
-- `Task032AcceptedFlowStateEvidence` — complete frozen TASK-032 success
-  canonical field set, 29 fields;
-- `Task032AcceptedRequestEvidence` — complete frozen TASK-032 request
-  canonical projection, including complete TASK-031 result/geometry,
-  `PropertySnapshot`, mass-flow authority, and evidence references.
+`Task032AcceptedFlowStateEvidence` has the exact frozen TASK-032 success
+canonical field order below. The complete projection is required; retaining
+only the values consumed by Eq.58, such as Re_s and Pr_s, is forbidden.
+
+```text
+TASK033_FLOW_STATE_EVIDENCE_FIELD_COUNT=29
+COMPLETE_TASK032_SUCCESS_CANONICAL_PROJECTION_REQUIRED=true
+TASK032_FLOW_STATE_EVIDENCE_PARTIAL_PROJECTION_ALLOWED=false
+
+TASK032_FLOW_STATE_EVIDENCE_FIELDS=(
+  schema_version,
+  profile_id,
+  implementation_software_version,
+  shell_side_case_id,
+  shell_side_stream_id,
+  shell_side_fluid_id,
+  task020_configuration_id,
+  task020_configuration_hash,
+  task031_geometry_id,
+  task031_geometry_hash,
+  property_snapshot_hash,
+  mass_flow_authority_hash,
+  engineering_authority_id,
+  engineering_authority_hash,
+  flow_model,
+  phase_region,
+  rheology_model,
+  shell_side_mass_flow_rate_kg_s,
+  shell_side_mass_velocity_kg_m2_s,
+  shell_side_bulk_velocity_m_s,
+  shell_side_reynolds_number,
+  shell_side_prandtl_number,
+  request_hash,
+  result_hash,
+  result_id,
+  warnings,
+  blockers,
+  deferred_capabilities,
+  provenance,
+)
+```
+
+`Task032AcceptedRequestEvidence` has the complete TASK-032 request canonical
+projection, including the complete nested projections needed for replay:
+
+```text
+TASK033_REQUEST_EVIDENCE_MODEL=TASK033_OWNED_IMMUTABLE_REPLAY_ENVELOPE
+TASK033_AUXILIARY_VALUE_PROOF_MODEL=REPLAY_EXACT_ACCEPTED_TASK032_REQUEST
+UPSTREAM_NESTED_PROJECTION_BYTE_EQUIVALENCE_REQUIRED=true
+
+TASK032_REQUEST_EVIDENCE_FIELDS=(
+  schema_version,
+  profile_id,
+  complete TASK031 result projection,
+  property_snapshot_hash,
+  complete PropertySnapshot projection,
+  complete mass-flow-authority projection,
+  evidence_refs,
+)
+
+TASK031_ENGINEERING_RECOMPUTATION=false
+PROPERTY_REEVALUATION=false
+MASS_FLOW_RECOMPUTATION=false
+```
 
 These are TASK-033-owned replay representations. They do not redefine or
 recalculate upstream engineering semantics.
@@ -380,9 +441,16 @@ The R2 binding changes the semantic types of the two upstream fields to the
 TASK-033-owned immutable replay envelopes described in §5.1. It does not
 change the frozen five-field public request shape.
 
-Top-level raw input is one exact built-in mapping with those five string keys,
-no aliases and no unknown fields. `evidence_refs` is a non-empty deterministic
-tuple of strings. No correlation selector is present.
+Top-level raw input is an exact built-in dict with those five string keys, no
+aliases and no unknown fields. A `Mapping`, `MutableMapping`, dict subclass,
+or other mapping-like object is not an equivalent request boundary.
+
+```text
+RAW_TOP_LEVEL_REQUEST_TYPE=EXACT_BUILTIN_DICT
+```
+
+`evidence_refs` is a non-empty deterministic tuple of strings. No correlation
+selector is present.
 
 ## 8. Decimal engineering algorithm
 
@@ -414,10 +482,19 @@ DECIMAL_TRAP_FLOAT_OPERATION=true
 FLOAT_OPERATION_SIGNAL_NOT_PERMITTED=true
 BINARY_FLOAT_ENGINEERING=false
 FLOAT_TO_DECIMAL_COERCION=false
+
+DECIMAL_SIGNAL_FAILURE_MAPPING=EXISTING_FORMULA_CALCULATION_BLOCKER
+DECIMAL_SIGNAL_FALLBACK=false
+DECIMAL_SIGNAL_PARTIAL_RESULT=false
 ```
 
 Ambient `Context()`, `DefaultContext`, process `getcontext()` state, binary
-float coercion, and float transcendental operations are forbidden.
+float coercion, and float transcendental operations are forbidden. Any trapped
+or calculation-failure Decimal signal is fail-closed: evaluation order is not
+changed, a binary-float path is not selected, no alternate formula or
+correlation fallback is attempted, no partial HTC is emitted, and HTC=0 is
+never returned as a substitute for failure. The existing frozen formula
+calculation blocker is used; no new blocker spelling is introduced.
 
 ### 8.2 Fractional-power identity and operation order
 
@@ -527,6 +604,38 @@ PARTIAL_HEAT_TRANSFER_RESULT=false
 BLOCKED_HTC_FIELD_PRESENT=false
 ```
 
+The typed-blocked result has this exact field order:
+
+```text
+TYPED_BLOCKED_RESULT_FIELDS=(
+  schema_version,
+  profile_id,
+  implementation_software_version,
+  failure_stage,
+  shell_side_case_id,
+  shell_side_stream_id,
+  shell_side_fluid_id,
+  task020_configuration_id,
+  task020_configuration_hash,
+  task031_geometry_id,
+  task031_geometry_hash,
+  property_snapshot_hash,
+  mass_flow_authority_hash,
+  task032_request_hash,
+  task032_result_hash,
+  task032_result_id,
+  request_hash,
+  blocked_result_hash,
+  warnings,
+  blockers,
+  deferred_capabilities,
+  provenance,
+)
+TYPED_BLOCKED_RESULT_FIELD_COUNT=22
+PARTIAL_HEAT_TRANSFER_RESULT=false
+BLOCKED_HTC_FIELD_PRESENT=false
+```
+
 Typed blocked identity fields that are not yet verified at the failure stage
 are represented as explicit `str | None` tagged unions; no guessed identity
 text or default identity is permitted.
@@ -566,6 +675,30 @@ UNSUPPORTED_CORRELATION_DOMAIN_AS_FALLBACK=false
 TASK-033 uses the frozen repository primitive kind/framing discipline with
 TASK-033-specific top-level namespaces:
 
+Frozen canonical kind tags are part of the byte contract:
+
+```text
+NULL_KIND=b"n"
+BOOL_KIND=b"b"
+INTEGER_KIND=b"i"
+STRING_KIND=b"s"
+DECIMAL_KIND=b"d"
+STRING_TUPLE_KIND=b"t"
+STRING_MAPPING_KIND=b"m"
+PROPERTY_SNAPSHOT_KIND=b"p"
+MASS_FLOW_AUTHORITY_KIND=b"a"
+TASK031_RESULT_KIND=b"h"
+BLOCKER_TUPLE_KIND=b"k"
+BLOCKER_ENTRY_KIND=b"c"
+TASK032_FLOW_STATE_KIND=b"f"
+TASK032_REQUEST_EVIDENCE_KIND=b"q"
+PROVENANCE_KIND=b"v"
+```
+
+These are frozen canonical byte-contract values, not implementation
+suggestions. Existing hash namespaces, UUID namespace, name prefix, and
+self-exclusions remain unchanged.
+
 ```text
 REQUEST_HASH_NAMESPACE=b"task033.request.v1"
 SUCCESS_RESULT_HASH_NAMESPACE=b"task033.success-result.v1"
@@ -602,24 +735,80 @@ and tolerance/hash repair are forbidden.
 
 ## 12. Provenance and raw projection
 
-The frozen provenance record has 30 ordered fields and preserves, at minimum,
-TASK identity/design path/software version, TASK-033 request hash, same-case
-identities, TASK-020/TASK-031 ancestry, property/mass-flow identities,
-TASK-032 request/result identities, correlation/source authority identity,
-surface basis, evidence references, source-definition Issue/freeze references,
-and `provenance_hash`.
+The frozen provenance record is an exact 30-field record. It is not a minimum
+set: extra provenance fields are forbidden.
 
 ```text
 PROVENANCE_FIELD_COUNT=30
-SOURCE_DEFINITION_ISSUE=196
-ENGINEERING_SOURCE_CORRELATION_FREEZE_COMMENT_ID=5387111841
-DESIGN_CONTRACT_PATH=docs/tasks/TASK-033-shell-and-tube-shell-side-single-phase-heat-transfer.md
+PROVENANCE_FIELD_SET_EXACT=true
+PROVENANCE_EXTRA_FIELDS_ALLOWED=false
+PROVENANCE_FIELD_ORDER_CANONICAL=true
+
+PROVENANCE_FIELDS=(
+  task_id,
+  design_contract_path,
+  implementation_software_version,
+  request_hash,
+  shell_side_case_id,
+  shell_side_stream_id,
+  shell_side_fluid_id,
+  task020_configuration_id,
+  task020_configuration_hash,
+  task031_geometry_id,
+  task031_geometry_hash,
+  property_snapshot_hash,
+  mass_flow_authority_hash,
+  task032_request_hash,
+  task032_result_hash,
+  task032_result_id,
+  correlation_id,
+  engineering_source_authority_record_id,
+  source_id,
+  source_doi,
+  source_location,
+  heat_transfer_surface,
+  value_authority_replay_model,
+  fractional_power_algorithm,
+  warnings,
+  deferred_capabilities,
+  evidence_refs,
+  source_definition_issue,
+  engineering_source_correlation_freeze_comment_id,
+  provenance_hash,
+)
+
+task_id=TASK033
+design_contract_path=docs/tasks/TASK-033-shell-and-tube-shell-side-single-phase-heat-transfer.md
+engineering_source_correlation_freeze_comment_id=5387111841
+correlation_id=TASK033_KERN_KHARAJI_2021_EQ58_NO_WALL_CORRECTION_V1
+source_id=SRC-INTECHOPEN-100450-KHARAJI-2021
+source_doi=10.5772/intechopen.100450
+source_location=Section_4.4_Shell_diameter_Equation_58
+heat_transfer_surface=OUTER_TUBE_SURFACE
+value_authority_replay_model=REPLAY_EXACT_ACCEPTED_TASK032_REQUEST
+fractional_power_algorithm=DECIMAL_LN_EXP_RATIONAL_EXPONENT_V1
 ```
 
 Raw-boundary projection is bounded and deterministic. Projection values are
-canonical kind/type tokens plus safely extracted lexical values only. Object
-addresses, arbitrary exception text, iteration-order-dependent values, and
-unbounded recursive serialization are forbidden.
+canonical kind/type tokens plus safely extracted lexical values only.
+
+```text
+RAW_PROJECTION_FIELDS=(
+  top_level_type,
+  sorted_top_level_keys,
+  schema_version_projection,
+  profile_id_projection,
+  task032_flow_state_type,
+  task032_request_evidence_type,
+  evidence_refs_projection,
+)
+RAW_PROJECTION_FIELD_COUNT=7
+```
+
+`repr(raw_request)`, object-address serialization, arbitrary exception
+messages, iteration-order-dependent representation, and unbounded recursive
+serialization are forbidden. Raw projection may use only canonical kind/type
+tokens and safely extracted lexical values.
 
 ## 13. Closed blocker/warning/deferred registries
 
