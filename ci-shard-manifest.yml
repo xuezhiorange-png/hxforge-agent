@@ -135,6 +135,18 @@ shards:
       - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_validation.py
       - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_canonical.py
       - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_architecture.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_models.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_schema.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_authority.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_canonical.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_formulas.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_validation.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_architecture.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_property_snapshot_binding.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_mass_flow_authority.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_determinism.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_python311_python312_byte_identical.py
+      - tests/exchangers/shell_tube/shell_side_flow_state/test_external_vectors.py
       - tests/shell_geometry_catalogs/test_models.py
       - tests/shell_geometry_catalogs/test_catalog.py
       - tests/shell_geometry_catalogs/test_architecture.py
