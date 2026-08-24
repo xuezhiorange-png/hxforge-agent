@@ -83,6 +83,8 @@ def make_blocker(
     details: Iterable[tuple[str, str]] = (),
 ) -> BlockerEntry:
     token = code.value if isinstance(code, BlockerCode) else code
+    if token not in TASK033_BLOCKER_REGISTRY:
+        raise ValueError(f"unknown TASK033 blocker token: {token!r}")
     return BlockerEntry(
         code=token,
         stage=stage or TASK033_BLOCKER_EARLIEST_STAGE[token],

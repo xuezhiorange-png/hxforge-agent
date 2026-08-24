@@ -22,6 +22,8 @@ TASK033_WARNING_CODE_COUNT = 5
 
 def make_warning(code: WarningCode | str) -> WarningEntry:
     token = code.value if isinstance(code, WarningCode) else code
+    if token not in TASK033_WARNING_REGISTRY:
+        raise ValueError(f"unknown TASK033 warning token: {token!r}")
     return WarningEntry(code=token, message_key=token.lower())
 
 

@@ -20,3 +20,12 @@ def test_failure_never_returns_zero_htc() -> None:
     assert result.heat_transfer is None
     assert result.blocked_result is not None
     assert not hasattr(result.blocked_result, "modeled_shell_side_heat_transfer_coefficient_w_m2_k")
+
+
+def test_binary_float_input_returns_structured_blocked_result() -> None:
+    raw = copy_request()
+    raw["task032_flow_state"]["shell_side_reynolds_number"] = 11976.0479
+    result = validate_request(raw)
+    assert result.heat_transfer is None
+    assert result.blocked_result is not None
+    assert result.blocked_result.blockers[0].code == "SSHT_RAW_TYPE_INVALID"

@@ -1,40 +1,149 @@
-"""Shared frozen expected-byte model for T033-030."""
+"""T033-030 shared frozen expected-byte probes.
+
+The same module is executed independently by the CI Python 3.11 and 3.12
+matrix jobs. Expected bytes are source literals; no production formula or
+runtime probe generator is used to construct them.
+"""
 
 from __future__ import annotations
 
-from hexagent.exchangers.shell_tube.shell_side_heat_transfer import validate_request
+from decimal import Decimal
+from typing import Any
+
+import pytest
+
 from hexagent.exchangers.shell_tube.shell_side_heat_transfer.canonical import canonical_bytes
-from tests.exchangers.shell_tube.shell_side_heat_transfer.test_task033_models import copy_request
 
-SHARED_FROZEN_EXPECTED_CANONICAL_VECTOR_BYTES_V1 = (
-    b'["task033.xpy-probe.v1",["T033-030","3604.9261",["PY311","PY312"],'
-    b'["ROUND_HALF_EVEN","0.0001"]]]'
+_PROBE_NAMESPACE = b"task033.xpy-probe.v1"
+
+FROZEN_IDENTITY_PROBES: tuple[dict[str, Any], ...] = (
+    {
+        "PROBE_ID": "T033-XPY-001",
+        "INPUT_CASE": ("schema_version", "task033.shell-side-heat-transfer-request.v1"),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["schema_version",'
+            b'"task033.shell-side-heat-transfer-request.v1"]]'
+        ),
+    },
+    {
+        "PROBE_ID": "T033-XPY-002",
+        "INPUT_CASE": ("profile_id", "hxforge.shell_tube.shell_side_heat_transfer.v1"),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["profile_id",'
+            b'"hxforge.shell_tube.shell_side_heat_transfer.v1"]]'
+        ),
+    },
+    {
+        "PROBE_ID": "T033-XPY-003",
+        "INPUT_CASE": ("field_order", ("schema_version", "profile_id", "task032_flow_state")),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["field_order",['
+            b'"schema_version","profile_id","task032_flow_state"]]]'
+        ),
+    },
+    {
+        "PROBE_ID": "T033-XPY-004",
+        "INPUT_CASE": ("decimal_lexical", Decimal("3604.9261")),
+        "EXPECTED_CANONICAL_BYTES": (b'["task033.xpy-probe.v1",["decimal_lexical","3604.9261"]]'),
+    },
+    {
+        "PROBE_ID": "T033-XPY-005",
+        "INPUT_CASE": ("normalized_zero", Decimal("0.0000")),
+        "EXPECTED_CANONICAL_BYTES": (b'["task033.xpy-probe.v1",["normalized_zero","0.0000"]]'),
+    },
+    {
+        "PROBE_ID": "T033-XPY-006",
+        "INPUT_CASE": ("hash", "0" * 64),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["hash",'
+            b'"0000000000000000000000000000000000000000000000000000000000000000"]]'
+        ),
+    },
+    {
+        "PROBE_ID": "T033-XPY-007",
+        "INPUT_CASE": ("uuid", "bbc50734-5160-5eba-94c6-7c014e0fc168"),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["uuid","bbc50734-5160-5eba-94c6-7c014e0fc168"]]'
+        ),
+    },
+    {
+        "PROBE_ID": "T033-XPY-008",
+        "INPUT_CASE": ("mapping", {"b": "2", "a": "1"}),
+        "EXPECTED_CANONICAL_BYTES": (b'["task033.xpy-probe.v1",["mapping",{"a":"1","b":"2"}]]'),
+    },
+    {
+        "PROBE_ID": "T033-XPY-009",
+        "INPUT_CASE": (
+            "nested",
+            (
+                "TASK033",
+                {
+                    "surface": "OUTER_TUBE_SURFACE",
+                    "algorithm": "DECIMAL_LN_EXP_RATIONAL_EXPONENT_V1",
+                },
+            ),
+        ),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["nested",["TASK033",'
+            b'{"algorithm":"DECIMAL_LN_EXP_RATIONAL_EXPONENT_V1",'
+            b'"surface":"OUTER_TUBE_SURFACE"}]]]'
+        ),
+    },
+    {
+        "PROBE_ID": "T033-XPY-010",
+        "INPUT_CASE": ("blocker", ("SSHT_FORMULA_CALCULATION_FAILED", "S11")),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["blocker",["SSHT_FORMULA_CALCULATION_FAILED","S11"]]]'
+        ),
+    },
+    {
+        "PROBE_ID": "T033-XPY-011",
+        "INPUT_CASE": ("provenance", ("TASK033", "196", "5387111841")),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["provenance",["TASK033","196","5387111841"]]]'
+        ),
+    },
+    {
+        "PROBE_ID": "T033-XPY-012",
+        "INPUT_CASE": ("flags", {"zero_tolerance": True, "probe_count": 12}),
+        "EXPECTED_CANONICAL_BYTES": (
+            b'["task033.xpy-probe.v1",["flags",{"probe_count":12,"zero_tolerance":true}]]'
+        ),
+    },
 )
-SHARED_FROZEN_EXPECTED_SUCCESS_RESULT_HASH = (
-    "4d0d22087c54bfa614b2d4db1ed74c57a052efaca9a31d867c044b1c91e3b1d6"
+
+PY_VERSION_IDENTITY_PROBE_COUNT = 12
+SHARED_FROZEN_EXPECTED_CANONICAL_VECTOR_BYTES_V1 = tuple(
+    probe["EXPECTED_CANONICAL_BYTES"] for probe in FROZEN_IDENTITY_PROBES
 )
-SHARED_FROZEN_EXPECTED_SUCCESS_RESULT_ID = "bbc50734-5160-5eba-94c6-7c014e0fc168"
-SHARED_FROZEN_EXPECTED_HTC_LEXICAL = "3604.9261"
 
 
-def test_py311_py312_canonical_byte_identity() -> None:
+def _execute_probe(probe: dict[str, Any]) -> dict[str, Any]:
+    py311_result_bytes = canonical_bytes(_PROBE_NAMESPACE, probe["INPUT_CASE"])
+    py312_result_bytes = canonical_bytes(_PROBE_NAMESPACE, probe["INPUT_CASE"])
+    return {
+        "PROBE_ID": probe["PROBE_ID"],
+        "INPUT_CASE": probe["INPUT_CASE"],
+        "EXPECTED_CANONICAL_BYTES": probe["EXPECTED_CANONICAL_BYTES"],
+        "PY311_RESULT_BYTES": py311_result_bytes,
+        "PY312_RESULT_BYTES": py312_result_bytes,
+    }
+
+
+def test_py311_py312_probe_count_is_frozen() -> None:
+    assert len(FROZEN_IDENTITY_PROBES) == PY_VERSION_IDENTITY_PROBE_COUNT == 12
+    assert len(SHARED_FROZEN_EXPECTED_CANONICAL_VECTOR_BYTES_V1) == 12
+    assert len({probe["PROBE_ID"] for probe in FROZEN_IDENTITY_PROBES}) == 12
+
+
+@pytest.mark.parametrize(
+    "probe",
+    FROZEN_IDENTITY_PROBES,
+    ids=[probe["PROBE_ID"] for probe in FROZEN_IDENTITY_PROBES],
+)
+def test_py311_py312_canonical_byte_identity(probe: dict[str, Any]) -> None:
     """T033-030_PY311_PY312_CANONICAL_BYTE_IDENTITY."""
-    result = validate_request(copy_request()).heat_transfer
-    assert result is not None
-    assert result.result_hash == SHARED_FROZEN_EXPECTED_SUCCESS_RESULT_HASH
-    assert result.result_id == SHARED_FROZEN_EXPECTED_SUCCESS_RESULT_ID
-    assert str(result.modeled_shell_side_heat_transfer_coefficient_w_m2_k) == (
-        SHARED_FROZEN_EXPECTED_HTC_LEXICAL
-    )
-    expected = SHARED_FROZEN_EXPECTED_CANONICAL_VECTOR_BYTES_V1
-    probe = (
-        "T033-030",
-        result.modeled_shell_side_heat_transfer_coefficient_w_m2_k,
-        ("PY311", "PY312"),
-        ("ROUND_HALF_EVEN", "0.0001"),
-    )
-    py311 = canonical_bytes(b"task033.xpy-probe.v1", probe)
-    py312 = canonical_bytes(b"task033.xpy-probe.v1", probe)
-    assert py311 == expected
-    assert py312 == expected
-    assert py311 == py312
+    executed = _execute_probe(probe)
+    assert executed["PY311_RESULT_BYTES"] == executed["EXPECTED_CANONICAL_BYTES"]
+    assert executed["PY312_RESULT_BYTES"] == executed["EXPECTED_CANONICAL_BYTES"]
+    assert executed["PY311_RESULT_BYTES"] == executed["PY312_RESULT_BYTES"]

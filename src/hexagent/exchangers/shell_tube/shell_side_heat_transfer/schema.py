@@ -28,6 +28,24 @@ def _dict(value: Any) -> bool:
     return type(value) is dict
 
 
+def _contains_binary_float(value: Any, seen: set[int] | None = None) -> bool:
+    if isinstance(value, float):
+        return True
+    if type(value) not in (dict, list, tuple):
+        return False
+    visited = set() if seen is None else seen
+    identity = id(value)
+    if identity in visited:
+        return False
+    visited.add(identity)
+    if type(value) is dict:
+        return any(
+            _contains_binary_float(key, visited) or _contains_binary_float(item, visited)
+            for key, item in value.items()
+        )
+    return any(_contains_binary_float(item, visited) for item in value)
+
+
 def _strings(value: Any) -> bool:
     return (
         type(value) is list
@@ -157,6 +175,17 @@ def parse_request(raw_request: Any) -> ShellSideHeatTransferRequest:
         )
     if nested_blockers:
         raise SchemaFailure(stage="S02", blockers=tuple(nested_blockers))
+    if _contains_binary_float(raw_request):
+        raise SchemaFailure(
+            stage="S02",
+            blockers=(
+                make_blocker(
+                    BlockerCode.SSHT_RAW_TYPE_INVALID,
+                    stage="S02",
+                    field_path="request",
+                ),
+            ),
+        )
 
     flow = Task032AcceptedFlowStateEvidence(
         **{field: raw_flow[field] for field in FLOW_STATE_EVIDENCE_FIELDS}

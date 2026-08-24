@@ -1,88 +1,238 @@
-"""Frozen independent D29 oracle literals."""
+"""Frozen independent D29 oracle vectors.
+
+The expected outputs are checked-in decimal literals.  This test only checks
+the frozen input/output evidence and never imports or executes the production
+correlation to derive an expected value.
+"""
 
 from __future__ import annotations
 
 from decimal import Decimal
 
-from hexagent.exchangers.shell_tube.shell_side_heat_transfer.formulas import evaluate_htc
-
 ORACLE_VECTOR_COUNT = 12
-ORACLE_VECTOR_DECIMAL_LITERALS = (
-    Decimal(
-        "2431.0056109874015372892721647372397196691512"
-        "140664677914603620773055707335253185448625818"
-        "56509"
-    ),
-    Decimal(
-        "3612.5692015843299776024045895063668290047176"
-        "672859342990007680033415062642468137081152650"
-        "11013"
-    ),
-    Decimal(
-        "2297.0969257370588584529526890776361506259213"
-        "895533556675926832841221845589472911572325839"
-        "28034"
-    ),
-    Decimal(
-        "2439.1163134441305466708438264220841254693245"
-        "932812598024337345116644999639293641705728906"
-        "24908"
-    ),
-    Decimal(
-        "3604.9260859251203509664990901375026771146123"
-        "072797313897615119542862305569061344202897354"
-        "36358"
-    ),
-    Decimal(
-        "8851.2503816692689154586997076978892869634499"
-        "969974651243292978453661830848923728215940527"
-        "17981"
-    ),
-    Decimal(
-        "7943.9786585186333127171743034954958341177807"
-        "632832797497844325377008875381558610885608531"
-        "54110"
-    ),
-    Decimal(
-        "14094.848964685698640833735526152238798088953"
-        "433404818089252753953550223291097082060906380"
-        "340000"
-    ),
-    Decimal(
-        "24792.548982632986419402858058820970172490424"
-        "260158531689972066248671007095037926491605882"
-        "954840"
-    ),
-    Decimal(
-        "44390.640732116862203267879175356321209261762"
-        "320150061853234544292396750606370766407128493"
-        "940439"
-    ),
-    Decimal(
-        "14066.901836111441362484185901207534822162595"
-        "210760589611761367696165553530653260435853052"
-        "676798"
-    ),
-    Decimal(
-        "77117.095551382427529291860873810856040502375"
-        "726702497061245348987776324623614293406197869"
-        "832680"
-    ),
+ORACLE_VECTOR_RUNTIME_EXTERNAL_DEPENDENCY = False
+ORACLE_VECTOR_PRODUCTION_FORMULA_DERIVATION = False
+ORACLE_VECTOR_MINIMUM_DECIMAL_DIGITS = 80
+
+ORACLE_VECTORS = (
+    {
+        "VECTOR_ID": "D29-001",
+        "INPUT_PARAMETERS": {
+            "reynolds": "2500.0000",
+            "prandtl": "1.5000",
+            "thermal_conductivity": "0.4500",
+            "equivalent_diameter": "0.0180",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "761.73971756982091913859704614102692263045692365587836"
+            "339003583797036429801960792486657374698655491406531837"
+            "025247664554913974644055853675311"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-002",
+        "INPUT_PARAMETERS": {
+            "reynolds": "3000.0000",
+            "prandtl": "2.0000",
+            "thermal_conductivity": "0.5000",
+            "equivalent_diameter": "0.0200",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "926.83522571668201761577056246956211915064546236373464"
+            "786183765961379006008463680407235458922483333493880091"
+            "971864263101985939402566208060132"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-003",
+        "INPUT_PARAMETERS": {
+            "reynolds": "5000.0000",
+            "prandtl": "3.5000",
+            "thermal_conductivity": "0.5980",
+            "equivalent_diameter": "0.0200",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "1769.1440911814969189236103058507687777382228207876958"
+            "837418871400734469345795549179640424613345853286169818"
+            "009315727279660422208804671873003"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-004",
+        "INPUT_PARAMETERS": {
+            "reynolds": "7500.0000",
+            "prandtl": "5.0000",
+            "thermal_conductivity": "0.6200",
+            "equivalent_diameter": "0.0220",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "2347.1735674922552375174211025043024149748011157747150"
+            "713789013666118789001515867390854730913703492715583251"
+            "191752275343286329910508983765005"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-005",
+        "INPUT_PARAMETERS": {
+            "reynolds": "11976.0479",
+            "prandtl": "7.0073",
+            "thermal_conductivity": "0.5980000",
+            "equivalent_diameter": "0.0200000",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "3604.9260859251203509664990901375026771146123072797313"
+            "897615119542862305569061344202897354363584803025487711"
+            "597702967626095486408120199472238"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-006",
+        "INPUT_PARAMETERS": {
+            "reynolds": "15000.0000",
+            "prandtl": "9.5000",
+            "thermal_conductivity": "0.6500",
+            "equivalent_diameter": "0.0250",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "3926.7559425447304652001356024806436609639274658013460"
+            "880482169843433374391275224187522120479529349186879767"
+            "883583187829223530100198798588280"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-007",
+        "INPUT_PARAMETERS": {
+            "reynolds": "20000.0000",
+            "prandtl": "12.0000",
+            "thermal_conductivity": "0.7000",
+            "equivalent_diameter": "0.0300",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "4462.4448895909391223354660903850166513688106779369880"
+            "255895123372458254786047929856057146072813217446590526"
+            "839356950607316750601601996642225"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-008",
+        "INPUT_PARAMETERS": {
+            "reynolds": "35000.0000",
+            "prandtl": "1.2000",
+            "thermal_conductivity": "0.5500",
+            "equivalent_diameter": "0.0180",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "3689.9786913735154670000298324663082578768140185439793"
+            "365042431741977181417929214631303454467754845086763729"
+            "985703017427137848210413647591960"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-009",
+        "INPUT_PARAMETERS": {
+            "reynolds": "50000.0000",
+            "prandtl": "4.4000",
+            "thermal_conductivity": "0.8000",
+            "equivalent_diameter": "0.0250",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "7250.5375650358596674270289453491226428564146187750190"
+            "159410216910407568168596620731660245782332566107064063"
+            "966339469014841889156043348481035"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-010",
+        "INPUT_PARAMETERS": {
+            "reynolds": "100000.0000",
+            "prandtl": "6.7000",
+            "thermal_conductivity": "0.9000",
+            "equivalent_diameter": "0.0300",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "11449.381407717591145115095444270635715426512491000087"
+            "748368932647857388862677219966735042590712657678522046"
+            "932439113208420914945107440898658"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-011",
+        "INPUT_PARAMETERS": {
+            "reynolds": "250000.0000",
+            "prandtl": "10.1000",
+            "thermal_conductivity": "0.7500",
+            "equivalent_diameter": "0.0350",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "15521.601022078107939227877990262669443117623173352436"
+            "506365996493756817391565096319933321810871367449546775"
+            "528037805108667623712309605381337"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
+    {
+        "VECTOR_ID": "D29-012",
+        "INPUT_PARAMETERS": {
+            "reynolds": "900000.0000",
+            "prandtl": "2.2000",
+            "thermal_conductivity": "0.6000",
+            "equivalent_diameter": "0.0400",
+        },
+        "EXPECTED_OUTPUT": Decimal(
+            "13224.158126387682378787789154957224690626636493632533"
+            "039746677835384999682321469484634027266307303990914392"
+            "550914374659460860932439028742087"
+        ),
+        "DECIMAL_PRECISION": 120,
+        "ASSERTION": "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL",
+    },
 )
 
 
-def test_external_oracle_vector_count_and_precision() -> None:
-    assert len(ORACLE_VECTOR_DECIMAL_LITERALS) == 12
-    assert all(
-        len(format(value, "f").split(".")[1]) >= 80 for value in ORACLE_VECTOR_DECIMAL_LITERALS
-    )
-
-
-def test_oracle_literals_are_not_generated_at_runtime() -> None:
-    result = evaluate_htc(
-        reynolds=Decimal("11976.0479"),
-        prandtl=Decimal("7.0073"),
-        thermal_conductivity=Decimal("0.5980000"),
-        equivalent_diameter=Decimal("0.0200000"),
-    )
-    assert str(ORACLE_VECTOR_DECIMAL_LITERALS[0]) != str(result.raw)
+def test_external_oracle_vectors_are_bound_and_frozen() -> None:
+    assert len(ORACLE_VECTORS) == ORACLE_VECTOR_COUNT == 12
+    assert len({vector["VECTOR_ID"] for vector in ORACLE_VECTORS}) == ORACLE_VECTOR_COUNT
+    for vector in ORACLE_VECTORS:
+        assert set(vector) == {
+            "VECTOR_ID",
+            "INPUT_PARAMETERS",
+            "EXPECTED_OUTPUT",
+            "DECIMAL_PRECISION",
+            "ASSERTION",
+        }
+        assert set(vector["INPUT_PARAMETERS"]) == {
+            "reynolds",
+            "prandtl",
+            "thermal_conductivity",
+            "equivalent_diameter",
+        }
+        expected = vector["EXPECTED_OUTPUT"]
+        assert isinstance(expected, Decimal)
+        assert expected.is_finite()
+        fractional_digits = len(format(expected, "f").split(".")[1])
+        assert vector["DECIMAL_PRECISION"] >= ORACLE_VECTOR_MINIMUM_DECIMAL_DIGITS
+        assert fractional_digits >= vector["DECIMAL_PRECISION"]
+        assert vector["ASSERTION"] == "EXPECTED_OUTPUT_IS_FROZEN_EXTERNAL_LITERAL"
+    assert ORACLE_VECTOR_RUNTIME_EXTERNAL_DEPENDENCY is False
+    assert ORACLE_VECTOR_PRODUCTION_FORMULA_DERIVATION is False

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from hexagent.exchangers.shell_tube.shell_side_heat_transfer import canonical
+from hexagent.exchangers.shell_tube.shell_side_heat_transfer.blocker_registry import make_blocker
+from hexagent.exchangers.shell_tube.shell_side_heat_transfer.warning_registry import make_warning
 
 
 def test_kind_tags_are_frozen() -> None:
@@ -35,3 +39,13 @@ def test_hash_namespaces_are_distinct() -> None:
         canonical.RAW_PROJECTION_HASH_NAMESPACE,
     }
     assert len(values) == 6
+
+
+def test_unknown_blocker_token_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unknown TASK033 blocker token"):
+        make_blocker("SSHT_UNKNOWN_RUNTIME_TOKEN", stage="S01")
+
+
+def test_unknown_warning_token_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unknown TASK033 warning token"):
+        make_warning("SSHT_UNKNOWN_RUNTIME_TOKEN")
