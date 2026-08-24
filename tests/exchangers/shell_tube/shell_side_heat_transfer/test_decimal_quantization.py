@@ -10,7 +10,7 @@ from hexagent.exchangers.shell_tube.shell_side_heat_transfer.decimal_quantizatio
     normalize_negative_zero,
     quantize_public_htc,
 )
-from tests.exchangers.shell_tube.shell_side_heat_transfer.test_models import valid_result
+from tests.exchangers.shell_tube.shell_side_heat_transfer.test_task033_models import valid_result
 
 
 def test_public_quantization_and_negative_zero() -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from hexagent.exchangers.shell_tube.shell_side_heat_transfer import validate_request
 from hexagent.exchangers.shell_tube.shell_side_heat_transfer.canonical import canonical_bytes
-from tests.exchangers.shell_tube.shell_side_heat_transfer.test_models import copy_request
+from tests.exchangers.shell_tube.shell_side_heat_transfer.test_task033_models import copy_request
 
 SHARED_FROZEN_EXPECTED_CANONICAL_VECTOR_BYTES_V1 = (
     b'["task033.xpy-probe.v1",["T033-030","3604.9261",["PY311","PY312"],'

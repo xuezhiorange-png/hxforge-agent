@@ -11,7 +11,7 @@ from hexagent.exchangers.shell_tube.shell_side_heat_transfer.formulas import (
     FormulaCalculationError,
     evaluate_htc,
 )
-from tests.exchangers.shell_tube.shell_side_heat_transfer.test_models import (
+from tests.exchangers.shell_tube.shell_side_heat_transfer.test_task033_models import (
     copy_request,
     valid_result,
 )

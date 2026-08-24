@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from hexagent.exchangers.shell_tube.shell_side_heat_transfer import validate_request
-from tests.exchangers.shell_tube.shell_side_heat_transfer.test_models import copy_request
+from tests.exchangers.shell_tube.shell_side_heat_transfer.test_task033_models import copy_request
 
 
 def test_success_has_no_blockers_or_partial_htc() -> None:
